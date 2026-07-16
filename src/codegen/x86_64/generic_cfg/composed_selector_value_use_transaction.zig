@@ -39,6 +39,10 @@ pub const ValueUseTransaction = struct {
     lifecycle: Lifecycle = .active,
     write_nodes: [physical_node_count]bool = [_]bool{false} ** physical_node_count,
     early_plans: [max_requests]EarlyPlan = [_]EarlyPlan{.{}} ** max_requests,
+    semantic_order_edges: [max_requests][max_requests]bool =
+        [_][max_requests]bool{[_]bool{false} ** max_requests} ** max_requests,
+    ordered_operands: [max_requests]OrderedOperand = undefined,
+    ordered_operand_count: u8 = 0,
     early_homes: [max_requests]EarlyPreparedHome = undefined,
     early_home_valid: [max_requests]bool = [_]bool{false} ** max_requests,
     prepared_views: [max_requests]PreparedRecord = undefined,
@@ -305,6 +309,23 @@ pub const ValueUseTransaction = struct {
         destination: ?ArgReg = null,
     };
 
+    const OperandPhase = enum {
+        no_op,
+        safe_early,
+        ordinary,
+    };
+
+    const OrderedOperand = struct {
+        request_index: u8,
+        role: SemanticRole,
+        phase: OperandPhase,
+    };
+
+    const SemanticRole = enum(u8) {
+        primary,
+        secondary,
+    };
+
     const EarlyPreparedHome = struct {
         loc: ValueLoc,
         source_vreg: VirtualReg,
@@ -556,6 +577,10 @@ pub const ValueUseTransaction = struct {
     pub fn seal(transaction: *ValueUseTransaction) !void {
         try transaction.requireActive();
         if (transaction.request_phase != .registering) return error.ValueUsePlanAlreadySealed;
+        errdefer transaction.resetSemanticOrderPlan();
+        // Validate the action-owned role graph before destination planning can
+        // obscure a semantic ownership contradiction with a physical conflict.
+        try transaction.validateSemanticOrderTopology();
         var destinations = [_]bool{false} ** physical_node_count;
         var graph = [_][physical_node_count]bool{[_]bool{false} ** physical_node_count} ** physical_node_count;
         var writes = [_]bool{false} ** physical_node_count;
@@ -721,6 +746,7 @@ pub const ValueUseTransaction = struct {
         transaction.request_phase = .registering;
         transaction.write_nodes = [_]bool{false} ** physical_node_count;
         transaction.early_plans = [_]EarlyPlan{.{}} ** max_requests;
+        transaction.resetSemanticOrderPlan();
         transaction.early_home_valid = [_]bool{false} ** max_requests;
         transaction.prepared_view_valid = [_]bool{false} ** max_requests;
         transaction.view_generation +%= 1;
@@ -848,6 +874,50 @@ pub const ValueUseTransaction = struct {
         }
     }
 
+    fn validateSemanticOrderTopology(transaction: *ValueUseTransaction) !void {
+        var owners = [_]?u8{null} ** max_requests;
+        var edges = [_][max_requests]bool{[_]bool{false} ** max_requests} ** max_requests;
+        for (transaction.requests[0..transaction.request_count], 0..) |*request, index_usize| {
+            const action = request.prepared_action orelse continue;
+            const index: u8 = @intCast(index_usize);
+            if (owners[index]) |owner| {
+                if (owner != index) return error.ValueUseEarlyOrderingConflict;
+            }
+            owners[index] = index;
+            const secondary = try transaction.actionSecondaryOperand(action) orelse continue;
+            if (secondary == index) return error.ValueUseEarlyOrderingCycle;
+            if (owners[secondary]) |owner| {
+                if (owner != index) return error.ValueUseEarlyOrderingConflict;
+            }
+            owners[secondary] = index;
+            edges[index][secondary] = true;
+        }
+        try rejectSemanticOrderCycles(edges, transaction.request_count);
+    }
+
+    fn actionSecondaryOperand(
+        transaction: *ValueUseTransaction,
+        action: PreparedAction,
+    ) !?u8 {
+        return switch (action) {
+            .form_byte_address => |address| switch (address.offset) {
+                .constant => null,
+                .request => |handle| try transaction.validateRegisteredOperandHandle(handle),
+            },
+            .form_scaled_address => |address| switch (address.index) {
+                .constant => null,
+                .request => |handle| try transaction.validateRegisteredOperandHandle(handle),
+            },
+            .validate_shape, .emit_copy_to, .form_readonly_table_address => null,
+        };
+    }
+
+    fn resetSemanticOrderPlan(transaction: *ValueUseTransaction) void {
+        transaction.semantic_order_edges =
+            [_][max_requests]bool{[_]bool{false} ** max_requests} ** max_requests;
+        transaction.ordered_operand_count = 0;
+    }
+
     fn planEarlyMaterializations(transaction: *ValueUseTransaction, mappings: []const Mapping) !void {
         var source_counts = [_]u8{0} ** max_requests;
         var source_nodes = [_]bool{false} ** physical_node_count;
@@ -863,27 +933,192 @@ pub const ValueUseTransaction = struct {
             }
         }
 
-        for (mappings) |mapping| {
-            const index = mapping.source_request_index orelse continue;
-            if (source_counts[index] != 1) continue;
-            const destination = argRegForNode(mapping.destination) orelse continue;
-            if (mapping.source == mapping.destination) continue;
-            if (source_nodes[@intFromEnum(mapping.destination)]) continue;
-            if (!selector_state.scratchRegIsProvenFree(transaction.selector, destination)) continue;
-            if (transaction.early_plans[index].destination != null) continue;
+        var owners = [_]?u8{null} ** max_requests;
+        var roots: [max_requests]u8 = undefined;
+        var root_count: u8 = 0;
+        transaction.resetSemanticOrderPlan();
 
-            const request = &transaction.requests[index];
-            const current = switch (request.source) {
-                .named => try transaction.validateRequest(request) orelse continue,
-                .null_value, .unsupported => continue,
-            };
-            if (!earlySequencingCandidate(current, request.form)) continue;
-            transaction.early_plans[index].destination = destination;
+        // Actions own their semantic operands. A secondary request cannot be
+        // silently shared by two instruction authorities.
+        for (transaction.requests[0..transaction.request_count], 0..) |*request, index_usize| {
+            const action = request.prepared_action orelse continue;
+            const index: u8 = @intCast(index_usize);
+            owners[index] = index;
+            roots[root_count] = index;
+            root_count += 1;
+            if (try transaction.actionSecondaryOperand(action)) |secondary| {
+                if (owners[secondary]) |owner| {
+                    if (owner != index) return error.ValueUseEarlyOrderingConflict;
+                }
+                owners[secondary] = index;
+                transaction.semantic_order_edges[index][secondary] = true;
+            }
+        }
+        for (transaction.requests[0..transaction.request_count], 0..) |_, index_usize| {
+            const index: u8 = @intCast(index_usize);
+            if (owners[index] != null) continue;
+            owners[index] = index;
+            roots[root_count] = index;
+            root_count += 1;
+        }
+        try rejectSemanticOrderCycles(transaction.semantic_order_edges, transaction.request_count);
+        try transaction.sortSemanticRoots(roots[0..root_count], mappings);
+
+        for (roots[0..root_count]) |root| {
+            var prefix_open = true;
+            try transaction.appendOrderedOperand(
+                root,
+                .primary,
+                &prefix_open,
+                mappings,
+                source_counts,
+                source_nodes,
+            );
+            if (transaction.requests[root].prepared_action) |action| {
+                if (try transaction.actionSecondaryOperand(action)) |secondary| try transaction.appendOrderedOperand(
+                    secondary,
+                    .secondary,
+                    &prefix_open,
+                    mappings,
+                    source_counts,
+                    source_nodes,
+                );
+            }
         }
     }
 
+    fn appendOrderedOperand(
+        transaction: *ValueUseTransaction,
+        request_index: u8,
+        role: SemanticRole,
+        prefix_open: *bool,
+        mappings: []const Mapping,
+        source_counts: [max_requests]u8,
+        source_nodes: [physical_node_count]bool,
+    ) !void {
+        if (transaction.ordered_operand_count == max_requests)
+            return error.ValueUseMappingCapacityExceeded;
+        var operand_phase: OperandPhase = .no_op;
+        var destination: ?ArgReg = null;
+        var matching_mapping: ?Mapping = null;
+        var matching_count: u8 = 0;
+        for (mappings) |mapping| {
+            if (mapping.source_request_index != request_index) continue;
+            matching_count += 1;
+            matching_mapping = mapping;
+        }
+        if (matching_count == 0 and
+            transaction.requests[request_index].destination != .prepared_source and
+            transaction.requests[request_index].destination != .prepared_view)
+        {
+            operand_phase = .ordinary;
+        } else if (matching_count > 1) {
+            operand_phase = .ordinary;
+        } else if (matching_mapping) |mapping| {
+            if (mapping.source == mapping.destination) {
+                operand_phase = .no_op;
+            } else if (source_counts[request_index] == 1 and
+                !source_nodes[@intFromEnum(mapping.destination)] and
+                argRegForNode(mapping.destination) != null and
+                selector_state.scratchRegIsProvenFree(
+                    transaction.selector,
+                    argRegForNode(mapping.destination).?,
+                ))
+            {
+                const request = &transaction.requests[request_index];
+                const current = switch (request.source) {
+                    .named => try transaction.validateRequest(request) orelse null,
+                    .null_value, .unsupported => null,
+                };
+                if (current != null and earlySequencingCandidate(current.?, request.form)) {
+                    operand_phase = .safe_early;
+                    destination = argRegForNode(mapping.destination).?;
+                } else {
+                    operand_phase = .ordinary;
+                }
+            } else {
+                operand_phase = .ordinary;
+            }
+        }
+        if (operand_phase == .ordinary) prefix_open.* = false;
+        if (operand_phase == .safe_early and !prefix_open.*) {
+            operand_phase = .ordinary;
+            destination = null;
+        }
+        if (operand_phase == .safe_early)
+            transaction.early_plans[request_index].destination = destination;
+        transaction.ordered_operands[transaction.ordered_operand_count] = .{
+            .request_index = request_index,
+            .role = role,
+            .phase = operand_phase,
+        };
+        transaction.ordered_operand_count += 1;
+    }
+
+    fn sortSemanticRoots(
+        transaction: *ValueUseTransaction,
+        roots: []u8,
+        mappings: []const Mapping,
+    ) !void {
+        if (roots.len < 2) return;
+        for (1..roots.len) |index| {
+            const current = roots[index];
+            var insertion = index;
+            while (insertion > 0 and transaction.semanticRootLessThan(current, roots[insertion - 1], mappings)) {
+                roots[insertion] = roots[insertion - 1];
+                insertion -= 1;
+            }
+            roots[insertion] = current;
+        }
+        for (roots[1..], roots[0 .. roots.len - 1]) |current, previous| {
+            if (!transaction.semanticRootLessThan(previous, current, mappings) and
+                !transaction.semanticRootLessThan(current, previous, mappings))
+            {
+                return error.ValueUseEarlyOrderingConflict;
+            }
+        }
+    }
+
+    /// Fixed structural ordering for independent authorities. It is derived
+    /// from physical destinations and stable semantic source identities, never
+    /// function names or request-registration order.
+    fn semanticRootLessThan(
+        transaction: *ValueUseTransaction,
+        lhs: u8,
+        rhs: u8,
+        mappings: []const Mapping,
+    ) bool {
+        const lhs_node = transaction.firstStructuralDestination(lhs, mappings);
+        const rhs_node = transaction.firstStructuralDestination(rhs, mappings);
+        if (@intFromEnum(lhs_node) != @intFromEnum(rhs_node))
+            return @intFromEnum(lhs_node) < @intFromEnum(rhs_node);
+        const lhs_source = &transaction.requests[lhs].source;
+        const rhs_source = &transaction.requests[rhs].source;
+        return sourceStructuralOrder(lhs_source, rhs_source) == .lt;
+    }
+
+    fn firstStructuralDestination(
+        transaction: *ValueUseTransaction,
+        request_index: u8,
+        mappings: []const Mapping,
+    ) PhysicalNode {
+        if (firstMappingDestination(request_index, mappings)) |node| return node;
+        return switch (transaction.requests[request_index].destination) {
+            .gpr32, .gpr64 => |reg| nodeForArgReg(reg),
+            .eax, .rax => .accumulator,
+            .pair => |pair| @enumFromInt(@min(
+                @intFromEnum(nodeForArgReg(pair.lo)),
+                @intFromEnum(nodeForArgReg(pair.hi)),
+            )),
+            .prepared_source, .prepared_view, .stack_argument, .new_pair => .accumulator,
+        };
+    }
+
     fn materializeEarlyPlans(transaction: *ValueUseTransaction) !void {
-        for (transaction.early_plans[0..transaction.request_count], 0..) |plan, index| {
+        for (transaction.ordered_operands[0..transaction.ordered_operand_count]) |ordered| {
+            if (ordered.phase != .safe_early) continue;
+            const index = ordered.request_index;
+            const plan = transaction.early_plans[index];
             const destination_reg = plan.destination orelse continue;
             if (!selector_state.scratchRegIsProvenFree(transaction.selector, destination_reg))
                 return error.ValueUseEarlyDestinationNoLongerFree;
@@ -2000,6 +2235,55 @@ fn visitCopyNode(
 }
 
 const CopyVisitState = enum { unseen, visiting, complete };
+
+fn rejectSemanticOrderCycles(
+    graph: [ValueUseTransaction.max_requests][ValueUseTransaction.max_requests]bool,
+    request_count: u8,
+) !void {
+    var states = [_]CopyVisitState{.unseen} ** ValueUseTransaction.max_requests;
+    for (0..request_count) |node| try visitSemanticOrderNode(graph, node, request_count, &states);
+}
+
+fn visitSemanticOrderNode(
+    graph: [ValueUseTransaction.max_requests][ValueUseTransaction.max_requests]bool,
+    node: usize,
+    request_count: u8,
+    states: *[ValueUseTransaction.max_requests]CopyVisitState,
+) !void {
+    switch (states[node]) {
+        .complete => return,
+        .visiting => return error.ValueUseEarlyOrderingCycle,
+        .unseen => states[node] = .visiting,
+    }
+    for (graph[node][0..request_count], 0..) |edge, destination| {
+        if (edge) try visitSemanticOrderNode(graph, destination, request_count, states);
+    }
+    states[node] = .complete;
+}
+
+fn firstMappingDestination(request_index: u8, mappings: []const Mapping) ?ValueUseTransaction.PhysicalNode {
+    var result: ?ValueUseTransaction.PhysicalNode = null;
+    for (mappings) |mapping| {
+        if (mapping.source_request_index != request_index) continue;
+        if (result == null or @intFromEnum(mapping.destination) < @intFromEnum(result.?))
+            result = mapping.destination;
+    }
+    return result;
+}
+
+fn sourceStructuralOrder(
+    lhs: *const ValueUseTransaction.Source,
+    rhs: *const ValueUseTransaction.Source,
+) std.math.Order {
+    const lhs_tag = std.meta.activeTag(lhs.*);
+    const rhs_tag = std.meta.activeTag(rhs.*);
+    if (@intFromEnum(lhs_tag) < @intFromEnum(rhs_tag)) return .lt;
+    if (@intFromEnum(lhs_tag) > @intFromEnum(rhs_tag)) return .gt;
+    return switch (lhs.*) {
+        .named => |*name| std.mem.order(u8, name.slice(), rhs.named.slice()),
+        .null_value, .unsupported => .eq,
+    };
+}
 
 fn clobberPhysicalNode(selector: *ComposedBlockSelector, node: ValueUseTransaction.PhysicalNode) !void {
     if (argRegForNode(node)) |reg| {

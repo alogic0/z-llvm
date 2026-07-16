@@ -351,6 +351,14 @@ fn readFrozenBypassInventory(allocator: std.mem.Allocator) ![:0]u8 {
 
 fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     try validateNoFunctionFamilyPredicate(source, error.ValueUseFunctionPredicateForbidden);
+    if (std.mem.indexOf(u8, source, "pub const SemanticRole") != null or
+        std.mem.indexOf(u8, source, "pub const OperandPhase") != null or
+        std.mem.indexOf(u8, source, "pub const OrderedOperand") != null or
+        std.mem.indexOf(u8, source, "semantic_priority") != null or
+        std.mem.indexOf(u8, source, "ordering_priority") != null)
+    {
+        return error.ValueUseConsumerOrderingForbidden;
+    }
     if (std.mem.indexOf(u8, source, "pub const PreparedView =") != null or
         std.mem.indexOf(u8, source, "pub fn readPreparedView") != null or
         std.mem.indexOf(u8, source, "pub fn invalidatePreparedViews") != null or
@@ -1331,6 +1339,14 @@ test "composed selector source guard rejects function predicates in the value-us
     try std.testing.expectError(
         error.ValueUsePreparedLocationEscape,
         validateValueUseAuthoritySource(accepted ++ "pub fn leak(view: *const PreparedView) void { _ = view; }"),
+    );
+    try std.testing.expectError(
+        error.ValueUseConsumerOrderingForbidden,
+        validateValueUseAuthoritySource(accepted ++ "pub const SemanticRole = enum { primary, secondary };"),
+    );
+    try std.testing.expectError(
+        error.ValueUseConsumerOrderingForbidden,
+        validateValueUseAuthoritySource(accepted ++ "const Request = struct { ordering_priority: u8 };"),
     );
 }
 

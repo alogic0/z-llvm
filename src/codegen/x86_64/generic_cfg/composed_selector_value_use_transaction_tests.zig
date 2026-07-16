@@ -809,6 +809,286 @@ test "value-use early sequencing rollback covers early and preservation failure 
     try selector.eflags.validateSnapshot(saved_eflags);
 }
 
+test "value-use semantic-role planner orders base before secondary for byte and scaled addresses" {
+    {
+        var machine = MachineFunction.init("value-use-byte-role-order", .ptr);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "base", "offset", "result" }) |name| try addLive(&plan, name);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "base", .{ .spill64 = .slot5 });
+        try selector_state.bindValueLoc(&selector, "offset", .{ .spill64 = .slot4 });
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        // Registration is deliberately secondary-first. Semantic action roles
+        // must still produce base(r8), then offset(rcx).
+        const offset = try transaction.register(preparedSourceRequest("offset", .{ .int = 64 }, .gpr64, .gpr64));
+        _ = try transaction.register(preparedRequest(
+            "base",
+            .ptr,
+            .gpr64,
+            .pointer,
+            .{ .form_byte_address = .{
+                .result = try actionIdentity("result"),
+                .offset = .{ .request = offset },
+            } },
+        ));
+        try transaction.seal();
+        try transaction.prepare();
+        try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+        try std.testing.expectEqual(machine_module.Instruction{
+            .reload_arg64_rsp = .{ .reg = .r8, .frame_index = .slot5 },
+        }, machine.instructions.items[0]);
+        try std.testing.expectEqual(machine_module.Instruction{
+            .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot4 },
+        }, machine.instructions.items[1]);
+        try transaction.rollback();
+    }
+
+    {
+        var machine = MachineFunction.init("value-use-scaled-role-order", .ptr);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "base", "index", "result" }) |name| try addLive(&plan, name);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "base", .{ .spill64 = .slot5 });
+        try selector_state.bindValueLoc(&selector, "index", .{ .spill64 = .slot4 });
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const index = try transaction.register(preparedSourceRequest("index", .{ .int = 64 }, .gpr64, .gpr64));
+        _ = try transaction.register(preparedRequest(
+            "base",
+            .ptr,
+            .gpr64,
+            .pointer,
+            .{ .form_scaled_address = .{
+                .result = try actionIdentity("result"),
+                .index = .{ .request = index },
+                .scale = 4,
+            } },
+        ));
+        try transaction.seal();
+        try transaction.prepare();
+        try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+        // Reversed physical destinations do not reverse semantic roles:
+        // scaled base(rcx) still precedes index(r8).
+        try std.testing.expectEqual(machine_module.Instruction{
+            .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot5 },
+        }, machine.instructions.items[0]);
+        try std.testing.expectEqual(machine_module.Instruction{
+            .reload_arg64_rsp = .{ .reg = .r8, .frame_index = .slot4 },
+        }, machine.instructions.items[1]);
+        try transaction.rollback();
+    }
+}
+
+test "value-use semantic-role early scheduling is prefix closed" {
+    {
+        var machine = MachineFunction.init("value-use-noop-then-early", .ptr);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "array", "index", "result" }) |name| try addLive(&plan, name);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "array", .{ .stack_i32_array = .{ .base_disp = 48, .len = 8 } });
+        try selector_state.bindValueLoc(&selector, "index", .{ .spill64 = .slot4 });
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const index = try transaction.register(preparedSourceRequest("index", .{ .int = 64 }, .gpr64, .gpr64));
+        _ = try transaction.register(preparedRequest(
+            "array",
+            .ptr,
+            .stack_object,
+            .stack_object_address,
+            .{ .form_scaled_address = .{
+                .result = try actionIdentity("result"),
+                .index = .{ .request = index },
+                .scale = 4,
+                .expected_stack_array_len = 8,
+            } },
+        ));
+        try transaction.seal();
+        try transaction.prepare();
+        try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+        try std.testing.expectEqual(machine_module.Instruction{
+            .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot4 },
+        }, machine.instructions.items[0]);
+        try transaction.rollback();
+    }
+
+    {
+        var machine = MachineFunction.init("value-use-ordinary-blocks-later-early", .ptr);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "base", "offset", "result" }) |name| try addLive(&plan, name);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "base", .{ .arg64 = .rdi });
+        try selector_state.bindValueLoc(&selector, "offset", .{ .spill64 = .slot4 });
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const offset = try transaction.register(preparedSourceRequest("offset", .{ .int = 64 }, .gpr64, .gpr64));
+        const action = try transaction.register(preparedRequest(
+            "base",
+            .ptr,
+            .gpr64,
+            .pointer,
+            .{ .form_byte_address = .{
+                .result = try actionIdentity("result"),
+                .offset = .{ .request = offset },
+            } },
+        ));
+        try transaction.seal();
+        try transaction.prepare();
+        // The otherwise-eligible spill-backed secondary cannot jump ahead of
+        // its ordinary in-register primary.
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(action));
+        try std.testing.expectEqual(machine_module.Instruction{ .mov_arg64_arg = .{ .src = .rdi, .dst = .r8 } }, machine.instructions.items[0]);
+        try std.testing.expectEqual(machine_module.Instruction{
+            .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot4 },
+        }, machine.instructions.items[1]);
+        try transaction.rollback();
+    }
+}
+
+test "value-use semantic ordering rejects shared role ownership before mutation" {
+    var machine = MachineFunction.init("value-use-role-conflict", .ptr);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "first", "second", "offset" }) |name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "first", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "second", .{ .arg64 = .rsi });
+    try selector_state.bindValueLoc(&selector, "offset", .{ .spill64 = .slot4 });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const offset = try transaction.register(preparedSourceRequest("offset", .{ .int = 64 }, .gpr64, .gpr64));
+    inline for (&.{ "first", "second" }) |name| _ = try transaction.register(preparedRequest(
+        name,
+        .ptr,
+        .gpr64,
+        .pointer,
+        .{ .form_byte_address = .{
+            .result = try actionIdentity(name ++ "-result"),
+            .offset = .{ .request = offset },
+        } },
+    ));
+    try std.testing.expectError(error.ValueUseEarlyOrderingConflict, transaction.seal());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use semantic-order rollback restores after first and second early copies" {
+    {
+        var machine = MachineFunction.init("value-use-role-rollback-first", .ptr);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "base", "index", "result" }) |name| try addLive(&plan, name);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "base", .{ .spill64 = .slot5 });
+        try selector_state.bindValueLoc(&selector, "index", .{ .spill64 = .slot4 });
+        try selector.eflags.apply(.definition);
+        const saved_eflags = selector.eflags.snapshot();
+        const base_binding = selector.values.get("base").?;
+        const index_binding = selector.values.get("index").?;
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const index = try transaction.register(preparedSourceRequest("index", .{ .int = 64 }, .gpr64, .gpr64));
+        _ = try transaction.register(preparedRequest(
+            "base",
+            .ptr,
+            .gpr64,
+            .pointer,
+            .{ .form_scaled_address = .{
+                .result = try actionIdentity("result"),
+                .index = .{ .request = index },
+                .scale = 4,
+            } },
+        ));
+        try transaction.seal();
+        selector.values.getPtr("index").?.loc = .{ .xmm = .{ .reg = .xmm0, .bits = 64 } };
+        try std.testing.expectError(error.ValueUseXmmUnsupported, transaction.prepare());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(base_binding, selector.values.get("base").?);
+        try std.testing.expectEqual(index_binding, selector.values.get("index").?);
+        try selector.eflags.validateSnapshot(saved_eflags);
+        try std.testing.expectEqual(@as(usize, 0), transaction.requestCount());
+    }
+
+    {
+        var machine = MachineFunction.init("value-use-role-rollback-second", .ptr);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "base", "index", "writer", "live-rdx", "result" }) |name| try addLive(&plan, name);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        try selector_state.bindValueLoc(&selector, "base", .{ .spill64 = .slot5 });
+        try selector_state.bindValueLoc(&selector, "index", .{ .spill64 = .slot4 });
+        try selector_state.bindValueLoc(&selector, "writer", .{ .arg64 = .rsi });
+        try selector_state.bindValueLoc(&selector, "live-rdx", .{ .arg64 = .rdx });
+        try selector.eflags.apply(.definition);
+        const saved_eflags = selector.eflags.snapshot();
+        const saved_next_vreg = selector.next_virtual_reg;
+        const saved_domain = selector.address_dependencies;
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const index = try transaction.register(preparedSourceRequest("index", .{ .int = 64 }, .gpr64, .gpr64));
+        _ = try transaction.register(preparedRequest(
+            "base",
+            .ptr,
+            .gpr64,
+            .pointer,
+            .{ .form_scaled_address = .{
+                .result = try actionIdentity("result"),
+                .index = .{ .request = index },
+                .scale = 4,
+            } },
+        ));
+        _ = try transaction.register(request("writer", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rdx }));
+        try transaction.seal();
+        // Both ordered early reloads succeed; preserving the live rdx then
+        // fails because this fixture intentionally has no stack frame.
+        try std.testing.expectError(error.UnsupportedCodegenValue, transaction.prepare());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+        try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+        try std.testing.expect(selector.address_dependencies.eql(&saved_domain));
+        try selector.eflags.validateSnapshot(saved_eflags);
+        try std.testing.expectEqual(@as(usize, 0), transaction.requestCount());
+    }
+}
+
 test "value-use prepared capabilities reject source relocation before production-path emission" {
     var machine = MachineFunction.init("value-use-view-phases", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
