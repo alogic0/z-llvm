@@ -333,6 +333,7 @@ fn validateProductionSource(name: []const u8, source: [:0]const u8) !void {
             try validateArchitecturalExclusionAllowlist(name, source);
             try validateAccumulatorDisplacementPolicies(source);
             try validateEflagsEmissionAuthority(name, source);
+            try validatePreparedViewLeafDiscipline(source);
         },
     }
 }
@@ -351,9 +352,7 @@ fn readFrozenBypassInventory(allocator: std.mem.Allocator) ![:0]u8 {
 fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     try validateNoFunctionFamilyPredicate(source, error.ValueUseFunctionPredicateForbidden);
     const required = [_]struct { function: []const u8, pattern: []const u8, count: usize }{
-        .{ .function = "prepare", .pattern = "resolveValue(", .count = 1 },
-        .{ .function = "validateRequest", .pattern = "resolveValue(", .count = 1 },
-        .{ .function = "materializeRequest", .pattern = "resolveValue(", .count = 1 },
+        .{ .function = "resolveNamedCurrent", .pattern = "resolveValue(", .count = 1 },
     };
     var body_storage: [max_function_bodies]FunctionBody = undefined;
     const bodies = try collectFunctionBodies(source, &body_storage);
@@ -362,7 +361,33 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
         if (countPattern(source[body.start..body.end], entry.pattern) != entry.count)
             return error.ValueUseResolutionAuthorityMismatch;
     }
-    if (countPattern(source, "resolveValue(") != 3) return error.ValueUseResolutionAuthorityMismatch;
+    if (countPattern(source, "resolveValue(") != 1) return error.ValueUseResolutionAuthorityMismatch;
+}
+
+fn validatePreparedViewLeafDiscipline(source: [:0]const u8) !void {
+    const forbidden = [_][]const u8{
+        "bindValueLoc(",
+        "bindEax(",
+        "bindRax(",
+        "bindAccumulator(",
+        "clobberAccumulator(",
+        "spillValue(",
+    };
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    for (bodies) |body| {
+        const function_source = source[body.start..body.end];
+        if (std.mem.indexOf(u8, function_source, ".preparedView(") == null and
+            std.mem.indexOf(u8, function_source, ".readPreparedView(") == null) continue;
+        for (bypass_operations) |operation| {
+            if (std.mem.indexOf(u8, function_source, operation) != null)
+                return error.ValueUsePreparedLeafRawOperation;
+        }
+        for (forbidden) |pattern| {
+            if (std.mem.indexOf(u8, function_source, pattern) != null)
+                return error.ValueUsePreparedLeafRawOperation;
+        }
+    }
 }
 
 fn validateNoFunctionFamilyPredicate(source: [:0]const u8, forbidden_error: anyerror) !void {
@@ -1247,13 +1272,29 @@ test "composed selector source guard rejects frozen bypass inventory growth" {
 
 test "composed selector source guard rejects function predicates in the value-use authority" {
     const accepted =
-        "fn prepare() void { _ = resolveValue(undefined, undefined); }" ++
-        "fn validateRequest() void { _ = resolveValue(undefined, undefined); }" ++
-        "fn materializeRequest() void { _ = resolveValue(undefined, undefined); }";
+        "fn resolveNamedCurrent() void { _ = resolveValue(undefined, undefined); }";
     try validateValueUseAuthoritySource(accepted);
     try std.testing.expectError(
         error.ValueUseFunctionPredicateForbidden,
         validateValueUseAuthoritySource(accepted ++ "fn bad(function_family: []const u8) void { _ = function_family; }"),
+    );
+}
+
+test "composed selector source guard rejects raw resolution or materialization after prepared-view exposure" {
+    try validatePreparedViewLeafDiscipline(
+        "fn lower() void { const lease = try transaction.preparedView(handle); _ = try transaction.readPreparedView(lease); try emit(view); }",
+    );
+    try std.testing.expectError(
+        error.ValueUsePreparedLeafRawOperation,
+        validatePreparedViewLeafDiscipline(
+            "fn lower() void { const lease = try transaction.preparedView(handle); _ = try transaction.readPreparedView(lease); _ = selector_state.resolveValue(selector, source); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUsePreparedLeafRawOperation,
+        validatePreparedViewLeafDiscipline(
+            "fn lower() void { _ = try transaction.preparedView(handle); try selector_state.materializeLocIntoLoc(selector, source, destination); }",
+        ),
     );
 }
 

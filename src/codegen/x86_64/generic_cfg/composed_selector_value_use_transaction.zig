@@ -8,6 +8,7 @@ const selector_state = @import("composed_selector_state.zig");
 const stage2_planning = @import("stage2_planning.zig");
 const address_dependencies = @import("composed_selector_address_dependencies.zig");
 const eflags = @import("composed_selector_eflags.zig");
+const constant_table = @import("../constant_table.zig");
 
 const ArgReg = x86_64_types.ArgReg;
 const FrameIndex = x86_64_types.FrameIndex;
@@ -35,6 +36,9 @@ pub const ValueUseTransaction = struct {
     request_phase: RequestPhase = .registering,
     lifecycle: Lifecycle = .active,
     write_nodes: [physical_node_count]bool = [_]bool{false} ** physical_node_count,
+    prepared_views: [max_requests]PreparedView = undefined,
+    prepared_view_valid: [max_requests]bool = [_]bool{false} ** max_requests,
+    view_generation: u32 = 1,
 
     pub const Expected = struct {
         ty: ir.Type,
@@ -65,6 +69,7 @@ pub const ValueUseTransaction = struct {
         eax,
         rax,
         pair: RegPair,
+        prepared_view,
         stack_argument: u32,
         new_pair,
 
@@ -75,9 +80,100 @@ pub const ValueUseTransaction = struct {
                 .gpr64 => |reg| reg == other.gpr64,
                 .pair => |pair| pair.eql(other.pair),
                 .stack_argument => |slot| slot == other.stack_argument,
-                .eax, .rax, .new_pair => true,
+                .eax, .rax, .prepared_view, .new_pair => true,
             };
         }
+    };
+
+    /// Opaque transaction-local identity. It contains no resolved location and
+    /// is invalid outside the authority that returned it.
+    pub const RequestHandle = struct {
+        authority: usize,
+        index: u8,
+        generation: u32,
+    };
+
+    /// Phase-bound capability for reading one prepared view. The view is
+    /// re-resolved and revalidated when the lease is read.
+    pub const PreparedViewLease = struct {
+        request: RequestHandle,
+        view_generation: u32,
+    };
+
+    pub const PreparedIdentity = struct {
+        bytes: [max_identity_bytes]u8 = undefined,
+        len: u8 = 0,
+
+        fn init(name: []const u8) !PreparedIdentity {
+            if (name.len == 0) return error.ValueUseEmptyIdentity;
+            if (name.len > max_identity_bytes) return error.ValueUseIdentityTooLong;
+            var identity: PreparedIdentity = .{};
+            @memcpy(identity.bytes[0..name.len], name);
+            identity.len = @intCast(name.len);
+            return identity;
+        }
+
+        pub fn slice(identity: *const PreparedIdentity) []const u8 {
+            return identity.bytes[0..identity.len];
+        }
+    };
+
+    pub const PreparedRegister = union(enum) {
+        gpr32: ArgReg,
+        gpr64: ArgReg,
+        eax,
+        rax,
+    };
+
+    pub const PreparedScalarHome = union(enum) {
+        register: PreparedRegister,
+        spill: FrameIndex,
+    };
+
+    pub const PreparedStackObject = union(enum) {
+        scalar: selector_types.StackScalarLoc,
+        integer128: u32,
+        integer32_array: selector_types.StackArrayLoc,
+    };
+
+    pub const PreparedAddressComponent = struct {
+        identity: PreparedIdentity,
+        role: AddressDependencyDomain.Role,
+        home: PreparedScalarHome,
+    };
+
+    pub const PreparedAddressDescriptor = struct {
+        disp: u32,
+        index: ?PreparedAddressComponent = null,
+        addend: ?PreparedAddressComponent = null,
+    };
+
+    pub const PreparedTablePointer = struct {
+        storage: union(enum) { register: ArgReg, spill: FrameIndex },
+        symbol: PreparedIdentity,
+        shape: constant_table.Shape,
+        offset: u8,
+    };
+
+    pub const PreparedPairLimb = union(enum) {
+        register: ArgReg,
+        spill: FrameIndex,
+    };
+
+    pub const PreparedReadOnlyPair = struct {
+        first: PreparedPairLimb,
+        second: PreparedPairLimb,
+    };
+
+    /// Restricted source-derived representation. No raw ValueLoc, binding, or
+    /// borrowed identity escapes the instruction-level authority.
+    pub const PreparedView = union(enum) {
+        register: struct { register: PreparedRegister, bits: u16 },
+        spill: struct { frame_index: FrameIndex, bits: u16 },
+        stack_object: PreparedStackObject,
+        address_descriptor: PreparedAddressDescriptor,
+        table_pointer: PreparedTablePointer,
+        read_only_pair: PreparedReadOnlyPair,
     };
 
     pub const Request = struct {
@@ -93,6 +189,8 @@ pub const ValueUseTransaction = struct {
         prepared,
         materializing,
         materialized,
+        views_exposed,
+        views_invalidated,
         committed,
     };
 
@@ -181,6 +279,7 @@ pub const ValueUseTransaction = struct {
         next_virtual_reg: usize,
         next_spill_slot: usize,
         edge_label_count: usize,
+        owned_labels_len: usize,
         stack_slot_allocated: bool,
         stack_array_allocated: bool,
         stack_array_count: usize,
@@ -215,6 +314,7 @@ pub const ValueUseTransaction = struct {
                 .next_virtual_reg = selector.next_virtual_reg,
                 .next_spill_slot = selector.next_spill_slot,
                 .edge_label_count = selector.edge_label_count,
+                .owned_labels_len = selector.machine.owned_labels.items.len,
                 .stack_slot_allocated = selector.stack_slot_allocated,
                 .stack_array_allocated = selector.stack_array_allocated,
                 .stack_array_count = selector.stack_array_count,
@@ -231,7 +331,13 @@ pub const ValueUseTransaction = struct {
         }
 
         fn restore(snapshot: *const Snapshot, selector: *ComposedBlockSelector) void {
+            // Instructions must stop referring to speculative labels before
+            // their owned storage is released.
             selector.machine.instructions.items.len = snapshot.instruction_len;
+            std.debug.assert(selector.machine.owned_labels.items.len >= snapshot.owned_labels_len);
+            for (selector.machine.owned_labels.items[snapshot.owned_labels_len..]) |label|
+                selector.allocator.free(label);
+            selector.machine.owned_labels.items.len = snapshot.owned_labels_len;
             selector.values.clearRetainingCapacity();
             for (snapshot.values) |entry| selector.values.putAssumeCapacity(entry.name, entry.binding);
             selector.spill_slots.clearRetainingCapacity();
@@ -279,7 +385,7 @@ pub const ValueUseTransaction = struct {
 
     /// Registers a request without touching selector state. Identical requests
     /// for one source coalesce into the existing record.
-    pub fn register(transaction: *ValueUseTransaction, request: Request) !usize {
+    pub fn register(transaction: *ValueUseTransaction, request: Request) !RequestHandle {
         try transaction.requireActive();
         if (transaction.request_phase != .registering) return error.ValueUseLateRegistration;
         const stored = StoredRequest{
@@ -290,14 +396,15 @@ pub const ValueUseTransaction = struct {
         };
         for (transaction.requests[0..transaction.request_count], 0..) |*existing, index| {
             if (!stored.source.eql(&existing.source)) continue;
-            if (stored.eql(existing)) return index;
-            return error.ValueUseIncompatibleDuplicate;
+            if (!stored.expected.eql(existing.expected) or stored.form != existing.form)
+                return error.ValueUseIncompatibleDuplicate;
+            if (stored.destination.eql(existing.destination)) return transaction.handleFor(@intCast(index));
         }
         if (transaction.request_count == max_requests) return error.ValueUseRequestCapacityExceeded;
         const index = transaction.request_count;
         transaction.requests[index] = stored;
         transaction.request_count += 1;
-        return index;
+        return transaction.handleFor(index);
     }
 
     /// Seals and validates the complete plan before selector mutation. Current
@@ -346,10 +453,10 @@ pub const ValueUseTransaction = struct {
 
         var nodes = transaction.write_nodes;
         for (transaction.requests[0..transaction.request_count]) |*request| {
+            if (request.destination == .prepared_view) continue;
             if (request.form != .pointer and request.form != .stack_object_address) continue;
             const current = switch (request.source) {
-                .named => |*name| selector_state.resolveValue(transaction.selector, .{ .named = name.slice() }) orelse
-                    return error.ValueUseUnresolvedSource,
+                .named => |*name| try transaction.resolveNamedCurrent(name.slice()),
                 .null_value, .unsupported => continue,
             };
             if (current == .stack_i32_ptr or current == .stack_scalar or current == .stack128 or current == .stack_i32_array) {
@@ -370,15 +477,64 @@ pub const ValueUseTransaction = struct {
         if (transaction.request_phase != .prepared) return error.ValueUseMaterializeBeforePrepare;
         transaction.request_phase = .materializing;
         errdefer transaction.rollbackInternal();
+        // Complete every mutation-producing fixed materialization first.
         for (transaction.requests[0..transaction.request_count]) |*request| {
+            if (request.destination == .prepared_view) continue;
             try transaction.materializeRequest(request);
+        }
+        // Only now expose source-derived views from canonical current state.
+        for (transaction.requests[0..transaction.request_count], 0..) |*request, index| {
+            if (request.destination != .prepared_view) continue;
+            transaction.prepared_views[index] = try transaction.buildPreparedView(request);
+            transaction.prepared_view_valid[index] = true;
         }
         transaction.request_phase = .materialized;
     }
 
+    pub fn preparedView(transaction: *ValueUseTransaction, handle: RequestHandle) !PreparedViewLease {
+        try transaction.requireActive();
+        if (transaction.request_phase != .materialized and transaction.request_phase != .views_exposed)
+            return error.ValueUsePreparedViewUnavailable;
+        errdefer transaction.rollbackInternal();
+        const index = try transaction.validateHandle(handle);
+        if (transaction.requests[index].destination != .prepared_view or !transaction.prepared_view_valid[index])
+            return error.ValueUsePreparedViewMissing;
+        transaction.request_phase = .views_exposed;
+        return .{ .request = handle, .view_generation = transaction.view_generation };
+    }
+
+    /// Re-resolves and revalidates the canonical source on every read. The
+    /// returned value owns all identity bytes inline and cannot mutate state.
+    pub fn readPreparedView(transaction: *ValueUseTransaction, lease: PreparedViewLease) !PreparedView {
+        try transaction.requireActive();
+        if (lease.view_generation != transaction.view_generation)
+            return error.ValueUsePreparedViewStale;
+        if (transaction.request_phase != .views_exposed)
+            return error.ValueUsePreparedViewUnavailable;
+        errdefer transaction.rollbackInternal();
+        const index = try transaction.validateHandle(lease.request);
+        if (!transaction.prepared_view_valid[index]) return error.ValueUsePreparedViewMissing;
+        const refreshed = try transaction.buildPreparedView(&transaction.requests[index]);
+        transaction.prepared_views[index] = refreshed;
+        return refreshed;
+    }
+
+    /// A future outer authority calls this before an action that can relocate
+    /// or rebind a source. Existing leases then fail closed.
+    pub fn invalidatePreparedViewsForRelocation(transaction: *ValueUseTransaction) !void {
+        try transaction.requireActive();
+        if (transaction.request_phase != .views_exposed)
+            return error.ValueUsePreparedViewUnavailable;
+        transaction.view_generation +%= 1;
+        if (transaction.view_generation == 0) transaction.view_generation = 1;
+        transaction.prepared_view_valid = [_]bool{false} ** max_requests;
+        transaction.request_phase = .views_invalidated;
+    }
+
     pub fn commit(transaction: *ValueUseTransaction) !void {
         try transaction.requireActive();
-        if (transaction.request_phase != .materialized) return error.ValueUseCommitBeforeMaterialization;
+        if (transaction.request_phase != .materialized and transaction.request_phase != .views_exposed)
+            return error.ValueUseCommitBeforeMaterialization;
         transaction.request_phase = .committed;
         transaction.lifecycle = .committed;
     }
@@ -405,7 +561,25 @@ pub const ValueUseTransaction = struct {
         transaction.request_count = 0;
         transaction.request_phase = .registering;
         transaction.write_nodes = [_]bool{false} ** physical_node_count;
+        transaction.prepared_view_valid = [_]bool{false} ** max_requests;
+        transaction.view_generation +%= 1;
+        if (transaction.view_generation == 0) transaction.view_generation = 1;
         transaction.lifecycle = .rolled_back;
+    }
+
+    fn handleFor(transaction: *ValueUseTransaction, index: u8) RequestHandle {
+        return .{
+            .authority = @intFromPtr(transaction),
+            .index = index,
+            .generation = transaction.view_generation,
+        };
+    }
+
+    fn validateHandle(transaction: *ValueUseTransaction, handle: RequestHandle) !u8 {
+        if (handle.authority != @intFromPtr(transaction) or handle.generation != transaction.view_generation)
+            return error.ValueUsePreparedViewStale;
+        if (handle.index >= transaction.request_count) return error.ValueUsePreparedViewMissing;
+        return handle.index;
     }
 
     fn validateRequest(transaction: *ValueUseTransaction, request: *const StoredRequest) !?ValueLoc {
@@ -419,13 +593,13 @@ pub const ValueUseTransaction = struct {
                 {
                     return error.ValueUseUntypedNullPointer;
                 }
+                if (request.destination == .prepared_view)
+                    return error.ValueUsePreparedViewUnsupported;
                 return null;
             },
             .named => |*name| {
-                const binding = transaction.selector.values.get(name.slice()) orelse
-                    return error.ValueUseUnresolvedSource;
-                const current = selector_state.resolveValue(transaction.selector, .{ .named = name.slice() }) orelse
-                    return error.ValueUseUnresolvedSource;
+                const binding = transaction.selector.values.get(name.slice()) orelse return error.ValueUseUnresolvedSource;
+                const current = try transaction.resolveNamedCurrent(name.slice());
                 try selector_state.validateAddressDependenciesForUse(transaction.selector, name.slice());
                 if (!try selector_state.valueIsLiveAtOrAfterCurrent(transaction.selector, name.slice()))
                     return error.ValueUseExpiredSource;
@@ -442,13 +616,11 @@ pub const ValueUseTransaction = struct {
         const current = switch (request.source) {
             .named => |*name| blk: {
                 // Deliberately resolve after all preparation/spill mutations.
-                const binding = transaction.selector.values.get(name.slice()) orelse
-                    return error.ValueUseUnresolvedSource;
+                const binding = transaction.selector.values.get(name.slice()) orelse return error.ValueUseUnresolvedSource;
                 if (binding.vreg.class != request.expected.register_class)
                     return error.ValueUseRegisterClassMismatch;
                 try selector_state.validateAddressDependenciesForUse(transaction.selector, name.slice());
-                break :blk selector_state.resolveValue(transaction.selector, .{ .named = name.slice() }) orelse
-                    return error.ValueUseUnresolvedSource;
+                break :blk try transaction.resolveNamedCurrent(name.slice());
             },
             .null_value => {
                 try materializeNull(transaction.selector, request.destination);
@@ -466,7 +638,156 @@ pub const ValueUseTransaction = struct {
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
         }
     }
+
+    fn resolveNamedCurrent(transaction: *ValueUseTransaction, name: []const u8) !ValueLoc {
+        return selector_state.resolveValue(transaction.selector, .{ .named = name }) orelse
+            error.ValueUseUnresolvedSource;
+    }
+
+    fn buildPreparedView(transaction: *ValueUseTransaction, request: *const StoredRequest) !PreparedView {
+        if (request.destination != .prepared_view) return error.ValueUsePreparedViewMissing;
+        const current = (try transaction.validateRequest(request)) orelse
+            return error.ValueUsePreparedViewUnsupported;
+        return preparedViewFromLoc(transaction, request, current);
+    }
 };
+
+fn preparedViewFromLoc(
+    transaction: *ValueUseTransaction,
+    request: *const ValueUseTransaction.StoredRequest,
+    loc: ValueLoc,
+) !ValueUseTransaction.PreparedView {
+    try validateExpectedType(request.expected, request.form);
+    try validateSourceView(loc, request.form);
+    return switch (request.form) {
+        .gpr32, .gpr64 => preparedScalarView(loc),
+        .pointer => preparedPointerView(transaction, request, loc),
+        .stack_object_address => preparedStackObjectView(loc),
+        .pair_low_high, .pair_high_low => preparedPairView(loc, request.form),
+        .stack_argument => error.ValueUseStackArgumentUnsupported,
+        .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
+    };
+}
+
+fn preparedScalarView(loc: ValueLoc) !ValueUseTransaction.PreparedView {
+    return switch (loc) {
+        .arg32, .scratch32 => |reg| .{ .register = .{ .register = .{ .gpr32 = reg }, .bits = 32 } },
+        .arg64, .scratch64 => |reg| .{ .register = .{ .register = .{ .gpr64 = reg }, .bits = 64 } },
+        .eax => .{ .register = .{ .register = .eax, .bits = 32 } },
+        .rax => .{ .register = .{ .register = .rax, .bits = 64 } },
+        .spill64 => |frame_index| .{ .spill = .{ .frame_index = frame_index, .bits = 64 } },
+        else => error.ValueUseSourceViewMismatch,
+    };
+}
+
+fn preparedPointerView(
+    transaction: *ValueUseTransaction,
+    request: *const ValueUseTransaction.StoredRequest,
+    loc: ValueLoc,
+) !ValueUseTransaction.PreparedView {
+    return switch (loc) {
+        .arg64, .scratch64, .rax, .spill64 => preparedScalarView(loc),
+        .stack_scalar, .stack128, .stack_i32_array => preparedStackObjectView(loc),
+        .stack_i32_ptr => |ptr| .{ .address_descriptor = try preparedAddressDescriptor(transaction, request, ptr) },
+        .readonly_table_ptr => |ptr| .{ .table_pointer = .{
+            .storage = switch (ptr.storage) {
+                .reg => |reg| .{ .register = reg },
+                .spill => |frame_index| .{ .spill = frame_index },
+            },
+            .symbol = try ValueUseTransaction.PreparedIdentity.init(ptr.symbol),
+            .shape = ptr.shape,
+            .offset = ptr.offset,
+        } },
+        else => error.ValueUseUnsupportedAddressForm,
+    };
+}
+
+fn preparedStackObjectView(loc: ValueLoc) !ValueUseTransaction.PreparedView {
+    return switch (loc) {
+        .stack_scalar => |stack| .{ .stack_object = .{ .scalar = stack } },
+        .stack128 => |disp| .{ .stack_object = .{ .integer128 = disp } },
+        .stack_i32_array => |array| .{ .stack_object = .{ .integer32_array = array } },
+        else => error.ValueUseSourceViewMismatch,
+    };
+}
+
+fn preparedAddressDescriptor(
+    transaction: *ValueUseTransaction,
+    request: *const ValueUseTransaction.StoredRequest,
+    ptr: selector_types.StackPtrLoc,
+) !ValueUseTransaction.PreparedAddressDescriptor {
+    const owner_name = switch (request.source) {
+        .named => |*name| name.slice(),
+        else => return error.ValueUsePreparedViewUnsupported,
+    };
+    var result = ValueUseTransaction.PreparedAddressDescriptor{ .disp = ptr.disp };
+    if (ptr.index) |index| {
+        const owner = transaction.selector.address_dependencies.ownerNamed(owner_name) orelse
+            return error.AddressDependencyMissingOwner;
+        try requireDependencyRole(owner, index.name, .index);
+        result.index = try preparedAddressComponent(transaction, index.name, .index);
+        if (index.addend_name) |addend_name| {
+            try requireDependencyRole(owner, addend_name, .addend);
+            result.addend = try preparedAddressComponent(transaction, addend_name, .addend);
+        }
+    }
+    return result;
+}
+
+fn requireDependencyRole(
+    owner: AddressDependencyDomain.OwnerView,
+    name: []const u8,
+    role: AddressDependencyDomain.Role,
+) !void {
+    for (owner.dependencies[0..owner.dependency_count]) |dependency| {
+        if (dependency.role == role and std.mem.eql(u8, dependency.name, name)) return;
+    }
+    return error.AddressDependencyMissingIdentity;
+}
+
+fn preparedAddressComponent(
+    transaction: *ValueUseTransaction,
+    name: []const u8,
+    role: AddressDependencyDomain.Role,
+) !ValueUseTransaction.PreparedAddressComponent {
+    const current = try transaction.resolveNamedCurrent(name);
+    return .{
+        .identity = try ValueUseTransaction.PreparedIdentity.init(name),
+        .role = role,
+        .home = try preparedScalarHome(current),
+    };
+}
+
+fn preparedScalarHome(loc: ValueLoc) !ValueUseTransaction.PreparedScalarHome {
+    return switch (loc) {
+        .arg32, .scratch32 => |reg| .{ .register = .{ .gpr32 = reg } },
+        .arg64, .scratch64 => |reg| .{ .register = .{ .gpr64 = reg } },
+        .eax => .{ .register = .eax },
+        .rax => .{ .register = .rax },
+        .spill64 => |frame_index| .{ .spill = frame_index },
+        else => error.ValueUseSourceViewMismatch,
+    };
+}
+
+fn preparedPairView(
+    loc: ValueLoc,
+    form: ValueUseTransaction.UseForm,
+) !ValueUseTransaction.PreparedView {
+    const low: ValueUseTransaction.PreparedPairLimb = switch (loc) {
+        .arg128, .scratch128 => |pair| .{ .register = pair.lo },
+        .spill128 => |pair| .{ .spill = pair.lo },
+        else => return error.ValueUseSourceViewMismatch,
+    };
+    const high: ValueUseTransaction.PreparedPairLimb = switch (loc) {
+        .arg128, .scratch128 => |pair| .{ .register = pair.hi },
+        .spill128 => |pair| .{ .spill = pair.hi },
+        else => return error.ValueUseSourceViewMismatch,
+    };
+    return .{ .read_only_pair = if (form == .pair_low_high)
+        .{ .first = low, .second = high }
+    else
+        .{ .first = high, .second = low } };
+}
 
 const NodeList = struct {
     items: [2]ValueUseTransaction.PhysicalNode = undefined,
@@ -503,6 +824,13 @@ const MappingList = struct {
 };
 
 fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest) !void {
+    if (request.destination == .prepared_view) {
+        return switch (request.form) {
+            .gpr32, .gpr64, .pointer, .stack_object_address, .pair_low_high, .pair_high_low => {},
+            .stack_argument => error.ValueUseStackArgumentUnsupported,
+            .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
+        };
+    }
     const valid = switch (request.form) {
         .gpr32 => request.destination == .gpr32 or request.destination == .eax,
         .gpr64 => request.destination == .gpr64 or request.destination == .rax,
@@ -584,6 +912,7 @@ fn requestDestinationNodes(request: *const ValueUseTransaction.StoredRequest) !N
             try result.append(nodeForArgReg(pair.lo));
             try result.append(nodeForArgReg(pair.hi));
         },
+        .prepared_view => {},
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -592,6 +921,7 @@ fn requestDestinationNodes(request: *const ValueUseTransaction.StoredRequest) !N
 
 fn requestMappings(request: *const ValueUseTransaction.StoredRequest, current: ?ValueLoc) !MappingList {
     var mappings: MappingList = .{};
+    if (request.destination == .prepared_view) return mappings;
     const destinations = try requestDestinationNodes(request);
     if (current == null) {
         for (destinations.slice()) |destination| mappings.append(.{ .source = null, .destination = destination });

@@ -214,6 +214,14 @@ test "value-use transaction null pointers are typed direct materializations with
     _ = try rejected.register(untyped);
     try std.testing.expectError(error.ValueUseUntypedNullPointer, rejected.seal());
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+
+    var prepared = try Transaction.begin(&selector);
+    defer prepared.deinit();
+    var prepared_null = accepted;
+    prepared_null.destination = .prepared_view;
+    _ = try prepared.register(prepared_null);
+    try std.testing.expectError(error.ValueUsePreparedViewUnsupported, prepared.seal());
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
 }
 
 test "value-use transaction phase capacity identity and coalescing rules fail before mutation" {
@@ -253,9 +261,16 @@ test "value-use transaction phase capacity identity and coalescing rules fail be
     const stable_request = request(&transient_name, .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rsi });
     const first = try phase.register(stable_request);
     try std.testing.expectEqual(first, try phase.register(stable_request));
-    var incompatible = stable_request;
-    incompatible.destination = .{ .gpr64 = .rdx };
-    try std.testing.expectError(error.ValueUseIncompatibleDuplicate, phase.register(incompatible));
+    var distinct_destination = stable_request;
+    distinct_destination.destination = .{ .gpr64 = .rdx };
+    const second = try phase.register(distinct_destination);
+    try std.testing.expect(first.index != second.index);
+    var incompatible_type = stable_request;
+    incompatible_type.expected = expected(.{ .int = 63 }, .gpr64);
+    try std.testing.expectError(error.ValueUseIncompatibleDuplicate, phase.register(incompatible_type));
+    var incompatible_form = stable_request;
+    incompatible_form.form = .pointer;
+    try std.testing.expectError(error.ValueUseIncompatibleDuplicate, phase.register(incompatible_form));
     @memset(&transient_name, 'x');
     try phase.seal();
     try std.testing.expectError(error.ValueUseLateRegistration, phase.register(stable_request));
@@ -443,4 +458,290 @@ test "value-use transaction dependency and unsupported-view failures leave selec
         .destination = .new_pair,
     });
     try std.testing.expectError(error.ValueUseNewPairOwnershipUnsupported, new_pair.seal());
+}
+
+test "value-use transaction exposes every restricted prepared-view member and both pair orders" {
+    var machine = MachineFunction.init("value-use-prepared-views", .ptr);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "reg", "spill", "stack", "index", "addend", "address", "table", "table-reg", "pair-lo", "pair-hi" }) |name|
+        try addLive(&plan, name);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "reg", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "spill", .{ .spill64 = .slot0 });
+    try selector_state.bindValueLoc(&selector, "stack", .{ .stack_scalar = .{ .base_disp = 16, .bits = 64 } });
+    try selector_state.bindValueLoc(&selector, "index", .{ .scratch64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "addend", .{ .spill64 = .slot1 });
+    try selector_state.bindValueLoc(&selector, "address", .{ .stack_i32_ptr = .{
+        .disp = 24,
+        .index = .{ .reg = .r8, .name = "index", .addend_name = "addend" },
+    } });
+    try selector_state.bindValueLoc(&selector, "table", .{ .readonly_table_ptr = .{
+        .storage = .{ .spill = .slot2 },
+        .symbol = "@prepared-table",
+        .shape = .i16_128,
+        .offset = 3,
+    } });
+    try selector_state.bindValueLoc(&selector, "table-reg", .{ .readonly_table_ptr = .{
+        .storage = .{ .reg = .r9 },
+        .symbol = "@prepared-table-reg",
+        .shape = .i16_128,
+    } });
+    try selector_state.bindValueLoc(&selector, "pair-lo", .{ .arg128 = .{ .lo = .rcx, .hi = .rdx } });
+    try selector_state.bindValueLoc(&selector, "pair-hi", .{ .spill128 = .{ .lo = .slot3, .hi = .slot4 } });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const handles = [_]Transaction.RequestHandle{
+        try transaction.register(request("reg", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view)),
+        try transaction.register(request("spill", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view)),
+        try transaction.register(request("stack", .ptr, .stack_object, .stack_object_address, .prepared_view)),
+        try transaction.register(request("address", .ptr, .stack_pointer, .pointer, .prepared_view)),
+        try transaction.register(request("table", .ptr, .stack_pointer, .pointer, .prepared_view)),
+        try transaction.register(request("table-reg", .ptr, .stack_pointer, .pointer, .prepared_view)),
+        try transaction.register(request("pair-lo", .{ .int = 128 }, .gpr128, .pair_low_high, .prepared_view)),
+        try transaction.register(request("pair-hi", .{ .int = 128 }, .gpr128, .pair_high_low, .prepared_view)),
+    };
+    try transaction.seal();
+    try std.testing.expectError(error.ValueUsePreparedViewUnavailable, transaction.preparedView(handles[0]));
+    try transaction.prepare();
+    try transaction.materializeAll();
+
+    var views: [handles.len]Transaction.PreparedView = undefined;
+    for (handles, 0..) |handle, index| {
+        const lease = try transaction.preparedView(handle);
+        views[index] = try transaction.readPreparedView(lease);
+    }
+    try std.testing.expect(views[0] == .register);
+    try std.testing.expect(views[0].register.register == .gpr64);
+    try std.testing.expectEqual(selector_types.ArgReg.rdi, views[0].register.register.gpr64);
+    try std.testing.expect(views[1] == .spill);
+    try std.testing.expectEqual(selector_types.FrameIndex.slot0, views[1].spill.frame_index);
+    try std.testing.expect(views[2] == .stack_object);
+    try std.testing.expectEqual(@as(u32, 16), views[2].stack_object.scalar.base_disp);
+    try std.testing.expect(views[3] == .address_descriptor);
+    try std.testing.expectEqualStrings("index", views[3].address_descriptor.index.?.identity.slice());
+    try std.testing.expectEqualStrings("addend", views[3].address_descriptor.addend.?.identity.slice());
+    try std.testing.expect(views[4] == .table_pointer);
+    try std.testing.expectEqualStrings("@prepared-table", views[4].table_pointer.symbol.slice());
+    try std.testing.expect(views[5] == .table_pointer);
+    try std.testing.expect(views[5].table_pointer.storage == .register);
+    try std.testing.expectEqual(selector_types.ArgReg.r9, views[5].table_pointer.storage.register);
+    try std.testing.expect(views[6] == .read_only_pair);
+    try std.testing.expectEqual(selector_types.ArgReg.rcx, views[6].read_only_pair.first.register);
+    try std.testing.expectEqual(selector_types.ArgReg.rdx, views[6].read_only_pair.second.register);
+    try std.testing.expect(views[7] == .read_only_pair);
+    try std.testing.expectEqual(selector_types.FrameIndex.slot4, views[7].read_only_pair.first.spill);
+    try std.testing.expectEqual(selector_types.FrameIndex.slot3, views[7].read_only_pair.second.spill);
+    try transaction.commit();
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use repeated sources separate destinations and preserve once before re-resolution" {
+    var machine = MachineFunction.init("value-use-multi-destination", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "writer", "shared" }) |name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "writer", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "shared", .{ .arg64 = .rsi });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    _ = try transaction.register(request("writer", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rsi }));
+    const first = try transaction.register(request("shared", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rdx }));
+    const coalesced = try transaction.register(request("shared", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rdx }));
+    const second = try transaction.register(request("shared", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .r8 }));
+    try std.testing.expectEqual(first, coalesced);
+    try std.testing.expect(first.index != second.index);
+    try transaction.seal();
+    try transaction.prepare();
+    try std.testing.expect(selector.values.get("shared").?.loc == .spill64);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try transaction.materializeAll();
+    try transaction.commit();
+    try std.testing.expectEqual(@as(usize, 4), machine.instructions.items.len);
+}
+
+test "value-use prepared views are phase-bound and stale missing or foreign handles fail closed" {
+    var machine = MachineFunction.init("value-use-view-phases", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addLive(&plan, "source");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "source", .{ .arg64 = .rdi });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const handle = try transaction.register(request("source", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    var missing = handle;
+    missing.index = 15;
+    try std.testing.expectError(error.ValueUsePreparedViewMissing, transaction.preparedView(missing));
+
+    var invalidated = try Transaction.begin(&selector);
+    defer invalidated.deinit();
+    const invalidated_handle = try invalidated.register(request("source", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    try invalidated.seal();
+    try invalidated.prepare();
+    try invalidated.materializeAll();
+    const lease = try invalidated.preparedView(invalidated_handle);
+    _ = try invalidated.readPreparedView(lease);
+    try invalidated.invalidatePreparedViewsForRelocation();
+    try std.testing.expectError(error.ValueUsePreparedViewStale, invalidated.readPreparedView(lease));
+
+    var foreign = try Transaction.begin(&selector);
+    defer foreign.deinit();
+    const foreign_handle = try foreign.register(request("source", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    try foreign.seal();
+    try foreign.prepare();
+    try foreign.materializeAll();
+    try std.testing.expectError(error.ValueUsePreparedViewStale, foreign.preparedView(invalidated_handle));
+    _ = foreign_handle;
+}
+
+test "value-use mixed fixed and prepared requests resolve views only after fixed preparation" {
+    var machine = MachineFunction.init("value-use-mixed-views", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "fixed", "view" }) |name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "fixed", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "view", .{ .arg64 = .rsi });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    _ = try transaction.register(request("fixed", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rsi }));
+    const view_handle = try transaction.register(request("view", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    try transaction.seal();
+    try transaction.prepare();
+    try std.testing.expect(selector.values.get("view").?.loc == .spill64);
+    try transaction.materializeAll();
+    const lease = try transaction.preparedView(view_handle);
+    const view = try transaction.readPreparedView(lease);
+    try std.testing.expect(view == .spill);
+    try transaction.commit();
+}
+
+test "value-use prepared views revalidate type class and canonical dependencies on every read" {
+    var machine = MachineFunction.init("value-use-view-revalidation", .ptr);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "scalar", "index", "address" }) |name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "scalar", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "index", .{ .arg64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "address", .{ .stack_i32_ptr = .{
+        .disp = 4,
+        .index = .{ .reg = .r8, .name = "index" },
+    } });
+
+    const scalar_binding = selector.values.get("scalar").?;
+    var type_transaction = try Transaction.begin(&selector);
+    defer type_transaction.deinit();
+    const scalar_handle = try type_transaction.register(request("scalar", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    try type_transaction.seal();
+    try type_transaction.prepare();
+    try type_transaction.materializeAll();
+    const scalar_lease = try type_transaction.preparedView(scalar_handle);
+    selector.values.getPtr("scalar").?.vreg.class = .gpr32;
+    try std.testing.expectError(error.ValueUseRegisterClassMismatch, type_transaction.readPreparedView(scalar_lease));
+    try std.testing.expectEqual(scalar_binding, selector.values.get("scalar").?);
+
+    var dependency_transaction = try Transaction.begin(&selector);
+    defer dependency_transaction.deinit();
+    const address_handle = try dependency_transaction.register(request("address", .ptr, .stack_pointer, .pointer, .prepared_view));
+    try dependency_transaction.seal();
+    try dependency_transaction.prepare();
+    try dependency_transaction.materializeAll();
+    const address_lease = try dependency_transaction.preparedView(address_handle);
+    _ = selector.values.remove("index");
+    try std.testing.expectError(error.AddressDependencyMissingBinding, dependency_transaction.readPreparedView(address_lease));
+    try std.testing.expect(selector.values.get("index") != null);
+}
+
+test "value-use rollback releases speculative owned labels after instructions and commit retains them" {
+    var machine = MachineFunction.init("value-use-owned-labels", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addLive(&plan, "source");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "source", .{ .arg64 = .rdi });
+
+    const retained = try selector_state.allocateEdgeLabel(&selector);
+    const retained_pointer = retained.ptr;
+    try std.testing.expectEqual(@as(usize, 1), machine.owned_labels.items.len);
+
+    var rollback_transaction = try Transaction.begin(&selector);
+    defer rollback_transaction.deinit();
+    const rollback_handle = try rollback_transaction.register(request("source", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    try rollback_transaction.seal();
+    try rollback_transaction.prepare();
+    try rollback_transaction.materializeAll();
+    const rollback_lease = try rollback_transaction.preparedView(rollback_handle);
+    _ = try rollback_transaction.readPreparedView(rollback_lease);
+    const first = try selector_state.allocateEdgeLabel(&selector);
+    const second = try selector_state.allocateEdgeLabel(&selector);
+    try machine.instructions.append(std.testing.allocator, .{ .label = first });
+    try machine.instructions.append(std.testing.allocator, .{ .label = second });
+    try rollback_transaction.rollback();
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(usize, 1), machine.owned_labels.items.len);
+    try std.testing.expectEqual(retained_pointer, machine.owned_labels.items[0].ptr);
+    try std.testing.expectEqual(@as(usize, 1), selector.edge_label_count);
+
+    var failure_transaction = try Transaction.begin(&selector);
+    defer failure_transaction.deinit();
+    const failure_handle = try failure_transaction.register(request("source", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    try failure_transaction.seal();
+    try failure_transaction.prepare();
+    try failure_transaction.materializeAll();
+    const failure_lease = try failure_transaction.preparedView(failure_handle);
+    const third = try selector_state.allocateEdgeLabel(&selector);
+    const fourth = try selector_state.allocateEdgeLabel(&selector);
+    try machine.instructions.append(std.testing.allocator, .{ .label = third });
+    try machine.instructions.append(std.testing.allocator, .{ .label = fourth });
+    _ = selector.values.remove("source");
+    try std.testing.expectError(error.ValueUseUnresolvedSource, failure_transaction.readPreparedView(failure_lease));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(usize, 1), machine.owned_labels.items.len);
+    try std.testing.expectEqual(retained_pointer, machine.owned_labels.items[0].ptr);
+    try std.testing.expect(selector.values.get("source") != null);
+
+    var commit_transaction = try Transaction.begin(&selector);
+    defer commit_transaction.deinit();
+    const commit_handle = try commit_transaction.register(request("source", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    try commit_transaction.seal();
+    try commit_transaction.prepare();
+    try commit_transaction.materializeAll();
+    _ = try commit_transaction.preparedView(commit_handle);
+    const committed = try selector_state.allocateEdgeLabel(&selector);
+    try machine.instructions.append(std.testing.allocator, .{ .label = committed });
+    try commit_transaction.commit();
+    try std.testing.expectEqual(@as(usize, 2), machine.owned_labels.items.len);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(retained_pointer, machine.owned_labels.items[0].ptr);
 }

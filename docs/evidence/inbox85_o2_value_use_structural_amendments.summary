@@ -1,0 +1,135 @@
+# INBOX-85 O2-3B0 dormant value-use structural amendments
+
+Status: delivered for Supervisor/Reviewer review. O2-3B1 is not authorized.
+
+## Base and boundary
+
+The accepted O2-3A code base is commit `9bc7e4de`, tree
+`f561a0d03d9c56756f3a19dd496c390f35af9d45`. Work began at the
+documentation-only authorization head `74ae5bb8`; its tree differs only in
+documentation, and `git diff 9bc7e4de..74ae5bb8 -- src tools build.zig` is
+empty.
+
+This slice changes only the dormant `ValueUseTransaction`, its white-box
+tests, its source guard, and this evidence. No composed-selector consumer calls
+the new APIs. No emitter route, mandatory runner, tool, gate inventory, or
+candidate identity changed.
+
+## Same-source multi-destination requests
+
+Registration now returns an opaque transaction-local `RequestHandle`.
+Requests with the same source/type/form and the same destination coalesce;
+requests with the same source/type/form and distinct destinations remain
+separate. Different types or forms for one source remain incompatible. Seal
+still rejects physical destination conflicts and genuine copy cycles before
+mutation with the existing O4-boundary error.
+
+The physical write set remains a boolean set, so preservation/clobbering runs
+once per physical source/register. Every separate request resolves the source
+again after preparation. Focused coverage forces one shared source to spill
+once and then materialize to two destinations from the relocated canonical
+home.
+
+## Restricted prepared views
+
+`Destination.prepared_view` requests produce no fixed write. Fixed-destination
+materializations complete first; only then does the authority resolve all
+prepared views from canonical state. A prepared view is available only through
+its request handle after `materializeAll`, and reading its phase-bound lease
+re-resolves and revalidates the source.
+
+The public `PreparedView` union contains only:
+
+- register (GPR32/GPR64/EAX/RAX);
+- scalar spill;
+- stack object;
+- typed address descriptor with inline-owned dependency identities;
+- readonly table pointer with inline-owned symbol identity and register/spill
+  storage;
+- strictly read-only ordered pair limbs in registers or spills.
+
+It never exposes `ValueLoc`, a binding, or borrowed identity storage. Each read
+revalidates the expected type/register class, supported source form, liveness,
+and canonical address-dependency closure. It cannot create a binding, durable
+alias, dependency edge, or relocation. A future outer authority must call the
+general relocation invalidator before any later relocation/rebind; all prior
+leases then fail stale. Phase, missing, foreign, and invalidated handles fail
+closed.
+
+The source guard now permits the one raw resolution authority only in
+`resolveNamedCurrent` and keeps the total exact at one. It also rejects every
+frozen raw resolution/materialization gateway, accumulator binding/clobber,
+or spill helper inside a consumer function that obtains/reads a prepared view.
+The frozen inbox81 bypass inventory remains exact; it does not claim zero
+bypasses.
+
+## Owned-label rollback
+
+The transaction snapshot records `MachineFunction.owned_labels.items.len`.
+Rollback performs the required order:
+
+1. truncate speculative instructions;
+2. free every after-snapshot label exactly once;
+3. truncate the owned-label list;
+4. restore the edge-label counter with the remaining selector state.
+
+Commit retains labels. The allocator-backed tests use multiple speculative
+labels, partial emission, a failure after prepared-view exposure, explicit
+rollback, and commit. They verify the retained pre-transaction label pointer
+identity, instruction/list/counter restoration, and allocator-clean
+free/deinit behavior.
+
+## Capacity and copy amplification
+
+The request and prepared-view stores are fixed inline arrays with capacity 16;
+named identities are copied into fixed 192-byte inline storage. The address
+domain remains copied exactly once at transaction begin:
+
+```text
+address_domain_snapshot_copies_per_transaction=1
+address_domain_snapshot_bytes=149761
+address_domain_copies_per_request=0
+```
+
+No request registration, prepared-view construction, or prepared-view read
+copies the whole domain.
+
+## Non-Tier-3 validation
+
+The final code state passed the complete authorized validation:
+
+```text
+full_unit=1124/1124
+structural_smoke=8/8
+strengthened_tier2=28/28 steps; 1132/1132 tests
+abi_differential=60/60 cases; 30/30 real functions; result=pass
+focused_codegen_canaries=2/2; execution_cases=35; local_fail=0
+integrated_exe=7/7; local_fail=0
+```
+
+The fresh post-final-code whole-cohort log is
+`tmp/inbox85_final_full_report.log`:
+
+```text
+report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681
+selected/emitted/failed=443/285/158
+first_failure=compiler_rt.trunc.truncl
+first_diagnostic=UnsupportedLongDoubleAbi
+first_selector=unsupported_type/unsupported-return-type
+```
+
+The accepted projection regenerated from the frozen 285-row input remains:
+
+```text
+object_sha256=061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be
+owner_manifest_sha256=5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d
+composed_block=40
+composed_cfg=127
+legacy_envelope=17
+structural_fallback=101
+ledger=167/17/101
+```
+
+The frozen identity tuple is exact:
+`49a19f04 / 443-285-158-truncl / 061a64e4 / 5d91960e / 167-17-101`.
+No Tier 3 was run. Stop for O2-3B0 review before any O2-3B1 consumer wiring.
