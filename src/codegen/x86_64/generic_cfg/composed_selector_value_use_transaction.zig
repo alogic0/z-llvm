@@ -21,9 +21,9 @@ const VirtualRegClass = selector_types.VirtualRegClass;
 const ComposedBlockSelector = state_data.ComposedBlockSelector;
 const AddressDependencyDomain = address_dependencies.AddressDependencyDomain;
 
-/// Dormant instruction-level authority for planning several value uses before
-/// any selector mutation. O2-2 deliberately wires no production consumer to
-/// this skeleton.
+/// Instruction-level authority for planning several value uses before any
+/// selector mutation. Newly added action variants remain dormant until their
+/// complete semantic consumer family is separately reviewed and wired.
 pub const ValueUseTransaction = struct {
     pub const max_requests = 16;
     pub const max_identity_bytes = 192;
@@ -180,6 +180,33 @@ pub const ValueUseTransaction = struct {
         scale: u8,
     };
 
+    /// Store a named i1/i32 value. The action is owned by the value request;
+    /// the pointer is the semantic secondary operand, preserving the accepted
+    /// value-before-address staging order.
+    pub const StoreScalarAction = struct {
+        pointer: RequestHandle,
+        bits: u8,
+    };
+
+    /// Store an inline i1/i32 value. The immediate is semantic intent rather
+    /// than a discovered source home and is emitted before pointer staging.
+    pub const StoreImmediateAction = struct {
+        value: i32,
+        bits: u8,
+    };
+
+    /// Store a named i64 value. The action is owned by the pointer request and
+    /// stages that pointer before the value, matching the accepted helper.
+    pub const StoreI64Action = struct {
+        value: RequestHandle,
+    };
+
+    /// Store the address of one stack object into another stack object. Both
+    /// operands are semantic requests; no stack descriptor escapes.
+    pub const StoreStackPointerAction = struct {
+        destination: RequestHandle,
+    };
+
     /// A complete, typed operation over a prepared source. This descriptor is
     /// registered before seal, so every physical destination participates in
     /// conflict, preservation, and cycle planning. No variant exposes source
@@ -190,6 +217,10 @@ pub const ValueUseTransaction = struct {
         form_byte_address: ByteAddressAction,
         form_scaled_address: ScaledAddressAction,
         form_readonly_table_address: ReadOnlyTableAddressAction,
+        store_scalar: StoreScalarAction,
+        store_immediate: StoreImmediateAction,
+        store_i64: StoreI64Action,
+        store_stack_pointer: StoreStackPointerAction,
 
         fn eql(action: PreparedAction, other: PreparedAction) bool {
             return std.meta.eql(action, other);
@@ -530,7 +561,7 @@ pub const ValueUseTransaction = struct {
         accumulator,
     };
     const physical_node_count = std.meta.fields(PhysicalNode).len;
-    const max_mappings = max_requests * 2;
+    const max_mappings = max_requests * 3;
 
     pub fn begin(selector: *ComposedBlockSelector) !ValueUseTransaction {
         return .{ .selector = selector, .snapshot = try Snapshot.init(selector) };
@@ -596,18 +627,20 @@ pub const ValueUseTransaction = struct {
                 destinations[node_index] = true;
             }
             const request_mappings = try requestMappings(transaction, request, @intCast(request_index), current);
+            const deferred_writes = request.prepared_action != null and
+                actionOwnsOrderedWrites(request.prepared_action.?);
             for (request_mappings.slice()) |mapping| {
                 if (mapping_count == mappings.len) return error.ValueUseMappingCapacityExceeded;
                 mappings[mapping_count] = mapping;
                 mapping_count += 1;
                 if (mapping.source == null) {
-                    writes[@intFromEnum(mapping.destination)] = true;
+                    if (!deferred_writes) writes[@intFromEnum(mapping.destination)] = true;
                     continue;
                 }
                 const source = mapping.source.?;
                 if (source == mapping.destination) continue;
                 graph[@intFromEnum(source)][@intFromEnum(mapping.destination)] = true;
-                writes[@intFromEnum(mapping.destination)] = true;
+                if (!deferred_writes) writes[@intFromEnum(mapping.destination)] = true;
             }
         }
         try rejectCopyCycles(graph);
@@ -708,10 +741,14 @@ pub const ValueUseTransaction = struct {
         try executePreparedActionInternal(transaction, &refreshed.view, &transaction.requests[index], action);
         // Defense in depth: even the closed internal action must not relocate
         // or rebind its source. Any violation rolls back speculative emission.
-        const after_consumption = try transaction.buildPreparedRecord(index);
-        if (!preparedRecordEql(&transaction.prepared_views[index], &after_consumption))
-            return error.ValueUsePreparedViewStale;
-        try transaction.validateActionDependenciesCanonical(action);
+        if (actionOwnsOrderedWrites(action)) {
+            try transaction.validateConsumedActionAfter(index, action);
+        } else {
+            const after_consumption = try transaction.buildPreparedRecord(index);
+            if (!preparedRecordEql(&transaction.prepared_views[index], &after_consumption))
+                return error.ValueUsePreparedViewStale;
+            try transaction.validateActionDependenciesCanonical(action);
+        }
         transaction.prepared_view_valid[index] = false;
     }
 
@@ -793,6 +830,24 @@ pub const ValueUseTransaction = struct {
                 _ = try scaleShift(address.scale);
                 if (address.scale != address.shape.stride()) return error.ValueUseAddressScaleMismatch;
             },
+            .store_scalar => |store| {
+                if (store.bits != 1 and store.bits != 32) return error.ValueUseStoreWidthUnsupported;
+                const index = try transaction.validateRegisteredOperandHandle(store.pointer);
+                try validateStorePointerOperand(&transaction.requests[index], true);
+            },
+            .store_immediate => |store| {
+                if (store.bits != 1 and store.bits != 32) return error.ValueUseStoreWidthUnsupported;
+                if (store.bits == 1 and store.value != 0 and store.value != 1)
+                    return error.ValueUseStoreImmediateOutOfRange;
+            },
+            .store_i64 => |store| {
+                const index = try transaction.validateRegisteredOperandHandle(store.value);
+                try validateStoreI64ValueOperand(&transaction.requests[index]);
+            },
+            .store_stack_pointer => |store| {
+                const index = try transaction.validateRegisteredOperandHandle(store.destination);
+                try validateStoreStackObjectOperand(&transaction.requests[index]);
+            },
         }
     }
 
@@ -832,8 +887,44 @@ pub const ValueUseTransaction = struct {
                 .constant => {},
                 .request => |handle| try transaction.validateOperandCanonical(handle),
             },
-            .validate_shape, .emit_copy_to, .form_readonly_table_address => {},
+            .store_scalar => |store| try transaction.validateOperandCanonical(store.pointer),
+            .store_i64 => |store| try transaction.validateOperandCanonical(store.value),
+            .store_stack_pointer => |store| try transaction.validateOperandCanonical(store.destination),
+            .validate_shape, .emit_copy_to, .form_readonly_table_address, .store_immediate => {},
         }
+    }
+
+    fn validateConsumedActionAfter(
+        transaction: *ValueUseTransaction,
+        owner_index: u8,
+        action: PreparedAction,
+    ) !void {
+        try transaction.validateConsumedOperandAfter(owner_index);
+        if (try transaction.actionSecondaryOperand(action)) |secondary|
+            try transaction.validateConsumedOperandAfter(secondary);
+    }
+
+    fn validateConsumedOperandAfter(transaction: *ValueUseTransaction, index: u8) !void {
+        const request = &transaction.requests[index];
+        const name = switch (request.source) {
+            .named => |*identity| identity.slice(),
+            .null_value, .unsupported => return,
+        };
+        const binding = transaction.selector.values.get(name) orelse {
+            if (try selector_state.valueIsLiveAfterCurrent(transaction.selector, name))
+                return error.ValueUsePreparedViewStale;
+            return;
+        };
+        if (!std.meta.eql(binding.vreg, transaction.prepared_views[index].source_vreg))
+            return error.ValueUsePreparedViewStale;
+        const refreshed = try transaction.buildPreparedRecord(index);
+        if (preparedRecordEql(&transaction.prepared_views[index], &refreshed)) return;
+        // A source genuinely live after the consuming instruction may be
+        // durably relocated by the ordinary clobber-preservation authority.
+        // The stable vreg, typed request validation, and canonical dependency
+        // re-derivation above distinguish that relocation from a rebind.
+        if (!try selector_state.valueIsLiveAfterCurrent(transaction.selector, name))
+            return error.ValueUsePreparedViewStale;
     }
 
     fn validateOperandCanonical(transaction: *ValueUseTransaction, handle: RequestHandle) !void {
@@ -908,7 +999,10 @@ pub const ValueUseTransaction = struct {
                 .constant => null,
                 .request => |handle| try transaction.validateRegisteredOperandHandle(handle),
             },
-            .validate_shape, .emit_copy_to, .form_readonly_table_address => null,
+            .store_scalar => |store| try transaction.validateRegisteredOperandHandle(store.pointer),
+            .store_i64 => |store| try transaction.validateRegisteredOperandHandle(store.value),
+            .store_stack_pointer => |store| try transaction.validateRegisteredOperandHandle(store.destination),
+            .validate_shape, .emit_copy_to, .form_readonly_table_address, .store_immediate => null,
         };
     }
 
@@ -1420,7 +1514,237 @@ fn executePreparedActionInternal(
         .form_byte_address => |address| try executeByteAddress(transaction, view, request, address),
         .form_scaled_address => |address| try executeScaledAddress(transaction, view, request, address),
         .form_readonly_table_address => |address| try executeReadOnlyTableAddress(transaction, view, request, address),
+        .store_scalar => |store| try executeStoreScalar(transaction, view, store),
+        .store_immediate => |store| try executeStoreImmediate(transaction, view, store),
+        .store_i64 => |store| try executeStoreI64(transaction, view, store),
+        .store_stack_pointer => |store| try executeStoreStackPointer(transaction, view, store),
     }
+}
+
+fn executeStoreScalar(
+    transaction: *ValueUseTransaction,
+    value_view: *const ValueUseTransaction.PreparedView,
+    action: ValueUseTransaction.StoreScalarAction,
+) !void {
+    try materializeActionScalar32(transaction, value_view, .accumulator);
+    const pointer_view = try transaction.registeredOperandView(action.pointer);
+    try executeStoreEaxToPointer(transaction, pointer_view, action.bits);
+}
+
+fn executeStoreImmediate(
+    transaction: *ValueUseTransaction,
+    pointer_view: *const ValueUseTransaction.PreparedView,
+    action: ValueUseTransaction.StoreImmediateAction,
+) !void {
+    try clobberPhysicalNode(transaction.selector, .accumulator);
+    try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+        .mov_imm_eax = action.value,
+    });
+    try executeStoreEaxToPointer(transaction, pointer_view, action.bits);
+}
+
+fn executeStoreI64(
+    transaction: *ValueUseTransaction,
+    pointer_view: *const ValueUseTransaction.PreparedView,
+    action: ValueUseTransaction.StoreI64Action,
+) !void {
+    const pointer = try preparedViewLoc(pointer_view);
+    switch (pointer) {
+        .arg64, .scratch64, .spill64 => {},
+        else => return error.ValueUseStorePointerFormUnsupported,
+    }
+    try materializeActionPointer(transaction, pointer, .rcx);
+    const value_view = try transaction.registeredOperandView(action.value);
+    try materializeActionScalar64(transaction, value_view, .accumulator);
+    try transaction.selector.machine.instructions.append(
+        transaction.selector.allocator,
+        .store_rax_rcx_ptr,
+    );
+}
+
+fn executeStoreStackPointer(
+    transaction: *ValueUseTransaction,
+    source_view: *const ValueUseTransaction.PreparedView,
+    action: ValueUseTransaction.StoreStackPointerAction,
+) !void {
+    const source = try stackScalarFromPreparedView(source_view);
+    const destination_view = try transaction.registeredOperandView(action.destination);
+    const destination = try stackScalarFromPreparedView(destination_view);
+    if (destination.kind != .integer or destination.bits != 64) {
+        return error.ValueUseStorePointerFormUnsupported;
+    }
+
+    try clobberPhysicalNode(transaction.selector, .rcx);
+    try transaction.selector.machine.instructions.append(
+        transaction.selector.allocator,
+        .{ .mov_rsp_arg64 = .rcx },
+    );
+    if (source.base_disp != 0) {
+        const offset = std.math.cast(i32, source.base_disp) orelse
+            return error.ValueUseStorePointerFormUnsupported;
+        try selector_state.emitEflagsInstruction(
+            transaction.selector,
+            .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = offset } },
+            .write,
+        );
+    }
+    if (destination.base_disp % 4 != 0) return error.ValueUseStorePointerAlignment;
+    const frame_index = FrameIndex.fromSlot(destination.base_disp / 4) catch
+        return error.ValueUseStorePointerFrame;
+    try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+        .spill_arg64_rsp = .{ .frame_index = frame_index, .reg = .rcx },
+    });
+}
+
+fn executeStoreEaxToPointer(
+    transaction: *ValueUseTransaction,
+    pointer_view: *const ValueUseTransaction.PreparedView,
+    bits: u8,
+) !void {
+    const pointer = try preparedViewLoc(pointer_view);
+    switch (pointer) {
+        .stack_scalar => |stack| {
+            if (bits != 1 or stack.kind != .integer or stack.bits != 8)
+                return error.ValueUseStorePointerFormUnsupported;
+            try transaction.selector.machine.instructions.append(
+                transaction.selector.allocator,
+                if (stack.base_disp <= std.math.maxInt(u8))
+                    .{ .store_al_stack_disp8 = @intCast(stack.base_disp) }
+                else
+                    .{ .store_al_stack_disp32 = stack.base_disp },
+            );
+        },
+        .arg64, .scratch64 => |reg| {
+            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            try transaction.selector.machine.instructions.append(
+                transaction.selector.allocator,
+                .{ .store_eax_arg_ptr = reg },
+            );
+        },
+        .spill64 => {
+            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            try materializeActionPointer(transaction, pointer, .rcx);
+            try transaction.selector.machine.instructions.append(
+                transaction.selector.allocator,
+                .{ .store_eax_arg_ptr = .rcx },
+            );
+        },
+        .stack_i32_ptr => |stack_ptr| {
+            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            try executeStoreStackI32(transaction, pointer_view, stack_ptr.disp);
+        },
+        .stack_i32_array => |array| {
+            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            try appendStoreEaxStack(transaction, array.base_disp, false);
+        },
+        .readonly_table_ptr => return error.ValueUseStoreReadOnlyPointer,
+        else => return error.ValueUseStorePointerFormUnsupported,
+    }
+}
+
+fn executeStoreStackI32(
+    transaction: *ValueUseTransaction,
+    pointer_view: *const ValueUseTransaction.PreparedView,
+    disp: u32,
+) !void {
+    const descriptor = switch (pointer_view.*) {
+        .address_descriptor => |*value| value,
+        else => return error.ValueUseStorePointerFormUnsupported,
+    };
+    if (descriptor.index) |*index| {
+        try materializeActionScalarHome(transaction, index.home, .rcx);
+        if (descriptor.addend) |*addend| {
+            try materializeActionScalarHome(transaction, addend.home, .r8);
+            try selector_state.emitEflagsInstruction(transaction.selector, .add_r8_rcx, .write);
+        }
+        try appendStoreEaxStack(transaction, disp, true);
+    } else {
+        try appendStoreEaxStack(transaction, disp, false);
+    }
+}
+
+fn appendStoreEaxStack(
+    transaction: *ValueUseTransaction,
+    disp: u32,
+    indexed: bool,
+) !void {
+    try transaction.selector.machine.instructions.append(transaction.selector.allocator, if (indexed)
+        if (disp <= std.math.maxInt(u8))
+            .{ .store_eax_stack_rcx4_disp8 = @intCast(disp) }
+        else
+            .{ .store_eax_stack_rcx4_disp32 = disp }
+    else if (disp <= std.math.maxInt(u8))
+        .{ .store_eax_stack_disp8 = @intCast(disp) }
+    else
+        .{ .store_eax_stack_disp32 = disp });
+}
+
+fn materializeActionScalar32(
+    transaction: *ValueUseTransaction,
+    view: *const ValueUseTransaction.PreparedView,
+    destination: ValueUseTransaction.PhysicalNode,
+) !void {
+    const current = try preparedViewLoc(view);
+    try clobberActionDestination(transaction, current, destination);
+    try materializeScalar32(transaction.selector, current, .eax);
+}
+
+fn materializeActionScalar64(
+    transaction: *ValueUseTransaction,
+    view: *const ValueUseTransaction.PreparedView,
+    destination: ValueUseTransaction.PhysicalNode,
+) !void {
+    const current = try preparedViewLoc(view);
+    try clobberActionDestination(transaction, current, destination);
+    try materializeScalar64(transaction.selector, current, .rax);
+}
+
+fn materializeActionPointer(
+    transaction: *ValueUseTransaction,
+    current: ValueLoc,
+    destination: ArgReg,
+) !void {
+    try clobberActionDestination(transaction, current, nodeForArgReg(destination));
+    try materializePointer(transaction.selector, current, .{ .gpr64 = destination });
+}
+
+fn materializeActionScalarHome(
+    transaction: *ValueUseTransaction,
+    home: ValueUseTransaction.PreparedScalarHome,
+    destination: ArgReg,
+) !void {
+    const current: ValueLoc = switch (home) {
+        .register => |register| switch (register) {
+            .gpr32 => |reg| .{ .scratch32 = reg },
+            .gpr64 => |reg| .{ .scratch64 = reg },
+            .eax => .eax,
+            .rax => .rax,
+        },
+        .spill => |frame_index| .{ .spill64 = frame_index },
+    };
+    try clobberActionDestination(transaction, current, nodeForArgReg(destination));
+    try materializeScalar64(transaction.selector, current, .{ .gpr64 = destination });
+}
+
+fn clobberActionDestination(
+    transaction: *ValueUseTransaction,
+    current: ValueLoc,
+    destination: ValueUseTransaction.PhysicalNode,
+) !void {
+    if (scalarSourceNode(current)) |source| if (source == destination) return;
+    try clobberPhysicalNode(transaction.selector, destination);
+}
+
+fn stackScalarFromPreparedView(
+    view: *const ValueUseTransaction.PreparedView,
+) !selector_types.StackScalarLoc {
+    return switch (view.*) {
+        .stack_object => |object| switch (object) {
+            .scalar => |stack| stack,
+            else => error.ValueUseStorePointerFormUnsupported,
+        },
+        else => error.ValueUseStorePointerFormUnsupported,
+    };
 }
 
 fn executeByteAddress(
@@ -1792,7 +2116,7 @@ fn preparedTablePointerEql(
 }
 
 const NodeList = struct {
-    items: [2]ValueUseTransaction.PhysicalNode = undefined,
+    items: [3]ValueUseTransaction.PhysicalNode = undefined,
     len: u8 = 0,
 
     fn append(list: *NodeList, node: ValueUseTransaction.PhysicalNode) !void {
@@ -1813,7 +2137,7 @@ const Mapping = struct {
 };
 
 const MappingList = struct {
-    items: [2]Mapping = undefined,
+    items: [3]Mapping = undefined,
     len: u8 = 0,
 
     fn append(list: *MappingList, mapping: Mapping) void {
@@ -1852,6 +2176,16 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .form_scaled_address => if (request.form != .pointer and request.form != .stack_object_address)
                 error.ValueUsePreparedActionFormMismatch,
             .form_readonly_table_address => if (request.form != .gpr64)
+                error.ValueUsePreparedActionFormMismatch,
+            .store_scalar => |store| if (request.form != .gpr32 or
+                request.expected.ty != .int or request.expected.ty.int != store.bits)
+                error.ValueUsePreparedActionFormMismatch,
+            .store_immediate => if (request.form != .pointer and request.form != .stack_object_address)
+                error.ValueUsePreparedActionFormMismatch,
+            .store_i64 => if (request.form != .pointer or request.expected.ty != .ptr)
+                error.ValueUsePreparedActionFormMismatch,
+            .store_stack_pointer => if (request.form != .stack_object_address or
+                request.expected.ty != .ptr or request.expected.register_class != .stack_object)
                 error.ValueUsePreparedActionFormMismatch,
         };
     }
@@ -2041,6 +2375,27 @@ fn requestDestinationNodes(
                 try result.append(.rcx);
                 try result.append(.r8);
             },
+            .store_scalar => |store| {
+                try result.append(.accumulator);
+                try appendStorePointerDestinationNodes(
+                    &result,
+                    try transaction.registeredOperandCurrent(store.pointer),
+                    store.bits,
+                );
+            },
+            .store_immediate => |store| {
+                try result.append(.accumulator);
+                try appendStorePointerDestinationNodes(
+                    &result,
+                    current orelse return error.ValueUseUnresolvedSource,
+                    store.bits,
+                );
+            },
+            .store_i64 => {
+                try result.append(.rcx);
+                try result.append(.accumulator);
+            },
+            .store_stack_pointer => try result.append(.rcx),
         },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2123,6 +2478,51 @@ fn requestMappings(
                 });
                 mappings.append(.{ .source = null, .destination = .rcx, .source_request_index = null });
             },
+            .store_scalar => |store| {
+                mappings.append(.{
+                    .source = scalarSourceNode(current orelse return error.ValueUseUnresolvedSource),
+                    .destination = .accumulator,
+                    .source_request_index = request_index,
+                });
+                try appendStorePointerMappings(
+                    transaction,
+                    &mappings,
+                    try transaction.registeredOperandCurrent(store.pointer),
+                    store.pointer.index,
+                    store.bits,
+                );
+            },
+            .store_immediate => |store| {
+                mappings.append(.{ .source = null, .destination = .accumulator, .source_request_index = null });
+                try appendStorePointerMappings(
+                    transaction,
+                    &mappings,
+                    current orelse return error.ValueUseUnresolvedSource,
+                    null,
+                    store.bits,
+                );
+            },
+            .store_i64 => |store| {
+                const pointer = current orelse return error.ValueUseUnresolvedSource;
+                try validateI64StorePointer(pointer);
+                mappings.append(.{
+                    .source = scalarSourceNode(pointer),
+                    .destination = .rcx,
+                    .source_request_index = request_index,
+                });
+                mappings.append(.{
+                    .source = scalarSourceNode(try transaction.registeredOperandCurrent(store.value)),
+                    .destination = .accumulator,
+                    .source_request_index = store.value.index,
+                });
+            },
+            .store_stack_pointer => |store| {
+                try validateStackPointerStoreViews(
+                    current orelse return error.ValueUseUnresolvedSource,
+                    try transaction.registeredOperandCurrent(store.destination),
+                );
+                mappings.append(.{ .source = null, .destination = .rcx, .source_request_index = request_index });
+            },
             .validate_shape, .emit_copy_to => {},
         }
         if (action != .emit_copy_to) return mappings;
@@ -2155,6 +2555,134 @@ fn requestMappings(
         .source_request_index = request_index,
     });
     return mappings;
+}
+
+fn actionOwnsOrderedWrites(action: ValueUseTransaction.PreparedAction) bool {
+    return switch (action) {
+        .store_scalar, .store_immediate, .store_i64, .store_stack_pointer => true,
+        .validate_shape,
+        .emit_copy_to,
+        .form_byte_address,
+        .form_scaled_address,
+        .form_readonly_table_address,
+        => false,
+    };
+}
+
+fn validateStorePointerOperand(
+    request: *const ValueUseTransaction.StoredRequest,
+    allow_stack_object: bool,
+) !void {
+    if (request.expected.ty != .ptr or request.expected.pointer_address_space != 0)
+        return error.ValueUsePreparedActionFormMismatch;
+    if (request.form == .pointer) {
+        if (request.expected.register_class != .gpr64 and
+            request.expected.register_class != .stack_pointer)
+            return error.ValueUsePreparedActionFormMismatch;
+        return;
+    }
+    if (allow_stack_object and request.form == .stack_object_address and
+        request.expected.register_class == .stack_object) return;
+    return error.ValueUsePreparedActionFormMismatch;
+}
+
+fn validateStoreI64ValueOperand(request: *const ValueUseTransaction.StoredRequest) !void {
+    if (request.form != .gpr64 or !request.expected.ty.eql(.{ .int = 64 }) or
+        request.expected.register_class != .gpr64)
+        return error.ValueUsePreparedActionFormMismatch;
+}
+
+fn validateStoreStackObjectOperand(request: *const ValueUseTransaction.StoredRequest) !void {
+    if (request.form != .stack_object_address or request.expected.ty != .ptr or
+        request.expected.register_class != .stack_object or
+        request.expected.pointer_address_space != 0)
+        return error.ValueUsePreparedActionFormMismatch;
+}
+
+fn appendStorePointerDestinationNodes(
+    nodes: *NodeList,
+    pointer: ValueLoc,
+    bits: u8,
+) !void {
+    switch (pointer) {
+        .stack_scalar => |stack| if (bits != 1 or stack.kind != .integer or stack.bits != 8)
+            return error.ValueUseStorePointerFormUnsupported,
+        .arg64, .scratch64 => if (bits != 32)
+            return error.ValueUseStorePointerFormUnsupported,
+        .spill64 => {
+            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            try nodes.append(.rcx);
+        },
+        .stack_i32_ptr => |ptr| {
+            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            if (ptr.index != null) try nodes.append(.rcx);
+            if (ptr.index != null and ptr.index.?.addend_name != null) try nodes.append(.r8);
+        },
+        .stack_i32_array => if (bits != 32)
+            return error.ValueUseStorePointerFormUnsupported,
+        .readonly_table_ptr => return error.ValueUseStoreReadOnlyPointer,
+        else => return error.ValueUseStorePointerFormUnsupported,
+    }
+}
+
+fn appendStorePointerMappings(
+    transaction: *ValueUseTransaction,
+    mappings: *MappingList,
+    pointer: ValueLoc,
+    source_request_index: ?u8,
+    bits: u8,
+) !void {
+    switch (pointer) {
+        .stack_scalar => |stack| if (bits != 1 or stack.kind != .integer or stack.bits != 8)
+            return error.ValueUseStorePointerFormUnsupported,
+        .arg64, .scratch64 => if (bits != 32)
+            return error.ValueUseStorePointerFormUnsupported,
+        .spill64 => {
+            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            mappings.append(.{ .source = null, .destination = .rcx, .source_request_index = source_request_index });
+        },
+        .stack_i32_ptr => |ptr| {
+            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            if (ptr.index) |index| {
+                mappings.append(.{
+                    .source = scalarSourceNode(try transaction.resolveNamedCurrent(index.name)),
+                    .destination = .rcx,
+                    .source_request_index = source_request_index,
+                });
+                if (index.addend_name) |addend_name| mappings.append(.{
+                    .source = scalarSourceNode(try transaction.resolveNamedCurrent(addend_name)),
+                    .destination = .r8,
+                    .source_request_index = source_request_index,
+                });
+            }
+        },
+        .stack_i32_array => if (bits != 32)
+            return error.ValueUseStorePointerFormUnsupported,
+        .readonly_table_ptr => return error.ValueUseStoreReadOnlyPointer,
+        else => return error.ValueUseStorePointerFormUnsupported,
+    }
+}
+
+fn validateI64StorePointer(pointer: ValueLoc) !void {
+    switch (pointer) {
+        .arg64, .scratch64, .spill64 => {},
+        else => return error.ValueUseStorePointerFormUnsupported,
+    }
+}
+
+fn validateStackPointerStoreViews(source: ValueLoc, destination: ValueLoc) !void {
+    const source_stack = switch (source) {
+        .stack_scalar => |stack| stack,
+        else => return error.ValueUseStorePointerFormUnsupported,
+    };
+    const destination_stack = switch (destination) {
+        .stack_scalar => |stack| stack,
+        else => return error.ValueUseStorePointerFormUnsupported,
+    };
+    _ = source_stack;
+    if (destination_stack.kind != .integer or destination_stack.bits != 64) {
+        return error.ValueUseStorePointerFormUnsupported;
+    }
 }
 
 fn validateCopyActionForm(

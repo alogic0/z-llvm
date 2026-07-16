@@ -17,6 +17,10 @@ fn addLive(plan: *SelectorAllocationPlan, name: []const u8) !void {
     try plan.interval_ends.put(name, 10);
 }
 
+fn addAtCurrent(plan: *SelectorAllocationPlan, name: []const u8) !void {
+    try plan.interval_ends.put(name, 1);
+}
+
 fn expected(ty: ir.Type, class: selector_types.VirtualRegClass) Transaction.Expected {
     return .{
         .ty = ty,
@@ -70,6 +74,389 @@ test "value-use transaction exposes fixed copy-amplification contract" {
     try std.testing.expectEqual(@as(usize, 1), Transaction.address_domain_snapshot_copies);
     try std.testing.expectEqual(@as(usize, 0), Transaction.address_domain_copies_per_request);
     try std.testing.expect(Transaction.address_domain_snapshot_bytes > 0);
+}
+
+test "value-use closed scalar store preserves same-register aliases and live EFLAGS" {
+    var machine = MachineFunction.init("value-use-store-scalar-alias", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "value", "pointer" }) |name| try addAtCurrent(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
+    try selector_state.bindValueLoc(&selector, "pointer", .{ .arg64 = .rdi });
+    try selector_state.emitEflagsInstruction(&selector, .{ .cmp_eax_imm32 = 0 }, .definition);
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const pointer = try transaction.register(preparedSourceRequest("pointer", .ptr, .gpr64, .pointer));
+    const action = try transaction.register(preparedRequest(
+        "value",
+        .{ .int = 32 },
+        .gpr32,
+        .gpr32,
+        .{ .store_scalar = .{ .pointer = pointer, .bits = 32 } },
+    ));
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(action));
+    try transaction.commit();
+
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .cmp_eax_imm32 = 0 },
+        .{ .mov_arg_eax = .rdi },
+        .{ .store_eax_arg_ptr = .rdi },
+    }, machine.instructions.items);
+    try selector_state.emitEflagsInstruction(&selector, .sete_eax, .use);
+}
+
+test "value-use scalar store preserves a live source exactly once before pointer staging" {
+    var machine = MachineFunction.init("value-use-store-live-source", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addLive(&plan, "value");
+    try addAtCurrent(&plan, "pointer");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rcx });
+    try selector_state.bindValueLoc(&selector, "pointer", .{ .spill64 = .slot4 });
+    const value_vreg = selector.values.get("value").?.vreg;
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const pointer = try transaction.register(preparedSourceRequest("pointer", .ptr, .gpr64, .pointer));
+    const action = try transaction.register(preparedRequest(
+        "value",
+        .{ .int = 32 },
+        .gpr32,
+        .gpr32,
+        .{ .store_scalar = .{ .pointer = pointer, .bits = 32 } },
+    ));
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(action));
+    try transaction.commit();
+
+    var preservation_count: usize = 0;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .mov_arg_arg, .mov_arg64_arg, .spill_arg_rsp, .spill_arg64_rsp => preservation_count += 1,
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), preservation_count);
+    try std.testing.expectEqual(value_vreg, selector.values.get("value").?.vreg);
+    try std.testing.expect(switch (selector.values.get("value").?.loc) {
+        .arg32, .arg64, .scratch32, .scratch64 => |reg| reg != .rcx,
+        else => true,
+    });
+}
+
+test "value-use closed immediate and i64 stores retain accepted staging order" {
+    {
+        var machine = MachineFunction.init("value-use-store-immediate", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "slot");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        try selector_state.bindValueLoc(&selector, "slot", .{ .stack_scalar = .{
+            .base_disp = 12,
+            .bits = 8,
+            .kind = .integer,
+        } });
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const action = try transaction.register(preparedRequest(
+            "slot",
+            .ptr,
+            .stack_object,
+            .stack_object_address,
+            .{ .store_immediate = .{ .value = 1, .bits = 1 } },
+        ));
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(action));
+        try transaction.commit();
+        try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+            .{ .mov_imm_eax = 1 },
+            .{ .store_al_stack_disp8 = 12 },
+        }, machine.instructions.items);
+    }
+
+    {
+        var machine = MachineFunction.init("value-use-store-i64", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "pointer", "value" }) |name| try addAtCurrent(&plan, name);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 64;
+        try selector_state.bindValueLoc(&selector, "pointer", .{ .spill64 = .slot0 });
+        try selector_state.bindValueLoc(&selector, "value", .rax);
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const value = try transaction.register(preparedSourceRequest("value", .{ .int = 64 }, .gpr64, .gpr64));
+        const action = try transaction.register(preparedRequest(
+            "pointer",
+            .ptr,
+            .gpr64,
+            .pointer,
+            .{ .store_i64 = .{ .value = value } },
+        ));
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(action));
+        try transaction.commit();
+        try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+            .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot0 } },
+            .store_rax_rcx_ptr,
+        }, machine.instructions.items);
+    }
+}
+
+test "value-use store rollback covers scalar dependency and stack-pointer partial stages" {
+    {
+        var machine = MachineFunction.init("value-use-store-index-rollback", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "value", "index", "addend", "pointer" }) |name| try addAtCurrent(&plan, name);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "value", .{ .spill64 = .slot0 });
+        selector.values.getPtr("value").?.vreg.class = .gpr32;
+        try selector_state.bindValueLoc(&selector, "index", .{ .spill64 = .slot2 });
+        try selector_state.bindValueLoc(&selector, "addend", .{ .spill64 = .slot4 });
+        try selector_state.bindValueLoc(&selector, "pointer", .{ .stack_i32_ptr = .{
+            .disp = 24,
+            .index = .{ .reg = .rcx, .name = "index", .addend_name = "addend" },
+        } });
+        try selector_state.emitEflagsInstruction(&selector, .{ .cmp_eax_imm32 = 0 }, .definition);
+        const saved_eflags = selector.eflags.snapshot();
+        const saved_domain = selector.address_dependencies;
+        const value_binding = selector.values.get("value").?;
+        const pointer_binding = selector.values.get("pointer").?;
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const pointer = try transaction.register(preparedSourceRequest("pointer", .ptr, .stack_pointer, .pointer));
+        const action = try transaction.register(preparedRequest(
+            "value",
+            .{ .int = 32 },
+            .gpr32,
+            .gpr32,
+            .{ .store_scalar = .{ .pointer = pointer, .bits = 32 } },
+        ));
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try std.testing.expectError(
+            error.EflagsClobberedWhileLive,
+            transaction.executePreparedAction(try transaction.preparedView(action)),
+        );
+        try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+        try std.testing.expectEqual(value_binding, selector.values.get("value").?);
+        try std.testing.expectEqual(pointer_binding, selector.values.get("pointer").?);
+        try std.testing.expect(selector.address_dependencies.eql(&saved_domain));
+        try selector.eflags.validateSnapshot(saved_eflags);
+    }
+
+    {
+        var machine = MachineFunction.init("value-use-store-stack-pointer-rollback", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "source", "destination" }) |name| try addAtCurrent(&plan, name);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        try selector_state.bindValueLoc(&selector, "source", .{ .stack_scalar = .{
+            .base_disp = 8,
+            .bits = 32,
+            .kind = .fp,
+        } });
+        try selector_state.bindValueLoc(&selector, "destination", .{ .stack_scalar = .{
+            .base_disp = 16,
+            .bits = 64,
+            .kind = .integer,
+        } });
+        try selector_state.emitEflagsInstruction(&selector, .{ .cmp_eax_imm32 = 0 }, .definition);
+        const saved_eflags = selector.eflags.snapshot();
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const destination = try transaction.register(preparedSourceRequest(
+            "destination",
+            .ptr,
+            .stack_object,
+            .stack_object_address,
+        ));
+        const action = try transaction.register(preparedRequest(
+            "source",
+            .ptr,
+            .stack_object,
+            .stack_object_address,
+            .{ .store_stack_pointer = .{ .destination = destination } },
+        ));
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try std.testing.expectError(
+            error.EflagsClobberedWhileLive,
+            transaction.executePreparedAction(try transaction.preparedView(action)),
+        );
+        try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+        try selector.eflags.validateSnapshot(saved_eflags);
+    }
+}
+
+test "value-use stack-pointer store commits closed source and destination descriptors" {
+    var machine = MachineFunction.init("value-use-store-stack-pointer", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "source", "destination" }) |name| try addAtCurrent(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "source", .{ .stack_scalar = .{
+        .base_disp = 8,
+        .bits = 32,
+        .kind = .fp,
+    } });
+    try selector_state.bindValueLoc(&selector, "destination", .{ .stack_scalar = .{
+        .base_disp = 16,
+        .bits = 64,
+        .kind = .integer,
+    } });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const destination = try transaction.register(preparedSourceRequest(
+        "destination",
+        .ptr,
+        .stack_object,
+        .stack_object_address,
+    ));
+    const action = try transaction.register(preparedRequest(
+        "source",
+        .ptr,
+        .stack_object,
+        .stack_object_address,
+        .{ .store_stack_pointer = .{ .destination = destination } },
+    ));
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(action));
+    try transaction.commit();
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .mov_rsp_arg64 = .rcx },
+        .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = 8 } },
+        .{ .spill_arg64_rsp = .{ .frame_index = .slot4, .reg = .rcx } },
+    }, machine.instructions.items);
+}
+
+test "value-use indexed scalar store emits value index addend and store in semantic order" {
+    var machine = MachineFunction.init("value-use-store-indexed", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "value", "index", "addend", "pointer" }) |name| try addAtCurrent(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
+    try selector_state.bindValueLoc(&selector, "index", .{ .spill64 = .slot2 });
+    try selector_state.bindValueLoc(&selector, "addend", .{ .arg64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "pointer", .{ .stack_i32_ptr = .{
+        .disp = 24,
+        .index = .{ .reg = .rcx, .name = "index", .addend_name = "addend" },
+    } });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const pointer = try transaction.register(preparedSourceRequest("pointer", .ptr, .stack_pointer, .pointer));
+    const action = try transaction.register(preparedRequest(
+        "value",
+        .{ .int = 32 },
+        .gpr32,
+        .gpr32,
+        .{ .store_scalar = .{ .pointer = pointer, .bits = 32 } },
+    ));
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(action));
+    try transaction.commit();
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .mov_arg_eax = .rdi },
+        .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot2 } },
+        .add_r8_rcx,
+        .{ .store_eax_stack_rcx4_disp8 = 24 },
+    }, machine.instructions.items);
+}
+
+test "value-use store writes participate in conflict and copy-cycle planning" {
+    var machine = MachineFunction.init("value-use-store-planning", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "pointer", "value", "writer" }) |name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "pointer", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "value", .{ .arg64 = .rcx });
+    selector.values.getPtr("value").?.vreg.class = .gpr32;
+    try selector_state.bindValueLoc(&selector, "writer", .rax);
+
+    var conflict = try Transaction.begin(&selector);
+    defer conflict.deinit();
+    const conflict_pointer = try conflict.register(preparedSourceRequest("pointer", .ptr, .gpr64, .pointer));
+    _ = try conflict.register(preparedRequest(
+        "value",
+        .{ .int = 32 },
+        .gpr32,
+        .gpr32,
+        .{ .store_scalar = .{ .pointer = conflict_pointer, .bits = 32 } },
+    ));
+    _ = try conflict.register(request("writer", .{ .int = 64 }, .gpr64, .gpr64, .rax));
+    try std.testing.expectError(error.ValueUseConflictingDestination, conflict.seal());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try conflict.rollback();
+    selector.values.getPtr("value").?.vreg.class = .gpr64;
+
+    var cycle = try Transaction.begin(&selector);
+    defer cycle.deinit();
+    const cycle_value = try cycle.register(preparedSourceRequest("value", .{ .int = 64 }, .gpr64, .gpr64));
+    _ = try cycle.register(preparedRequest(
+        "pointer",
+        .ptr,
+        .gpr64,
+        .pointer,
+        .{ .store_i64 = .{ .value = cycle_value } },
+    ));
+    _ = try cycle.register(request("writer", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rdi }));
+    try std.testing.expectError(error.ValueUseCopyCycleRequiresO4, cycle.seal());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
 test "value-use transaction materializes GPR EAX RAX scalar spill and pointer views without rebinding sources" {

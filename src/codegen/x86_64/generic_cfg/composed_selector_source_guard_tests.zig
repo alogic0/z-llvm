@@ -386,6 +386,13 @@ fn validatePreparedViewLeafDiscipline(source: [:0]const u8) !void {
     }
     if (std.mem.indexOf(u8, source, ".validate_shape") != null)
         return error.ValueUsePreparedTestActionInProduction;
+    if (std.mem.indexOf(u8, source, ".store_scalar") != null or
+        std.mem.indexOf(u8, source, ".store_immediate") != null or
+        std.mem.indexOf(u8, source, ".store_i64") != null or
+        std.mem.indexOf(u8, source, ".store_stack_pointer") != null)
+    {
+        return error.ValueUseDormantStoreActionInProduction;
+    }
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -1380,6 +1387,12 @@ test "composed selector source guard rejects callback escapes and raw operations
         error.ValueUsePreparedTestActionInProduction,
         validatePreparedViewLeafDiscipline(
             "fn lower() void { const action: Transaction.PreparedAction = .{ .validate_shape = expected }; _ = action; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseDormantStoreActionInProduction,
+        validatePreparedViewLeafDiscipline(
+            "fn lowerStore() void { const action: Transaction.PreparedAction = .{ .store_i64 = intent }; _ = action; }",
         ),
     );
 }

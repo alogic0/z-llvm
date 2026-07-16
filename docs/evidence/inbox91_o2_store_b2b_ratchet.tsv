@@ -1,0 +1,11 @@
+file	function	gateway	occurrence	expected_count	semantic_owner	b2b_disposition
+composed_selector_memory.zig	lowerStore	emitValueIntoEax	1	1	integer scalar store leaf	remove when store_scalar/store_immediate wiring lands
+composed_selector_memory.zig	lowerStore	lowerStoreI64	1	1	parent-owned i64 helper dispatch	remove when helper collapses into lowerStore authority
+composed_selector_memory.zig	lowerStore	materializeLocIntoLoc	1	1	i32 spilled-pointer staging	remove when closed store action owns pointer staging
+composed_selector_memory.zig	lowerStore	resolveValue	1	1	integer store pointer use	remove when pointer request registration lands
+composed_selector_memory.zig	lowerStore	resolveValue	2	1	integer store named-value classification use	remove when value request registration/typed diagnostic query lands
+composed_selector_memory.zig	lowerStoreI64	emitValueIntoRax	1	1	parent-owned i64 value staging	remove with helper collapse
+composed_selector_memory.zig	lowerStoreI64	materializeLocIntoLoc	1	1	parent-owned register-pointer staging	remove with helper collapse
+composed_selector_memory.zig	lowerStoreI64	materializeLocIntoLoc	2	1	parent-owned spill-pointer staging	remove with helper collapse
+composed_selector_memory.zig	lowerStoreStackPointer	resolveValue	1	1	pointer-store destination use	remove when destination request registration lands
+composed_selector_memory.zig	lowerStoreStackPointer	resolveValue	2	1	pointer-store source use	remove when source request registration lands
