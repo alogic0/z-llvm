@@ -9,6 +9,7 @@ const stage2_planning = @import("stage2_planning.zig");
 const address_dependencies = @import("composed_selector_address_dependencies.zig");
 const eflags = @import("composed_selector_eflags.zig");
 const constant_table = @import("../constant_table.zig");
+const aggregate_object = @import("aggregate_object.zig");
 
 const ArgReg = x86_64_types.ArgReg;
 const FrameIndex = x86_64_types.FrameIndex;
@@ -57,6 +58,9 @@ pub const ValueUseTransaction = struct {
         gpr32,
         gpr64,
         pointer,
+        /// Action-only bounded descriptor view. It is accepted exclusively by
+        /// form_byte_address and is never a generic pointer materialization.
+        stack_f32_pair_byte_address,
         stack_object_address,
         pair_low_high,
         pair_high_low,
@@ -159,6 +163,7 @@ pub const ValueUseTransaction = struct {
         result: ActionIdentity,
         index: AddressOffset,
         scale: u8,
+        expected_stack_array_len: ?u32 = null,
     };
 
     pub const ReadOnlyTableAddressAction = struct {
@@ -253,6 +258,11 @@ pub const ValueUseTransaction = struct {
         addend: ?PreparedAddressComponent = null,
     };
 
+    const PreparedStackF32PairAddress = struct {
+        object_base_disp: u32,
+        disp: u32,
+    };
+
     const PreparedTablePointer = struct {
         storage: union(enum) { register: ArgReg, spill: FrameIndex },
         symbol: PreparedIdentity,
@@ -277,6 +287,7 @@ pub const ValueUseTransaction = struct {
         spill: struct { frame_index: FrameIndex, bits: u16 },
         stack_object: PreparedStackObject,
         address_descriptor: PreparedAddressDescriptor,
+        stack_f32_pair_address: PreparedStackF32PairAddress,
         table_pointer: PreparedTablePointer,
         read_only_pair: PreparedReadOnlyPair,
     };
@@ -828,6 +839,7 @@ pub const ValueUseTransaction = struct {
             .gpr32 => try materializeScalar32(transaction.selector, current, request.destination),
             .gpr64 => try materializeScalar64(transaction.selector, current, request.destination),
             .pointer, .stack_object_address => try materializePointer(transaction.selector, current, request.destination),
+            .stack_f32_pair_byte_address => return error.ValueUsePreparedActionRequired,
             .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, request.destination),
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -874,10 +886,21 @@ fn preparedViewFromLoc(
     return switch (request.form) {
         .gpr32, .gpr64 => preparedScalarView(loc),
         .pointer => preparedPointerView(transaction, request, loc),
+        .stack_f32_pair_byte_address => preparedStackF32PairAddressView(loc),
         .stack_object_address => preparedStackObjectView(loc),
         .pair_low_high, .pair_high_low => preparedPairView(loc, request.form),
         .stack_argument => error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
+    };
+}
+
+fn preparedStackF32PairAddressView(loc: ValueLoc) !ValueUseTransaction.PreparedView {
+    return switch (loc) {
+        .stack_f32_pair_ptr => |ptr| .{ .stack_f32_pair_address = .{
+            .object_base_disp = ptr.object_base_disp,
+            .disp = ptr.disp,
+        } },
+        else => error.ValueUseSourceViewMismatch,
     };
 }
 
@@ -1018,6 +1041,7 @@ fn executePreparedActionInternal(
                 .gpr32 => try materializeScalar32(transaction.selector, current, target),
                 .gpr64 => try materializeScalar64(transaction.selector, current, target),
                 .pointer, .stack_object_address => try materializePointer(transaction.selector, current, target),
+                .stack_f32_pair_byte_address => return error.ValueUsePreparedActionFormMismatch,
                 .pair_low_high, .pair_high_low => return error.ValueUsePreparedActionFormMismatch,
                 .stack_argument => return error.ValueUseStackArgumentUnsupported,
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -1041,6 +1065,22 @@ fn executeByteAddress(
             const current = (try transaction.validateRequest(base_request)) orelse
                 return error.ValueUseUnsupportedSource;
             switch (current) {
+                .stack_f32_pair_ptr => |ptr| {
+                    const adjusted = std.math.add(i64, ptr.disp, offset) catch
+                        return error.ValueUseAddressOffsetOutOfRange;
+                    const disp = std.math.cast(u32, adjusted) orelse
+                        return error.ValueUseAddressOffsetOutOfRange;
+                    const object_end = std.math.add(u32, ptr.object_base_disp, aggregate_object.byte_size) catch
+                        return error.ValueUseAddressOffsetOutOfRange;
+                    if (disp < ptr.object_base_disp or disp > object_end)
+                        return error.ValueUseAddressOffsetOutOfRange;
+                    try selector_state.bindValueLoc(transaction.selector, result_name, .{
+                        .stack_f32_pair_ptr = .{
+                            .object_base_disp = ptr.object_base_disp,
+                            .disp = disp,
+                        },
+                    });
+                },
                 .stack_i32_ptr => |ptr| {
                     const adjusted = std.math.add(i64, ptr.disp, offset) catch
                         return error.ValueUseAddressOffsetOutOfRange;
@@ -1051,18 +1091,14 @@ fn executeByteAddress(
                     });
                 },
                 .readonly_table_ptr => |ptr| {
-                    const adjusted = std.math.add(i32, ptr.offset, offset) catch
-                        return error.ValueUseAddressOffsetOutOfRange;
-                    const table_offset = std.math.cast(u8, adjusted) orelse
-                        return error.ValueUseAddressOffsetOutOfRange;
-                    if (!ptr.shape.allowsOffset(table_offset))
+                    if (offset != 8 or ptr.offset != 0 or !ptr.shape.allowsOffset(8))
                         return error.ValueUseAddressOffsetOutOfRange;
                     var result = ptr;
-                    result.offset = table_offset;
+                    result.offset = 8;
                     try selector_state.bindValueLoc(transaction.selector, result_name, .{ .readonly_table_ptr = result });
                 },
                 else => {
-                    try materializePointer(transaction.selector, try preparedViewLoc(base_view), .{ .gpr64 = .rcx });
+                    try materializeByteAddressPointer(transaction.selector, try preparedViewLoc(base_view), .rcx);
                     if (offset != 0) try selector_state.emitEflagsInstruction(
                         transaction.selector,
                         .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = offset } },
@@ -1074,7 +1110,7 @@ fn executeByteAddress(
         },
         .request => |offset_handle| {
             const offset_view = try transaction.registeredOperandView(offset_handle);
-            try materializePointer(transaction.selector, try preparedViewLoc(base_view), .{ .gpr64 = .r8 });
+            try materializeByteAddressPointer(transaction.selector, try preparedViewLoc(base_view), .r8);
             try materializeScalar64(transaction.selector, try preparedViewLoc(offset_view), .{ .gpr64 = .rcx });
             try selector_state.emitEflagsInstruction(transaction.selector, .add_r8_rcx, .write);
             try selector_state.bindScratch(transaction.selector, result_name, .rcx, 64);
@@ -1094,6 +1130,9 @@ fn executeScaledAddress(
     switch (current) {
         .stack_i32_array => |array| {
             if (action.scale != 4) return error.ValueUseAddressDescriptorScaleMismatch;
+            if (action.expected_stack_array_len) |expected_len| {
+                if (array.len != expected_len) return error.ValueUseAddressDescriptorLengthMismatch;
+            }
             switch (action.index) {
                 .constant => |constant_index| {
                     const index = std.math.cast(u32, constant_index) orelse
@@ -1119,6 +1158,8 @@ fn executeScaledAddress(
             }
         },
         .stack_i32_ptr => |ptr| {
+            if (action.expected_stack_array_len != null)
+                return error.ValueUseAddressDescriptorLengthMismatch;
             if (action.scale != 4) return error.ValueUseAddressDescriptorScaleMismatch;
             switch (action.index) {
                 .constant => |constant_index| {
@@ -1133,6 +1174,7 @@ fn executeScaledAddress(
                 },
                 .request => |index_handle| {
                     const existing = ptr.index orelse return error.ValueUseUnsupportedAddressForm;
+                    if (existing.reg != .rcx) return error.ValueUseUnsupportedAddressForm;
                     if (existing.addend_name != null) return error.ValueUseUnsupportedAddressForm;
                     const addend_name = try ownRegisteredOperandName(transaction, index_handle);
                     try selector_state.bindValueLoc(transaction.selector, result_name, .{ .stack_i32_ptr = .{
@@ -1143,6 +1185,8 @@ fn executeScaledAddress(
             }
         },
         else => {
+            if (action.expected_stack_array_len != null)
+                return error.ValueUseAddressDescriptorLengthMismatch;
             try materializePointer(transaction.selector, try preparedViewLoc(base_view), .{ .gpr64 = .rcx });
             switch (action.index) {
                 .constant => |constant_index| {
@@ -1292,6 +1336,10 @@ fn preparedViewLoc(view: *const ValueUseTransaction.PreparedView) !ValueLoc {
                 .addend_name = if (address.addend) |*addend| addend.identity.slice() else null,
             } else null,
         } },
+        .stack_f32_pair_address => |address| .{ .stack_f32_pair_ptr = .{
+            .object_base_disp = address.object_base_disp,
+            .disp = address.disp,
+        } },
         .table_pointer => |*table| .{ .readonly_table_ptr = .{
             .storage = switch (table.storage) {
                 .register => |reg| .{ .reg = reg },
@@ -1322,6 +1370,7 @@ fn preparedViewEql(
         .spill => |value| std.meta.eql(value, rhs.spill),
         .stack_object => |*value| preparedStackObjectEql(value, &rhs.stack_object),
         .address_descriptor => |*value| preparedAddressDescriptorEql(value, &rhs.address_descriptor),
+        .stack_f32_pair_address => |value| std.meta.eql(value, rhs.stack_f32_pair_address),
         .table_pointer => |*value| preparedTablePointerEql(value, &rhs.table_pointer),
         .read_only_pair => |value| std.meta.eql(value, rhs.read_only_pair),
     };
@@ -1409,6 +1458,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
         if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
         return switch (request.form) {
             .gpr32, .gpr64, .pointer, .stack_object_address, .pair_low_high, .pair_high_low => {},
+            .stack_f32_pair_byte_address => error.ValueUsePreparedActionRequired,
             .stack_argument => error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
         };
@@ -1416,14 +1466,15 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
     if (request.destination == .prepared_view) {
         const action = request.prepared_action orelse return error.ValueUsePreparedActionMissing;
         switch (request.form) {
-            .gpr32, .gpr64, .pointer, .stack_object_address, .pair_low_high, .pair_high_low => {},
+            .gpr32, .gpr64, .pointer, .stack_f32_pair_byte_address, .stack_object_address, .pair_low_high, .pair_high_low => {},
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
         }
         return switch (action) {
-            .validate_shape => {},
+            .validate_shape => if (request.form == .stack_f32_pair_byte_address)
+                error.ValueUsePreparedActionFormMismatch,
             .emit_copy_to => |destination| validateCopyActionForm(request.form, destination),
-            .form_byte_address => if (request.form != .pointer)
+            .form_byte_address => if (request.form != .pointer and request.form != .stack_f32_pair_byte_address)
                 error.ValueUsePreparedActionFormMismatch,
             .form_scaled_address => if (request.form != .pointer and request.form != .stack_object_address)
                 error.ValueUsePreparedActionFormMismatch,
@@ -1436,6 +1487,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
         .gpr32 => request.destination == .gpr32 or request.destination == .eax,
         .gpr64 => request.destination == .gpr64 or request.destination == .rax,
         .pointer, .stack_object_address => request.destination == .gpr64 or request.destination == .rax,
+        .stack_f32_pair_byte_address => false,
         .pair_low_high, .pair_high_low => request.destination == .pair,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -1452,6 +1504,14 @@ fn validateExpectedType(expected: ValueUseTransaction.Expected, form: ValueUseTr
         .pointer => {
             if (expected.ty != .ptr or
                 (expected.register_class != .gpr64 and expected.register_class != .stack_pointer) or
+                expected.pointer_address_space == null or expected.pointer_address_space.? != 0)
+            {
+                return error.ValueUseTypeMismatch;
+            }
+        },
+        .stack_f32_pair_byte_address => {
+            if (expected.ty != .ptr or
+                expected.register_class != .stack_pointer or
                 expected.pointer_address_space == null or expected.pointer_address_space.? != 0)
             {
                 return error.ValueUseTypeMismatch;
@@ -1493,6 +1553,10 @@ fn validateSourceView(loc: ValueLoc, form: ValueUseTransaction.UseForm) !void {
             .aggregate_sse => return error.ValueUseAggregateUnsupported,
             else => return error.ValueUseSourceViewMismatch,
         },
+        .stack_f32_pair_byte_address => switch (loc) {
+            .stack_f32_pair_ptr => {},
+            else => return error.ValueUseSourceViewMismatch,
+        },
         .pair_low_high, .pair_high_low => switch (loc) {
             .arg128, .scratch128, .spill128 => {},
             .xmm => return error.ValueUseXmmUnsupported,
@@ -1526,7 +1590,7 @@ fn requestDestinationNodes(
             },
             .form_byte_address => |address| switch (address.offset) {
                 .constant => switch (current orelse return error.ValueUseUnresolvedSource) {
-                    .stack_i32_ptr, .readonly_table_ptr => {},
+                    .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr => {},
                     else => try result.append(.rcx),
                 },
                 .request => |handle| {
@@ -1580,7 +1644,7 @@ fn requestMappings(
         switch (action) {
             .form_byte_address => |address| switch (address.offset) {
                 .constant => switch (current orelse return error.ValueUseUnresolvedSource) {
-                    .stack_i32_ptr, .readonly_table_ptr => return mappings,
+                    .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr => return mappings,
                     else => mappings.append(.{ .source = scalarSourceNode(current.?), .destination = .rcx }),
                 },
                 .request => |handle| {
@@ -1651,6 +1715,7 @@ fn validateCopyActionForm(
     const valid = switch (form) {
         .gpr32 => destination == .gpr32 or destination == .eax,
         .gpr64, .pointer, .stack_object_address => destination == .gpr64 or destination == .rax,
+        .stack_f32_pair_byte_address => false,
         .pair_low_high, .pair_high_low => false,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -1754,6 +1819,17 @@ fn materializeScalar64(selector: *ComposedBlockSelector, current: ValueLoc, dest
             else => return error.ValueUseSourceViewMismatch,
         },
         else => return error.ValueUseDestinationFormMismatch,
+    }
+}
+
+fn materializeByteAddressPointer(selector: *ComposedBlockSelector, current: ValueLoc, destination: ArgReg) !void {
+    switch (current) {
+        .stack_f32_pair_ptr => try selector_state.materializeLocIntoLoc(
+            selector,
+            current,
+            .{ .scratch64 = destination },
+        ),
+        else => try materializePointer(selector, current, .{ .gpr64 = destination }),
     }
 }
 
