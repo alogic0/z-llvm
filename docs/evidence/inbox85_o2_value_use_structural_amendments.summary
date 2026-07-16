@@ -1,6 +1,7 @@
 # INBOX-85 O2-3B0 dormant value-use structural amendments
 
-Status: delivered for Supervisor/Reviewer review. O2-3B1 is not authorized.
+Status: corrected by the prepared-view lifetime follow-up and delivered for
+Supervisor/Reviewer review. O2-3B1 is not authorized.
 
 ## Base and boundary
 
@@ -30,15 +31,14 @@ again after preparation. Focused coverage forces one shared source to spill
 once and then materialize to two destinations from the relocated canonical
 home.
 
-## Restricted prepared views
+## Restricted prepared views and lifetime correction
 
 `Destination.prepared_view` requests produce no fixed write. Fixed-destination
-materializations complete first; only then does the authority resolve all
-prepared views from canonical state. A prepared view is available only through
-its request handle after `materializeAll`, and reading its phase-bound lease
-re-resolves and revalidates the source.
+materializations complete first; only then does the authority resolve private
+prepared records from canonical state. A capability is available only through
+its request handle after `materializeAll`.
 
-The public `PreparedView` union contains only:
+The internal, private `PreparedView` union contains only:
 
 - register (GPR32/GPR64/EAX/RAX);
 - scalar spill;
@@ -48,18 +48,30 @@ The public `PreparedView` union contains only:
   storage;
 - strictly read-only ordered pair limbs in registers or spills.
 
-It never exposes `ValueLoc`, a binding, or borrowed identity storage. Each read
-revalidates the expected type/register class, supported source form, liveness,
-and canonical address-dependency closure. It cannot create a binding, durable
-alias, dependency edge, or relocation. A future outer authority must call the
-general relocation invalidator before any later relocation/rebind; all prior
-leases then fail stale. Phase, missing, foreign, and invalidated handles fail
-closed.
+It is never returned and cannot be named by a production consumer. The public
+API returns only a phase-bound lease; `consumePreparedView` returns `void` and
+invokes a checked, non-retainable borrow callback. Every consumption checks the
+lease generation, re-resolves the source, and revalidates the expected
+type/register class, supported source form, liveness, and canonical
+address-dependency closure at the point of use.
+
+The transaction stores a private canonical record containing the source vreg,
+the restricted representation, and vregs/homes for address dependencies.
+Before invoking the consumer it compares a freshly resolved record with that
+canonical record. A relocation or rebind therefore returns
+`ValueUsePreparedViewStale` before the callback can emit. It performs the same
+comparison after the callback, so an attempted source mutation during
+consumption rolls back the complete authority including speculative emission.
+There is no public/manual invalidation API. Phase, missing, foreign, relocated,
+and rebound capabilities fail closed.
 
 The source guard now permits the one raw resolution authority only in
 `resolveNamedCurrent` and keeps the total exact at one. It also rejects every
 frozen raw resolution/materialization gateway, accumulator binding/clobber,
-or spill helper inside a consumer function that obtains/reads a prepared view.
+or spill helper inside a consumer function that obtains/consumes a prepared
+view. It also rejects reintroducing a public prepared-location union, a
+returning `readPreparedView`, a manual invalidation API, or a production
+consumer naming/retaining/directly inspecting a prepared-location value.
 The frozen inbox81 bypass inventory remains exact; it does not claim zero
 bypasses.
 
@@ -91,12 +103,24 @@ address_domain_snapshot_bytes=149761
 address_domain_copies_per_request=0
 ```
 
-No request registration, prepared-view construction, or prepared-view read
-copies the whole domain.
+No request registration, prepared-view construction, or prepared-view
+consumption copies the whole domain.
+
+## Lifetime follow-up proof
+
+The correction is layered on the original B0 commit `397b9359`. The working
+authorization head is a documentation-only descendant; its `src`, `tools`,
+and `build.zig` state was byte-identical to `397b9359` before this follow-up.
+
+The production-path negative acquires a capability for a source in RDI, uses
+the real `selector_state.bindValueLoc` authority to relocate that source to
+RSI, and supplies a consumer that would append an instruction. Consumption
+returns `ValueUsePreparedViewStale`; the callback count and instruction count
+remain zero, and rollback restores the original RDI binding.
 
 ## Non-Tier-3 validation
 
-The final code state passed the complete authorized validation:
+The original B0 code state passed the complete authorized validation:
 
 ```text
 full_unit=1124/1124
@@ -107,8 +131,19 @@ focused_codegen_canaries=2/2; execution_cases=35; local_fail=0
 integrated_exe=7/7; local_fail=0
 ```
 
-The fresh post-final-code whole-cohort log is
-`tmp/inbox85_final_full_report.log`:
+The lifetime correction then passed its bounded validation after the final
+code change:
+
+```text
+lifetime_followup_value_use_focused=17/17
+lifetime_followup_source_guard_focused=18/18
+lifetime_followup_full_unit=1124/1124
+lifetime_followup_source_guard=current-tree-pass; frozen-bypass-inventory-exact
+lifetime_followup_production_consumer_wiring=none
+```
+
+The fresh post-follow-up-code whole-cohort log is
+`tmp/inbox85_followup_full_report.log`:
 
 ```text
 report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681

@@ -15,6 +15,7 @@ const FrameIndex = x86_64_types.FrameIndex;
 const RegPair = selector_types.RegPair;
 const ValueBinding = selector_types.ValueBinding;
 const ValueLoc = selector_types.ValueLoc;
+const VirtualReg = selector_types.VirtualReg;
 const VirtualRegClass = selector_types.VirtualRegClass;
 const ComposedBlockSelector = state_data.ComposedBlockSelector;
 const AddressDependencyDomain = address_dependencies.AddressDependencyDomain;
@@ -36,7 +37,7 @@ pub const ValueUseTransaction = struct {
     request_phase: RequestPhase = .registering,
     lifecycle: Lifecycle = .active,
     write_nodes: [physical_node_count]bool = [_]bool{false} ** physical_node_count,
-    prepared_views: [max_requests]PreparedView = undefined,
+    prepared_views: [max_requests]PreparedRecord = undefined,
     prepared_view_valid: [max_requests]bool = [_]bool{false} ** max_requests,
     view_generation: u32 = 1,
 
@@ -100,7 +101,7 @@ pub const ValueUseTransaction = struct {
         view_generation: u32,
     };
 
-    pub const PreparedIdentity = struct {
+    const PreparedIdentity = struct {
         bytes: [max_identity_bytes]u8 = undefined,
         len: u8 = 0,
 
@@ -113,67 +114,77 @@ pub const ValueUseTransaction = struct {
             return identity;
         }
 
-        pub fn slice(identity: *const PreparedIdentity) []const u8 {
+        fn slice(identity: *const PreparedIdentity) []const u8 {
             return identity.bytes[0..identity.len];
+        }
+
+        fn eql(identity: *const PreparedIdentity, other: *const PreparedIdentity) bool {
+            return std.mem.eql(u8, identity.slice(), other.slice());
         }
     };
 
-    pub const PreparedRegister = union(enum) {
+    const PreparedRegister = union(enum) {
         gpr32: ArgReg,
         gpr64: ArgReg,
         eax,
         rax,
     };
 
-    pub const PreparedScalarHome = union(enum) {
+    const PreparedScalarHome = union(enum) {
         register: PreparedRegister,
         spill: FrameIndex,
     };
 
-    pub const PreparedStackObject = union(enum) {
+    const PreparedStackObject = union(enum) {
         scalar: selector_types.StackScalarLoc,
         integer128: u32,
         integer32_array: selector_types.StackArrayLoc,
     };
 
-    pub const PreparedAddressComponent = struct {
+    const PreparedAddressComponent = struct {
         identity: PreparedIdentity,
         role: AddressDependencyDomain.Role,
         home: PreparedScalarHome,
+        vreg: VirtualReg,
     };
 
-    pub const PreparedAddressDescriptor = struct {
+    const PreparedAddressDescriptor = struct {
         disp: u32,
         index: ?PreparedAddressComponent = null,
         addend: ?PreparedAddressComponent = null,
     };
 
-    pub const PreparedTablePointer = struct {
+    const PreparedTablePointer = struct {
         storage: union(enum) { register: ArgReg, spill: FrameIndex },
         symbol: PreparedIdentity,
         shape: constant_table.Shape,
         offset: u8,
     };
 
-    pub const PreparedPairLimb = union(enum) {
+    const PreparedPairLimb = union(enum) {
         register: ArgReg,
         spill: FrameIndex,
     };
 
-    pub const PreparedReadOnlyPair = struct {
+    const PreparedReadOnlyPair = struct {
         first: PreparedPairLimb,
         second: PreparedPairLimb,
     };
 
     /// Restricted source-derived representation. No raw ValueLoc, binding, or
     /// borrowed identity escapes the instruction-level authority.
-    pub const PreparedView = union(enum) {
+    const PreparedView = union(enum) {
         register: struct { register: PreparedRegister, bits: u16 },
         spill: struct { frame_index: FrameIndex, bits: u16 },
         stack_object: PreparedStackObject,
         address_descriptor: PreparedAddressDescriptor,
         table_pointer: PreparedTablePointer,
         read_only_pair: PreparedReadOnlyPair,
+    };
+
+    const PreparedRecord = struct {
+        view: PreparedView,
+        source_vreg: VirtualReg,
     };
 
     pub const Request = struct {
@@ -190,7 +201,6 @@ pub const ValueUseTransaction = struct {
         materializing,
         materialized,
         views_exposed,
-        views_invalidated,
         committed,
     };
 
@@ -485,7 +495,7 @@ pub const ValueUseTransaction = struct {
         // Only now expose source-derived views from canonical current state.
         for (transaction.requests[0..transaction.request_count], 0..) |*request, index| {
             if (request.destination != .prepared_view) continue;
-            transaction.prepared_views[index] = try transaction.buildPreparedView(request);
+            transaction.prepared_views[index] = try transaction.buildPreparedRecord(request);
             transaction.prepared_view_valid[index] = true;
         }
         transaction.request_phase = .materialized;
@@ -503,9 +513,13 @@ pub const ValueUseTransaction = struct {
         return .{ .request = handle, .view_generation = transaction.view_generation };
     }
 
-    /// Re-resolves and revalidates the canonical source on every read. The
-    /// returned value owns all identity bytes inline and cannot mutate state.
-    pub fn readPreparedView(transaction: *ValueUseTransaction, lease: PreparedViewLease) !PreparedView {
+    /// Consumes a phase-bound borrow without returning a retainable location.
+    /// Every consumption checks the generation, re-resolves canonical state,
+    /// and rejects relocation/rebinding before invoking the consumer. The
+    /// consumer must expose `consume(*const opaque_view) !void`; the private
+    /// borrow is valid only for that call and cannot be named by production
+    /// consumers.
+    pub fn consumePreparedView(transaction: *ValueUseTransaction, lease: PreparedViewLease, consumer: anytype) !void {
         try transaction.requireActive();
         if (lease.view_generation != transaction.view_generation)
             return error.ValueUsePreparedViewStale;
@@ -514,21 +528,16 @@ pub const ValueUseTransaction = struct {
         errdefer transaction.rollbackInternal();
         const index = try transaction.validateHandle(lease.request);
         if (!transaction.prepared_view_valid[index]) return error.ValueUsePreparedViewMissing;
-        const refreshed = try transaction.buildPreparedView(&transaction.requests[index]);
-        transaction.prepared_views[index] = refreshed;
-        return refreshed;
-    }
-
-    /// A future outer authority calls this before an action that can relocate
-    /// or rebind a source. Existing leases then fail closed.
-    pub fn invalidatePreparedViewsForRelocation(transaction: *ValueUseTransaction) !void {
-        try transaction.requireActive();
-        if (transaction.request_phase != .views_exposed)
-            return error.ValueUsePreparedViewUnavailable;
-        transaction.view_generation +%= 1;
-        if (transaction.view_generation == 0) transaction.view_generation = 1;
-        transaction.prepared_view_valid = [_]bool{false} ** max_requests;
-        transaction.request_phase = .views_invalidated;
+        const refreshed = try transaction.buildPreparedRecord(&transaction.requests[index]);
+        if (!preparedRecordEql(&transaction.prepared_views[index], &refreshed))
+            return error.ValueUsePreparedViewStale;
+        try consumer.consume(&refreshed.view);
+        // Defense in depth for a consumer that violates the borrow contract:
+        // any source mutation during consumption makes the entire instruction
+        // authority fail and roll back, including speculative emission.
+        const after_consumption = try transaction.buildPreparedRecord(&transaction.requests[index]);
+        if (!preparedRecordEql(&transaction.prepared_views[index], &after_consumption))
+            return error.ValueUsePreparedViewStale;
     }
 
     pub fn commit(transaction: *ValueUseTransaction) !void {
@@ -644,11 +653,19 @@ pub const ValueUseTransaction = struct {
             error.ValueUseUnresolvedSource;
     }
 
-    fn buildPreparedView(transaction: *ValueUseTransaction, request: *const StoredRequest) !PreparedView {
+    fn buildPreparedRecord(transaction: *ValueUseTransaction, request: *const StoredRequest) !PreparedRecord {
         if (request.destination != .prepared_view) return error.ValueUsePreparedViewMissing;
+        const name = switch (request.source) {
+            .named => |*identity| identity.slice(),
+            else => return error.ValueUsePreparedViewUnsupported,
+        };
+        const binding = transaction.selector.values.get(name) orelse return error.ValueUseUnresolvedSource;
         const current = (try transaction.validateRequest(request)) orelse
             return error.ValueUsePreparedViewUnsupported;
-        return preparedViewFromLoc(transaction, request, current);
+        return .{
+            .view = try preparedViewFromLoc(transaction, request, current),
+            .source_vreg = binding.vreg,
+        };
     }
 };
 
@@ -751,10 +768,12 @@ fn preparedAddressComponent(
     role: AddressDependencyDomain.Role,
 ) !ValueUseTransaction.PreparedAddressComponent {
     const current = try transaction.resolveNamedCurrent(name);
+    const binding = transaction.selector.values.get(name) orelse return error.ValueUseUnresolvedSource;
     return .{
         .identity = try ValueUseTransaction.PreparedIdentity.init(name),
         .role = role,
         .home = try preparedScalarHome(current),
+        .vreg = binding.vreg,
     };
 }
 
@@ -787,6 +806,71 @@ fn preparedPairView(
         .{ .first = low, .second = high }
     else
         .{ .first = high, .second = low } };
+}
+
+fn preparedRecordEql(
+    lhs: *const ValueUseTransaction.PreparedRecord,
+    rhs: *const ValueUseTransaction.PreparedRecord,
+) bool {
+    return std.meta.eql(lhs.source_vreg, rhs.source_vreg) and preparedViewEql(&lhs.view, &rhs.view);
+}
+
+fn preparedViewEql(
+    lhs: *const ValueUseTransaction.PreparedView,
+    rhs: *const ValueUseTransaction.PreparedView,
+) bool {
+    if (std.meta.activeTag(lhs.*) != std.meta.activeTag(rhs.*)) return false;
+    return switch (lhs.*) {
+        .register => |value| std.meta.eql(value, rhs.register),
+        .spill => |value| std.meta.eql(value, rhs.spill),
+        .stack_object => |*value| preparedStackObjectEql(value, &rhs.stack_object),
+        .address_descriptor => |*value| preparedAddressDescriptorEql(value, &rhs.address_descriptor),
+        .table_pointer => |*value| preparedTablePointerEql(value, &rhs.table_pointer),
+        .read_only_pair => |value| std.meta.eql(value, rhs.read_only_pair),
+    };
+}
+
+fn preparedStackObjectEql(
+    lhs: *const ValueUseTransaction.PreparedStackObject,
+    rhs: *const ValueUseTransaction.PreparedStackObject,
+) bool {
+    if (std.meta.activeTag(lhs.*) != std.meta.activeTag(rhs.*)) return false;
+    return switch (lhs.*) {
+        .scalar => |value| std.meta.eql(value, rhs.scalar),
+        .integer128 => |value| value == rhs.integer128,
+        .integer32_array => |value| std.meta.eql(value, rhs.integer32_array),
+    };
+}
+
+fn preparedAddressDescriptorEql(
+    lhs: *const ValueUseTransaction.PreparedAddressDescriptor,
+    rhs: *const ValueUseTransaction.PreparedAddressDescriptor,
+) bool {
+    if (lhs.disp != rhs.disp or (lhs.index == null) != (rhs.index == null) or
+        (lhs.addend == null) != (rhs.addend == null)) return false;
+    if (lhs.index) |*component| {
+        if (!preparedAddressComponentEql(component, &rhs.index.?)) return false;
+    }
+    if (lhs.addend) |*component| {
+        if (!preparedAddressComponentEql(component, &rhs.addend.?)) return false;
+    }
+    return true;
+}
+
+fn preparedAddressComponentEql(
+    lhs: *const ValueUseTransaction.PreparedAddressComponent,
+    rhs: *const ValueUseTransaction.PreparedAddressComponent,
+) bool {
+    return lhs.identity.eql(&rhs.identity) and lhs.role == rhs.role and
+        std.meta.eql(lhs.home, rhs.home) and std.meta.eql(lhs.vreg, rhs.vreg);
+}
+
+fn preparedTablePointerEql(
+    lhs: *const ValueUseTransaction.PreparedTablePointer,
+    rhs: *const ValueUseTransaction.PreparedTablePointer,
+) bool {
+    return std.meta.eql(lhs.storage, rhs.storage) and lhs.symbol.eql(&rhs.symbol) and
+        lhs.shape == rhs.shape and lhs.offset == rhs.offset;
 }
 
 const NodeList = struct {

@@ -351,6 +351,12 @@ fn readFrozenBypassInventory(allocator: std.mem.Allocator) ![:0]u8 {
 
 fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     try validateNoFunctionFamilyPredicate(source, error.ValueUseFunctionPredicateForbidden);
+    if (std.mem.indexOf(u8, source, "pub const PreparedView =") != null or
+        std.mem.indexOf(u8, source, "pub fn readPreparedView") != null or
+        std.mem.indexOf(u8, source, "pub fn invalidatePreparedViews") != null)
+    {
+        return error.ValueUsePreparedLocationEscape;
+    }
     const required = [_]struct { function: []const u8, pattern: []const u8, count: usize }{
         .{ .function = "resolveNamedCurrent", .pattern = "resolveValue(", .count = 1 },
     };
@@ -365,6 +371,12 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
 }
 
 fn validatePreparedViewLeafDiscipline(source: [:0]const u8) !void {
+    if (std.mem.indexOf(u8, source, "readPreparedView(") != null or
+        std.mem.indexOf(u8, source, ".PreparedView") != null or
+        std.mem.indexOf(u8, source, ".prepared_views") != null)
+    {
+        return error.ValueUsePreparedLocationEscape;
+    }
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -378,7 +390,7 @@ fn validatePreparedViewLeafDiscipline(source: [:0]const u8) !void {
     for (bodies) |body| {
         const function_source = source[body.start..body.end];
         if (std.mem.indexOf(u8, function_source, ".preparedView(") == null and
-            std.mem.indexOf(u8, function_source, ".readPreparedView(") == null) continue;
+            std.mem.indexOf(u8, function_source, ".consumePreparedView(") == null) continue;
         for (bypass_operations) |operation| {
             if (std.mem.indexOf(u8, function_source, operation) != null)
                 return error.ValueUsePreparedLeafRawOperation;
@@ -1278,22 +1290,36 @@ test "composed selector source guard rejects function predicates in the value-us
         error.ValueUseFunctionPredicateForbidden,
         validateValueUseAuthoritySource(accepted ++ "fn bad(function_family: []const u8) void { _ = function_family; }"),
     );
+    try std.testing.expectError(
+        error.ValueUsePreparedLocationEscape,
+        validateValueUseAuthoritySource(accepted ++ "pub const PreparedView = union(enum) { register: u8 };"),
+    );
+    try std.testing.expectError(
+        error.ValueUsePreparedLocationEscape,
+        validateValueUseAuthoritySource(accepted ++ "pub fn readPreparedView() PreparedView { return undefined; }"),
+    );
 }
 
-test "composed selector source guard rejects raw resolution or materialization after prepared-view exposure" {
+test "composed selector source guard rejects retained views and raw operations after checked consumption" {
     try validatePreparedViewLeafDiscipline(
-        "fn lower() void { const lease = try transaction.preparedView(handle); _ = try transaction.readPreparedView(lease); try emit(view); }",
+        "fn lower() void { const lease = try transaction.preparedView(handle); try transaction.consumePreparedView(lease, &consumer); }",
     );
     try std.testing.expectError(
         error.ValueUsePreparedLeafRawOperation,
         validatePreparedViewLeafDiscipline(
-            "fn lower() void { const lease = try transaction.preparedView(handle); _ = try transaction.readPreparedView(lease); _ = selector_state.resolveValue(selector, source); }",
+            "fn lower() void { const lease = try transaction.preparedView(handle); try transaction.consumePreparedView(lease, &consumer); _ = selector_state.resolveValue(selector, source); }",
         ),
     );
     try std.testing.expectError(
         error.ValueUsePreparedLeafRawOperation,
         validatePreparedViewLeafDiscipline(
             "fn lower() void { _ = try transaction.preparedView(handle); try selector_state.materializeLocIntoLoc(selector, source, destination); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUsePreparedLocationEscape,
+        validatePreparedViewLeafDiscipline(
+            "fn lower() void { const retained: Transaction.PreparedView = try transaction.readPreparedView(lease); _ = retained.register; }",
         ),
     );
 }
