@@ -1,0 +1,130 @@
+# INBOX-80 O1 commit 7B closeout evidence
+
+Status: delivered for Supervisor/Reviewer review; O1 is not accepted until
+this evidence is reviewed.
+
+## Tested source identity
+
+- source commit: `cdd95cb063ac7eecaa6b2246e5e20255dbdcb12b`
+- source tree: `f43ce713312cb6eb6811a70aea854cd84475ab50`
+- parent: `08e1c3cfa071bbf753a5c77df7c99d2c54aa7e6d`
+- Zig runner version: `0.16.0`
+
+The code commit was created before the fresh preflight, strengthened Tier 2,
+and the one authorized Tier 3. The evidence and retention-pin commit is not
+part of the tested source tree.
+
+## Mandatory canary promotion
+
+`tools/codegen_canary_shared.zig` is the single canary implementation. The
+standalone `focused-codegen-canaries` tool and the mandatory integrated-exe
+runner both call it directly. The mandatory runner does not invoke the
+standalone executable.
+
+The existing integrated-exe inventory remains exactly seven cases, enforced by
+a comptime assertion. The existing i128 case now applies the frozen `__multi3`
+object, machine-stream, symbol-byte/hash, and six-case executable proof. The
+existing fma case now applies the frozen object, machine-stream, symbol-byte,
+internal ldexp/add_and_denorm helper, 29-case executable, and no-host-libc-fma
+proof. Candidate selection, emitter, environment construction, and the
+runner-owned temp root remain owned by the mandatory runner.
+
+The shared validator contains fixed accepted hashes and exposes no expected
+hash or runtime override. `assertMandatoryMismatchNegative` deliberately feeds
+a mismatch to every fixed identity and requires `CanaryIdentityMismatch`; the
+mandatory runner invokes that production function, and the same function has a
+direct Zig test. Both the direct shared-validator test and the standalone
+focused tool were green before the tested source commit was frozen. The
+standalone summary remained two canaries / 35 executable cases / `local_fail=0`.
+
+The mandatory runner summary schema and case count did not change, so no
+counter, fixture, normalizer, linker-boundary, distribution-all inventory, or
+summary-version migration was triggered. The mandatory contract documentation
+was updated in `docs/validation_tiers.md`.
+
+## Fresh serial-headroom preflight
+
+This report-only preflight ran first and deleted nothing:
+
+```text
+filesystem_total_bytes=982240026624
+filesystem_free_bytes=130920202240
+serial_headroom reserve_bytes=49112001332 projected_peak_bytes=4419112960 required_start_bytes=53531114292 ready_now=true
+deleted=0
+```
+
+- log: `tmp/inbox80_serial_headroom_preflight.tsv`
+- SHA-256: `2f0f334ddea4f85ee2f6a164532983ea2ca8c9b26d8f24d0d88d1aeef5a36b59`
+
+## Strengthened Tier 2
+
+The accepted strengthened Tier-2 command passed before Tier 3:
+
+```text
+Build Summary: 28/28 steps succeeded; 1099/1099 tests passed
+summary abi-differential ... abi_diff_cases_attempted=60 abi_diff_cases_matched=60 abi_diff_real_functions_matched=30 ... result=pass
+summary zig-integrated-exe total=7 build_ok=7 run_ok=7 stdout_ok=7 exit_ok=7 ... local_fail=0
+```
+
+- log: `tmp/inbox80_strengthened_tier2.log`
+- SHA-256: `58c02bae10978d13ff8441b57a7594b7338215d03c1aee9aeca8265c94b52a68`
+
+The accepted-cohort object and owner manifest were also regenerated before the
+Tier-3 command:
+
+```text
+accepted_object_sha256=061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be
+owner_manifest_sha256=5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d
+composed_block=40
+composed_cfg=127
+legacy_envelope=17
+structural_fallback=101
+aggregate_live_ledger=167/17/101
+```
+
+There is no `src/` or emitter change in 7B. The full captured-cohort report is
+therefore byte-identical by construction to the accepted report:
+
+```text
+report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681
+selected/emitted/failed=443/285/158
+first_failure=compiler_rt.trunc.truncl
+first_diagnostic=UnsupportedLongDoubleAbi
+first_detail=unsupported-return-type
+```
+
+Thus the frozen identity tuple is exact: `49a19f04` /
+`443-285-158-truncl` / `061a64e4` / `5d91960e` / `167-17-101`.
+
+## Single tracked serial Tier 3
+
+Exactly one Tier-3 command was run for O1 commit 7B:
+
+```text
+zig build distribution-all -- --serial --real-rows-concurrency=3
+```
+
+Result:
+
+```text
+gate-start count=17
+gate-end exit_status=0 count=17
+summary distribution-all-gate-inventory ... subgates=17 ... local_fail=0
+real-rows-mode-parallel ... concurrency=3 workers=3 modes=ReleaseFast,ReleaseSafe,ReleaseSmall ... local_fail=0
+summary zig-integrated-exe total=7 build_ok=7 run_ok=7 stdout_ok=7 exit_ok=7 ... local_fail=0
+summary distribution-all-serial ... real_rows_concurrency=3 subgates=17 wall_ms=1445199 starting_free_bytes=130850426880 minimum_observed_free_bytes=130844770304 final_free_bytes=130844770304 observed_peak_bytes=5656576 reserve_bytes=49112001332 required_start_bytes=53531114292 local_fail=0
+ok distribution all gates
+```
+
+Durable raw evidence:
+
+- path: `tmp/inbox80_evidence_protected/tier3_cdd95cb0.raw.log`
+- bytes / lines: `510325 / 1293`
+- SHA-256: `27b455d6f293ce93f85aebff3b6d818fe1e12f760fe8e1b306942e43138273ff`
+- retention pin: `docs/evidence/tmp_retention_pins.tsv`
+- serial run id: `d20bf190ade3360ebd43ac9fe5375079`
+- real-row group run id: `2891ac898283e24912cd3bc94498e0b8`
+
+The run recorded no nonzero gate exit, `local_fail=1`, object movement, owner
+movement, report movement, or route movement. This is the one O1 Tier 3. Stop
+for Supervisor/Reviewer review; no successor work is authorized here.
