@@ -130,9 +130,16 @@ running this focused boundary gate once the public CLI surface changed.
 
 The permanent, deterministic runtime checks; every tier-2 run executes
 them. Current members: the syscall hello (three modes), the compiler_rt
-i128 arithmetic program, the setcc predicate program, and the mandatory
-`abi-differential` gate over ten audited accepted compiler-rt functions in
-all three modes. The ABI gate's paired-execution counters belong only to the
+i128 arithmetic program, the fma program, the setcc predicate program, the
+aggregate-SSE-return program, and the mandatory `abi-differential` gate over
+ten audited accepted compiler-rt functions in all three modes. The existing
+seven integrated-executable cases remain seven. Inside the i128 and fma cases,
+the mandatory runner directly uses the same production canary implementation
+as the standalone focused tool to require the frozen __multi3 and fma machine
+streams, exact symbol bytes, fma ldexp/add_and_denorm helper identities, and
+executable proofs. A mandatory mismatch negative invokes that fixed-hash
+production validator on every runner execution; accepted identities have no
+runtime override. The ABI gate's paired-execution counters belong only to the
 285-function compiler-rt population and do not describe the separate 100-row
 compiler-core distribution population. Every
 executable semantic case added under the INBOX-10 rule (each new

@@ -1,4 +1,5 @@
 const std = @import("std");
+const canaries = @import("codegen_canary_shared.zig");
 const common = @import("tool_common.zig");
 
 const Case = struct {
@@ -104,6 +105,10 @@ const cases = [_]Case{
     },
 };
 
+comptime {
+    if (cases.len != 7) @compileError("mandatory integrated-exe inventory must remain exactly seven cases");
+}
+
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
@@ -119,6 +124,7 @@ pub fn main(init: std.process.Init) !void {
             try common.validationError(io, "unexpected argument for integrated exe runner: {s}\n", .{arg});
         }
     }
+    try canaries.assertMandatoryMismatchNegative();
 
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
@@ -200,6 +206,7 @@ pub fn main(init: std.process.Init) !void {
             if (case.generic_cfg_selector) {
                 try focused_env.put("ZLLVM_GENERIC_CFG_SELECTOR", "1");
             }
+            try canaries.runMulti3Canary(allocator, io, temp, zllvm_exe, zig_emitter, target, &focused_env);
             const builtins_obj = try common.allocTempFile(allocator, temp, case.id, ".builtins.o");
             errdefer allocator.free(builtins_obj);
             const helper_obj = try common.allocTempFile(allocator, temp, case.id, ".helper.o");
@@ -227,9 +234,7 @@ pub fn main(init: std.process.Init) !void {
             errdefer allocator.free(fma_obj);
             const fma_helpers_obj = try common.allocTempFile(allocator, temp, case.id, ".fma-helpers.o");
             errdefer allocator.free(fma_helpers_obj);
-            try emitFocusedCompilerRtFmaObject(allocator, io, zllvm_exe, target, fma_obj, &focused_env);
-            try buildCompilerRtFmaHelpers(allocator, io, zig_emitter, target, fma_helpers_obj);
-            try inspectFocusedCompilerRtFmaObjects(allocator, io, fma_obj, fma_helpers_obj);
+            try canaries.buildAndValidateFmaObjects(allocator, io, zllvm_exe, zig_emitter, target, fma_obj, fma_helpers_obj, &focused_env);
             try extra_objects.appendSlice(allocator, &.{ fma_obj, fma_helpers_obj });
         } else if (case.setcc_semantic_object) {
             const predicate_obj = try common.allocTempFile(allocator, temp, case.id, ".predicates.o");
@@ -284,121 +289,6 @@ pub fn main(init: std.process.Init) !void {
         },
     );
     try stdout_writer.interface.flush();
-}
-
-fn emitFocusedCompilerRtFmaObject(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    zllvm_exe: []const u8,
-    target: []const u8,
-    object_path: []const u8,
-    env_map: *const std.process.Environ.Map,
-) !void {
-    const target_arg = try std.fmt.allocPrint(allocator, "--target={s}", .{zllvmTarget(target)});
-    defer allocator.free(target_arg);
-    const argv = [_][]const u8{
-        zllvm_exe,
-        "--emit=obj",
-        target_arg,
-        "--input-limit=1048576",
-        "test/zig/integrated/compiler_rt_fma.ll",
-    };
-    const result = try common.runCaptureEnv(allocator, io, &argv, "z_llvm focused compiler_rt fma", env_map);
-    defer common.freeRunResult(allocator, result);
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = object_path, .data = result.stdout });
-}
-
-fn buildCompilerRtFmaHelpers(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    zig_emitter: []const u8,
-    target: []const u8,
-    object_path: []const u8,
-) !void {
-    const emit_arg = try std.fmt.allocPrint(allocator, "-femit-bin={s}", .{object_path});
-    defer allocator.free(emit_arg);
-    const argv = [_][]const u8{
-        zig_emitter,
-        "build-obj",
-        "-fllvm",
-        "-flibllvm",
-        "-fno-compiler-rt",
-        "-fno-stack-protector",
-        "-fno-unwind-tables",
-        "-O",
-        "ReleaseFast",
-        "-target",
-        target,
-        "test/zig/integrated/compiler_rt_fma_helpers.ll",
-        emit_arg,
-    };
-    const result = try common.runCapture(allocator, io, &argv, "pinned Zig frozen compiler_rt fma helper object");
-    common.freeRunResult(allocator, result);
-}
-
-fn inspectFocusedCompilerRtFmaObjects(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    fma_object_path: []const u8,
-    helper_object_path: []const u8,
-) !void {
-    const defined_argv = [_][]const u8{ "llvm-nm-22", "--defined-only", fma_object_path };
-    const defined = try common.runCapture(allocator, io, &defined_argv, "compiler_rt fma defined-symbol inspection");
-    defer common.freeRunResult(allocator, defined);
-    if (std.mem.indexOf(u8, defined.stdout, "compiler_rt.fma.fma") == null) {
-        try common.validationError(io, "compiler_rt fma object is missing its emitted definition\n", .{});
-    }
-
-    const helper_defined_argv = [_][]const u8{ "llvm-nm-22", "--defined-only", helper_object_path };
-    const helper_defined = try common.runCapture(allocator, io, &helper_defined_argv, "compiler_rt fma helper defined-symbol inspection");
-    defer common.freeRunResult(allocator, helper_defined);
-    const required_helpers = [_][]const u8{
-        "math.ldexp.ldexp__anon_5959",
-        "compiler_rt.fma.add_and_denorm",
-        "zllvm_fma_proof_ldexp",
-        "zllvm_fma_proof_add_and_denorm",
-    };
-    for (required_helpers) |symbol| {
-        if (std.mem.indexOf(u8, helper_defined.stdout, symbol) == null) {
-            try common.validationError(io, "compiler_rt fma object is missing required definition {s}\n", .{symbol});
-        }
-    }
-
-    const undefined_argv = [_][]const u8{ "llvm-nm-22", "--undefined-only", fma_object_path };
-    const undefined_symbols = try common.runCapture(allocator, io, &undefined_argv, "compiler_rt fma undefined-symbol inspection");
-    defer common.freeRunResult(allocator, undefined_symbols);
-    var undefined_count: usize = 0;
-    var undefined_lines = std.mem.splitScalar(u8, undefined_symbols.stdout, '\n');
-    while (undefined_lines.next()) |line| {
-        const trimmed = std.mem.trim(u8, line, " \t\r");
-        if (trimmed.len == 0) continue;
-        undefined_count += 1;
-        if (!std.mem.endsWith(u8, trimmed, "math.ldexp.ldexp__anon_5959") and
-            !std.mem.endsWith(u8, trimmed, "compiler_rt.fma.add_and_denorm"))
-        {
-            try common.validationError(io, "compiler_rt fma object has forbidden external dependency: {s}\n", .{trimmed});
-        }
-    }
-    if (undefined_count != 2) {
-        try common.validationError(io, "compiler_rt fma object expected exactly two frozen internal helper references, found {}\n", .{undefined_count});
-    }
-
-    const helper_undefined_argv = [_][]const u8{ "llvm-nm-22", "--undefined-only", helper_object_path };
-    const helper_undefined = try common.runCapture(allocator, io, &helper_undefined_argv, "compiler_rt fma helper undefined-symbol inspection");
-    defer common.freeRunResult(allocator, helper_undefined);
-    if (std.mem.trim(u8, helper_undefined.stdout, " \t\r\n").len != 0) {
-        try common.validationError(io, "compiler_rt fma helper object has external dependencies (host fallback forbidden):\n{s}\n", .{helper_undefined.stdout});
-    }
-
-    const disassembly_argv = [_][]const u8{ "llvm-objdump-22", "-dr", fma_object_path };
-    const disassembly = try common.runCapture(allocator, io, &disassembly_argv, "compiler_rt fma recursive-call inspection");
-    defer common.freeRunResult(allocator, disassembly);
-    var lines = std.mem.splitScalar(u8, disassembly.stdout, '\n');
-    while (lines.next()) |line| {
-        if (std.mem.indexOf(u8, line, "R_X86_64") != null and std.mem.indexOf(u8, line, "compiler_rt.fma.fma") != null) {
-            try common.validationError(io, "compiler_rt fma object contains a recursive fma call: {s}\n", .{line});
-        }
-    }
 }
 
 fn emitAggregateSseSemanticObject(
