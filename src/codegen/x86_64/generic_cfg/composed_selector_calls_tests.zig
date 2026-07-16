@@ -89,6 +89,33 @@ test "generic cfg selector lowers exact i64 unsigned saturating subtraction" {
     try std.testing.expectEqualStrings("composed-block-usub-sat-args", diagnostic.detail());
 }
 
+test "generic cfg selector usub sat reuses a dead accumulator lhs" {
+    var machine = MachineFunction.init("usub-sat-dead-rax", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try selector_state.bindValueLoc(&selector, "source", .rax);
+
+    var call = ir.CallInst{
+        .ret_ty = .{ .int = 64 },
+        .callee = "llvm.usub.sat.i64",
+        .tail_kind = "tail",
+        .args = .empty,
+    };
+    defer call.deinit(std.testing.allocator);
+    try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .named = "source" } });
+    try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 55 } });
+
+    try std.testing.expect((try selector_calls.lowerCall(&selector, "difference", call)) == null);
+    try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "source").?);
+    try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "difference").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_imm_rcx = 55 },
+        .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } },
+    }, machine.instructions.items[0..2]);
+}
+
 test "generic cfg selector normalizes narrow intByteSize call results" {
     const input =
         \\declare fastcc i16 @zig.target.intByteSize(i16)

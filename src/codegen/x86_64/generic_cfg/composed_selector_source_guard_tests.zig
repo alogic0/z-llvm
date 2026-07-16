@@ -104,21 +104,6 @@ const generic_binding_inventory = [_]GenericBindingInventoryEntry{
 
 const alias_only_cast_binding_site = "try selector_state.bindValueLoc(selector, result_name, result_loc);";
 
-const EflagsEmissionInventoryEntry = struct {
-    source: []const u8,
-    maximum: usize,
-};
-
-// Frozen at INBOX-75 before any accumulator producer migration. Later slices
-// may only move these physical EFLAGS writes behind the semantic authority;
-// they cannot add or relocate a raw append site.
-const raw_eflags_emission_inventory = [_]EflagsEmissionInventoryEntry{
-    .{ .source = "composed_selector_calls.zig", .maximum = 34 },
-    .{ .source = "composed_selector_cfg.zig", .maximum = 0 },
-    .{ .source = "composed_selector_icmp.zig", .maximum = 93 },
-    .{ .source = "composed_selector_scalar.zig", .maximum = 53 },
-};
-
 fn validateCurrentTree(allocator: std.mem.Allocator) !void {
     const io = std.testing.io;
     var dir = try std.Io.Dir.cwd().openDir(io, source_dir, .{ .iterate = true });
@@ -167,16 +152,18 @@ fn validateProductionSource(name: []const u8, source: []const u8) !void {
 }
 
 fn validateEflagsEmissionAuthority(name: []const u8, source: []const u8) !void {
-    const maximum = for (raw_eflags_emission_inventory) |entry| {
-        if (std.mem.eql(u8, entry.source, name)) break entry.maximum;
-    } else return;
+    const guarded = std.mem.eql(u8, name, "composed_selector_calls.zig") or
+        std.mem.eql(u8, name, "composed_selector_cfg.zig") or
+        std.mem.eql(u8, name, "composed_selector_icmp.zig") or
+        std.mem.eql(u8, name, "composed_selector_scalar.zig");
+    if (!guarded) return;
+
     const markers = [_][]const u8{
         ".cmp_",        ".test_", ".setb_eax", ".seta_eax", ".sete_eax", ".setg_eax", ".setl_eax", ".setne_eax",
         ".binary_arg_", ".imul_", ".mul_rax",  ".xor_edx",  ".div_arg",  ".add_",     ".sub_",     ".shl_",
         ".shr_",        ".sar_",  ".and_",     ".or_",      ".adc_",     ".sbb_",     ".je ",      ".jne ",
         ".jo ",         ".jc ",   ".jp ",      ".js ",      ".jae ",     ".jle ",
     };
-    var raw_count: usize = 0;
     inline for (markers) |marker| {
         var search_from: usize = 0;
         while (std.mem.indexOfPos(u8, source, search_from, marker)) |index| {
@@ -186,12 +173,11 @@ fn validateEflagsEmissionAuthority(name: []const u8, source: []const u8) !void {
             if (std.mem.indexOf(u8, statement, "instructions.append") != null or
                 std.mem.indexOf(u8, statement, "instructions.appendSlice") != null)
             {
-                raw_count += 1;
+                return error.RawEflagsInstructionAppend;
             }
             search_from = index + marker.len;
         }
     }
-    if (raw_count > maximum) return error.RawEflagsInstructionAppendInventoryGrowth;
 }
 
 fn validateStateDataLifecycle(source: []const u8) !void {
@@ -264,6 +250,7 @@ fn validateAccumulatorDisplacementPolicies(source: []const u8) !void {
         const end = call_end orelse return error.MalformedAccumulatorPrepareCall;
         const call = source[call_start..end];
         if (std.mem.indexOf(u8, call, ".spill_live") == null and
+            std.mem.indexOf(u8, call, ".spill_source") == null and
             std.mem.indexOf(u8, call, ".scratch_preferred") == null and
             std.mem.indexOf(u8, call, "accumulatorLocDisplacement(") == null and
             std.mem.indexOf(u8, call, "accumulatorCastDisplacement(") == null)
@@ -363,15 +350,20 @@ test "composed selector source guard requires an explicit accumulator displaceme
 }
 
 test "composed selector source guard requires the EFLAGS emission authority" {
-    try std.testing.expectError(
-        error.RawEflagsInstructionAppendInventoryGrowth,
-        validateEflagsEmissionAuthority(
-            "composed_selector_cfg.zig",
-            "try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = 0 });",
-        ),
-    );
+    const raw_sites = [_][]const u8{
+        "try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = 0 });",
+        "try selector.machine.instructions.append(selector.allocator, .setne_eax);",
+        "try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = undefined });",
+        "try selector.machine.instructions.append(selector.allocator, .{ .jne = target });",
+    };
+    for (raw_sites) |site| {
+        try std.testing.expectError(
+            error.RawEflagsInstructionAppend,
+            validateEflagsEmissionAuthority("composed_selector_scalar.zig", site),
+        );
+    }
     try validateEflagsEmissionAuthority(
-        "composed_selector_cfg.zig",
+        "composed_selector_scalar.zig",
         "try selector_state.emitEflagsInstruction(selector, .{ .cmp_eax_imm32 = 0 }, .definition);",
     );
 }

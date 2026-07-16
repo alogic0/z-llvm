@@ -14,6 +14,18 @@ fn expectInstruction(instructions: []const codegen.x86_64.Instruction, expected:
     return error.ExpectedInstructionNotFound;
 }
 
+fn expectAccumulatorBinaryOperation(instructions: []const codegen.x86_64.Instruction, expected: codegen.x86_64.Instruction) !void {
+    const expected_op = switch (expected) {
+        .binary_arg_eax => |binary| binary.op,
+        else => unreachable,
+    };
+    for (instructions) |instruction| switch (instruction) {
+        .binary_arg_eax => |binary| if (binary.op == expected_op) return,
+        else => {},
+    };
+    return error.ExpectedInstructionNotFound;
+}
+
 fn expectInstructionTag(instructions: []const codegen.x86_64.Instruction, comptime tag: std.meta.Tag(codegen.x86_64.Instruction)) !void {
     for (instructions) |instruction| {
         if (std.meta.activeTag(instruction) == tag) return;
@@ -3893,7 +3905,7 @@ test "generic cfg selector preserves aliased accumulator binary operands" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
-        \\define i32 @double_low_bits(i32 %value) {
+        \\define i32 @add_lhs_rhs(i32 %value) {
         \\entry:
         \\  %narrow = trunc i32 %value to i16
         \\  %wide = zext i16 %narrow to i32
@@ -3901,17 +3913,63 @@ test "generic cfg selector preserves aliased accumulator binary operands" {
         \\  %result = add i32 %wide, %alias
         \\  ret i32 %result
         \\}
+        \\define i32 @add_rhs_lhs(i32 %value) {
+        \\entry:
+        \\  %narrow = trunc i32 %value to i16
+        \\  %wide = zext i16 %narrow to i32
+        \\  %alias = freeze i32 %wide
+        \\  %result = add i32 %alias, %wide
+        \\  ret i32 %result
+        \\}
+        \\define i32 @sub_lhs_rhs(i32 %value) {
+        \\entry:
+        \\  %narrow = trunc i32 %value to i16
+        \\  %wide = zext i16 %narrow to i32
+        \\  %alias = freeze i32 %wide
+        \\  %result = sub i32 %wide, %alias
+        \\  ret i32 %result
+        \\}
+        \\define i32 @sub_rhs_lhs(i32 %value) {
+        \\entry:
+        \\  %narrow = trunc i32 %value to i16
+        \\  %wide = zext i16 %narrow to i32
+        \\  %alias = freeze i32 %wide
+        \\  %result = sub i32 %alias, %wide
+        \\  ret i32 %result
+        \\}
+        \\define i32 @alias_live_after(i32 %value) {
+        \\entry:
+        \\  %narrow = trunc i32 %value to i16
+        \\  %wide = zext i16 %narrow to i32
+        \\  %alias = freeze i32 %wide
+        \\  %difference = sub i32 %alias, %wide
+        \\  %kept = add i32 %wide, 1
+        \\  %result = add i32 %difference, %kept
+        \\  ret i32 %result
+        \\}
         \\
     ;
     var module = try ir.Module.parse(std.testing.allocator, text);
     defer module.deinit();
 
-    var machine = codegen.x86_64.MachineFunction.init("double_low_bits", module.functions.items[0].ret_ty);
-    defer machine.deinit(std.testing.allocator);
+    const expected_instructions = [_]codegen.x86_64.Instruction{
+        .{ .binary_arg_eax = .{ .op = .add, .reg = .rcx } },
+        .{ .binary_arg_eax = .{ .op = .add, .reg = .rcx } },
+        .{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } },
+        .{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } },
+        .{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } },
+    };
+    for (module.functions.items, expected_instructions, 0..) |function, expected_instruction, index| {
+        var machine = codegen.x86_64.MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
 
-    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    try std.testing.expectEqual(selector.SelectionResult.selected, result);
-    try expectInstruction(machine.instructions.items, .{ .binary_arg_eax = .{ .op = .add, .reg = .rcx } });
+        const result = try selector.tryLower(std.testing.allocator, &machine, function);
+        try std.testing.expectEqual(selector.SelectionResult.selected, result);
+        if (index < 4)
+            try expectInstruction(machine.instructions.items, expected_instruction)
+        else
+            try expectAccumulatorBinaryOperation(machine.instructions.items, expected_instruction);
+    }
 }
 
 test "generic cfg selector narrows trunc result location class" {

@@ -177,16 +177,22 @@ pub fn lowerUsubSatI64(selector: *ComposedBlockSelector, result: ?[]const u8, ca
     {
         return .{ .no_emitter = "composed-block-usub-sat-args" };
     }
-    if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, lhs.value)) |diagnostic| return diagnostic;
-    selector_state.emitValueIntoRax(selector, lhs.value) catch return .{ .unsupported_value = "composed-block-usub-sat-lhs" };
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(
+        .preserve,
+        selector_scalar.accumulatorPreserveCurrentDisplacement(selector, lhs.value, .spill_live),
+    )) |diagnostic| return diagnostic;
+    transaction.materialize(lhs.value, .fullRax()) catch return .{ .unsupported_value = "composed-block-usub-sat-lhs" };
     try selector_state.clobberArgReg(selector, .rcx);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs.value.int) });
-    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } });
+    try selector_state.emitEflagsDefinition(selector, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } }, .carry);
     const no_borrow = try selector_state.allocateEdgeLabel(selector);
-    try selector.machine.instructions.append(selector.allocator, .{ .jae = no_borrow });
+    try selector_state.emitEflagsInstruction(selector, .{ .jae = no_borrow }, .use);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = 0 });
     try selector.machine.instructions.append(selector.allocator, .{ .label = no_borrow });
-    try selector_state.bindRax(selector, result_name);
+    try transaction.define(result_name, .fullRax());
+    try transaction.commit();
     return null;
 }
 
@@ -249,14 +255,14 @@ fn lowerFpAbs(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.Ca
     try selector_state.clobberAccumulator(selector);
     if (bits == 64) {
         try selector.machine.instructions.append(selector.allocator, .{ .movq_xmm_rax = .xmm0 });
-        try selector.machine.instructions.append(selector.allocator, .{ .shl_rax_imm6 = 1 });
-        try selector.machine.instructions.append(selector.allocator, .{ .shr_rax_imm6 = 1 });
+        try selector_state.emitEflagsInstruction(selector, .{ .shl_rax_imm6 = 1 }, .write);
+        try selector_state.emitEflagsInstruction(selector, .{ .shr_rax_imm6 = 1 }, .write);
         try selector_state.clobberXmmReg(selector, .xmm0);
         try selector.machine.instructions.append(selector.allocator, .{ .movq_rax_xmm = .xmm0 });
     } else {
         try selector.machine.instructions.append(selector.allocator, .{ .movd_xmm_eax = .xmm0 });
         try selector_state.clobberXmmReg(selector, .xmm0);
-        try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = if (bits == 16) 0x7fff else 0x7fff_ffff });
+        try selector_state.emitEflagsInstruction(selector, .{ .and_eax_imm32 = if (bits == 16) 0x7fff else 0x7fff_ffff }, .write);
         try selector.machine.instructions.append(selector.allocator, .{ .movd_eax_xmm = .xmm0 });
     }
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
@@ -334,11 +340,11 @@ pub fn lowerUnsignedOverflowI32(selector: *ComposedBlockSelector, result: ?[]con
         else => {},
     }
     selector_state.emitValueIntoEax(selector, lhs.value) catch return .{ .unsupported_value = "composed-block-overflow-lhs" };
-    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs_scratch } });
+    try selector_state.emitEflagsDefinition(selector, .{ .binary_arg_eax = .{ .op = op, .reg = rhs_scratch } }, .carry);
     try selector_state.clobberArgReg(selector, .rdx);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = .rdx });
     try selector_state.clobberAccumulator(selector);
-    try selector.machine.instructions.append(selector.allocator, .setb_eax);
+    try selector_state.emitEflagsInstruction(selector, .setb_eax, .use);
     try selector.overflow_results.put(result_name, .{
         .value = .{ .scratch32 = .rdx },
         .overflow = .eax,
@@ -388,16 +394,16 @@ pub fn lowerSmulOverflowI128(selector: *ComposedBlockSelector, result: ?[]const 
 
     try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = p00.hi, .reg = .r8 } });
     try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .r8 } });
-    try selector.machine.instructions.append(selector.allocator, .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 63 } });
+    try selector_state.emitEflagsInstruction(selector, .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 63 } }, .write);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = .r9 });
-    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } });
+    try selector_state.emitEflagsInstruction(selector, .{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } }, .write);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .r8 });
     try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = .rdx });
-    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } });
-    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"or", .reg = .r8 } });
+    try selector_state.emitEflagsInstruction(selector, .{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } }, .write);
+    try selector_state.emitEflagsInstruction(selector, .{ .binary_arg_rax = .{ .op = .@"or", .reg = .r8 } }, .write);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .rcx });
-    try selector.machine.instructions.append(selector.allocator, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = 0 } });
-    try selector.machine.instructions.append(selector.allocator, .setne_eax);
+    try selector_state.emitEflagsInstruction(selector, .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = 0 } }, .definition);
+    try selector_state.emitEflagsInstruction(selector, .setne_eax, .use);
 
     const overflow_spill = selector_state.allocateSpillSlot(selector, overflow_name) orelse return .{ .no_spill_envelope = "composed-block-smulo-i128-overflow-spill" };
     try selector.machine.instructions.append(selector.allocator, .{ .spill_eax_rsp = overflow_spill });
@@ -425,17 +431,17 @@ pub fn lowerSmulOverflowI64(selector: *ComposedBlockSelector, result: ?[]const u
     selector_state.prepareFixedProductDefs(selector) catch return .{ .no_spill_envelope = "composed-block-smulo-i64-fixed-defs" };
     selector_state.emitValueIntoScratch(selector, rhs.value, .rcx, 64) catch return .{ .unsupported_value = "composed-block-smulo-i64-rhs" };
     selector_state.emitValueIntoAccumulator(selector, lhs.value, 64) catch return .{ .unsupported_value = "composed-block-smulo-i64-lhs" };
-    try selector.machine.instructions.append(selector.allocator, .{ .imul_rax_arg64_full = .rcx });
+    try selector_state.emitEflagsInstruction(selector, .{ .imul_rax_arg64_full = .rcx }, .write);
 
     const value_name = try ownedInternalValueName(selector, result_name, "value");
     const value_spill = selector_state.allocateSpillSlot(selector, value_name) orelse return .{ .no_spill_envelope = "composed-block-smulo-i64-value" };
     try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = value_spill });
     selector_state.clobberArgReg(selector, .rcx) catch return .{ .no_spill_envelope = "composed-block-smulo-i64-sign" };
     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .rcx });
-    try selector.machine.instructions.append(selector.allocator, .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 63 } });
-    try selector.machine.instructions.append(selector.allocator, .{ .cmp_rcx_arg64 = .rdx });
+    try selector_state.emitEflagsInstruction(selector, .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 63 } }, .write);
+    try selector_state.emitEflagsInstruction(selector, .{ .cmp_rcx_arg64 = .rdx }, .definition);
     selector_state.clobberAccumulator(selector) catch return .{ .no_spill_envelope = "composed-block-smulo-i64-overflow" };
-    try selector.machine.instructions.append(selector.allocator, .setne_eax);
+    try selector_state.emitEflagsInstruction(selector, .setne_eax, .use);
     const overflow_name = try ownedInternalValueName(selector, result_name, "overflow");
     const overflow_spill = selector_state.allocateSpillSlot(selector, overflow_name) orelse return .{ .no_spill_envelope = "composed-block-smulo-i64-overflow" };
     try selector.machine.instructions.append(selector.allocator, .{ .spill_eax_rsp = overflow_spill });
@@ -541,7 +547,7 @@ pub fn lowerCtlzI52(selector: *ComposedBlockSelector, result: ?[]const u8, call:
         return .{ .unsupported_value = "composed-block-ctlz-value" };
     try selector_state.clobberAccumulator(selector);
     try selector.machine.instructions.append(selector.allocator, .clz_i64_rdi_eax);
-    try selector.machine.instructions.append(selector.allocator, .{ .add_eax_imm32 = -12 });
+    try selector_state.emitEflagsInstruction(selector, .{ .add_eax_imm32 = -12 }, .write);
     try selector_state.bindRax(selector, result_name);
     return null;
 }
@@ -650,16 +656,14 @@ fn lowerCtpop(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.Ca
     try selector_state.clobberArgReg(selector, .rcx);
     try selector_state.clobberArgReg(selector, .rdx);
     try selector_state.clobberAccumulator(selector);
-    try selector.machine.instructions.appendSlice(selector.allocator, &.{
-        .{ .reload_rsp_rax = source.lo },
-        .popcount_rax,
-        .{ .mov_rax_to_arg = pair_b.lo },
-        .{ .reload_rsp_rax = source.hi },
-        .popcount_rax,
-        .{ .add_arg64_rax = pair_b.lo },
-        .{ .mov_rax_to_arg = pair_b.lo },
-        .{ .mov_imm_r9 = 0 },
-    });
+    try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = source.lo });
+    try selector.machine.instructions.append(selector.allocator, .popcount_rax);
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair_b.lo });
+    try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = source.hi });
+    try selector.machine.instructions.append(selector.allocator, .popcount_rax);
+    try selector_state.emitEflagsInstruction(selector, .{ .add_arg64_rax = pair_b.lo }, .write);
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair_b.lo });
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_r9 = 0 });
     try selector_state.bindPairScratch(selector, result_name, pair_b);
     return null;
 }
@@ -798,12 +802,12 @@ pub fn lowerCtlzI16(selector: *ComposedBlockSelector, result: ?[]const u8, call:
         return .{ .no_emitter = "composed-block-ctlz-args" };
     }
     selector_state.emitValueIntoEax(selector, value_arg.value) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
-    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 0xffff });
+    try selector_state.emitEflagsInstruction(selector, .{ .and_eax_imm32 = 0xffff }, .write);
     try selector_state.clobberArgReg(selector, .rdi);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = .rdi });
     try selector_state.clobberAccumulator(selector);
     try selector.machine.instructions.append(selector.allocator, .clz_i32_edi_eax);
-    try selector.machine.instructions.append(selector.allocator, .{ .add_eax_imm32 = -16 });
+    try selector_state.emitEflagsInstruction(selector, .{ .add_eax_imm32 = -16 }, .write);
     try selector_state.bindEax(selector, result_name);
     return null;
 }
@@ -871,7 +875,7 @@ pub fn lowerIntByteSizeCall(selector: *ComposedBlockSelector, result: ?[]const u
     if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
     try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
     if (needs_alignment) try selector_frame.appendAddRsp(selector, 8);
-    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 0xffff });
+    try selector_state.emitEflagsInstruction(selector, .{ .and_eax_imm32 = 0xffff }, .write);
     try selector_state.bindEax(selector, result_name);
     return null;
 }
@@ -963,7 +967,7 @@ pub fn lowerDirectCallArg(selector: *ComposedBlockSelector, arg: ir.CallArg, tar
         try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = target });
         if (disp != 0) {
             const addend: i32 = std.math.cast(i32, disp) orelse return .{ .no_spill_envelope = "composed-block-call-stack-disp" };
-            try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_imm32 = .{ .reg = target, .imm = addend } });
+            try selector_state.emitEflagsInstruction(selector, .{ .add_arg64_imm32 = .{ .reg = target, .imm = addend } }, .write);
         }
         return null;
     }

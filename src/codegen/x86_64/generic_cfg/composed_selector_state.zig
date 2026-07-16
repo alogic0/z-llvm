@@ -94,6 +94,10 @@ pub const AccumulatorDisplacementPolicy = union(enum) {
     /// Reproduce clobberAccumulator: every live accumulator alias is assigned
     /// its deterministic spill home, even when a scratch register is free.
     spill_live,
+    /// Reproduce an accepted spill-current-source path before a destructive
+    /// definition. Only this source identity is pinned until it is spilled;
+    /// no general current-position protection is enabled.
+    spill_source: []const u8,
     /// Reproduce preserveLiveAccumulatorValue: prefer the deterministic
     /// scratch register and fall back to the deterministic spill home.
     scratch_preferred,
@@ -253,6 +257,16 @@ pub const AccumulatorDefinitionTransaction = struct {
         errdefer transaction.restore(.rolled_back);
         switch (displacement) {
             .spill_live => try clobberAccumulator(transaction.selector),
+            .spill_source => |source_name| {
+                const source = transaction.selector.values.get(source_name) orelse
+                    return error.AccumulatorSpillSourceUnknown;
+                switch (source.loc) {
+                    .eax, .rax => {},
+                    else => return error.AccumulatorSpillSourceNotResident,
+                }
+                try spillValueOrError(transaction.selector, source_name);
+                try clobberAccumulator(transaction.selector);
+            },
             .scratch_preferred => {
                 while (liveAccumulatorNameAfterCurrent(transaction.selector)) |live_name| {
                     if (try preserveLiveAccumulatorValue(transaction.selector, live_name)) |diagnostic| {
@@ -293,10 +307,13 @@ pub const AccumulatorDefinitionTransaction = struct {
                 try transaction.materializeCurrentLocIntoAccumulator(current, definition);
             },
             .int => |int| {
-                if (definition.physicalLoc() != .eax) return error.UnsupportedCodegenValue;
                 try transaction.selector.machine.instructions.append(
                     transaction.selector.allocator,
-                    .{ .mov_imm_eax = try i32Value(int) },
+                    switch (definition.physicalLoc()) {
+                        .eax => .{ .mov_imm_eax = try i32Value(int) },
+                        .rax => .{ .mov_imm_rax = try i64Value(int) },
+                        else => unreachable,
+                    },
                 );
             },
             .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
@@ -1336,7 +1353,7 @@ pub fn emitUnsignedLimbProduct(selector: *ComposedBlockSelector, lhs: FrameIndex
     try prepareFixedProductDefs(selector);
     try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = lhs });
     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = rhs } });
-    try selector.machine.instructions.append(selector.allocator, .{ .mul_rax_arg64_full = .rcx });
+    try emitEflagsInstruction(selector, .{ .mul_rax_arg64_full = .rcx }, .write);
     try bindFixedProductResult(selector, name);
     return switch (valueLoc(selector, name) orelse return error.UnsupportedCodegenValue) {
         .spill128 => |spill| spill,
@@ -1567,6 +1584,18 @@ pub fn emitValueIntoScratch(selector: *ComposedBlockSelector, value: ir.Value, r
     try emitValueIntoScratchExcept(selector, value, reg, bits, null);
 }
 
+/// Materialize a named value into a scratch register and make that existing
+/// copy its canonical location. Binary producers use this after stabilizing a
+/// distinct accumulator alias before a destructive accumulator definition.
+pub fn emitValueIntoScratchAndRelocate(selector: *ComposedBlockSelector, value: ir.Value, reg: ArgReg, bits: u16) !void {
+    const name = switch (value) {
+        .named => |name| name,
+        else => return error.UnsupportedCodegenValue,
+    };
+    try emitValueIntoScratch(selector, value, reg, bits);
+    try bindValueLoc(selector, name, if (bits == 64) .{ .scratch64 = reg } else .{ .scratch32 = reg });
+}
+
 pub fn emitPhiValueIntoScratch(selector: *ComposedBlockSelector, value: ir.Value, reg: ArgReg, bits: u16) !void {
     switch (value) {
         .named => {
@@ -1694,15 +1723,15 @@ pub fn emitValueIntoScratchExcept(selector: *ComposedBlockSelector, value: ir.Va
 
 pub fn emitBinaryArgAccumulator(selector: *ComposedBlockSelector, op: MachineBinaryOp, reg: ArgReg, bits: u16) !void {
     if (bits == 64) {
-        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{
+        try emitEflagsInstruction(selector, .{ .binary_arg_rax = .{
             .op = op,
             .reg = reg,
-        } });
+        } }, .write);
     } else {
-        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{
+        try emitEflagsInstruction(selector, .{ .binary_arg_eax = .{
             .op = op,
             .reg = reg,
-        } });
+        } }, .write);
     }
 }
 
@@ -1861,11 +1890,11 @@ pub fn emitPairOrInPlace(selector: *ComposedBlockSelector, dst: RegPair, rhs: Re
 pub fn emitPairSubInPlace(selector: *ComposedBlockSelector, dst: RegPair, rhs: RegPair) !void {
     try clobberAccumulator(selector);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = dst.lo });
-    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .sub, .reg = rhs.lo } });
+    try emitEflagsDefinition(selector, .{ .binary_arg_rax = .{ .op = .sub, .reg = rhs.lo } }, .carry);
     try clobberArgReg(selector, dst.lo);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = dst.lo });
     try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = dst.hi });
-    try selector.machine.instructions.append(selector.allocator, .{ .sbb_arg64_rax = rhs.hi });
+    try emitEflagsInstruction(selector, .{ .sbb_arg64_rax = rhs.hi }, .use_and_clobber);
     try clobberArgReg(selector, dst.hi);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = dst.hi });
 }

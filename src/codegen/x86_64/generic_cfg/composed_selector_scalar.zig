@@ -78,9 +78,12 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
     if (bits == 1) {
         if ((binary.op != .@"and" and binary.op != .@"or") or valueIsInt(binary.lhs) or valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
         selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits) catch return .{ .unsupported_value = "composed-block-unknown-rhs" };
-        selector_state.emitValueIntoEax(selector, binary.lhs) catch return .{ .unsupported_value = "composed-block-unknown-lhs" };
-        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = machineBinaryOp(binary.op) orelse unreachable, .reg = .rcx } });
-        try selector_state.bindEax(selector, result_name);
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.preserve, accumulatorDirectMaterializationDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+        transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-unknown-lhs" };
+        try emitArithmeticWrite(selector, .{ .binary_arg_eax = .{ .op = machineBinaryOp(binary.op) orelse unreachable, .reg = .rcx } });
+        try finishArithmeticResult(&transaction, result_name, bits);
         return null;
     }
     if (bits == 8) {
@@ -104,47 +107,54 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         return try lowerUnsignedDivRem(selector, result_name, binary, bits);
     }
     if (binary.op == .mul and bits <= 32) {
-        while (selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
-            if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
-        }
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
         try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
-        try selector_state.emitValueIntoEax(selector, binary.lhs);
-        try selector.machine.instructions.append(selector.allocator, .{ .imul_eax_arg32 = .rcx });
-        try selector_state.bindEax(selector, result_name);
+        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+        try emitArithmeticWrite(selector, .{ .imul_eax_arg32 = .rcx });
+        try finishArithmeticResult(&transaction, result_name, bits);
         return null;
     }
     if ((binary.op == .shl or binary.op == .lshr or binary.op == .ashr) and (bits == 16 or bits == 32 or (exact_ei_narrow and bits < 32))) {
         try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
-        try selector_state.emitValueIntoEax(selector, binary.lhs);
-        try selector.machine.instructions.append(selector.allocator, switch (binary.op) {
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.preserve, accumulatorDirectMaterializationDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+        try emitArithmeticWrite(selector, switch (binary.op) {
             .shl => .shl_eax_cl,
             .lshr => .shr_eax_cl,
             .ashr => .sar_eax_cl,
             else => unreachable,
         });
-        try selector_state.bindEax(selector, result_name);
+        try finishArithmeticResult(&transaction, result_name, bits);
         return null;
     }
     if ((binary.op == .shl or binary.op == .lshr or binary.op == .ashr) and (bits == 64 or (exact_ei_narrow and bits > 32))) {
         selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-ei-shift-rhs" };
-        if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
-        selector_state.emitValueIntoRax(selector, binary.lhs) catch return .{ .unsupported_value = "composed-block-ei-shift-lhs" };
-        try selector.machine.instructions.append(selector.allocator, switch (binary.op) {
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+        transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-ei-shift-lhs" };
+        try emitArithmeticWrite(selector, switch (binary.op) {
             .shl => .shl_rax_cl,
             .lshr => .shr_rax_cl,
             .ashr => .sar_rax_cl,
             else => unreachable,
         });
-        try selector_state.bindRax(selector, result_name);
+        try finishArithmeticResult(&transaction, result_name, bits);
         return null;
     }
     if (exact_ei_narrow and bits > 32) {
         const op = machineBinaryOp(binary.op) orelse return .{ .no_emitter = "composed-block-binary-op" };
         selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-ei-binary-rhs" };
-        if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
-        selector_state.emitValueIntoRax(selector, binary.lhs) catch return .{ .unsupported_value = "composed-block-ei-binary-lhs" };
-        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = op, .reg = .rcx } });
-        try selector_state.bindRax(selector, result_name);
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+        transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-ei-binary-lhs" };
+        try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = op, .reg = .rcx } });
+        try finishArithmeticResult(&transaction, result_name, bits);
         return null;
     }
 
@@ -161,13 +171,27 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
     const rhs = selector_state.resolveValue(selector, binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
 
     if (locIsAccumulator(rhs) and locIsAccumulator(lhs)) {
-        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
-        try selector_state.emitValueIntoAccumulator(selector, binary.lhs, bits);
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        const lhs_name = namedValue(binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
+        const rhs_name = namedValue(binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
+        if (std.mem.eql(u8, lhs_name, rhs_name))
+            try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits)
+        else
+            try selector_state.emitValueIntoScratchAndRelocate(selector, binary.rhs, .rcx, bits);
+        if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
         try selector_state.emitBinaryArgAccumulator(selector, op, .rcx, bits);
+        try finishArithmeticResult(&transaction, result_name, bits);
     } else if (locIsAccumulator(rhs)) {
         if (isCommutative(op)) {
-            try selector_state.spillAccumulatorAliasesExcept(selector, binary.rhs);
-            try selector_state.emitBinaryLocIntoAccumulator(selector, op, lhs, bits);
+            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+            defer transaction.deinit();
+            if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.rhs, .spill_live))) |diagnostic| return diagnostic;
+            try transaction.materialize(binary.rhs, accumulatorDefinition(bits));
+            const current_lhs = selector_state.resolveValue(selector, binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
+            try selector_state.emitBinaryLocIntoAccumulator(selector, op, current_lhs, bits);
+            try finishArithmeticResult(&transaction, result_name, bits);
         } else {
             const rhs_scratch: ArgReg = switch (lhs) {
                 .arg32, .arg64, .scratch32, .scratch64 => |reg| if (reg == .rcx) .rdx else .rcx,
@@ -175,14 +199,20 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
                 .eax, .rax => unreachable,
             };
             try selector_state.emitValueIntoScratch(selector, binary.rhs, rhs_scratch, bits);
-            if (locIsAccumulator(lhs)) try selector_state.spillAccumulatorAliasesExcept(selector, binary.lhs);
-            try selector_state.emitValueIntoAccumulator(selector, binary.lhs, bits);
+            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+            defer transaction.deinit();
+            if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+            try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
             try selector_state.emitBinaryArgAccumulator(selector, op, rhs_scratch, bits);
+            try finishArithmeticResult(&transaction, result_name, bits);
         }
     } else {
-        if (locIsAccumulator(lhs)) try selector_state.spillAccumulatorAliasesExcept(selector, binary.lhs);
-        try selector_state.emitValueIntoAccumulator(selector, binary.lhs, bits);
-        const rhs_reg: ArgReg = switch (rhs) {
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+        const current_rhs = selector_state.resolveValue(selector, binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
+        const rhs_reg: ArgReg = switch (current_rhs) {
             .arg32, .scratch32 => |reg| if (bits <= 32) reg else return .{ .no_emitter = "composed-block-rhs-i32-for-i64" },
             .arg64, .scratch64 => |reg| if (bits == 64 or (exact_ei_narrow and bits > 32)) reg else return .{ .no_emitter = "composed-block-rhs-i64-for-i32" },
             .arg128, .scratch128 => return .{ .no_emitter = "composed-block-rhs-width" },
@@ -199,9 +229,8 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
             .eax, .rax => unreachable,
         };
         try selector_state.emitBinaryArgAccumulator(selector, op, rhs_reg, bits);
+        try finishArithmeticResult(&transaction, result_name, bits);
     }
-
-    try selector_state.bindAccumulator(selector, result_name, bits);
     return null;
 }
 
@@ -213,16 +242,16 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
     const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
     if (binary.op == .sdiv) {
         if (bits != 32 or rhs != 2 or binary.lhs != .named) return .{ .no_emitter = "composed-block-sdiv-form" };
-        while (selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
-            if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
-        }
-        selector_state.emitValueIntoEax(selector, binary.lhs) catch return .{ .unsupported_value = "composed-block-sdiv-lhs" };
         selector_state.clobberArgReg(selector, .rcx) catch return .{ .no_spill_envelope = "composed-block-sdiv-rcx" };
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
+        transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-sdiv-lhs" };
         try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = .rcx });
-        try selector.machine.instructions.append(selector.allocator, .{ .shr_eax_imm5 = 31 });
-        try selector.machine.instructions.append(selector.allocator, .add_ecx_eax);
-        try selector.machine.instructions.append(selector.allocator, .{ .sar_eax_imm5 = 1 });
-        try selector_state.bindEax(selector, result_name);
+        try emitArithmeticWrite(selector, .{ .shr_eax_imm5 = 31 });
+        try emitArithmeticWrite(selector, .add_ecx_eax);
+        try emitArithmeticWrite(selector, .{ .sar_eax_imm5 = 1 });
+        try finishArithmeticResult(&transaction, result_name, bits);
         return null;
     }
     if (bits <= 32) switch (binary.op) {
@@ -242,7 +271,7 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
                 16, 32 => {
                     try selector_state.emitValueIntoScratch(selector, binary.lhs, .rcx, bits);
                     const amount = try shiftAmount5(rhs);
-                    if (amount != 0) try selector.machine.instructions.append(selector.allocator, .{ .shr_arg_imm5 = .{
+                    if (amount != 0) try emitArithmeticWrite(selector, .{ .shr_arg_imm5 = .{
                         .reg = .rcx,
                         .amount = amount,
                     } });
@@ -262,7 +291,7 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
                             return null;
                         };
                     try selector_state.emitValueIntoScratch(selector, binary.lhs, dst, bits);
-                    if (amount != 0) try selector.machine.instructions.append(selector.allocator, .{ .shr_arg64_imm6 = .{
+                    if (amount != 0) try emitArithmeticWrite(selector, .{ .shr_arg64_imm6 = .{
                         .reg = dst,
                         .amount = amount,
                     } });
@@ -279,24 +308,33 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
             }
             if (bits == 64) {
                 const amount = try shiftAmount6(rhs);
-                if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
-                try selector_state.emitValueIntoRax(selector, binary.lhs);
-                if (amount != 0) try selector.machine.instructions.append(selector.allocator, .{ .shl_rax_imm6 = amount });
-                try selector_state.bindRax(selector, result_name);
+                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                defer transaction.deinit();
+                if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+                if (amount != 0) try emitArithmeticWrite(selector, .{ .shl_rax_imm6 = amount });
+                try finishArithmeticResult(&transaction, result_name, bits);
                 return null;
             }
             if (bits > 32) return .{ .no_emitter = "composed-block-shl-imm-width" };
             const amount = try shiftAmount5(rhs);
             const lhs_loc = selector_state.resolveValue(selector, binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
-            if (try selector_state.preserveCurrentEaxIntoScratch(selector)) |diagnostic| return diagnostic;
-            try selector_state.emitValueIntoEax(selector, binary.lhs);
-            if (amount != 0) try selector.machine.instructions.append(selector.allocator, .{ .shl_eax_imm5 = amount });
             switch (lhs_loc) {
                 .scratch32 => |reg| {
+                    if (try selector_state.preserveCurrentEaxIntoScratch(selector)) |diagnostic| return diagnostic;
+                    try selector_state.emitValueIntoEax(selector, binary.lhs);
+                    if (amount != 0) try emitArithmeticWrite(selector, .{ .shl_eax_imm5 = amount });
                     try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = reg });
                     try selector_state.bindScratch(selector, result_name, reg, bits);
                 },
-                .arg32, .arg64, .scratch64, .arg128, .scratch128, .xmm, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => try selector_state.bindEax(selector, result_name),
+                .arg32, .arg64, .scratch64, .arg128, .scratch128, .xmm, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => {
+                    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                    defer transaction.deinit();
+                    if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
+                    try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+                    if (amount != 0) try emitArithmeticWrite(selector, .{ .shl_eax_imm5 = amount });
+                    try finishArithmeticResult(&transaction, result_name, bits);
+                },
             }
         },
         .ashr => {
@@ -308,15 +346,18 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
             }
             if (bits <= 32) {
                 const amount = try shiftAmount5(rhs);
-                try selector_state.emitValueIntoEax(selector, binary.lhs);
-                if (amount != 0) try selector.machine.instructions.append(selector.allocator, .{ .sar_eax_imm5 = amount });
-                try selector_state.bindEax(selector, result_name);
+                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                defer transaction.deinit();
+                if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+                if (amount != 0) try emitArithmeticWrite(selector, .{ .sar_eax_imm5 = amount });
+                try finishArithmeticResult(&transaction, result_name, bits);
                 return null;
             }
             if (bits != 64) return .{ .no_emitter = "composed-block-ashr-width" };
             const amount = try shiftAmount6(rhs);
             try selector_state.emitValueIntoScratch(selector, binary.lhs, .rcx, bits);
-            if (amount != 0) try selector.machine.instructions.append(selector.allocator, .{ .sar_arg64_imm6 = .{
+            if (amount != 0) try emitArithmeticWrite(selector, .{ .sar_arg64_imm6 = .{
                 .reg = .rcx,
                 .amount = amount,
             } });
@@ -325,98 +366,123 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
         },
         .@"and" => {
             if (bits == 64 and rhs == std.math.maxInt(u32)) {
-                if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
-                selector_state.emitValueIntoRax(selector, binary.lhs) catch |err| switch (err) {
+                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                defer transaction.deinit();
+                if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch |err| switch (err) {
                     error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-and64-lhs" },
                     else => return err,
                 };
                 const imm = i32BitPattern(rhs) catch return .{ .no_emitter = "composed-block-and64-imm" };
-                try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = imm });
-                try selector_state.bindRax(selector, result_name);
+                try emitArithmeticWrite(selector, .{ .and_eax_imm32 = imm });
+                try finishArithmeticResult(&transaction, result_name, bits);
                 return null;
             }
             if (bits == 64) {
-                if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
-                selector_state.emitValueIntoRax(selector, binary.lhs) catch |err| switch (err) {
+                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                defer transaction.deinit();
+                if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch |err| switch (err) {
                     error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-and64-lhs" },
                     else => return err,
                 };
                 try selector_state.clobberArgReg(selector, .rcx);
                 try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs) });
-                try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
-                try selector_state.bindRax(selector, result_name);
+                try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
+                try finishArithmeticResult(&transaction, result_name, bits);
                 return null;
             }
             if (bits > 32) return .{ .no_emitter = "composed-block-binary-imm-rhs-width" };
-            try selector_state.emitValueIntoEax(selector, binary.lhs);
-            try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = try i32Value(rhs) });
-            try selector_state.bindEax(selector, result_name);
+            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+            defer transaction.deinit();
+            if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
+            try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+            try emitArithmeticWrite(selector, .{ .and_eax_imm32 = try i32Value(rhs) });
+            try finishArithmeticResult(&transaction, result_name, bits);
         },
         .@"or" => {
             if (bits == 64) {
-                if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
-                selector_state.emitValueIntoRax(selector, binary.lhs) catch return .{ .unsupported_value = "composed-block-or64-lhs" };
+                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                defer transaction.deinit();
+                if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-or64-lhs" };
                 try selector_state.clobberArgReg(selector, .rcx);
                 try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs) });
-                try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } });
-                try selector_state.bindRax(selector, result_name);
+                try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } });
+                try finishArithmeticResult(&transaction, result_name, bits);
                 return null;
             }
             if (bits > 32) return .{ .no_emitter = "composed-block-binary-imm-rhs-width" };
-            try selector_state.emitValueIntoEax(selector, binary.lhs);
-            try selector.machine.instructions.append(selector.allocator, .{ .or_eax_imm32 = try i32Value(rhs) });
-            try selector_state.bindEax(selector, result_name);
+            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+            defer transaction.deinit();
+            if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
+            try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+            try emitArithmeticWrite(selector, .{ .or_eax_imm32 = try i32Value(rhs) });
+            try finishArithmeticResult(&transaction, result_name, bits);
         },
         .add => {
             if (bits == 64) {
                 const imm = i32Value(rhs) catch {
-                    if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
-                    selector_state.emitValueIntoRax(selector, binary.lhs) catch return .{ .unsupported_value = "composed-block-add64-lhs" };
+                    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                    defer transaction.deinit();
+                    if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                    transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-add64-lhs" };
                     try selector_state.clobberArgReg(selector, .rcx);
                     try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs) });
-                    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .add, .reg = .rcx } });
-                    try selector_state.bindRax(selector, result_name);
+                    try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = .add, .reg = .rcx } });
+                    try finishArithmeticResult(&transaction, result_name, bits);
                     return null;
                 };
                 try selector_state.emitValueIntoScratch(selector, binary.lhs, .rcx, bits);
-                try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = imm } });
+                try emitArithmeticWrite(selector, .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = imm } });
                 try selector_state.bindScratch(selector, result_name, .rcx, bits);
             } else {
                 if (bits > 32) return .{ .no_emitter = "composed-block-binary-imm-rhs-width" };
-                try selector_state.emitValueIntoEax(selector, binary.lhs);
-                try selector.machine.instructions.append(selector.allocator, .{ .add_eax_imm32 = try i32Value(rhs) });
-                try selector_state.bindEax(selector, result_name);
+                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                defer transaction.deinit();
+                if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
+                try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+                try emitArithmeticWrite(selector, .{ .add_eax_imm32 = try i32Value(rhs) });
+                try finishArithmeticResult(&transaction, result_name, bits);
             }
         },
         .sub => {
             const imm = try i32Value(rhs);
             if (bits == 64) {
                 try selector_state.emitValueIntoScratch(selector, binary.lhs, .rcx, bits);
-                try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = -imm } });
+                try emitArithmeticWrite(selector, .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = -imm } });
                 try selector_state.bindScratch(selector, result_name, .rcx, bits);
             } else {
                 if (bits > 32) return .{ .no_emitter = "composed-block-binary-imm-rhs-width" };
-                try selector_state.emitValueIntoEax(selector, binary.lhs);
-                try selector.machine.instructions.append(selector.allocator, .{ .add_eax_imm32 = -imm });
-                try selector_state.bindEax(selector, result_name);
+                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                defer transaction.deinit();
+                if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
+                try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+                try emitArithmeticWrite(selector, .{ .add_eax_imm32 = -imm });
+                try finishArithmeticResult(&transaction, result_name, bits);
             }
         },
         .xor => {
             if (bits == 64) {
-                if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
-                selector_state.emitValueIntoRax(selector, binary.lhs) catch return .{ .unsupported_value = "composed-block-xor64-lhs" };
+                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                defer transaction.deinit();
+                if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-xor64-lhs" };
                 try selector_state.clobberArgReg(selector, .rcx);
                 try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs) });
-                try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } });
-                try selector_state.bindRax(selector, result_name);
+                try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } });
+                try finishArithmeticResult(&transaction, result_name, bits);
                 return null;
             }
             if (bits > 32) return .{ .no_emitter = "composed-block-binary-imm-rhs-width" };
-            try selector_state.emitValueIntoEax(selector, binary.lhs);
             try selector_state.clobberArgReg(selector, .rcx);
+            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+            defer transaction.deinit();
+            if (try transaction.prepare(.preserve, accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
+            try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
             try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i32Value(rhs) });
-            try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = .xor, .reg = .rcx } });
-            try selector_state.bindEax(selector, result_name);
+            try emitArithmeticWrite(selector, .{ .binary_arg_eax = .{ .op = .xor, .reg = .rcx } });
+            try finishArithmeticResult(&transaction, result_name, bits);
         },
         else => return .{ .no_emitter = "composed-block-binary-imm-rhs" },
     }
@@ -488,7 +554,7 @@ pub fn lowerMul64(selector: *ComposedBlockSelector, result_name: []const u8, bin
                 },
         .arg64, .rax, .spill64 => plannedScratch64RegForResult(selector, result_name) orelse
             (scratch64RegForUseAvoiding(selector, null) orelse {
-                if (lhs == .spill64) return try lowerMul64SpillLhsThroughRax(selector, result_name, lhs.spill64, binary.rhs);
+                if (lhs == .spill64) return try lowerMul64SpillLhsThroughRax(selector, result_name, binary.lhs, binary.rhs);
                 return .{ .no_spill_envelope = "composed-block-mul64-dst" };
             }),
         .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-mul64-lhs" },
@@ -497,16 +563,16 @@ pub fn lowerMul64(selector: *ComposedBlockSelector, result_name: []const u8, bin
 
     const rhs = selector_state.resolveValue(selector, binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
     switch (rhs) {
-        .scratch64, .arg64 => |src| try selector.machine.instructions.append(selector.allocator, .{ .imul_arg64_arg64 = .{ .dst = dst, .src = src } }),
-        .rax => try selector.machine.instructions.append(selector.allocator, .{ .imul_arg64_rax = dst }),
+        .scratch64, .arg64 => |src| try emitArithmeticWrite(selector, .{ .imul_arg64_arg64 = .{ .dst = dst, .src = src } }),
+        .rax => try emitArithmeticWrite(selector, .{ .imul_arg64_rax = dst }),
         .spill64 => |frame_index| {
             if (scratch64RegForUseAvoiding(selector, dst)) |src| {
                 selector_state.emitValueIntoScratch(selector, binary.rhs, src, 64) catch return .{ .unsupported_value = "composed-block-mul64-rhs" };
-                try selector.machine.instructions.append(selector.allocator, .{ .imul_arg64_arg64 = .{ .dst = dst, .src = src } });
+                try emitArithmeticWrite(selector, .{ .imul_arg64_arg64 = .{ .dst = dst, .src = src } });
             } else {
                 if (try selector_state.spillCurrentAccumulator(selector)) |diagnostic| return diagnostic;
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = frame_index });
-                try selector.machine.instructions.append(selector.allocator, .{ .imul_arg64_rax = dst });
+                try emitArithmeticWrite(selector, .{ .imul_arg64_rax = dst });
             }
         },
         .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-mul64-rhs" },
@@ -515,16 +581,18 @@ pub fn lowerMul64(selector: *ComposedBlockSelector, result_name: []const u8, bin
     return null;
 }
 
-pub fn lowerMul64SpillLhsThroughRax(selector: *ComposedBlockSelector, result_name: []const u8, lhs_frame_index: FrameIndex, rhs_value: ir.Value) !?Diagnostic {
-    if (try selector_state.spillCurrentAccumulator(selector)) |diagnostic| return diagnostic;
-    try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = lhs_frame_index });
+pub fn lowerMul64SpillLhsThroughRax(selector: *ComposedBlockSelector, result_name: []const u8, lhs_value: ir.Value, rhs_value: ir.Value) !?Diagnostic {
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+    transaction.materialize(lhs_value, accumulatorDefinition(64)) catch return .{ .unsupported_value = "composed-block-mul64-lhs" };
     const rhs = selector_state.resolveValue(selector, rhs_value) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
     switch (rhs) {
-        .arg64, .scratch64 => |src| try selector.machine.instructions.append(selector.allocator, .{ .imul_rax_arg64 = src }),
-        .spill64 => |frame_index| try selector.machine.instructions.append(selector.allocator, .{ .imul_rax_rsp = frame_index }),
+        .arg64, .scratch64 => |src| try emitArithmeticWrite(selector, .{ .imul_rax_arg64 = src }),
+        .spill64 => |frame_index| try emitArithmeticWrite(selector, .{ .imul_rax_rsp = frame_index }),
         .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-mul64-rhs" },
     }
-    try selector_state.bindRax(selector, result_name);
+    try finishArithmeticResult(&transaction, result_name, 64);
     return null;
 }
 
@@ -563,14 +631,16 @@ pub fn spillScratch64SourceForInPlace(selector: *ComposedBlockSelector, value: i
 
 pub fn tryLowerLshr64SpillThroughRax(selector: *ComposedBlockSelector, result_name: []const u8, value: ir.Value, amount: u6) !?Diagnostic {
     const loc = selector_state.resolveValue(selector, value) orelse return .{ .no_spill_envelope = "composed-block-lshr64-dst" };
-    const frame_index = switch (loc) {
-        .spill64 => |frame_index| frame_index,
+    switch (loc) {
+        .spill64 => {},
         else => return .{ .no_spill_envelope = "composed-block-lshr64-dst" },
-    };
-    if (try selector_state.spillCurrentAccumulator(selector)) |diagnostic| return diagnostic;
-    try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = frame_index });
-    if (amount != 0) try selector.machine.instructions.append(selector.allocator, .{ .shr_rax_imm6 = amount });
-    try selector_state.bindRax(selector, result_name);
+    }
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+    transaction.materialize(value, accumulatorDefinition(64)) catch return .{ .no_spill_envelope = "composed-block-lshr64-dst" };
+    if (amount != 0) try emitArithmeticWrite(selector, .{ .shr_rax_imm6 = amount });
+    try finishArithmeticResult(&transaction, result_name, 64);
     return null;
 }
 
@@ -580,6 +650,32 @@ pub fn scratch64RegIsAvailableForUse(selector: *const ComposedBlockSelector, reg
 }
 
 pub fn lowerUnsignedDivRem(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {
+    if (binary.op == .urem) return lowerUnsignedRem(selector, result_name, binary, bits);
+    const rhs = selector_state.resolveValue(selector, binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
+    const rhs_is_accumulator = switch (rhs) {
+        .eax => bits == 32,
+        .rax => bits == 64,
+        else => false,
+    };
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (rhs_is_accumulator) {
+        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
+        if (try transaction.prepare(.preserve, accumulatorDirectMaterializationDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+    } else {
+        if (try transaction.prepare(.preserve, accumulatorDirectMaterializationDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
+    }
+    try selector_state.clobberArgReg(selector, .rdx);
+    try emitArithmeticWrite(selector, .xor_edx_edx);
+    try selector_state.emitEflagsInstruction(selector, if (bits == 32) .{ .div_arg32 = .rcx } else .{ .div_arg64 = .rcx }, .clobber);
+    try finishArithmeticResult(&transaction, result_name, bits);
+    return null;
+}
+
+fn lowerUnsignedRem(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {
     const rhs = selector_state.resolveValue(selector, binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
     const rhs_is_accumulator = switch (rhs) {
         .eax => bits == 32,
@@ -594,17 +690,9 @@ pub fn lowerUnsignedDivRem(selector: *ComposedBlockSelector, result_name: []cons
         try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
     }
     try selector_state.clobberArgReg(selector, .rdx);
-    try selector.machine.instructions.append(selector.allocator, .xor_edx_edx);
-    try selector.machine.instructions.append(selector.allocator, if (bits == 32) .{ .div_arg32 = .rcx } else .{ .div_arg64 = .rcx });
-    switch (binary.op) {
-        .udiv => {
-            try selector_state.bindAccumulator(selector, result_name, bits);
-        },
-        .urem => {
-            try selector_state.bindScratch(selector, result_name, .rdx, bits);
-        },
-        else => unreachable,
-    }
+    try emitArithmeticWrite(selector, .xor_edx_edx);
+    try selector_state.emitEflagsInstruction(selector, if (bits == 32) .{ .div_arg32 = .rcx } else .{ .div_arg64 = .rcx }, .clobber);
+    try selector_state.bindScratch(selector, result_name, .rdx, bits);
     return null;
 }
 
@@ -625,50 +713,60 @@ pub fn lowerBinaryImmediateLhs(selector: *ComposedBlockSelector, result_name: []
     }
     if (binary.op == .sub and bits == 64) {
         try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
-        try selector_state.clobberAccumulator(selector);
-        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = try i64Value(lhs) });
-        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } });
-        try selector_state.bindRax(selector, result_name);
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+        try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } });
+        try finishArithmeticResult(&transaction, result_name, bits);
         return null;
     }
     if (binary.op == .sub and bits <= 32) {
         try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
-        try selector_state.clobberAccumulator(selector);
-        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(lhs) });
-        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } });
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+        try emitArithmeticWrite(selector, .{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } });
         if (bits < 32) {
             const shift: u5 = @intCast(bits);
             const mask = (@as(i32, 1) << shift) - 1;
-            try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = mask });
+            try emitArithmeticWrite(selector, .{ .and_eax_imm32 = mask });
         }
-        try selector_state.bindEax(selector, result_name);
+        try finishArithmeticResult(&transaction, result_name, bits);
         return null;
     }
     if (binary.op == .shl and (bits == 16 or bits == 32)) {
         try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
-        try selector_state.clobberAccumulator(selector);
-        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(lhs) });
-        try selector.machine.instructions.append(selector.allocator, .shl_eax_cl);
-        if (bits == 16) try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 0xffff });
-        try selector_state.bindEax(selector, result_name);
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+        try emitArithmeticWrite(selector, .shl_eax_cl);
+        if (bits == 16) try emitArithmeticWrite(selector, .{ .and_eax_imm32 = 0xffff });
+        try finishArithmeticResult(&transaction, result_name, bits);
         return null;
     }
     if (binary.op != .lshr) return .{ .no_emitter = "composed-block-binary-imm-lhs" };
     if (bits == 64) {
         try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
-        try selector_state.clobberAccumulator(selector);
-        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = try i64Value(lhs) });
-        try selector.machine.instructions.append(selector.allocator, .shr_rax_cl);
-        try selector_state.bindRax(selector, result_name);
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+        try emitArithmeticWrite(selector, .shr_rax_cl);
+        try finishArithmeticResult(&transaction, result_name, bits);
         return null;
     }
     if (bits > 32) return .{ .no_emitter = "composed-block-variable-shift-width" };
 
     try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
-    try selector_state.clobberAccumulator(selector);
-    try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(lhs) });
-    try selector.machine.instructions.append(selector.allocator, .shr_eax_cl);
-    try selector_state.bindEax(selector, result_name);
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+    try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+    try emitArithmeticWrite(selector, .shr_eax_cl);
+    try finishArithmeticResult(&transaction, result_name, bits);
     return null;
 }
 
@@ -730,7 +828,7 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
                 const mask: u64 = (@as(u64, 1) << @intCast(from_bits)) - 1;
                 try selector_state.clobberArgReg(selector, .rcx);
                 try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = @bitCast(mask) });
-                try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
+                try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
                 // The mask proves every physical bit above the source domain zero.
                 try transaction.define(result_name, if (to_bits == 64) .fullRax() else .zeroExtendedRax(to_bits));
                 try transaction.commit();
@@ -749,7 +847,7 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
             if (from_bits < 32) {
                 const shift: u5 = @intCast(from_bits);
                 const mask = (@as(i32, 1) << shift) - 1;
-                try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = mask });
+                try emitArithmeticWrite(selector, .{ .and_eax_imm32 = mask });
             }
             // An EAX definition proves the full physical RAX transport. Wider
             // logical results therefore have an explicit zero-extension proof.
@@ -812,7 +910,7 @@ fn lowerI52Cast(
         )) |diagnostic| return diagnostic;
         transaction.materialize(cast.value, .zeroExtending(6)) catch
             return .{ .unsupported_value = "composed-block-unknown-cast" };
-        try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 63 });
+        try emitArithmeticWrite(selector, .{ .and_eax_imm32 = 63 });
         // The EAX write defines all of RAX with zeroes above bit 31.
         try transaction.define(result_name, .zeroExtendedRax(52));
         try transaction.commit();
@@ -840,7 +938,7 @@ fn lowerI52Cast(
             accumulatorLocDisplacement(cast.value, source),
         )) |diagnostic| return diagnostic;
         transaction.materialize(cast.value, .zeroExtending(32)) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
-        if (to_bits == 6) try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 63 });
+        if (to_bits == 6) try emitArithmeticWrite(selector, .{ .and_eax_imm32 = 63 });
         try transaction.define(result_name, .zeroExtending(to_bits));
         try transaction.commit();
         return null;
@@ -855,17 +953,22 @@ fn lowerI52Binary(selector: *ComposedBlockSelector, result_name: []const u8, bin
     {
         return .{ .no_emitter = "composed-block-i52-binary-form" };
     }
-    if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, binary.lhs)) |diagnostic| return diagnostic;
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(
+        .preserve,
+        accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live),
+    )) |diagnostic| return diagnostic;
     selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch
         return .{ .unsupported_value = "composed-block-i52-shift-rhs" };
-    selector_state.emitValueIntoRax(selector, binary.lhs) catch
+    transaction.materialize(binary.lhs, accumulatorDefinition(52)) catch
         return .{ .unsupported_value = "composed-block-i52-shift-lhs" };
     // Count 52 is poison in LLVM's i52 domain. The captured family keeps that
     // value on the unselected side of its guarding select; x86 may compute any
     // physical value here, and the low-52 mask preserves every defined case.
-    try selector.machine.instructions.append(selector.allocator, .shl_rax_cl);
+    try emitArithmeticWrite(selector, .shl_rax_cl);
     try maskRaxToI52(selector);
-    try selector_state.bindRax(selector, result_name);
+    try finishArithmeticResult(&transaction, result_name, 52);
     return null;
 }
 
@@ -932,7 +1035,7 @@ fn instructionByResult(function: ir.Function, name: []const u8) ?ir.Instruction 
 fn maskRaxToI52(selector: *ComposedBlockSelector) !void {
     try selector_state.clobberArgReg(selector, .rcx);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = (1 << 52) - 1 });
-    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
+    try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
 }
 
 const AccumulatorCastSource = union(enum) {
@@ -951,6 +1054,76 @@ fn accumulatorLocDisplacement(
         },
         else => .spill_live,
     };
+}
+
+fn accumulatorArithmeticDisplacement(
+    selector: *const ComposedBlockSelector,
+    value: ir.Value,
+    fallback: selector_state.AccumulatorDisplacementPolicy,
+) selector_state.AccumulatorDisplacementPolicy {
+    const name = switch (value) {
+        .named => |name| name,
+        else => return fallback,
+    };
+    const source = selector_state.resolveValue(selector, value) orelse return fallback;
+    return switch (source) {
+        .eax, .rax => if (!selector_state.valueIsLiveAfterCurrent(selector, name))
+            .{ .reuse_source = name }
+        else
+            fallback,
+        else => fallback,
+    };
+}
+
+fn accumulatorDirectMaterializationDisplacement(
+    selector: *const ComposedBlockSelector,
+    value: ir.Value,
+    fallback: selector_state.AccumulatorDisplacementPolicy,
+) selector_state.AccumulatorDisplacementPolicy {
+    const source = selector_state.resolveValue(selector, value) orelse return fallback;
+    return switch (source) {
+        .eax, .rax => accumulatorLocDisplacement(value, source),
+        else => fallback,
+    };
+}
+
+pub fn accumulatorPreserveCurrentDisplacement(
+    selector: *const ComposedBlockSelector,
+    value: ir.Value,
+    fallback: selector_state.AccumulatorDisplacementPolicy,
+) selector_state.AccumulatorDisplacementPolicy {
+    if (selector_state.liveAccumulatorName(selector)) |name| return .{ .spill_source = name };
+    const name = switch (value) {
+        .named => |name| name,
+        else => return fallback,
+    };
+    const source = selector_state.resolveValue(selector, value) orelse return fallback;
+    return switch (source) {
+        .eax, .rax => .{ .reuse_source = name },
+        else => fallback,
+    };
+}
+
+fn accumulatorDefinition(bits: u16) selector_state.AccumulatorDefinition {
+    return if (bits <= 32)
+        .zeroExtending(bits)
+    else if (bits == 64)
+        .fullRax()
+    else
+        .zeroExtendedRax(bits);
+}
+
+fn emitArithmeticWrite(selector: *ComposedBlockSelector, instruction: x86_64_machine.Instruction) !void {
+    try selector_state.emitEflagsInstruction(selector, instruction, .write);
+}
+
+fn finishArithmeticResult(
+    transaction: *selector_state.AccumulatorDefinitionTransaction,
+    result_name: []const u8,
+    bits: u16,
+) !void {
+    try transaction.define(result_name, accumulatorDefinition(bits));
+    try transaction.commit();
 }
 
 fn accumulatorCastDisplacement(

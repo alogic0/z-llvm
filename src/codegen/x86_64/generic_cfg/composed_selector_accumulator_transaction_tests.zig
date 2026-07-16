@@ -563,6 +563,33 @@ test "missing named source after preparation rolls back the complete transaction
     try std.testing.expectEqual(saved_eflags_semantics_len, selector.eflags_semantics.items.len);
 }
 
+test "source-specific spill displacement preserves current source for exact reload" {
+    var machine = MachineFunction.init("spill-current-source", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("source", 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    selector.stack_frame_bytes = 24;
+    try state.bindValueLoc(&selector, "source", .rax);
+
+    var transaction = try AccumulatorDefinitionTransaction.begin(&selector);
+    defer transaction.deinit();
+    try std.testing.expect((try transaction.prepare(
+        .preserve,
+        .{ .spill_source = "source" },
+    )) == null);
+    try transaction.materialize(.{ .named = "source" }, .fullRax());
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .spill_rax_rsp = .slot0 },
+        .{ .reload_rsp_rax = .slot0 },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.values.get("source").?.loc);
+}
+
 test "accumulator typed displacement preserves scratch preference and unconditional spill" {
     var scratch_machine = MachineFunction.init("scratch-preferred", .{ .int = 32 });
     defer scratch_machine.deinit(std.testing.allocator);

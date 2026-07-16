@@ -497,6 +497,151 @@ test "generic cfg selector preserves live rax before another i64 low-half mask" 
     try std.testing.expectEqual(x86_64_machine.Instruction{ .and_eax_imm32 = -1 }, machine.instructions.items[2]);
 }
 
+test "generic cfg selector immediate i64 siblings reuse a dead accumulator lhs" {
+    inline for (.{
+        .{ ir.BinaryOp.@"and", @as(i128, 0x1_0000_0000), x86_64_machine.Instruction{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } } },
+        .{ ir.BinaryOp.@"or", @as(i128, 0x2_0000_0000), x86_64_machine.Instruction{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } } },
+        .{ ir.BinaryOp.add, @as(i128, 0x3_0000_0000), x86_64_machine.Instruction{ .binary_arg_rax = .{ .op = .add, .reg = .rcx } } },
+        .{ ir.BinaryOp.xor, @as(i128, 0x4_0000_0000), x86_64_machine.Instruction{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } } },
+    }) |case| {
+        var machine = MachineFunction.init("dead-rax-immediate", .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.stack_frame_bytes = stage2SpillReservedBytes();
+        try selector_state.bindValueLoc(&selector, "source", .rax);
+
+        try std.testing.expect((try selector_scalar.lowerBinaryImmediateRhs(&selector, "result", .{
+            .op = case[0],
+            .ty = .{ .int = 64 },
+            .lhs = .{ .named = "source" },
+            .rhs = .{ .int = case[1] },
+        })) == null);
+        try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "source").?);
+        try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "result").?);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_imm_rcx = @intCast(case[1]) },
+            case[2],
+        }, machine.instructions.items);
+    }
+}
+
+test "generic cfg selector exact ei binary and shift reuse a dead accumulator lhs" {
+    const input =
+        \\define double @exact(ptr readonly %input, i64 %bits) {
+        \\entry:
+        \\  %tag = trunc i64 %bits to i16
+        \\  switch i16 %tag, label %fallback [
+        \\    i16 0, label %case0
+        \\    i16 1, label %case1
+        \\    i16 2, label %case2
+        \\    i16 3, label %case3
+        \\    i16 4, label %case4
+        \\  ]
+        \\case0:
+        \\  ret double 0.000000e+00
+        \\case1:
+        \\  ret double 0.000000e+00
+        \\case2:
+        \\  ret double 0.000000e+00
+        \\case3:
+        \\  ret double 0.000000e+00
+        \\case4:
+        \\  ret double 0.000000e+00
+        \\fallback:
+        \\  ret double 0.000000e+00
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try std.testing.expect(stage2_planning.isExactEiScalarFamily(module.functions.items[0]));
+
+    inline for (.{
+        .{ ir.BinaryOp.@"or", @as(u16, 55), x86_64_machine.Instruction{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } } },
+        .{ ir.BinaryOp.shl, @as(u16, 56), x86_64_machine.Instruction.shl_rax_cl },
+    }) |case| {
+        var machine = MachineFunction.init("dead-rax-exact-ei", .{ .int = case[1] });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.function = &module.functions.items[0];
+        selector.stack_frame_bytes = stage2SpillReservedBytes();
+        try selector_state.bindValueLoc(&selector, "source", .rax);
+        try selector_state.bindValueLoc(&selector, "amount", .{ .arg64 = .rsi });
+
+        try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
+            .op = case[0],
+            .ty = .{ .int = case[1] },
+            .lhs = .{ .named = "source" },
+            .rhs = .{ .named = "amount" },
+        })) == null);
+        try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "source").?);
+        try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "result").?);
+        try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rsi } }, machine.instructions.items[0]);
+        try std.testing.expectEqual(case[2], machine.instructions.items[1]);
+    }
+}
+
+test "exact ei shift preserves the accepted current-use accumulator rhs spill" {
+    const input =
+        \\define double @exact(ptr readonly %input, i64 %bits) {
+        \\entry:
+        \\  %tag = trunc i64 %bits to i16
+        \\  switch i16 %tag, label %fallback [
+        \\    i16 0, label %case0
+        \\    i16 1, label %case1
+        \\    i16 2, label %case2
+        \\    i16 3, label %case3
+        \\    i16 4, label %case4
+        \\  ]
+        \\case0:
+        \\  ret double 0.000000e+00
+        \\case1:
+        \\  ret double 0.000000e+00
+        \\case2:
+        \\  ret double 0.000000e+00
+        \\case3:
+        \\  ret double 0.000000e+00
+        \\case4:
+        \\  ret double 0.000000e+00
+        \\fallback:
+        \\  ret double 0.000000e+00
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try std.testing.expect(stage2_planning.isExactEiScalarFamily(module.functions.items[0]));
+
+    var machine = MachineFunction.init("current-rhs-exact-ei", .{ .int = 56 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("amount", 4);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.function = &module.functions.items[0];
+    selector.allocation_plan = &plan;
+    selector.current_position = 4;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .spill64 = .slot6 });
+    try selector_state.bindValueLoc(&selector, "amount", .rax);
+
+    try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
+        .op = .shl,
+        .ty = .{ .int = 56 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "amount" },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_rax_to_arg = .rcx },
+        .{ .spill_rax_rsp = .slot0 },
+        .{ .reload_rsp_rax = .slot6 },
+        .shl_rax_cl,
+    }, machine.instructions.items);
+}
+
 test "generic cfg selector lshr64 avoids live scalar scratch values" {
     var machine = MachineFunction.init("lshr64-avoid-live-scalar", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
@@ -941,6 +1086,95 @@ test "generic cfg selector lowers named i32 unsigned division and remainder" {
         .xor_edx_edx,
         .{ .div_arg32 = .rcx },
     }, remainder_machine.instructions.items);
+}
+
+test "accumulator-resident named i32 shift keeps accepted direct materialization stream" {
+    var machine = MachineFunction.init("shift-i32-accumulator-lhs", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("lhs", 9);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 4;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try selector_state.bindValueLoc(&selector, "lhs", .eax);
+    try selector_state.bindValueLoc(&selector, "amount", .{ .arg32 = .rsi });
+
+    try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
+        .op = .shl,
+        .ty = .{ .int = 32 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "amount" },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
+        .shl_eax_cl,
+    }, machine.instructions.items);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "lhs").?);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
+}
+
+test "accumulator-resident udiv lhs keeps accepted fixed-register stream" {
+    var machine = MachineFunction.init("udiv-i32-accumulator-lhs", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("lhs", 9);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 4;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try selector_state.bindValueLoc(&selector, "lhs", .eax);
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
+
+    try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
+        .op = .udiv,
+        .ty = .{ .int = 32 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
+        .xor_edx_edx,
+        .{ .div_arg32 = .rcx },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "lhs").?);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
+}
+
+test "named i32 multiply preserves the accepted accumulator-before-rhs order" {
+    var machine = MachineFunction.init("mul-i32-preserve-order", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("live", 9);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 4;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try selector_state.bindValueLoc(&selector, "live", .eax);
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .spill64 = .slot2 });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .spill64 = .slot3 });
+
+    try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
+        .op = .mul,
+        .ty = .{ .int = 32 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_eax_to_arg = .rdi },
+        .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = .slot3 } },
+        .{ .reload_rsp_eax = .slot2 },
+        .{ .imul_eax_arg32 = .rcx },
+    }, machine.instructions.items);
 }
 
 test "generic cfg selector lowers named i32 unsigned greater-than" {
