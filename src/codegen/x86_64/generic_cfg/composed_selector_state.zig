@@ -2329,6 +2329,8 @@ pub fn livePairNameContainingRegExcept(selector: *const ComposedBlockSelector, r
 }
 
 pub fn valueIsLiveAfterCurrent(selector: *const ComposedBlockSelector, name: []const u8) !bool {
+    if (selector.address_dependencies.count() != 0 and selector.allocation_plan == null)
+        return error.AddressDependencyMissingPlan;
     const plan = selector.allocation_plan orelse return false;
     const context = AddressDependencyLivenessContext{ .selector = selector };
     if (try selector.address_dependencies.dependencyIsRequired(name, context)) return true;
@@ -2351,7 +2353,8 @@ const AddressDependencyLivenessContext = struct {
     pub fn isOwnerLive(context: AddressDependencyLivenessContext, owner_name: []const u8) !bool {
         const plan = context.selector.allocation_plan orelse
             return error.AddressDependencyMissingPlan;
-        const end = plan.intervalEnd(owner_name) orelse return true;
+        const end = plan.intervalEnd(owner_name) orelse
+            return error.AddressDependencyMissingOwnerPlanEntry;
         return end > context.selector.current_position;
     }
 

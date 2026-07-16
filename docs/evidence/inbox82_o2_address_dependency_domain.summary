@@ -50,10 +50,10 @@ The error-bearing liveness authority validates the entire live-owner closure.
 It rejects missing dependency bindings, missing dependency plan entries,
 missing owner bindings, stale owner/edge descriptions, incompatible identity
 types or roles, duplicate identities/roles, and cycles. A dependency's own
-expired interval never defeats an extension from a live owner. As in the
-accepted allocation-plan behavior, a pressure-exempt owner with no interval
-entry remains conservatively live; every identity that owner references must
-still have both a binding and a plan entry.
+expired interval never defeats an extension from a live owner. Pressure-exempt
+values retain their accepted unbounded-live behavior through an explicit
+maximum interval entry, rather than through missing plan metadata; every
+registered owner and every identity it references has a plan entry.
 
 Production registration now occurs when a named dynamic `stack_i32_ptr` is
 bound: its named index and optional named addend become typed integer
@@ -131,3 +131,38 @@ Therefore the frozen identity tuple remains
 `49a19f04 / 443-285-158-truncl / 061a64e4 / 5d91960e / 167-17-101`.
 The later `443/287/156` value remains only the O2 frontier prediction. No Tier
 3 was run.
+
+## Fail-closed liveness follow-up
+
+The INBOX-82 follow-up closes two malformed-domain escape paths found during
+review. `valueIsLiveAfterCurrent` now rejects a nonempty dependency domain with
+no allocation plan as `AddressDependencyMissingPlan` before any boolean legacy
+path can bypass the domain. `AddressDependencyLivenessContext.isOwnerLive` now
+rejects a registered owner absent from an existing plan with the distinct
+`AddressDependencyMissingOwnerPlanEntry` error. An empty domain with no plan
+retains the pre-O2 behavior and returns `false`.
+
+The allocation-plan producer now records the pre-existing unbounded-live rule
+for pressure-exempt values as an explicit `maxInt(usize)` interval. This is a
+metadata representation correction: it makes normal derived-address owners
+well formed without shortening their lifetime or changing their accepted
+materialization/emission behavior.
+
+Focused coverage exercises all three cases directly. The correction changes
+neither emission nor capability; its validation results and exact cohort hash
+are recorded by the follow-up commit.
+
+Follow-up validation reproduced:
+
+```text
+selector-focused tests=456/456
+full unit suite=1102/1102
+report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681
+selected/emitted/failed=443/285/158
+first_failure=compiler_rt.trunc.truncl
+first_diagnostic=UnsupportedLongDoubleAbi
+```
+
+The repository's full-unit `zig build test` step also ran its existing ABI
+child dependency; no separate ABI, canary, strengthened Tier-2, or Tier-3 gate
+was invoked for this correction. The frozen identity tuple remains unchanged.

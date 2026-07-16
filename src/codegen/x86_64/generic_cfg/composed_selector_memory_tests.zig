@@ -177,6 +177,7 @@ test "migrated load production rollback restores full state before and after par
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
     defer plan.deinit();
     try plan.interval_ends.put("old", 10);
+    try plan.interval_ends.put("bad-index-ptr", 10);
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();

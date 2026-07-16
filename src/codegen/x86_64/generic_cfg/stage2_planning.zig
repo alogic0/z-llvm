@@ -514,6 +514,13 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
     }
 
     var plan = try allocateSelectorIntervals(allocator, intervals.items);
+    // Pressure-exempt values historically had no interval entry and were
+    // therefore treated as unbounded-live. Preserve that behavior explicitly
+    // so every address-dependency owner still has validated plan metadata.
+    var exempt_it = pressure_exempt_values.iterator();
+    while (exempt_it.next()) |entry| {
+        try plan.interval_ends.put(entry.key_ptr.*, std.math.maxInt(usize));
+    }
     var forward_it = forward_values.iterator();
     while (forward_it.next()) |entry| try plan.forward_values.put(entry.key_ptr.*, entry.value_ptr.*);
     try recordPreservationDemands(&plan, intervals.items, preservation_barrier_positions.items);

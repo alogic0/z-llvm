@@ -260,3 +260,35 @@ test "generic cfg selector address dependency liveness fails closed for missing 
     try selector.values.put("pointer", .{ .vreg = pointer_binding.vreg, .loc = .{ .stack_i32_ptr = .{ .disp = 4 } } });
     try std.testing.expectError(error.AddressDependencyStaleEdge, selector_state.valueIsLiveAfterCurrent(&selector, "index"));
 }
+
+test "generic cfg selector address dependency liveness distinguishes missing plan owner entry and legacy empty domain" {
+    var machine = MachineFunction.init("address-dependency-missing-plan", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try std.testing.expect(!try selector_state.valueIsLiveAfterCurrent(&selector, "ordinary"));
+
+    try selector.address_dependencies.replaceAddress("pointer", &.{
+        .{ .name = "index", .identity_type = .integer, .role = .index },
+    });
+    try std.testing.expectError(
+        error.AddressDependencyMissingPlan,
+        selector_state.valueIsLiveAfterCurrent(&selector, "index"),
+    );
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("index", 1);
+    selector.allocation_plan = &plan;
+    selector.current_position = 5;
+    try selector_state.bindValueLoc(&selector, "index", .{ .scratch64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "pointer", .{ .stack_i32_ptr = .{
+        .disp = 4,
+        .index = .{ .reg = .r8, .name = "index" },
+    } });
+    try std.testing.expectError(
+        error.AddressDependencyMissingOwnerPlanEntry,
+        selector_state.valueIsLiveAfterCurrent(&selector, "index"),
+    );
+}
