@@ -185,59 +185,10 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
     if (scalarFpStoreBits(store.ty)) |bits| return lowerStoreFp(selector, store, bits);
     if (store.ty == .ptr) return lowerStoreStackPointer(selector, store);
     if (!store.ty.eql(.{ .int = 1 }) and !store.ty.eql(.{ .int = 32 }) and !store.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-store-width" };
-    const ptr = selector_state.resolveValue(selector, store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
-    const value_loc = switch (store.value) {
-        .named => selector_state.resolveValue(selector, store.value) orelse return .{ .unsupported_value = "composed-block-unknown-store-value" },
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
-    };
-    const value_detail = if (value_loc) |loc| switch (loc) {
-        .arg32, .arg64 => "composed-block-store-value-arg",
-        .scratch32, .scratch64 => "composed-block-store-value-scratch",
-        .eax, .rax => "composed-block-store-value-accumulator",
-        .spill64 => "composed-block-store-value-spill",
-        .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => "composed-block-store-value-other",
-    } else "composed-block-store-value-other";
-    if (store.ty.eql(.{ .int = 64 })) return lowerStoreI64(selector, ptr, store.value, value_detail);
-    selector_state.emitValueIntoEax(selector, store.value) catch return .{ .unsupported_value = value_detail };
-    switch (ptr) {
-        .stack_scalar => |stack| {
-            if (stack.bits != 8 or !store.ty.eql(.{ .int = 1 })) return .{ .no_emitter = "composed-block-store-stack-width" };
-            if (stack.base_disp <= std.math.maxInt(u8)) {
-                try selector.machine.instructions.append(selector.allocator, .{ .store_al_stack_disp8 = @intCast(stack.base_disp) });
-            } else {
-                try selector.machine.instructions.append(selector.allocator, .{ .store_al_stack_disp32 = stack.base_disp });
-            }
-        },
-        .arg64, .scratch64 => |reg| {
-            if (!store.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-store-ptr-width" };
-            try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = reg });
-        },
-        .stack_i32_ptr => |stack_ptr| {
-            if (!store.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-store-ptr-width" };
-            appendStoreStackI32(selector, stack_ptr) catch |err| switch (err) {
-                error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-stack-index" },
-                else => return err,
-            };
-        },
-        .stack_i32_array => |stack_array| {
-            if (!store.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-store-ptr-width" };
-            appendStoreStackI32(selector, .{ .disp = stack_array.base_disp }) catch |err| switch (err) {
-                error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-array-index" },
-                else => return err,
-            };
-        },
-        .spill64 => |frame_index| {
-            if (!store.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-store-ptr-width" };
-            selector_state.materializeLocIntoLoc(selector, .{ .spill64 = frame_index }, .{ .scratch64 = .rcx }) catch |err| switch (err) {
-                error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-spill-ptr" },
-                else => return err,
-            };
-            try selector.machine.instructions.append(selector.allocator, .{ .store_eax_arg_ptr = .rcx });
-        },
-        .readonly_table_ptr => return .{ .no_emitter = "composed-block-store-readonly-table" },
-        .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .rax, .stack128, .stack128_value, .stack_f32_pair_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-store-ptr" },
-    }
-    return null;
+    const pointer_class = selector_state.storePointerDiagnosticClass(selector, store.ptr) orelse
+        return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
+    if (store.ty.eql(.{ .int = 64 })) return lowerStoreI64Transactional(selector, store, pointer_class);
+    return lowerStoreScalarTransactional(selector, store, pointer_class, @intCast(store.ty.int));
 }
 
 fn lowerReadOnlyPointerIntegerLoad(selector: *ComposedBlockSelector, result_name: []const u8, load: ir.LoadInst, bits: u16) !?Diagnostic {
@@ -323,25 +274,46 @@ fn lowerReadOnlyPointerIntegerLoad(selector: *ComposedBlockSelector, result_name
 
 fn lowerStoreStackPointer(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
     if (store.ty_addrspace != null or store.ptr_addrspace != null) return .{ .no_emitter = "composed-block-store-stack-pointer-addrspace" };
-    const ptr = selector_state.resolveValue(selector, store.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
-    const destination = switch (ptr) {
-        .stack_scalar => |stack| if (stack.bits == 64 and stack.kind == .integer) stack else return .{ .no_emitter = "composed-block-store-stack-pointer-width" },
+    const destination_class = selector_state.storePointerDiagnosticClass(selector, store.ptr) orelse
+        return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
+    switch (destination_class) {
+        .stack_scalar => |stack| if (stack.bits != 64 or stack.kind != .integer)
+            return .{ .no_emitter = "composed-block-store-stack-pointer-width" },
         else => return .{ .no_emitter = "composed-block-store-stack-pointer-ptr" },
-    };
-    const value = selector_state.resolveValue(selector, store.value) orelse return .{ .unsupported_value = "composed-block-store-stack-pointer-value" };
-    const source = switch (value) {
-        .stack_scalar => |stack| stack,
-        else => return .{ .no_emitter = "composed-block-store-stack-pointer-value" },
-    };
-
-    try selector_state.clobberArgReg(selector, .rcx);
-    try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = .rcx });
-    if (source.base_disp != 0) {
-        try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = @intCast(source.base_disp) } });
     }
-    if (destination.base_disp % 4 != 0) return .{ .no_emitter = "composed-block-store-stack-pointer-align" };
-    const frame_index = x86_64_types.FrameIndex.fromSlot(destination.base_disp / 4) catch return .{ .no_emitter = "composed-block-store-stack-pointer-frame" };
-    try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame_index, .reg = .rcx } });
+    const source_class = selector_state.storePointerDiagnosticClass(selector, store.value) orelse
+        return .{ .unsupported_value = "composed-block-store-stack-pointer-value" };
+    if (source_class != .stack_scalar)
+        return .{ .no_emitter = "composed-block-store-stack-pointer-value" };
+
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const destination = registerValueUseSource(
+        &transaction,
+        store.ptr,
+        .ptr,
+        .stack_object,
+        .stack_object_address,
+    ) catch return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
+    const action = registerValueUseAction(
+        &transaction,
+        store.value,
+        .ptr,
+        .stack_object,
+        .stack_object_address,
+        .{ .store_stack_pointer = .{ .destination = destination } },
+    ) catch return .{ .unsupported_value = "composed-block-store-stack-pointer-value" };
+    executeValueUseAction(&transaction, action) catch |err| return switch (err) {
+        error.ValueUseStorePointerAlignment => .{ .no_emitter = "composed-block-store-stack-pointer-align" },
+        error.ValueUseStorePointerFrame => .{ .no_emitter = "composed-block-store-stack-pointer-frame" },
+        error.ValueUseUnresolvedSource, error.ValueUseExpiredSource => .{ .unsupported_value = "composed-block-store-stack-pointer-value" },
+        error.ValueUseStorePointerFormUnsupported,
+        error.ValueUseSourceViewMismatch,
+        error.ValueUseRegisterClassMismatch,
+        error.ValueUseTypeMismatch,
+        => .{ .no_emitter = "composed-block-store-stack-pointer-value" },
+        else => return err,
+    };
     return null;
 }
 
@@ -483,18 +455,129 @@ fn lowerStoreFp(selector: *ComposedBlockSelector, store: ir.StoreInst, bits: u16
     return null;
 }
 
-fn lowerStoreI64(selector: *ComposedBlockSelector, ptr: ValueLoc, value: ir.Value, value_detail: []const u8) !?Diagnostic {
-    switch (ptr) {
-        .arg64, .scratch64 => |reg| try selector_state.materializeLocIntoLoc(selector, .{ .scratch64 = reg }, .{ .scratch64 = .rcx }),
-        .spill64 => |frame_index| selector_state.materializeLocIntoLoc(selector, .{ .spill64 = frame_index }, .{ .scratch64 = .rcx }) catch |err| switch (err) {
-            error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-store-spill-ptr" },
-            else => return err,
+fn lowerStoreScalarTransactional(
+    selector: *ComposedBlockSelector,
+    store: ir.StoreInst,
+    pointer_class: selector_state.StorePointerDiagnosticClass,
+    bits: u8,
+) !?Diagnostic {
+    if (scalarStorePointerDiagnostic(pointer_class, bits)) |diagnostic| return diagnostic;
+    const pointer_use = pointerUseForm(selector, store.ptr, false) orelse
+        return .{ .no_emitter = "composed-block-store-ptr" };
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const action = switch (store.value) {
+        .named => blk: {
+            const pointer = registerValueUseSource(
+                &transaction,
+                store.ptr,
+                .ptr,
+                pointer_use.class,
+                pointer_use.form,
+            ) catch return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
+            break :blk registerValueUseAction(
+                &transaction,
+                store.value,
+                .{ .int = bits },
+                .gpr32,
+                .gpr32,
+                .{ .store_scalar = .{ .pointer = pointer, .bits = bits } },
+            ) catch return .{ .unsupported_value = storeValueDetail(selector, store.value) };
         },
-        .arg32, .arg128, .eax, .rax, .scratch32, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-store-ptr" },
-    }
-    selector_state.emitValueIntoRax(selector, value) catch return .{ .unsupported_value = value_detail };
-    try selector.machine.instructions.append(selector.allocator, .store_rax_rcx_ptr);
+        .int => |int| blk: {
+            const immediate = i32Value(int) catch return .{ .unsupported_value = "composed-block-store-value-other" };
+            break :blk registerValueUseAction(
+                &transaction,
+                store.ptr,
+                .ptr,
+                pointer_use.class,
+                pointer_use.form,
+                .{ .store_immediate = .{ .value = immediate, .bits = bits } },
+            ) catch return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-store-value-other" },
+    };
+    executeValueUseAction(&transaction, action) catch |err| return switch (err) {
+        error.ValueUseStoreReadOnlyPointer => .{ .no_emitter = "composed-block-store-readonly-table" },
+        error.ValueUseUnresolvedSource, error.ValueUseExpiredSource => .{ .unsupported_value = storeValueDetail(selector, store.value) },
+        error.ValueUseStorePointerFormUnsupported,
+        error.ValueUseSourceViewMismatch,
+        error.ValueUseRegisterClassMismatch,
+        error.ValueUseTypeMismatch,
+        => .{ .no_emitter = "composed-block-store-ptr" },
+        else => return err,
+    };
     return null;
+}
+
+fn lowerStoreI64Transactional(
+    selector: *ComposedBlockSelector,
+    store: ir.StoreInst,
+    pointer_class: selector_state.StorePointerDiagnosticClass,
+) !?Diagnostic {
+    switch (pointer_class) {
+        .register64, .spill64 => {},
+        else => return .{ .no_emitter = "composed-block-store-ptr" },
+    }
+    if (store.value != .named) return .{ .unsupported_value = "composed-block-store-value-other" };
+    const pointer_use = pointerUseForm(selector, store.ptr, false) orelse
+        return .{ .no_emitter = "composed-block-store-ptr" };
+
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const value = registerValueUseSource(
+        &transaction,
+        store.value,
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+    ) catch return .{ .unsupported_value = storeValueDetail(selector, store.value) };
+    const action = registerValueUseAction(
+        &transaction,
+        store.ptr,
+        .ptr,
+        pointer_use.class,
+        pointer_use.form,
+        .{ .store_i64 = .{ .value = value } },
+    ) catch return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
+    executeValueUseAction(&transaction, action) catch |err| return switch (err) {
+        error.ValueUseUnresolvedSource, error.ValueUseExpiredSource => .{ .unsupported_value = storeValueDetail(selector, store.value) },
+        error.ValueUseStorePointerFormUnsupported,
+        error.ValueUseSourceViewMismatch,
+        error.ValueUseRegisterClassMismatch,
+        error.ValueUseTypeMismatch,
+        => .{ .no_emitter = "composed-block-store-ptr" },
+        else => return err,
+    };
+    return null;
+}
+
+fn scalarStorePointerDiagnostic(
+    pointer_class: selector_state.StorePointerDiagnosticClass,
+    bits: u8,
+) ?Diagnostic {
+    return switch (pointer_class) {
+        .stack_scalar => |stack| if (bits == 1 and stack.bits == 8 and stack.kind == .integer)
+            null
+        else
+            .{ .no_emitter = "composed-block-store-stack-width" },
+        .register64, .spill64, .stack_i32_ptr, .stack_i32_array => if (bits == 32)
+            null
+        else
+            .{ .no_emitter = "composed-block-store-ptr-width" },
+        .readonly_table => .{ .no_emitter = "composed-block-store-readonly-table" },
+        .other => .{ .no_emitter = "composed-block-store-ptr" },
+    };
+}
+
+fn storeValueDetail(selector: *const ComposedBlockSelector, value: ir.Value) []const u8 {
+    return switch (selector_state.storeValueDiagnosticClass(selector, value) orelse return "composed-block-unknown-store-value") {
+        .argument => "composed-block-store-value-arg",
+        .scratch => "composed-block-store-value-scratch",
+        .accumulator => "composed-block-store-value-accumulator",
+        .spill => "composed-block-store-value-spill",
+        .other => "composed-block-store-value-other",
+    };
 }
 
 fn valueUseExpected(ty: ir.Type, register_class: VirtualRegClass) ValueUseTransaction.Expected {

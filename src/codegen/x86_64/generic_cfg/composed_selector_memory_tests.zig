@@ -17,7 +17,6 @@ const selector_memory = @import("composed_selector_memory.zig");
 const MachineFunction = impl.MachineFunction;
 const ComposedBlockSelector = impl.ComposedBlockSelector;
 const ValueLoc = selector_types.ValueLoc;
-const VirtualRegMetadata = selector_types.VirtualRegMetadata;
 const pair_a = selector_types.pair_a;
 const pair_b = selector_types.pair_b;
 const PlannedValueAssignment = stage2_planning.PlannedValueAssignment;
@@ -318,9 +317,14 @@ test "stack i32 loads preserve accumulator values used only by phi edges" {
 test "generic cfg selector stores i64 through a spilled pointer" {
     var machine = MachineFunction.init("store-i64-spilled-ptr", .void);
     defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("out", 1);
+    try plan.interval_ends.put("value", 1);
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
+    selector.allocation_plan = &plan;
     selector.stack_frame_bytes = 16;
     try selector_state.bindValueLoc(&selector, "out", .{ .spill64 = .slot0 });
     try selector_state.bindValueLoc(&selector, "value", .{ .arg64 = .rdi });
@@ -330,12 +334,51 @@ test "generic cfg selector stores i64 through a spilled pointer" {
         .value = .{ .named = "value" },
         .ptr = .{ .named = "out" },
     });
-
     try std.testing.expect(diagnostic == null);
     try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot0 } }, machine.instructions.items[0]);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[1]);
     try std.testing.expectEqual(x86_64_machine.Instruction.store_rax_rcx_ptr, machine.instructions.items[2]);
+}
+
+test "lowerStore delegates the exact inbox92 wide spill binding to transaction compatibility" {
+    var machine = MachineFunction.init("inbox92-store-production-wide-spill", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "%236", "index", "addend", "%166" }) |name|
+        try plan.interval_ends.put(name, 395);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 395;
+    selector.stack_frame_bytes = 8192;
+    try selector_state.bindValueLoc(&selector, "%236", .{ .spill64 = .{ .slot = 380 } });
+    try selector_state.bindValueLoc(&selector, "index", .{ .spill64 = .{ .slot = 486 } });
+    try selector_state.bindValueLoc(&selector, "addend", .{ .spill64 = .{ .slot = 450 } });
+    try selector_state.bindValueLoc(&selector, "%166", .{ .stack_i32_ptr = .{
+        .disp = 0x1b94,
+        .index = .{ .reg = .rcx, .name = "index", .addend_name = "addend" },
+    } });
+    const binding = selector.values.get("%236").?;
+    try std.testing.expectEqual(selector_types.VirtualRegClass.gpr64, binding.vreg.class);
+    try std.testing.expectEqual(@as(u8, 64), binding.vreg.bits);
+
+    try std.testing.expect((try selector_memory.lowerStore(&selector, .{
+        .ty = .{ .int = 32 },
+        .value = .{ .named = "%236" },
+        .ptr = .{ .named = "%166" },
+    })) == null);
+
+    try std.testing.expectEqual(binding, selector.values.get("%236").?);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .reload_rsp_eax = .{ .slot = 380 } },
+        .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .{ .slot = 486 } } },
+        .{ .reload_arg64_rsp = .{ .reg = .r8, .frame_index = .{ .slot = 450 } } },
+        .add_r8_rcx,
+        .{ .store_eax_stack_rcx4_disp32 = 0x1b94 },
+    }, machine.instructions.items);
 }
 
 test "composed selector lowers typed float and double stack roundtrips" {

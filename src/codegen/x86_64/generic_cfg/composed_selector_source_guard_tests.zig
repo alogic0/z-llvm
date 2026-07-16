@@ -40,7 +40,7 @@ const classified_sources = [_]ClassifiedSource{
 };
 
 const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-const frozen_bypass_inventory_sha256 = "d928d02a154aeda3f4cb0b2269a0c4ca40cb70cada1f539849c2ea40fddd2249";
+const frozen_bypass_inventory_sha256 = "62888e477a39ce8de36f386051dff1049a06f321764da4c02a1211ff0272371b";
 const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -325,7 +325,7 @@ fn validateProductionSource(name: []const u8, source: [:0]const u8) !void {
             try validateArchitecturalExclusionAllowlist(name, source);
             try validateAccumulatorDisplacementPolicies(source);
             try validateEflagsEmissionAuthority(name, source);
-            try validatePreparedViewLeafDiscipline(source);
+            try validatePreparedViewLeafDiscipline(name, source);
         },
     }
 }
@@ -373,7 +373,7 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     if (countPattern(source, "resolveValue(") != 1) return error.ValueUseResolutionAuthorityMismatch;
 }
 
-fn validatePreparedViewLeafDiscipline(source: [:0]const u8) !void {
+fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const u8) !void {
     if (std.mem.indexOf(u8, source, "readPreparedView(") != null or
         std.mem.indexOf(u8, source, "consumePreparedView(") != null or
         std.mem.indexOf(u8, source, ".PreparedView") != null or
@@ -386,13 +386,7 @@ fn validatePreparedViewLeafDiscipline(source: [:0]const u8) !void {
     }
     if (std.mem.indexOf(u8, source, ".validate_shape") != null)
         return error.ValueUsePreparedTestActionInProduction;
-    if (std.mem.indexOf(u8, source, ".store_scalar") != null or
-        std.mem.indexOf(u8, source, ".store_immediate") != null or
-        std.mem.indexOf(u8, source, ".store_i64") != null or
-        std.mem.indexOf(u8, source, ".store_stack_pointer") != null)
-    {
-        return error.ValueUseDormantStoreActionInProduction;
-    }
+    try validateStoreActionProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -414,6 +408,33 @@ fn validatePreparedViewLeafDiscipline(source: [:0]const u8) !void {
         for (forbidden) |pattern| {
             if (std.mem.indexOf(u8, function_source, pattern) != null)
                 return error.ValueUsePreparedLeafRawOperation;
+        }
+    }
+}
+
+fn validateStoreActionProductionSites(source_name: []const u8, source: [:0]const u8) !void {
+    const allowed = [_]struct { function: []const u8, pattern: []const u8 }{
+        .{ .function = "lowerStoreScalarTransactional", .pattern = ".store_scalar" },
+        .{ .function = "lowerStoreScalarTransactional", .pattern = ".store_immediate" },
+        .{ .function = "lowerStoreI64Transactional", .pattern = ".store_i64" },
+        .{ .function = "lowerStoreStackPointer", .pattern = ".store_stack_pointer" },
+    };
+    var total_store_actions: usize = 0;
+    for (allowed) |entry| total_store_actions += countPattern(source, entry.pattern);
+    if (!std.mem.eql(u8, source_name, "composed_selector_memory.zig")) {
+        if (total_store_actions != 0) return error.ValueUseStoreActionOutsideAllowlist;
+        return;
+    }
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    for (allowed) |entry| {
+        const body = functionBodyNamed(bodies, entry.function) orelse
+            return error.ValueUseStoreActionAllowlistMismatch;
+        if (countPattern(source[body.start..body.end], entry.pattern) != 1 or
+            countPattern(source, entry.pattern) != 1)
+        {
+            return error.ValueUseStoreActionAllowlistMismatch;
         }
     }
 }
@@ -1351,49 +1372,78 @@ test "composed selector source guard rejects function predicates in the value-us
 
 test "composed selector source guard rejects callback escapes and raw operations around closed actions" {
     try validatePreparedViewLeafDiscipline(
+        "composed_selector_fixture.zig",
         "fn lower() void { const lease = try transaction.preparedView(handle); try transaction.executePreparedAction(lease); }",
     );
     try std.testing.expectError(
         error.ValueUsePreparedLeafRawOperation,
         validatePreparedViewLeafDiscipline(
+            "composed_selector_fixture.zig",
             "fn lower() void { const lease = try transaction.preparedView(handle); try transaction.executePreparedAction(lease); _ = selector_state.resolveValue(selector, source); }",
         ),
     );
     try std.testing.expectError(
         error.ValueUsePreparedLeafRawOperation,
         validatePreparedViewLeafDiscipline(
+            "composed_selector_fixture.zig",
             "fn lower() void { _ = try transaction.preparedView(handle); try selector_state.materializeLocIntoLoc(selector, source, destination); }",
         ),
     );
     try std.testing.expectError(
         error.ValueUsePreparedLocationEscape,
         validatePreparedViewLeafDiscipline(
+            "composed_selector_fixture.zig",
             "fn lower() void { const retained: Transaction.PreparedView = try transaction.readPreparedView(lease); _ = retained.register; }",
         ),
     );
     try std.testing.expectError(
         error.ValueUsePreparedLocationEscape,
         validatePreparedViewLeafDiscipline(
+            "composed_selector_fixture.zig",
             "const Escaper = struct { fn consume(self: *@This(), view: anytype) void { self.saved = @intFromPtr(view); } }; fn lower() void { const lease = try transaction.preparedView(handle); try transaction.executePreparedAction(lease); }",
         ),
     );
     try std.testing.expectError(
         error.ValueUsePreparedLocationEscape,
         validatePreparedViewLeafDiscipline(
+            "composed_selector_fixture.zig",
             "fn consume(self: *@This(), view: *const Transaction.PreparedView) void { self.saved = view; }",
         ),
     );
     try std.testing.expectError(
         error.ValueUsePreparedTestActionInProduction,
         validatePreparedViewLeafDiscipline(
+            "composed_selector_fixture.zig",
             "fn lower() void { const action: Transaction.PreparedAction = .{ .validate_shape = expected }; _ = action; }",
         ),
     );
     try std.testing.expectError(
-        error.ValueUseDormantStoreActionInProduction,
+        error.ValueUseStoreActionOutsideAllowlist,
         validatePreparedViewLeafDiscipline(
+            "composed_selector_fixture.zig",
             "fn lowerStore() void { const action: Transaction.PreparedAction = .{ .store_i64 = intent }; _ = action; }",
         ),
+    );
+}
+
+test "composed selector source guard freezes production store actions by function" {
+    const accepted: [:0]const u8 =
+        "fn lowerStoreScalarTransactional() void { _ = .store_scalar; _ = .store_immediate; } " ++
+        "fn lowerStoreI64Transactional() void { _ = .store_i64; } " ++
+        "fn lowerStoreStackPointer() void { _ = .store_stack_pointer; }";
+    try validateStoreActionProductionSites("composed_selector_memory.zig", accepted);
+    try std.testing.expectError(
+        error.ValueUseStoreActionAllowlistMismatch,
+        validateStoreActionProductionSites(
+            "composed_selector_memory.zig",
+            "fn lowerStoreScalarTransactional() void { _ = .store_scalar; _ = .store_immediate; _ = .store_i64; } " ++
+                "fn lowerStoreI64Transactional() void {} " ++
+                "fn lowerStoreStackPointer() void { _ = .store_stack_pointer; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseStoreActionAllowlistMismatch,
+        validateStoreActionProductionSites("composed_selector_memory.zig", accepted ++ " fn extra() void { _ = .store_scalar; }"),
     );
 }
 

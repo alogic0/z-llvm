@@ -1187,6 +1187,76 @@ pub fn valueRegisterClass(selector: *const ComposedBlockSelector, value: ir.Valu
     return binding.vreg.class;
 }
 
+/// Read-only diagnostic classification for store consumers. This preserves
+/// the accepted diagnostic vocabulary without exposing a physical ValueLoc or
+/// permitting a consumer to make materialization decisions from it.
+pub const StoreValueDiagnosticClass = enum {
+    argument,
+    scratch,
+    accumulator,
+    spill,
+    other,
+};
+
+pub fn storeValueDiagnosticClass(selector: *const ComposedBlockSelector, value: ir.Value) ?StoreValueDiagnosticClass {
+    const name = switch (value) {
+        .named => |name| name,
+        else => return .other,
+    };
+    const binding = selector.values.get(name) orelse return null;
+    return switch (binding.loc) {
+        .arg32, .arg64 => .argument,
+        .scratch32, .scratch64 => .scratch,
+        .eax, .rax => .accumulator,
+        .spill64 => .spill,
+        .arg128,
+        .scratch128,
+        .xmm,
+        .stack_scalar,
+        .stack128,
+        .stack128_value,
+        .stack_i32_array,
+        .stack_i32_ptr,
+        .stack_f32_pair_ptr,
+        .readonly_table_ptr,
+        .spill128,
+        .spill_fp,
+        .spill_vector,
+        .aggregate_sse,
+        => .other,
+    };
+}
+
+/// Semantic store-pointer shape used only to retain legacy diagnostic
+/// boundaries. Register identities, spill slots, and address descriptors stay
+/// private to the value-use transaction.
+pub const StorePointerDiagnosticClass = union(enum) {
+    stack_scalar: struct { bits: u16, kind: selector_types.StackScalarLoc.Kind },
+    register64,
+    spill64,
+    stack_i32_ptr,
+    stack_i32_array,
+    readonly_table,
+    other,
+};
+
+pub fn storePointerDiagnosticClass(selector: *const ComposedBlockSelector, value: ir.Value) ?StorePointerDiagnosticClass {
+    const name = switch (value) {
+        .named => |name| name,
+        else => return null,
+    };
+    const binding = selector.values.get(name) orelse return null;
+    return switch (binding.loc) {
+        .stack_scalar => |stack| .{ .stack_scalar = .{ .bits = stack.bits, .kind = stack.kind } },
+        .arg64, .scratch64 => .register64,
+        .spill64 => .spill64,
+        .stack_i32_ptr => .stack_i32_ptr,
+        .stack_i32_array => .stack_i32_array,
+        .readonly_table_ptr => .readonly_table,
+        else => .other,
+    };
+}
+
 pub const Scratch64InPlaceSource = struct {
     name: []const u8,
     reg: ArgReg,
