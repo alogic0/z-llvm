@@ -141,7 +141,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         null;
     defer if (transaction) |*active| active.deinit();
     if (transaction) |*active| {
-        if (try active.prepare(.clobber, .caller_clobbers)) |diagnostic| return diagnostic;
+        if (try active.prepareCallBeforeArguments(.clobber)) |diagnostic| return diagnostic;
     } else if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
     for (call.args.items) |arg| {
         const target = ArgReg.fromIndex(abi_index) catch return .{ .unsupported_value = "composed-block-call-arg-reg" };
@@ -149,6 +149,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         abi_index += callArgRegisterCount(arg.ty) orelse return .{ .no_emitter = "composed-block-call-arg-type" };
         if (abi_index > 6) return .{ .unsupported_value = "composed-block-call-arg-count" };
     }
+    if (transaction) |*active| try active.finishCallPreparationAfterArguments();
 
     const needs_alignment = selector.stack_frame_bytes == 0;
     if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
@@ -223,7 +224,7 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
         null;
     defer if (transaction) |*active| active.deinit();
     if (transaction) |*active| {
-        if (try active.prepare(.clobber, .caller_clobbers)) |diagnostic| return diagnostic;
+        if (try active.prepareCallBeforeArguments(.clobber)) |diagnostic| return diagnostic;
     } else if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
     for (call.args.items) |arg| {
         if (!sysv_abi.isScalarSseAbiType(arg.ty)) continue;
@@ -244,6 +245,7 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
         .stack_f32_const, .stack_f32_param, .stack_f64_const, .stack_f64_param => return .{ .unsupported_value = "composed-block-call-stack-fp-arg" },
         .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => return .{ .no_emitter = "composed-block-call-aggregate-arg" },
     };
+    if (transaction) |*active| try active.finishCallPreparationAfterArguments();
 
     if (transaction != null)
         try selector_state.emitEflagsInstruction(selector, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } }, .clobber)
@@ -946,8 +948,9 @@ pub fn lowerIntByteSizeCall(selector: *ComposedBlockSelector, result: ?[]const u
 
     var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
     defer transaction.deinit();
-    if (try transaction.prepare(.clobber, .caller_clobbers)) |diagnostic| return diagnostic;
+    if (try transaction.prepareCallBeforeArguments(.clobber)) |diagnostic| return diagnostic;
     selector_state.emitValueIntoScratch(selector, arg.value, .rdi, 16) catch return .{ .unsupported_value = "composed-block-intbytesize-arg-value" };
+    try transaction.finishCallPreparationAfterArguments();
     const needs_alignment = selector.stack_frame_bytes == 0;
     if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
     try selector_state.emitEflagsInstruction(selector, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } }, .clobber);

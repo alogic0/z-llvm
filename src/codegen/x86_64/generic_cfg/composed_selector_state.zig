@@ -91,9 +91,6 @@ pub const AccumulatorPreparationEffect = enum {
 };
 
 pub const AccumulatorDisplacementPolicy = union(enum) {
-    /// Preserve the accepted direct-call sequence: spill every live SysV
-    /// caller-clobbered value in the existing accumulator/GPR/XMM order.
-    caller_clobbers,
     /// Reproduce clobberAccumulator: every live accumulator alias is assigned
     /// its deterministic spill home, even when a scratch register is free.
     spill_live,
@@ -183,6 +180,7 @@ pub const AccumulatorDefinitionTransaction = struct {
 
     const Phase = enum {
         begun,
+        preparing_call,
         prepared,
         defined,
         committed,
@@ -244,7 +242,7 @@ pub const AccumulatorDefinitionTransaction = struct {
 
     pub fn deinit(transaction: *AccumulatorDefinitionTransaction) void {
         switch (transaction.phase) {
-            .begun, .prepared, .defined => transaction.restore(.rolled_back),
+            .begun, .preparing_call, .prepared, .defined => transaction.restore(.rolled_back),
             .committed, .rolled_back => {},
         }
         transaction.selector.allocator.free(transaction.spill_slots);
@@ -259,10 +257,6 @@ pub const AccumulatorDefinitionTransaction = struct {
         try transaction.beginPreparation(effect);
         errdefer transaction.restore(.rolled_back);
         switch (displacement) {
-            .caller_clobbers => if (try spillLiveCallerClobbersForCall(transaction.selector)) |diagnostic| {
-                transaction.restore(.rolled_back);
-                return diagnostic;
-            },
             .spill_live => try clobberAccumulator(transaction.selector),
             .spill_source => |source_name| {
                 const source = transaction.selector.values.get(source_name) orelse
@@ -297,6 +291,38 @@ pub const AccumulatorDefinitionTransaction = struct {
         }
         try transaction.finishPreparation();
         return null;
+    }
+
+    /// Validate the call's EFLAGS clobber before the first call-sequence
+    /// mutation, then preserve every genuinely live caller-clobbered value in
+    /// the established accumulator/GPR/XMM order. Arguments are deliberately
+    /// staged only after this method returns.
+    pub fn prepareCallBeforeArguments(
+        transaction: *AccumulatorDefinitionTransaction,
+        effect: AccumulatorPreparationEffect,
+    ) !?Diagnostic {
+        if (effect != .clobber) return error.AccumulatorCallMustClobberEflags;
+        try transaction.beginPreparation(effect);
+        errdefer transaction.restore(.rolled_back);
+        if (try spillLiveCallerClobbersForCall(transaction.selector)) |diagnostic| {
+            transaction.restore(.rolled_back);
+            return diagnostic;
+        }
+        transaction.phase = .preparing_call;
+        return null;
+    }
+
+    /// Complete call preparation only after every argument has been staged.
+    /// Expired EAX/RAX bindings are pure bookkeeping and may now be discarded;
+    /// a live or protected binding that survived caller-clobber preservation
+    /// remains a hard failure.
+    pub fn finishCallPreparationAfterArguments(transaction: *AccumulatorDefinitionTransaction) !void {
+        if (transaction.phase != .preparing_call) return error.AccumulatorCallPreparationOrder;
+        errdefer transaction.restore(.rolled_back);
+        dropExpiredAccumulatorBindings(transaction.selector);
+        try transaction.requireAccumulatorUnbound();
+        transaction.selector.accumulator_domain.invalidate();
+        transaction.phase = .prepared;
     }
 
     pub fn materialize(
@@ -339,7 +365,7 @@ pub const AccumulatorDefinitionTransaction = struct {
         definition: AccumulatorDefinition,
     ) !void {
         switch (transaction.phase) {
-            .begun => return error.AccumulatorTransactionNotPrepared,
+            .begun, .preparing_call => return error.AccumulatorTransactionNotPrepared,
             .prepared => {},
             .defined => return error.AccumulatorAlreadyDefined,
             .committed, .rolled_back => return error.AccumulatorTransactionClosed,
@@ -363,7 +389,7 @@ pub const AccumulatorDefinitionTransaction = struct {
 
     pub fn commit(transaction: *AccumulatorDefinitionTransaction) !void {
         switch (transaction.phase) {
-            .begun, .prepared => return error.AccumulatorCommitWithoutDefinition,
+            .begun, .preparing_call, .prepared => return error.AccumulatorCommitWithoutDefinition,
             .defined => {},
             .committed, .rolled_back => return error.AccumulatorTransactionClosed,
         }
@@ -405,7 +431,7 @@ pub const AccumulatorDefinitionTransaction = struct {
 
     pub fn rollback(transaction: *AccumulatorDefinitionTransaction) !void {
         switch (transaction.phase) {
-            .begun, .prepared, .defined => transaction.restore(.rolled_back),
+            .begun, .preparing_call, .prepared, .defined => transaction.restore(.rolled_back),
             .committed, .rolled_back => return error.AccumulatorTransactionClosed,
         }
     }
@@ -417,7 +443,7 @@ pub const AccumulatorDefinitionTransaction = struct {
     fn requirePrepared(transaction: *const AccumulatorDefinitionTransaction) !void {
         switch (transaction.phase) {
             .prepared => {},
-            .begun => return error.AccumulatorTransactionNotPrepared,
+            .begun, .preparing_call => return error.AccumulatorTransactionNotPrepared,
             .defined => return error.AccumulatorAlreadyDefined,
             .committed, .rolled_back => return error.AccumulatorTransactionClosed,
         }
@@ -429,7 +455,7 @@ pub const AccumulatorDefinitionTransaction = struct {
     ) !void {
         switch (transaction.phase) {
             .begun => {},
-            .prepared, .defined => return error.AccumulatorTransactionAlreadyPrepared,
+            .preparing_call, .prepared, .defined => return error.AccumulatorTransactionAlreadyPrepared,
             .committed, .rolled_back => return error.AccumulatorTransactionClosed,
         }
 

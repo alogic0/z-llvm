@@ -250,7 +250,6 @@ fn validateAccumulatorDisplacementPolicies(source: []const u8) !void {
         const end = call_end orelse return error.MalformedAccumulatorPrepareCall;
         const call = source[call_start..end];
         if (std.mem.indexOf(u8, call, ".spill_live") == null and
-            std.mem.indexOf(u8, call, ".caller_clobbers") == null and
             std.mem.indexOf(u8, call, ".spill_source") == null and
             std.mem.indexOf(u8, call, ".scratch_preferred") == null and
             std.mem.indexOf(u8, call, "accumulatorInputDisplacement(") == null and
@@ -345,7 +344,6 @@ test "composed selector source guard requires an explicit accumulator displaceme
     );
     try validateAccumulatorDisplacementPolicies(
         "_ = transaction.prepare(.preserve, .spill_live);" ++
-            "_ = transaction.prepare(.clobber, .caller_clobbers);" ++
             "_ = transaction.prepare(.preserve, .scratch_preferred);" ++
             "_ = transaction.prepare(.clobber, accumulatorLocDisplacement(value, source));" ++
             "_ = transaction.prepare(.clobber, accumulatorCastDisplacement(value, source));",

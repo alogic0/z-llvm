@@ -119,8 +119,11 @@ test "generic cfg selector usub sat reuses a dead accumulator lhs" {
 test "generic cfg selector normalizes narrow intByteSize call results" {
     const input =
         \\declare fastcc i16 @zig.target.intByteSize(i16)
+        \\declare void @llvm.assume(i1)
         \\define i64 @limb_count(i64 %wide_bits) {
         \\entry:
+        \\  %bounded = icmp ult i64 %wide_bits, 65536
+        \\  call void @llvm.assume(i1 %bounded)
         \\  %bits = trunc i64 %wide_bits to i16
         \\  %bytes = tail call fastcc i16 @zig.target.intByteSize(i16 %bits)
         \\  %limbs = lshr i16 %bytes, 2
@@ -136,6 +139,19 @@ test "generic cfg selector normalizes narrow intByteSize call results" {
     defer machine.deinit(std.testing.allocator);
     try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
     try x86_64_verify.verifyFunction(machine);
+    var saw_compare = false;
+    var saw_setcc = false;
+    var saw_call = false;
+    var saw_mask_after_call = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .cmp_arg64_imm64 => saw_compare = true,
+        .setb_eax => saw_setcc = saw_compare,
+        .direct_call => saw_call = saw_setcc,
+        .and_eax_imm32 => |mask| saw_mask_after_call = saw_call and mask == 0xffff,
+        .spill_eax_rsp, .spill_rax_rsp => return error.UnexpectedExpiredAccumulatorSpill,
+        else => {},
+    };
+    try std.testing.expect(saw_compare and saw_setcc and saw_call and saw_mask_after_call);
     const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
     defer std.testing.allocator.free(bytes);
 
@@ -608,12 +624,13 @@ test "composed selector call result rejects live EFLAGS before any call mutation
 }
 
 test "composed selector call transaction rolls back every call-sequence checkpoint" {
-    inline for (0..5) |checkpoint| {
+    inline for (0..6) |checkpoint| {
         var machine = MachineFunction.init("call-checkpoint-rollback", .{ .int = 32 });
         defer machine.deinit(std.testing.allocator);
         var plan = SelectorAllocationPlan.init(std.testing.allocator);
         defer plan.deinit();
         try plan.interval_ends.put("live", 10);
+        try plan.interval_ends.put("dead", 0);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
         selector.allocation_plan = &plan;
@@ -623,23 +640,27 @@ test "composed selector call transaction rolls back every call-sequence checkpoi
         try seed.define("live", .zeroExtending(32));
         try seed.commit();
         seed.deinit();
+        try selector_state.bindValueLoc(&selector, "dead", .eax);
         const live_binding = selector.values.get("live").?;
+        const dead_binding = selector.values.get("dead").?;
         const saved_domain = selector.accumulator_domain;
         const saved_next_vreg = selector.next_virtual_reg;
         const saved_next_spill = selector.next_spill_slot;
 
         var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(&selector);
         defer transaction.deinit();
-        _ = try transaction.prepare(.clobber, .caller_clobbers);
+        _ = try transaction.prepareCallBeforeArguments(.clobber);
         if (checkpoint >= 1) try machine.instructions.append(std.testing.allocator, .{ .mov_imm_rdi = 7 });
-        if (checkpoint >= 2) try selector_state.emitEflagsInstruction(&selector, .sub_rsp_8, .write);
-        if (checkpoint >= 3) try selector_state.emitEflagsInstruction(&selector, .{ .direct_call = .{ .symbol = "callee", .ret_ty = .{ .int = 32 } } }, .clobber);
-        if (checkpoint >= 4) try transaction.define("result", .zeroExtending(32));
+        if (checkpoint >= 2) try transaction.finishCallPreparationAfterArguments();
+        if (checkpoint >= 3) try selector_state.emitEflagsInstruction(&selector, .sub_rsp_8, .write);
+        if (checkpoint >= 4) try selector_state.emitEflagsInstruction(&selector, .{ .direct_call = .{ .symbol = "callee", .ret_ty = .{ .int = 32 } } }, .clobber);
+        if (checkpoint >= 5) try transaction.define("result", .zeroExtending(32));
         try transaction.rollback();
 
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
-        try std.testing.expectEqual(@as(usize, 1), selector.values.count());
+        try std.testing.expectEqual(@as(usize, 2), selector.values.count());
         try std.testing.expectEqual(live_binding, selector.values.get("live").?);
+        try std.testing.expectEqual(dead_binding, selector.values.get("dead").?);
         try std.testing.expect(selector.values.get("result") == null);
         try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
         try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
@@ -648,12 +669,12 @@ test "composed selector call transaction rolls back every call-sequence checkpoi
     }
 }
 
-test "composed selector preserves an accumulator-resident argument before defining a call result" {
-    var machine = MachineFunction.init("live-accumulator-call-argument", .{ .int = 32 });
+test "composed selector stages a dead accumulator argument before dropping its binding" {
+    var machine = MachineFunction.init("dead-accumulator-call-argument", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
     defer plan.deinit();
-    try plan.interval_ends.put("argument", 10);
+    try plan.interval_ends.put("argument", 0);
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
     selector.allocation_plan = &plan;
@@ -669,7 +690,128 @@ test "composed selector preserves an accumulator-resident argument before defini
     try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "argument" } });
     try std.testing.expect((try selector_calls.lowerCall(&selector, "result", call)) == null);
     try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
-    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector_state.valueLoc(&selector, "argument").?);
+    try std.testing.expect(selector_state.valueLoc(&selector, "argument") == null);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_eax_to_arg = .rdi }, machine.instructions.items[0]);
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .spill_eax_rsp, .spill_rax_rsp => return error.UnexpectedDeadArgumentSpill,
+        else => {},
+    };
+}
+
+test "composed selector spills a live accumulator call value exactly once" {
+    var machine = MachineFunction.init("live-accumulator-call-value", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("live", 10);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try selector_state.bindValueLoc(&selector, "live", .eax);
+
+    var call = ir.CallInst{ .ret_ty = .{ .int = 32 }, .callee = "callee", .args = .empty };
+    defer call.deinit(std.testing.allocator);
+    try std.testing.expect((try selector_calls.lowerCall(&selector, "result", call)) == null);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector_state.valueLoc(&selector, "live").?);
+    var spill_count: usize = 0;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .spill_eax_rsp, .spill_rax_rsp => spill_count += 1,
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), spill_count);
+}
+
+test "composed selector preserves a protected accumulator PHI across a call" {
+    var machine = MachineFunction.init("protected-phi-call", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("phi", 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try selector_state.bindValueLoc(&selector, "phi", .eax);
+    try selector.phi_results.put("phi", {});
+
+    var call = ir.CallInst{ .ret_ty = .{ .int = 32 }, .callee = "callee", .args = .empty };
+    defer call.deinit(std.testing.allocator);
+    try std.testing.expect((try selector_calls.lowerCall(&selector, "result", call)) == null);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector_state.valueLoc(&selector, "phi").?);
+    var spill_count: usize = 0;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .spill_eax_rsp, .spill_rax_rsp => spill_count += 1,
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), spill_count);
+}
+
+test "composed selector separates dead and live accumulator aliases at a call" {
+    var machine = MachineFunction.init("call-accumulator-aliases", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("dead", 0);
+    try plan.interval_ends.put("live", 10);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try selector_state.bindValueLoc(&selector, "dead", .eax);
+    try selector_state.bindValueLoc(&selector, "live", .rax);
+
+    var call = ir.CallInst{ .ret_ty = .{ .int = 64 }, .callee = "callee", .args = .empty };
+    defer call.deinit(std.testing.allocator);
+    try std.testing.expect((try selector_calls.lowerCall(&selector, "result", call)) == null);
+    try std.testing.expect(selector_state.valueLoc(&selector, "dead") == null);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector_state.valueLoc(&selector, "live").?);
+    var spill_count: usize = 0;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .spill_eax_rsp, .spill_rax_rsp => spill_count += 1,
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), spill_count);
+}
+
+test "call preparation failure after expired drop restores full state" {
+    var machine = MachineFunction.init("call-drop-rollback", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("dead", 0);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try selector_state.bindValueLoc(&selector, "dead", .eax);
+    try selector_state.bindValueLoc(&selector, "occupied", .{ .scratch32 = .r9 });
+    try selector.spill_slots.put("seed", .{ .base = 0, .slots = 1 });
+    selector.next_spill_slot = 1;
+    const dead_binding = selector.values.get("dead").?;
+    const occupied_binding = selector.values.get("occupied").?;
+    const saved_domain = selector.accumulator_domain;
+    const saved_eflags = selector.eflags.snapshot();
+    const saved_next_vreg = selector.next_virtual_reg;
+    const saved_next_spill = selector.next_spill_slot;
+
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(&selector);
+    defer transaction.deinit();
+    _ = try transaction.prepareCallBeforeArguments(.clobber);
+    try machine.instructions.append(std.testing.allocator, .{ .mov_eax_to_arg = .rdi });
+    try transaction.finishCallPreparationAfterArguments();
+    try std.testing.expect(selector_state.valueLoc(&selector, "dead") == null);
+    try std.testing.expectError(error.AccumulatorDefinitionAlreadyBound, transaction.define("occupied", .zeroExtending(32)));
+    try transaction.rollback();
+
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(dead_binding, selector.values.get("dead").?);
+    try std.testing.expectEqual(occupied_binding, selector.values.get("occupied").?);
+    try std.testing.expectEqual(@as(usize, 1), selector.spill_slots.count());
+    try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+    try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+    try std.testing.expectEqual(saved_domain, selector.accumulator_domain);
+    try selector.eflags.validateSnapshot(saved_eflags);
 }
 
 test "composed selector leaves generic narrow returns and unsupported return attributes rejected" {
