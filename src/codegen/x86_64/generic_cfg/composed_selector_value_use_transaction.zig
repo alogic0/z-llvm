@@ -38,6 +38,9 @@ pub const ValueUseTransaction = struct {
     request_phase: RequestPhase = .registering,
     lifecycle: Lifecycle = .active,
     write_nodes: [physical_node_count]bool = [_]bool{false} ** physical_node_count,
+    early_plans: [max_requests]EarlyPlan = [_]EarlyPlan{.{}} ** max_requests,
+    early_homes: [max_requests]EarlyPreparedHome = undefined,
+    early_home_valid: [max_requests]bool = [_]bool{false} ** max_requests,
     prepared_views: [max_requests]PreparedRecord = undefined,
     prepared_view_valid: [max_requests]bool = [_]bool{false} ** max_requests,
     view_generation: u32 = 1,
@@ -295,6 +298,16 @@ pub const ValueUseTransaction = struct {
     const PreparedRecord = struct {
         view: PreparedView,
         source_vreg: VirtualReg,
+        canonical_source_loc: ValueLoc,
+    };
+
+    const EarlyPlan = struct {
+        destination: ?ArgReg = null,
+    };
+
+    const EarlyPreparedHome = struct {
+        loc: ValueLoc,
+        source_vreg: VirtualReg,
     };
 
     pub const Request = struct {
@@ -496,6 +509,7 @@ pub const ValueUseTransaction = struct {
         accumulator,
     };
     const physical_node_count = std.meta.fields(PhysicalNode).len;
+    const max_mappings = max_requests * 2;
 
     pub fn begin(selector: *ComposedBlockSelector) !ValueUseTransaction {
         return .{ .selector = selector, .snapshot = try Snapshot.init(selector) };
@@ -545,8 +559,10 @@ pub const ValueUseTransaction = struct {
         var destinations = [_]bool{false} ** physical_node_count;
         var graph = [_][physical_node_count]bool{[_]bool{false} ** physical_node_count} ** physical_node_count;
         var writes = [_]bool{false} ** physical_node_count;
+        var mappings: [max_mappings]Mapping = undefined;
+        var mapping_count: usize = 0;
 
-        for (transaction.requests[0..transaction.request_count]) |*request| {
+        for (transaction.requests[0..transaction.request_count], 0..) |*request, request_index| {
             const current = try transaction.validateRequest(request);
             const destination_nodes = try requestDestinationNodes(transaction, request, current);
             for (destination_nodes.slice()) |destination_node| {
@@ -554,8 +570,11 @@ pub const ValueUseTransaction = struct {
                 if (destinations[node_index]) return error.ValueUseConflictingDestination;
                 destinations[node_index] = true;
             }
-            const mappings = try requestMappings(transaction, request, current);
-            for (mappings.slice()) |mapping| {
+            const request_mappings = try requestMappings(transaction, request, @intCast(request_index), current);
+            for (request_mappings.slice()) |mapping| {
+                if (mapping_count == mappings.len) return error.ValueUseMappingCapacityExceeded;
+                mappings[mapping_count] = mapping;
+                mapping_count += 1;
                 if (mapping.source == null) {
                     writes[@intFromEnum(mapping.destination)] = true;
                     continue;
@@ -567,6 +586,7 @@ pub const ValueUseTransaction = struct {
             }
         }
         try rejectCopyCycles(graph);
+        try transaction.planEarlyMaterializations(mappings[0..mapping_count]);
         transaction.write_nodes = writes;
         transaction.request_phase = .sealed;
     }
@@ -580,6 +600,7 @@ pub const ValueUseTransaction = struct {
         transaction.selector.preserve_current_position_values = true;
         defer transaction.selector.preserve_current_position_values = saved_preserve;
 
+        try transaction.materializeEarlyPlans();
         var nodes = transaction.write_nodes;
         for (transaction.requests[0..transaction.request_count]) |*request| {
             if (request.destination == .prepared_source) continue;
@@ -595,6 +616,9 @@ pub const ValueUseTransaction = struct {
                     nodes[@intFromEnum(PhysicalNode.r8)] = true;
             }
         }
+        for (transaction.early_plans) |plan| {
+            if (plan.destination) |reg| nodes[@intFromEnum(nodeForArgReg(reg))] = false;
+        }
         for (nodes, 0..) |needed, index| {
             if (!needed) continue;
             try clobberPhysicalNode(transaction.selector, @enumFromInt(index));
@@ -608,14 +632,18 @@ pub const ValueUseTransaction = struct {
         transaction.request_phase = .materializing;
         errdefer transaction.rollbackInternal();
         // Complete every mutation-producing fixed materialization first.
-        for (transaction.requests[0..transaction.request_count]) |*request| {
+        for (transaction.requests[0..transaction.request_count], 0..) |*request, index| {
             if (request.destination == .prepared_source or request.destination == .prepared_view) continue;
+            if (transaction.early_home_valid[index]) {
+                try transaction.validateEarlyHome(@intCast(index));
+                continue;
+            }
             try transaction.materializeRequest(request);
         }
         // Only now expose source-derived views from canonical current state.
         for (transaction.requests[0..transaction.request_count], 0..) |*request, index| {
             if (request.destination != .prepared_source and request.destination != .prepared_view) continue;
-            transaction.prepared_views[index] = try transaction.buildPreparedRecord(request);
+            transaction.prepared_views[index] = try transaction.buildPreparedRecord(@intCast(index));
             transaction.prepared_view_valid[index] = true;
         }
         transaction.request_phase = .materialized;
@@ -646,7 +674,7 @@ pub const ValueUseTransaction = struct {
         errdefer transaction.rollbackInternal();
         const index = try transaction.validateHandle(lease.request);
         if (!transaction.prepared_view_valid[index]) return error.ValueUsePreparedViewMissing;
-        const refreshed = try transaction.buildPreparedRecord(&transaction.requests[index]);
+        const refreshed = try transaction.buildPreparedRecord(index);
         if (!preparedRecordEql(&transaction.prepared_views[index], &refreshed))
             return error.ValueUsePreparedViewStale;
         const action = transaction.requests[index].prepared_action orelse
@@ -655,7 +683,7 @@ pub const ValueUseTransaction = struct {
         try executePreparedActionInternal(transaction, &refreshed.view, &transaction.requests[index], action);
         // Defense in depth: even the closed internal action must not relocate
         // or rebind its source. Any violation rolls back speculative emission.
-        const after_consumption = try transaction.buildPreparedRecord(&transaction.requests[index]);
+        const after_consumption = try transaction.buildPreparedRecord(index);
         if (!preparedRecordEql(&transaction.prepared_views[index], &after_consumption))
             return error.ValueUsePreparedViewStale;
         try transaction.validateActionDependenciesCanonical(action);
@@ -692,6 +720,8 @@ pub const ValueUseTransaction = struct {
         transaction.request_count = 0;
         transaction.request_phase = .registering;
         transaction.write_nodes = [_]bool{false} ** physical_node_count;
+        transaction.early_plans = [_]EarlyPlan{.{}} ** max_requests;
+        transaction.early_home_valid = [_]bool{false} ** max_requests;
         transaction.prepared_view_valid = [_]bool{false} ** max_requests;
         transaction.view_generation +%= 1;
         if (transaction.view_generation == 0) transaction.view_generation = 1;
@@ -783,7 +813,7 @@ pub const ValueUseTransaction = struct {
     fn validateOperandCanonical(transaction: *ValueUseTransaction, handle: RequestHandle) !void {
         const index = try transaction.validateRegisteredOperandHandle(handle);
         if (!transaction.prepared_view_valid[index]) return error.ValueUsePreparedViewMissing;
-        const refreshed = try transaction.buildPreparedRecord(&transaction.requests[index]);
+        const refreshed = try transaction.buildPreparedRecord(index);
         if (!preparedRecordEql(&transaction.prepared_views[index], &refreshed))
             return error.ValueUsePreparedViewStale;
     }
@@ -818,6 +848,96 @@ pub const ValueUseTransaction = struct {
         }
     }
 
+    fn planEarlyMaterializations(transaction: *ValueUseTransaction, mappings: []const Mapping) !void {
+        var source_counts = [_]u8{0} ** max_requests;
+        var source_nodes = [_]bool{false} ** physical_node_count;
+        for (mappings) |mapping| {
+            if (mapping.source) |source| source_nodes[@intFromEnum(source)] = true;
+            if (mapping.source_request_index) |mapped_index| {
+                for (transaction.requests[0..transaction.request_count], 0..) |*request, request_index| {
+                    if (!request.source.eql(&transaction.requests[mapped_index].source)) continue;
+                    if (source_counts[request_index] == std.math.maxInt(u8))
+                        return error.ValueUseMappingCapacityExceeded;
+                    source_counts[request_index] += 1;
+                }
+            }
+        }
+
+        for (mappings) |mapping| {
+            const index = mapping.source_request_index orelse continue;
+            if (source_counts[index] != 1) continue;
+            const destination = argRegForNode(mapping.destination) orelse continue;
+            if (mapping.source == mapping.destination) continue;
+            if (source_nodes[@intFromEnum(mapping.destination)]) continue;
+            if (!selector_state.scratchRegIsProvenFree(transaction.selector, destination)) continue;
+            if (transaction.early_plans[index].destination != null) continue;
+
+            const request = &transaction.requests[index];
+            const current = switch (request.source) {
+                .named => try transaction.validateRequest(request) orelse continue,
+                .null_value, .unsupported => continue,
+            };
+            if (!earlySequencingCandidate(current, request.form)) continue;
+            transaction.early_plans[index].destination = destination;
+        }
+    }
+
+    fn materializeEarlyPlans(transaction: *ValueUseTransaction) !void {
+        for (transaction.early_plans[0..transaction.request_count], 0..) |plan, index| {
+            const destination_reg = plan.destination orelse continue;
+            if (!selector_state.scratchRegIsProvenFree(transaction.selector, destination_reg))
+                return error.ValueUseEarlyDestinationNoLongerFree;
+            const request = &transaction.requests[index];
+            const name = switch (request.source) {
+                .named => |*identity| identity.slice(),
+                .null_value, .unsupported => return error.ValueUseEarlySourceNotNamed,
+            };
+            const binding = transaction.selector.values.get(name) orelse
+                return error.ValueUseUnresolvedSource;
+            const current = (try transaction.validateRequest(request)) orelse
+                return error.ValueUseUnsupportedSource;
+            if (!earlyCopyIsFlagsPreserving(current, request.form))
+                return error.ValueUseEarlyMaterializationNotFlagsPreserving;
+
+            const instruction_start = transaction.selector.machine.instructions.items.len;
+            const destination: Destination = switch (request.form) {
+                .gpr32 => .{ .gpr32 = destination_reg },
+                .gpr64, .pointer => .{ .gpr64 = destination_reg },
+                else => return error.ValueUseEarlyMaterializationNotFlagsPreserving,
+            };
+            try transaction.materializeRequestFromLoc(request, current, destination);
+            for (transaction.selector.machine.instructions.items[instruction_start..]) |instruction| {
+                if (eflags.instructionEffect(instruction) != .preserve)
+                    return error.ValueUseEarlyMaterializationClobbersEflags;
+            }
+            transaction.early_homes[index] = .{
+                .loc = switch (request.form) {
+                    .gpr32 => .{ .scratch32 = destination_reg },
+                    .gpr64, .pointer => .{ .scratch64 = destination_reg },
+                    else => unreachable,
+                },
+                .source_vreg = binding.vreg,
+            };
+            transaction.early_home_valid[index] = true;
+        }
+    }
+
+    fn validateEarlyHome(transaction: *ValueUseTransaction, index: u8) !void {
+        if (!transaction.early_home_valid[index]) return error.ValueUseEarlyHomeMissing;
+        const request = &transaction.requests[index];
+        const name = switch (request.source) {
+            .named => |*identity| identity.slice(),
+            .null_value, .unsupported => return error.ValueUseEarlySourceNotNamed,
+        };
+        const binding = transaction.selector.values.get(name) orelse
+            return error.ValueUseUnresolvedSource;
+        if (!std.meta.eql(binding.vreg, transaction.early_homes[index].source_vreg))
+            return error.ValueUsePreparedViewStale;
+        _ = try transaction.validateRequest(request);
+        try validateExpectedType(request.expected, request.form);
+        try validateSourceView(transaction.early_homes[index].loc, request.form);
+    }
+
     fn materializeRequest(transaction: *ValueUseTransaction, request: *const StoredRequest) !void {
         const current = switch (request.source) {
             .named => |*name| blk: {
@@ -834,13 +954,22 @@ pub const ValueUseTransaction = struct {
             },
             .unsupported => return error.ValueUseUnsupportedSource,
         };
+        try transaction.materializeRequestFromLoc(request, current, request.destination);
+    }
+
+    fn materializeRequestFromLoc(
+        transaction: *ValueUseTransaction,
+        request: *const StoredRequest,
+        current: ValueLoc,
+        destination: Destination,
+    ) !void {
         try validateSourceView(current, request.form);
         switch (request.form) {
-            .gpr32 => try materializeScalar32(transaction.selector, current, request.destination),
-            .gpr64 => try materializeScalar64(transaction.selector, current, request.destination),
-            .pointer, .stack_object_address => try materializePointer(transaction.selector, current, request.destination),
+            .gpr32 => try materializeScalar32(transaction.selector, current, destination),
+            .gpr64 => try materializeScalar64(transaction.selector, current, destination),
+            .pointer, .stack_object_address => try materializePointer(transaction.selector, current, destination),
             .stack_f32_pair_byte_address => return error.ValueUsePreparedActionRequired,
-            .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, request.destination),
+            .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, destination),
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
         }
@@ -851,7 +980,8 @@ pub const ValueUseTransaction = struct {
             error.ValueUseUnresolvedSource;
     }
 
-    fn buildPreparedRecord(transaction: *ValueUseTransaction, request: *const StoredRequest) !PreparedRecord {
+    fn buildPreparedRecord(transaction: *ValueUseTransaction, index: u8) !PreparedRecord {
+        const request = &transaction.requests[index];
         if (request.destination != .prepared_source and request.destination != .prepared_view)
             return error.ValueUsePreparedViewMissing;
         const name = switch (request.source) {
@@ -861,9 +991,14 @@ pub const ValueUseTransaction = struct {
         const binding = transaction.selector.values.get(name) orelse return error.ValueUseUnresolvedSource;
         const current = (try transaction.validateRequest(request)) orelse
             return error.ValueUsePreparedViewUnsupported;
+        const prepared_loc = if (transaction.early_home_valid[index]) blk: {
+            try transaction.validateEarlyHome(index);
+            break :blk transaction.early_homes[index].loc;
+        } else current;
         return .{
-            .view = try preparedViewFromLoc(transaction, request, current),
+            .view = try preparedViewFromLoc(transaction, request, prepared_loc),
             .source_vreg = binding.vreg,
+            .canonical_source_loc = current,
         };
     }
 };
@@ -1357,7 +1492,9 @@ fn preparedRecordEql(
     lhs: *const ValueUseTransaction.PreparedRecord,
     rhs: *const ValueUseTransaction.PreparedRecord,
 ) bool {
-    return std.meta.eql(lhs.source_vreg, rhs.source_vreg) and preparedViewEql(&lhs.view, &rhs.view);
+    return std.meta.eql(lhs.source_vreg, rhs.source_vreg) and
+        std.meta.eql(lhs.canonical_source_loc, rhs.canonical_source_loc) and
+        preparedViewEql(&lhs.view, &rhs.view);
 }
 
 fn preparedViewEql(
@@ -1437,6 +1574,7 @@ const NodeList = struct {
 const Mapping = struct {
     source: ?ValueUseTransaction.PhysicalNode,
     destination: ValueUseTransaction.PhysicalNode,
+    source_request_index: ?u8,
 };
 
 const MappingList = struct {
@@ -1568,6 +1706,50 @@ fn validateSourceView(loc: ValueLoc, form: ValueUseTransaction.UseForm) !void {
     }
 }
 
+/// Only forms whose complete materialization is exhaustively classified by
+/// the EFLAGS authority as preserving may participate in the planner's early
+/// phase. Address arithmetic, generated writes, pairs, and accumulator writes
+/// deliberately remain in the ordinary phase.
+fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: ValueUseTransaction.UseForm) bool {
+    return switch (form) {
+        .gpr32 => switch (loc) {
+            .arg32, .scratch32, .arg64, .scratch64, .eax, .rax, .spill64 => true,
+            else => false,
+        },
+        .gpr64 => switch (loc) {
+            .arg64, .scratch64, .rax, .spill64 => true,
+            else => false,
+        },
+        .pointer => switch (loc) {
+            .arg64, .scratch64, .rax, .spill64, .readonly_table_ptr => true,
+            else => false,
+        },
+        .stack_f32_pair_byte_address,
+        .stack_object_address,
+        .pair_low_high,
+        .pair_high_low,
+        .stack_argument,
+        .new_pair_ownership,
+        => false,
+    };
+}
+
+/// The dormant sequencing amendment is intentionally narrower than the set of
+/// all preserving copies: it advances reloads whose accepted ordering must
+/// precede preservation of another mapped destination. In-register copies do
+/// not need this phase and retain their existing order.
+fn earlySequencingCandidate(loc: ValueLoc, form: ValueUseTransaction.UseForm) bool {
+    return switch (form) {
+        .gpr32, .gpr64 => loc == .spill64,
+        .pointer => switch (loc) {
+            .spill64 => true,
+            .readonly_table_ptr => |ptr| ptr.storage == .spill,
+            else => false,
+        },
+        else => false,
+    };
+}
+
 fn requestDestinationNodes(
     transaction: *ValueUseTransaction,
     request: *const ValueUseTransaction.StoredRequest,
@@ -1634,6 +1816,7 @@ fn requestDestinationNodes(
 fn requestMappings(
     transaction: *ValueUseTransaction,
     request: *const ValueUseTransaction.StoredRequest,
+    request_index: u8,
     current: ?ValueLoc,
 ) !MappingList {
     var mappings: MappingList = .{};
@@ -1645,12 +1828,24 @@ fn requestMappings(
             .form_byte_address => |address| switch (address.offset) {
                 .constant => switch (current orelse return error.ValueUseUnresolvedSource) {
                     .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr => return mappings,
-                    else => mappings.append(.{ .source = scalarSourceNode(current.?), .destination = .rcx }),
+                    else => mappings.append(.{
+                        .source = scalarSourceNode(current.?),
+                        .destination = .rcx,
+                        .source_request_index = request_index,
+                    }),
                 },
                 .request => |handle| {
                     const offset_current = try transaction.registeredOperandCurrent(handle);
-                    mappings.append(.{ .source = scalarSourceNode(current orelse return error.ValueUseUnresolvedSource), .destination = .r8 });
-                    mappings.append(.{ .source = scalarSourceNode(offset_current), .destination = .rcx });
+                    mappings.append(.{
+                        .source = scalarSourceNode(current orelse return error.ValueUseUnresolvedSource),
+                        .destination = .r8,
+                        .source_request_index = request_index,
+                    });
+                    mappings.append(.{
+                        .source = scalarSourceNode(offset_current),
+                        .destination = .rcx,
+                        .source_request_index = handle.index,
+                    });
                 },
             },
             .form_scaled_address => |address| {
@@ -1660,6 +1855,7 @@ fn requestMappings(
                         .request => |handle| mappings.append(.{
                             .source = scalarSourceNode(try transaction.registeredOperandCurrent(handle)),
                             .destination = .rcx,
+                            .source_request_index = handle.index,
                         }),
                     },
                     .stack_i32_ptr => return mappings,
@@ -1667,20 +1863,30 @@ fn requestMappings(
                         .constant => mappings.append(.{
                             .source = scalarSourceNode(current.?),
                             .destination = .rcx,
+                            .source_request_index = request_index,
                         }),
                         .request => |handle| {
-                            mappings.append(.{ .source = scalarSourceNode(current.?), .destination = .rcx });
+                            mappings.append(.{
+                                .source = scalarSourceNode(current.?),
+                                .destination = .rcx,
+                                .source_request_index = request_index,
+                            });
                             mappings.append(.{
                                 .source = scalarSourceNode(try transaction.registeredOperandCurrent(handle)),
                                 .destination = .r8,
+                                .source_request_index = handle.index,
                             });
                         },
                     },
                 }
             },
             .form_readonly_table_address => {
-                mappings.append(.{ .source = scalarSourceNode(current orelse return error.ValueUseUnresolvedSource), .destination = .r8 });
-                mappings.append(.{ .source = null, .destination = .rcx });
+                mappings.append(.{
+                    .source = scalarSourceNode(current orelse return error.ValueUseUnresolvedSource),
+                    .destination = .r8,
+                    .source_request_index = request_index,
+                });
+                mappings.append(.{ .source = null, .destination = .rcx, .source_request_index = null });
             },
             .validate_shape, .emit_copy_to => {},
         }
@@ -1688,7 +1894,11 @@ fn requestMappings(
     }
     const destinations = try requestDestinationNodes(transaction, request, current);
     if (current == null) {
-        for (destinations.slice()) |destination| mappings.append(.{ .source = null, .destination = destination });
+        for (destinations.slice()) |destination| mappings.append(.{
+            .source = null,
+            .destination = destination,
+            .source_request_index = null,
+        });
         return mappings;
     }
     if (request.form == .pair_low_high or request.form == .pair_high_low) {
@@ -1696,15 +1906,19 @@ fn requestMappings(
         const low = source_nodes[0];
         const high = source_nodes[1];
         if (request.form == .pair_low_high) {
-            mappings.append(.{ .source = low, .destination = destinations.items[0] });
-            mappings.append(.{ .source = high, .destination = destinations.items[1] });
+            mappings.append(.{ .source = low, .destination = destinations.items[0], .source_request_index = request_index });
+            mappings.append(.{ .source = high, .destination = destinations.items[1], .source_request_index = request_index });
         } else {
-            mappings.append(.{ .source = high, .destination = destinations.items[0] });
-            mappings.append(.{ .source = low, .destination = destinations.items[1] });
+            mappings.append(.{ .source = high, .destination = destinations.items[0], .source_request_index = request_index });
+            mappings.append(.{ .source = low, .destination = destinations.items[1], .source_request_index = request_index });
         }
         return mappings;
     }
-    mappings.append(.{ .source = scalarSourceNode(current.?), .destination = destinations.items[0] });
+    mappings.append(.{
+        .source = scalarSourceNode(current.?),
+        .destination = destinations.items[0],
+        .source_request_index = request_index,
+    });
     return mappings;
 }
 

@@ -1627,7 +1627,7 @@ pub fn scratchRegIsProvenFree(selector: *const ComposedBlockSelector, reg: ArgRe
                 .reg => |value_reg| if (value_reg == reg) return false,
                 .spill => {},
             },
-            .eax, .rax, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => {},
+            .eax, .rax, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_f32_pair_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => {},
         }
     }
     return true;
