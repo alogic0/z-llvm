@@ -1,0 +1,84 @@
+# INBOX-79 commit 7A residual audit and hard enforcement
+
+Commit 7A audits the accepted commit-6 code state `324fa993` from the
+docs-only dispatch HEAD `627de956`. No production emitter source, canary tool,
+mandatory runner, build step, or Tier-3 infrastructure changed.
+
+The historical per-file maximum-count guard was replaced by two exact,
+function-scoped allowlists:
+
+- 48 residual accumulator operation groups / 72 occurrences covering every
+  production consumer `bindEax`, `bindRax`, `bindAccumulator`,
+  `clobberAccumulator`, and `bindValueLoc` site;
+- 8 predeclared pair/RDX exclusion groups / 11 occurrences covering the urem
+  RDX result, fixed full-product RAX/RDX, and every current pair-result bind.
+
+Every entry records file, enclosing function, operation, structural role,
+classification, future architectural slice, and exact expected occurrence
+count. The audit found zero unclassified sites and no ordinary EAX/RAX result
+producer outside `AccumulatorDefinitionTransaction`. Full enumeration:
+[INBOX-79 residual audit](inbox79_residual_accumulator_audit.md).
+
+The guard fails closed on:
+
+- an added operation in an otherwise allowlisted function;
+- relocation to a different function;
+- operation reclassification (clobber changed to bind);
+- removal/count drift;
+- an approved pair/RDX exclusion without the owning
+  `pair_rdx_authority` future slice.
+
+## Frozen validation
+
+Full unit and mandatory ABI differential:
+
+```text
+Build Summary: 7/7 steps succeeded; 1087/1087 tests passed
+abi_diff_cases_attempted=60
+abi_diff_cases_matched=60
+abi_diff_real_functions_matched=30
+result=pass
+```
+
+- log: `tmp/inbox79_unit.log`
+- SHA-256: `de7e283565892fe7e7a397b187b1eedf8966af565d17b1a7b89236e32771ea64`
+
+Standalone procedural canaries:
+
+```text
+summary focused-codegen-canaries target=x86_64-linux-gnu canaries=2 execution_cases=35 local_fail=0
+```
+
+- log: `tmp/inbox79_focused_canaries.log`
+- SHA-256: `2bf6f68ae7cec068253218a52e4d89d17d0b193396c31e3bca2feb72744e40f8`
+
+Full captured cohort:
+
+```text
+summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emitted_functions=285 failed_functions=158 first_failing_function=compiler_rt.trunc.truncl first_failing_diagnostic=UnsupportedLongDoubleAbi first_failing_selector_tag=unsupported_type first_failing_selector_detail=unsupported-return-type local_fail=1
+```
+
+- report SHA-256: `49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681`
+- accepted-cohort object SHA-256:
+  `061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be`
+- owner-manifest SHA-256:
+  `5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d`
+- live owner ledger: `167 / 17 / 101` composed / legacy / fallback.
+
+The unchanged standard integrated-executable runner passed 7/7. Log
+`tmp/inbox79_integrated_exe.log`, SHA-256
+`c0b9678666690672de4f3ba705a6b128c295a9bbc715f2d9a5a3c7386ff2e42e`.
+
+Strengthened Tier 2 passed:
+
+```text
+Build Summary: 28/28 steps succeeded; 1095/1095 tests passed
+```
+
+- log: `tmp/inbox79_tier2.log`
+- SHA-256: `99d23df01524dc917c2aaa58aa7f66eb784db29d408db0fa86559fd3ec578cda`
+
+Frozen identities are exact: `49a19f04` / `443-285-158-truncl` /
+`061a64e4` / `5d91960e` / `167-17-101`. No Tier 3 was run. The standalone
+canaries were not promoted and 7B was not started. Stop for
+Supervisor/Reviewer acceptance of 7A.

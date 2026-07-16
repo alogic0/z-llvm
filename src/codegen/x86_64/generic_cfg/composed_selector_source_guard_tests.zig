@@ -40,6 +40,7 @@ const DirectOperation = enum {
     bind_rax,
     bind_accumulator,
     clobber_accumulator,
+    bind_value_loc,
 
     fn pattern(operation: DirectOperation) []const u8 {
         return switch (operation) {
@@ -47,62 +48,132 @@ const DirectOperation = enum {
             .bind_rax => "bindRax(",
             .bind_accumulator => "bindAccumulator(",
             .clobber_accumulator => "clobberAccumulator(",
+            .bind_value_loc => "bindValueLoc(",
         };
     }
 };
 
-const DirectInventoryEntry = struct {
+const ResidualClassification = enum {
+    internal_temporary,
+    alias_only_binding,
+    approved_pair_rdx_exclusion,
+    non_accumulator_result_path,
+};
+
+const FutureArchitecturalSlice = enum {
+    none,
+    pair_rdx_authority,
+};
+
+const ResidualAllowlistEntry = struct {
     source: []const u8,
+    function: []const u8,
     operation: DirectOperation,
-    maximum: usize,
+    structural_role: []const u8,
+    classification: ResidualClassification,
+    future_slice: FutureArchitecturalSlice,
+    expected_count: usize,
 };
 
-// Frozen at INBOX-72. Later O1 commits may reduce these per-file/per-operation
-// maxima, but cannot add or relocate a direct accumulator bind/clobber site.
-const direct_accumulator_inventory = [_]DirectInventoryEntry{
-    .{ .source = "composed_selector_calls.zig", .operation = .bind_eax, .maximum = 0 },
-    .{ .source = "composed_selector_calls.zig", .operation = .bind_rax, .maximum = 0 },
-    .{ .source = "composed_selector_calls.zig", .operation = .clobber_accumulator, .maximum = 5 },
-    .{ .source = "composed_selector_cfg.zig", .operation = .bind_accumulator, .maximum = 1 },
-    .{ .source = "composed_selector_cfg.zig", .operation = .clobber_accumulator, .maximum = 8 },
-    .{ .source = "composed_selector_conversion.zig", .operation = .bind_eax, .maximum = 1 },
-    .{ .source = "composed_selector_conversion.zig", .operation = .clobber_accumulator, .maximum = 2 },
-    .{ .source = "composed_selector_fp.zig", .operation = .bind_eax, .maximum = 4 },
-    .{ .source = "composed_selector_fp.zig", .operation = .bind_rax, .maximum = 1 },
-    .{ .source = "composed_selector_fp.zig", .operation = .clobber_accumulator, .maximum = 8 },
-    .{ .source = "composed_selector_icmp.zig", .operation = .bind_eax, .maximum = 4 },
-    .{ .source = "composed_selector_icmp.zig", .operation = .clobber_accumulator, .maximum = 22 },
-    .{ .source = "composed_selector_memory.zig", .operation = .bind_eax, .maximum = 6 },
-    .{ .source = "composed_selector_memory.zig", .operation = .bind_rax, .maximum = 3 },
-    .{ .source = "composed_selector_memory.zig", .operation = .clobber_accumulator, .maximum = 8 },
-    .{ .source = "composed_selector_scalar.zig", .operation = .bind_eax, .maximum = 16 },
-    .{ .source = "composed_selector_scalar.zig", .operation = .bind_rax, .maximum = 17 },
-    .{ .source = "composed_selector_scalar.zig", .operation = .bind_accumulator, .maximum = 3 },
-    .{ .source = "composed_selector_scalar.zig", .operation = .clobber_accumulator, .maximum = 5 },
-    .{ .source = "composed_selector_vector.zig", .operation = .bind_rax, .maximum = 1 },
-    .{ .source = "composed_selector_vector.zig", .operation = .bind_accumulator, .maximum = 3 },
-    .{ .source = "composed_selector_vector.zig", .operation = .clobber_accumulator, .maximum = 4 },
+// Exact INBOX-79 residual inventory. Every production occurrence is scoped to
+// its enclosing function; additions, moves, and operation reclassification
+// therefore fail closed. Ordinary EAX/RAX result producers are absent.
+const residual_accumulator_allowlist = [_]ResidualAllowlistEntry{
+    .{ .source = "composed_selector_aggregate.zig", .function = "lowerInsertValue", .operation = .bind_value_loc, .structural_role = "fixed aggregate-SSE result binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 3 },
+
+    .{ .source = "composed_selector_calls.zig", .function = "lowerFpAbs", .operation = .clobber_accumulator, .structural_role = "temporary GPR bit-mask path for an XMM result", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerUnsignedOverflowI32", .operation = .clobber_accumulator, .structural_role = "aggregate overflow flag temporary after value relocation to RDX", .classification = .approved_pair_rdx_exclusion, .future_slice = .pair_rdx_authority, .expected_count = 1 },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerSmulOverflowI64", .operation = .clobber_accumulator, .structural_role = "full-product RAX/RDX aggregate overflow flag temporary", .classification = .approved_pair_rdx_exclusion, .future_slice = .pair_rdx_authority, .expected_count = 1 },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerCtpop", .operation = .clobber_accumulator, .structural_role = "i128 pair-result limb accumulation temporary", .classification = .approved_pair_rdx_exclusion, .future_slice = .pair_rdx_authority, .expected_count = 1 },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerBitPermutation", .operation = .clobber_accumulator, .structural_role = "i128 pair-result limb permutation temporary", .classification = .approved_pair_rdx_exclusion, .future_slice = .pair_rdx_authority, .expected_count = 1 },
+
+    .{ .source = "composed_selector_cfg.zig", .function = "lowerSelect", .operation = .bind_accumulator, .structural_role = "alias-only binding after both scalar select arms materialize", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_cfg.zig", .function = "emitScalarSelectValue", .operation = .clobber_accumulator, .structural_role = "scalar select immediate-arm materialization temporary", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_cfg.zig", .function = "restoreDisplacedPhiDestinations", .operation = .bind_value_loc, .structural_role = "computed PHI destination alias restoration", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_cfg.zig", .function = "emitPhiEdgeMoves", .operation = .bind_value_loc, .structural_role = "computed PHI edge destination alias binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_cfg.zig", .function = "materializeScalarPhiSnapshot", .operation = .clobber_accumulator, .structural_role = "PHI snapshot copy-through-accumulator temporary", .classification = .internal_temporary, .future_slice = .none, .expected_count = 3 },
+    .{ .source = "composed_selector_cfg.zig", .function = "emitValueIntoLoc", .operation = .clobber_accumulator, .structural_role = "PHI edge scratch/spill materialization temporary", .classification = .internal_temporary, .future_slice = .none, .expected_count = 4 },
+
+    .{ .source = "composed_selector_conversion.zig", .function = "lowerUnsignedI64", .operation = .clobber_accumulator, .structural_role = "integer-to-FP conversion temporary for an XMM result", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_conversion.zig", .function = "lowerWideInteger", .operation = .clobber_accumulator, .structural_role = "wide integer-to-FP conversion temporary for an XMM result", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
+
+    .{ .source = "composed_selector_fp.zig", .function = "lowerHalfFadd", .operation = .bind_value_loc, .structural_role = "fixed XMM0 half result binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerCopySign", .operation = .clobber_accumulator, .structural_role = "GPR mask temporary for an XMM result", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_fp.zig", .function = "materializeFpValue", .operation = .clobber_accumulator, .structural_role = "FP immediate materialization temporary", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerFcmp", .operation = .clobber_accumulator, .structural_role = "specialized FP compare result preparation", .classification = .internal_temporary, .future_slice = .none, .expected_count = 2 },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerFcmp", .operation = .bind_eax, .structural_role = "alias-only binding after specialized FP setcc", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerHalfOeqZero", .operation = .clobber_accumulator, .structural_role = "specialized half-zero compare result preparation", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerHalfOeqZero", .operation = .bind_eax, .structural_role = "alias-only binding after specialized half-zero setcc", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerHalfFcmp", .operation = .clobber_accumulator, .structural_role = "specialized half compare conversion/result temporary", .classification = .internal_temporary, .future_slice = .none, .expected_count = 2 },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerHalfFcmp", .operation = .bind_eax, .structural_role = "alias-only binding after specialized half setcc", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerFpIntBitcast", .operation = .clobber_accumulator, .structural_role = "FP-to-integer bitcast result preparation", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerFpIntBitcast", .operation = .bind_eax, .structural_role = "alias-only EAX binding after FP bit transfer", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerFpIntBitcast", .operation = .bind_rax, .structural_role = "alias-only RAX binding after FP bit transfer", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerFloatToHalf", .operation = .bind_value_loc, .structural_role = "fixed XMM0 half conversion result binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerHalfExtension", .operation = .bind_value_loc, .structural_role = "fixed XMM0 half extension result binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 1 },
+
+    .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .operation = .bind_value_loc, .structural_role = "fixed stack object and pointer binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 4 },
+
+    .{ .source = "composed_selector_impl.zig", .function = "bindParams", .operation = .bind_value_loc, .structural_role = "fixed incoming ABI parameter binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 5 },
+    .{ .source = "composed_selector_impl.zig", .function = "bindPhiResults", .operation = .bind_value_loc, .structural_role = "computed planned PHI destination alias binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 3 },
+    .{ .source = "composed_selector_impl.zig", .function = "stabilizeFramedPhiDestinations", .operation = .bind_value_loc, .structural_role = "computed stabilized PHI destination alias binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_impl.zig", .function = "enterBlock", .operation = .bind_value_loc, .structural_role = "computed predecessor PHI location alias binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+
+    .{ .source = "composed_selector_memory.zig", .function = "lowerLoad", .operation = .bind_value_loc, .structural_role = "fixed stack128 aggregate load binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_memory.zig", .function = "lowerStoreFp", .operation = .clobber_accumulator, .structural_role = "FP store address/value transfer temporary", .classification = .internal_temporary, .future_slice = .none, .expected_count = 2 },
+    .{ .source = "composed_selector_memory.zig", .function = "lowerGep", .operation = .bind_value_loc, .structural_role = "fixed stack i32 pointer alias binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_memory.zig", .function = "lowerI32ElementPointerGep", .operation = .bind_value_loc, .structural_role = "fixed stack i32 element pointer alias binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 2 },
+    .{ .source = "composed_selector_memory.zig", .function = "lowerBytePointerGep", .operation = .bind_value_loc, .structural_role = "fixed stack/readonly byte pointer alias binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 3 },
+    .{ .source = "composed_selector_memory.zig", .function = "lowerReadOnlyTableGep", .operation = .bind_value_loc, .structural_role = "fixed readonly-table pointer alias binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_memory.zig", .function = "loadStackU64IntoRax", .operation = .clobber_accumulator, .structural_role = "stack-to-RAX helper temporary with no result binding", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
+
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .operation = .bind_value_loc, .structural_role = "computed no-emission cast alias binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerFreeze", .operation = .bind_value_loc, .structural_role = "computed no-emission freeze alias binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+
+    .{ .source = "composed_selector_vector.zig", .function = "lowerMask4ToI4", .operation = .clobber_accumulator, .structural_role = "specialized vector-mask scalar extraction preparation", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_vector.zig", .function = "lowerI64x2ExtractElement", .operation = .clobber_accumulator, .structural_role = "specialized vector lane scalar extraction preparation", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_vector.zig", .function = "lowerI64x2ExtractElement", .operation = .bind_rax, .structural_role = "alias-only RAX binding after vector lane transfer", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_vector.zig", .function = "lowerMaskExtractElement", .operation = .clobber_accumulator, .structural_role = "specialized vector-mask lane extraction preparation", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
+    .{ .source = "composed_selector_vector.zig", .function = "bindMaskScalarResult", .operation = .bind_accumulator, .structural_role = "alias-only mask scalar result binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 3 },
+    .{ .source = "composed_selector_vector.zig", .function = "materializeLaneBits", .operation = .clobber_accumulator, .structural_role = "lane-bit immediate transfer temporary for an XMM result", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
 };
 
-const GenericBindingInventoryEntry = struct {
+const ExclusionOperation = enum {
+    urem_rdx_result,
+    full_product_rax_rdx,
+    pair_result,
+
+    fn pattern(operation: ExclusionOperation) []const u8 {
+        return switch (operation) {
+            .urem_rdx_result => "bindScratch(selector, result_name, .rdx, bits)",
+            .full_product_rax_rdx => "prepareFixedProductDefs(selector)",
+            .pair_result => "bindPairScratch(selector, result_name,",
+        };
+    }
+};
+
+const ExclusionAllowlistEntry = struct {
     source: []const u8,
-    maximum: usize,
+    function: []const u8,
+    operation: ExclusionOperation,
+    structural_role: []const u8,
+    future_slice: FutureArchitecturalSlice,
+    expected_count: usize,
 };
 
-// Freeze every generic production binding site, including computed locations.
-// The scalar lowerCast site below is the one accepted alias-only accumulator
-// cast: it emits no instruction and therefore is not a physical definition.
-const generic_binding_inventory = [_]GenericBindingInventoryEntry{
-    .{ .source = "composed_selector_aggregate.zig", .maximum = 3 },
-    .{ .source = "composed_selector_cfg.zig", .maximum = 2 },
-    .{ .source = "composed_selector_fp.zig", .maximum = 3 },
-    .{ .source = "composed_selector_frame.zig", .maximum = 4 },
-    .{ .source = "composed_selector_impl.zig", .maximum = 10 },
-    .{ .source = "composed_selector_memory.zig", .maximum = 8 },
-    .{ .source = "composed_selector_scalar.zig", .maximum = 2 },
+// The predeclared non-ordinary producer exclusions are pinned independently
+// from the accumulator-call inventory so their non-EAX/RAX result bindings
+// cannot move or multiply unnoticed.
+const architectural_exclusion_allowlist = [_]ExclusionAllowlistEntry{
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerUnsignedRem", .operation = .urem_rdx_result, .structural_role = "unsigned remainder result in RDX", .future_slice = .pair_rdx_authority, .expected_count = 1 },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerSmulOverflowI64", .operation = .full_product_rax_rdx, .structural_role = "signed full-product RAX/RDX aggregate value", .future_slice = .pair_rdx_authority, .expected_count = 1 },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerCtpop", .operation = .pair_result, .structural_role = "i128 population-count pair result", .future_slice = .pair_rdx_authority, .expected_count = 1 },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerBitPermutation", .operation = .pair_result, .structural_role = "i128 bit-permutation pair result", .future_slice = .pair_rdx_authority, .expected_count = 1 },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerAbsI128", .operation = .pair_result, .structural_role = "i128 absolute-value pair result", .future_slice = .pair_rdx_authority, .expected_count = 1 },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerBinaryImmediateLhs", .operation = .pair_result, .structural_role = "i128 immediate-LHS pair result", .future_slice = .pair_rdx_authority, .expected_count = 1 },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerPairBinary", .operation = .pair_result, .structural_role = "i128 binary pair result", .future_slice = .pair_rdx_authority, .expected_count = 4 },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .operation = .pair_result, .structural_role = "integer-to-i128 cast pair result", .future_slice = .pair_rdx_authority, .expected_count = 1 },
 };
-
-const alias_only_cast_binding_site = "try selector_state.bindValueLoc(selector, result_name, result_loc);";
 
 fn validateCurrentTree(allocator: std.mem.Allocator) !void {
     const io = std.testing.io;
@@ -138,15 +209,10 @@ fn validateProductionSource(name: []const u8, source: []const u8) !void {
         .lifecycle => try validateStateDataLifecycle(source),
         .consumer => {
             if (std.mem.indexOf(u8, source, ".values") != null) return error.RawSelectorValuesAccess;
-            try validateDirectAccumulatorInventory(name, source);
-            try validateGenericBindingInventory(name, source);
+            try validateResidualAccumulatorAllowlist(&residual_accumulator_allowlist, name, source);
+            try validateArchitecturalExclusionAllowlist(name, source);
             try validateAccumulatorDisplacementPolicies(source);
             try validateEflagsEmissionAuthority(name, source);
-            if (std.mem.eql(u8, name, "composed_selector_scalar.zig") and
-                std.mem.count(u8, source, alias_only_cast_binding_site) != 1)
-            {
-                return error.AliasOnlyCastBindingInventoryMismatch;
-            }
         },
     }
 }
@@ -200,31 +266,112 @@ fn validateStateDataLifecycle(source: []const u8) !void {
     if (init_count != 1 or deinit_count != 1) return error.StateDataLifecycleInventoryMismatch;
 }
 
-fn validateDirectAccumulatorInventory(name: []const u8, source: []const u8) !void {
-    inline for (std.meta.tags(DirectOperation)) |operation| {
-        const actual = std.mem.count(u8, source, operation.pattern());
-        const maximum = directInventoryMaximum(name, operation);
-        if (actual > maximum) return error.DirectAccumulatorInventoryGrowth;
-    }
-}
-
-fn directInventoryMaximum(name: []const u8, operation: DirectOperation) usize {
-    for (direct_accumulator_inventory) |entry| {
-        if (entry.operation == operation and std.mem.eql(u8, entry.source, name)) return entry.maximum;
-    }
-    return 0;
-}
-
-fn validateGenericBindingInventory(name: []const u8, source: []const u8) !void {
-    const actual = std.mem.count(u8, source, "bindValueLoc(");
-    var maximum: usize = 0;
-    for (generic_binding_inventory) |entry| {
-        if (std.mem.eql(u8, entry.source, name)) {
-            maximum = entry.maximum;
-            break;
+fn validateResidualAccumulatorAllowlist(
+    allowlist: []const ResidualAllowlistEntry,
+    name: []const u8,
+    source: []const u8,
+) !void {
+    if (allowlist.len > residual_accumulator_allowlist.len) return error.ResidualAllowlistTooLarge;
+    for (allowlist, 0..) |entry, index| {
+        for (allowlist[index + 1 ..]) |other| {
+            if (entry.operation == other.operation and
+                std.mem.eql(u8, entry.source, other.source) and
+                std.mem.eql(u8, entry.function, other.function))
+            {
+                return error.DuplicateResidualAllowlistEntry;
+            }
         }
     }
-    if (actual > maximum) return error.GenericBindingInventoryGrowth;
+
+    var counts = [_]usize{0} ** residual_accumulator_allowlist.len;
+    var current_function: ?[]const u8 = null;
+    var lines = std.mem.splitScalar(u8, source, '\n');
+    while (lines.next()) |line| {
+        if (functionName(line)) |function| current_function = function;
+        for (std.meta.tags(DirectOperation)) |operation| {
+            const occurrences = std.mem.count(u8, line, operation.pattern());
+            if (occurrences == 0) continue;
+            const function = current_function orelse return error.ResidualAccumulatorOperationOutsideFunction;
+            const index = residualAllowlistIndex(allowlist, name, function, operation) orelse
+                return error.UnallowlistedResidualAccumulatorOperation;
+            counts[index] += occurrences;
+        }
+    }
+
+    for (allowlist, 0..) |entry, index| {
+        if (!std.mem.eql(u8, entry.source, name)) continue;
+        if (counts[index] != entry.expected_count) return error.ResidualAccumulatorOccurrenceMismatch;
+        if (entry.classification == .approved_pair_rdx_exclusion and entry.future_slice != .pair_rdx_authority) {
+            return error.ResidualExclusionMissingFutureSlice;
+        }
+        if (entry.classification != .approved_pair_rdx_exclusion and entry.future_slice != .none) {
+            return error.ResidualNonExclusionOwnsFutureSlice;
+        }
+        if (entry.structural_role.len == 0) return error.ResidualStructuralRoleMissing;
+    }
+}
+
+fn functionName(line: []const u8) ?[]const u8 {
+    const trimmed = std.mem.trimStart(u8, line, " \t");
+    const prefixes = [_][]const u8{ "pub inline fn ", "inline fn ", "pub fn ", "fn " };
+    for (prefixes) |prefix| {
+        if (!std.mem.startsWith(u8, trimmed, prefix)) continue;
+        const rest = trimmed[prefix.len..];
+        const end = std.mem.indexOfScalar(u8, rest, '(') orelse return null;
+        return rest[0..end];
+    }
+    return null;
+}
+
+fn residualAllowlistIndex(
+    allowlist: []const ResidualAllowlistEntry,
+    source: []const u8,
+    function: []const u8,
+    operation: DirectOperation,
+) ?usize {
+    for (allowlist, 0..) |entry, index| {
+        if (entry.operation == operation and
+            std.mem.eql(u8, entry.source, source) and
+            std.mem.eql(u8, entry.function, function)) return index;
+    }
+    return null;
+}
+
+fn validateArchitecturalExclusionAllowlist(name: []const u8, source: []const u8) !void {
+    var counts = [_]usize{0} ** architectural_exclusion_allowlist.len;
+    var current_function: ?[]const u8 = null;
+    var lines = std.mem.splitScalar(u8, source, '\n');
+    while (lines.next()) |line| {
+        if (functionName(line)) |function| current_function = function;
+        for (std.meta.tags(ExclusionOperation)) |operation| {
+            const occurrences = std.mem.count(u8, line, operation.pattern());
+            if (occurrences == 0) continue;
+            const function = current_function orelse return error.ArchitecturalExclusionOutsideFunction;
+            const index = architecturalExclusionIndex(name, function, operation) orelse
+                return error.UnallowlistedArchitecturalExclusion;
+            counts[index] += occurrences;
+        }
+    }
+
+    for (architectural_exclusion_allowlist, 0..) |entry, index| {
+        if (!std.mem.eql(u8, entry.source, name)) continue;
+        if (counts[index] != entry.expected_count) return error.ArchitecturalExclusionOccurrenceMismatch;
+        if (entry.future_slice != .pair_rdx_authority) return error.ArchitecturalExclusionMissingFutureSlice;
+        if (entry.structural_role.len == 0) return error.ArchitecturalExclusionStructuralRoleMissing;
+    }
+}
+
+fn architecturalExclusionIndex(
+    source: []const u8,
+    function: []const u8,
+    operation: ExclusionOperation,
+) ?usize {
+    for (architectural_exclusion_allowlist, 0..) |entry, index| {
+        if (entry.operation == operation and
+            std.mem.eql(u8, entry.source, source) and
+            std.mem.eql(u8, entry.function, function)) return index;
+    }
+    return null;
 }
 
 fn validateAccumulatorDisplacementPolicies(source: []const u8) !void {
@@ -310,37 +457,75 @@ test "composed selector source guard narrowly permits only state-data lifecycle 
     );
 }
 
-test "composed selector source guard freezes direct accumulator inventory" {
+test "composed selector source guard rejects residual accumulator additions" {
+    const allowlist = [_]ResidualAllowlistEntry{.{
+        .source = "composed_selector_fixture.zig",
+        .function = "keep",
+        .operation = .clobber_accumulator,
+        .structural_role = "fixture temporary",
+        .classification = .internal_temporary,
+        .future_slice = .none,
+        .expected_count = 1,
+    }};
+    try validateResidualAccumulatorAllowlist(
+        &allowlist,
+        "composed_selector_fixture.zig",
+        "fn keep() void { selector_state.clobberAccumulator(undefined); }",
+    );
     try std.testing.expectError(
-        error.DirectAccumulatorInventoryGrowth,
-        validateProductionSource(
-            "composed_selector_aggregate.zig",
-            "fn bad() void { selector_state.bindEax(undefined, \"x\") catch unreachable; }",
+        error.ResidualAccumulatorOccurrenceMismatch,
+        validateResidualAccumulatorAllowlist(
+            &allowlist,
+            "composed_selector_fixture.zig",
+            "fn keep() void { selector_state.clobberAccumulator(undefined); selector_state.clobberAccumulator(undefined); }",
         ),
     );
 }
 
-test "composed selector source guard freezes generic and alias-only accumulator binding sites" {
+test "composed selector source guard rejects residual accumulator relocation" {
+    const allowlist = [_]ResidualAllowlistEntry{.{
+        .source = "composed_selector_fixture.zig",
+        .function = "keep",
+        .operation = .bind_value_loc,
+        .structural_role = "fixture alias",
+        .classification = .alias_only_binding,
+        .future_slice = .none,
+        .expected_count = 1,
+    }};
     try std.testing.expectError(
-        error.GenericBindingInventoryGrowth,
-        validateProductionSource(
-            "composed_selector_aggregate.zig",
-            "bindValueLoc( bindValueLoc( bindValueLoc( bindValueLoc(",
+        error.UnallowlistedResidualAccumulatorOperation,
+        validateResidualAccumulatorAllowlist(
+            &allowlist,
+            "composed_selector_fixture.zig",
+            "fn moved() void { selector_state.bindValueLoc(undefined, \"x\", undefined); }",
         ),
     );
+}
+
+test "composed selector source guard rejects residual accumulator reclassification" {
+    const allowlist = [_]ResidualAllowlistEntry{.{
+        .source = "composed_selector_fixture.zig",
+        .function = "keep",
+        .operation = .clobber_accumulator,
+        .structural_role = "fixture temporary",
+        .classification = .internal_temporary,
+        .future_slice = .none,
+        .expected_count = 1,
+    }};
     try std.testing.expectError(
-        error.AliasOnlyCastBindingInventoryMismatch,
-        validateProductionSource("composed_selector_scalar.zig", "fn lowerCast() void {}"),
+        error.UnallowlistedResidualAccumulatorOperation,
+        validateResidualAccumulatorAllowlist(
+            &allowlist,
+            "composed_selector_fixture.zig",
+            "fn keep() void { selector_state.bindEax(undefined, \"x\"); }",
+        ),
     );
 }
 
 test "composed selector source guard requires an explicit accumulator displacement policy" {
     try std.testing.expectError(
         error.MissingAccumulatorDisplacementPolicy,
-        validateProductionSource(
-            "composed_selector_conversion.zig",
-            "fn lower() void { _ = transaction.prepare(.preserve); }",
-        ),
+        validateAccumulatorDisplacementPolicies("fn lower() void { _ = transaction.prepare(.preserve); }"),
     );
     try validateAccumulatorDisplacementPolicies(
         "_ = transaction.prepare(.preserve, .spill_live);" ++
