@@ -1,0 +1,133 @@
+# INBOX-82 O2-1 address-dependency domain
+
+## Scope and frozen base
+
+O2-1 replaces the `stack_i32_ptr` liveness scan with a canonical typed
+address-dependency authority. It adds no materialization capability and changes
+no instruction emitter, candidate order, mandatory runner, or gate inventory.
+
+The requested accepted base is commit
+`7e18722e5fd83bf8e6c36c65ccc602d08f714518`, tree
+`e615afe9f32750da1c2c00571cbe1c465a3ee694`. The implementation was prepared
+at documentation head `4c848e338217a3a05972d05e9cb192b8fac3eda1`, tree
+`3dfb129a0a1b8ad2dd82c8c5307cc11707ebb240`; the intervening commits change
+documentation only, and `git diff 7e18722e..4c848e33 -- src tools build.zig`
+is empty. Thus the production base is exactly the accepted O2-0 production
+tree.
+
+## Authority and semantics
+
+`AddressDependencyDomain` stores edges from a derived address owner to typed
+`base`, `index`, and `addend` identities. Traversal follows those edges only:
+a live owner extends dependency liveness transitively, while a dependency
+cannot revive its owner. Multiple owners may share an identity.
+
+Owner replacement and removal operate on a copied domain and commit only after
+validation. The value-map authority reserves capacity before committing a
+binding and its dependency metadata together. Rebinding a non-address or an
+address without named dependencies removes the old owner edge, so no stale edge
+survives invalidation. Both `SelectionTransaction` and
+`AccumulatorDefinitionTransaction` snapshot and restore the complete domain.
+
+Names are copied into domain-owned fixed inline buffers; stored slices do not
+borrow parser, map-key, or temporary caller storage. Limits are explicit:
+
+```text
+owners=192
+dependencies_per_owner=3
+identity_bytes=192
+```
+
+The frozen compiler-rt capture has a conservative maximum of 156 static
+`getelementptr` sites in one function, so 192 is a fixed reviewed bound with
+headroom. Overflow returns `AddressDependencyDomainCapacityExceeded`; it never
+allocates, truncates, or silently drops metadata. A provisional 32-owner sizing
+run stopped fail-closed at `compiler_rt.udivmodei4.__udivei5`; the bound was
+measured before the final frozen-tree validation, which then ran once and
+passed in full.
+
+The error-bearing liveness authority validates the entire live-owner closure.
+It rejects missing dependency bindings, missing dependency plan entries,
+missing owner bindings, stale owner/edge descriptions, incompatible identity
+types or roles, duplicate identities/roles, and cycles. A dependency's own
+expired interval never defeats an extension from a live owner. As in the
+accepted allocation-plan behavior, a pressure-exempt owner with no interval
+entry remains conservatively live; every identity that owner references must
+still have both a binding and a plan entry.
+
+Production registration now occurs when a named dynamic `stack_i32_ptr` is
+bound: its named index and optional named addend become typed integer
+dependencies. The stack frame base is implicit in this existing `ValueLoc`, so
+there is no invented base identity for this migration. The general authority
+supports explicit typed base edges, and its focused tests exercise them.
+
+The retired `.stack_i32_ptr` iteration is absent from
+`valueIsLiveAfterCurrent`; all extension behavior flows through
+`dependencyIsRequired`, which returns an error union rather than a conservative
+boolean on malformed metadata.
+
+## Focused coverage and enforcement
+
+The focused domain and production tests cover:
+
+- typed base/index/addend liveness and transitive owner-to-dependency traversal;
+- missing identities/plan entries/bindings, stale edges, invalid role/type, and
+  cycle rejection;
+- dead-owner release, shared dependencies, rebind/removal cleanup, and atomic
+  failed replacement;
+- stable inline identity lifetime and fixed-capacity overflow;
+- exact accumulator-transaction and selection-transaction rollback;
+- production `stack_i32_ptr` index/addend extension and release.
+
+The source guard classifies the new production file and token-checks it for
+function/callee/family-name predicates. A function-body-aware negative also
+proves that `.stack_i32_ptr` scanning cannot return to
+`valueIsLiveAfterCurrent`. Both forbidden patterns have explicit negative
+fixtures.
+
+## Explicit O2-2 deferral
+
+O2-2 must add a typed pointer `.null_value` use request that materializes the
+null pointer directly, without a `ValueLoc`, values-map binding, or dependency
+edge. This O2-0 finding applies to five pointer-call frontier rows and is not
+implemented or partially admitted by O2-1.
+
+## Non-Tier-3 validation
+
+The final tree passed the complete authorized non-Tier-3 set:
+
+```text
+Build Summary: 28/28 steps succeeded
+unit tests: 1101/1101
+structural smoke: 8/8
+abi differential: 60/60 cases, 30/30 real functions
+integrated executable: 7/7
+focused codegen canaries: 2/2, 35/35 execution cases
+```
+
+The full frozen capture reproduced exactly:
+
+```text
+report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681
+selected/emitted/failed=443/285/158
+first_failure=compiler_rt.trunc.truncl
+first_diagnostic=UnsupportedLongDoubleAbi
+first_selector=unsupported_type/unsupported-return-type
+```
+
+The original accepted-only 285-row projection also reproduced exactly:
+
+```text
+object_sha256=061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be
+owner_manifest_sha256=5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d
+composed_block=40
+composed_cfg=127
+legacy_envelope=17
+structural_fallback=101
+ledger=167/17/101
+```
+
+Therefore the frozen identity tuple remains
+`49a19f04 / 443-285-158-truncl / 061a64e4 / 5d91960e / 167-17-101`.
+The later `443/287/156` value remains only the O2 frontier prediction. No Tier
+3 was run.

@@ -22,7 +22,7 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
     defer transaction.deinit();
-    while (selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
+    while (try selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
         if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
     }
     if (isExactEiNarrowIcmp(selector, icmp)) return lowerExactEiNarrowIcmp(&transaction, result_name, icmp);

@@ -32,7 +32,7 @@ pub fn lowerIntToFpCast(selector: *ComposedBlockSelector, result: ?[]const u8, c
     if (from_bits > 64) {
         if (try lowerWideInteger(selector, cast, to_bits)) |diagnostic| return diagnostic;
     } else {
-        while (selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
+        while (try selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
             if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
         }
         if (cast.op == .uitofp and from_bits == 64) {

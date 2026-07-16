@@ -32,10 +32,10 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
     const lhs = describeVectorValue(selector, binary.lhs, binary.ty) orelse return .{ .unsupported_value = "composed-vector-binary-lhs" };
     const rhs = describeVectorValue(selector, binary.rhs, binary.ty) orelse return .{ .unsupported_value = "composed-vector-binary-rhs" };
     const rhs_reg = vectorValueReg(selector, binary.rhs);
-    const dst = resultXmmReg(selector, result_name, binary.lhs, rhs_reg) orelse return .{ .no_spill_envelope = "composed-vector-binary-dst" };
+    const dst = try resultXmmReg(selector, result_name, binary.lhs, rhs_reg) orelse return .{ .no_spill_envelope = "composed-vector-binary-dst" };
     if (try materializeVectorValue(selector, binary.lhs, lhs, dst, rhs_reg)) |diagnostic| return diagnostic;
     const src = vectorValueReg(selector, binary.rhs) orelse blk: {
-        const scratch = scratchXmmReg(selector, dst, null);
+        const scratch = try scratchXmmReg(selector, dst, null);
         if (try materializeVectorValue(selector, binary.rhs, rhs, scratch, dst)) |diagnostic| return diagnostic;
         break :blk scratch;
     };
@@ -86,19 +86,19 @@ pub fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select
 
     const false_initial = vectorValueReg(selector, select.false_value);
     const condition_initial = vectorValueReg(selector, select.cond);
-    const dst = resultXmmRegAvoidingTwo(selector, result_name, select.true_value, false_initial, condition_initial) orelse
+    const dst = try resultXmmRegAvoidingTwo(selector, result_name, select.true_value, false_initial, condition_initial) orelse
         return .{ .no_spill_envelope = "composed-vector-select-dst" };
     if (try materializeVectorValue(selector, select.true_value, true_value, dst, false_initial)) |_| return .{ .unsupported_value = "composed-vector-select-true-materialize" };
     const false_reg = vectorValueReg(selector, select.false_value) orelse blk: {
         const scratch = if (condition_initial) |condition_reg|
-            scratchXmmRegAvoidingTwo(selector, dst, condition_reg)
+            try scratchXmmRegAvoidingTwo(selector, dst, condition_reg)
         else
-            scratchXmmReg(selector, dst, null);
+            try scratchXmmReg(selector, dst, null);
         if (try materializeVectorValueAvoidingTwo(selector, select.false_value, false_value, scratch, dst, condition_initial)) |_| return .{ .unsupported_value = "composed-vector-select-false-materialize" };
         break :blk scratch;
     };
     const condition_reg = vectorValueReg(selector, select.cond) orelse blk: {
-        const scratch = scratchXmmReg(selector, dst, false_reg);
+        const scratch = try scratchXmmReg(selector, dst, false_reg);
         if (try materializeVectorValue(selector, select.cond, condition, scratch, dst)) |_| return .{ .unsupported_value = "composed-vector-select-cond-materialize" };
         break :blk scratch;
     };
@@ -148,15 +148,15 @@ fn lowerCopySign(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (!sign.shape.eql(expected_shape)) return .{ .unsupported_value = "composed-vector-copysign-sign" };
 
     const sign_initial = vectorValueReg(selector, call.args.items[1].value);
-    const dst = resultXmmReg(selector, result_name, call.args.items[0].value, sign_initial) orelse
+    const dst = try resultXmmReg(selector, result_name, call.args.items[0].value, sign_initial) orelse
         return .{ .no_spill_envelope = "composed-vector-copysign-dst" };
     if (try materializeVectorValue(selector, call.args.items[0].value, magnitude, dst, sign_initial)) |_| return .{ .unsupported_value = "composed-vector-copysign-magnitude-materialize" };
     const sign_reg = vectorValueReg(selector, call.args.items[1].value) orelse blk: {
-        const scratch = scratchXmmReg(selector, dst, null);
+        const scratch = try scratchXmmReg(selector, dst, null);
         if (try materializeVectorValue(selector, call.args.items[1].value, sign, scratch, dst)) |_| return .{ .unsupported_value = "composed-vector-copysign-sign-materialize" };
         break :blk scratch;
     };
-    const mask = scratchXmmReg(selector, dst, sign_reg);
+    const mask = try scratchXmmReg(selector, dst, sign_reg);
     try materializeLaneSplat(selector, if (lane_type == .float) 0x8000_0000 else 0x8000_0000_0000_0000, mask, expected_shape.lane_bits);
     try selector_state.clobberXmmReg(selector, sign_reg);
     try selector.machine.instructions.appendSlice(selector.allocator, &.{
@@ -191,9 +191,9 @@ fn lowerFabs(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.Cal
     const operand = describeVectorValue(selector, value, ty) orelse return .{ .unsupported_value = "composed-vector-fabs-source" };
     if (operand.shape.kind != .data or operand.shape.lane_type != lane_type) return .{ .unsupported_value = "composed-vector-fabs-source" };
     const source_reg = vectorValueReg(selector, value);
-    const dst = resultXmmReg(selector, result_name, value, null) orelse return .{ .no_spill_envelope = "composed-vector-fabs-dst" };
+    const dst = try resultXmmReg(selector, result_name, value, null) orelse return .{ .no_spill_envelope = "composed-vector-fabs-dst" };
     if (try materializeVectorValue(selector, value, operand, dst, source_reg)) |diagnostic| return diagnostic;
-    const mask = scratchXmmReg(selector, dst, null);
+    const mask = try scratchXmmReg(selector, dst, null);
     try materializeLaneSplat(selector, if (lane_type == .float) 0x7fff_ffff else 0x7fff_ffff_ffff_ffff, mask, operand.shape.lane_bits);
     try selector_state.clobberXmmReg(selector, dst);
     try selector.machine.instructions.append(selector.allocator, .{ .andps_xmm = .{ .dst = dst, .src = mask } });
@@ -214,7 +214,7 @@ pub fn lowerBitcast(selector: *ComposedBlockSelector, result: ?[]const u8, cast:
     const operand = describeVectorValue(selector, cast.value, cast.from_ty) orelse return .{ .unsupported_value = "composed-vector-bitcast-source" };
     if (operand.shape.kind != .data) return .{ .unsupported_value = "composed-vector-bitcast-source" };
     const source_reg = vectorValueReg(selector, cast.value);
-    const dst = resultXmmReg(selector, result_name, cast.value, null) orelse return .{ .no_spill_envelope = "composed-vector-bitcast-dst" };
+    const dst = try resultXmmReg(selector, result_name, cast.value, null) orelse return .{ .no_spill_envelope = "composed-vector-bitcast-dst" };
     if (try materializeVectorValue(selector, cast.value, operand, dst, source_reg)) |diagnostic| return diagnostic;
     var retagged = result_shape;
     retagged.defined_lanes = operand.shape.defined_lanes;
@@ -226,7 +226,7 @@ fn lowerMask4ToI4(selector: *ComposedBlockSelector, result_name: []const u8, cas
     const operand = describeVectorValue(selector, cast.value, cast.from_ty) orelse return .{ .unsupported_value = "composed-vector-bitcast-source" };
     if (!operand.shape.eql(VectorShape.mask32x4(0b1111))) return .{ .unsupported_value = "composed-vector-bitcast-source" };
     const source_reg = vectorValueReg(selector, cast.value);
-    const reg = source_reg orelse scratchXmmReg(selector, .xmm0, null);
+    const reg = source_reg orelse try scratchXmmReg(selector, .xmm0, null);
     if (source_reg == null) {
         if (try materializeVectorValue(selector, cast.value, operand, reg, null)) |diagnostic| return diagnostic;
     }
@@ -250,14 +250,14 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
     const rhs = describeVectorValue(selector, rhs_value, icmp.operand_ty) orelse return .{ .unsupported_value = "composed-vector-icmp-rhs" };
     if (lhs.shape.kind != .data or rhs.shape.kind != .data) return .{ .unsupported_value = "composed-vector-icmp-operand" };
     const rhs_reg = vectorValueReg(selector, rhs_value);
-    const dst = resultXmmReg(selector, result_name, lhs_value, rhs_reg) orelse return .{ .no_spill_envelope = "composed-vector-icmp-dst" };
+    const dst = try resultXmmReg(selector, result_name, lhs_value, rhs_reg) orelse return .{ .no_spill_envelope = "composed-vector-icmp-dst" };
     if (try materializeVectorValue(selector, lhs_value, lhs, dst, rhs_reg)) |diagnostic| return diagnostic;
     const src = rhs_reg orelse blk: {
-        const scratch = scratchXmmReg(selector, dst, null);
+        const scratch = try scratchXmmReg(selector, dst, null);
         if (try materializeVectorValue(selector, rhs_value, rhs, scratch, dst)) |diagnostic| return diagnostic;
         break :blk scratch;
     };
-    const bias = scratchXmmRegAvoidingTwo(selector, dst, src);
+    const bias = try scratchXmmRegAvoidingTwo(selector, dst, src);
     try materializeI32Splat(selector, 0x8000_0000, bias);
     try selector_state.clobberXmmReg(selector, dst);
     try selector_state.clobberXmmReg(selector, src);
@@ -279,10 +279,10 @@ pub fn lowerFcmp(selector: *ComposedBlockSelector, result: ?[]const u8, fcmp: ir
     const lhs = describeVectorValue(selector, fcmp.lhs, fcmp.operand_ty) orelse return .{ .unsupported_value = "composed-vector-fcmp-lhs" };
     const rhs = describeVectorValue(selector, fcmp.rhs, fcmp.operand_ty) orelse return .{ .unsupported_value = "composed-vector-fcmp-rhs" };
     const rhs_reg = vectorValueReg(selector, fcmp.rhs);
-    const dst = resultXmmReg(selector, result_name, fcmp.lhs, rhs_reg) orelse return .{ .no_spill_envelope = "composed-vector-fcmp-dst" };
+    const dst = try resultXmmReg(selector, result_name, fcmp.lhs, rhs_reg) orelse return .{ .no_spill_envelope = "composed-vector-fcmp-dst" };
     if (try materializeVectorValue(selector, fcmp.lhs, lhs, dst, rhs_reg)) |diagnostic| return diagnostic;
     const src = rhs_reg orelse blk: {
-        const scratch = scratchXmmReg(selector, dst, null);
+        const scratch = try scratchXmmReg(selector, dst, null);
         if (try materializeVectorValue(selector, fcmp.rhs, rhs, scratch, dst)) |diagnostic| return diagnostic;
         break :blk scratch;
     };
@@ -311,13 +311,13 @@ pub fn lowerInsertElement(selector: *ComposedBlockSelector, result: ?[]const u8,
     const base = describeVectorValue(selector, insert.vector, insert.vector_ty) orelse return .{ .unsupported_value = "composed-vector-insert-base" };
     const scalar_reg = scalarValueReg(selector, insert.value, base.shape.lane_bits);
     const preserve_scalar = insert.vector != .poison and insert.vector != .undef;
-    const dst = resultXmmReg(selector, result_name, insert.vector, if (preserve_scalar) scalar_reg else null) orelse return .{ .no_spill_envelope = "composed-vector-insert-dst" };
+    const dst = try resultXmmReg(selector, result_name, insert.vector, if (preserve_scalar) scalar_reg else null) orelse return .{ .no_spill_envelope = "composed-vector-insert-dst" };
 
     if (insert.vector != .poison and insert.vector != .undef) {
         if (try materializeVectorValue(selector, insert.vector, base, dst, scalar_reg)) |diagnostic| return diagnostic;
     }
     const src = scalar_reg orelse blk: {
-        const scratch = scratchXmmReg(selector, dst, null);
+        const scratch = try scratchXmmReg(selector, dst, null);
         if (try selector_fp.materializeFpValue(selector, insert.value, scratch, base.shape.lane_bits)) |diagnostic| return diagnostic;
         break :blk scratch;
     };
@@ -353,10 +353,10 @@ pub fn lowerShuffleVector(selector: *ComposedBlockSelector, result: ?[]const u8,
     else
         null;
     const rhs_reg = if (rhs != null) vectorValueReg(selector, shuffle.rhs) else null;
-    const dst = resultXmmReg(selector, result_name, shuffle.lhs, rhs_reg) orelse return .{ .no_spill_envelope = "composed-vector-shuffle-dst" };
+    const dst = try resultXmmReg(selector, result_name, shuffle.lhs, rhs_reg) orelse return .{ .no_spill_envelope = "composed-vector-shuffle-dst" };
     if (try materializeVectorValue(selector, shuffle.lhs, source, dst, rhs_reg)) |diagnostic| return diagnostic;
     const src = if (rhs) |rhs_operand| vectorValueReg(selector, shuffle.rhs) orelse blk: {
-        const scratch = scratchXmmReg(selector, dst, null);
+        const scratch = try scratchXmmReg(selector, dst, null);
         if (try materializeVectorValue(selector, shuffle.rhs, rhs_operand, scratch, dst)) |diagnostic| return diagnostic;
         break :blk scratch;
     } else null;
@@ -393,7 +393,7 @@ pub fn lowerShuffleVector(selector: *ComposedBlockSelector, result: ?[]const u8,
 fn lowerF32x4Shuffle(selector: *ComposedBlockSelector, result_name: []const u8, shuffle: ir.ShuffleVectorInst) !?Diagnostic {
     const mask = ir.vector_constant.classifyPackedF32x4ShuffleMask(shuffle) orelse return .{ .no_emitter = "composed-vector-shuffle-form" };
     const source = describeVectorValue(selector, shuffle.lhs, shuffle.lhs_ty) orelse return .{ .unsupported_value = "composed-vector-shuffle-source" };
-    const dst = resultXmmReg(selector, result_name, shuffle.lhs, null) orelse return .{ .no_spill_envelope = "composed-vector-shuffle-dst" };
+    const dst = try resultXmmReg(selector, result_name, shuffle.lhs, null) orelse return .{ .no_spill_envelope = "composed-vector-shuffle-dst" };
     if (try materializeVectorValue(selector, shuffle.lhs, source, dst, null)) |diagnostic| return diagnostic;
     try selector_state.clobberXmmReg(selector, dst);
     const immediate: u8 = switch (mask) {
@@ -424,7 +424,7 @@ pub fn lowerExtractElement(selector: *ComposedBlockSelector, result: ?[]const u8
     const lane = constantExtractLane(extract.index, extract.vector_ty) orelse return .{ .no_emitter = "composed-vector-extract-index" };
     const source = describeVectorValue(selector, extract.vector, extract.vector_ty) orelse return .{ .unsupported_value = "composed-vector-extract-source" };
     const source_reg = vectorValueReg(selector, extract.vector);
-    const dst = plannedScalarXmmReg(selector, result_name, source.shape.lane_bits) orelse scratchXmmReg(selector, source_reg orelse .xmm0, source_reg);
+    const dst = try plannedScalarXmmReg(selector, result_name, source.shape.lane_bits) orelse try scratchXmmReg(selector, source_reg orelse .xmm0, source_reg);
     if (try materializeVectorValue(selector, extract.vector, source, dst, source_reg)) |diagnostic| return diagnostic;
     if (lane == 2) {
         try selector.machine.instructions.append(selector.allocator, .{ .shufps_xmm = .{ .dst = dst, .src = dst, .imm = 0xaa } });
@@ -444,7 +444,7 @@ fn lowerI64x2ExtractElement(selector: *ComposedBlockSelector, result_name: []con
 
     const source_reg = vectorValueReg(selector, extract.vector);
     const reg = if (lane == 0 and source_reg != null) source_reg.? else blk: {
-        const scratch = scratchXmmReg(selector, source_reg orelse .xmm0, source_reg);
+        const scratch = try scratchXmmReg(selector, source_reg orelse .xmm0, source_reg);
         if (try materializeVectorValue(selector, extract.vector, source, scratch, source_reg)) |diagnostic| return diagnostic;
         break :blk scratch;
     };
@@ -467,7 +467,7 @@ fn lowerMaskExtractElement(selector: *ComposedBlockSelector, result_name: []cons
         return .{ .unsupported_value = "composed-vector-mask-extract-shape" };
     }
     const source_reg = vectorValueReg(selector, extract.vector);
-    const reg = source_reg orelse scratchXmmReg(selector, .xmm0, null);
+    const reg = source_reg orelse try scratchXmmReg(selector, .xmm0, null);
     if (source_reg == null) {
         if (try materializeVectorValue(selector, extract.vector, source, reg, null)) |diagnostic| return diagnostic;
     }
@@ -544,7 +544,7 @@ fn materializeVectorValueAvoidingTwo(
     second_protected: ?XmmReg,
 ) !?Diagnostic {
     if (operand.constant) |constant| {
-        const high = scratchXmmRegAvoidingThree(selector, dst, protected, second_protected);
+        const high = try scratchXmmRegAvoidingThree(selector, dst, protected, second_protected);
         const materialized_bits: u16 = if (constant.shape.lane_count == 4) 64 else constant.shape.lane_bits;
         try materializeLaneBits(selector, constant.bits[0], dst, materialized_bits);
         try materializeLaneBits(selector, constant.bits[1], high, materialized_bits);
@@ -579,8 +579,8 @@ fn scalarValueReg(selector: *ComposedBlockSelector, value: ir.Value, bits: u16) 
     };
 }
 
-fn resultXmmReg(selector: *const ComposedBlockSelector, result_name: []const u8, reusable: ir.Value, avoid: ?XmmReg) ?XmmReg {
-    if (plannedVectorXmmReg(selector, result_name)) |reg| {
+fn resultXmmReg(selector: *const ComposedBlockSelector, result_name: []const u8, reusable: ir.Value, avoid: ?XmmReg) !?XmmReg {
+    if (try plannedVectorXmmReg(selector, result_name)) |reg| {
         if (avoid == null or reg != avoid.?) return reg;
     }
     if (reusable == .named) {
@@ -590,7 +590,7 @@ fn resultXmmReg(selector: *const ComposedBlockSelector, result_name: []const u8,
     }
     for (xmm_regs) |reg| {
         if (avoid != null and reg == avoid.?) continue;
-        if (xmmRegAvailable(selector, reg)) return reg;
+        if (try xmmRegAvailable(selector, reg)) return reg;
     }
     for (xmm_regs) |reg| if (avoid == null or reg != avoid.?) return reg;
     return null;
@@ -602,8 +602,8 @@ fn resultXmmRegAvoidingTwo(
     reusable: ir.Value,
     first_avoid: ?XmmReg,
     second_avoid: ?XmmReg,
-) ?XmmReg {
-    if (plannedVectorXmmReg(selector, result_name)) |reg| {
+) !?XmmReg {
+    if (try plannedVectorXmmReg(selector, result_name)) |reg| {
         if ((first_avoid == null or reg != first_avoid.?) and (second_avoid == null or reg != second_avoid.?)) return reg;
     }
     if (reusable == .named) {
@@ -613,7 +613,7 @@ fn resultXmmRegAvoidingTwo(
     }
     for (xmm_regs) |reg| {
         if ((first_avoid != null and reg == first_avoid.?) or (second_avoid != null and reg == second_avoid.?)) continue;
-        if (xmmRegAvailable(selector, reg)) return reg;
+        if (try xmmRegAvailable(selector, reg)) return reg;
     }
     for (xmm_regs) |reg| {
         if ((first_avoid == null or reg != first_avoid.?) and (second_avoid == null or reg != second_avoid.?)) return reg;
@@ -621,17 +621,17 @@ fn resultXmmRegAvoidingTwo(
     return null;
 }
 
-fn plannedVectorXmmReg(selector: *const ComposedBlockSelector, result_name: []const u8) ?XmmReg {
+fn plannedVectorXmmReg(selector: *const ComposedBlockSelector, result_name: []const u8) !?XmmReg {
     const plan = selector.allocation_plan orelse return null;
     const assignment = plan.assignment(result_name) orelse return null;
     const reg = switch (assignment) {
         .vector_xmm => |reg| reg,
         else => return null,
     };
-    return if (xmmRegAvailable(selector, reg)) reg else null;
+    return if (try xmmRegAvailable(selector, reg)) reg else null;
 }
 
-fn plannedScalarXmmReg(selector: *const ComposedBlockSelector, result_name: []const u8, bits: u16) ?XmmReg {
+fn plannedScalarXmmReg(selector: *const ComposedBlockSelector, result_name: []const u8, bits: u16) !?XmmReg {
     const plan = selector.allocation_plan orelse return null;
     const assignment = plan.assignment(result_name) orelse return null;
     const reg = switch (assignment) {
@@ -639,17 +639,17 @@ fn plannedScalarXmmReg(selector: *const ComposedBlockSelector, result_name: []co
         .fp64 => |reg| if (bits == 64) reg else return null,
         else => return null,
     };
-    return if (xmmRegAvailable(selector, reg)) reg else null;
+    return if (try xmmRegAvailable(selector, reg)) reg else null;
 }
 
-fn scratchXmmReg(selector: *const ComposedBlockSelector, avoid: XmmReg, second_avoid: ?XmmReg) XmmReg {
+fn scratchXmmReg(selector: *const ComposedBlockSelector, avoid: XmmReg, second_avoid: ?XmmReg) !XmmReg {
     return scratchXmmRegAvoidingThree(selector, avoid, second_avoid, null);
 }
 
-fn scratchXmmRegAvoidingThree(selector: *const ComposedBlockSelector, first: XmmReg, second: ?XmmReg, third: ?XmmReg) XmmReg {
+fn scratchXmmRegAvoidingThree(selector: *const ComposedBlockSelector, first: XmmReg, second: ?XmmReg, third: ?XmmReg) !XmmReg {
     for (xmm_regs) |reg| {
         if (reg == first or (second != null and reg == second.?) or (third != null and reg == third.?)) continue;
-        if (xmmRegAvailable(selector, reg)) return reg;
+        if (try xmmRegAvailable(selector, reg)) return reg;
     }
     for (xmm_regs) |reg| {
         if (reg != first and (second == null or reg != second.?) and (third == null or reg != third.?)) return reg;
@@ -657,7 +657,7 @@ fn scratchXmmRegAvoidingThree(selector: *const ComposedBlockSelector, first: Xmm
     unreachable;
 }
 
-fn xmmRegAvailable(selector: *const ComposedBlockSelector, reg: XmmReg) bool {
+fn xmmRegAvailable(selector: *const ComposedBlockSelector, reg: XmmReg) !bool {
     return selector_state.xmmRegAvailable(selector, reg);
 }
 
@@ -821,10 +821,10 @@ fn materializeLaneSplat(selector: *ComposedBlockSelector, bits: u64, reg: XmmReg
     }
 }
 
-fn scratchXmmRegAvoidingTwo(selector: *const ComposedBlockSelector, first: XmmReg, second: XmmReg) XmmReg {
+fn scratchXmmRegAvoidingTwo(selector: *const ComposedBlockSelector, first: XmmReg, second: XmmReg) !XmmReg {
     for (xmm_regs) |reg| {
         if (reg == first or reg == second) continue;
-        if (xmmRegAvailable(selector, reg)) return reg;
+        if (try xmmRegAvailable(selector, reg)) return reg;
     }
     for (xmm_regs) |reg| if (reg != first and reg != second) return reg;
     unreachable;

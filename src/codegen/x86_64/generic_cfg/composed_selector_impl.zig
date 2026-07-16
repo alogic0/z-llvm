@@ -17,6 +17,7 @@ const selector_memory = @import("composed_selector_memory.zig");
 const selector_calls = @import("composed_selector_calls.zig");
 const selector_cfg = @import("composed_selector_cfg.zig");
 const selector_aggregate = @import("composed_selector_aggregate.zig");
+const address_dependencies = @import("composed_selector_address_dependencies.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
@@ -37,6 +38,7 @@ const pair_b = selector_types.pair_b;
 const selector_allocatable_pairs = selector_types.selector_allocatable_pairs;
 const selector_allocatable_regs = selector_types.selector_allocatable_regs;
 const argRegIndex = selector_types.argRegIndex;
+const AddressDependencyDomain = address_dependencies.AddressDependencyDomain;
 
 pub const Diagnostic = inspection.Diagnostic;
 pub const SelectionResult = inspection.SelectionResult;
@@ -93,6 +95,23 @@ pub fn tryLowerComposedCfgWithContext(
     function: ir.Function,
     module_context: ?*const x86_64_types.ReadOnlyModuleContext,
 ) !SelectionResult {
+    var dependency_domain: AddressDependencyDomain = .{};
+    return tryLowerComposedCfgWithContextAndAddressDependencies(
+        allocator,
+        machine,
+        function,
+        module_context,
+        &dependency_domain,
+    );
+}
+
+pub fn tryLowerComposedCfgWithContextAndAddressDependencies(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    module_context: ?*const x86_64_types.ReadOnlyModuleContext,
+    dependency_domain: *AddressDependencyDomain,
+) !SelectionResult {
     if (!isComposedReturnType(function.ret_ty)) return unsupported(.{ .no_emitter = "stage2-ret-type" });
     if (function.blocks.items.len == 0) return unsupported(.{ .unsupported_control_flow = "stage2-empty-function" });
     if (function.blocks.items.len > stage2_max_blocks) return unsupported(.{ .no_spill_envelope = "stage2-block-count" });
@@ -105,9 +124,11 @@ pub fn tryLowerComposedCfgWithContext(
     composed.module_context = module_context;
     composed.function = &function;
     composed.allocation_plan = &allocation_plan;
+    composed.address_dependencies = dependency_domain.*;
     composed.next_spill_slot = allocation_plan.spill_slots;
     composed.enable_expired_plan_register_reuse = canUseExpiredPlanRegisterReuse(function);
     defer composed.deinit();
+    defer dependency_domain.* = composed.address_dependencies;
 
     if (try bindParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try bindPhiResults(&composed, function)) |diagnostic| return unsupported(diagnostic);
@@ -429,6 +450,23 @@ pub fn tryLowerComposedBlockWithContext(
     function: ir.Function,
     module_context: ?*const x86_64_types.ReadOnlyModuleContext,
 ) !SelectionResult {
+    var dependency_domain: AddressDependencyDomain = .{};
+    return tryLowerComposedBlockWithContextAndAddressDependencies(
+        allocator,
+        machine,
+        function,
+        module_context,
+        &dependency_domain,
+    );
+}
+
+pub fn tryLowerComposedBlockWithContextAndAddressDependencies(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    module_context: ?*const x86_64_types.ReadOnlyModuleContext,
+    dependency_domain: *AddressDependencyDomain,
+) !SelectionResult {
     if (!isComposedReturnType(function.ret_ty)) return unsupported(.{ .no_emitter = "composed-block-ret-type" });
     if (function.blocks.items.len != 1) return unsupported(.{ .no_emitter = "composed-block-not-single-block" });
 
@@ -440,8 +478,10 @@ pub fn tryLowerComposedBlockWithContext(
     composed.module_context = module_context;
     composed.function = &function;
     composed.allocation_plan = &allocation_plan;
+    composed.address_dependencies = dependency_domain.*;
     composed.enable_expired_plan_register_reuse = canUseExpiredPlanRegisterReuse(function);
     defer composed.deinit();
+    defer dependency_domain.* = composed.address_dependencies;
 
     if (try bindParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try selector_frame.prepareStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);

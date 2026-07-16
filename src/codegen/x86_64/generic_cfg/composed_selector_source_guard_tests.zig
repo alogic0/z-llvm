@@ -6,6 +6,7 @@ const source_suffix = ".zig";
 
 const SourceKind = enum {
     authority,
+    address_dependency_domain,
     lifecycle,
     consumer,
 };
@@ -19,6 +20,7 @@ const ClassifiedSource = struct {
 // white-box fixtures and are deliberately classified by their `_tests.zig`
 // suffix instead.
 const classified_sources = [_]ClassifiedSource{
+    .{ .name = "composed_selector_address_dependencies.zig", .kind = .address_dependency_domain },
     .{ .name = "composed_selector_aggregate.zig", .kind = .consumer },
     .{ .name = "composed_selector_calls.zig", .kind = .consumer },
     .{ .name = "composed_selector_cfg.zig", .kind = .consumer },
@@ -188,7 +190,7 @@ const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_aggregate.zig", .function = "lowerInsertValue", .body_sha256 = "fc92d603662eeb6958b5797a0343f1ef9ec785dd9afcba5b69d5948108a1cc05" },
 
     .{ .source = "composed_selector_calls.zig", .function = "lowerFpAbs", .body_sha256 = "c6abc1b3e6db1cb525680f9fc387476665f04bb05e65faec8f0a959e0b5bfc68" },
-    .{ .source = "composed_selector_calls.zig", .function = "lowerUnsignedOverflowI32", .body_sha256 = "bcecbf2dd58dcd1bea58a8e9be1e29487f8cf81d5b61b02541bb8c5d887bf4ae" },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerUnsignedOverflowI32", .body_sha256 = "4dc4da7d4dd45a3ddb97b01d1c722605a902b76c147962bfc5581e59333d0121" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerSmulOverflowI64", .body_sha256 = "7354791d4df4eba960278a7e0662130d91700494cb73b4c83233fcf662f76cb9" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerCtpop", .body_sha256 = "386892044354332641c3184338b678f04aa018652f909cb27820bb82788fd66a" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerBitPermutation", .body_sha256 = "498fb6091e5385483eb55a6b67d2c813fb7ce8a401c41f837a451adf1150a497" },
@@ -196,7 +198,7 @@ const residual_function_fingerprints = [_]FunctionFingerprint{
 
     .{ .source = "composed_selector_cfg.zig", .function = "lowerSelect", .body_sha256 = "7de55a040bf63ee1db4c709fde09ddf8c865a3dc6ba7ceadcd3677520937a5f1" },
     .{ .source = "composed_selector_cfg.zig", .function = "emitScalarSelectValue", .body_sha256 = "3cfedbd0e4c15ed10dbf266fcc09854fcc0a183f9eb6367f21c5a2a17832143a" },
-    .{ .source = "composed_selector_cfg.zig", .function = "restoreDisplacedPhiDestinations", .body_sha256 = "894606b792624924e37c003cc311cb06ab16632b91d88a242c802dbbd8d3c557" },
+    .{ .source = "composed_selector_cfg.zig", .function = "restoreDisplacedPhiDestinations", .body_sha256 = "60fd82341b65b3871cd42cc35b5b2b9accadccf217c551d619b742da4664dd1a" },
     .{ .source = "composed_selector_cfg.zig", .function = "emitPhiEdgeMoves", .body_sha256 = "01698460d35fe4d18ab53ffd9b16d92f778625d29c4d9dde5d16b41251311d70" },
     .{ .source = "composed_selector_cfg.zig", .function = "materializeScalarPhiSnapshot", .body_sha256 = "b4362e002bdf4d9d26b75e6c054c0294250fbe894a34c42e4ad4b542d8a75616" },
     .{ .source = "composed_selector_cfg.zig", .function = "emitValueIntoLoc", .body_sha256 = "d2a8cdd3327dca52cf55a1bc5825b5b5e3210dad426c33073233d4a2ea00de3c" },
@@ -229,15 +231,15 @@ const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_memory.zig", .function = "lowerReadOnlyTableGep", .body_sha256 = "1a62f83a6009ed69f9ef1cc4cd721fb525b4cc5082fc1a73c1f95a27ac33320b" },
     .{ .source = "composed_selector_memory.zig", .function = "loadStackU64IntoRax", .body_sha256 = "3fd7fcf3653b5083f8123224f83a04abd16bbb7411dac2d4279079a74cf7648d" },
 
-    .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .body_sha256 = "812d2dbcd2f2f85ec6861920eae1f8f8df4dde594329856b8feba6c4a5fa3a81" },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .body_sha256 = "84e76037ccb926b8edcfd5965355fcb81461d96318b71ae6e47ae96b74e3766d" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerFreeze", .body_sha256 = "110d9c541f057cdb2a9a350cb9c16a1f9eac811c9739ed6cda8826d614b70b84" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerUnsignedRem", .body_sha256 = "8536b14d20e330bce4f1717f6dda9d3f6b663664507cf302d1e4d6a68fccf211" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerBinaryImmediateLhs", .body_sha256 = "6db0334ddb212391cd4c3ee92e7aa6fe86768a2196e7235af1fef35a09919626" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerPairBinary", .body_sha256 = "16f097aeb8b2391b7ab68a68810854781d3bcfee4c276645d37b7355442ee650" },
 
-    .{ .source = "composed_selector_vector.zig", .function = "lowerMask4ToI4", .body_sha256 = "f8cafdc8dcde25bd6f12129fe5c2c2db8cd5d64bb5897001b8e5a0e979eb10d4" },
-    .{ .source = "composed_selector_vector.zig", .function = "lowerI64x2ExtractElement", .body_sha256 = "fbda473e2f769f44c81efca8f83a3d7d214278ed3bcc32e8f9a4fbe982546aa4" },
-    .{ .source = "composed_selector_vector.zig", .function = "lowerMaskExtractElement", .body_sha256 = "41b65f6e152b0ef1d9f3181a06bc28ea6eff86b6bccf3c152b52282bf5b626da" },
+    .{ .source = "composed_selector_vector.zig", .function = "lowerMask4ToI4", .body_sha256 = "1e62b361133724f37967c07e4ad6896dd1a83c1b5dd48f394a7f677373f2f912" },
+    .{ .source = "composed_selector_vector.zig", .function = "lowerI64x2ExtractElement", .body_sha256 = "a2910ce5399d079e9843b0d0cfb84744322f7a8d8c49c70d3656f3b5b4dadca5" },
+    .{ .source = "composed_selector_vector.zig", .function = "lowerMaskExtractElement", .body_sha256 = "f0266e26516fdac573f2884fc2633783cffc309e3a18c3205e696eb91c2bdda7" },
     .{ .source = "composed_selector_vector.zig", .function = "bindMaskScalarResult", .body_sha256 = "09ae0154e05f25471555c6a8c7c213f9879b128ff820693611199dac4afe36f1" },
     .{ .source = "composed_selector_vector.zig", .function = "materializeLaneBits", .body_sha256 = "1da4969d92d741be7fe53dc07461046dee0acf56fd161e50c94e666863c5c639" },
 };
@@ -287,7 +289,8 @@ fn validateCurrentTree(allocator: std.mem.Allocator) !void {
 fn validateProductionSource(name: []const u8, source: [:0]const u8) !void {
     const index = classificationIndex(name) orelse return error.UnclassifiedComposedSelectorSource;
     switch (classified_sources[index].kind) {
-        .authority => {},
+        .authority => try validateAddressDependencyStateAuthority(source),
+        .address_dependency_domain => try validateAddressDependencyDomainSource(source),
         .lifecycle => try validateStateDataLifecycle(source),
         .consumer => {
             if (std.mem.indexOf(u8, source, ".values") != null) return error.RawSelectorValuesAccess;
@@ -297,6 +300,41 @@ fn validateProductionSource(name: []const u8, source: [:0]const u8) !void {
             try validateAccumulatorDisplacementPolicies(source);
             try validateEflagsEmissionAuthority(name, source);
         },
+    }
+}
+
+fn validateAddressDependencyStateAuthority(source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const body = functionBodyNamed(bodies, "valueIsLiveAfterCurrent") orelse
+        return error.AddressDependencyLivenessAuthorityMissing;
+    const liveness_body = source[body.start..body.end];
+    if (std.mem.indexOf(u8, liveness_body, "stack_i32_ptr") != null)
+        return error.StackPointerLivenessSpecialCaseReintroduced;
+}
+
+fn validateAddressDependencyDomainSource(source: [:0]const u8) !void {
+    var tokenizer = std.zig.Tokenizer.init(source);
+    while (true) {
+        const token = tokenizer.next();
+        switch (token.tag) {
+            .eof => return,
+            .invalid, .invalid_periodasterisks => return error.InvalidZigSource,
+            .identifier => {
+                const identifier = source[token.loc.start..token.loc.end];
+                if (std.mem.indexOf(u8, identifier, "function") != null or
+                    std.mem.indexOf(u8, identifier, "Function") != null or
+                    std.mem.indexOf(u8, identifier, "family") != null or
+                    std.mem.indexOf(u8, identifier, "Family") != null or
+                    std.mem.indexOf(u8, identifier, "callee") != null or
+                    std.mem.indexOf(u8, identifier, "Callee") != null or
+                    std.mem.startsWith(u8, identifier, "isExact"))
+                {
+                    return error.AddressDependencyFunctionPredicateForbidden;
+                }
+            },
+            else => {},
+        }
     }
 }
 
@@ -955,6 +993,45 @@ test "composed selector source guard requires the EFLAGS emission authority" {
         "composed_selector_scalar.zig",
         "try selector_state.emitEflagsInstruction(selector, .{ .cmp_eax_imm32 = 0 }, .definition);",
     );
+}
+
+test "composed selector source guard rejects the retired stack pointer liveness scan" {
+    const accepted =
+        "fn valueIsLiveAfterCurrent(selector: anytype, name: []const u8) !bool {\n" ++
+        "    return selector.address_dependencies.dependencyIsRequired(name, undefined);\n" ++
+        "}\n";
+    try validateProductionSource("composed_selector_state.zig", accepted);
+
+    const reintroduced =
+        "fn valueIsLiveAfterCurrent(selector: anytype, name: []const u8) !bool {\n" ++
+        "    var it = selector.values.iterator();\n" ++
+        "    while (it.next()) |entry| switch (entry.value_ptr.loc) {\n" ++
+        "        .stack_i32_ptr => return true,\n" ++
+        "        else => {},\n" ++
+        "    };\n" ++
+        "    return false;\n" ++
+        "}\n";
+    try std.testing.expectError(
+        error.StackPointerLivenessSpecialCaseReintroduced,
+        validateProductionSource("composed_selector_state.zig", reintroduced),
+    );
+}
+
+test "composed selector source guard rejects function and family predicates in the address dependency domain" {
+    try validateProductionSource(
+        "composed_selector_address_dependencies.zig",
+        "const Domain = struct { pub fn validate(_: *const Domain) !void {} };",
+    );
+    const fixtures = [_][:0]const u8{
+        "fn bad(function: anytype) bool { return std.mem.eql(u8, function.name, \"stack_i32_ptr\"); }",
+        "fn bad(function_family: []const u8) bool { return function_family.len != 0; }",
+    };
+    for (fixtures) |fixture| {
+        try std.testing.expectError(
+            error.AddressDependencyFunctionPredicateForbidden,
+            validateProductionSource("composed_selector_address_dependencies.zig", fixture),
+        );
+    }
 }
 
 test "composed selector source guard accepts the fully classified current tree" {

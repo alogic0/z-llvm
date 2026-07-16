@@ -5,6 +5,7 @@ const ir = @import("../../../ir.zig");
 const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
 const eflags = @import("composed_selector_eflags.zig");
+const address_dependencies = @import("composed_selector_address_dependencies.zig");
 
 const MachineFunction = x86_64_machine.MachineFunction;
 const AccumulatorDomain = selector_types.AccumulatorDomain;
@@ -13,6 +14,7 @@ const ValueLoc = selector_types.ValueLoc;
 const NameSet = stage2_planning.NameSet;
 const SelectorAllocationPlan = stage2_planning.SelectorAllocationPlan;
 const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
+const AddressDependencyDomain = address_dependencies.AddressDependencyDomain;
 
 const OverflowResultLoc = struct {
     value: ValueLoc,
@@ -55,6 +57,7 @@ pub const ComposedBlockSelector = struct {
     eflags: eflags.Liveness = .{},
     eflags_semantics: std.ArrayList(EflagsSemanticRecord) = .empty,
     accumulator_domain: AccumulatorDomain = .{},
+    address_dependencies: AddressDependencyDomain = .{},
 
     pub fn init(allocator: std.mem.Allocator, machine: *MachineFunction) ComposedBlockSelector {
         return .{

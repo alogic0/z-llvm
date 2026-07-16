@@ -1,5 +1,6 @@
 test {
     _ = @import("composed_selector_eflags_tests.zig");
+    _ = @import("composed_selector_address_dependencies_tests.zig");
     _ = @import("composed_selector_accumulator_transaction_tests.zig");
     _ = @import("composed_selector_multi3_tests.zig");
     _ = @import("composed_selector_source_guard_tests.zig");

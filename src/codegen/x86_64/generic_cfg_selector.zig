@@ -5,12 +5,14 @@ const inspection = @import("generic_cfg/inspection.zig");
 const legacy_lowering = @import("generic_cfg/legacy_lowering.zig");
 const stage2_planning = @import("generic_cfg/stage2_planning.zig");
 const composed_selector = @import("generic_cfg/composed_selector.zig");
+const address_dependencies = @import("generic_cfg/composed_selector_address_dependencies.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 
 pub const Diagnostic = inspection.Diagnostic;
 pub const SelectionResult = inspection.SelectionResult;
 pub const inspectFunction = inspection.inspectFunction;
+const AddressDependencyDomain = address_dependencies.AddressDependencyDomain;
 
 pub const StageTwoSummary = stage2_planning.StageTwoSummary;
 pub const analyzeStageTwoNoSpillEnvelope = stage2_planning.analyzeStageTwoNoSpillEnvelope;
@@ -98,9 +100,19 @@ const SelectionTransaction = struct {
     snapshot: MachineFunction,
     instruction_len: usize,
     owned_labels_len: usize,
+    address_dependencies: AddressDependencyDomain,
+    address_dependencies_snapshot: AddressDependencyDomain,
     state: State = .active,
 
     fn begin(allocator: std.mem.Allocator, machine: *MachineFunction) SelectionTransaction {
+        return beginWithAddressDependencies(allocator, machine, .{});
+    }
+
+    fn beginWithAddressDependencies(
+        allocator: std.mem.Allocator,
+        machine: *MachineFunction,
+        initial_address_dependencies: AddressDependencyDomain,
+    ) SelectionTransaction {
         comptime assertMachineFunctionFieldsCovered();
         return .{
             .allocator = allocator,
@@ -108,6 +120,8 @@ const SelectionTransaction = struct {
             .snapshot = machine.*,
             .instruction_len = machine.instructions.items.len,
             .owned_labels_len = machine.owned_labels.items.len,
+            .address_dependencies = initial_address_dependencies,
+            .address_dependencies_snapshot = initial_address_dependencies,
         };
     }
 
@@ -138,6 +152,7 @@ const SelectionTransaction = struct {
         transaction.machine.codegen_path = transaction.snapshot.codegen_path;
         transaction.machine.entry_xmm_defined_bits = transaction.snapshot.entry_xmm_defined_bits;
         transaction.machine.selection_owner = transaction.snapshot.selection_owner;
+        transaction.address_dependencies = transaction.address_dependencies_snapshot;
         transaction.state = .rolled_back;
     }
 
@@ -168,7 +183,7 @@ fn tryLowerComposedBlockFailClosed(
     var transaction = SelectionTransaction.begin(allocator, machine);
     defer transaction.rollbackUnlessCommitted();
     errdefer transaction.rollback();
-    const result = composed_selector.tryLowerComposedBlockWithContext(allocator, machine, function, module_context) catch |err| {
+    const result = composed_selector.tryLowerComposedBlockWithContextAndAddressDependencies(allocator, machine, function, module_context, &transaction.address_dependencies) catch |err| {
         return switch (err) {
             error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "composed-block-unsupported-value" }),
             else => err,
@@ -190,7 +205,7 @@ fn tryLowerComposedCfgFailClosed(
     var transaction = SelectionTransaction.begin(allocator, machine);
     defer transaction.rollbackUnlessCommitted();
     errdefer transaction.rollback();
-    const result = composed_selector.tryLowerComposedCfgWithContext(allocator, machine, function, module_context) catch |err| {
+    const result = composed_selector.tryLowerComposedCfgWithContextAndAddressDependencies(allocator, machine, function, module_context, &transaction.address_dependencies) catch |err| {
         return switch (err) {
             error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "stage2-unsupported-value" }),
             else => err,
@@ -205,4 +220,23 @@ fn tryLowerComposedCfgFailClosed(
 
 fn unsupported(diagnostic: Diagnostic) SelectionResult {
     return .{ .unsupported = diagnostic };
+}
+
+test "generic cfg selector selection transaction rollback restores address dependency domain exactly" {
+    var machine = MachineFunction.init("selection-address-dependency-rollback", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+
+    var initial: AddressDependencyDomain = .{};
+    try initial.replaceAddress("original-owner", &.{
+        .{ .name = "original-index", .identity_type = .integer, .role = .index },
+    });
+    var transaction = SelectionTransaction.beginWithAddressDependencies(std.testing.allocator, &machine, initial);
+    const snapshot = transaction.address_dependencies_snapshot;
+    try transaction.address_dependencies.replaceAddress("owner", &.{
+        .{ .name = "index", .identity_type = .integer, .role = .index },
+    });
+    transaction.rollback();
+
+    try std.testing.expect(transaction.address_dependencies.eql(&snapshot));
+    try std.testing.expectEqual(@as(usize, 1), transaction.address_dependencies.count());
 }

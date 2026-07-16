@@ -203,12 +203,13 @@ test "migrated load production rollback restores full state before and after par
     const occupied_binding = selector.values.get("occupied").?;
     const old_binding = selector.values.get("old").?;
     const saved_domain = selector.accumulator_domain;
+    const saved_address_dependencies = selector.address_dependencies;
     const saved_eflags = selector.eflags.snapshot();
     const saved_next_virtual_reg = selector.next_virtual_reg;
     const saved_next_spill_slot = selector.next_spill_slot;
 
     try std.testing.expectError(
-        error.UnsupportedCodegenValue,
+        error.AddressDependencyMissingBinding,
         selector_memory.lowerLoad(&selector, "before-emission", .{
             .ty = .{ .int = 32 },
             .ptr = .{ .named = "bad-index-ptr" },
@@ -221,10 +222,15 @@ test "migrated load production rollback restores full state before and after par
         occupied_binding,
         old_binding,
         saved_domain,
+        saved_address_dependencies,
         saved_eflags,
         saved_next_virtual_reg,
         saved_next_spill_slot,
     );
+
+    try selector_state.bindValueLoc(&selector, "bad-index-ptr", .{ .stack_i32_ptr = .{ .disp = 0 } });
+    const repaired_bad_ptr_binding = selector.values.get("bad-index-ptr").?;
+    const repaired_address_dependencies = selector.address_dependencies;
 
     try std.testing.expectError(
         error.AccumulatorDefinitionAlreadyBound,
@@ -236,10 +242,11 @@ test "migrated load production rollback restores full state before and after par
     try expectLoadRollbackState(
         &selector,
         ptr_binding,
-        bad_ptr_binding,
+        repaired_bad_ptr_binding,
         occupied_binding,
         old_binding,
         saved_domain,
+        repaired_address_dependencies,
         saved_eflags,
         saved_next_virtual_reg,
         saved_next_spill_slot,
@@ -253,6 +260,7 @@ fn expectLoadRollbackState(
     occupied_binding: selector_types.ValueBinding,
     old_binding: selector_types.ValueBinding,
     saved_domain: selector_types.AccumulatorDomain,
+    saved_address_dependencies: selector_state.AddressDependencies,
     saved_eflags: selector_state.EflagsLiveness.Snapshot,
     saved_next_virtual_reg: usize,
     saved_next_spill_slot: usize,
@@ -269,6 +277,7 @@ fn expectLoadRollbackState(
     try std.testing.expectEqual(saved_next_virtual_reg, selector.next_virtual_reg);
     try std.testing.expectEqual(saved_next_spill_slot, selector.next_spill_slot);
     try std.testing.expectEqual(saved_domain, selector.accumulator_domain);
+    try std.testing.expect(selector.address_dependencies.eql(&saved_address_dependencies));
     try selector.eflags.validateSnapshot(saved_eflags);
 }
 

@@ -814,7 +814,7 @@ pub fn restoreDisplacedPhiDestinations(selector: *ComposedBlockSelector) !?Diagn
     var it = selector.phi_destinations.iterator();
     while (it.next()) |entry| {
         const name = entry.key_ptr.*;
-        if (!selector_state.valueIsLiveAfterCurrent(selector, name)) continue;
+        if (!try selector_state.valueIsLiveAfterCurrent(selector, name)) continue;
         const destination = entry.value_ptr.*;
         const actual = selector_state.valueLoc(selector, name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
         if (valueLocEql(actual, destination)) continue;

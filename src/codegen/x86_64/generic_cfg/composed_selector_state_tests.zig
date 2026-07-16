@@ -70,8 +70,8 @@ test "generic cfg selector state authority owns scratch XMM and value-bit querie
     try std.testing.expect(selector_state.spillScratch64SourceForInPlace(&selector, .{ .named = "source" }) == null);
 
     try selector_state.bindValueLoc(&selector, "live-xmm", .{ .xmm = .{ .reg = .xmm2, .bits = 64 } });
-    try std.testing.expect(!selector_state.xmmRegAvailable(&selector, .xmm2));
-    try std.testing.expect(selector_state.xmmRegAvailable(&selector, .xmm1));
+    try std.testing.expect(!try selector_state.xmmRegAvailable(&selector, .xmm2));
+    try std.testing.expect(try selector_state.xmmRegAvailable(&selector, .xmm1));
 }
 
 test "generic cfg selector derives supported FP classes from types" {

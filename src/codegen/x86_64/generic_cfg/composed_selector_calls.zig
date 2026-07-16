@@ -363,7 +363,7 @@ pub fn lowerUnsignedOverflowI32(selector: *ComposedBlockSelector, result: ?[]con
         .eax, .rax => {
             selector_state.spillAccumulatorAliasesExcept(selector, lhs.value) catch return .{ .no_spill_envelope = "composed-block-overflow-lhs-alias" };
             if (namedValue(lhs.value)) |lhs_name| {
-                if (selector_state.valueIsLiveAfterCurrent(selector, lhs_name)) {
+                if (try selector_state.valueIsLiveAfterCurrent(selector, lhs_name)) {
                     selector_state.spillValueOrError(selector, lhs_name) catch return .{ .no_spill_envelope = "composed-block-overflow-live-lhs" };
                 }
             }

@@ -8,6 +8,7 @@ const stage2_planning = @import("stage2_planning.zig");
 const composed_helpers = @import("composed_helpers.zig");
 const state_data = @import("composed_selector_state_data.zig");
 const eflags = @import("composed_selector_eflags.zig");
+const address_dependencies = @import("composed_selector_address_dependencies.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
@@ -25,6 +26,7 @@ const VirtualReg = selector_types.VirtualReg;
 const VirtualRegClass = selector_types.VirtualRegClass;
 const VirtualRegMetadata = selector_types.VirtualRegMetadata;
 const VectorShape = selector_types.VectorShape;
+const AddressDependencyDomain = address_dependencies.AddressDependencyDomain;
 const pair_a = selector_types.pair_a;
 const pair_b = selector_types.pair_b;
 const selector_allocatable_pairs = selector_types.selector_allocatable_pairs;
@@ -77,6 +79,7 @@ pub const ComposedBlockSelector = state_data.ComposedBlockSelector;
 pub const EflagsEffect = eflags.Effect;
 pub const EflagsLiveness = eflags.Liveness;
 pub const EflagsDefinitionPurpose = eflags.DefinitionPurpose;
+pub const AddressDependencies = AddressDependencyDomain;
 
 pub const AccumulatorPreparationEffect = enum {
     preserve,
@@ -172,6 +175,7 @@ pub const AccumulatorDefinitionTransaction = struct {
     next_virtual_reg: usize,
     next_spill_slot: usize,
     accumulator_domain: AccumulatorDomain,
+    address_dependencies: AddressDependencyDomain,
     eflags_snapshot: EflagsLiveness.Snapshot,
     eflags_semantics_len: usize,
     phase: Phase = .begun,
@@ -235,6 +239,7 @@ pub const AccumulatorDefinitionTransaction = struct {
             .next_virtual_reg = selector.next_virtual_reg,
             .next_spill_slot = selector.next_spill_slot,
             .accumulator_domain = selector.accumulator_domain,
+            .address_dependencies = selector.address_dependencies,
             .eflags_snapshot = selector.eflags.snapshot(),
             .eflags_semantics_len = selector.eflags_semantics.items.len,
         };
@@ -269,13 +274,13 @@ pub const AccumulatorDefinitionTransaction = struct {
                 try clobberAccumulator(transaction.selector);
             },
             .scratch_preferred => {
-                while (liveAccumulatorNameAfterCurrent(transaction.selector)) |live_name| {
+                while (try liveAccumulatorNameAfterCurrent(transaction.selector)) |live_name| {
                     if (try preserveLiveAccumulatorValue(transaction.selector, live_name)) |diagnostic| {
                         transaction.restore(.rolled_back);
                         return diagnostic;
                     }
                 }
-                dropExpiredAccumulatorBindings(transaction.selector);
+                try dropExpiredAccumulatorBindings(transaction.selector);
             },
             .reuse_source => |source_name| {
                 const source = transaction.selector.values.get(source_name) orelse
@@ -285,7 +290,7 @@ pub const AccumulatorDefinitionTransaction = struct {
                     else => return error.AccumulatorReuseSourceNotResident,
                 }
                 try spillAccumulatorAliasesExcept(transaction.selector, .{ .named = source_name });
-                dropExpiredAccumulatorBindingsExcept(transaction.selector, source_name);
+                try dropExpiredAccumulatorBindingsExcept(transaction.selector, source_name);
                 transaction.reused_source = source_name;
             },
         }
@@ -319,7 +324,7 @@ pub const AccumulatorDefinitionTransaction = struct {
     pub fn finishCallPreparationAfterArguments(transaction: *AccumulatorDefinitionTransaction) !void {
         if (transaction.phase != .preparing_call) return error.AccumulatorCallPreparationOrder;
         errdefer transaction.restore(.rolled_back);
-        dropExpiredAccumulatorBindings(transaction.selector);
+        try dropExpiredAccumulatorBindings(transaction.selector);
         try transaction.requireAccumulatorUnbound();
         transaction.selector.accumulator_domain.invalidate();
         transaction.phase = .prepared;
@@ -407,7 +412,7 @@ pub const AccumulatorDefinitionTransaction = struct {
                 pending.definition.bindingBits(),
             );
         }
-        try transaction.selector.values.put(pending.name, .{
+        try putValueBinding(transaction.selector, pending.name, .{
             .vreg = pending.binding.vreg,
             .loc = target,
         });
@@ -544,6 +549,7 @@ pub const AccumulatorDefinitionTransaction = struct {
         transaction.selector.next_virtual_reg = transaction.next_virtual_reg;
         transaction.selector.next_spill_slot = transaction.next_spill_slot;
         transaction.selector.accumulator_domain = transaction.accumulator_domain;
+        transaction.selector.address_dependencies = transaction.address_dependencies;
         transaction.selector.eflags.restore(transaction.eflags_snapshot);
         transaction.selector.eflags_semantics.items.len = transaction.eflags_semantics_len;
         transaction.pending = null;
@@ -622,15 +628,15 @@ pub fn validateEflagsInstructions(
     try selector.eflags.validateSnapshot(saved);
 }
 
-fn scratch64RegForUseAvoiding(selector: *const ComposedBlockSelector, avoid: ?ArgReg) ?ArgReg {
+fn scratch64RegForUseAvoiding(selector: *const ComposedBlockSelector, avoid: ?ArgReg) !?ArgReg {
     for (selector_allocatable_regs) |reg| {
         if (avoid != null and reg == avoid.?) continue;
-        if (scratch64RegIsAvailableForUse(selector, reg)) return reg;
+        if (try scratch64RegIsAvailableForUse(selector, reg)) return reg;
     }
     return null;
 }
 
-fn scratch64RegIsAvailableForUse(selector: *const ComposedBlockSelector, reg: ArgReg) bool {
+fn scratch64RegIsAvailableForUse(selector: *const ComposedBlockSelector, reg: ArgReg) !bool {
     const status = regConflictStatus(selector, reg) orelse return true;
     return status;
 }
@@ -682,7 +688,7 @@ pub fn bindValueLoc(selector: *ComposedBlockSelector, name: []const u8, loc: Val
         selector.next_virtual_reg += 1;
         break :blk vreg;
     };
-    try selector.values.put(name, .{ .vreg = vreg, .loc = loc });
+    try putValueBinding(selector, name, .{ .vreg = vreg, .loc = loc });
 }
 
 pub fn bindResultLoc(selector: *ComposedBlockSelector, name: []const u8, actual: ValueLoc) !void {
@@ -700,7 +706,62 @@ pub fn bindResultLoc(selector: *ComposedBlockSelector, name: []const u8, actual:
         break :blk created;
     };
     if (!valueLocEql(actual, target)) try materializeLocIntoLocWithBits(selector, actual, target, vreg.bits);
-    try selector.values.put(name, .{ .vreg = vreg, .loc = target });
+    try putValueBinding(selector, name, .{ .vreg = vreg, .loc = target });
+}
+
+fn putValueBinding(
+    selector: *ComposedBlockSelector,
+    name: []const u8,
+    binding: ValueBinding,
+) !void {
+    var next_dependencies = selector.address_dependencies;
+    try updateAddressDependenciesForBinding(&next_dependencies, name, binding.loc);
+    try selector.values.ensureUnusedCapacity(1);
+    selector.values.putAssumeCapacity(name, binding);
+    selector.address_dependencies = next_dependencies;
+}
+
+pub fn removeValueBinding(selector: *ComposedBlockSelector, name: []const u8) bool {
+    var next_dependencies = selector.address_dependencies;
+    next_dependencies.removeOwner(name);
+    const removed = selector.values.remove(name);
+    selector.address_dependencies = next_dependencies;
+    return removed;
+}
+
+fn updateAddressDependenciesForBinding(
+    domain: *AddressDependencyDomain,
+    owner_name: []const u8,
+    loc: ValueLoc,
+) !void {
+    const stack_ptr = switch (loc) {
+        .stack_i32_ptr => |stack_ptr| stack_ptr,
+        else => {
+            domain.removeOwner(owner_name);
+            return;
+        },
+    };
+    const index = stack_ptr.index orelse {
+        domain.removeOwner(owner_name);
+        return;
+    };
+    var dependencies: [AddressDependencyDomain.max_dependencies_per_owner]AddressDependencyDomain.DependencySpec = undefined;
+    var count: usize = 0;
+    dependencies[count] = .{
+        .name = index.name,
+        .identity_type = .integer,
+        .role = .index,
+    };
+    count += 1;
+    if (index.addend_name) |addend_name| {
+        dependencies[count] = .{
+            .name = addend_name,
+            .identity_type = .integer,
+            .role = .addend,
+        };
+        count += 1;
+    }
+    try domain.replaceAddress(owner_name, dependencies[0..count]);
 }
 
 pub fn prepareFixedProductDefs(selector: *ComposedBlockSelector) !void {
@@ -1135,10 +1196,10 @@ pub fn spillScratch64SourceForInPlace(selector: *const ComposedBlockSelector, va
     return source;
 }
 
-pub fn xmmRegAvailable(selector: *const ComposedBlockSelector, reg: XmmReg) bool {
+pub fn xmmRegAvailable(selector: *const ComposedBlockSelector, reg: XmmReg) !bool {
     var it = selector.values.iterator();
     while (it.next()) |entry| switch (entry.value_ptr.loc) {
-        .xmm => |xmm| if (xmm.reg == reg and valueMustSurviveClobber(selector, entry.key_ptr.*)) return false,
+        .xmm => |xmm| if (xmm.reg == reg and try valueMustSurviveClobber(selector, entry.key_ptr.*)) return false,
         else => {},
     };
     return true;
@@ -1237,7 +1298,7 @@ pub fn emitPairIntoAbiRegs(selector: *ComposedBlockSelector, src: RegPair, dst: 
 }
 
 pub fn spillCurrentAccumulator(selector: *ComposedBlockSelector) !?Diagnostic {
-    const name = liveAccumulatorName(selector) orelse return null;
+    const name = try liveAccumulatorName(selector) orelse return null;
     return try spillValue(selector, name);
 }
 
@@ -1254,7 +1315,7 @@ pub fn preserveLiveAccumulatorValue(selector: *ComposedBlockSelector, name: []co
         .eax, .rax => {},
         else => return null,
     }
-    const dst = scratch64RegForUseAvoiding(selector, null) orelse return try spillValue(selector, name);
+    const dst = try scratch64RegForUseAvoiding(selector, null) orelse return try spillValue(selector, name);
     try clobberArgReg(selector, dst);
     if (bits == 64) {
         try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = dst });
@@ -1536,8 +1597,8 @@ pub fn emitValueIntoAccumulator(selector: *ComposedBlockSelector, value: ir.Valu
 }
 
 pub fn preserveCurrentEaxIntoScratch(selector: *ComposedBlockSelector) !?Diagnostic {
-    const name = liveEaxName(selector) orelse return null;
-    const dst = scratch64RegForUseAvoiding(selector, null) orelse {
+    const name = try liveEaxName(selector) orelse return null;
+    const dst = try scratch64RegForUseAvoiding(selector, null) orelse {
         try spillValueOrError(selector, name);
         return null;
     };
@@ -1547,8 +1608,8 @@ pub fn preserveCurrentEaxIntoScratch(selector: *ComposedBlockSelector) !?Diagnos
 }
 
 pub fn preserveCurrentRaxIntoScratch(selector: *ComposedBlockSelector) !?Diagnostic {
-    const name = liveRaxName(selector) orelse return null;
-    const dst = scratch64RegForUseAvoiding(selector, null) orelse
+    const name = try liveRaxName(selector) orelse return null;
+    const dst = try scratch64RegForUseAvoiding(selector, null) orelse
         return .{ .no_spill_envelope = "composed-block-preserve-rax" };
     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = dst });
     try bindValueLoc(selector, name, .{ .scratch64 = dst });
@@ -1790,9 +1851,9 @@ pub fn emitPairLshrImmediate(selector: *ComposedBlockSelector, result_name: []co
     if (amount > 127) return error.UnsupportedCodegenValue;
     const existing = resolvePairValue(selector, value);
     const dst = if (existing) |src|
-        choosePairScratch(selector, src) orelse return error.UnsupportedCodegenValue
+        try choosePairScratch(selector, src) orelse return error.UnsupportedCodegenValue
     else
-        choosePairScratch(selector, null) orelse return error.UnsupportedCodegenValue;
+        try choosePairScratch(selector, null) orelse return error.UnsupportedCodegenValue;
     const src = if (existing) |src| src else try materializePairValue(selector, value, dst);
     switch (amount) {
         0 => {
@@ -1955,20 +2016,20 @@ pub fn emitZeroArg64(selector: *ComposedBlockSelector, reg: ArgReg) !void {
     }
 }
 
-pub fn choosePairScratch(selector: *const ComposedBlockSelector, src: ?RegPair) ?RegPair {
+pub fn choosePairScratch(selector: *const ComposedBlockSelector, src: ?RegPair) !?RegPair {
     for (selector_allocatable_pairs) |pair| {
         if (src) |source| if (source.eql(pair)) continue;
-        if (pairScratchIsAvailableForUse(selector, pair)) return pair;
+        if (try pairScratchIsAvailableForUse(selector, pair)) return pair;
     }
     return null;
 }
 
-pub fn choosePairScratchForClobber(selector: *const ComposedBlockSelector, src: ?RegPair) ?RegPair {
-    if (!nextSpillSlotsFit(selector, 2)) return choosePairScratch(selector, src);
+pub fn choosePairScratchForClobber(selector: *const ComposedBlockSelector, src: ?RegPair) !?RegPair {
+    if (!nextSpillSlotsFit(selector, 2)) return try choosePairScratch(selector, src);
     for (selector_allocatable_pairs) |pair| {
         if (src) |source| if (source.eql(pair)) continue;
-        if (livePairNameContainingReg(selector, pair.lo) != null) continue;
-        if (livePairNameContainingReg(selector, pair.hi) != null) continue;
+        if (try livePairNameContainingReg(selector, pair.lo) != null) continue;
+        if (try livePairNameContainingReg(selector, pair.hi) != null) continue;
         return pair;
     }
     return null;
@@ -1981,8 +2042,8 @@ pub fn nextSpillSlotsFit(selector: *const ComposedBlockSelector, slots: usize) b
     return frameIndexFitsFrame(selector, frame_index);
 }
 
-pub fn pairScratchIsAvailableForUse(selector: *const ComposedBlockSelector, pair: RegPair) bool {
-    return scratch64RegIsAvailableForUse(selector, pair.lo) and scratch64RegIsAvailableForUse(selector, pair.hi);
+pub fn pairScratchIsAvailableForUse(selector: *const ComposedBlockSelector, pair: RegPair) !bool {
+    return try scratch64RegIsAvailableForUse(selector, pair.lo) and try scratch64RegIsAvailableForUse(selector, pair.hi);
 }
 
 pub fn clobberArgReg(selector: *ComposedBlockSelector, reg: ArgReg) !void {
@@ -1991,27 +2052,27 @@ pub fn clobberArgReg(selector: *ComposedBlockSelector, reg: ArgReg) !void {
 
 pub fn clobberArgRegExcept(selector: *ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) !void {
     while (pairNameContainingRegExcept(selector, reg, ignore_name)) |name| {
-        if (valueMustSurviveClobber(selector, name)) {
+        if (try valueMustSurviveClobber(selector, name)) {
             try spillPairValueOrError(selector, name);
         } else {
-            _ = selector.values.remove(name);
+            _ = removeValueBinding(selector, name);
         }
     }
     while (scalarNameInRegExcept(selector, reg, ignore_name)) |name| {
-        if (valueMustSurviveClobber(selector, name)) {
+        if (try valueMustSurviveClobber(selector, name)) {
             try spillValueOrError(selector, name);
         } else {
-            _ = selector.values.remove(name);
+            _ = removeValueBinding(selector, name);
         }
     }
 }
 
 pub fn clobberXmmReg(selector: *ComposedBlockSelector, reg: XmmReg) !void {
     while (fpNameInReg(selector, reg)) |name| {
-        if (valueMustSurviveClobber(selector, name)) {
+        if (try valueMustSurviveClobber(selector, name)) {
             try spillValueOrError(selector, name);
         } else {
-            _ = selector.values.remove(name);
+            _ = removeValueBinding(selector, name);
         }
     }
 }
@@ -2025,17 +2086,17 @@ fn fpNameInReg(selector: *const ComposedBlockSelector, reg: XmmReg) ?[]const u8 
     return null;
 }
 
-pub fn valueMustSurviveClobber(selector: *const ComposedBlockSelector, name: []const u8) bool {
+pub fn valueMustSurviveClobber(selector: *const ComposedBlockSelector, name: []const u8) !bool {
     if (selector.phi_results.contains(name)) return true;
     return if (selector.preserve_current_position_values)
         valueIsLiveAtOrAfterCurrent(selector, name)
     else
-        valueIsLiveAfterCurrent(selector, name);
+        try valueIsLiveAfterCurrent(selector, name);
 }
 
 pub fn clobberAccumulator(selector: *ComposedBlockSelector) !void {
-    dropExpiredAccumulatorBindings(selector);
-    while (liveAccumulatorName(selector)) |name| {
+    try dropExpiredAccumulatorBindings(selector);
+    while (try liveAccumulatorName(selector)) |name| {
         try spillValueOrError(selector, name);
     }
 }
@@ -2063,7 +2124,7 @@ pub fn liveAccumulatorNameExcept(selector: *const ComposedBlockSelector, ignored
     return null;
 }
 
-pub fn dropExpiredAccumulatorBindings(selector: *ComposedBlockSelector) void {
+pub fn dropExpiredAccumulatorBindings(selector: *ComposedBlockSelector) !void {
     while (true) {
         var expired_name: ?[]const u8 = null;
         var it = selector.values.iterator();
@@ -2072,12 +2133,12 @@ pub fn dropExpiredAccumulatorBindings(selector: *ComposedBlockSelector) void {
                 .eax, .rax => {},
                 .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => continue,
             }
-            if (valueMustSurviveClobber(selector, entry.key_ptr.*)) continue;
+            if (try valueMustSurviveClobber(selector, entry.key_ptr.*)) continue;
             expired_name = entry.key_ptr.*;
             break;
         }
         if (expired_name) |name| {
-            _ = selector.values.remove(name);
+            _ = removeValueBinding(selector, name);
             continue;
         }
         break;
@@ -2087,7 +2148,7 @@ pub fn dropExpiredAccumulatorBindings(selector: *ComposedBlockSelector) void {
 /// The reuse-source transaction pins exactly one current operand across its
 /// mutating preparation boundary. No other current-position value receives
 /// this exclusion.
-fn dropExpiredAccumulatorBindingsExcept(selector: *ComposedBlockSelector, excluded_name: []const u8) void {
+fn dropExpiredAccumulatorBindingsExcept(selector: *ComposedBlockSelector, excluded_name: []const u8) !void {
     while (true) {
         var expired_name: ?[]const u8 = null;
         var it = selector.values.iterator();
@@ -2097,12 +2158,12 @@ fn dropExpiredAccumulatorBindingsExcept(selector: *ComposedBlockSelector, exclud
                 .eax, .rax => {},
                 .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => continue,
             }
-            if (valueMustSurviveClobber(selector, entry.key_ptr.*)) continue;
+            if (try valueMustSurviveClobber(selector, entry.key_ptr.*)) continue;
             expired_name = entry.key_ptr.*;
             break;
         }
         if (expired_name) |name| {
-            _ = selector.values.remove(name);
+            _ = removeValueBinding(selector, name);
             continue;
         }
         break;
@@ -2112,25 +2173,25 @@ fn dropExpiredAccumulatorBindingsExcept(selector: *ComposedBlockSelector, exclud
 pub fn spillLiveCallerClobbersForCall(selector: *ComposedBlockSelector) !?Diagnostic {
     if (try spillCurrentAccumulator(selector)) |diagnostic| return diagnostic;
     for (selector_allocatable_regs) |reg| {
-        if (livePairNameContainingReg(selector, reg)) |name| {
+        if (try livePairNameContainingReg(selector, reg)) |name| {
             if (try spillPairValue(selector, name)) |diagnostic| return diagnostic;
         }
-        if (liveScalarNameInReg(selector, reg)) |name| {
+        if (try liveScalarNameInReg(selector, reg)) |name| {
             if (try spillValue(selector, name)) |diagnostic| return diagnostic;
         }
     }
     for (selector_allocatable_xmm_regs) |reg| {
-        while (liveFpNameInReg(selector, reg)) |name| {
+        while (try liveFpNameInReg(selector, reg)) |name| {
             if (try spillValue(selector, name)) |diagnostic| return diagnostic;
         }
     }
     return null;
 }
 
-fn liveFpNameInReg(selector: *const ComposedBlockSelector, reg: XmmReg) ?[]const u8 {
+fn liveFpNameInReg(selector: *const ComposedBlockSelector, reg: XmmReg) !?[]const u8 {
     var it = selector.values.iterator();
     while (it.next()) |entry| {
-        if (!valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
+        if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .xmm => |fp| if (fp.reg == reg) return entry.key_ptr.*,
             else => {},
@@ -2139,7 +2200,7 @@ fn liveFpNameInReg(selector: *const ComposedBlockSelector, reg: XmmReg) ?[]const
     return null;
 }
 
-pub fn liveAccumulatorName(selector: *const ComposedBlockSelector) ?[]const u8 {
+pub fn liveAccumulatorName(selector: *const ComposedBlockSelector) !?[]const u8 {
     var it = selector.values.iterator();
     while (it.next()) |entry| {
         if (!valueIsLiveAtOrAfterCurrent(selector, entry.key_ptr.*)) continue;
@@ -2151,10 +2212,10 @@ pub fn liveAccumulatorName(selector: *const ComposedBlockSelector) ?[]const u8 {
     return null;
 }
 
-pub fn liveAccumulatorNameAfterCurrent(selector: *const ComposedBlockSelector) ?[]const u8 {
+pub fn liveAccumulatorNameAfterCurrent(selector: *const ComposedBlockSelector) !?[]const u8 {
     var it = selector.values.iterator();
     while (it.next()) |entry| {
-        if (!valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
+        if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .eax, .rax => return entry.key_ptr.*,
             .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => {},
@@ -2169,10 +2230,10 @@ pub fn valueIsLiveAtOrAfterCurrent(selector: *const ComposedBlockSelector, name:
     return end >= selector.current_position;
 }
 
-pub fn liveEaxName(selector: *const ComposedBlockSelector) ?[]const u8 {
+pub fn liveEaxName(selector: *const ComposedBlockSelector) !?[]const u8 {
     var it = selector.values.iterator();
     while (it.next()) |entry| {
-        if (!valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
+        if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .eax => return entry.key_ptr.*,
             .arg32, .arg64, .arg128, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => {},
@@ -2181,10 +2242,10 @@ pub fn liveEaxName(selector: *const ComposedBlockSelector) ?[]const u8 {
     return null;
 }
 
-pub fn liveRaxName(selector: *const ComposedBlockSelector) ?[]const u8 {
+pub fn liveRaxName(selector: *const ComposedBlockSelector) !?[]const u8 {
     var it = selector.values.iterator();
     while (it.next()) |entry| {
-        if (!valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
+        if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .rax => return entry.key_ptr.*,
             .arg32, .arg64, .arg128, .eax, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => {},
@@ -2193,8 +2254,8 @@ pub fn liveRaxName(selector: *const ComposedBlockSelector) ?[]const u8 {
     return null;
 }
 
-pub fn liveScalarNameInReg(selector: *const ComposedBlockSelector, reg: ArgReg) ?[]const u8 {
-    return liveScalarNameInRegExcept(selector, reg, null);
+pub fn liveScalarNameInReg(selector: *const ComposedBlockSelector, reg: ArgReg) !?[]const u8 {
+    return try liveScalarNameInRegExcept(selector, reg, null);
 }
 
 pub fn scalarNameInRegExcept(selector: *const ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) ?[]const u8 {
@@ -2215,13 +2276,13 @@ pub fn scalarNameInRegExcept(selector: *const ComposedBlockSelector, reg: ArgReg
     return null;
 }
 
-pub fn liveScalarNameInRegExcept(selector: *const ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) ?[]const u8 {
+pub fn liveScalarNameInRegExcept(selector: *const ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) !?[]const u8 {
     var it = selector.values.iterator();
     while (it.next()) |entry| {
         if (ignore_name) |ignored| {
             if (std.mem.eql(u8, entry.key_ptr.*, ignored)) continue;
         }
-        if (!valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
+        if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .arg32, .arg64, .scratch32, .scratch64 => |value_reg| if (value_reg == reg) return entry.key_ptr.*,
             .readonly_table_ptr => |ptr| switch (ptr.storage) {
@@ -2234,8 +2295,8 @@ pub fn liveScalarNameInRegExcept(selector: *const ComposedBlockSelector, reg: Ar
     return null;
 }
 
-pub fn livePairNameContainingReg(selector: *const ComposedBlockSelector, reg: ArgReg) ?[]const u8 {
-    return livePairNameContainingRegExcept(selector, reg, null);
+pub fn livePairNameContainingReg(selector: *const ComposedBlockSelector, reg: ArgReg) !?[]const u8 {
+    return try livePairNameContainingRegExcept(selector, reg, null);
 }
 
 pub fn pairNameContainingRegExcept(selector: *const ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) ?[]const u8 {
@@ -2252,13 +2313,13 @@ pub fn pairNameContainingRegExcept(selector: *const ComposedBlockSelector, reg: 
     return null;
 }
 
-pub fn livePairNameContainingRegExcept(selector: *const ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) ?[]const u8 {
+pub fn livePairNameContainingRegExcept(selector: *const ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) !?[]const u8 {
     var it = selector.values.iterator();
     while (it.next()) |entry| {
         if (ignore_name) |ignored| {
             if (std.mem.eql(u8, entry.key_ptr.*, ignored)) continue;
         }
-        if (!valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
+        if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .arg128, .scratch128 => |pair| if (pair.contains(reg)) return entry.key_ptr.*,
             .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => {},
@@ -2267,22 +2328,74 @@ pub fn livePairNameContainingRegExcept(selector: *const ComposedBlockSelector, r
     return null;
 }
 
-pub fn valueIsLiveAfterCurrent(selector: *const ComposedBlockSelector, name: []const u8) bool {
+pub fn valueIsLiveAfterCurrent(selector: *const ComposedBlockSelector, name: []const u8) !bool {
     const plan = selector.allocation_plan orelse return false;
-    var it = selector.values.iterator();
-    while (it.next()) |entry| {
-        const stack_ptr = switch (entry.value_ptr.loc) {
-            .stack_i32_ptr => |stack_ptr| stack_ptr,
-            else => continue,
-        };
-        const index = stack_ptr.index orelse continue;
-        if (!std.mem.eql(u8, index.name, name) and
-            (index.addend_name == null or !std.mem.eql(u8, index.addend_name.?, name))) continue;
-        const pointer_end = plan.intervalEnd(entry.key_ptr.*) orelse return true;
-        if (pointer_end > selector.current_position) return true;
-    }
+    const context = AddressDependencyLivenessContext{ .selector = selector };
+    if (try selector.address_dependencies.dependencyIsRequired(name, context)) return true;
     const end = plan.intervalEnd(name) orelse return true;
     return end > selector.current_position;
+}
+
+const AddressDependencyLivenessContext = struct {
+    selector: *const ComposedBlockSelector,
+
+    pub fn validateOwner(context: AddressDependencyLivenessContext, owner: AddressDependencyDomain.OwnerView) !void {
+        const binding = context.selector.values.get(owner.name) orelse
+            return error.AddressDependencyMissingOwnerBinding;
+        if (owner.identity_type != .address or binding.vreg.class != .stack_pointer)
+            return error.AddressDependencyInvalidOwnerBindingType;
+        if (!addressOwnerMatchesBinding(owner, binding.loc))
+            return error.AddressDependencyStaleEdge;
+    }
+
+    pub fn isOwnerLive(context: AddressDependencyLivenessContext, owner_name: []const u8) !bool {
+        const plan = context.selector.allocation_plan orelse
+            return error.AddressDependencyMissingPlan;
+        const end = plan.intervalEnd(owner_name) orelse return true;
+        return end > context.selector.current_position;
+    }
+
+    pub fn validateDependency(
+        context: AddressDependencyLivenessContext,
+        dependency: AddressDependencyDomain.DependencyView,
+    ) !void {
+        const binding = context.selector.values.get(dependency.name) orelse
+            return error.AddressDependencyMissingBinding;
+        const plan = context.selector.allocation_plan orelse
+            return error.AddressDependencyMissingPlan;
+        _ = plan.intervalEnd(dependency.name) orelse
+            return error.AddressDependencyMissingPlanEntry;
+        const valid = switch (dependency.identity_type) {
+            .address => binding.vreg.class == .stack_pointer,
+            .pointer => binding.vreg.class == .stack_pointer or binding.vreg.class == .gpr64,
+            .integer => switch (binding.vreg.class) {
+                .gpr32, .gpr64, .gpr128 => true,
+                .fp16, .fp32, .fp64, .vector_xmm, .aggregate_sse, .stack_object, .stack_pointer => false,
+            },
+            .frame_object => binding.vreg.class == .stack_object,
+        };
+        if (!valid) return error.AddressDependencyInvalidBindingType;
+    }
+};
+
+fn addressOwnerMatchesBinding(owner: AddressDependencyDomain.OwnerView, loc: ValueLoc) bool {
+    const stack_ptr = switch (loc) {
+        .stack_i32_ptr => |stack_ptr| stack_ptr,
+        else => return false,
+    };
+    const index = stack_ptr.index orelse return false;
+    const dependencies = owner.dependencySlice();
+    const expected_count: usize = if (index.addend_name == null) 1 else 2;
+    if (dependencies.len != expected_count) return false;
+    if (dependencies[0].role != .index or
+        dependencies[0].identity_type != .integer or
+        !std.mem.eql(u8, dependencies[0].name, index.name)) return false;
+    if (index.addend_name) |addend_name| {
+        if (dependencies[1].role != .addend or
+            dependencies[1].identity_type != .integer or
+            !std.mem.eql(u8, dependencies[1].name, addend_name)) return false;
+    }
+    return true;
 }
 
 pub fn spillValueOrError(selector: *ComposedBlockSelector, name: []const u8) !void {
@@ -2294,7 +2407,7 @@ pub fn spillPairValueOrError(selector: *ComposedBlockSelector, name: []const u8)
 }
 
 pub fn spillLiveValuesForCfgBoundary(selector: *ComposedBlockSelector) !void {
-    while (liveRegisterValueName(selector)) |name| {
+    while (try liveRegisterValueName(selector)) |name| {
         const loc = selector.values.get(name).?.loc;
         switch (loc) {
             .arg128, .scratch128 => try spillPairValueOrError(selector, name),
@@ -2308,10 +2421,10 @@ pub fn spillLiveValuesForCfgBoundary(selector: *ComposedBlockSelector) !void {
     }
 }
 
-fn liveRegisterValueName(selector: *const ComposedBlockSelector) ?[]const u8 {
+fn liveRegisterValueName(selector: *const ComposedBlockSelector) !?[]const u8 {
     var it = selector.values.iterator();
     while (it.next()) |entry| {
-        if (!valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
+        if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm => return entry.key_ptr.*,
             .readonly_table_ptr => |ptr| if (ptr.storage == .reg) return entry.key_ptr.*,

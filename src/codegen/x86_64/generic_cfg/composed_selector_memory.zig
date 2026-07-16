@@ -256,7 +256,7 @@ fn lowerReadOnlyPointerIntegerLoad(selector: *ComposedBlockSelector, result_name
         else => return .{ .no_emitter = "composed-block-load-readonly-param-provenance" },
     };
     if (bits == 96 or bits == 128) {
-        const pair = selector_state.choosePairScratchForClobber(selector, null) orelse
+        const pair = try selector_state.choosePairScratchForClobber(selector, null) orelse
             return .{ .no_spill_envelope = "composed-block-load-readonly-param-pair" };
         if (pair.contains(ptr_reg)) {
             selector_state.materializeLocIntoLoc(selector, ptr, .{ .scratch64 = .rdi }) catch
