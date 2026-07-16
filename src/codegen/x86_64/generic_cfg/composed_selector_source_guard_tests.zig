@@ -84,6 +84,26 @@ const direct_accumulator_inventory = [_]DirectInventoryEntry{
     .{ .source = "composed_selector_vector.zig", .operation = .clobber_accumulator, .maximum = 4 },
 };
 
+const GenericBindingInventoryEntry = struct {
+    source: []const u8,
+    maximum: usize,
+};
+
+// Freeze every generic production binding site, including computed locations.
+// The scalar lowerCast site below is the one accepted alias-only accumulator
+// cast: it emits no instruction and therefore is not a physical definition.
+const generic_binding_inventory = [_]GenericBindingInventoryEntry{
+    .{ .source = "composed_selector_aggregate.zig", .maximum = 3 },
+    .{ .source = "composed_selector_cfg.zig", .maximum = 2 },
+    .{ .source = "composed_selector_fp.zig", .maximum = 3 },
+    .{ .source = "composed_selector_frame.zig", .maximum = 4 },
+    .{ .source = "composed_selector_impl.zig", .maximum = 10 },
+    .{ .source = "composed_selector_memory.zig", .maximum = 8 },
+    .{ .source = "composed_selector_scalar.zig", .maximum = 2 },
+};
+
+const alias_only_cast_binding_site = "try selector_state.bindValueLoc(selector, result_name, result_loc);";
+
 fn validateCurrentTree(allocator: std.mem.Allocator) !void {
     const io = std.testing.io;
     var dir = try std.Io.Dir.cwd().openDir(io, source_dir, .{ .iterate = true });
@@ -119,6 +139,13 @@ fn validateProductionSource(name: []const u8, source: []const u8) !void {
         .consumer => {
             if (std.mem.indexOf(u8, source, ".values") != null) return error.RawSelectorValuesAccess;
             try validateDirectAccumulatorInventory(name, source);
+            try validateGenericBindingInventory(name, source);
+            try validateAccumulatorDisplacementPolicies(source);
+            if (std.mem.eql(u8, name, "composed_selector_scalar.zig") and
+                std.mem.count(u8, source, alias_only_cast_binding_site) != 1)
+            {
+                return error.AliasOnlyCastBindingInventoryMismatch;
+            }
         },
     }
 }
@@ -156,6 +183,51 @@ fn directInventoryMaximum(name: []const u8, operation: DirectOperation) usize {
         if (entry.operation == operation and std.mem.eql(u8, entry.source, name)) return entry.maximum;
     }
     return 0;
+}
+
+fn validateGenericBindingInventory(name: []const u8, source: []const u8) !void {
+    const actual = std.mem.count(u8, source, "bindValueLoc(");
+    var maximum: usize = 0;
+    for (generic_binding_inventory) |entry| {
+        if (std.mem.eql(u8, entry.source, name)) {
+            maximum = entry.maximum;
+            break;
+        }
+    }
+    if (actual > maximum) return error.GenericBindingInventoryGrowth;
+}
+
+fn validateAccumulatorDisplacementPolicies(source: []const u8) !void {
+    const call_prefix = "transaction.prepare(";
+    var search_from: usize = 0;
+    while (std.mem.indexOfPos(u8, source, search_from, call_prefix)) |call_start| {
+        const open_paren = call_start + call_prefix.len - 1;
+        var depth: usize = 0;
+        var call_end: ?usize = null;
+        for (source[open_paren..], open_paren..) |byte, index| {
+            switch (byte) {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if (depth == 0) {
+                        call_end = index + 1;
+                        break;
+                    }
+                },
+                else => {},
+            }
+        }
+        const end = call_end orelse return error.MalformedAccumulatorPrepareCall;
+        const call = source[call_start..end];
+        if (std.mem.indexOf(u8, call, ".spill_live") == null and
+            std.mem.indexOf(u8, call, ".scratch_preferred") == null and
+            std.mem.indexOf(u8, call, "accumulatorLocDisplacement(") == null and
+            std.mem.indexOf(u8, call, "accumulatorCastDisplacement(") == null)
+        {
+            return error.MissingAccumulatorDisplacementPolicy;
+        }
+        search_from = end;
+    }
 }
 
 fn classificationIndex(name: []const u8) ?usize {
@@ -213,6 +285,36 @@ test "composed selector source guard freezes direct accumulator inventory" {
             "composed_selector_aggregate.zig",
             "fn bad() void { selector_state.bindEax(undefined, \"x\") catch unreachable; }",
         ),
+    );
+}
+
+test "composed selector source guard freezes generic and alias-only accumulator binding sites" {
+    try std.testing.expectError(
+        error.GenericBindingInventoryGrowth,
+        validateProductionSource(
+            "composed_selector_aggregate.zig",
+            "bindValueLoc( bindValueLoc( bindValueLoc( bindValueLoc(",
+        ),
+    );
+    try std.testing.expectError(
+        error.AliasOnlyCastBindingInventoryMismatch,
+        validateProductionSource("composed_selector_scalar.zig", "fn lowerCast() void {}"),
+    );
+}
+
+test "composed selector source guard requires an explicit accumulator displacement policy" {
+    try std.testing.expectError(
+        error.MissingAccumulatorDisplacementPolicy,
+        validateProductionSource(
+            "composed_selector_conversion.zig",
+            "fn lower() void { _ = transaction.prepare(.preserve); }",
+        ),
+    );
+    try validateAccumulatorDisplacementPolicies(
+        "_ = transaction.prepare(.preserve, .spill_live);" ++
+            "_ = transaction.prepare(.preserve, .scratch_preferred);" ++
+            "_ = transaction.prepare(.clobber, accumulatorLocDisplacement(value, source));" ++
+            "_ = transaction.prepare(.clobber, accumulatorCastDisplacement(value, source));",
     );
 }
 

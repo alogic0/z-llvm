@@ -25,6 +25,65 @@ const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
 const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
 
+test "flag-writing accumulator cast rejects live EFLAGS before mutating selector state" {
+    var machine = MachineFunction.init("live-flags-cast", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "source", .{ .arg32 = .rdi });
+    try machine.instructions.append(std.testing.allocator, .{ .mov_imm_eax = 7 });
+    try selector.eflags.apply(.definition);
+
+    const source_binding = selector.values.get("source").?;
+    const saved_eflags = selector.eflags.snapshot();
+    const saved_next_virtual_reg = selector.next_virtual_reg;
+    try std.testing.expectError(
+        error.EflagsClobberedWhileLive,
+        selector_scalar.lowerCast(&selector, "result", .{
+            .op = .zext,
+            .value = .{ .named = "source" },
+            .from_ty = .{ .int = 8 },
+            .to_ty = .{ .int = 32 },
+        }),
+    );
+
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(source_binding, selector.values.get("source").?);
+    try std.testing.expect(selector.values.get("result") == null);
+    try std.testing.expectEqual(saved_next_virtual_reg, selector.next_virtual_reg);
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    try std.testing.expect(selector.accumulator_domain.occupantFor(.eax) == null);
+    try selector.eflags.validateSnapshot(saved_eflags);
+}
+
+test "i52 destructive cast re-resolves the accepted spill and reload source" {
+    var machine = MachineFunction.init("i52-spill-reload", .{ .int = 52 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("source", 5);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try selector_state.bindValueLoc(&selector, "source", .rax);
+
+    try std.testing.expect((try selector_scalar.lowerCast(&selector, "result", .{
+        .op = .trunc,
+        .value = .{ .named = "source" },
+        .from_ty = .{ .int = 64 },
+        .to_ty = .{ .int = 52 },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .spill_rax_rsp = .slot0 },
+        .{ .reload_rsp_rax = .slot0 },
+        .{ .mov_imm_rcx = @bitCast(@as(u64, (@as(u64, 1) << 52) - 1)) },
+        .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "result").?);
+}
+
 test "generic cfg selector materializes mul64 lhs into planned register" {
     var machine = MachineFunction.init("planned-mul64", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);

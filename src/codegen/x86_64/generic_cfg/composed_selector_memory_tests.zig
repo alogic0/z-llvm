@@ -27,6 +27,251 @@ const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
 const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
 
+const floateidf_i56_fixture =
+    \\define double @compiler_rt.floateidf.__floateidf(ptr nonnull readonly %p, i64 %bits) {
+    \\Entry:
+    \\  %cond = trunc i64 %bits to i16
+    \\  switch i16 %cond, label %Default [
+    \\    i16 0, label %Join
+    \\    i16 1, label %Case1
+    \\    i16 2, label %Case2
+    \\    i16 3, label %Case3
+    \\    i16 4, label %Case4
+    \\  ]
+    \\Case1:
+    \\  %v1 = load i32, ptr %p, align 1
+    \\  %r1 = sitofp i32 %v1 to double
+    \\  br label %Join
+    \\Case2:
+    \\  %v2 = load i64, ptr %p, align 1
+    \\  %r2 = sitofp i64 %v2 to double
+    \\  br label %Join
+    \\Case3:
+    \\  %v3 = load i96, ptr %p, align 1
+    \\  %r3 = sitofp i96 %v3 to double
+    \\  br label %Join
+    \\Case4:
+    \\  %v4 = load i128, ptr %p, align 1
+    \\  %r4 = sitofp i128 %v4 to double
+    \\  br label %Join
+    \\Default:
+    \\  %v56 = load i56, ptr %p, align 1
+    \\  %r56 = sitofp i56 %v56 to double
+    \\  br label %Join
+    \\Join:
+    \\  %result = phi double [ 0.000000e+00, %Entry ], [ %r1, %Case1 ], [ %r2, %Case2 ], [ %r3, %Case3 ], [ %r4, %Case4 ], [ %r56, %Default ]
+    \\  ret double %result
+    \\}
+    \\
+;
+
+test "migrated i56 load keeps logical domain and physical RAX binding while preserving flags and live value" {
+    var module = try ir.Module.parse(std.testing.allocator, floateidf_i56_fixture);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("i56-load-binding", .{ .int = 56 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.function = &module.functions.items[0];
+    selector.stack_frame_bytes = 24;
+    try selector.readonly_pointer_params.put("p", {});
+    try selector_state.bindValueLoc(&selector, "p", .{ .arg64 = .rdi });
+    try selector.eflags.apply(.definition);
+    const saved_eflags = selector.eflags.snapshot();
+
+    try std.testing.expect((try selector_memory.lowerLoad(&selector, "loaded", .{
+        .ty = .{ .int = 56 },
+        .ptr = .{ .named = "p" },
+    })) == null);
+
+    const binding = selector.values.get("loaded").?;
+    try std.testing.expectEqual(@as(u16, 64), binding.vreg.bits);
+    try std.testing.expectEqual(ValueLoc.rax, binding.loc);
+    try std.testing.expectEqual(@as(u16, 56), selector.accumulator_domain.occupantFor(.rax).?.logical_bits);
+    try std.testing.expectEqual(@as(u16, 64), selector.accumulator_domain.defined_bits);
+    try selector.eflags.validateSnapshot(saved_eflags);
+
+    try std.testing.expect((try selector_state.preserveLiveAccumulatorValue(&selector, "loaded")) == null);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, selector.values.get("loaded").?.loc);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_rax_to_arg = .rdi }, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "exact floateidf i56 path executes byte-six and maximal low-56-bit patterns" {
+    var module = try ir.Module.parse(std.testing.allocator, floateidf_i56_fixture);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init(module.functions.items[0].name, .double);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const function: *const fn ([*]const u8, usize) callconv(.c) f64 = @ptrCast(mapping.ptr);
+
+    const byte_six_set = [_]u8{ 0, 0, 0, 0, 0, 0, 1 };
+    const maximal_low_56 = [_]u8{0xff} ** 7;
+    try std.testing.expectEqual(@as(f64, 281_474_976_710_656), function(&byte_six_set, 56));
+    try std.testing.expectEqual(@as(f64, -1), function(&maximal_low_56, 56));
+}
+
+test "migrated pointer load displaces one and multiple accumulator aliases instruction-identically" {
+    inline for (.{ @as(usize, 1), @as(usize, 2) }) |alias_count| {
+        var baseline_machine = MachineFunction.init("load-alias-baseline", .{ .int = 32 });
+        defer baseline_machine.deinit(std.testing.allocator);
+        var migrated_machine = MachineFunction.init("load-alias-migrated", .{ .int = 32 });
+        defer migrated_machine.deinit(std.testing.allocator);
+        var baseline_plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer baseline_plan.deinit();
+        var migrated_plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer migrated_plan.deinit();
+        try baseline_plan.interval_ends.put("eax_alias", 10);
+        try migrated_plan.interval_ends.put("eax_alias", 10);
+        if (alias_count == 2) {
+            try baseline_plan.interval_ends.put("rax_alias", 10);
+            try migrated_plan.interval_ends.put("rax_alias", 10);
+        }
+
+        var baseline = ComposedBlockSelector.init(std.testing.allocator, &baseline_machine);
+        defer baseline.deinit();
+        baseline.allocation_plan = &baseline_plan;
+        baseline.stack_frame_bytes = 24;
+        var migrated = ComposedBlockSelector.init(std.testing.allocator, &migrated_machine);
+        defer migrated.deinit();
+        migrated.allocation_plan = &migrated_plan;
+        migrated.stack_frame_bytes = 24;
+
+        inline for (.{ &baseline, &migrated }) |selector| {
+            try selector_state.bindValueLoc(selector, "ptr", .{ .arg64 = .rdi });
+            try selector_state.bindValueLoc(selector, "eax_alias", .eax);
+            if (alias_count == 2) try selector_state.bindValueLoc(selector, "rax_alias", .rax);
+        }
+
+        try selector_state.clobberAccumulator(&baseline);
+        try baseline.machine.instructions.append(std.testing.allocator, .{ .load_arg_ptr_eax = .rdi });
+        try selector_state.bindEax(&baseline, "loaded");
+
+        try std.testing.expect((try selector_memory.lowerLoad(&migrated, "loaded", .{
+            .ty = .{ .int = 32 },
+            .ptr = .{ .named = "ptr" },
+        })) == null);
+        try std.testing.expectEqualSlices(
+            x86_64_machine.Instruction,
+            baseline_machine.instructions.items,
+            migrated_machine.instructions.items,
+        );
+        try std.testing.expectEqual(selector_state.valueLoc(&baseline, "eax_alias"), selector_state.valueLoc(&migrated, "eax_alias"));
+        if (alias_count == 2) try std.testing.expectEqual(selector_state.valueLoc(&baseline, "rax_alias"), selector_state.valueLoc(&migrated, "rax_alias"));
+    }
+}
+
+test "migrated load production rollback restores full state before and after partial emission" {
+    var machine = MachineFunction.init("load-production-rollback", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("old", 10);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 24;
+    try selector_state.bindValueLoc(&selector, "ptr", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "bad-index-ptr", .{ .stack_i32_ptr = .{
+        .disp = 0,
+        .index = .{ .reg = .rcx, .name = "missing-index" },
+    } });
+    try selector_state.bindValueLoc(&selector, "occupied", .{ .scratch32 = .rsi });
+    var seed = try selector_state.AccumulatorDefinitionTransaction.begin(&selector);
+    _ = try seed.prepare(.preserve, .spill_live);
+    try seed.define("old", .zeroExtending(32));
+    try seed.commit();
+    seed.deinit();
+    try selector.spill_slots.put("seed", .{ .base = 0, .slots = 1 });
+    selector.next_spill_slot = 1;
+    try machine.instructions.append(std.testing.allocator, .{ .mov_imm_eax = 11 });
+    try selector.eflags.apply(.definition);
+
+    const ptr_binding = selector.values.get("ptr").?;
+    const bad_ptr_binding = selector.values.get("bad-index-ptr").?;
+    const occupied_binding = selector.values.get("occupied").?;
+    const old_binding = selector.values.get("old").?;
+    const saved_domain = selector.accumulator_domain;
+    const saved_eflags = selector.eflags.snapshot();
+    const saved_next_virtual_reg = selector.next_virtual_reg;
+    const saved_next_spill_slot = selector.next_spill_slot;
+
+    try std.testing.expectError(
+        error.UnsupportedCodegenValue,
+        selector_memory.lowerLoad(&selector, "before-emission", .{
+            .ty = .{ .int = 32 },
+            .ptr = .{ .named = "bad-index-ptr" },
+        }),
+    );
+    try expectLoadRollbackState(
+        &selector,
+        ptr_binding,
+        bad_ptr_binding,
+        occupied_binding,
+        old_binding,
+        saved_domain,
+        saved_eflags,
+        saved_next_virtual_reg,
+        saved_next_spill_slot,
+    );
+
+    try std.testing.expectError(
+        error.AccumulatorDefinitionAlreadyBound,
+        selector_memory.lowerLoad(&selector, "occupied", .{
+            .ty = .{ .int = 32 },
+            .ptr = .{ .named = "ptr" },
+        }),
+    );
+    try expectLoadRollbackState(
+        &selector,
+        ptr_binding,
+        bad_ptr_binding,
+        occupied_binding,
+        old_binding,
+        saved_domain,
+        saved_eflags,
+        saved_next_virtual_reg,
+        saved_next_spill_slot,
+    );
+}
+
+fn expectLoadRollbackState(
+    selector: *const ComposedBlockSelector,
+    ptr_binding: selector_types.ValueBinding,
+    bad_ptr_binding: selector_types.ValueBinding,
+    occupied_binding: selector_types.ValueBinding,
+    old_binding: selector_types.ValueBinding,
+    saved_domain: selector_types.AccumulatorDomain,
+    saved_eflags: selector_state.EflagsLiveness.Snapshot,
+    saved_next_virtual_reg: usize,
+    saved_next_spill_slot: usize,
+) !void {
+    try std.testing.expectEqual(@as(usize, 1), selector.machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_imm_eax = 11 }, selector.machine.instructions.items[0]);
+    try std.testing.expectEqual(@as(usize, 4), selector.values.count());
+    try std.testing.expectEqual(ptr_binding, selector.values.get("ptr").?);
+    try std.testing.expectEqual(bad_ptr_binding, selector.values.get("bad-index-ptr").?);
+    try std.testing.expectEqual(occupied_binding, selector.values.get("occupied").?);
+    try std.testing.expectEqual(old_binding, selector.values.get("old").?);
+    try std.testing.expectEqual(@as(usize, 1), selector.spill_slots.count());
+    try std.testing.expect(selector.spill_slots.get("seed") != null);
+    try std.testing.expectEqual(saved_next_virtual_reg, selector.next_virtual_reg);
+    try std.testing.expectEqual(saved_next_spill_slot, selector.next_spill_slot);
+    try std.testing.expectEqual(saved_domain, selector.accumulator_domain);
+    try selector.eflags.validateSnapshot(saved_eflags);
+}
+
 test "stack i32 loads preserve accumulator values used only by phi edges" {
     const input =
         \\define i64 @phi_edge_live_across_stack_load(i64 %m, i64 %n) {

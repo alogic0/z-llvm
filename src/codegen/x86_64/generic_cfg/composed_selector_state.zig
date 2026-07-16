@@ -89,6 +89,18 @@ pub const AccumulatorPreparationEffect = enum {
     }
 };
 
+pub const AccumulatorDisplacementPolicy = union(enum) {
+    /// Reproduce clobberAccumulator: every live accumulator alias is assigned
+    /// its deterministic spill home, even when a scratch register is free.
+    spill_live,
+    /// Reproduce preserveLiveAccumulatorValue: prefer the deterministic
+    /// scratch register and fall back to the deterministic spill home.
+    scratch_preferred,
+    /// Retain a source already resident in EAX/RAX for an in-place definition.
+    /// Other live aliases are displaced by the transaction authority.
+    reuse_source: []const u8,
+};
+
 pub const AccumulatorDefinition = struct {
     logical_bits: u16,
     upper_bits: UpperBits,
@@ -107,24 +119,38 @@ pub const AccumulatorDefinition = struct {
         return .{ .logical_bits = 64, .upper_bits = .fully_defined };
     }
 
+    /// A producer-specific proof that a logical 33-63-bit result defines the
+    /// complete physical RAX value with zeroes above its logical domain.
+    pub fn zeroExtendedRax(logical_bits: u16) AccumulatorDefinition {
+        return .{ .logical_bits = logical_bits, .upper_bits = .fully_defined };
+    }
+
     pub fn preserving(logical_bits: u16) AccumulatorDefinition {
         return .{ .logical_bits = logical_bits, .upper_bits = .preserve };
     }
 
     fn validate(definition: AccumulatorDefinition) !void {
-        switch (definition.logical_bits) {
-            8, 16, 32 => if (definition.upper_bits != .zero_extend) return error.AccumulatorStaleUpperBits,
-            64 => if (definition.upper_bits != .fully_defined) return error.AccumulatorStaleUpperBits,
-            else => return error.InvalidAccumulatorDefinitionWidth,
-        }
+        if (definition.logical_bits == 0 or definition.logical_bits > 64)
+            return error.InvalidAccumulatorDefinitionWidth;
+        if (definition.logical_bits <= 32) {
+            if (definition.upper_bits != .zero_extend) return error.AccumulatorStaleUpperBits;
+        } else if (definition.upper_bits != .fully_defined) return error.AccumulatorStaleUpperBits;
     }
 
     fn physicalLoc(definition: AccumulatorDefinition) ValueLoc {
-        return if (definition.logical_bits == 64) .rax else .eax;
+        return if (definition.logical_bits > 32) .rax else .eax;
+    }
+
+    pub fn bindingBits(definition: AccumulatorDefinition) u16 {
+        return switch (definition.physicalLoc()) {
+            .eax => 32,
+            .rax => 64,
+            else => unreachable,
+        };
     }
 
     fn virtualRegClass(definition: AccumulatorDefinition) VirtualRegClass {
-        return if (definition.logical_bits == 64) .gpr64 else .gpr32;
+        return if (definition.logical_bits > 32) .gpr64 else .gpr32;
     }
 };
 
@@ -144,6 +170,7 @@ pub const AccumulatorDefinitionTransaction = struct {
     eflags_snapshot: EflagsLiveness.Snapshot,
     phase: Phase = .begun,
     pending: ?PendingDefinition = null,
+    reused_source: ?[]const u8 = null,
 
     const Phase = enum {
         begun,
@@ -214,36 +241,63 @@ pub const AccumulatorDefinitionTransaction = struct {
         transaction.selector.allocator.free(transaction.values);
     }
 
-    pub fn prepare(transaction: *AccumulatorDefinitionTransaction, effect: AccumulatorPreparationEffect) !void {
-        switch (transaction.phase) {
-            .begun => {},
-            .prepared, .defined => return error.AccumulatorTransactionAlreadyPrepared,
-            .committed, .rolled_back => return error.AccumulatorTransactionClosed,
-        }
-
-        // Validate the declared EFLAGS effect against a copy first.  A live
-        // flags rejection therefore cannot partially mutate accumulator or
-        // value state.
-        var next_eflags = transaction.selector.eflags;
-        try next_eflags.apply(effect.eflagsEffect());
-        transaction.selector.eflags = next_eflags;
-
+    pub fn prepare(
+        transaction: *AccumulatorDefinitionTransaction,
+        effect: AccumulatorPreparationEffect,
+        displacement: AccumulatorDisplacementPolicy,
+    ) !?Diagnostic {
+        try transaction.beginPreparation(effect);
         errdefer transaction.restore(.rolled_back);
-        try clobberAccumulator(transaction.selector);
-        try transaction.requireAccumulatorUnbound();
-        transaction.selector.accumulator_domain.invalidate();
-        transaction.phase = .prepared;
+        switch (displacement) {
+            .spill_live => try clobberAccumulator(transaction.selector),
+            .scratch_preferred => {
+                while (liveAccumulatorNameAfterCurrent(transaction.selector)) |live_name| {
+                    if (try preserveLiveAccumulatorValue(transaction.selector, live_name)) |diagnostic| {
+                        transaction.restore(.rolled_back);
+                        return diagnostic;
+                    }
+                }
+                dropExpiredAccumulatorBindings(transaction.selector);
+            },
+            .reuse_source => |source_name| {
+                const source = transaction.selector.values.get(source_name) orelse
+                    return error.AccumulatorReuseSourceUnknown;
+                switch (source.loc) {
+                    .eax, .rax => {},
+                    else => return error.AccumulatorReuseSourceNotResident,
+                }
+                try spillAccumulatorAliasesExcept(transaction.selector, .{ .named = source_name });
+                dropExpiredAccumulatorBindingsExcept(transaction.selector, source_name);
+                transaction.reused_source = source_name;
+            },
+        }
+        try transaction.finishPreparation();
+        return null;
     }
 
     pub fn materialize(
         transaction: *AccumulatorDefinitionTransaction,
-        source: ValueLoc,
+        source: ir.Value,
         definition: AccumulatorDefinition,
     ) !void {
         try transaction.requirePrepared();
         try definition.validate();
         errdefer transaction.restore(.rolled_back);
-        try transaction.materializeIntoAccumulator(source, definition);
+        switch (source) {
+            .named => {
+                const current = resolveValue(transaction.selector, source) orelse
+                    return error.UnsupportedCodegenValue;
+                try transaction.materializeCurrentLocIntoAccumulator(current, definition);
+            },
+            .int => |int| {
+                if (definition.physicalLoc() != .eax) return error.UnsupportedCodegenValue;
+                try transaction.selector.machine.instructions.append(
+                    transaction.selector.allocator,
+                    .{ .mov_imm_eax = try i32Value(int) },
+                );
+            },
+            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        }
     }
 
     pub fn spill(transaction: *AccumulatorDefinitionTransaction, name: []const u8) !void {
@@ -269,7 +323,7 @@ pub const AccumulatorDefinitionTransaction = struct {
         const vreg: VirtualReg = .{
             .index = transaction.selector.next_virtual_reg,
             .class = definition.virtualRegClass(),
-            .bits = definition.logical_bits,
+            .bits = definition.bindingBits(),
         };
         transaction.selector.next_virtual_reg += 1;
         transaction.pending = .{
@@ -287,7 +341,7 @@ pub const AccumulatorDefinitionTransaction = struct {
             .committed, .rolled_back => return error.AccumulatorTransactionClosed,
         }
         errdefer transaction.restore(.rolled_back);
-        try transaction.requireAccumulatorUnbound();
+        try transaction.requireAccumulatorReadyForCommit();
 
         const pending = transaction.pending.?;
         const physical = pending.definition.physicalLoc();
@@ -297,7 +351,7 @@ pub const AccumulatorDefinitionTransaction = struct {
                 transaction.selector,
                 physical,
                 target,
-                pending.definition.logical_bits,
+                pending.definition.bindingBits(),
             );
         }
         try transaction.selector.values.put(pending.name, .{
@@ -338,6 +392,43 @@ pub const AccumulatorDefinitionTransaction = struct {
         }
     }
 
+    fn beginPreparation(
+        transaction: *AccumulatorDefinitionTransaction,
+        effect: AccumulatorPreparationEffect,
+    ) !void {
+        switch (transaction.phase) {
+            .begun => {},
+            .prepared, .defined => return error.AccumulatorTransactionAlreadyPrepared,
+            .committed, .rolled_back => return error.AccumulatorTransactionClosed,
+        }
+
+        // Validate the declared EFLAGS effect against a copy first. A live
+        // flags rejection therefore cannot partially mutate accumulator or
+        // value state.
+        var next_eflags = transaction.selector.eflags;
+        try next_eflags.apply(effect.eflagsEffect());
+        transaction.selector.eflags = next_eflags;
+    }
+
+    fn finishPreparation(transaction: *AccumulatorDefinitionTransaction) !void {
+        try transaction.requireAccumulatorReadyForCommit();
+        if (transaction.reused_source == null) transaction.selector.accumulator_domain.invalidate();
+        transaction.phase = .prepared;
+    }
+
+    fn requireAccumulatorReadyForCommit(transaction: *const AccumulatorDefinitionTransaction) !void {
+        const reused_source = transaction.reused_source;
+        var it = transaction.selector.values.iterator();
+        while (it.next()) |entry| switch (entry.value_ptr.loc) {
+            .eax, .rax => if (reused_source == null or
+                !std.mem.eql(u8, entry.key_ptr.*, reused_source.?))
+            {
+                return error.AccumulatorAliasConflict;
+            },
+            else => {},
+        };
+    }
+
     fn requireAccumulatorUnbound(transaction: *const AccumulatorDefinitionTransaction) !void {
         var it = transaction.selector.values.iterator();
         while (it.next()) |entry| switch (entry.value_ptr.loc) {
@@ -346,7 +437,7 @@ pub const AccumulatorDefinitionTransaction = struct {
         };
     }
 
-    fn materializeIntoAccumulator(
+    fn materializeCurrentLocIntoAccumulator(
         transaction: *AccumulatorDefinitionTransaction,
         source: ValueLoc,
         definition: AccumulatorDefinition,
@@ -398,6 +489,7 @@ pub const AccumulatorDefinitionTransaction = struct {
         transaction.selector.accumulator_domain = transaction.accumulator_domain;
         transaction.selector.eflags.restore(transaction.eflags_snapshot);
         transaction.pending = null;
+        transaction.reused_source = null;
         transaction.phase = phase;
     }
 };
@@ -1849,6 +1941,31 @@ pub fn dropExpiredAccumulatorBindings(selector: *ComposedBlockSelector) void {
         var expired_name: ?[]const u8 = null;
         var it = selector.values.iterator();
         while (it.next()) |entry| {
+            switch (entry.value_ptr.loc) {
+                .eax, .rax => {},
+                .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => continue,
+            }
+            if (valueMustSurviveClobber(selector, entry.key_ptr.*)) continue;
+            expired_name = entry.key_ptr.*;
+            break;
+        }
+        if (expired_name) |name| {
+            _ = selector.values.remove(name);
+            continue;
+        }
+        break;
+    }
+}
+
+/// The reuse-source transaction pins exactly one current operand across its
+/// mutating preparation boundary. No other current-position value receives
+/// this exclusion.
+fn dropExpiredAccumulatorBindingsExcept(selector: *ComposedBlockSelector, excluded_name: []const u8) void {
+    while (true) {
+        var expired_name: ?[]const u8 = null;
+        var it = selector.values.iterator();
+        while (it.next()) |entry| {
+            if (std.mem.eql(u8, entry.key_ptr.*, excluded_name)) continue;
             switch (entry.value_ptr.loc) {
                 .eax, .rax => {},
                 .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => continue,

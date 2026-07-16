@@ -92,13 +92,14 @@ pub fn lowerFpToSignedIntCast(selector: *ComposedBlockSelector, result: ?[]const
         64
     else
         return .{ .no_emitter = "composed-fp-int-from-type" };
-    while (selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
-        if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
-    }
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, .scratch_preferred)) |diagnostic| return diagnostic;
     const source = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-fp-int-source" };
     selector_state.materializeLocIntoLoc(selector, source, .{ .xmm = .{ .reg = .xmm0, .bits = from_bits } }) catch return .{ .unsupported_value = "composed-fp-int-source" };
     try selector.machine.instructions.append(selector.allocator, if (from_bits == 32) .cvttss2si_xmm0_eax else .cvttsd2si_xmm0_eax);
-    try selector_state.bindEax(selector, result_name);
+    try transaction.define(result_name, .zeroExtending(32));
+    try transaction.commit();
     return null;
 }
 

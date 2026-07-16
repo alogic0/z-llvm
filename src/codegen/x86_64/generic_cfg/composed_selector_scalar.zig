@@ -719,26 +719,47 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
             const exact_ei_narrow = isExactEiNarrowBits(selector, from_bits) or isExactEiNarrowBits(selector, to_bits);
             if (from_bits > 32) {
                 if (!exact_ei_narrow or to_bits > 64) return .{ .no_emitter = "composed-block-zext-width" };
-                try selector_state.emitValueIntoRax(selector, cast.value);
+                const source = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
+                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                defer transaction.deinit();
+                if (try transaction.prepare(
+                    .clobber,
+                    accumulatorLocDisplacement(cast.value, source),
+                )) |diagnostic| return diagnostic;
+                transaction.materialize(cast.value, .zeroExtendedRax(from_bits)) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
                 const mask: u64 = (@as(u64, 1) << @intCast(from_bits)) - 1;
                 try selector_state.clobberArgReg(selector, .rcx);
                 try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = @bitCast(mask) });
                 try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
-                try selector_state.bindAccumulator(selector, result_name, to_bits);
+                // The mask proves every physical bit above the source domain zero.
+                try transaction.define(result_name, if (to_bits == 64) .fullRax() else .zeroExtendedRax(to_bits));
+                try transaction.commit();
                 return null;
             }
             if (to_bits > 32 and to_bits != 64 and !exact_ei_narrow) return .{ .no_emitter = "composed-block-zext-width" };
-            try selector_state.emitValueIntoEax(selector, cast.value);
+            const source = try accumulatorCastSource(selector, cast.value);
+            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+            defer transaction.deinit();
+            if (try transaction.prepare(
+                if (from_bits < 32) .clobber else .preserve,
+                accumulatorCastDisplacement(cast.value, source),
+            )) |diagnostic| return diagnostic;
+            transaction.materialize(cast.value, .zeroExtending(from_bits)) catch
+                return .{ .unsupported_value = "composed-block-unknown-cast" };
             if (from_bits < 32) {
                 const shift: u5 = @intCast(from_bits);
                 const mask = (@as(i32, 1) << shift) - 1;
                 try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = mask });
             }
-            if (to_bits > 32) {
-                try selector_state.bindRax(selector, result_name);
-            } else {
-                try selector_state.bindEax(selector, result_name);
-            }
+            // An EAX definition proves the full physical RAX transport. Wider
+            // logical results therefore have an explicit zero-extension proof.
+            try transaction.define(result_name, if (to_bits <= 32)
+                .zeroExtending(to_bits)
+            else if (to_bits == 64)
+                .fullRax()
+            else
+                .zeroExtendedRax(to_bits));
+            try transaction.commit();
         },
         .sext => {
             if (from_bits != 32 or to_bits != 64) return .{ .no_emitter = "composed-block-sext-width" };
@@ -772,27 +793,56 @@ fn lowerI52Cast(
 ) !?Diagnostic {
     if (cast.value != .named) return .{ .no_emitter = "composed-block-i52-cast-value" };
     if (cast.op == .trunc and from_bits == 64 and to_bits == 52) {
-        if (try selector_state.preserveRaxForDestructiveAccumulatorUse(selector, cast.value)) |diagnostic| return diagnostic;
-        selector_state.emitValueIntoRax(selector, cast.value) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+        transaction.materialize(cast.value, .fullRax()) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
         try maskRaxToI52(selector);
-        try selector_state.bindRax(selector, result_name);
+        try transaction.define(result_name, .zeroExtendedRax(52));
+        try transaction.commit();
         return null;
     }
     if (cast.op == .zext and from_bits == 6 and to_bits == 52) {
-        selector_state.emitValueIntoEax(selector, cast.value) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
+        const source = try accumulatorCastSource(selector, cast.value);
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(
+            .clobber,
+            accumulatorCastDisplacement(cast.value, source),
+        )) |diagnostic| return diagnostic;
+        transaction.materialize(cast.value, .zeroExtending(6)) catch
+            return .{ .unsupported_value = "composed-block-unknown-cast" };
         try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 63 });
-        try selector_state.bindRax(selector, result_name);
+        // The EAX write defines all of RAX with zeroes above bit 31.
+        try transaction.define(result_name, .zeroExtendedRax(52));
+        try transaction.commit();
         return null;
     }
     if (cast.op == .zext and from_bits == 52 and to_bits == 64) {
-        selector_state.emitValueIntoRax(selector, cast.value) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
-        try selector_state.bindRax(selector, result_name);
+        const source = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(
+            .preserve,
+            accumulatorLocDisplacement(cast.value, source),
+        )) |diagnostic| return diagnostic;
+        transaction.materialize(cast.value, .zeroExtendedRax(52)) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
+        try transaction.define(result_name, .fullRax());
+        try transaction.commit();
         return null;
     }
     if (cast.op == .trunc and from_bits == 52 and (to_bits == 6 or to_bits == 32)) {
-        selector_state.emitValueIntoEax(selector, cast.value) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
+        const source = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(
+            if (to_bits == 6) .clobber else .preserve,
+            accumulatorLocDisplacement(cast.value, source),
+        )) |diagnostic| return diagnostic;
+        transaction.materialize(cast.value, .zeroExtending(32)) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
         if (to_bits == 6) try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = 63 });
-        try selector_state.bindEax(selector, result_name);
+        try transaction.define(result_name, .zeroExtending(to_bits));
+        try transaction.commit();
         return null;
     }
     return .{ .no_emitter = "composed-block-i52-cast-form" };
@@ -883,6 +933,42 @@ fn maskRaxToI52(selector: *ComposedBlockSelector) !void {
     try selector_state.clobberArgReg(selector, .rcx);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = (1 << 52) - 1 });
     try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
+}
+
+const AccumulatorCastSource = union(enum) {
+    immediate: i32,
+    location: ValueLoc,
+};
+
+fn accumulatorLocDisplacement(
+    value: ir.Value,
+    source: ValueLoc,
+) selector_state.AccumulatorDisplacementPolicy {
+    return switch (source) {
+        .eax, .rax => switch (value) {
+            .named => |name| .{ .reuse_source = name },
+            else => .spill_live,
+        },
+        else => .spill_live,
+    };
+}
+
+fn accumulatorCastDisplacement(
+    value: ir.Value,
+    source: AccumulatorCastSource,
+) selector_state.AccumulatorDisplacementPolicy {
+    return switch (source) {
+        .immediate => .spill_live,
+        .location => |location| accumulatorLocDisplacement(value, location),
+    };
+}
+
+fn accumulatorCastSource(selector: *const ComposedBlockSelector, value: ir.Value) !AccumulatorCastSource {
+    return switch (value) {
+        .int => |int| .{ .immediate = try i32Value(int) },
+        .named => .{ .location = selector_state.resolveValue(selector, value) orelse return error.UnsupportedCodegenValue },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => error.UnsupportedCodegenValue,
+    };
 }
 
 pub fn isExactEiNarrowBits(selector: *const ComposedBlockSelector, bits: u16) bool {

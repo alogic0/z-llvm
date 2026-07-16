@@ -111,16 +111,23 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
     switch (ptr) {
         .stack_scalar => |stack| {
             if (stack.bits == 64 and load.ty.eql(.{ .int = 64 })) {
-                try loadStackU64IntoRax(selector, stack.base_disp);
-                try selector_state.bindRax(selector, result_name);
+                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                defer transaction.deinit();
+                if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+                try appendLoadStackU64IntoRax(selector, stack.base_disp);
+                try transaction.define(result_name, .fullRax());
+                try transaction.commit();
             } else if (stack.bits == 8 and load.ty.eql(.{ .int = 8 })) {
-                try selector_state.clobberAccumulator(selector);
+                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+                defer transaction.deinit();
+                if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
                 if (stack.base_disp <= std.math.maxInt(u8)) {
                     try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_u8_eax = @intCast(stack.base_disp) });
                 } else {
                     try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_u8_eax = stack.base_disp });
                 }
-                try selector_state.bindEax(selector, result_name);
+                try transaction.define(result_name, .zeroExtending(8));
+                try transaction.commit();
             } else return .{ .no_emitter = "composed-block-load-stack-width" };
         },
         .stack128 => |disp| {
@@ -129,26 +136,40 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
         },
         .stack_i32_ptr => |stack_ptr| {
             if (!load.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-load-stack-array-width" };
+            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+            defer transaction.deinit();
+            if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
             try appendLoadStackI32(selector, stack_ptr);
-            try selector_state.bindEax(selector, result_name);
+            try transaction.define(result_name, .zeroExtending(32));
+            try transaction.commit();
         },
         .stack_i32_array => |stack_array| {
             if (!load.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-load-stack-array-width" };
+            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+            defer transaction.deinit();
+            if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
             try appendLoadStackI32(selector, .{ .disp = stack_array.base_disp });
-            try selector_state.bindEax(selector, result_name);
+            try transaction.define(result_name, .zeroExtending(32));
+            try transaction.commit();
         },
         .arg64, .scratch64 => |reg| {
             if (!load.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-load-ptr-width" };
-            try selector_state.clobberAccumulator(selector);
+            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+            defer transaction.deinit();
+            if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
             try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_eax = reg });
-            try selector_state.bindEax(selector, result_name);
+            try transaction.define(result_name, .zeroExtending(32));
+            try transaction.commit();
         },
         .spill64 => |frame_index| {
             if (!load.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-load-ptr-width" };
-            try selector_state.clobberAccumulator(selector);
+            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+            defer transaction.deinit();
+            if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
             try selector_state.materializeLocIntoLoc(selector, .{ .spill64 = frame_index }, .{ .scratch64 = .rcx });
             try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_eax = .rcx });
-            try selector_state.bindEax(selector, result_name);
+            try transaction.define(result_name, .zeroExtending(32));
+            try transaction.commit();
         },
         .arg32, .arg128, .xmm, .eax, .rax, .scratch32, .scratch128, .stack128_value, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-load-ptr" },
     }
@@ -234,7 +255,31 @@ fn lowerReadOnlyPointerIntegerLoad(selector: *ComposedBlockSelector, result_name
         },
         else => return .{ .no_emitter = "composed-block-load-readonly-param-provenance" },
     };
-    try selector_state.clobberAccumulator(selector);
+    if (bits == 96 or bits == 128) {
+        const pair = selector_state.choosePairScratchForClobber(selector, null) orelse
+            return .{ .no_spill_envelope = "composed-block-load-readonly-param-pair" };
+        if (pair.contains(ptr_reg)) {
+            selector_state.materializeLocIntoLoc(selector, ptr, .{ .scratch64 = .rdi }) catch
+                return .{ .unsupported_value = "composed-block-load-readonly-param-alias" };
+            ptr_reg = .rdi;
+        }
+        try selector_state.clobberArgReg(selector, pair.lo);
+        try selector_state.clobberArgReg(selector, pair.hi);
+        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 0 } });
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair.lo });
+        if (bits == 96) {
+            try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 8 } });
+        } else {
+            try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 8 } });
+        }
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair.hi });
+        try selector_state.bindResultLoc(selector, result_name, .{ .scratch128 = pair });
+        return null;
+    }
+
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
     if (bits == 8 or bits == 16 or bits == 32) {
         try selector.machine.instructions.append(selector.allocator, switch (bits) {
             8 => .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = ptr_reg, .offset = 0 } },
@@ -242,7 +287,8 @@ fn lowerReadOnlyPointerIntegerLoad(selector: *ComposedBlockSelector, result_name
             32 => .{ .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 0 } },
             else => unreachable,
         });
-        try selector_state.bindEax(selector, result_name);
+        try transaction.define(result_name, .zeroExtending(bits));
+        try transaction.commit();
         return null;
     }
     if (bits == 56) {
@@ -257,35 +303,20 @@ fn lowerReadOnlyPointerIntegerLoad(selector: *ComposedBlockSelector, result_name
         try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = scratch });
         try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 0 } });
         try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"or", .reg = scratch } });
-        try selector_state.bindRax(selector, result_name);
+        // The three loads assemble 56 logical bits and prove the top byte of
+        // the physical RAX transport is zero.
+        try transaction.define(result_name, .zeroExtendedRax(56));
+        try transaction.commit();
         return null;
     }
     if (bits == 64) {
         try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 0 } });
-        try selector_state.bindRax(selector, result_name);
+        try transaction.define(result_name, .fullRax());
+        try transaction.commit();
         return null;
     }
 
-    if (bits != 96 and bits != 128) return .{ .no_emitter = "composed-block-load-width" };
-    const pair = selector_state.choosePairScratchForClobber(selector, null) orelse
-        return .{ .no_spill_envelope = "composed-block-load-readonly-param-pair" };
-    if (pair.contains(ptr_reg)) {
-        selector_state.materializeLocIntoLoc(selector, ptr, .{ .scratch64 = .rdi }) catch
-            return .{ .unsupported_value = "composed-block-load-readonly-param-alias" };
-        ptr_reg = .rdi;
-    }
-    try selector_state.clobberArgReg(selector, pair.lo);
-    try selector_state.clobberArgReg(selector, pair.hi);
-    try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 0 } });
-    try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair.lo });
-    if (bits == 96) {
-        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 8 } });
-    } else {
-        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 8 } });
-    }
-    try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair.hi });
-    try selector_state.bindResultLoc(selector, result_name, .{ .scratch128 = pair });
-    return null;
+    return .{ .no_emitter = "composed-block-load-width" };
 }
 
 fn lowerStoreStackPointer(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
@@ -753,7 +784,6 @@ pub fn isBytePointerSource(ty: ir.Type) bool {
 }
 
 pub fn appendLoadStackI32(selector: *ComposedBlockSelector, stack_ptr: StackPtrLoc) !void {
-    try selector_state.clobberAccumulator(selector);
     try materializeStackIndex(selector, stack_ptr);
     if (stack_ptr.index != null) {
         if (stack_ptr.disp <= std.math.maxInt(u8)) {
@@ -779,6 +809,10 @@ pub fn loadStackU64IntoArg(selector: *ComposedBlockSelector, reg: ArgReg, disp: 
 
 pub fn loadStackU64IntoRax(selector: *ComposedBlockSelector, disp: u32) !void {
     try selector_state.clobberAccumulator(selector);
+    try appendLoadStackU64IntoRax(selector, disp);
+}
+
+fn appendLoadStackU64IntoRax(selector: *ComposedBlockSelector, disp: u32) !void {
     if (disp <= std.math.maxInt(u8)) {
         try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_rax = @intCast(disp) });
     } else {
