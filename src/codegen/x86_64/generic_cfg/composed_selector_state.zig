@@ -91,6 +91,9 @@ pub const AccumulatorPreparationEffect = enum {
 };
 
 pub const AccumulatorDisplacementPolicy = union(enum) {
+    /// Preserve the accepted direct-call sequence: spill every live SysV
+    /// caller-clobbered value in the existing accumulator/GPR/XMM order.
+    caller_clobbers,
     /// Reproduce clobberAccumulator: every live accumulator alias is assigned
     /// its deterministic spill home, even when a scratch register is free.
     spill_live,
@@ -256,6 +259,10 @@ pub const AccumulatorDefinitionTransaction = struct {
         try transaction.beginPreparation(effect);
         errdefer transaction.restore(.rolled_back);
         switch (displacement) {
+            .caller_clobbers => if (try spillLiveCallerClobbersForCall(transaction.selector)) |diagnostic| {
+                transaction.restore(.rolled_back);
+                return diagnostic;
+            },
             .spill_live => try clobberAccumulator(transaction.selector),
             .spill_source => |source_name| {
                 const source = transaction.selector.values.get(source_name) orelse

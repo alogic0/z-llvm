@@ -553,6 +553,149 @@ test "composed selector binds half float and double direct call results in XMM0"
     }
 }
 
+test "composed selector transaction binds direct i32 i64 pointer and mixed SSE GPR call results" {
+    inline for (.{
+        .{ .ty = ir.Type{ .int = 32 }, .loc = ValueLoc.eax },
+        .{ .ty = ir.Type{ .int = 64 }, .loc = ValueLoc.rax },
+        .{ .ty = ir.Type.ptr, .loc = ValueLoc.rax },
+    }) |case| {
+        var machine = MachineFunction.init("direct-gpr-result", case.ty);
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.stack_frame_bytes = stage2SpillReservedBytes();
+        var call = ir.CallInst{ .ret_ty = case.ty, .callee = "callee", .args = .empty };
+        defer call.deinit(std.testing.allocator);
+        try std.testing.expect((try selector_calls.lowerCall(&selector, "result", call)) == null);
+        try std.testing.expectEqual(case.loc, selector_state.valueLoc(&selector, "result").?);
+        try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+        try std.testing.expect(machine.instructions.items[0] == .direct_call);
+    }
+
+    const mixed_input =
+        \\declare i64 @mixed(double, i32)
+        \\define i64 @caller(double %fp, i32 %integer) {
+        \\entry:
+        \\  %result = call i64 @mixed(double %fp, i32 %integer)
+        \\  ret i64 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, mixed_input);
+    defer module.deinit();
+    try module.verify();
+    var mixed_machine = MachineFunction.init("caller", .{ .int = 64 });
+    defer mixed_machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &mixed_machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(mixed_machine);
+}
+
+test "composed selector call result rejects live EFLAGS before any call mutation" {
+    var machine = MachineFunction.init("call-flags-reject", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try selector_state.emitEflagsInstruction(&selector, .{ .cmp_eax_imm32 = 0 }, .definition);
+    const saved_len = machine.instructions.items.len;
+    const saved_flags = selector.eflags.snapshot();
+    var call = ir.CallInst{ .ret_ty = .{ .int = 32 }, .callee = "callee", .args = .empty };
+    defer call.deinit(std.testing.allocator);
+    try std.testing.expectError(error.EflagsClobberedWhileLive, selector_calls.lowerCall(&selector, "result", call));
+    try std.testing.expectEqual(saved_len, machine.instructions.items.len);
+    try std.testing.expect(selector_state.valueLoc(&selector, "result") == null);
+    try selector.eflags.validateSnapshot(saved_flags);
+}
+
+test "composed selector call transaction rolls back every call-sequence checkpoint" {
+    inline for (0..5) |checkpoint| {
+        var machine = MachineFunction.init("call-checkpoint-rollback", .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("live", 10);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = stage2SpillReservedBytes();
+        var seed = try selector_state.AccumulatorDefinitionTransaction.begin(&selector);
+        _ = try seed.prepare(.preserve, .spill_live);
+        try seed.define("live", .zeroExtending(32));
+        try seed.commit();
+        seed.deinit();
+        const live_binding = selector.values.get("live").?;
+        const saved_domain = selector.accumulator_domain;
+        const saved_next_vreg = selector.next_virtual_reg;
+        const saved_next_spill = selector.next_spill_slot;
+
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(&selector);
+        defer transaction.deinit();
+        _ = try transaction.prepare(.clobber, .caller_clobbers);
+        if (checkpoint >= 1) try machine.instructions.append(std.testing.allocator, .{ .mov_imm_rdi = 7 });
+        if (checkpoint >= 2) try selector_state.emitEflagsInstruction(&selector, .sub_rsp_8, .write);
+        if (checkpoint >= 3) try selector_state.emitEflagsInstruction(&selector, .{ .direct_call = .{ .symbol = "callee", .ret_ty = .{ .int = 32 } } }, .clobber);
+        if (checkpoint >= 4) try transaction.define("result", .zeroExtending(32));
+        try transaction.rollback();
+
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(@as(usize, 1), selector.values.count());
+        try std.testing.expectEqual(live_binding, selector.values.get("live").?);
+        try std.testing.expect(selector.values.get("result") == null);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+        try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+        try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+        try std.testing.expectEqual(saved_domain, selector.accumulator_domain);
+    }
+}
+
+test "composed selector preserves an accumulator-resident argument before defining a call result" {
+    var machine = MachineFunction.init("live-accumulator-call-argument", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("argument", 10);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = stage2SpillReservedBytes();
+    var seed = try selector_state.AccumulatorDefinitionTransaction.begin(&selector);
+    _ = try seed.prepare(.preserve, .spill_live);
+    try seed.define("argument", .zeroExtending(32));
+    try seed.commit();
+    seed.deinit();
+
+    var call = ir.CallInst{ .ret_ty = .{ .int = 32 }, .callee = "callee", .args = .empty };
+    defer call.deinit(std.testing.allocator);
+    try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "argument" } });
+    try std.testing.expect((try selector_calls.lowerCall(&selector, "result", call)) == null);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector_state.valueLoc(&selector, "argument").?);
+}
+
+test "composed selector leaves generic narrow returns and unsupported return attributes rejected" {
+    inline for (.{ @as(u16, 8), @as(u16, 16) }) |bits| {
+        var machine = MachineFunction.init("narrow-return", .{ .int = bits });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        var call = ir.CallInst{ .ret_ty = .{ .int = bits }, .callee = "callee", .args = .empty };
+        defer call.deinit(std.testing.allocator);
+        const diagnostic = (try selector_calls.lowerCall(&selector, "result", call)).?;
+        try std.testing.expectEqualStrings("composed-block-call-ret-width", diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+
+    var machine = MachineFunction.init("return-attributes", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    var call = ir.CallInst{ .ret_ty = .{ .int = 32 }, .ret_attrs = "zeroext", .callee = "callee", .args = .empty };
+    defer call.deinit(std.testing.allocator);
+    const diagnostic = (try selector_calls.lowerCall(&selector, "result", call)).?;
+    try std.testing.expectEqualStrings("composed-block-call-form", diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
 test "composed selector lowers tail and notail calls ordinarily and rejects musttail" {
     const input =
         \\declare float @callee(float)

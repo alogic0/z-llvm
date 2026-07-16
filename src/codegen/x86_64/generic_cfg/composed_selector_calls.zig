@@ -131,11 +131,18 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (sysv_abi.callHasScalarSseType(call)) return lowerScalarSseCall(selector, result, call);
     try sysv_abi.rejectUnsupportedCallEnvelope(call);
     try sysv_abi.rejectUnsupportedCallSignature(call);
-    const ret_bits = if (call.ret_ty == .void) @as(u16, 0) else intBits(call.ret_ty) orelse return .{ .no_emitter = "composed-block-call-ret" };
+    const ret_bits = if (call.ret_ty == .void) @as(u16, 0) else if (call.ret_ty == .ptr) @as(u16, 64) else intBits(call.ret_ty) orelse return .{ .no_emitter = "composed-block-call-ret" };
     if (ret_bits != 0 and ret_bits != 32 and ret_bits != 64 and ret_bits != 128) return .{ .no_emitter = "composed-block-call-ret-width" };
     var abi_index: usize = 0;
 
-    if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+    var transaction: ?selector_state.AccumulatorDefinitionTransaction = if (result != null and (ret_bits == 32 or ret_bits == 64))
+        try selector_state.AccumulatorDefinitionTransaction.begin(selector)
+    else
+        null;
+    defer if (transaction) |*active| active.deinit();
+    if (transaction) |*active| {
+        if (try active.prepare(.clobber, .caller_clobbers)) |diagnostic| return diagnostic;
+    } else if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
     for (call.args.items) |arg| {
         const target = ArgReg.fromIndex(abi_index) catch return .{ .unsupported_value = "composed-block-call-arg-reg" };
         if (try lowerDirectCallArg(selector, arg, target)) |diagnostic| return diagnostic;
@@ -145,12 +152,21 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
 
     const needs_alignment = selector.stack_frame_bytes == 0;
     if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
-    try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+    if (transaction != null)
+        try selector_state.emitEflagsInstruction(selector, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } }, .clobber)
+    else
+        try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
     if (needs_alignment) try selector_frame.appendAddRsp(selector, 8);
     if (result) |result_name| switch (ret_bits) {
         0 => return .{ .unsupported_value = "composed-block-void-call-result" },
-        32 => try selector_state.bindEax(selector, result_name),
-        64 => try selector_state.bindRax(selector, result_name),
+        32 => {
+            try transaction.?.define(result_name, .zeroExtending(32));
+            try transaction.?.commit();
+        },
+        64 => {
+            try transaction.?.define(result_name, .fullRax());
+            try transaction.?.commit();
+        },
         128 => {},
         else => unreachable,
     };
@@ -200,7 +216,15 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
     var plan = try sysv_abi.planScalarCall(selector.allocator, call);
     defer plan.deinit(selector.allocator);
 
-    if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+    const gpr_result = result != null and (call.ret_ty.eql(.{ .int = 32 }) or call.ret_ty.eql(.{ .int = 64 }) or call.ret_ty == .ptr);
+    var transaction: ?selector_state.AccumulatorDefinitionTransaction = if (gpr_result)
+        try selector_state.AccumulatorDefinitionTransaction.begin(selector)
+    else
+        null;
+    defer if (transaction) |*active| active.deinit();
+    if (transaction) |*active| {
+        if (try active.prepare(.clobber, .caller_clobbers)) |diagnostic| return diagnostic;
+    } else if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
     for (call.args.items) |arg| {
         if (!sysv_abi.isScalarSseAbiType(arg.ty)) continue;
         const name = switch (arg.value) {
@@ -221,15 +245,20 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
         .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => return .{ .no_emitter = "composed-block-call-aggregate-arg" },
     };
 
-    try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+    if (transaction != null)
+        try selector_state.emitEflagsInstruction(selector, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } }, .clobber)
+    else
+        try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
     if (result) |result_name| {
         if (sysv_abi.isScalarSseAbiType(call.ret_ty)) {
             const bits: u16 = if (call.ret_ty == .half) 16 else if (call.ret_ty == .float) 32 else 64;
             try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
         } else if (call.ret_ty.eql(.{ .int = 32 })) {
-            try selector_state.bindEax(selector, result_name);
+            try transaction.?.define(result_name, .zeroExtending(32));
+            try transaction.?.commit();
         } else if (call.ret_ty.eql(.{ .int = 64 }) or call.ret_ty == .ptr) {
-            try selector_state.bindRax(selector, result_name);
+            try transaction.?.define(result_name, .fullRax());
+            try transaction.?.commit();
         } else if (call.ret_ty == .void) {
             return .{ .unsupported_value = "composed-block-void-call-result" };
         } else {
@@ -514,11 +543,30 @@ pub fn lowerCtlzI32(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     if (!value_arg.ty.eql(.{ .int = 32 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !valid_zero_flag) {
         return .{ .no_emitter = "composed-block-ctlz-args" };
     }
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
     selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 32) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
-    try selector_state.clobberAccumulator(selector);
-    try selector.machine.instructions.append(selector.allocator, .clz_i32_edi_eax);
-    try selector_state.bindEax(selector, result_name);
+    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    try selector_state.emitEflagsInstruction(selector, .clz_i32_edi_eax, .clobber);
+    try transaction.define(result_name, .zeroExtending(32));
+    try transaction.commit();
     return null;
+}
+
+fn accumulatorInputDisplacement(
+    selector: *const ComposedBlockSelector,
+    value: ir.Value,
+    fallback: selector_state.AccumulatorDisplacementPolicy,
+) selector_state.AccumulatorDisplacementPolicy {
+    const name = switch (value) {
+        .named => |name| name,
+        else => return fallback,
+    };
+    const source = selector_state.resolveValue(selector, value) orelse return fallback;
+    return switch (source) {
+        .eax, .rax => .{ .reuse_source = name },
+        else => fallback,
+    };
 }
 
 pub fn lowerCtlzI64(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
@@ -533,22 +581,28 @@ pub fn lowerCtlzI64(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     if (!value_arg.ty.eql(.{ .int = 64 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !valid_zero_flag) {
         return .{ .no_emitter = "composed-block-ctlz-args" };
     }
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
     selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 64) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
-    try selector_state.clobberAccumulator(selector);
-    try selector.machine.instructions.append(selector.allocator, .clz_i64_rdi_eax);
-    try selector_state.bindRax(selector, result_name);
+    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    try selector_state.emitEflagsInstruction(selector, .clz_i64_rdi_eax, .clobber);
+    try transaction.define(result_name, .fullRax());
+    try transaction.commit();
     return null;
 }
 
 pub fn lowerCtlzI52(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (!isExactCtlzI52Call(call)) return .{ .no_emitter = "composed-block-ctlz-i52-envelope" };
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
     selector_state.emitValueIntoScratch(selector, call.args.items[0].value, .rdi, 64) catch
         return .{ .unsupported_value = "composed-block-ctlz-value" };
-    try selector_state.clobberAccumulator(selector);
-    try selector.machine.instructions.append(selector.allocator, .clz_i64_rdi_eax);
+    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    try selector_state.emitEflagsInstruction(selector, .clz_i64_rdi_eax, .clobber);
     try selector_state.emitEflagsInstruction(selector, .{ .add_eax_imm32 = -12 }, .write);
-    try selector_state.bindRax(selector, result_name);
+    try transaction.define(result_name, .zeroExtendedRax(52));
+    try transaction.commit();
     return null;
 }
 
@@ -591,10 +645,13 @@ pub fn lowerCttzI32(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     if (!value_arg.ty.eql(.{ .int = 32 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !valid_zero_flag) {
         return .{ .no_emitter = "composed-block-cttz-args" };
     }
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
     selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 32) catch return .{ .unsupported_value = "composed-block-cttz-value" };
-    try selector_state.clobberAccumulator(selector);
-    try selector.machine.instructions.append(selector.allocator, .ctz_i32_edi_eax);
-    try selector_state.bindEax(selector, result_name);
+    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    try selector_state.emitEflagsInstruction(selector, .ctz_i32_edi_eax, .clobber);
+    try transaction.define(result_name, .zeroExtending(32));
+    try transaction.commit();
     return null;
 }
 
@@ -610,10 +667,13 @@ pub fn lowerCttzI64(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     if (!value_arg.ty.eql(.{ .int = 64 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !valid_zero_flag) {
         return .{ .no_emitter = "composed-block-cttz-args" };
     }
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
     selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 64) catch return .{ .unsupported_value = "composed-block-cttz-value" };
-    try selector_state.clobberAccumulator(selector);
-    try selector.machine.instructions.append(selector.allocator, .ctz_i64_rdi_eax);
-    try selector_state.bindRax(selector, result_name);
+    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    try selector_state.emitEflagsInstruction(selector, .ctz_i64_rdi_eax, .clobber);
+    try transaction.define(result_name, .fullRax());
+    try transaction.commit();
     return null;
 }
 
@@ -639,12 +699,16 @@ fn lowerCtpop(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.Ca
     }
 
     if (bits == 64) {
-        selector_state.emitValueIntoRax(selector, call.args.items[0].value) catch
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.clobber, accumulatorInputDisplacement(selector, call.args.items[0].value, .spill_live))) |diagnostic| return diagnostic;
+        transaction.materialize(call.args.items[0].value, .fullRax()) catch
             return .{ .unsupported_value = "composed-block-ctpop-value" };
         try selector_state.clobberArgReg(selector, .rcx);
         try selector_state.clobberArgReg(selector, .rdx);
-        try selector.machine.instructions.append(selector.allocator, .popcount_rax);
-        try selector_state.bindRax(selector, result_name);
+        try selector_state.emitEflagsInstruction(selector, .popcount_rax, .clobber);
+        try transaction.define(result_name, .fullRax());
+        try transaction.commit();
         return null;
     }
 
@@ -696,12 +760,16 @@ fn lowerBitPermutation(
 
     if (bits == 64) {
         if (operation != .bit_reverse) unreachable;
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.clobber, accumulatorInputDisplacement(selector, call.args.items[0].value, .spill_live))) |diagnostic| return diagnostic;
         try selector_state.clobberArgReg(selector, .rcx);
         try selector_state.clobberArgReg(selector, .rdx);
-        selector_state.emitValueIntoRax(selector, call.args.items[0].value) catch
+        transaction.materialize(call.args.items[0].value, .fullRax()) catch
             return .{ .unsupported_value = "composed-block-bit-permutation-value" };
-        try selector.machine.instructions.append(selector.allocator, .bit_reverse_rax);
-        try selector_state.bindRax(selector, result_name);
+        try selector_state.emitEflagsInstruction(selector, .bit_reverse_rax, .clobber);
+        try transaction.define(result_name, .fullRax());
+        try transaction.commit();
         return null;
     }
 
@@ -801,14 +869,17 @@ pub fn lowerCtlzI16(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     if (!value_arg.ty.eql(.{ .int = 16 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !valid_zero_flag) {
         return .{ .no_emitter = "composed-block-ctlz-args" };
     }
-    selector_state.emitValueIntoEax(selector, value_arg.value) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.clobber, accumulatorInputDisplacement(selector, value_arg.value, .spill_live))) |diagnostic| return diagnostic;
+    transaction.materialize(value_arg.value, .zeroExtending(16)) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
     try selector_state.emitEflagsInstruction(selector, .{ .and_eax_imm32 = 0xffff }, .write);
     try selector_state.clobberArgReg(selector, .rdi);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = .rdi });
-    try selector_state.clobberAccumulator(selector);
-    try selector.machine.instructions.append(selector.allocator, .clz_i32_edi_eax);
+    try selector_state.emitEflagsInstruction(selector, .clz_i32_edi_eax, .clobber);
     try selector_state.emitEflagsInstruction(selector, .{ .add_eax_imm32 = -16 }, .write);
-    try selector_state.bindEax(selector, result_name);
+    try transaction.define(result_name, .zeroExtending(16));
+    try transaction.commit();
     return null;
 }
 
@@ -826,10 +897,14 @@ pub fn lowerFshlI32(selector: *ComposedBlockSelector, result: ?[]const u8, call:
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-fshl-amount" },
     };
     const amount: u5 = @intCast(@as(u64, @bitCast(amount_value)) & 31);
-    selector_state.emitValueIntoEax(selector, call.args.items[0].value) catch return .{ .unsupported_value = "composed-block-fshl-lhs" };
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.clobber, accumulatorInputDisplacement(selector, call.args.items[0].value, .spill_live))) |diagnostic| return diagnostic;
+    transaction.materialize(call.args.items[0].value, .zeroExtending(32)) catch return .{ .unsupported_value = "composed-block-fshl-lhs" };
     selector_state.emitValueIntoScratch(selector, call.args.items[1].value, .rcx, 32) catch return .{ .unsupported_value = "composed-block-fshl-rhs" };
-    try selector.machine.instructions.append(selector.allocator, .{ .fshl_eax_arg32_imm5 = .{ .reg = .rcx, .amount = amount } });
-    try selector_state.bindEax(selector, result_name);
+    try selector_state.emitEflagsInstruction(selector, .{ .fshl_eax_arg32_imm5 = .{ .reg = .rcx, .amount = amount } }, .write);
+    try transaction.define(result_name, .zeroExtending(32));
+    try transaction.commit();
     return null;
 }
 
@@ -869,14 +944,17 @@ pub fn lowerIntByteSizeCall(selector: *ComposedBlockSelector, result: ?[]const u
     const arg = call.args.items[0];
     if (!arg.ty.eql(.{ .int = 16 })) return .{ .no_emitter = "composed-block-intbytesize-arg" };
 
-    if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.clobber, .caller_clobbers)) |diagnostic| return diagnostic;
     selector_state.emitValueIntoScratch(selector, arg.value, .rdi, 16) catch return .{ .unsupported_value = "composed-block-intbytesize-arg-value" };
     const needs_alignment = selector.stack_frame_bytes == 0;
     if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
-    try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+    try selector_state.emitEflagsInstruction(selector, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } }, .clobber);
     if (needs_alignment) try selector_frame.appendAddRsp(selector, 8);
     try selector_state.emitEflagsInstruction(selector, .{ .and_eax_imm32 = 0xffff }, .write);
-    try selector_state.bindEax(selector, result_name);
+    try transaction.define(result_name, .zeroExtending(16));
+    try transaction.commit();
     return null;
 }
 
@@ -895,10 +973,13 @@ pub fn lowerAbsI32(selector: *ComposedBlockSelector, result: ?[]const u8, call: 
     };
     if (!poison_ok) return .{ .no_emitter = "composed-block-abs-poison-mode" };
 
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
     try selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 32);
-    if (try selector_state.spillCurrentAccumulator(selector)) |diagnostic| return diagnostic;
-    try selector.machine.instructions.append(selector.allocator, .abs_i32_edi_eax);
-    try selector_state.bindEax(selector, result_name);
+    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    try selector_state.emitEflagsInstruction(selector, .abs_i32_edi_eax, .clobber);
+    try transaction.define(result_name, .zeroExtending(32));
+    try transaction.commit();
     return null;
 }
 
@@ -918,10 +999,13 @@ pub fn lowerAbsI64(selector: *ComposedBlockSelector, result: ?[]const u8, call: 
     };
     if (!poison_ok) return .{ .no_emitter = "composed-block-abs-poison-mode" };
 
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
     try selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 64);
-    if (try selector_state.spillCurrentAccumulator(selector)) |diagnostic| return diagnostic;
-    try selector.machine.instructions.append(selector.allocator, .abs_i64_rdi_rax);
-    try selector_state.bindRax(selector, result_name);
+    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    try selector_state.emitEflagsInstruction(selector, .abs_i64_rdi_rax, .clobber);
+    try transaction.define(result_name, .fullRax());
+    try transaction.commit();
     return null;
 }
 

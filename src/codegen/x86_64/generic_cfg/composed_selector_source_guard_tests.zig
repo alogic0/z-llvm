@@ -60,9 +60,9 @@ const DirectInventoryEntry = struct {
 // Frozen at INBOX-72. Later O1 commits may reduce these per-file/per-operation
 // maxima, but cannot add or relocate a direct accumulator bind/clobber site.
 const direct_accumulator_inventory = [_]DirectInventoryEntry{
-    .{ .source = "composed_selector_calls.zig", .operation = .bind_eax, .maximum = 9 },
-    .{ .source = "composed_selector_calls.zig", .operation = .bind_rax, .maximum = 9 },
-    .{ .source = "composed_selector_calls.zig", .operation = .clobber_accumulator, .maximum = 12 },
+    .{ .source = "composed_selector_calls.zig", .operation = .bind_eax, .maximum = 0 },
+    .{ .source = "composed_selector_calls.zig", .operation = .bind_rax, .maximum = 0 },
+    .{ .source = "composed_selector_calls.zig", .operation = .clobber_accumulator, .maximum = 5 },
     .{ .source = "composed_selector_cfg.zig", .operation = .bind_accumulator, .maximum = 1 },
     .{ .source = "composed_selector_cfg.zig", .operation = .clobber_accumulator, .maximum = 8 },
     .{ .source = "composed_selector_conversion.zig", .operation = .bind_eax, .maximum = 1 },
@@ -250,8 +250,10 @@ fn validateAccumulatorDisplacementPolicies(source: []const u8) !void {
         const end = call_end orelse return error.MalformedAccumulatorPrepareCall;
         const call = source[call_start..end];
         if (std.mem.indexOf(u8, call, ".spill_live") == null and
+            std.mem.indexOf(u8, call, ".caller_clobbers") == null and
             std.mem.indexOf(u8, call, ".spill_source") == null and
             std.mem.indexOf(u8, call, ".scratch_preferred") == null and
+            std.mem.indexOf(u8, call, "accumulatorInputDisplacement(") == null and
             std.mem.indexOf(u8, call, "accumulatorLocDisplacement(") == null and
             std.mem.indexOf(u8, call, "accumulatorCastDisplacement(") == null)
         {
@@ -343,6 +345,7 @@ test "composed selector source guard requires an explicit accumulator displaceme
     );
     try validateAccumulatorDisplacementPolicies(
         "_ = transaction.prepare(.preserve, .spill_live);" ++
+            "_ = transaction.prepare(.clobber, .caller_clobbers);" ++
             "_ = transaction.prepare(.preserve, .scratch_preferred);" ++
             "_ = transaction.prepare(.clobber, accumulatorLocDisplacement(value, source));" ++
             "_ = transaction.prepare(.clobber, accumulatorCastDisplacement(value, source));",
