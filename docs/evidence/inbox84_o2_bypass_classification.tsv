@@ -32,7 +32,7 @@ composed_selector_cfg.zig	emitBranchCondition	resolveValue	1	1	1	O2-3B+	migrate_
 composed_selector_cfg.zig	emitPhiEdgeMoves	emitValueIntoLoc	1	1	5	O4-PHI-cycle	retain_for_phi_edge_migration	-
 composed_selector_cfg.zig	emitPhiEdgeMoves	materializeLocIntoLoc	1	1	5	O4-PHI-cycle	retain_for_phi_edge_migration	-
 composed_selector_cfg.zig	emitPhiEdgeMoves	materializeScalarPhiSnapshot	1	1	5	O4-PHI-cycle	retain_for_phi_edge_migration	-
-composed_selector_cfg.zig	emitScalarSelectValue	emitValueIntoAccumulator	1	1	1	O2-3B+	migrate_as_lowerSelect_arm	use_scalar_select
+composed_selector_cfg.zig	emitScalarSelectValue	emitValueIntoAccumulator	1	1	5	O4-conditional-copy	retain_for_conditional_destination_authority	use_scalar_select
 composed_selector_cfg.zig	emitValueIntoLoc	materializeLocIntoLoc	1-2	2	6	parent-consumer	collapse_with_phi_edge_owner	-
 composed_selector_cfg.zig	emitValueIntoLoc	materializeLocIntoLocWithBits	1-2	2	6	parent-consumer	collapse_with_phi_edge_owner	-
 composed_selector_cfg.zig	emitValueIntoLoc	resolveValue	1-3	3	6	parent-consumer	collapse_with_phi_edge_owner	-
@@ -43,7 +43,7 @@ composed_selector_cfg.zig	lowerReturn	emitValueIntoAccumulator	1	1	5	O5-ABI	reta
 composed_selector_cfg.zig	lowerReturn	emitValueIntoFpReturn	1	1	5	O5-ABI	retain_for_abi_return_migration	-
 composed_selector_cfg.zig	lowerReturn	emitValueIntoI128Return	1	1	5	O5-ABI	retain_for_abi_return_migration	-
 composed_selector_cfg.zig	lowerReturn	resolveValue	1	1	5	O5-ABI	retain_for_abi_return_migration	-
-composed_selector_cfg.zig	lowerSelect	resolveValue	1-2	2	1	O2-3B+	migrate_complete_scalar_select_consumer	use_scalar_select
+composed_selector_cfg.zig	lowerSelect	resolveValue	1-2	2	5	O4-conditional-copy	retain_for_conditional_destination_authority	use_scalar_select
 composed_selector_cfg.zig	lowerSwitch	emitValueIntoEax	1	1	1	O2-3B+	migrate_complete_switch_condition_consumer	use_switch_condition
 composed_selector_cfg.zig	materializeScalarPhiSnapshot	materializeLocIntoLocWithBits	1-3	3	6	parent-consumer	collapse_with_phi_snapshot_owner	-
 composed_selector_cfg.zig	restoreDisplacedPhiDestinations	materializeLocIntoLocWithBits	1	1	5	O4-PHI-cycle	retain_for_phi_restore_migration	-
@@ -53,8 +53,8 @@ composed_selector_cfg.zig	snapshotScalarPhiSources	resolveValue	1-3	3	5	O4-PHI-c
 composed_selector_cfg.zig	snapshotXmmPhiSources	materializeLocIntoLoc	1	1	5	O4-PHI-cycle	retain_for_phi_snapshot_migration	-
 composed_selector_cfg.zig	snapshotXmmPhiSources	resolveValue	1-2	2	5	O4-PHI-cycle	retain_for_phi_snapshot_migration	-
 composed_selector_cfg.zig	stabilizePhiEdgeSources	valueLoc	1	1	5	O4-PHI-cycle	retain_for_phi_stabilization_migration	-
-composed_selector_conversion.zig	lowerFpToSignedIntCast	materializeLocIntoLoc	1	1	3	O2-3B-O1	compose_fp_source_use_with_accumulator_result_transaction	o1_fp_to_signed_int
-composed_selector_conversion.zig	lowerFpToSignedIntCast	resolveValue	1	1	3	O2-3B-O1	compose_fp_source_use_with_accumulator_result_transaction	o1_fp_to_signed_int
+composed_selector_conversion.zig	lowerFpToSignedIntCast	materializeLocIntoLoc	1	1	4	O3-FP-XMM	retain_for_xmm_source_migration	o1_fp_to_signed_int
+composed_selector_conversion.zig	lowerFpToSignedIntCast	resolveValue	1	1	4	O3-FP-XMM	retain_for_xmm_source_migration	o1_fp_to_signed_int
 composed_selector_conversion.zig	lowerIntToFpCast	emitValueIntoEax	1	1	4	O3-FP-XMM	retain_for_fp_result_migration	-
 composed_selector_conversion.zig	lowerIntToFpCast	emitValueIntoRax	1	1	4	O3-FP-XMM	retain_for_fp_result_migration	-
 composed_selector_conversion.zig	lowerUnsignedI64	emitValueIntoRax	1	1	6	parent-consumer	collapse_with_lowerIntToFpCast	-
@@ -129,7 +129,7 @@ composed_selector_scalar.zig	lowerBinaryImmediateRhs	resolveValue	1	1	3	O2-3B-O1
 composed_selector_scalar.zig	lowerCast	emitValueIntoScratch	1	1	3	O2-3B-O1	compose_cast_source_with_accumulator_result_transaction	o1_cast
 composed_selector_scalar.zig	lowerCast	resolvePairValue	1	1	3	O2-3B-O1	compose_readonly_pair_source_with_result_transaction	o1_cast
 composed_selector_scalar.zig	lowerCast	resolveValue	1-3	3	3	O2-3B-O1	compose_cast_source_with_accumulator_result_transaction	o1_cast
-composed_selector_scalar.zig	lowerFreeze	resolveValue	1	1	1	O2-3B+	migrate_complete_freeze_consumer	use_freeze
+composed_selector_scalar.zig	lowerFreeze	resolveValue	1	1	5	O4-alias-copy	retain_as_approved_alias_only_binding	use_freeze
 composed_selector_scalar.zig	lowerI52Binary	emitValueIntoScratch	1	1	3	O2-3B-O1	compose_binary_use_with_accumulator_result_transaction	o1_i52_binary
 composed_selector_scalar.zig	lowerI52Cast	resolveValue	1-2	2	3	O2-3B-O1	compose_cast_use_with_accumulator_result_transaction	o1_i52_cast
 composed_selector_scalar.zig	lowerMul64	emitValueIntoScratch	1-2	2	3	O2-3B-O1	compose_multiply_uses_with_accumulator_result_transaction	o1_mul64
