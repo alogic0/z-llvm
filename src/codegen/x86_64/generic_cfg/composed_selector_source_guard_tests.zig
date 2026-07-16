@@ -384,6 +384,8 @@ fn validatePreparedViewLeafDiscipline(source: [:0]const u8) !void {
     {
         return error.ValueUsePreparedLocationEscape;
     }
+    if (std.mem.indexOf(u8, source, ".validate_shape") != null)
+        return error.ValueUsePreparedTestActionInProduction;
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -1364,6 +1366,12 @@ test "composed selector source guard rejects callback escapes and raw operations
         error.ValueUsePreparedLocationEscape,
         validatePreparedViewLeafDiscipline(
             "fn consume(self: *@This(), view: *const Transaction.PreparedView) void { self.saved = view; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUsePreparedTestActionInProduction,
+        validatePreparedViewLeafDiscipline(
+            "fn lower() void { const action: Transaction.PreparedAction = .{ .validate_shape = expected }; _ = action; }",
         ),
     );
 }

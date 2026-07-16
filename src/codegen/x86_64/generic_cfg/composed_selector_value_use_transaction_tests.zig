@@ -52,6 +52,19 @@ fn preparedRequest(
     return result;
 }
 
+fn preparedSourceRequest(
+    name: []const u8,
+    ty: ir.Type,
+    class: selector_types.VirtualRegClass,
+    form: Transaction.UseForm,
+) Transaction.Request {
+    return request(name, ty, class, form, .prepared_source);
+}
+
+fn actionIdentity(name: []const u8) !Transaction.ActionIdentity {
+    return Transaction.ActionIdentity.init(name);
+}
+
 test "value-use transaction exposes fixed copy-amplification contract" {
     try std.testing.expectEqual(@as(usize, 16), Transaction.max_requests);
     try std.testing.expectEqual(@as(usize, 1), Transaction.address_domain_snapshot_copies);
@@ -839,4 +852,296 @@ test "value-use rollback releases speculative owned labels after instructions an
     try std.testing.expectEqual(@as(usize, 2), machine.owned_labels.items.len);
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
     try std.testing.expectEqual(retained_pointer, machine.owned_labels.items[0].ptr);
+}
+
+test "value-use address actions derive stack-array descriptors and roll back durable bindings" {
+    var machine = MachineFunction.init("value-use-stack-array-action", .ptr);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "array", "index", "derived" }) |name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "array", .{ .stack_i32_array = .{ .base_disp = 48, .len = 8 } });
+    try selector_state.bindValueLoc(&selector, "index", .{ .arg64 = .rdi });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const index = try transaction.register(preparedSourceRequest(
+        "index",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+    ));
+    const address = try transaction.register(preparedRequest(
+        "array",
+        .ptr,
+        .stack_object,
+        .stack_object_address,
+        .{ .form_scaled_address = .{
+            .result = try actionIdentity("derived"),
+            .index = .{ .request = index },
+            .scale = 4,
+        } },
+    ));
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    const lease = try transaction.preparedView(address);
+    try transaction.executePreparedAction(lease);
+
+    const derived = selector.values.get("derived").?.loc.stack_i32_ptr;
+    try std.testing.expectEqual(@as(u32, 48), derived.disp);
+    try std.testing.expect(derived.index != null);
+    try std.testing.expectEqual(selector_types.ArgReg.rcx, derived.index.?.reg);
+    try std.testing.expect(std.mem.eql(u8, "index", derived.index.?.name));
+    try std.testing.expect(selector.address_dependencies.ownerNamed("derived") != null);
+    try std.testing.expectEqual(@as(usize, 2), machine.owned_labels.items.len);
+    try std.testing.expect(machine.instructions.items.len != 0);
+
+    try transaction.rollback();
+    try std.testing.expect(selector.values.get("derived") == null);
+    try std.testing.expect(selector.address_dependencies.ownerNamed("derived") == null);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+
+    var constant = try Transaction.begin(&selector);
+    defer constant.deinit();
+    const constant_address = try constant.register(preparedRequest(
+        "array",
+        .ptr,
+        .stack_object,
+        .stack_object_address,
+        .{ .form_scaled_address = .{
+            .result = try actionIdentity("derived-constant"),
+            .index = .{ .constant = 3 },
+            .scale = 4,
+        } },
+    ));
+    try constant.seal();
+    try constant.prepare();
+    try constant.materializeAll();
+    try constant.executePreparedAction(try constant.preparedView(constant_address));
+    try std.testing.expectEqual(
+        @as(u32, 60),
+        selector.values.get("derived-constant").?.loc.stack_i32_ptr.disp,
+    );
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try constant.rollback();
+}
+
+test "value-use byte-address actions support constant and named offsets with atomic multi-source failure" {
+    var machine = MachineFunction.init("value-use-byte-address-actions", .ptr);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "base", "offset", "constant-result", "named-result" }) |name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "base", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "offset", .{ .arg64 = .rsi });
+
+    var constant = try Transaction.begin(&selector);
+    defer constant.deinit();
+    const constant_action = try constant.register(preparedRequest(
+        "base",
+        .ptr,
+        .gpr64,
+        .pointer,
+        .{ .form_byte_address = .{
+            .result = try actionIdentity("constant-result"),
+            .offset = .{ .constant = 12 },
+        } },
+    ));
+    try constant.seal();
+    try constant.prepare();
+    try constant.materializeAll();
+    try constant.executePreparedAction(try constant.preparedView(constant_action));
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.values.get("constant-result").?.loc);
+    try constant.rollback();
+    try std.testing.expect(selector.values.get("constant-result") == null);
+
+    const initial_instruction_len = machine.instructions.items.len;
+    const initial_labels_len = machine.owned_labels.items.len;
+    try selector.eflags.apply(.definition);
+    var named = try Transaction.begin(&selector);
+    defer named.deinit();
+    const offset = try named.register(preparedSourceRequest(
+        "offset",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+    ));
+    const named_action = try named.register(preparedRequest(
+        "base",
+        .ptr,
+        .gpr64,
+        .pointer,
+        .{ .form_byte_address = .{
+            .result = try actionIdentity("named-result"),
+            .offset = .{ .request = offset },
+        } },
+    ));
+    try named.seal();
+    try named.prepare();
+    try named.materializeAll();
+    const named_lease = try named.preparedView(named_action);
+    try std.testing.expectError(error.EflagsClobberedWhileLive, named.executePreparedAction(named_lease));
+    try std.testing.expect(selector.values.get("named-result") == null);
+    try std.testing.expectEqual(ValueLoc{ .arg64 = .rdi }, selector.values.get("base").?.loc);
+    try std.testing.expectEqual(ValueLoc{ .arg64 = .rsi }, selector.values.get("offset").?.loc);
+    try std.testing.expectEqual(initial_instruction_len, machine.instructions.items.len);
+    try std.testing.expectEqual(initial_labels_len, machine.owned_labels.items.len);
+}
+
+test "value-use scaled-address action internally resolves both current homes" {
+    var machine = MachineFunction.init("value-use-scaled-address-action", .ptr);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "base", "index", "scaled-result" }) |name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "base", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "index", .{ .spill64 = .slot0 });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const index = try transaction.register(preparedSourceRequest(
+        "index",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+    ));
+    const address = try transaction.register(preparedRequest(
+        "base",
+        .ptr,
+        .gpr64,
+        .pointer,
+        .{ .form_scaled_address = .{
+            .result = try actionIdentity("scaled-result"),
+            .index = .{ .request = index },
+            .scale = 4,
+        } },
+    ));
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(address));
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.values.get("scaled-result").?.loc);
+    try std.testing.expect(machine.instructions.items.len >= 4);
+    try transaction.rollback();
+    try std.testing.expect(selector.values.get("scaled-result") == null);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use address actions include every physical destination in conflict and cycle planning" {
+    var machine = MachineFunction.init("value-use-address-action-plan", .ptr);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "base", "offset", "other" }) |name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "base", .{ .arg64 = .rcx });
+    try selector_state.bindValueLoc(&selector, "offset", .{ .arg64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "other", .{ .arg64 = .rdi });
+
+    var cycle = try Transaction.begin(&selector);
+    defer cycle.deinit();
+    const cycle_offset = try cycle.register(preparedSourceRequest(
+        "offset",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+    ));
+    _ = try cycle.register(preparedRequest(
+        "base",
+        .ptr,
+        .gpr64,
+        .pointer,
+        .{ .form_byte_address = .{
+            .result = try actionIdentity("cycle-result"),
+            .offset = .{ .request = cycle_offset },
+        } },
+    ));
+    try std.testing.expectError(error.ValueUseCopyCycleRequiresO4, cycle.seal());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+
+    var conflict = try Transaction.begin(&selector);
+    defer conflict.deinit();
+    _ = try conflict.register(preparedRequest(
+        "base",
+        .ptr,
+        .gpr64,
+        .pointer,
+        .{ .form_byte_address = .{
+            .result = try actionIdentity("conflict-result"),
+            .offset = .{ .constant = 4 },
+        } },
+    ));
+    _ = try conflict.register(request(
+        "other",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .gpr64 = .rcx },
+    ));
+    try std.testing.expectError(error.ValueUseConflictingDestination, conflict.seal());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+
+    var malformed = try Transaction.begin(&selector);
+    defer malformed.deinit();
+    try std.testing.expectError(error.ValueUseEmptyIdentity, malformed.register(preparedRequest(
+        "base",
+        .ptr,
+        .gpr64,
+        .pointer,
+        .{ .form_byte_address = .{
+            .result = .{},
+            .offset = .{ .constant = 0 },
+        } },
+    )));
+}
+
+test "value-use readonly-table address action owns semantic symbol and committed result" {
+    var machine = MachineFunction.init("value-use-table-address-action", .ptr);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "index", "table-result" }) |name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "index", .{ .arg64 = .rdi });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const action = try transaction.register(preparedRequest(
+        "index",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .form_readonly_table_address = .{
+            .result = try actionIdentity("table-result"),
+            .symbol = try actionIdentity("@readonly-table"),
+            .shape = .i16_128,
+            .scale = 2,
+        } },
+    ));
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(action));
+    const table = selector.values.get("table-result").?.loc.readonly_table_ptr;
+    try std.testing.expectEqual(selector_types.ArgReg.rcx, table.storage.reg);
+    try std.testing.expect(std.mem.eql(u8, "@readonly-table", table.symbol));
+    try std.testing.expect(table.shape == .i16_128);
+    try transaction.commit();
+    try std.testing.expectEqual(@as(usize, 2), machine.owned_labels.items.len);
+    try std.testing.expect(machine.instructions.items.len >= 4);
 }
