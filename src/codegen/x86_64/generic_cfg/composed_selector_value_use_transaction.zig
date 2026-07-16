@@ -10,6 +10,7 @@ const address_dependencies = @import("composed_selector_address_dependencies.zig
 const eflags = @import("composed_selector_eflags.zig");
 const constant_table = @import("../constant_table.zig");
 const aggregate_object = @import("aggregate_object.zig");
+const composed_helpers = @import("composed_helpers.zig");
 
 const ArgReg = x86_64_types.ArgReg;
 const FrameIndex = x86_64_types.FrameIndex;
@@ -47,6 +48,7 @@ pub const ValueUseTransaction = struct {
     early_home_valid: [max_requests]bool = [_]bool{false} ** max_requests,
     prepared_views: [max_requests]PreparedRecord = undefined,
     prepared_view_valid: [max_requests]bool = [_]bool{false} ** max_requests,
+    switch_boundary_applied: [max_requests]bool = [_]bool{false} ** max_requests,
     view_generation: u32 = 1,
 
     pub const Expected = struct {
@@ -71,6 +73,12 @@ pub const ValueUseTransaction = struct {
         stack_object_address,
         pair_low_high,
         pair_high_low,
+        /// Exact legacy branch-condition homes only. This is intentionally
+        /// narrower than the generic semantic low32 relation.
+        branch_condition,
+        /// Exact legacy compare-chain switch homes, including the read-only
+        /// low limb of an existing pair and an action-owned immediate.
+        switch_condition,
         stack_argument,
         new_pair_ownership,
     };
@@ -207,6 +215,69 @@ pub const ValueUseTransaction = struct {
         destination: RequestHandle,
     };
 
+    pub const max_switch_cases = 8;
+
+    pub const SwitchCaseIntent = struct {
+        value: i32,
+        target: []const u8,
+    };
+
+    /// Fixed-owned compare-chain semantics. Input target slices are copied by
+    /// init; no borrowed case/target storage survives registration.
+    pub const SwitchCompareChainAction = struct {
+        bits: u8,
+        case_count: u8,
+        case_values: [max_switch_cases]i32 = [_]i32{0} ** max_switch_cases,
+        case_targets: [max_switch_cases]ActionIdentity = [_]ActionIdentity{.{}} ** max_switch_cases,
+        default_target: ActionIdentity,
+        exhaustive_case: ?u8 = null,
+
+        pub fn init(
+            bits: u8,
+            cases: []const SwitchCaseIntent,
+            default_target: []const u8,
+            exhaustive_case: ?u8,
+        ) !SwitchCompareChainAction {
+            if (bits == 0 or bits > 32) return error.ValueUseSwitchWidthUnsupported;
+            if (cases.len == 0 or cases.len > max_switch_cases)
+                return error.ValueUseSwitchCaseCountUnsupported;
+            var result = SwitchCompareChainAction{
+                .bits = bits,
+                .case_count = @intCast(cases.len),
+                .default_target = try ActionIdentity.init(default_target),
+                .exhaustive_case = exhaustive_case,
+            };
+            for (cases, 0..) |case, index| {
+                for (result.case_values[0..index]) |previous| {
+                    if (previous == case.value) return error.ValueUseSwitchDuplicateCase;
+                }
+                result.case_values[index] = case.value;
+                result.case_targets[index] = try ActionIdentity.init(case.target);
+            }
+            if (exhaustive_case) |index| {
+                if (index >= cases.len) return error.ValueUseSwitchExhaustiveCaseOutOfRange;
+            }
+            return result;
+        }
+
+        fn validate(action: *const SwitchCompareChainAction) !void {
+            if (action.bits == 0 or action.bits > 32) return error.ValueUseSwitchWidthUnsupported;
+            if (action.case_count == 0 or action.case_count > max_switch_cases)
+                return error.ValueUseSwitchCaseCountUnsupported;
+            try action.default_target.validate();
+            for (0..action.case_count) |index| {
+                try action.case_targets[index].validate();
+                for (action.case_values[0..index]) |previous| {
+                    if (previous == action.case_values[index])
+                        return error.ValueUseSwitchDuplicateCase;
+                }
+            }
+            if (action.exhaustive_case) |index| {
+                if (index >= action.case_count) return error.ValueUseSwitchExhaustiveCaseOutOfRange;
+            }
+        }
+    };
+
     /// A complete, typed operation over a prepared source. This descriptor is
     /// registered before seal, so every physical destination participates in
     /// conflict, preservation, and cycle planning. No variant exposes source
@@ -221,6 +292,8 @@ pub const ValueUseTransaction = struct {
         store_immediate: StoreImmediateAction,
         store_i64: StoreI64Action,
         store_stack_pointer: StoreStackPointerAction,
+        branch_condition,
+        switch_compare_chain: SwitchCompareChainAction,
 
         fn eql(action: PreparedAction, other: PreparedAction) bool {
             return std.meta.eql(action, other);
@@ -318,6 +391,16 @@ pub const ValueUseTransaction = struct {
         second: PreparedPairLimb,
     };
 
+    const PreparedCondition = union(enum) {
+        eax,
+        rax_low32,
+        register32: ArgReg,
+        register64_low32: ArgReg,
+        pair_low32: ArgReg,
+        spill_low32: FrameIndex,
+        immediate: i32,
+    };
+
     /// Restricted source-derived representation. No raw ValueLoc, binding, or
     /// borrowed identity escapes the instruction-level authority.
     const PreparedView = union(enum) {
@@ -328,6 +411,7 @@ pub const ValueUseTransaction = struct {
         stack_f32_pair_address: PreparedStackF32PairAddress,
         table_pointer: PreparedTablePointer,
         read_only_pair: PreparedReadOnlyPair,
+        condition: PreparedCondition,
     };
 
     const PreparedRecord = struct {
@@ -406,14 +490,16 @@ pub const ValueUseTransaction = struct {
 
     const Source = union(enum) {
         named: Identity,
+        int: i128,
         null_value,
         unsupported,
 
         fn from(input: ir.Value) !Source {
             return switch (input) {
                 .named => |name| .{ .named = try Identity.init(name) },
+                .int => |integer| .{ .int = integer },
                 .null_value => .null_value,
-                .int, .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => .unsupported,
+                .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => .unsupported,
             };
         }
 
@@ -421,6 +507,7 @@ pub const ValueUseTransaction = struct {
             if (std.meta.activeTag(source.*) != std.meta.activeTag(other.*)) return false;
             return switch (source.*) {
                 .named => |*name| name.eql(&other.named),
+                .int => |integer| integer == other.int,
                 .null_value, .unsupported => true,
             };
         }
@@ -428,6 +515,7 @@ pub const ValueUseTransaction = struct {
         fn value(source: *const Source) ir.Value {
             return switch (source.*) {
                 .named => |*name| .{ .named = name.slice() },
+                .int => |integer| .{ .int = integer },
                 .null_value => .null_value,
                 .unsupported => .undef,
             };
@@ -460,10 +548,16 @@ pub const ValueUseTransaction = struct {
         assignment: stage2_planning.SpillSlotAssignment,
     };
 
+    const PhiDestinationEntry = struct {
+        name: []const u8,
+        loc: ValueLoc,
+    };
+
     const Snapshot = struct {
         instruction_len: usize,
         values: []ValueEntry,
         spill_slots: []SpillEntry,
+        phi_destinations: []PhiDestinationEntry,
         next_virtual_reg: usize,
         next_spill_slot: usize,
         edge_label_count: usize,
@@ -484,6 +578,8 @@ pub const ValueUseTransaction = struct {
             errdefer selector.allocator.free(values);
             const spill_slots = try selector.allocator.alloc(SpillEntry, selector.spill_slots.count());
             errdefer selector.allocator.free(spill_slots);
+            const phi_destinations = try selector.allocator.alloc(PhiDestinationEntry, selector.phi_destinations.count());
+            errdefer selector.allocator.free(phi_destinations);
 
             var value_index: usize = 0;
             var value_it = selector.values.iterator();
@@ -495,10 +591,16 @@ pub const ValueUseTransaction = struct {
             while (spill_it.next()) |entry| : (spill_index += 1) {
                 spill_slots[spill_index] = .{ .name = entry.key_ptr.*, .assignment = entry.value_ptr.* };
             }
+            var phi_index: usize = 0;
+            var phi_it = selector.phi_destinations.iterator();
+            while (phi_it.next()) |entry| : (phi_index += 1) {
+                phi_destinations[phi_index] = .{ .name = entry.key_ptr.*, .loc = entry.value_ptr.* };
+            }
             return .{
                 .instruction_len = selector.machine.instructions.items.len,
                 .values = values,
                 .spill_slots = spill_slots,
+                .phi_destinations = phi_destinations,
                 .next_virtual_reg = selector.next_virtual_reg,
                 .next_spill_slot = selector.next_spill_slot,
                 .edge_label_count = selector.edge_label_count,
@@ -530,6 +632,8 @@ pub const ValueUseTransaction = struct {
             for (snapshot.values) |entry| selector.values.putAssumeCapacity(entry.name, entry.binding);
             selector.spill_slots.clearRetainingCapacity();
             for (snapshot.spill_slots) |entry| selector.spill_slots.putAssumeCapacity(entry.name, entry.assignment);
+            selector.phi_destinations.clearRetainingCapacity();
+            for (snapshot.phi_destinations) |entry| selector.phi_destinations.putAssumeCapacity(entry.name, entry.loc);
             selector.next_virtual_reg = snapshot.next_virtual_reg;
             selector.next_spill_slot = snapshot.next_spill_slot;
             selector.edge_label_count = snapshot.edge_label_count;
@@ -546,6 +650,7 @@ pub const ValueUseTransaction = struct {
         }
 
         fn deinit(snapshot: *Snapshot, selector: *ComposedBlockSelector) void {
+            selector.allocator.free(snapshot.phi_destinations);
             selector.allocator.free(snapshot.spill_slots);
             selector.allocator.free(snapshot.values);
         }
@@ -619,7 +724,10 @@ pub const ValueUseTransaction = struct {
         var mapping_count: usize = 0;
 
         for (transaction.requests[0..transaction.request_count], 0..) |*request, request_index| {
-            const current = try transaction.validateRequest(request);
+            const deferred_switch = request.prepared_action != null and
+                request.prepared_action.? == .switch_compare_chain;
+            if (deferred_switch) try validateDeferredSwitchRequest(request);
+            const current = if (deferred_switch) null else try transaction.validateRequest(request);
             const destination_nodes = try requestDestinationNodes(transaction, request, current);
             for (destination_nodes.slice()) |destination_node| {
                 const node_index = @intFromEnum(destination_node);
@@ -654,6 +762,14 @@ pub const ValueUseTransaction = struct {
         if (transaction.request_phase != .sealed) return error.ValueUsePrepareBeforeSeal;
         errdefer transaction.rollbackInternal();
 
+        for (transaction.requests[0..transaction.request_count], 0..) |request, index| {
+            if (request.prepared_action != null and request.prepared_action.? == .switch_compare_chain and
+                !transaction.switch_boundary_applied[index])
+            {
+                return error.ValueUseSwitchBoundaryRequired;
+            }
+        }
+
         const saved_preserve = transaction.selector.preserve_current_position_values;
         transaction.selector.preserve_current_position_values = true;
         defer transaction.selector.preserve_current_position_values = saved_preserve;
@@ -666,7 +782,7 @@ pub const ValueUseTransaction = struct {
             if (request.form != .pointer and request.form != .stack_object_address) continue;
             const current = switch (request.source) {
                 .named => |*name| try transaction.resolveNamedCurrent(name.slice()),
-                .null_value, .unsupported => continue,
+                .int, .null_value, .unsupported => continue,
             };
             if (current == .stack_i32_ptr or current == .stack_scalar or current == .stack128 or current == .stack_i32_array) {
                 nodes[@intFromEnum(PhysicalNode.rcx)] = true;
@@ -682,6 +798,34 @@ pub const ValueUseTransaction = struct {
             try clobberPhysicalNode(transaction.selector, @enumFromInt(index));
         }
         transaction.request_phase = .prepared;
+    }
+
+    /// Applies the accepted ordinary-switch CFG boundary inside the existing
+    /// instruction authority. The switch condition is intentionally not
+    /// resolved during seal; this method performs the boundary first, then
+    /// validates the canonical post-boundary home.
+    pub fn applySwitchBoundary(
+        transaction: *ValueUseTransaction,
+        handle: RequestHandle,
+    ) !void {
+        try transaction.requireActive();
+        if (transaction.request_phase != .sealed) return error.ValueUseSwitchBoundaryPhase;
+        errdefer transaction.rollbackInternal();
+        const index = try transaction.validateHandle(handle);
+        _ = switch (transaction.requests[index].prepared_action orelse
+            return error.ValueUsePreparedActionMissing) {
+            .switch_compare_chain => |action| action,
+            else => return error.ValueUseSwitchBoundaryActionMismatch,
+        };
+        if (transaction.switch_boundary_applied[index]) return error.ValueUseSwitchBoundaryAlreadyApplied;
+
+        if (transaction.selector.stack_frame_bytes != 0) {
+            try selector_state.spillLiveValuesForCfgBoundary(transaction.selector);
+        } else {
+            try restoreSwitchDisplacedPhiDestinations(transaction.selector);
+        }
+        _ = try transaction.validateRequest(&transaction.requests[index]);
+        transaction.switch_boundary_applied[index] = true;
     }
 
     pub fn materializeAll(transaction: *ValueUseTransaction) !void {
@@ -786,6 +930,7 @@ pub const ValueUseTransaction = struct {
         transaction.resetSemanticOrderPlan();
         transaction.early_home_valid = [_]bool{false} ** max_requests;
         transaction.prepared_view_valid = [_]bool{false} ** max_requests;
+        transaction.switch_boundary_applied = [_]bool{false} ** max_requests;
         transaction.view_generation +%= 1;
         if (transaction.view_generation == 0) transaction.view_generation = 1;
         transaction.lifecycle = .rolled_back;
@@ -848,6 +993,8 @@ pub const ValueUseTransaction = struct {
                 const index = try transaction.validateRegisteredOperandHandle(store.destination);
                 try validateStoreStackObjectOperand(&transaction.requests[index]);
             },
+            .branch_condition => {},
+            .switch_compare_chain => |*switch_action| try switch_action.validate(),
         }
     }
 
@@ -890,7 +1037,13 @@ pub const ValueUseTransaction = struct {
             .store_scalar => |store| try transaction.validateOperandCanonical(store.pointer),
             .store_i64 => |store| try transaction.validateOperandCanonical(store.value),
             .store_stack_pointer => |store| try transaction.validateOperandCanonical(store.destination),
-            .validate_shape, .emit_copy_to, .form_readonly_table_address, .store_immediate => {},
+            .validate_shape,
+            .emit_copy_to,
+            .form_readonly_table_address,
+            .store_immediate,
+            .branch_condition,
+            .switch_compare_chain,
+            => {},
         }
     }
 
@@ -908,7 +1061,7 @@ pub const ValueUseTransaction = struct {
         const request = &transaction.requests[index];
         const name = switch (request.source) {
             .named => |*identity| identity.slice(),
-            .null_value, .unsupported => return,
+            .int, .null_value, .unsupported => return,
         };
         const binding = transaction.selector.values.get(name) orelse {
             if (try selector_state.valueIsLiveAfterCurrent(transaction.selector, name))
@@ -939,6 +1092,16 @@ pub const ValueUseTransaction = struct {
         try validateFormAndDestination(request);
         switch (request.source) {
             .unsupported => return error.ValueUseUnsupportedSource,
+            .int => |value| {
+                if (request.form != .switch_condition or request.prepared_action == null or
+                    request.prepared_action.? != .switch_compare_chain)
+                {
+                    return error.ValueUseUnsupportedSource;
+                }
+                try validateExpectedType(request.expected, request.form);
+                _ = std.math.cast(i32, value) orelse return error.ValueUseSwitchImmediateOutOfRange;
+                return null;
+            },
             .null_value => {
                 if (request.form != .pointer or request.expected.ty != .ptr or
                     (request.expected.register_class != .gpr64 and request.expected.register_class != .stack_pointer) or
@@ -1000,7 +1163,13 @@ pub const ValueUseTransaction = struct {
             .store_scalar => |store| try transaction.validateRegisteredOperandHandle(store.pointer),
             .store_i64 => |store| try transaction.validateRegisteredOperandHandle(store.value),
             .store_stack_pointer => |store| try transaction.validateRegisteredOperandHandle(store.destination),
-            .validate_shape, .emit_copy_to, .form_readonly_table_address, .store_immediate => null,
+            .validate_shape,
+            .emit_copy_to,
+            .form_readonly_table_address,
+            .store_immediate,
+            .branch_condition,
+            .switch_compare_chain,
+            => null,
         };
     }
 
@@ -1120,7 +1289,7 @@ pub const ValueUseTransaction = struct {
                 const request = &transaction.requests[request_index];
                 const current = switch (request.source) {
                     .named => try transaction.validateRequest(request) orelse null,
-                    .null_value, .unsupported => null,
+                    .int, .null_value, .unsupported => null,
                 };
                 if (current != null and earlySequencingCandidate(current.?, request.form)) {
                     operand_phase = .safe_early;
@@ -1217,7 +1386,7 @@ pub const ValueUseTransaction = struct {
             const request = &transaction.requests[index];
             const name = switch (request.source) {
                 .named => |*identity| identity.slice(),
-                .null_value, .unsupported => return error.ValueUseEarlySourceNotNamed,
+                .int, .null_value, .unsupported => return error.ValueUseEarlySourceNotNamed,
             };
             const binding = transaction.selector.values.get(name) orelse
                 return error.ValueUseUnresolvedSource;
@@ -1254,7 +1423,7 @@ pub const ValueUseTransaction = struct {
         const request = &transaction.requests[index];
         const name = switch (request.source) {
             .named => |*identity| identity.slice(),
-            .null_value, .unsupported => return error.ValueUseEarlySourceNotNamed,
+            .int, .null_value, .unsupported => return error.ValueUseEarlySourceNotNamed,
         };
         const binding = transaction.selector.values.get(name) orelse
             return error.ValueUseUnresolvedSource;
@@ -1279,6 +1448,7 @@ pub const ValueUseTransaction = struct {
                 try materializeNull(transaction.selector, request.destination);
                 return;
             },
+            .int => return error.ValueUseUnsupportedSource,
             .unsupported => return error.ValueUseUnsupportedSource,
         };
         try transaction.materializeRequestFromLoc(request, current, request.destination);
@@ -1295,7 +1465,7 @@ pub const ValueUseTransaction = struct {
             .gpr32 => try materializeScalar32(transaction.selector, current, destination),
             .gpr64 => try materializeScalar64(transaction.selector, current, destination),
             .pointer, .stack_object_address => try materializePointer(transaction.selector, current, destination),
-            .stack_f32_pair_byte_address => return error.ValueUsePreparedActionRequired,
+            .stack_f32_pair_byte_address, .branch_condition, .switch_condition => return error.ValueUsePreparedActionRequired,
             .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, destination),
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -1313,6 +1483,25 @@ pub const ValueUseTransaction = struct {
             return error.ValueUsePreparedViewMissing;
         const name = switch (request.source) {
             .named => |*identity| identity.slice(),
+            .int => |value| {
+                if (request.form != .switch_condition or request.prepared_action == null or
+                    request.prepared_action.? != .switch_compare_chain)
+                {
+                    return error.ValueUsePreparedViewUnsupported;
+                }
+                try validateExpectedType(request.expected, request.form);
+                const immediate = std.math.cast(i32, value) orelse
+                    return error.ValueUseSwitchImmediateOutOfRange;
+                return .{
+                    .view = .{ .condition = .{ .immediate = immediate } },
+                    .source_vreg = .{
+                        .index = std.math.maxInt(usize),
+                        .class = .gpr32,
+                        .bits = request.expected.ty.int,
+                    },
+                    .canonical_source_loc = .eax,
+                };
+            },
             else => return error.ValueUsePreparedViewUnsupported,
         };
         const binding = transaction.selector.values.get(name) orelse return error.ValueUseUnresolvedSource;
@@ -1351,9 +1540,22 @@ fn preparedViewFromLoc(
         .stack_f32_pair_byte_address => preparedStackF32PairAddressView(loc),
         .stack_object_address => preparedStackObjectView(loc),
         .pair_low_high, .pair_high_low => preparedPairView(loc, request.form),
+        .branch_condition, .switch_condition => preparedConditionView(loc),
         .stack_argument => error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
     };
+}
+
+fn preparedConditionView(loc: ValueLoc) !ValueUseTransaction.PreparedView {
+    return .{ .condition = switch (loc) {
+        .eax => .eax,
+        .rax => .rax_low32,
+        .arg32, .scratch32 => |reg| .{ .register32 = reg },
+        .arg64, .scratch64 => |reg| .{ .register64_low32 = reg },
+        .arg128, .scratch128 => |pair| .{ .pair_low32 = pair.lo },
+        .spill64 => |frame_index| .{ .spill_low32 = frame_index },
+        else => return error.ValueUseSourceViewMismatch,
+    } };
 }
 
 fn preparedStackF32PairAddressView(loc: ValueLoc) !ValueUseTransaction.PreparedView {
@@ -1503,8 +1705,12 @@ fn executePreparedActionInternal(
                 .gpr32 => try materializeScalar32(transaction.selector, current, target),
                 .gpr64 => try materializeScalar64(transaction.selector, current, target),
                 .pointer, .stack_object_address => try materializePointer(transaction.selector, current, target),
-                .stack_f32_pair_byte_address => return error.ValueUsePreparedActionFormMismatch,
-                .pair_low_high, .pair_high_low => return error.ValueUsePreparedActionFormMismatch,
+                .stack_f32_pair_byte_address,
+                .pair_low_high,
+                .pair_high_low,
+                .branch_condition,
+                .switch_condition,
+                => return error.ValueUsePreparedActionFormMismatch,
                 .stack_argument => return error.ValueUseStackArgumentUnsupported,
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
             }
@@ -1516,6 +1722,143 @@ fn executePreparedActionInternal(
         .store_immediate => |store| try executeStoreImmediate(transaction, view, store),
         .store_i64 => |store| try executeStoreI64(transaction, view, store),
         .store_stack_pointer => |store| try executeStoreStackPointer(transaction, view, store),
+        .branch_condition => try executeBranchCondition(transaction, view),
+        .switch_compare_chain => |switch_action| try executeSwitchCompareChain(transaction, view, &switch_action),
+    }
+}
+
+fn executeBranchCondition(
+    transaction: *ValueUseTransaction,
+    view: *const ValueUseTransaction.PreparedView,
+) !void {
+    const condition = switch (view.*) {
+        .condition => |condition| condition,
+        else => return error.ValueUseBranchConditionHomeUnsupported,
+    };
+    switch (condition) {
+        .eax => try selector_state.emitEflagsInstruction(
+            transaction.selector,
+            .test_eax_eax,
+            .definition,
+        ),
+        .register32 => |reg| try selector_state.emitEflagsInstruction(
+            transaction.selector,
+            .{ .test_arg8 = reg },
+            .definition,
+        ),
+        .spill_low32 => |frame_index| {
+            try clobberPhysicalNode(transaction.selector, .rcx);
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .reload_arg_rsp = .{ .reg = .rcx, .frame_index = frame_index },
+            });
+            try selector_state.emitEflagsInstruction(
+                transaction.selector,
+                .{ .test_arg8 = .rcx },
+                .definition,
+            );
+        },
+        .rax_low32,
+        .register64_low32,
+        .pair_low32,
+        .immediate,
+        => return error.ValueUseBranchConditionHomeUnsupported,
+    }
+}
+
+fn executeSwitchCompareChain(
+    transaction: *ValueUseTransaction,
+    view: *const ValueUseTransaction.PreparedView,
+    action: *const ValueUseTransaction.SwitchCompareChainAction,
+) !void {
+    var targets: [ValueUseTransaction.max_switch_cases][]const u8 = undefined;
+    for (0..action.case_count) |index|
+        targets[index] = try ownActionIdentity(transaction, &action.case_targets[index]);
+    const default_target = try ownActionIdentity(transaction, &action.default_target);
+
+    const condition = switch (view.*) {
+        .condition => |condition| condition,
+        else => return error.ValueUseSwitchConditionHomeUnsupported,
+    };
+    switch (condition) {
+        .eax, .rax_low32 => {},
+        .register32, .register64_low32, .pair_low32 => |reg| {
+            try clobberPhysicalNode(transaction.selector, .accumulator);
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .mov_arg_eax = reg,
+            });
+        },
+        .spill_low32 => |frame_index| {
+            try clobberPhysicalNode(transaction.selector, .accumulator);
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .reload_rsp_eax = frame_index,
+            });
+        },
+        .immediate => |value| {
+            try clobberPhysicalNode(transaction.selector, .accumulator);
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .mov_imm_eax = value,
+            });
+        },
+    }
+    if (action.bits < 32) try selector_state.emitEflagsInstruction(
+        transaction.selector,
+        .{ .and_eax_imm32 = switchConditionMask(action.bits) },
+        .write,
+    );
+    for (0..action.case_count) |index| {
+        if (action.exhaustive_case != null and action.exhaustive_case.? == index) continue;
+        try selector_state.emitEflagsInstruction(
+            transaction.selector,
+            .{ .cmp_eax_imm32 = action.case_values[index] },
+            .definition,
+        );
+        try selector_state.emitEflagsInstruction(
+            transaction.selector,
+            .{ .je = targets[index] },
+            .use,
+        );
+    }
+    try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+        .jmp = if (action.exhaustive_case) |index| targets[index] else default_target,
+    });
+}
+
+fn switchConditionMask(bits: u8) i32 {
+    std.debug.assert(bits > 0 and bits < 32);
+    const shift: u5 = @intCast(bits);
+    return @bitCast((@as(u32, 1) << shift) - 1);
+}
+
+fn validateDeferredSwitchRequest(request: *const ValueUseTransaction.StoredRequest) !void {
+    try validateFormAndDestination(request);
+    if (request.form != .switch_condition or request.destination != .prepared_view or
+        request.prepared_action == null or request.prepared_action.? != .switch_compare_chain)
+    {
+        return error.ValueUsePreparedActionFormMismatch;
+    }
+    try validateExpectedType(request.expected, .switch_condition);
+    switch (request.source) {
+        .named => {},
+        .int => |integer| {
+            _ = std.math.cast(i32, integer) orelse return error.ValueUseSwitchImmediateOutOfRange;
+        },
+        .null_value, .unsupported => return error.ValueUseUnsupportedSource,
+    }
+}
+
+fn restoreSwitchDisplacedPhiDestinations(selector: *ComposedBlockSelector) !void {
+    var it = selector.phi_destinations.iterator();
+    while (it.next()) |entry| {
+        const name = entry.key_ptr.*;
+        if (!try selector_state.valueIsLiveAfterCurrent(selector, name)) continue;
+        const destination = entry.value_ptr.*;
+        const actual = selector_state.valueLoc(selector, name) orelse
+            return error.ValueUseSwitchPhiDestinationMissing;
+        if (composed_helpers.valueLocEql(actual, destination)) continue;
+        const bits = selector_state.valueBits(selector, name) orelse
+            return error.ValueUseSwitchPhiDestinationBitsMissing;
+        try selector_state.materializeLocIntoLocWithBits(selector, actual, destination, bits);
+        try selector_state.bindValueLoc(selector, name, destination);
     }
 }
 
@@ -1950,7 +2293,7 @@ fn ownRegisteredOperandName(
     const index = try transaction.validateRegisteredOperandHandle(handle);
     const source = switch (transaction.requests[index].source) {
         .named => |*identity| identity.slice(),
-        .null_value, .unsupported => return error.ValueUseActionOperandNotNamed,
+        .int, .null_value, .unsupported => return error.ValueUseActionOperandNotNamed,
     };
     const owned = try transaction.selector.allocator.dupe(u8, source);
     errdefer transaction.selector.allocator.free(owned);
@@ -2041,7 +2384,7 @@ fn preparedViewLoc(view: *const ValueUseTransaction.PreparedView) !ValueLoc {
             .shape = table.shape,
             .offset = table.offset,
         } },
-        .read_only_pair => error.ValueUsePreparedActionFormMismatch,
+        .read_only_pair, .condition => error.ValueUsePreparedActionFormMismatch,
     };
 }
 
@@ -2067,6 +2410,7 @@ fn preparedViewEql(
         .stack_f32_pair_address => |value| std.meta.eql(value, rhs.stack_f32_pair_address),
         .table_pointer => |*value| preparedTablePointerEql(value, &rhs.table_pointer),
         .read_only_pair => |value| std.meta.eql(value, rhs.read_only_pair),
+        .condition => |value| std.meta.eql(value, rhs.condition),
     };
 }
 
@@ -2153,7 +2497,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
         if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
         return switch (request.form) {
             .gpr32, .gpr64, .pointer, .stack_object_address, .pair_low_high, .pair_high_low => {},
-            .stack_f32_pair_byte_address => error.ValueUsePreparedActionRequired,
+            .stack_f32_pair_byte_address, .branch_condition, .switch_condition => error.ValueUsePreparedActionRequired,
             .stack_argument => error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
         };
@@ -2161,7 +2505,16 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
     if (request.destination == .prepared_view) {
         const action = request.prepared_action orelse return error.ValueUsePreparedActionMissing;
         switch (request.form) {
-            .gpr32, .gpr64, .pointer, .stack_f32_pair_byte_address, .stack_object_address, .pair_low_high, .pair_high_low => {},
+            .gpr32,
+            .gpr64,
+            .pointer,
+            .stack_f32_pair_byte_address,
+            .stack_object_address,
+            .pair_low_high,
+            .pair_high_low,
+            .branch_condition,
+            .switch_condition,
+            => {},
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
         }
@@ -2185,6 +2538,10 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .store_stack_pointer => if (request.form != .stack_object_address or
                 request.expected.ty != .ptr or request.expected.register_class != .stack_object)
                 error.ValueUsePreparedActionFormMismatch,
+            .branch_condition => if (request.form != .branch_condition)
+                error.ValueUsePreparedActionFormMismatch,
+            .switch_compare_chain => if (request.form != .switch_condition)
+                error.ValueUsePreparedActionFormMismatch,
         };
     }
     if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
@@ -2192,7 +2549,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
         .gpr32 => request.destination == .gpr32 or request.destination == .eax,
         .gpr64 => request.destination == .gpr64 or request.destination == .rax,
         .pointer, .stack_object_address => request.destination == .gpr64 or request.destination == .rax,
-        .stack_f32_pair_byte_address => false,
+        .stack_f32_pair_byte_address, .branch_condition, .switch_condition => false,
         .pair_low_high, .pair_high_low => request.destination == .pair,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2211,6 +2568,30 @@ fn validateBindingCompatibility(
     request: *const ValueUseTransaction.StoredRequest,
     current: ValueLoc,
 ) !void {
+    if (request.form == .branch_condition) {
+        try validateExpectedType(request.expected, request.form);
+        if (binding.vreg.bits < 1) return error.ValueUseBranchConditionWidthMismatch;
+        const accepted = switch (current) {
+            .eax, .arg32, .scratch32 => binding.vreg.class == .gpr32,
+            .spill64 => binding.vreg.class == .gpr32 or binding.vreg.class == .gpr64,
+            else => false,
+        };
+        if (!accepted) return error.ValueUseBranchConditionHomeUnsupported;
+        return;
+    }
+    if (request.form == .switch_condition) {
+        try validateExpectedType(request.expected, request.form);
+        const bits = request.expected.ty.int;
+        if (binding.vreg.bits < bits) return error.ValueUseSwitchConditionWidthMismatch;
+        const accepted = switch (current) {
+            .eax, .arg32, .scratch32 => binding.vreg.class == .gpr32,
+            .arg64, .scratch64, .rax, .spill64 => binding.vreg.class == .gpr32 or binding.vreg.class == .gpr64,
+            .arg128, .scratch128 => binding.vreg.class == .gpr128,
+            else => false,
+        };
+        if (!accepted) return error.ValueUseSwitchConditionHomeUnsupported;
+        return;
+    }
     if (binding.vreg.class == request.expected.register_class) {
         try validateExpectedType(request.expected, request.form);
         return;
@@ -2264,6 +2645,13 @@ fn validateExpectedType(expected: ValueUseTransaction.Expected, form: ValueUseTr
         },
         .pair_low_high, .pair_high_low => if (!expected.ty.eql(.{ .int = 128 }) or expected.register_class != .gpr128)
             return error.ValueUseTypeMismatch,
+        .branch_condition => if (!expected.ty.eql(.{ .int = 1 }) or expected.register_class != .gpr32)
+            return error.ValueUseTypeMismatch,
+        .switch_condition => if (expected.ty != .int or expected.ty.int == 0 or
+            expected.ty.int > 32 or expected.register_class != .gpr32)
+        {
+            return error.ValueUseTypeMismatch;
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -2300,6 +2688,23 @@ fn validateSourceView(loc: ValueLoc, form: ValueUseTransaction.UseForm) !void {
             .aggregate_sse => return error.ValueUseAggregateUnsupported,
             else => return error.ValueUseSourceViewMismatch,
         },
+        .branch_condition => switch (loc) {
+            .eax, .arg32, .scratch32, .spill64 => {},
+            else => return error.ValueUseBranchConditionHomeUnsupported,
+        },
+        .switch_condition => switch (loc) {
+            .eax,
+            .rax,
+            .arg32,
+            .scratch32,
+            .arg64,
+            .scratch64,
+            .arg128,
+            .scratch128,
+            .spill64,
+            => {},
+            else => return error.ValueUseSwitchConditionHomeUnsupported,
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -2327,6 +2732,8 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: ValueUseTransaction.UseForm) 
         .stack_object_address,
         .pair_low_high,
         .pair_high_low,
+        .branch_condition,
+        .switch_condition,
         .stack_argument,
         .new_pair_ownership,
         => false,
@@ -2345,6 +2752,7 @@ fn earlySequencingCandidate(loc: ValueLoc, form: ValueUseTransaction.UseForm) bo
             .readonly_table_ptr => |ptr| ptr.storage == .spill,
             else => false,
         },
+        .branch_condition, .switch_condition => false,
         else => false,
     };
 }
@@ -2426,6 +2834,11 @@ fn requestDestinationNodes(
                 try result.append(.accumulator);
             },
             .store_stack_pointer => try result.append(.rcx),
+            .branch_condition => switch (current orelse return error.ValueUseUnresolvedSource) {
+                .spill64 => try result.append(.rcx),
+                else => {},
+            },
+            .switch_compare_chain => try result.append(.accumulator),
         },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2553,6 +2966,15 @@ fn requestMappings(
                 );
                 mappings.append(.{ .source = null, .destination = .rcx, .source_request_index = request_index });
             },
+            .branch_condition => switch (current orelse return error.ValueUseUnresolvedSource) {
+                .spill64 => mappings.append(.{
+                    .source = scalarSourceNode(current.?),
+                    .destination = .rcx,
+                    .source_request_index = request_index,
+                }),
+                else => {},
+            },
+            .switch_compare_chain => return mappings,
             .validate_shape, .emit_copy_to => {},
         }
         if (action != .emit_copy_to) return mappings;
@@ -2589,7 +3011,13 @@ fn requestMappings(
 
 fn actionOwnsOrderedWrites(action: ValueUseTransaction.PreparedAction) bool {
     return switch (action) {
-        .store_scalar, .store_immediate, .store_i64, .store_stack_pointer => true,
+        .store_scalar,
+        .store_immediate,
+        .store_i64,
+        .store_stack_pointer,
+        .branch_condition,
+        .switch_compare_chain,
+        => true,
         .validate_shape,
         .emit_copy_to,
         .form_byte_address,
@@ -2722,8 +3150,12 @@ fn validateCopyActionForm(
     const valid = switch (form) {
         .gpr32 => destination == .gpr32 or destination == .eax,
         .gpr64, .pointer, .stack_object_address => destination == .gpr64 or destination == .rax,
-        .stack_f32_pair_byte_address => false,
-        .pair_low_high, .pair_high_low => false,
+        .stack_f32_pair_byte_address,
+        .pair_low_high,
+        .pair_high_low,
+        .branch_condition,
+        .switch_condition,
+        => false,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     };
@@ -2839,6 +3271,7 @@ fn sourceStructuralOrder(
     if (@intFromEnum(lhs_tag) > @intFromEnum(rhs_tag)) return .gt;
     return switch (lhs.*) {
         .named => |*name| std.mem.order(u8, name.slice(), rhs.named.slice()),
+        .int => |integer| std.math.order(integer, rhs.int),
         .null_value, .unsupported => .eq,
     };
 }

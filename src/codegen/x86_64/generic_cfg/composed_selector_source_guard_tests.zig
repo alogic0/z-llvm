@@ -386,6 +386,12 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     }
     if (std.mem.indexOf(u8, source, ".validate_shape") != null)
         return error.ValueUsePreparedTestActionInProduction;
+    if (std.mem.indexOf(u8, source, ".branch_condition") != null or
+        std.mem.indexOf(u8, source, ".switch_condition") != null or
+        std.mem.indexOf(u8, source, ".switch_compare_chain") != null)
+    {
+        return error.ValueUseDormantBranchSwitchActionInProduction;
+    }
     try validateStoreActionProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
@@ -1444,6 +1450,23 @@ test "composed selector source guard freezes production store actions by functio
     try std.testing.expectError(
         error.ValueUseStoreActionAllowlistMismatch,
         validateStoreActionProductionSites("composed_selector_memory.zig", accepted ++ " fn extra() void { _ = .store_scalar; }"),
+    );
+}
+
+test "composed selector source guard keeps branch and switch actions dormant" {
+    try std.testing.expectError(
+        error.ValueUseDormantBranchSwitchActionInProduction,
+        validatePreparedViewLeafDiscipline(
+            "composed_selector_fixture.zig",
+            "fn lower() void { _ = .branch_condition; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseDormantBranchSwitchActionInProduction,
+        validatePreparedViewLeafDiscipline(
+            "composed_selector_fixture.zig",
+            "fn lower() void { _ = .switch_condition; _ = .switch_compare_chain; }",
+        ),
     );
 }
 
