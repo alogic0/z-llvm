@@ -19,6 +19,28 @@ count. The audit found zero unclassified sites and no ordinary EAX/RAX result
 producer outside `AccumulatorDefinitionTransaction`. Full enumeration:
 [INBOX-79 residual audit](inbox79_residual_accumulator_audit.md).
 
+## Enforcement-hardening follow-up
+
+The Reviewer-identified last-seen-function gap is closed. The guard now uses
+the Zig tokenizer plus balanced braces to identify the actual function body
+enclosing every direct operation and rejects operations outside all closed
+bodies. A normalized table of 46 exact function-body SHA-256 fingerprints is
+enforced for every residual and architectural-exclusion entry. This makes a
+same-count move to a different semantic branch fail closed instead of leaving
+`structural_role` as the only description of position.
+
+Focused guard validation passed 13/13. It retains the addition,
+cross-function relocation, reclassification, removal, and missing-future-slice
+negatives and adds same-function semantic-branch relocation plus
+outside-closed-body negatives. The full unit root passed 1091/1091 via
+`zig test src/tests.zig`.
+
+This bounded follow-up changes only
+`composed_selector_source_guard_tests.zig` plus documentation. It changes no
+production emitter, build step, canary implementation, mandatory runner, or
+Tier-3 infrastructure. No ABI, cohort, canary, Tier-2, or Tier-3 command was
+rerun; the frozen evidence below remains valid by construction.
+
 The guard fails closed on:
 
 - an added operation in an otherwise allowlisted function;
@@ -82,3 +104,8 @@ Frozen identities are exact: `49a19f04` / `443-285-158-truncl` /
 `061a64e4` / `5d91960e` / `167-17-101`. No Tier 3 was run. The standalone
 canaries were not promoted and 7B was not started. Stop for
 Supervisor/Reviewer acceptance of 7A.
+
+For 7B, the mandatory canary-mismatch negative must exercise the shared
+production validator used by the mandatory runner, without any runtime
+override for accepted hashes. This follow-up does not implement or promote
+that validator.

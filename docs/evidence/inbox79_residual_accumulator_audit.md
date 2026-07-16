@@ -14,10 +14,18 @@ The executable canonical inventory is
 `residual_accumulator_allowlist` in
 `composed_selector_source_guard_tests.zig`. Every entry records source file,
 enclosing function, operation, structural role, classification, owning future
-slice, and exact expected count. The validator discovers the enclosing
-function from source and requires an exact match; an added occurrence, a move
-to another function, a changed operation, or a removed occurrence fails
-closed.
+slice, and exact expected count. The hardened validator uses Zig tokenization
+and balanced braces to discover the actual body containing each occurrence;
+it does not retain a last-seen function declaration. An operation outside all
+closed function bodies fails closed.
+
+The normalized `residual_function_fingerprints` table adds 46 enforced
+SHA-256 anchors for the exact function bodies containing the 48 residual
+groups and 8 architectural-exclusion groups. Every allowlist entry must resolve
+to one of these anchors. Moving an operation to another semantic branch within
+the same function changes the body fingerprint even if its function-level
+operation count is unchanged. Missing, duplicate, malformed, mismatched, and
+orphaned fingerprints fail closed.
 
 ## Result
 
@@ -124,7 +132,8 @@ to the not-yet-authorized `pair_rdx_authority` slice:
 
 This makes the urem RDX result, full-product RAX/RDX, and every current direct
 pair-result binding explicit and relocation-sensitive rather than relying on a
-comment or a file-wide count.
+comment or a file-wide count. These exclusion functions use the same enforced
+body fingerprints as the residual accumulator inventory.
 
 ## Enforcement fixtures
 
@@ -132,9 +141,46 @@ White-box tests prove:
 
 - adding a second residual operation to an otherwise allowlisted function is
   rejected with `ResidualAccumulatorOccurrenceMismatch`;
+- removing an allowlisted operation is rejected with
+  `ResidualAccumulatorOccurrenceMismatch`;
 - relocating an allowlisted `bindValueLoc` operation to another function is
   rejected with `UnallowlistedResidualAccumulatorOperation`;
+- relocating an operation to a different branch within the same function,
+  while preserving its count, is rejected with
+  `ResidualFunctionFingerprintMismatch`;
+- placing an operation after the prior function's closing brace is rejected
+  with `ResidualAccumulatorOperationOutsideFunction` rather than attributed to
+  the prior declaration;
 - reclassifying an allowlisted clobber into a bind operation is rejected with
   `UnallowlistedResidualAccumulatorOperation`;
+- approving a pair/RDX exclusion without `pair_rdx_authority` ownership is
+  rejected with `ResidualExclusionMissingFutureSlice`;
 - the fully classified production tree passes the exact allowlists with zero
   unclassified sites.
+
+## INBOX-79 enforcement-hardening follow-up
+
+The focused guard validation passed all 13 source-guard tests, including the
+same-function semantic-branch relocation and outside-closed-body regressions:
+
+```text
+zig test src/inbox79_source_guard_focused.zig --test-filter 'composed selector source guard'
+All 13 tests passed.
+```
+
+`src/inbox79_source_guard_focused.zig` was a temporary project-root test shim
+used only to preserve the normal `src/` module boundary; it was removed before
+the final diff. The full unit root then passed without invoking the build
+step's ABI dependency:
+
+```text
+zig test src/tests.zig
+All 1091 tests passed.
+```
+
+The follow-up changes only
+`composed_selector_source_guard_tests.zig` and documentation. No production
+emitter, mandatory runner, canary, ABI, cohort, Tier-2, or Tier-3 path changed
+or ran. The accepted emission evidence therefore remains valid by
+construction, with frozen identities `49a19f04` / `443-285-158-truncl` /
+`061a64e4` / `5d91960e` / `167-17-101`.

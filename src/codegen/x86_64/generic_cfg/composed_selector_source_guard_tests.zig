@@ -175,6 +175,81 @@ const architectural_exclusion_allowlist = [_]ExclusionAllowlistEntry{
     .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .operation = .pair_result, .structural_role = "integer-to-i128 cast pair result", .future_slice = .pair_rdx_authority, .expected_count = 1 },
 };
 
+const FunctionFingerprint = struct {
+    source: []const u8,
+    function: []const u8,
+    body_sha256: []const u8,
+};
+
+// Each allowlisted operation is additionally anchored by the exact tokenized
+// function body that encloses it. Moving an operation between semantic
+// branches changes this fingerprint even when the function-level count holds.
+const residual_function_fingerprints = [_]FunctionFingerprint{
+    .{ .source = "composed_selector_aggregate.zig", .function = "lowerInsertValue", .body_sha256 = "fc92d603662eeb6958b5797a0343f1ef9ec785dd9afcba5b69d5948108a1cc05" },
+
+    .{ .source = "composed_selector_calls.zig", .function = "lowerFpAbs", .body_sha256 = "c6abc1b3e6db1cb525680f9fc387476665f04bb05e65faec8f0a959e0b5bfc68" },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerUnsignedOverflowI32", .body_sha256 = "bcecbf2dd58dcd1bea58a8e9be1e29487f8cf81d5b61b02541bb8c5d887bf4ae" },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerSmulOverflowI64", .body_sha256 = "7354791d4df4eba960278a7e0662130d91700494cb73b4c83233fcf662f76cb9" },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerCtpop", .body_sha256 = "386892044354332641c3184338b678f04aa018652f909cb27820bb82788fd66a" },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerBitPermutation", .body_sha256 = "498fb6091e5385483eb55a6b67d2c813fb7ce8a401c41f837a451adf1150a497" },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerAbsI128", .body_sha256 = "cf69f866c281db4b54bbeec420603927e57fc1b11220102ce0da5d2137296d79" },
+
+    .{ .source = "composed_selector_cfg.zig", .function = "lowerSelect", .body_sha256 = "7de55a040bf63ee1db4c709fde09ddf8c865a3dc6ba7ceadcd3677520937a5f1" },
+    .{ .source = "composed_selector_cfg.zig", .function = "emitScalarSelectValue", .body_sha256 = "3cfedbd0e4c15ed10dbf266fcc09854fcc0a183f9eb6367f21c5a2a17832143a" },
+    .{ .source = "composed_selector_cfg.zig", .function = "restoreDisplacedPhiDestinations", .body_sha256 = "894606b792624924e37c003cc311cb06ab16632b91d88a242c802dbbd8d3c557" },
+    .{ .source = "composed_selector_cfg.zig", .function = "emitPhiEdgeMoves", .body_sha256 = "01698460d35fe4d18ab53ffd9b16d92f778625d29c4d9dde5d16b41251311d70" },
+    .{ .source = "composed_selector_cfg.zig", .function = "materializeScalarPhiSnapshot", .body_sha256 = "b4362e002bdf4d9d26b75e6c054c0294250fbe894a34c42e4ad4b542d8a75616" },
+    .{ .source = "composed_selector_cfg.zig", .function = "emitValueIntoLoc", .body_sha256 = "d2a8cdd3327dca52cf55a1bc5825b5b5e3210dad426c33073233d4a2ea00de3c" },
+
+    .{ .source = "composed_selector_conversion.zig", .function = "lowerUnsignedI64", .body_sha256 = "5529a412ec2efd88d5155aa6042341963928853fd75dc01ca9f5f897a391d941" },
+    .{ .source = "composed_selector_conversion.zig", .function = "lowerWideInteger", .body_sha256 = "1156e47aa1ca42b16dc2abd52f99caf2ad2ad3dcec871fea124b873023a49dad" },
+
+    .{ .source = "composed_selector_fp.zig", .function = "lowerHalfFadd", .body_sha256 = "017cf5df4a1e73f5b342c9f2714c952b3479cffb13b662ec9291b34cfa3e3fb0" },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerCopySign", .body_sha256 = "3cc9a52f65a3ae0aa7a02f815c529662218ab923b2658aa8d8530937a2fee831" },
+    .{ .source = "composed_selector_fp.zig", .function = "materializeFpValue", .body_sha256 = "0127e07639dabb6ece03faf1cc240af3547904a1124fe2a4ed76a6f52e136645" },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerFcmp", .body_sha256 = "fa502ad214048f3afb55e11dd87872af687fef9816470ea4c59ee34840665484" },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerHalfOeqZero", .body_sha256 = "de1f42d09aebc6de4e9f5c35aeb59330f2e6871443d66e0b870eb46df603aeb5" },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerHalfFcmp", .body_sha256 = "e429cc984c62e169d1d294144f8fb330aa6c4fc6b2fc8e7aec4ab2b40bdf194b" },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerFpIntBitcast", .body_sha256 = "f02eefad53336dd24e5261f34f6a19e7011849404e3ea3932b822db9780e4012" },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerFloatToHalf", .body_sha256 = "ee1a865fa09595be9ac940a938d7ec3b5996b25a835a92afa7b17fbb72016960" },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerHalfExtension", .body_sha256 = "86cd446354c4986acf2cc70c24d18f69f054f2a38703ab9ee7f2e47ae1e6be2c" },
+
+    .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .body_sha256 = "a8bcdf56e974a472cccd313a71889df9c6724bd7db069754dbb15556f166516c" },
+
+    .{ .source = "composed_selector_impl.zig", .function = "bindParams", .body_sha256 = "7c01485e0ef99b02379254f22843a201d6e020ad7d020587ee6f0c8158ad7afb" },
+    .{ .source = "composed_selector_impl.zig", .function = "bindPhiResults", .body_sha256 = "9b28317ec222e3cfab3bba08a458b2168ff1cf7c3266edda61536781a8e47c0c" },
+    .{ .source = "composed_selector_impl.zig", .function = "stabilizeFramedPhiDestinations", .body_sha256 = "84522a7d762d08de43dcffc4c9284f642605be75b0078f0bf74516df20f1196f" },
+    .{ .source = "composed_selector_impl.zig", .function = "enterBlock", .body_sha256 = "edb2e130813a5ca0847f5e5060f9088d196db18deaec281dbd95a58b7db92b1f" },
+
+    .{ .source = "composed_selector_memory.zig", .function = "lowerLoad", .body_sha256 = "22736bb4f166cedae30f077d2f5a8daeccc8293a83f016401b092b595bbd1526" },
+    .{ .source = "composed_selector_memory.zig", .function = "lowerStoreFp", .body_sha256 = "08773e5639dfcc22a932d0a4d702bbe8ff4b3ecb5e398c3b06a9de056fb8a81d" },
+    .{ .source = "composed_selector_memory.zig", .function = "lowerGep", .body_sha256 = "27fb6d9820346eb3b3e20aae1a9abb29875a9a6df30f9b793dc016d723dcd203" },
+    .{ .source = "composed_selector_memory.zig", .function = "lowerI32ElementPointerGep", .body_sha256 = "63a8f52f1abf750d00286104d79577d6a39cb4c1e50209b740ecd5ac86d523b3" },
+    .{ .source = "composed_selector_memory.zig", .function = "lowerBytePointerGep", .body_sha256 = "2b3a2e0da2ecbab1b40062000122d50a0943673d6feb968c22b7c2683ebfe863" },
+    .{ .source = "composed_selector_memory.zig", .function = "lowerReadOnlyTableGep", .body_sha256 = "1a62f83a6009ed69f9ef1cc4cd721fb525b4cc5082fc1a73c1f95a27ac33320b" },
+    .{ .source = "composed_selector_memory.zig", .function = "loadStackU64IntoRax", .body_sha256 = "3fd7fcf3653b5083f8123224f83a04abd16bbb7411dac2d4279079a74cf7648d" },
+
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .body_sha256 = "812d2dbcd2f2f85ec6861920eae1f8f8df4dde594329856b8feba6c4a5fa3a81" },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerFreeze", .body_sha256 = "110d9c541f057cdb2a9a350cb9c16a1f9eac811c9739ed6cda8826d614b70b84" },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerUnsignedRem", .body_sha256 = "8536b14d20e330bce4f1717f6dda9d3f6b663664507cf302d1e4d6a68fccf211" },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerBinaryImmediateLhs", .body_sha256 = "6db0334ddb212391cd4c3ee92e7aa6fe86768a2196e7235af1fef35a09919626" },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerPairBinary", .body_sha256 = "16f097aeb8b2391b7ab68a68810854781d3bcfee4c276645d37b7355442ee650" },
+
+    .{ .source = "composed_selector_vector.zig", .function = "lowerMask4ToI4", .body_sha256 = "f8cafdc8dcde25bd6f12129fe5c2c2db8cd5d64bb5897001b8e5a0e979eb10d4" },
+    .{ .source = "composed_selector_vector.zig", .function = "lowerI64x2ExtractElement", .body_sha256 = "fbda473e2f769f44c81efca8f83a3d7d214278ed3bcc32e8f9a4fbe982546aa4" },
+    .{ .source = "composed_selector_vector.zig", .function = "lowerMaskExtractElement", .body_sha256 = "41b65f6e152b0ef1d9f3181a06bc28ea6eff86b6bccf3c152b52282bf5b626da" },
+    .{ .source = "composed_selector_vector.zig", .function = "bindMaskScalarResult", .body_sha256 = "09ae0154e05f25471555c6a8c7c213f9879b128ff820693611199dac4afe36f1" },
+    .{ .source = "composed_selector_vector.zig", .function = "materializeLaneBits", .body_sha256 = "1da4969d92d741be7fe53dc07461046dee0acf56fd161e50c94e666863c5c639" },
+};
+
+const FunctionBody = struct {
+    name: []const u8,
+    start: usize,
+    end: usize,
+};
+
+const max_function_bodies = 256;
+
 fn validateCurrentTree(allocator: std.mem.Allocator) !void {
     const io = std.testing.io;
     var dir = try std.Io.Dir.cwd().openDir(io, source_dir, .{ .iterate = true });
@@ -192,7 +267,14 @@ fn validateCurrentTree(allocator: std.mem.Allocator) !void {
         seen[classification_index] = true;
         const path = try std.fs.path.join(allocator, &.{ source_dir, entry.name });
         defer allocator.free(path);
-        const source = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(2 * 1024 * 1024));
+        const source = try std.Io.Dir.cwd().readFileAllocOptions(
+            io,
+            path,
+            allocator,
+            .limited(2 * 1024 * 1024),
+            .of(u8),
+            0,
+        );
         defer allocator.free(source);
         try validateProductionSource(entry.name, source);
     }
@@ -202,14 +284,15 @@ fn validateCurrentTree(allocator: std.mem.Allocator) !void {
     }
 }
 
-fn validateProductionSource(name: []const u8, source: []const u8) !void {
+fn validateProductionSource(name: []const u8, source: [:0]const u8) !void {
     const index = classificationIndex(name) orelse return error.UnclassifiedComposedSelectorSource;
     switch (classified_sources[index].kind) {
         .authority => {},
         .lifecycle => try validateStateDataLifecycle(source),
         .consumer => {
             if (std.mem.indexOf(u8, source, ".values") != null) return error.RawSelectorValuesAccess;
-            try validateResidualAccumulatorAllowlist(&residual_accumulator_allowlist, name, source);
+            try validateFunctionFingerprintInventory(name, source);
+            try validateResidualAccumulatorAllowlist(&residual_accumulator_allowlist, &residual_function_fingerprints, name, source);
             try validateArchitecturalExclusionAllowlist(name, source);
             try validateAccumulatorDisplacementPolicies(source);
             try validateEflagsEmissionAuthority(name, source);
@@ -268,8 +351,9 @@ fn validateStateDataLifecycle(source: []const u8) !void {
 
 fn validateResidualAccumulatorAllowlist(
     allowlist: []const ResidualAllowlistEntry,
+    fingerprints: []const FunctionFingerprint,
     name: []const u8,
-    source: []const u8,
+    source: [:0]const u8,
 ) !void {
     if (allowlist.len > residual_accumulator_allowlist.len) return error.ResidualAllowlistTooLarge;
     for (allowlist, 0..) |entry, index| {
@@ -283,24 +367,26 @@ fn validateResidualAccumulatorAllowlist(
         }
     }
 
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
     var counts = [_]usize{0} ** residual_accumulator_allowlist.len;
-    var current_function: ?[]const u8 = null;
-    var lines = std.mem.splitScalar(u8, source, '\n');
-    while (lines.next()) |line| {
-        if (functionName(line)) |function| current_function = function;
-        for (std.meta.tags(DirectOperation)) |operation| {
-            const occurrences = std.mem.count(u8, line, operation.pattern());
-            if (occurrences == 0) continue;
-            const function = current_function orelse return error.ResidualAccumulatorOperationOutsideFunction;
-            const index = residualAllowlistIndex(allowlist, name, function, operation) orelse
+    for (std.meta.tags(DirectOperation)) |operation| {
+        var search_from: usize = 0;
+        while (std.mem.indexOfPos(u8, source, search_from, operation.pattern())) |operation_offset| {
+            const body = functionBodyContaining(bodies, operation_offset) orelse
+                return error.ResidualAccumulatorOperationOutsideFunction;
+            const index = residualAllowlistIndex(allowlist, name, body.name, operation) orelse
                 return error.UnallowlistedResidualAccumulatorOperation;
-            counts[index] += occurrences;
+            counts[index] += 1;
+            search_from = operation_offset + operation.pattern().len;
         }
     }
 
     for (allowlist, 0..) |entry, index| {
         if (!std.mem.eql(u8, entry.source, name)) continue;
         if (counts[index] != entry.expected_count) return error.ResidualAccumulatorOccurrenceMismatch;
+        const body = functionBodyNamed(bodies, entry.function) orelse return error.ResidualAllowlistedFunctionMissing;
+        try validateFunctionBodyFingerprint(fingerprints, name, body, source);
         if (entry.classification == .approved_pair_rdx_exclusion and entry.future_slice != .pair_rdx_authority) {
             return error.ResidualExclusionMissingFutureSlice;
         }
@@ -311,16 +397,176 @@ fn validateResidualAccumulatorAllowlist(
     }
 }
 
-fn functionName(line: []const u8) ?[]const u8 {
-    const trimmed = std.mem.trimStart(u8, line, " \t");
-    const prefixes = [_][]const u8{ "pub inline fn ", "inline fn ", "pub fn ", "fn " };
-    for (prefixes) |prefix| {
-        if (!std.mem.startsWith(u8, trimmed, prefix)) continue;
-        const rest = trimmed[prefix.len..];
-        const end = std.mem.indexOfScalar(u8, rest, '(') orelse return null;
-        return rest[0..end];
+fn collectFunctionBodies(source: [:0]const u8, storage: *[max_function_bodies]FunctionBody) ![]const FunctionBody {
+    var count: usize = 0;
+    var tokenizer = std.zig.Tokenizer.init(source);
+    while (true) {
+        const token = tokenizer.next();
+        switch (token.tag) {
+            .eof => return storage[0..count],
+            .invalid, .invalid_periodasterisks => return error.InvalidZigSource,
+            .keyword_fn => {},
+            else => continue,
+        }
+
+        const name_token = tokenizer.next();
+        if (name_token.tag != .identifier) continue;
+        const function_name = source[name_token.loc.start..name_token.loc.end];
+        var paren_depth: usize = 0;
+        var bracket_depth: usize = 0;
+        var signature_brace_depth: usize = 0;
+        var next_brace_is_type = false;
+        while (true) {
+            const signature_token = tokenizer.next();
+            switch (signature_token.tag) {
+                .eof => return error.UnclosedFunctionDeclaration,
+                .invalid, .invalid_periodasterisks => return error.InvalidZigSource,
+                .l_paren => paren_depth += 1,
+                .r_paren => {
+                    if (paren_depth == 0) return error.MalformedFunctionDeclaration;
+                    paren_depth -= 1;
+                },
+                .l_bracket => bracket_depth += 1,
+                .r_bracket => {
+                    if (bracket_depth == 0) return error.MalformedFunctionDeclaration;
+                    bracket_depth -= 1;
+                },
+                .keyword_error, .keyword_struct, .keyword_union, .keyword_enum, .keyword_opaque => next_brace_is_type = true,
+                .l_brace => {
+                    if (paren_depth != 0 or bracket_depth != 0 or signature_brace_depth != 0 or next_brace_is_type) {
+                        signature_brace_depth += 1;
+                        next_brace_is_type = false;
+                        continue;
+                    }
+                    if (count == storage.len) return error.TooManyFunctionBodies;
+                    var body_depth: usize = 1;
+                    while (body_depth != 0) {
+                        const body_token = tokenizer.next();
+                        switch (body_token.tag) {
+                            .eof => return error.UnclosedFunctionBody,
+                            .invalid, .invalid_periodasterisks => return error.InvalidZigSource,
+                            .l_brace => body_depth += 1,
+                            .r_brace => {
+                                body_depth -= 1;
+                                if (body_depth == 0) {
+                                    storage[count] = .{
+                                        .name = function_name,
+                                        .start = signature_token.loc.start,
+                                        .end = body_token.loc.end,
+                                    };
+                                    count += 1;
+                                }
+                            },
+                            else => {},
+                        }
+                    }
+                    break;
+                },
+                .r_brace => {
+                    if (signature_brace_depth == 0) return error.MalformedFunctionDeclaration;
+                    signature_brace_depth -= 1;
+                },
+                .semicolon => if (paren_depth == 0 and bracket_depth == 0 and signature_brace_depth == 0) break,
+                else => next_brace_is_type = false,
+            }
+        }
+    }
+}
+
+fn functionBodyContaining(bodies: []const FunctionBody, offset: usize) ?FunctionBody {
+    for (bodies) |body| {
+        if (offset > body.start and offset < body.end) return body;
     }
     return null;
+}
+
+fn functionBodyNamed(bodies: []const FunctionBody, name: []const u8) ?FunctionBody {
+    for (bodies) |body| {
+        if (std.mem.eql(u8, body.name, name)) return body;
+    }
+    return null;
+}
+
+fn validateFunctionBodyFingerprint(
+    fingerprints: []const FunctionFingerprint,
+    source_name: []const u8,
+    body: FunctionBody,
+    source: []const u8,
+) !void {
+    const expected = functionFingerprint(fingerprints, source_name, body.name) orelse
+        return error.ResidualFunctionFingerprintMissing;
+    if (expected.len != std.crypto.hash.sha2.Sha256.digest_length * 2) return error.MalformedResidualFunctionFingerprint;
+    const actual = functionBodyFingerprint(source, body);
+    if (!std.mem.eql(u8, &actual, expected)) return error.ResidualFunctionFingerprintMismatch;
+}
+
+fn functionBodyFingerprint(source: []const u8, body: FunctionBody) [std.crypto.hash.sha2.Sha256.digest_length * 2]u8 {
+    var digest: [std.crypto.hash.sha2.Sha256.digest_length]u8 = undefined;
+    std.crypto.hash.sha2.Sha256.hash(source[body.start..body.end], &digest, .{});
+    return std.fmt.bytesToHex(digest, .lower);
+}
+
+fn fixtureFunctionFingerprint(
+    source_name: []const u8,
+    function: []const u8,
+    source: [:0]const u8,
+    storage: *[std.crypto.hash.sha2.Sha256.digest_length * 2]u8,
+) !FunctionFingerprint {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const body = functionBodyNamed(bodies, function) orelse return error.FixtureFunctionMissing;
+    storage.* = functionBodyFingerprint(source, body);
+    return .{
+        .source = source_name,
+        .function = function,
+        .body_sha256 = storage,
+    };
+}
+
+fn validateFunctionFingerprintInventory(source_name: []const u8, source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    for (residual_function_fingerprints, 0..) |fingerprint, index| {
+        if (!std.mem.eql(u8, fingerprint.source, source_name)) continue;
+        for (residual_function_fingerprints[0..index]) |prior| {
+            if (std.mem.eql(u8, prior.source, fingerprint.source) and
+                std.mem.eql(u8, prior.function, fingerprint.function))
+            {
+                return error.DuplicateResidualFunctionFingerprint;
+            }
+        }
+        if (!functionHasAllowlistedOperation(source_name, fingerprint.function)) {
+            return error.OrphanResidualFunctionFingerprint;
+        }
+        const body = functionBodyNamed(bodies, fingerprint.function) orelse
+            return error.ResidualAllowlistedFunctionMissing;
+        try validateFunctionBodyFingerprint(&residual_function_fingerprints, source_name, body, source);
+    }
+}
+
+fn functionHasAllowlistedOperation(source: []const u8, function: []const u8) bool {
+    for (residual_accumulator_allowlist) |entry| {
+        if (std.mem.eql(u8, entry.source, source) and std.mem.eql(u8, entry.function, function)) return true;
+    }
+    for (architectural_exclusion_allowlist) |entry| {
+        if (std.mem.eql(u8, entry.source, source) and std.mem.eql(u8, entry.function, function)) return true;
+    }
+    return false;
+}
+
+fn functionFingerprint(
+    fingerprints: []const FunctionFingerprint,
+    source: []const u8,
+    function: []const u8,
+) ?[]const u8 {
+    var result: ?[]const u8 = null;
+    for (fingerprints) |fingerprint| {
+        if (!std.mem.eql(u8, fingerprint.source, source) or
+            !std.mem.eql(u8, fingerprint.function, function)) continue;
+        if (result != null) return null;
+        result = fingerprint.body_sha256;
+    }
+    return result;
 }
 
 fn residualAllowlistIndex(
@@ -337,25 +583,27 @@ fn residualAllowlistIndex(
     return null;
 }
 
-fn validateArchitecturalExclusionAllowlist(name: []const u8, source: []const u8) !void {
+fn validateArchitecturalExclusionAllowlist(name: []const u8, source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
     var counts = [_]usize{0} ** architectural_exclusion_allowlist.len;
-    var current_function: ?[]const u8 = null;
-    var lines = std.mem.splitScalar(u8, source, '\n');
-    while (lines.next()) |line| {
-        if (functionName(line)) |function| current_function = function;
-        for (std.meta.tags(ExclusionOperation)) |operation| {
-            const occurrences = std.mem.count(u8, line, operation.pattern());
-            if (occurrences == 0) continue;
-            const function = current_function orelse return error.ArchitecturalExclusionOutsideFunction;
-            const index = architecturalExclusionIndex(name, function, operation) orelse
+    for (std.meta.tags(ExclusionOperation)) |operation| {
+        var search_from: usize = 0;
+        while (std.mem.indexOfPos(u8, source, search_from, operation.pattern())) |operation_offset| {
+            const body = functionBodyContaining(bodies, operation_offset) orelse
+                return error.ArchitecturalExclusionOutsideFunction;
+            const index = architecturalExclusionIndex(name, body.name, operation) orelse
                 return error.UnallowlistedArchitecturalExclusion;
-            counts[index] += occurrences;
+            counts[index] += 1;
+            search_from = operation_offset + operation.pattern().len;
         }
     }
 
     for (architectural_exclusion_allowlist, 0..) |entry, index| {
         if (!std.mem.eql(u8, entry.source, name)) continue;
         if (counts[index] != entry.expected_count) return error.ArchitecturalExclusionOccurrenceMismatch;
+        const body = functionBodyNamed(bodies, entry.function) orelse return error.ArchitecturalExclusionFunctionMissing;
+        try validateFunctionBodyFingerprint(&residual_function_fingerprints, name, body, source);
         if (entry.future_slice != .pair_rdx_authority) return error.ArchitecturalExclusionMissingFutureSlice;
         if (entry.structural_role.len == 0) return error.ArchitecturalExclusionStructuralRoleMissing;
     }
@@ -421,7 +669,7 @@ fn isTestSource(name: []const u8) bool {
 }
 
 test "composed selector source guard rejects all raw map methods outside the authority" {
-    const fixtures = [_][]const u8{
+    const fixtures = [_][:0]const u8{
         "fn bad(selector: anytype) void { _ = selector.values.get(\"x\"); }",
         "fn bad(selector: anytype) void { var it = selector.values.iterator(); _ = &it; }",
         "fn bad(selector: anytype) void { selector.values.put(\"x\", undefined) catch unreachable; }",
@@ -458,8 +706,10 @@ test "composed selector source guard narrowly permits only state-data lifecycle 
 }
 
 test "composed selector source guard rejects residual accumulator additions" {
+    const source_name = "composed_selector_fixture.zig";
+    const accepted_source = "fn keep() void { selector_state.clobberAccumulator(undefined); }";
     const allowlist = [_]ResidualAllowlistEntry{.{
-        .source = "composed_selector_fixture.zig",
+        .source = source_name,
         .function = "keep",
         .operation = .clobber_accumulator,
         .structural_role = "fixture temporary",
@@ -467,24 +717,65 @@ test "composed selector source guard rejects residual accumulator additions" {
         .future_slice = .none,
         .expected_count = 1,
     }};
+    var fingerprint_storage: [std.crypto.hash.sha2.Sha256.digest_length * 2]u8 = undefined;
+    const fingerprints = [_]FunctionFingerprint{try fixtureFunctionFingerprint(
+        source_name,
+        "keep",
+        accepted_source,
+        &fingerprint_storage,
+    )};
     try validateResidualAccumulatorAllowlist(
         &allowlist,
-        "composed_selector_fixture.zig",
-        "fn keep() void { selector_state.clobberAccumulator(undefined); }",
+        &fingerprints,
+        source_name,
+        accepted_source,
     );
     try std.testing.expectError(
         error.ResidualAccumulatorOccurrenceMismatch,
         validateResidualAccumulatorAllowlist(
             &allowlist,
-            "composed_selector_fixture.zig",
+            &fingerprints,
+            source_name,
             "fn keep() void { selector_state.clobberAccumulator(undefined); selector_state.clobberAccumulator(undefined); }",
         ),
     );
 }
 
-test "composed selector source guard rejects residual accumulator relocation" {
+test "composed selector source guard rejects residual accumulator removal" {
+    const source_name = "composed_selector_fixture.zig";
+    const accepted_source = "fn keep() void { selector_state.clobberAccumulator(undefined); }";
     const allowlist = [_]ResidualAllowlistEntry{.{
-        .source = "composed_selector_fixture.zig",
+        .source = source_name,
+        .function = "keep",
+        .operation = .clobber_accumulator,
+        .structural_role = "fixture temporary",
+        .classification = .internal_temporary,
+        .future_slice = .none,
+        .expected_count = 1,
+    }};
+    var fingerprint_storage: [std.crypto.hash.sha2.Sha256.digest_length * 2]u8 = undefined;
+    const fingerprints = [_]FunctionFingerprint{try fixtureFunctionFingerprint(
+        source_name,
+        "keep",
+        accepted_source,
+        &fingerprint_storage,
+    )};
+    try std.testing.expectError(
+        error.ResidualAccumulatorOccurrenceMismatch,
+        validateResidualAccumulatorAllowlist(
+            &allowlist,
+            &fingerprints,
+            source_name,
+            "fn keep() void {}",
+        ),
+    );
+}
+
+test "composed selector source guard rejects cross-function residual accumulator relocation" {
+    const source_name = "composed_selector_fixture.zig";
+    const accepted_source = "fn keep() void { selector_state.bindValueLoc(undefined, \"x\", undefined); }";
+    const allowlist = [_]ResidualAllowlistEntry{.{
+        .source = source_name,
         .function = "keep",
         .operation = .bind_value_loc,
         .structural_role = "fixture alias",
@@ -492,19 +783,68 @@ test "composed selector source guard rejects residual accumulator relocation" {
         .future_slice = .none,
         .expected_count = 1,
     }};
+    var fingerprint_storage: [std.crypto.hash.sha2.Sha256.digest_length * 2]u8 = undefined;
+    const fingerprints = [_]FunctionFingerprint{try fixtureFunctionFingerprint(
+        source_name,
+        "keep",
+        accepted_source,
+        &fingerprint_storage,
+    )};
     try std.testing.expectError(
         error.UnallowlistedResidualAccumulatorOperation,
         validateResidualAccumulatorAllowlist(
             &allowlist,
-            "composed_selector_fixture.zig",
+            &fingerprints,
+            source_name,
             "fn moved() void { selector_state.bindValueLoc(undefined, \"x\", undefined); }",
         ),
     );
 }
 
-test "composed selector source guard rejects residual accumulator reclassification" {
+test "composed selector source guard rejects same-function semantic-branch relocation" {
+    const source_name = "composed_selector_fixture.zig";
+    const accepted_source =
+        \\fn keep(condition: bool) void {
+        \\    if (condition) {
+        \\        selector_state.clobberAccumulator(undefined);
+        \\    } else {}
+        \\}
+    ;
+    const relocated_source =
+        \\fn keep(condition: bool) void {
+        \\    if (condition) {} else {
+        \\        selector_state.clobberAccumulator(undefined);
+        \\    }
+        \\}
+    ;
     const allowlist = [_]ResidualAllowlistEntry{.{
-        .source = "composed_selector_fixture.zig",
+        .source = source_name,
+        .function = "keep",
+        .operation = .clobber_accumulator,
+        .structural_role = "condition-true temporary",
+        .classification = .internal_temporary,
+        .future_slice = .none,
+        .expected_count = 1,
+    }};
+    var fingerprint_storage: [std.crypto.hash.sha2.Sha256.digest_length * 2]u8 = undefined;
+    const fingerprints = [_]FunctionFingerprint{try fixtureFunctionFingerprint(
+        source_name,
+        "keep",
+        accepted_source,
+        &fingerprint_storage,
+    )};
+    try validateResidualAccumulatorAllowlist(&allowlist, &fingerprints, source_name, accepted_source);
+    try std.testing.expectError(
+        error.ResidualFunctionFingerprintMismatch,
+        validateResidualAccumulatorAllowlist(&allowlist, &fingerprints, source_name, relocated_source),
+    );
+}
+
+test "composed selector source guard rejects residual accumulator operation outside closed function body" {
+    const source_name = "composed_selector_fixture.zig";
+    const accepted_source = "fn keep() void { selector_state.clobberAccumulator(undefined); }";
+    const allowlist = [_]ResidualAllowlistEntry{.{
+        .source = source_name,
         .function = "keep",
         .operation = .clobber_accumulator,
         .structural_role = "fixture temporary",
@@ -512,13 +852,76 @@ test "composed selector source guard rejects residual accumulator reclassificati
         .future_slice = .none,
         .expected_count = 1,
     }};
+    var fingerprint_storage: [std.crypto.hash.sha2.Sha256.digest_length * 2]u8 = undefined;
+    const fingerprints = [_]FunctionFingerprint{try fixtureFunctionFingerprint(
+        source_name,
+        "keep",
+        accepted_source,
+        &fingerprint_storage,
+    )};
+    try std.testing.expectError(
+        error.ResidualAccumulatorOperationOutsideFunction,
+        validateResidualAccumulatorAllowlist(
+            &allowlist,
+            &fingerprints,
+            source_name,
+            "fn keep() void {}\nselector_state.clobberAccumulator(undefined);",
+        ),
+    );
+}
+
+test "composed selector source guard rejects residual accumulator reclassification" {
+    const source_name = "composed_selector_fixture.zig";
+    const accepted_source = "fn keep() void { selector_state.clobberAccumulator(undefined); }";
+    const allowlist = [_]ResidualAllowlistEntry{.{
+        .source = source_name,
+        .function = "keep",
+        .operation = .clobber_accumulator,
+        .structural_role = "fixture temporary",
+        .classification = .internal_temporary,
+        .future_slice = .none,
+        .expected_count = 1,
+    }};
+    var fingerprint_storage: [std.crypto.hash.sha2.Sha256.digest_length * 2]u8 = undefined;
+    const fingerprints = [_]FunctionFingerprint{try fixtureFunctionFingerprint(
+        source_name,
+        "keep",
+        accepted_source,
+        &fingerprint_storage,
+    )};
     try std.testing.expectError(
         error.UnallowlistedResidualAccumulatorOperation,
         validateResidualAccumulatorAllowlist(
             &allowlist,
-            "composed_selector_fixture.zig",
+            &fingerprints,
+            source_name,
             "fn keep() void { selector_state.bindEax(undefined, \"x\"); }",
         ),
+    );
+}
+
+test "composed selector source guard requires future-slice ownership for approved exclusions" {
+    const source_name = "composed_selector_fixture.zig";
+    const accepted_source = "fn keep() void { selector_state.clobberAccumulator(undefined); }";
+    const allowlist = [_]ResidualAllowlistEntry{.{
+        .source = source_name,
+        .function = "keep",
+        .operation = .clobber_accumulator,
+        .structural_role = "fixture pair result",
+        .classification = .approved_pair_rdx_exclusion,
+        .future_slice = .none,
+        .expected_count = 1,
+    }};
+    var fingerprint_storage: [std.crypto.hash.sha2.Sha256.digest_length * 2]u8 = undefined;
+    const fingerprints = [_]FunctionFingerprint{try fixtureFunctionFingerprint(
+        source_name,
+        "keep",
+        accepted_source,
+        &fingerprint_storage,
+    )};
+    try std.testing.expectError(
+        error.ResidualExclusionMissingFutureSlice,
+        validateResidualAccumulatorAllowlist(&allowlist, &fingerprints, source_name, accepted_source),
     );
 }
 
