@@ -358,7 +358,8 @@ test "composed selector executes captured multiway scalar phi shapes" {
     for (module.functions.items, 0..) |function, index| {
         var machine = MachineFunction.init(function.name, function.ret_ty);
         defer machine.deinit(std.testing.allocator);
-        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+        const selection = try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function);
+        try std.testing.expectEqual(impl.SelectionResult.selected, selection);
         try x86_64_verify.verifyFunction(machine);
 
         const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
@@ -412,6 +413,67 @@ test "composed selector executes captured multiway scalar phi shapes" {
             try std.testing.expectEqual(@as(u64, 0x0000_0000_ffff_ffff), paired(3, a32, b32, a64, b64));
         }
     }
+}
+
+test "composed selector executes reduced compare setcc test branch phi sequence" {
+    const input =
+        \\define i32 @compare_branch_phi(i32 %value) {
+        \\entry:
+        \\  %is_zero = icmp eq i32 %value, 0
+        \\  br i1 %is_zero, label %zero, label %nonzero
+        \\zero:
+        \\  br label %merge
+        \\nonzero:
+        \\  br label %merge
+        \\merge:
+        \\  %result = phi i32 [ 7, %zero ], [ 9, %nonzero ]
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const function = module.functions.items[0];
+    var machine = MachineFunction.init(function.name, function.ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(
+        impl.SelectionResult.selected,
+        try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function),
+    );
+    try x86_64_verify.verifyFunction(machine);
+
+    var sequence_index: usize = 0;
+    for (machine.instructions.items) |instruction| {
+        const tag = std.meta.activeTag(instruction);
+        switch (sequence_index) {
+            0 => {
+                if (tag == .test_arg32) sequence_index = 1;
+            },
+            1 => {
+                if (tag == .sete_eax) sequence_index = 2;
+            },
+            2 => {
+                if (tag == .test_eax_eax) sequence_index = 3;
+            },
+            3 => {
+                if (tag == .jne) sequence_index = 4;
+            },
+            else => break,
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 4), sequence_index);
+
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const compare_branch_phi: *const fn (u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(u32, 7), compare_branch_phi(0));
+    try std.testing.expectEqual(@as(u32, 9), compare_branch_phi(1));
+    try std.testing.expectEqual(@as(u32, 9), compare_branch_phi(std.math.maxInt(u32)));
 }
 
 test "generic cfg selector restores only live displaced phi destinations" {

@@ -76,6 +76,7 @@ const i64Value = composed_helpers.i64Value;
 pub const ComposedBlockSelector = state_data.ComposedBlockSelector;
 pub const EflagsEffect = eflags.Effect;
 pub const EflagsLiveness = eflags.Liveness;
+pub const EflagsDefinitionPurpose = eflags.DefinitionPurpose;
 
 pub const AccumulatorPreparationEffect = enum {
     preserve,
@@ -168,6 +169,7 @@ pub const AccumulatorDefinitionTransaction = struct {
     next_spill_slot: usize,
     accumulator_domain: AccumulatorDomain,
     eflags_snapshot: EflagsLiveness.Snapshot,
+    eflags_semantics_len: usize,
     phase: Phase = .begun,
     pending: ?PendingDefinition = null,
     reused_source: ?[]const u8 = null,
@@ -229,6 +231,7 @@ pub const AccumulatorDefinitionTransaction = struct {
             .next_spill_slot = selector.next_spill_slot,
             .accumulator_domain = selector.accumulator_domain,
             .eflags_snapshot = selector.eflags.snapshot(),
+            .eflags_semantics_len = selector.eflags_semantics.items.len,
         };
     }
 
@@ -488,6 +491,7 @@ pub const AccumulatorDefinitionTransaction = struct {
         transaction.selector.next_spill_slot = transaction.next_spill_slot;
         transaction.selector.accumulator_domain = transaction.accumulator_domain;
         transaction.selector.eflags.restore(transaction.eflags_snapshot);
+        transaction.selector.eflags_semantics.items.len = transaction.eflags_semantics_len;
         transaction.pending = null;
         transaction.reused_source = null;
         transaction.phase = phase;
@@ -498,12 +502,69 @@ pub fn eflagsInstructionEffect(instruction: x86_64_machine.Instruction) EflagsEf
     return eflags.instructionEffect(instruction);
 }
 
+/// The sole production append authority for instructions that participate in
+/// EFLAGS liveness. The semantic effect is validated and applied before the
+/// instruction becomes externally visible; allocation failure restores the
+/// exact prior flags state.
+pub fn emitEflagsInstruction(
+    selector: *ComposedBlockSelector,
+    instruction: x86_64_machine.Instruction,
+    semantic_effect: EflagsEffect,
+) !void {
+    try eflags.validateSemanticEffect(eflags.instructionEffect(instruction), semantic_effect);
+    try selector.machine.instructions.ensureUnusedCapacity(selector.allocator, 1);
+    try selector.eflags_semantics.ensureUnusedCapacity(selector.allocator, 1);
+    const saved = selector.eflags.snapshot();
+    switch (semantic_effect) {
+        .definition => try selector.eflags.defineFor(.comparison),
+        .use => try selector.eflags.useFor(eflags.consumerPurpose(instruction) orelse return error.EflagsConsumerPurposeMissing, false),
+        .use_and_definition => try selector.eflags.carryLink(false),
+        .use_and_clobber => if (eflags.consumerPurpose(instruction)) |purpose|
+            try selector.eflags.useFor(purpose, true)
+        else
+            try selector.eflags.carryLink(true),
+        .preserve, .write, .clobber => try selector.eflags.apply(semantic_effect),
+    }
+    errdefer selector.eflags.restore(saved);
+    selector.machine.instructions.appendAssumeCapacity(instruction);
+    selector.eflags_semantics.appendAssumeCapacity(.{
+        .instruction_index = selector.machine.instructions.items.len - 1,
+        .effect = semantic_effect,
+    });
+}
+
+pub fn emitEflagsDefinition(
+    selector: *ComposedBlockSelector,
+    instruction: x86_64_machine.Instruction,
+    purpose: EflagsDefinitionPurpose,
+) !void {
+    try eflags.validateSemanticEffect(eflags.instructionEffect(instruction), .definition);
+    try selector.machine.instructions.ensureUnusedCapacity(selector.allocator, 1);
+    try selector.eflags_semantics.ensureUnusedCapacity(selector.allocator, 1);
+    const saved = selector.eflags.snapshot();
+    try selector.eflags.defineFor(purpose);
+    errdefer selector.eflags.restore(saved);
+    selector.machine.instructions.appendAssumeCapacity(instruction);
+    selector.eflags_semantics.appendAssumeCapacity(.{
+        .instruction_index = selector.machine.instructions.items.len - 1,
+        .effect = .definition,
+    });
+}
+
 pub fn validateEflagsInstructions(
     selector: *const ComposedBlockSelector,
     instructions: []const x86_64_machine.Instruction,
+    start_index: usize,
 ) !void {
     const saved = selector.eflags.snapshot();
-    try eflags.validateInstructions(selector.allocator, instructions);
+    const effects = try selector.allocator.alloc(EflagsEffect, instructions.len);
+    defer selector.allocator.free(effects);
+    for (instructions, effects) |instruction, *effect| effect.* = eflags.instructionEffect(instruction);
+    for (selector.eflags_semantics.items) |record| {
+        if (record.instruction_index < start_index or record.instruction_index >= start_index + instructions.len) continue;
+        effects[record.instruction_index - start_index] = record.effect;
+    }
+    try eflags.validateInstructionsWithEffects(selector.allocator, instructions, effects);
     try selector.eflags.validateSnapshot(saved);
 }
 
@@ -1282,20 +1343,20 @@ pub fn emitUnsignedLimbProduct(selector: *ComposedBlockSelector, lhs: FrameIndex
 pub fn accumulateLimbWithCarry(selector: *ComposedBlockSelector, lhs: FrameIndex, rhs: FrameIndex, sum: ArgReg, carry: ArgReg) !void {
     try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = lhs });
     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = rhs } });
-    try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_rax = .rcx });
+    try emitEflagsDefinition(selector, .{ .add_arg64_rax = .rcx }, .carry);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = sum });
     try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = carry });
-    try selector.machine.instructions.append(selector.allocator, .adc_rax_imm0);
+    try emitEflagsInstruction(selector, .adc_rax_imm0, .use_and_clobber);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = carry });
 }
 
 pub fn accumulateRegWithCarry(selector: *ComposedBlockSelector, lhs: ArgReg, rhs: FrameIndex, sum: ArgReg, carry: ArgReg) !void {
     try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = lhs });
     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = rhs } });
-    try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_rax = .rcx });
+    try emitEflagsDefinition(selector, .{ .add_arg64_rax = .rcx }, .carry);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = sum });
     try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = carry });
-    try selector.machine.instructions.append(selector.allocator, .adc_rax_imm0);
+    try emitEflagsInstruction(selector, .adc_rax_imm0, .use_and_clobber);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = carry });
 }
 
@@ -1303,17 +1364,17 @@ pub fn emitSignedUpperCorrection(selector: *ComposedBlockSelector, sign_limb: Fr
     const correction_label = try allocateEdgeLabel(selector);
     const end_label = try allocateEdgeLabel(selector);
     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = sign_limb } });
-    try selector.machine.instructions.append(selector.allocator, .{ .test_arg64 = .rcx });
-    try selector.machine.instructions.append(selector.allocator, .{ .js = correction_label });
+    try emitEflagsInstruction(selector, .{ .test_arg64 = .rcx }, .definition);
+    try emitEflagsInstruction(selector, .{ .js = correction_label }, .use);
     try selector.machine.instructions.append(selector.allocator, .{ .jmp = end_label });
     try selector.machine.instructions.append(selector.allocator, .{ .label = correction_label });
     try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = .r9 });
     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = subtract.lo } });
-    try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } });
+    try emitEflagsDefinition(selector, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } }, .carry);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .r9 });
     try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = .rdx });
     try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = subtract.hi } });
-    try selector.machine.instructions.append(selector.allocator, .{ .sbb_arg64_rax = .rcx });
+    try emitEflagsInstruction(selector, .{ .sbb_arg64_rax = .rcx }, .use_and_clobber);
     try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .rdx });
     try selector.machine.instructions.append(selector.allocator, .{ .label = end_label });
 }

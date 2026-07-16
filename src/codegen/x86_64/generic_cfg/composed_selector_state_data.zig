@@ -22,6 +22,11 @@ const OverflowResultLoc = struct {
     overflow_extracted: bool = false,
 };
 
+pub const EflagsSemanticRecord = struct {
+    instruction_index: usize,
+    effect: eflags.Effect,
+};
+
 pub const ComposedBlockSelector = struct {
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -48,6 +53,7 @@ pub const ComposedBlockSelector = struct {
     spill_slots: std.StringHashMap(SpillSlotAssignment),
     next_spill_slot: usize = 0,
     eflags: eflags.Liveness = .{},
+    eflags_semantics: std.ArrayList(EflagsSemanticRecord) = .empty,
     accumulator_domain: AccumulatorDomain = .{},
 
     pub fn init(allocator: std.mem.Allocator, machine: *MachineFunction) ComposedBlockSelector {
@@ -68,6 +74,7 @@ pub const ComposedBlockSelector = struct {
     }
 
     pub fn deinit(selector: *ComposedBlockSelector) void {
+        selector.eflags_semantics.deinit(selector.allocator);
         selector.overflow_results.deinit();
         selector.spill_slots.deinit();
         selector.phi_destinations.deinit();

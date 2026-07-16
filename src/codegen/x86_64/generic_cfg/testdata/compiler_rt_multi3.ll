@@ -1,0 +1,37 @@
+define dso_local i128 @__multi3(i128 %0, i128 %1) {
+Entry:
+  %.sroa.01.0.extract.trunc = trunc i128 %0 to i64
+  %.sroa.3.0.extract.shift = lshr i128 %0, 64
+  %.sroa.3.0.extract.trunc = trunc nuw i128 %.sroa.3.0.extract.shift to i64
+  %.sroa.04.0.extract.trunc = trunc i128 %1 to i64
+  %.sroa.36.0.extract.shift = lshr i128 %1, 64
+  %.sroa.36.0.extract.trunc = trunc nuw i128 %.sroa.36.0.extract.shift to i64
+  %2 = and i64 %.sroa.01.0.extract.trunc, 4294967295
+  %3 = and i64 %.sroa.04.0.extract.trunc, 4294967295
+  %4 = mul nuw i64 %3, %2
+  %5 = lshr i64 %4, 32
+  %6 = and i64 %4, 4294967295
+  %7 = lshr i64 %.sroa.01.0.extract.trunc, 32
+  %8 = mul nuw i64 %3, %7
+  %9 = add nuw i64 %5, %8
+  %10 = lshr i64 %9, 32
+  %11 = and i64 %9, 4294967295
+  %12 = lshr i64 %.sroa.04.0.extract.trunc, 32
+  %13 = mul nuw i64 %12, %2
+  %14 = add nuw i64 %11, %13
+  %15 = shl i64 %14, 32
+  %16 = or disjoint i64 %15, %6
+  %17 = lshr i64 %14, 32
+  %18 = mul nuw i64 %12, %7
+  %.sroa.0.0.insert.ext.i = zext i64 %16 to i128
+  %19 = mul i64 %.sroa.3.0.extract.trunc, %.sroa.04.0.extract.trunc
+  %20 = mul i64 %.sroa.36.0.extract.trunc, %.sroa.01.0.extract.trunc
+  %21 = add i64 %20, %19
+  %22 = add i64 %21, %18
+  %23 = add i64 %22, %10
+  %24 = add i64 %23, %17
+  %.sroa.2.0.insert.ext = zext i64 %24 to i128
+  %.sroa.2.0.insert.shift = shl nuw i128 %.sroa.2.0.insert.ext, 64
+  %.sroa.07.0.insert.insert = or disjoint i128 %.sroa.2.0.insert.shift, %.sroa.0.0.insert.ext.i
+  ret i128 %.sroa.07.0.insert.insert
+}

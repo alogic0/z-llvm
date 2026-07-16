@@ -152,7 +152,7 @@ pub fn tryLowerComposedCfgWithContext(
         try selector_frame.appendAddRsp(&composed, composed.stack_frame_bytes);
         try machine.instructions.append(allocator, .ret);
     }
-    try selector_state.validateEflagsInstructions(&composed, machine.instructions.items[start_len..]);
+    try selector_state.validateEflagsInstructions(&composed, machine.instructions.items[start_len..], start_len);
     return .selected;
 }
 
@@ -460,7 +460,7 @@ pub fn tryLowerComposedBlockWithContext(
         },
         .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return unsupported(.{ .no_emitter = "composed-block-terminator-not-owned" }),
     }
-    try selector_state.validateEflagsInstructions(&composed, machine.instructions.items[start_len..]);
+    try selector_state.validateEflagsInstructions(&composed, machine.instructions.items[start_len..], start_len);
     return .selected;
 }
 

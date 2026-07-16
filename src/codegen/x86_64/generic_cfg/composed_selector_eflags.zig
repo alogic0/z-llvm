@@ -13,6 +13,18 @@ pub const Effect = enum {
     clobber,
 };
 
+pub const DefinitionPurpose = enum {
+    comparison,
+    overflow,
+    carry,
+};
+
+pub const ConsumerPurpose = enum {
+    comparison,
+    overflow,
+    carry,
+};
+
 pub const Liveness = struct {
     const Status = enum {
         undefined,
@@ -22,20 +34,24 @@ pub const Liveness = struct {
 
     pub const Snapshot = struct {
         status: Status,
+        definition_purpose: ?DefinitionPurpose,
     };
 
     status: Status = .undefined,
+    definition_purpose: ?DefinitionPurpose = null,
 
     pub fn snapshot(liveness: Liveness) Snapshot {
-        return .{ .status = liveness.status };
+        return .{ .status = liveness.status, .definition_purpose = liveness.definition_purpose };
     }
 
     pub fn restore(liveness: *Liveness, saved: Snapshot) void {
         liveness.status = saved.status;
+        liveness.definition_purpose = saved.definition_purpose;
     }
 
     pub fn validateSnapshot(liveness: Liveness, saved: Snapshot) !void {
-        if (liveness.status != saved.status) return error.EflagsSnapshotMismatch;
+        if (liveness.status != saved.status or liveness.definition_purpose != saved.definition_purpose)
+            return error.EflagsSnapshotMismatch;
     }
 
     pub fn apply(liveness: *Liveness, effect: Effect) !void {
@@ -44,6 +60,7 @@ pub const Liveness = struct {
             .definition => {
                 if (liveness.status == .defined_unused) return error.EflagsDefinitionOverwrittenWhileLive;
                 liveness.status = .defined_unused;
+                liveness.definition_purpose = null;
             },
             .use => {
                 if (liveness.status == .undefined) return error.EflagsConsumerWithoutDefinition;
@@ -52,15 +69,45 @@ pub const Liveness = struct {
             .use_and_definition => {
                 if (liveness.status == .undefined) return error.EflagsConsumerWithoutDefinition;
                 liveness.status = .defined_unused;
+                liveness.definition_purpose = null;
             },
             .use_and_clobber => {
                 if (liveness.status == .undefined) return error.EflagsConsumerWithoutDefinition;
                 liveness.status = .undefined;
+                liveness.definition_purpose = null;
             },
             .write, .clobber => {
                 if (liveness.status == .defined_unused) return error.EflagsClobberedWhileLive;
                 liveness.status = .undefined;
+                liveness.definition_purpose = null;
             },
+        }
+    }
+
+    pub fn defineFor(liveness: *Liveness, purpose: DefinitionPurpose) !void {
+        try liveness.apply(.definition);
+        liveness.definition_purpose = purpose;
+    }
+
+    pub fn useFor(liveness: *Liveness, purpose: ConsumerPurpose, final: bool) !void {
+        if (liveness.status == .undefined) return error.EflagsConsumerWithoutDefinition;
+        if (liveness.definition_purpose) |definition| {
+            const compatible = definition == .comparison or switch (purpose) {
+                .comparison => false,
+                .overflow => definition == .overflow,
+                .carry => definition == .carry,
+            };
+            if (!compatible) return error.EflagsIncompatibleConsumer;
+        }
+        liveness.status = if (final) .undefined else .defined_used;
+        if (final) liveness.definition_purpose = null;
+    }
+
+    pub fn carryLink(liveness: *Liveness, final: bool) !void {
+        try liveness.useFor(.carry, final);
+        if (!final) {
+            liveness.status = .defined_unused;
+            liveness.definition_purpose = .carry;
         }
     }
 
@@ -70,6 +117,12 @@ pub const Liveness = struct {
 };
 
 pub fn instructionEffect(instruction: Instruction) Effect {
+    // DIV leaves arithmetic flags undefined. Keep this fail-closed override
+    // ahead of the exhaustive physical-write classification below.
+    switch (instruction) {
+        .div_arg32, .div_arg64 => return .clobber,
+        else => {},
+    }
     return switch (instruction) {
         .cmp_r8d_arg32, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rcx, .cmp_rdx_rdi, .cmp_rax_rdx, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .ucomisd, .ucomiss, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64 => .definition,
         .setb_eax, .seta_eax, .sete_eax, .setg_eax, .setl_eax, .setne_eax, .je, .jne, .jo, .jc, .jp, .js, .jae, .jle => .use,
@@ -98,7 +151,46 @@ pub fn instructionEffect(instruction: Instruction) Effect {
     };
 }
 
+pub fn validateSemanticEffect(physical: Effect, semantic: Effect) !void {
+    const compatible = switch (physical) {
+        .preserve => semantic == .preserve,
+        .definition => semantic == .definition,
+        .use => semantic == .use,
+        .use_and_definition => semantic == .use_and_definition or semantic == .use_and_clobber,
+        .use_and_clobber => semantic == .use_and_clobber,
+        .write => semantic == .write or semantic == .definition or semantic == .clobber,
+        .clobber => semantic == .clobber,
+    };
+    if (!compatible) return error.EflagsSemanticEffectMismatch;
+}
+
+pub fn consumerPurpose(instruction: Instruction) ?ConsumerPurpose {
+    return switch (instruction) {
+        .setb_eax, .seta_eax, .jc, .jae => .carry,
+        .jo => .overflow,
+        .sete_eax, .setg_eax, .setl_eax, .setne_eax, .je, .jne, .jp, .js, .jle, .set_fcmp_eax => .comparison,
+        else => null,
+    };
+}
+
 pub fn validateInstructions(allocator: std.mem.Allocator, instructions: []const Instruction) !void {
+    return validateInstructionsImpl(allocator, instructions, null);
+}
+
+pub fn validateInstructionsWithEffects(
+    allocator: std.mem.Allocator,
+    instructions: []const Instruction,
+    effects: []const Effect,
+) !void {
+    if (instructions.len != effects.len) return error.EflagsEffectCountMismatch;
+    return validateInstructionsImpl(allocator, instructions, effects);
+}
+
+fn validateInstructionsImpl(
+    allocator: std.mem.Allocator,
+    instructions: []const Instruction,
+    effects: ?[]const Effect,
+) !void {
     if (instructions.len == 0) return;
 
     const live_in = try allocator.alloc(bool, instructions.len);
@@ -112,7 +204,7 @@ pub fn validateInstructions(allocator: std.mem.Allocator, instructions: []const 
         while (reverse_index != 0) {
             reverse_index -= 1;
             const live_out = try successorLive(instructions, live_in, reverse_index);
-            const next_live_in = switch (instructionEffect(instructions[reverse_index])) {
+            const next_live_in = switch (effectAt(instructions, effects, reverse_index)) {
                 .preserve => live_out,
                 .definition, .write => false,
                 .use, .use_and_definition, .use_and_clobber => true,
@@ -125,19 +217,19 @@ pub fn validateInstructions(allocator: std.mem.Allocator, instructions: []const 
         }
     }
 
-    for (instructions, 0..) |instruction, index| {
+    for (instructions, 0..) |_, index| {
         const live_out = try successorLive(instructions, live_in, index);
-        switch (instructionEffect(instruction)) {
+        switch (effectAt(instructions, effects, index)) {
             .clobber, .use_and_clobber => if (live_out) return error.EflagsClobberedWhileLive,
             .preserve, .definition, .use, .use_and_definition, .write => {},
         }
     }
     if (live_in[0]) return error.EflagsConsumerWithoutDefinition;
 
-    try validateReachingDefinitions(allocator, instructions);
+    try validateReachingDefinitions(allocator, instructions, effects);
 }
 
-fn validateReachingDefinitions(allocator: std.mem.Allocator, instructions: []const Instruction) !void {
+fn validateReachingDefinitions(allocator: std.mem.Allocator, instructions: []const Instruction, effects: ?[]const Effect) !void {
     const reachable = try allocator.alloc(bool, instructions.len);
     defer allocator.free(reachable);
     @memset(reachable, false);
@@ -155,9 +247,9 @@ fn validateReachingDefinitions(allocator: std.mem.Allocator, instructions: []con
     var changed = true;
     while (changed) {
         changed = false;
-        for (instructions, 0..) |instruction, index| {
+        for (instructions, 0..) |_, index| {
             if (!reachable[index]) continue;
-            const undefined_out = switch (instructionEffect(instruction)) {
+            const undefined_out = switch (effectAt(instructions, effects, index)) {
                 .definition, .use_and_definition, .write => false,
                 .preserve, .use => undefined_in[index],
                 .use_and_clobber, .clobber => true,
@@ -173,13 +265,17 @@ fn validateReachingDefinitions(allocator: std.mem.Allocator, instructions: []con
         }
     }
 
-    for (instructions, 0..) |instruction, index| {
+    for (instructions, 0..) |_, index| {
         if (!reachable[index] or !undefined_in[index]) continue;
-        switch (instructionEffect(instruction)) {
+        switch (effectAt(instructions, effects, index)) {
             .use, .use_and_definition, .use_and_clobber => return error.EflagsConsumerWithoutDefinition,
             .preserve, .definition, .write, .clobber => {},
         }
     }
+}
+
+fn effectAt(instructions: []const Instruction, effects: ?[]const Effect, index: usize) Effect {
+    return if (effects) |semantic| semantic[index] else instructionEffect(instructions[index]);
 }
 
 fn successorLive(instructions: []const Instruction, live_in: []const bool, index: usize) !bool {

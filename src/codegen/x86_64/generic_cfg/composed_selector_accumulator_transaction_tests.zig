@@ -24,6 +24,8 @@ fn accumulatorBindingCount(selector: *const ComposedBlockSelector) usize {
 
 test "accumulator transaction separates logical widths from physical EAX RAX binding widths" {
     const definitions = [_]AccumulatorDefinition{
+        .zeroExtending(1),
+        .zeroExtending(6),
         .zeroExtending(8),
         .zeroExtending(16),
         .zeroExtending(32),
@@ -31,7 +33,7 @@ test "accumulator transaction separates logical widths from physical EAX RAX bin
         .zeroExtendedRax(56),
         .fullRax(),
     };
-    const names = [_][]const u8{ "v8", "v16", "v32", "v52", "v56", "v64" };
+    const names = [_][]const u8{ "v1", "v6", "v8", "v16", "v32", "v52", "v56", "v64" };
 
     for (definitions, names) |definition, name| {
         var machine = MachineFunction.init(name, .{ .int = definition.logical_bits });
@@ -203,6 +205,7 @@ test "accumulator transaction rollback restores instructions bindings bits spill
     const other_binding = selector.values.get("other").?;
     const saved_domain = selector.accumulator_domain;
     const saved_eflags = selector.eflags.snapshot();
+    const saved_eflags_semantics_len = selector.eflags_semantics.items.len;
     const saved_next_virtual_reg = selector.next_virtual_reg;
     const saved_next_spill_slot = selector.next_spill_slot;
     const saved_instructions = [_]machine_module.Instruction{.{ .mov_imm_eax = 13 }};
@@ -233,6 +236,53 @@ test "accumulator transaction rollback restores instructions bindings bits spill
     try std.testing.expectEqual(saved_next_spill_slot, selector.next_spill_slot);
     try std.testing.expectEqual(saved_domain, selector.accumulator_domain);
     try selector.eflags.validateSnapshot(saved_eflags);
+    try std.testing.expectEqual(saved_eflags_semantics_len, selector.eflags_semantics.items.len);
+}
+
+test "EFLAGS append rejection after preparation and materialization rolls back full transaction state" {
+    var machine = MachineFunction.init("transaction-eflags-reject", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 24;
+
+    var initial = try AccumulatorDefinitionTransaction.begin(&selector);
+    _ = try initial.prepare(.preserve, .spill_live);
+    try initial.define("old", .zeroExtending(32));
+    try initial.commit();
+    initial.deinit();
+    try state.bindValueLoc(&selector, "source", .{ .arg32 = .rdi });
+    try machine.instructions.append(std.testing.allocator, .{ .mov_imm_eax = 9 });
+    try selector.eflags.defineFor(.comparison);
+
+    const old_binding = selector.values.get("old").?;
+    const source_binding = selector.values.get("source").?;
+    const saved_domain = selector.accumulator_domain;
+    const saved_eflags = selector.eflags.snapshot();
+    const saved_eflags_semantics_len = selector.eflags_semantics.items.len;
+    const saved_next_virtual_reg = selector.next_virtual_reg;
+    const saved_next_spill_slot = selector.next_spill_slot;
+
+    var transaction = try AccumulatorDefinitionTransaction.begin(&selector);
+    defer transaction.deinit();
+    _ = try transaction.prepare(.preserve, .spill_live);
+    try transaction.materialize(.{ .named = "source" }, .zeroExtending(32));
+    try std.testing.expectError(
+        error.EflagsClobberedWhileLive,
+        state.emitEflagsInstruction(&selector, .{ .add_eax_imm32 = 1 }, .write),
+    );
+    try transaction.rollback();
+
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{.{ .mov_imm_eax = 9 }}, machine.instructions.items);
+    try std.testing.expectEqual(@as(usize, 2), selector.values.count());
+    try std.testing.expectEqual(old_binding, selector.values.get("old").?);
+    try std.testing.expectEqual(source_binding, selector.values.get("source").?);
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    try std.testing.expectEqual(saved_next_virtual_reg, selector.next_virtual_reg);
+    try std.testing.expectEqual(saved_next_spill_slot, selector.next_spill_slot);
+    try std.testing.expectEqual(saved_domain, selector.accumulator_domain);
+    try selector.eflags.validateSnapshot(saved_eflags);
+    try std.testing.expectEqual(saved_eflags_semantics_len, selector.eflags_semantics.items.len);
 }
 
 test "accumulator preparation rejects live-flags clobber before mutation and permits preserve" {
@@ -487,6 +537,7 @@ test "missing named source after preparation rolls back the complete transaction
     const saved_binding = selector.values.get("source").?;
     const saved_domain = selector.accumulator_domain;
     const saved_eflags = selector.eflags.snapshot();
+    const saved_eflags_semantics_len = selector.eflags_semantics.items.len;
     const saved_next_virtual_reg = selector.next_virtual_reg;
     const saved_next_spill_slot = selector.next_spill_slot;
     const saved_instructions = [_]machine_module.Instruction{.{ .mov_imm_eax = 9 }};
@@ -509,6 +560,7 @@ test "missing named source after preparation rolls back the complete transaction
     try std.testing.expectEqual(saved_next_virtual_reg, selector.next_virtual_reg);
     try std.testing.expectEqual(saved_next_spill_slot, selector.next_spill_slot);
     try selector.eflags.validateSnapshot(saved_eflags);
+    try std.testing.expectEqual(saved_eflags_semantics_len, selector.eflags_semantics.items.len);
 }
 
 test "accumulator typed displacement preserves scratch preference and unconditional spill" {

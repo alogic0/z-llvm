@@ -119,7 +119,7 @@ pub fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select
     }
     emitScalarSelectValue(selector, select.false_value, bits) catch return .{ .unsupported_value = "composed-block-select-false-value" };
     const end_label = try ownedSelectEndLabel(selector);
-    try selector.machine.instructions.append(selector.allocator, .{ .je = end_label });
+    try selector_state.emitEflagsInstruction(selector, .{ .je = end_label }, .use);
     emitScalarSelectValue(selector, select.true_value, bits) catch return .{ .unsupported_value = "composed-block-select-true-value" };
     try selector.machine.instructions.append(selector.allocator, .{ .label = end_label });
     try selector_state.bindAccumulator(selector, result_name, bits);
@@ -144,7 +144,7 @@ fn lowerFpSelect(selector: *ComposedBlockSelector, result_name: []const u8, sele
     const dst = fpSelectScratch(true_reg, false_reg);
     if (try selector_fp.materializeFpValue(selector, select.false_value, dst, bits)) |diagnostic| return diagnostic;
     const end_label = try ownedSelectEndLabel(selector);
-    try selector.machine.instructions.append(selector.allocator, .{ .je = end_label });
+    try selector_state.emitEflagsInstruction(selector, .{ .je = end_label }, .use);
     if (try selector_fp.materializeFpValue(selector, select.true_value, dst, bits)) |diagnostic| return diagnostic;
     try selector.machine.instructions.append(selector.allocator, .{ .label = end_label });
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = bits } });
@@ -262,7 +262,7 @@ pub fn lowerCfgTerminator(
             if (then_has_phi_edge or else_has_phi_edge) {
                 return try lowerConditionalPhiEdges(selector, function, block_index, then_index, else_index);
             }
-            try selector.machine.instructions.append(selector.allocator, .{ .jne = condbr.then_target });
+            try selector_state.emitEflagsInstruction(selector, .{ .jne = condbr.then_target }, .use);
             if (else_index != block_index + 1) {
                 try selector.machine.instructions.append(selector.allocator, .{ .jmp = condbr.else_target });
             }
@@ -351,12 +351,12 @@ fn lowerSwitch(
         return diagnostic;
     }
     selector_state.emitValueIntoEax(selector, switch_term.cond) catch return .{ .unsupported_value = "stage2-switch-cond" };
-    if (bits < 32) try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = switchValueMask(bits) });
+    if (bits < 32) try selector_state.emitEflagsInstruction(selector, .{ .and_eax_imm32 = switchValueMask(bits) }, .write);
 
     for (switch_term.cases.items, case_values[0..switch_term.cases.items.len], 0..) |case, value, case_index| {
         if (exhaustive_case != null and exhaustive_case.? == case_index) continue;
-        try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = value });
-        try selector.machine.instructions.append(selector.allocator, .{ .je = case.target });
+        try selector_state.emitEflagsInstruction(selector, .{ .cmp_eax_imm32 = value }, .definition);
+        try selector_state.emitEflagsInstruction(selector, .{ .je = case.target }, .use);
     }
     try selector.machine.instructions.append(selector.allocator, .{ .jmp = if (exhaustive_case) |case_index|
         switch_term.cases.items[case_index].target
@@ -480,11 +480,11 @@ fn lowerExactFrexpSwitchPhiEdge(
     if (try stabilizePhiEdgeSources(selector, phi_target, predecessor)) |diagnostic| return diagnostic;
 
     selector_state.emitValueIntoEax(selector, switch_term.cond) catch return .{ .unsupported_value = "stage2-switch-cond" };
-    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = switchValueMask(11) });
+    try selector_state.emitEflagsInstruction(selector, .{ .and_eax_imm32 = switchValueMask(11) }, .write);
     const phi_edge_label = try ownedEdgeLabel(selector);
     for (switch_term.cases.items, case_values, 0..) |case, value, case_index| {
-        try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = value });
-        try selector.machine.instructions.append(selector.allocator, .{ .je = if (case_index == all_ones_case_index) phi_edge_label else case.target });
+        try selector_state.emitEflagsInstruction(selector, .{ .cmp_eax_imm32 = value }, .definition);
+        try selector_state.emitEflagsInstruction(selector, .{ .je = if (case_index == all_ones_case_index) phi_edge_label else case.target }, .use);
     }
     try selector.machine.instructions.append(selector.allocator, .{ .jmp = function.blocks.items[default_index].name });
     try selector.machine.instructions.append(selector.allocator, .{ .label = phi_edge_label });
@@ -685,14 +685,14 @@ fn lowerExactEiEntrySwitchPhiEdges(
     if (try stabilizePhiEdgeSources(selector, function.blocks.items[default_index], predecessor)) |diagnostic| return diagnostic;
 
     selector_state.emitValueIntoEax(selector, switch_term.cond) catch return .{ .unsupported_value = "stage2-switch-cond" };
-    try selector.machine.instructions.append(selector.allocator, .{ .and_eax_imm32 = switchValueMask(16) });
+    try selector_state.emitEflagsInstruction(selector, .{ .and_eax_imm32 = switchValueMask(16) }, .write);
 
     var case_edge_labels: [5][]const u8 = undefined;
     for (&case_edge_labels) |*label| label.* = try ownedEdgeLabel(selector);
     const default_edge_label = try ownedEdgeLabel(selector);
     for (case_values, case_edge_labels) |value, edge_label| {
-        try selector.machine.instructions.append(selector.allocator, .{ .cmp_eax_imm32 = value });
-        try selector.machine.instructions.append(selector.allocator, .{ .je = edge_label });
+        try selector_state.emitEflagsInstruction(selector, .{ .cmp_eax_imm32 = value }, .definition);
+        try selector_state.emitEflagsInstruction(selector, .{ .je = edge_label }, .use);
     }
     try selector.machine.instructions.append(selector.allocator, .{ .jmp = default_edge_label });
 
@@ -839,7 +839,7 @@ pub fn lowerConditionalPhiEdges(
 
     if (try stabilizePhiEdgeSources(selector, function.blocks.items[then_index], predecessor)) |diagnostic| return diagnostic;
     if (try stabilizePhiEdgeSources(selector, function.blocks.items[else_index], predecessor)) |diagnostic| return diagnostic;
-    try selector.machine.instructions.append(selector.allocator, .{ .jne = then_edge_label });
+    try selector_state.emitEflagsInstruction(selector, .{ .jne = then_edge_label }, .use);
 
     if (try emitPhiEdgeMoves(selector, function.blocks.items[else_index], predecessor)) |diagnostic| return diagnostic;
     try selector.machine.instructions.append(selector.allocator, .{ .jmp = else_target });
@@ -1266,12 +1266,12 @@ pub fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: 
 pub fn emitBranchCondition(selector: *ComposedBlockSelector, value: ir.Value) !?Diagnostic {
     const loc = selector_state.resolveValue(selector, value) orelse return .{ .unsupported_value = "stage2-unknown-cond" };
     switch (loc) {
-        .eax => try selector.machine.instructions.append(selector.allocator, .test_eax_eax),
-        .arg32, .scratch32 => |reg| try selector.machine.instructions.append(selector.allocator, .{ .test_arg8 = reg }),
+        .eax => try selector_state.emitEflagsInstruction(selector, .test_eax_eax, .definition),
+        .arg32, .scratch32 => |reg| try selector_state.emitEflagsInstruction(selector, .{ .test_arg8 = reg }, .definition),
         .spill64 => |frame_index| {
             try selector_state.clobberArgReg(selector, .rcx);
             try selector.machine.instructions.append(selector.allocator, .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = frame_index } });
-            try selector.machine.instructions.append(selector.allocator, .{ .test_arg8 = .rcx });
+            try selector_state.emitEflagsInstruction(selector, .{ .test_arg8 = .rcx }, .definition);
         },
         .arg64, .scratch64, .arg128, .scratch128, .xmm, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "stage2-cond-loc" },
     }

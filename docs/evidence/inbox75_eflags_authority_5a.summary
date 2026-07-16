@@ -1,0 +1,124 @@
+# INBOX-75 O1 Commit 5A — Emission-Time EFLAGS Authority
+
+schema_version: 1
+directive: `INBOX-75`
+target: `x86_64-linux-gnu`
+status: delivered; review requested
+baseline_code: `6b74acea`
+validated_parent: `86bd90cc`
+
+INBOX-75 is acknowledged by id. Commit 5 was re-sliced after the INBOX-74
+blast-radius ratchet. This commit contains only slice 5A and stops for review;
+5B, 5C, O1 commit 6, and Tier 3 were not started.
+
+## Lossless Re-Slice Preservation
+
+Before changing the intermixed working tree, the complete tracked and
+previously untracked delta was preserved as:
+
+- ignored patch: `tmp/inbox74_intermixed_reslice_base.patch`;
+- patch SHA-256:
+  `bfc0a2a3fe25290d543077852213d3b0f1c962cc7eed131321c01bc42c06b888`;
+- scratch branch: `scratch/inbox74-intermixed-reslice-base`;
+- scratch commit: `466be30cb2190e1b0683dc3244ea0b8ded56a968`.
+
+`git apply --check` accepted the patch in a detached worktree at the commit-4
+baseline `6b74acea`. A fresh binary diff from parent `86bd90cc` to the scratch
+commit had the same SHA-256 as the saved patch. The INBOX-74 compare migration,
+scalar-arithmetic migration, fma and __multi3 repairs, and canary additions are
+therefore recoverable without loss for 5B/5C.
+
+## Slice 5A Boundary
+
+The delivered production mechanism applies and validates the semantic EFLAGS
+effect before exposing an instruction, records semantic effects by machine
+instruction index, restores the record length with the accumulator transaction,
+and validates final CFG dataflow against semantic overrides. Definition purpose
+distinguishes comparison, overflow, and carry; division is classified as a
+clobber. CFG branches/switches and existing carry chains use the authority.
+
+The source guard freezes raw EFLAGS append inventories at the 5A boundary:
+
+```text
+composed_selector_calls.zig=34
+composed_selector_cfg.zig=0
+composed_selector_icmp.zig=93
+composed_selector_scalar.zig=53
+```
+
+Those maxima may only hold or shrink. `composed_selector_calls.zig`,
+`composed_selector_icmp.zig`, and `composed_selector_scalar.zig` are unchanged
+from commit 4 and contain zero `emitEflagsInstruction` or
+`emitEflagsDefinition` call sites. No compare, compare-like call, scalar
+arithmetic, arithmetic-call, fma, or __multi3 accumulator producer was migrated.
+
+White-box coverage exercises pre-append rejection and exact state preservation,
+second-definition rejection, intentional overflow/carry compatibility, CFG
+fallthrough and target paths, carry-chain acceptance/rejection, preserving
+materialization, division clobbering, 1/6/8/16/32-bit EAX binding with full-RAX
+definedness, and rollback of flags, semantic records, instructions, bindings,
+spills, counters, and accumulator domain.
+
+Permanent canaries freeze the commit-4 __multi3 IR, selection result, instruction
+stream, exact symbol bytes, and executable edge cases. The integrated fma proof
+now additionally freezes its machine stream, exact symbol bytes, internal ldexp
+and add_and_denorm helper bytes, and absence of a host fallback.
+
+## Validation
+
+Formatting and `git diff --check` passed.
+
+Full unit plus mandatory ABI differential:
+
+```text
+Build Summary: 7/7 steps succeeded; 1068/1068 tests passed
+abi_diff_cases_attempted=60
+abi_diff_cases_matched=60
+abi_diff_real_functions_matched=30
+result=pass
+```
+
+- log: `tmp/inbox75_5a_unit.log`
+- log SHA-256:
+  `de137ce9ac38c5b2ae8369186c3f4e159b1b2e18891cf1146de97adaa49128d5`
+
+The decisive whole-capture report is byte-identical to the accepted baseline:
+
+```text
+summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emitted_functions=285 failed_functions=158 first_failing_function=compiler_rt.trunc.truncl first_failing_diagnostic=UnsupportedLongDoubleAbi first_failing_selector_tag=unsupported_type first_failing_selector_detail=unsupported-return-type local_fail=1
+```
+
+- report: `tmp/inbox75_5a_full_capture_report.log`
+- report SHA-256:
+  `49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681`
+- complete accepted cohort: 285 selected / 285 emitted / 0 failed;
+- accepted object SHA-256:
+  `061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be`;
+- owner manifest SHA-256:
+  `5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d`;
+- live ledger: `167 / 17 / 101` composed / legacy / fallback.
+
+The complete integrated executable gate passed all seven cases, including the
+permanent __multi3 and fma canaries:
+
+```text
+summary zig-integrated-exe total=7 build_ok=7 run_ok=7 stdout_ok=7 exit_ok=7 minimal_inline_asm_syscall_rows=3 compiler_rt_i128_arithmetic_rows=1 compiler_rt_fma_rows=1 setcc_predicate_rows=1 aggregate_sse_return_rows=1 local_fail=0
+```
+
+- log: `tmp/inbox75_5a_integrated_exe.log`
+- log SHA-256:
+  `46003978d45f38407f056c5ee7a5ef20f51e75df29628ec446880e659b86957e`
+
+Strengthened Tier 2 passed:
+
+```text
+Build Summary: 28/28 steps succeeded; 1076/1076 tests passed
+```
+
+- log: `tmp/inbox75_5a_tier2.log`
+- log SHA-256:
+  `5ca0443b9f54bfd056ab1430f381dd49eb049f73ee51b93f67ac5d85e4385005`
+
+Frozen identities are exact: `49a19f04` / `443-285-158-truncl` /
+`061a64e4` / `5d91960e` / `167-17-101`. No Tier 3 was run. Stop for
+Supervisor/Reviewer acceptance before INBOX-76 or INBOX-77.
