@@ -353,10 +353,13 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     try validateNoFunctionFamilyPredicate(source, error.ValueUseFunctionPredicateForbidden);
     if (std.mem.indexOf(u8, source, "pub const PreparedView =") != null or
         std.mem.indexOf(u8, source, "pub fn readPreparedView") != null or
-        std.mem.indexOf(u8, source, "pub fn invalidatePreparedViews") != null)
+        std.mem.indexOf(u8, source, "pub fn invalidatePreparedViews") != null or
+        std.mem.indexOf(u8, source, "pub fn consumePreparedView") != null or
+        std.mem.indexOf(u8, source, "consumer: anytype") != null)
     {
         return error.ValueUsePreparedLocationEscape;
     }
+    try validateNoPublicPreparedPointer(source);
     const required = [_]struct { function: []const u8, pattern: []const u8, count: usize }{
         .{ .function = "resolveNamedCurrent", .pattern = "resolveValue(", .count = 1 },
     };
@@ -372,8 +375,12 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
 
 fn validatePreparedViewLeafDiscipline(source: [:0]const u8) !void {
     if (std.mem.indexOf(u8, source, "readPreparedView(") != null or
+        std.mem.indexOf(u8, source, "consumePreparedView(") != null or
         std.mem.indexOf(u8, source, ".PreparedView") != null or
-        std.mem.indexOf(u8, source, ".prepared_views") != null)
+        std.mem.indexOf(u8, source, ".prepared_views") != null or
+        (std.mem.indexOf(u8, source, "fn consume(") != null and
+            (std.mem.indexOf(u8, source, "view: anytype") != null or
+                std.mem.indexOf(u8, source, "view: *") != null)))
     {
         return error.ValueUsePreparedLocationEscape;
     }
@@ -390,7 +397,7 @@ fn validatePreparedViewLeafDiscipline(source: [:0]const u8) !void {
     for (bodies) |body| {
         const function_source = source[body.start..body.end];
         if (std.mem.indexOf(u8, function_source, ".preparedView(") == null and
-            std.mem.indexOf(u8, function_source, ".consumePreparedView(") == null) continue;
+            std.mem.indexOf(u8, function_source, ".executePreparedAction(") == null) continue;
         for (bypass_operations) |operation| {
             if (std.mem.indexOf(u8, function_source, operation) != null)
                 return error.ValueUsePreparedLeafRawOperation;
@@ -399,6 +406,23 @@ fn validatePreparedViewLeafDiscipline(source: [:0]const u8) !void {
             if (std.mem.indexOf(u8, function_source, pattern) != null)
                 return error.ValueUsePreparedLeafRawOperation;
         }
+    }
+}
+
+fn validateNoPublicPreparedPointer(source: []const u8) !void {
+    var cursor: usize = 0;
+    while (std.mem.indexOfPos(u8, source, cursor, "pub fn ")) |start| {
+        const signature_end = std.mem.indexOfPos(u8, source, start, "{") orelse
+            return error.InvalidZigSource;
+        const signature = source[start..signature_end];
+        if (std.mem.indexOf(u8, signature, "*const PreparedView") != null or
+            std.mem.indexOf(u8, signature, "*PreparedView") != null or
+            std.mem.indexOf(u8, signature, "*const PreparedRecord") != null or
+            std.mem.indexOf(u8, signature, "*PreparedRecord") != null)
+        {
+            return error.ValueUsePreparedLocationEscape;
+        }
+        cursor = signature_end + 1;
     }
 }
 
@@ -1298,16 +1322,24 @@ test "composed selector source guard rejects function predicates in the value-us
         error.ValueUsePreparedLocationEscape,
         validateValueUseAuthoritySource(accepted ++ "pub fn readPreparedView() PreparedView { return undefined; }"),
     );
+    try std.testing.expectError(
+        error.ValueUsePreparedLocationEscape,
+        validateValueUseAuthoritySource(accepted ++ "pub fn consumePreparedView(consumer: anytype) void { _ = consumer; }"),
+    );
+    try std.testing.expectError(
+        error.ValueUsePreparedLocationEscape,
+        validateValueUseAuthoritySource(accepted ++ "pub fn leak(view: *const PreparedView) void { _ = view; }"),
+    );
 }
 
-test "composed selector source guard rejects retained views and raw operations after checked consumption" {
+test "composed selector source guard rejects callback escapes and raw operations around closed actions" {
     try validatePreparedViewLeafDiscipline(
-        "fn lower() void { const lease = try transaction.preparedView(handle); try transaction.consumePreparedView(lease, &consumer); }",
+        "fn lower() void { const lease = try transaction.preparedView(handle); try transaction.executePreparedAction(lease); }",
     );
     try std.testing.expectError(
         error.ValueUsePreparedLeafRawOperation,
         validatePreparedViewLeafDiscipline(
-            "fn lower() void { const lease = try transaction.preparedView(handle); try transaction.consumePreparedView(lease, &consumer); _ = selector_state.resolveValue(selector, source); }",
+            "fn lower() void { const lease = try transaction.preparedView(handle); try transaction.executePreparedAction(lease); _ = selector_state.resolveValue(selector, source); }",
         ),
     );
     try std.testing.expectError(
@@ -1320,6 +1352,18 @@ test "composed selector source guard rejects retained views and raw operations a
         error.ValueUsePreparedLocationEscape,
         validatePreparedViewLeafDiscipline(
             "fn lower() void { const retained: Transaction.PreparedView = try transaction.readPreparedView(lease); _ = retained.register; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUsePreparedLocationEscape,
+        validatePreparedViewLeafDiscipline(
+            "const Escaper = struct { fn consume(self: *@This(), view: anytype) void { self.saved = @intFromPtr(view); } }; fn lower() void { const lease = try transaction.preparedView(handle); try transaction.executePreparedAction(lease); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUsePreparedLocationEscape,
+        validatePreparedViewLeafDiscipline(
+            "fn consume(self: *@This(), view: *const Transaction.PreparedView) void { self.saved = view; }",
         ),
     );
 }

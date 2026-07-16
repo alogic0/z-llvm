@@ -1,6 +1,6 @@
 # INBOX-85 O2-3B0 dormant value-use structural amendments
 
-Status: corrected by the prepared-view lifetime follow-up and delivered for
+Status: corrected by the final prepared-view escape closure and delivered for
 Supervisor/Reviewer review. O2-3B1 is not authorized.
 
 ## Base and boundary
@@ -33,10 +33,12 @@ home.
 
 ## Restricted prepared views and lifetime correction
 
-`Destination.prepared_view` requests produce no fixed write. Fixed-destination
-materializations complete first; only then does the authority resolve private
-prepared records from canonical state. A capability is available only through
-its request handle after `materializeAll`.
+`Destination.prepared_view` requests carry a closed `PreparedAction` intent
+registered before seal. The action's physical destination therefore
+participates in the same conflict, preservation, and copy-cycle planning as a
+fixed request. Fixed-destination materializations complete first; only then
+does the authority resolve private prepared records from canonical state. A
+capability is available only through its request handle after `materializeAll`.
 
 The internal, private `PreparedView` union contains only:
 
@@ -48,30 +50,36 @@ The internal, private `PreparedView` union contains only:
   storage;
 - strictly read-only ordered pair limbs in registers or spills.
 
-It is never returned and cannot be named by a production consumer. The public
-API returns only a phase-bound lease; `consumePreparedView` returns `void` and
-invokes a checked, non-retainable borrow callback. Every consumption checks the
-lease generation, re-resolves the source, and revalidates the expected
-type/register class, supported source form, liveness, and canonical
-address-dependency closure at the point of use.
+It is never returned, passed to a callback, or named by a production consumer.
+The public API returns only a phase-bound lease. `executePreparedAction` takes
+only that lease; it receives no generic consumer and crosses no private-view
+pointer over the public API. The currently closed, general typed action forms
+are shape validation and copy emission to a typed GPR/EAX/RAX destination.
+The authority itself selects and emits the instruction form from the private
+view. Every execution checks the lease generation, re-resolves the source,
+and revalidates the expected type/register class, supported source form,
+liveness, and canonical address-dependency closure at the point of use.
 
 The transaction stores a private canonical record containing the source vreg,
 the restricted representation, and vregs/homes for address dependencies.
-Before invoking the consumer it compares a freshly resolved record with that
-canonical record. A relocation or rebind therefore returns
-`ValueUsePreparedViewStale` before the callback can emit. It performs the same
-comparison after the callback, so an attempted source mutation during
-consumption rolls back the complete authority including speculative emission.
-There is no public/manual invalidation API. Phase, missing, foreign, relocated,
-and rebound capabilities fail closed.
+Before executing the closed action it compares a freshly resolved record with
+that canonical record. A relocation or rebind therefore returns
+`ValueUsePreparedViewStale` before internal emission. It performs the same
+comparison after action execution as defense in depth, so any internal source
+mutation rolls back the complete authority including speculative emission.
+Successful execution consumes the request capability. There is no public or
+generic callback and no public/manual invalidation API. Phase, missing,
+foreign, reused, relocated, and rebound capabilities fail closed.
 
 The source guard now permits the one raw resolution authority only in
 `resolveNamedCurrent` and keeps the total exact at one. It also rejects every
 frozen raw resolution/materialization gateway, accumulator binding/clobber,
-or spill helper inside a consumer function that obtains/consumes a prepared
-view. It also rejects reintroducing a public prepared-location union, a
-returning `readPreparedView`, a manual invalidation API, or a production
-consumer naming/retaining/directly inspecting a prepared-location value.
+or spill helper inside a consumer function that obtains/executes a prepared
+action. It also rejects reintroducing a public prepared-location union, a
+returning `readPreparedView`, the old generic `consumePreparedView`, an
+external `consume(..., view: anytype)` escape, a private-view pointer in a
+public signature, a manual invalidation API, or a production consumer
+naming/retaining/directly inspecting a prepared-location value.
 The frozen inbox81 bypass inventory remains exact; it does not claim zero
 bypasses.
 
@@ -103,20 +111,24 @@ address_domain_snapshot_bytes=149761
 address_domain_copies_per_request=0
 ```
 
-No request registration, prepared-view construction, or prepared-view
-consumption copies the whole domain.
+No request registration, prepared-view construction, or prepared-action
+execution copies the whole domain.
 
-## Lifetime follow-up proof
+## Final escape-closure proof
 
-The correction is layered on the original B0 commit `397b9359`. The working
+The first lifetime correction is commit `58a6d65a`. The follow-up-2 working
 authorization head is a documentation-only descendant; its `src`, `tools`,
-and `build.zig` state was byte-identical to `397b9359` before this follow-up.
+and `build.zig` state was byte-identical to `58a6d65a` before this correction.
 
-The production-path negative acquires a capability for a source in RDI, uses
-the real `selector_state.bindValueLoc` authority to relocate that source to
-RSI, and supplies a consumer that would append an instruction. Consumption
-returns `ValueUsePreparedViewStale`; the callback count and instruction count
-remain zero, and rollback restores the original RDI binding.
+The production-path negative registers a typed `emit_copy_to(.rax)` action,
+acquires its capability for a source in RDI, and uses the real
+`selector_state.bindValueLoc` authority to relocate that source to RSI.
+Execution returns `ValueUsePreparedViewStale` before internal emission; the
+instruction count remains zero and rollback restores the original RDI
+binding. The same action on an unchanged source emits the expected
+`mov_arg_rax(.rdi)` internally, returns no location, and a second execution of
+the consumed capability fails closed and rolls the speculative instruction
+back.
 
 ## Non-Tier-3 validation
 
@@ -131,19 +143,19 @@ focused_codegen_canaries=2/2; execution_cases=35; local_fail=0
 integrated_exe=7/7; local_fail=0
 ```
 
-The lifetime correction then passed its bounded validation after the final
-code change:
+The final escape closure passed its bounded validation after the final code
+change:
 
 ```text
-lifetime_followup_value_use_focused=17/17
-lifetime_followup_source_guard_focused=18/18
-lifetime_followup_full_unit=1124/1124
-lifetime_followup_source_guard=current-tree-pass; frozen-bypass-inventory-exact
-lifetime_followup_production_consumer_wiring=none
+escape_closure_value_use_focused=17/17
+escape_closure_source_guard_focused=18/18
+escape_closure_full_unit=1124/1124
+escape_closure_source_guard=current-tree-pass; frozen-bypass-inventory-exact
+escape_closure_production_consumer_wiring=none
 ```
 
-The fresh post-follow-up-code whole-cohort log is
-`tmp/inbox85_followup_full_report.log`:
+The fresh post-escape-closure whole-cohort log is
+`tmp/inbox85_followup2_full_report.log`:
 
 ```text
 report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681

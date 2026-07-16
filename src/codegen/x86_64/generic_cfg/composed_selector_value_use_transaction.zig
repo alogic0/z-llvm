@@ -94,11 +94,58 @@ pub const ValueUseTransaction = struct {
         generation: u32,
     };
 
-    /// Phase-bound capability for reading one prepared view. The view is
-    /// re-resolved and revalidated when the lease is read.
+    /// Phase-bound capability for executing one sealed prepared action. It
+    /// contains no source location or representation.
     pub const PreparedViewLease = struct {
         request: RequestHandle,
         view_generation: u32,
+    };
+
+    /// Closed source-view contracts used by validation actions. Every field is
+    /// caller-supplied intent; the authority never returns discovered storage.
+    pub const PreparedShape = union(enum) {
+        register_gpr32: ArgReg,
+        register_gpr64: ArgReg,
+        register_eax,
+        register_rax,
+        scalar_spill: FrameIndex,
+        stack_scalar: u32,
+        stack_integer128: u32,
+        stack_i32_array: selector_types.StackArrayLoc,
+        address_descriptor: struct { has_index: bool, has_addend: bool },
+        table_register: ArgReg,
+        table_spill: FrameIndex,
+        pair_register: RegPair,
+        pair_spill: selector_types.PairSpillLoc,
+    };
+
+    /// A complete, typed operation over a prepared source. This descriptor is
+    /// registered before seal, so every physical destination participates in
+    /// conflict, preservation, and cycle planning. No variant exposes source
+    /// storage to its caller.
+    pub const PreparedAction = union(enum) {
+        validate_shape: PreparedShape,
+        emit_copy_to: CopyDestination,
+
+        fn eql(action: PreparedAction, other: PreparedAction) bool {
+            return std.meta.eql(action, other);
+        }
+    };
+
+    pub const CopyDestination = union(enum) {
+        gpr32: ArgReg,
+        gpr64: ArgReg,
+        eax,
+        rax,
+
+        fn asDestination(copy_destination: CopyDestination) Destination {
+            return switch (copy_destination) {
+                .gpr32 => |reg| .{ .gpr32 = reg },
+                .gpr64 => |reg| .{ .gpr64 = reg },
+                .eax => .eax,
+                .rax => .rax,
+            };
+        }
     };
 
     const PreparedIdentity = struct {
@@ -192,6 +239,7 @@ pub const ValueUseTransaction = struct {
         expected: Expected,
         form: UseForm,
         destination: Destination,
+        prepared_action: ?PreparedAction = null,
     };
 
     pub const RequestPhase = enum {
@@ -263,12 +311,14 @@ pub const ValueUseTransaction = struct {
         expected: Expected,
         form: UseForm,
         destination: Destination,
+        prepared_action: ?PreparedAction,
 
         fn eql(request: *const StoredRequest, other: *const StoredRequest) bool {
             return request.source.eql(&other.source) and
                 request.expected.eql(other.expected) and
                 request.form == other.form and
-                request.destination.eql(other.destination);
+                request.destination.eql(other.destination) and
+                optionalPreparedActionEql(request.prepared_action, other.prepared_action);
         }
     };
 
@@ -403,12 +453,17 @@ pub const ValueUseTransaction = struct {
             .expected = request.expected,
             .form = request.form,
             .destination = request.destination,
+            .prepared_action = request.prepared_action,
         };
         for (transaction.requests[0..transaction.request_count], 0..) |*existing, index| {
             if (!stored.source.eql(&existing.source)) continue;
             if (!stored.expected.eql(existing.expected) or stored.form != existing.form)
                 return error.ValueUseIncompatibleDuplicate;
-            if (stored.destination.eql(existing.destination)) return transaction.handleFor(@intCast(index));
+            if (stored.destination.eql(existing.destination) and
+                optionalPreparedActionEql(stored.prepared_action, existing.prepared_action))
+            {
+                return transaction.handleFor(@intCast(index));
+            }
         }
         if (transaction.request_count == max_requests) return error.ValueUseRequestCapacityExceeded;
         const index = transaction.request_count;
@@ -463,7 +518,7 @@ pub const ValueUseTransaction = struct {
 
         var nodes = transaction.write_nodes;
         for (transaction.requests[0..transaction.request_count]) |*request| {
-            if (request.destination == .prepared_view) continue;
+            if (request.destination == .prepared_view and request.prepared_action.? == .validate_shape) continue;
             if (request.form != .pointer and request.form != .stack_object_address) continue;
             const current = switch (request.source) {
                 .named => |*name| try transaction.resolveNamedCurrent(name.slice()),
@@ -513,13 +568,11 @@ pub const ValueUseTransaction = struct {
         return .{ .request = handle, .view_generation = transaction.view_generation };
     }
 
-    /// Consumes a phase-bound borrow without returning a retainable location.
-    /// Every consumption checks the generation, re-resolves canonical state,
-    /// and rejects relocation/rebinding before invoking the consumer. The
-    /// consumer must expose `consume(*const opaque_view) !void`; the private
-    /// borrow is valid only for that call and cannot be named by production
-    /// consumers.
-    pub fn consumePreparedView(transaction: *ValueUseTransaction, lease: PreparedViewLease, consumer: anytype) !void {
+    /// Executes the request's sealed, typed action entirely inside the
+    /// transaction authority. No private representation or source location
+    /// crosses this API. Canonical pre/post derivation remains defense in
+    /// depth around the internal action emission.
+    pub fn executePreparedAction(transaction: *ValueUseTransaction, lease: PreparedViewLease) !void {
         try transaction.requireActive();
         if (lease.view_generation != transaction.view_generation)
             return error.ValueUsePreparedViewStale;
@@ -531,13 +584,15 @@ pub const ValueUseTransaction = struct {
         const refreshed = try transaction.buildPreparedRecord(&transaction.requests[index]);
         if (!preparedRecordEql(&transaction.prepared_views[index], &refreshed))
             return error.ValueUsePreparedViewStale;
-        try consumer.consume(&refreshed.view);
-        // Defense in depth for a consumer that violates the borrow contract:
-        // any source mutation during consumption makes the entire instruction
-        // authority fail and roll back, including speculative emission.
+        const action = transaction.requests[index].prepared_action orelse
+            return error.ValueUsePreparedActionMissing;
+        try executePreparedActionInternal(transaction.selector, &refreshed.view, transaction.requests[index].form, action);
+        // Defense in depth: even the closed internal action must not relocate
+        // or rebind its source. Any violation rolls back speculative emission.
         const after_consumption = try transaction.buildPreparedRecord(&transaction.requests[index]);
         if (!preparedRecordEql(&transaction.prepared_views[index], &after_consumption))
             return error.ValueUsePreparedViewStale;
+        transaction.prepared_view_valid[index] = false;
     }
 
     pub fn commit(transaction: *ValueUseTransaction) !void {
@@ -668,6 +723,14 @@ pub const ValueUseTransaction = struct {
         };
     }
 };
+
+fn optionalPreparedActionEql(
+    lhs: ?ValueUseTransaction.PreparedAction,
+    rhs: ?ValueUseTransaction.PreparedAction,
+) bool {
+    if ((lhs == null) != (rhs == null)) return false;
+    return if (lhs) |action| action.eql(rhs.?) else true;
+}
 
 fn preparedViewFromLoc(
     transaction: *ValueUseTransaction,
@@ -808,6 +871,99 @@ fn preparedPairView(
         .{ .first = high, .second = low } };
 }
 
+fn executePreparedActionInternal(
+    selector: *ComposedBlockSelector,
+    view: *const ValueUseTransaction.PreparedView,
+    form: ValueUseTransaction.UseForm,
+    action: ValueUseTransaction.PreparedAction,
+) !void {
+    switch (action) {
+        .validate_shape => |expected_shape| try validatePreparedShape(view, expected_shape),
+        .emit_copy_to => |destination| {
+            const current = try preparedViewLoc(view);
+            const target = destination.asDestination();
+            switch (form) {
+                .gpr32 => try materializeScalar32(selector, current, target),
+                .gpr64 => try materializeScalar64(selector, current, target),
+                .pointer, .stack_object_address => try materializePointer(selector, current, target),
+                .pair_low_high, .pair_high_low => return error.ValueUsePreparedActionFormMismatch,
+                .stack_argument => return error.ValueUseStackArgumentUnsupported,
+                .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
+            }
+        },
+    }
+}
+
+fn validatePreparedShape(
+    view: *const ValueUseTransaction.PreparedView,
+    expected: ValueUseTransaction.PreparedShape,
+) !void {
+    const matches = switch (expected) {
+        .register_gpr32 => |reg| view.* == .register and
+            view.register.register == .gpr32 and view.register.register.gpr32 == reg,
+        .register_gpr64 => |reg| view.* == .register and
+            view.register.register == .gpr64 and view.register.register.gpr64 == reg,
+        .register_eax => view.* == .register and view.register.register == .eax,
+        .register_rax => view.* == .register and view.register.register == .rax,
+        .scalar_spill => |frame_index| view.* == .spill and view.spill.frame_index.eql(frame_index),
+        .stack_scalar => |disp| view.* == .stack_object and
+            view.stack_object == .scalar and view.stack_object.scalar.base_disp == disp,
+        .stack_integer128 => |disp| view.* == .stack_object and
+            view.stack_object == .integer128 and view.stack_object.integer128 == disp,
+        .stack_i32_array => |array| view.* == .stack_object and
+            view.stack_object == .integer32_array and std.meta.eql(view.stack_object.integer32_array, array),
+        .address_descriptor => |shape| view.* == .address_descriptor and
+            (view.address_descriptor.index != null) == shape.has_index and
+            (view.address_descriptor.addend != null) == shape.has_addend,
+        .table_register => |reg| view.* == .table_pointer and
+            view.table_pointer.storage == .register and view.table_pointer.storage.register == reg,
+        .table_spill => |frame_index| view.* == .table_pointer and
+            view.table_pointer.storage == .spill and view.table_pointer.storage.spill.eql(frame_index),
+        .pair_register => |pair| view.* == .read_only_pair and
+            view.read_only_pair.first == .register and view.read_only_pair.second == .register and
+            view.read_only_pair.first.register == pair.lo and view.read_only_pair.second.register == pair.hi,
+        .pair_spill => |pair| view.* == .read_only_pair and
+            view.read_only_pair.first == .spill and view.read_only_pair.second == .spill and
+            view.read_only_pair.first.spill.eql(pair.lo) and view.read_only_pair.second.spill.eql(pair.hi),
+    };
+    if (!matches) return error.ValueUsePreparedShapeMismatch;
+}
+
+fn preparedViewLoc(view: *const ValueUseTransaction.PreparedView) !ValueLoc {
+    return switch (view.*) {
+        .register => |value| switch (value.register) {
+            .gpr32 => |reg| .{ .scratch32 = reg },
+            .gpr64 => |reg| .{ .scratch64 = reg },
+            .eax => .eax,
+            .rax => .rax,
+        },
+        .spill => |value| .{ .spill64 = value.frame_index },
+        .stack_object => |object| switch (object) {
+            .scalar => |stack| .{ .stack_scalar = stack },
+            .integer128 => |disp| .{ .stack128 = disp },
+            .integer32_array => |array| .{ .stack_i32_array = array },
+        },
+        .address_descriptor => |*address| .{ .stack_i32_ptr = .{
+            .disp = address.disp,
+            .index = if (address.index) |*index| .{
+                .reg = .rcx,
+                .name = index.identity.slice(),
+                .addend_name = if (address.addend) |*addend| addend.identity.slice() else null,
+            } else null,
+        } },
+        .table_pointer => |*table| .{ .readonly_table_ptr = .{
+            .storage = switch (table.storage) {
+                .register => |reg| .{ .reg = reg },
+                .spill => |frame_index| .{ .spill = frame_index },
+            },
+            .symbol = table.symbol.slice(),
+            .shape = table.shape,
+            .offset = table.offset,
+        } },
+        .read_only_pair => error.ValueUsePreparedActionFormMismatch,
+    };
+}
+
 fn preparedRecordEql(
     lhs: *const ValueUseTransaction.PreparedRecord,
     rhs: *const ValueUseTransaction.PreparedRecord,
@@ -909,12 +1065,18 @@ const MappingList = struct {
 
 fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest) !void {
     if (request.destination == .prepared_view) {
-        return switch (request.form) {
+        const action = request.prepared_action orelse return error.ValueUsePreparedActionMissing;
+        switch (request.form) {
             .gpr32, .gpr64, .pointer, .stack_object_address, .pair_low_high, .pair_high_low => {},
-            .stack_argument => error.ValueUseStackArgumentUnsupported,
-            .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
+            .stack_argument => return error.ValueUseStackArgumentUnsupported,
+            .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
+        }
+        return switch (action) {
+            .validate_shape => {},
+            .emit_copy_to => |destination| validateCopyActionForm(request.form, destination),
         };
     }
+    if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
     const valid = switch (request.form) {
         .gpr32 => request.destination == .gpr32 or request.destination == .eax,
         .gpr64 => request.destination == .gpr64 or request.destination == .rax,
@@ -996,7 +1158,13 @@ fn requestDestinationNodes(request: *const ValueUseTransaction.StoredRequest) !N
             try result.append(nodeForArgReg(pair.lo));
             try result.append(nodeForArgReg(pair.hi));
         },
-        .prepared_view => {},
+        .prepared_view => switch (request.prepared_action orelse return error.ValueUsePreparedActionMissing) {
+            .validate_shape => {},
+            .emit_copy_to => |destination| switch (destination) {
+                .gpr32, .gpr64 => |reg| try result.append(nodeForArgReg(reg)),
+                .eax, .rax => try result.append(.accumulator),
+            },
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -1005,7 +1173,8 @@ fn requestDestinationNodes(request: *const ValueUseTransaction.StoredRequest) !N
 
 fn requestMappings(request: *const ValueUseTransaction.StoredRequest, current: ?ValueLoc) !MappingList {
     var mappings: MappingList = .{};
-    if (request.destination == .prepared_view) return mappings;
+    if (request.destination == .prepared_view and request.prepared_action.? == .validate_shape)
+        return mappings;
     const destinations = try requestDestinationNodes(request);
     if (current == null) {
         for (destinations.slice()) |destination| mappings.append(.{ .source = null, .destination = destination });
@@ -1026,6 +1195,20 @@ fn requestMappings(request: *const ValueUseTransaction.StoredRequest, current: ?
     }
     mappings.append(.{ .source = scalarSourceNode(current.?), .destination = destinations.items[0] });
     return mappings;
+}
+
+fn validateCopyActionForm(
+    form: ValueUseTransaction.UseForm,
+    destination: ValueUseTransaction.CopyDestination,
+) !void {
+    const valid = switch (form) {
+        .gpr32 => destination == .gpr32 or destination == .eax,
+        .gpr64, .pointer, .stack_object_address => destination == .gpr64 or destination == .rax,
+        .pair_low_high, .pair_high_low => false,
+        .stack_argument => return error.ValueUseStackArgumentUnsupported,
+        .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
+    };
+    if (!valid) return error.ValueUsePreparedActionFormMismatch;
 }
 
 fn scalarSourceNode(loc: ValueLoc) ?ValueUseTransaction.PhysicalNode {

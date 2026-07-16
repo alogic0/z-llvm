@@ -40,91 +40,17 @@ fn request(
     };
 }
 
-const PreparedExpectation = union(enum) {
-    register_gpr64: selector_types.ArgReg,
-    spill: selector_types.FrameIndex,
-    stack_scalar: u32,
-    address: struct { index: []const u8, addend: []const u8 },
-    table_spill: struct { frame_index: selector_types.FrameIndex, symbol: []const u8 },
-    table_register: struct { reg: selector_types.ArgReg, symbol: []const u8 },
-    pair_register: selector_types.RegPair,
-    pair_spill: selector_types.PairSpillLoc,
-};
-
-const PreparedConsumer = struct {
-    expected_view: PreparedExpectation,
-    calls: usize = 0,
-
-    pub fn consume(consumer: *PreparedConsumer, view: anytype) !void {
-        consumer.calls += 1;
-        switch (consumer.expected_view) {
-            .register_gpr64 => |expected_reg| {
-                try std.testing.expect(view.* == .register);
-                try std.testing.expect(view.register.register == .gpr64);
-                try std.testing.expectEqual(expected_reg, view.register.register.gpr64);
-            },
-            .spill => |expected_frame| {
-                try std.testing.expect(view.* == .spill);
-                try std.testing.expectEqual(expected_frame, view.spill.frame_index);
-            },
-            .stack_scalar => |expected_disp| {
-                try std.testing.expect(view.* == .stack_object);
-                try std.testing.expectEqual(expected_disp, view.stack_object.scalar.base_disp);
-            },
-            .address => |expected_address| {
-                try std.testing.expect(view.* == .address_descriptor);
-                const index = view.address_descriptor.index.?;
-                const addend = view.address_descriptor.addend.?;
-                try std.testing.expectEqualStrings(expected_address.index, index.identity.bytes[0..index.identity.len]);
-                try std.testing.expectEqualStrings(expected_address.addend, addend.identity.bytes[0..addend.identity.len]);
-            },
-            .table_spill => |expected_table| {
-                try std.testing.expect(view.* == .table_pointer);
-                try std.testing.expect(view.table_pointer.storage == .spill);
-                try std.testing.expectEqual(expected_table.frame_index, view.table_pointer.storage.spill);
-                const symbol = view.table_pointer.symbol;
-                try std.testing.expectEqualStrings(expected_table.symbol, symbol.bytes[0..symbol.len]);
-            },
-            .table_register => |expected_table| {
-                try std.testing.expect(view.* == .table_pointer);
-                try std.testing.expect(view.table_pointer.storage == .register);
-                try std.testing.expectEqual(expected_table.reg, view.table_pointer.storage.register);
-                const symbol = view.table_pointer.symbol;
-                try std.testing.expectEqualStrings(expected_table.symbol, symbol.bytes[0..symbol.len]);
-            },
-            .pair_register => |expected_pair| {
-                try std.testing.expect(view.* == .read_only_pair);
-                try std.testing.expectEqual(expected_pair.lo, view.read_only_pair.first.register);
-                try std.testing.expectEqual(expected_pair.hi, view.read_only_pair.second.register);
-            },
-            .pair_spill => |expected_pair| {
-                try std.testing.expect(view.* == .read_only_pair);
-                try std.testing.expectEqual(expected_pair.lo, view.read_only_pair.first.spill);
-                try std.testing.expectEqual(expected_pair.hi, view.read_only_pair.second.spill);
-            },
-        }
-    }
-};
-
-const CountingPreparedConsumer = struct {
-    calls: usize = 0,
-
-    pub fn consume(consumer: *CountingPreparedConsumer, view: anytype) !void {
-        _ = view;
-        consumer.calls += 1;
-    }
-};
-
-const EmittingPreparedConsumer = struct {
-    machine: *MachineFunction,
-    calls: usize = 0,
-
-    pub fn consume(consumer: *EmittingPreparedConsumer, view: anytype) !void {
-        _ = view;
-        consumer.calls += 1;
-        try consumer.machine.instructions.append(std.testing.allocator, .{ .mov_imm_rax = 7 });
-    }
-};
+fn preparedRequest(
+    name: []const u8,
+    ty: ir.Type,
+    class: selector_types.VirtualRegClass,
+    form: Transaction.UseForm,
+    action: Transaction.PreparedAction,
+) Transaction.Request {
+    var result = request(name, ty, class, form, .prepared_view);
+    result.prepared_action = action;
+    return result;
+}
 
 test "value-use transaction exposes fixed copy-amplification contract" {
     try std.testing.expectEqual(@as(usize, 16), Transaction.max_requests);
@@ -305,6 +231,7 @@ test "value-use transaction null pointers are typed direct materializations with
     defer prepared.deinit();
     var prepared_null = accepted;
     prepared_null.destination = .prepared_view;
+    prepared_null.prepared_action = .{ .validate_shape = .{ .register_gpr64 = .rdi } };
     _ = try prepared.register(prepared_null);
     try std.testing.expectError(error.ValueUsePreparedViewUnsupported, prepared.seal());
     try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
@@ -365,6 +292,18 @@ test "value-use transaction phase capacity identity and coalescing rules fail be
     defer unsealed.deinit();
     try std.testing.expectError(error.ValueUsePrepareBeforeSeal, unsealed.prepare());
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+
+    var missing_action = try Transaction.begin(&selector);
+    defer missing_action.deinit();
+    _ = try missing_action.register(request("stable", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    try std.testing.expectError(error.ValueUsePreparedActionMissing, missing_action.seal());
+
+    var unexpected_action = try Transaction.begin(&selector);
+    defer unexpected_action.deinit();
+    var fixed_with_action = request("stable", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rsi });
+    fixed_with_action.prepared_action = .{ .emit_copy_to = .{ .gpr64 = .rsi } };
+    _ = try unexpected_action.register(fixed_with_action);
+    try std.testing.expectError(error.ValueUsePreparedActionUnexpected, unexpected_action.seal());
 }
 
 test "value-use transaction separates safe overlap from genuine copy cycles and conflicting destinations" {
@@ -401,6 +340,18 @@ test "value-use transaction separates safe overlap from genuine copy cycles and 
     _ = try conflict.register(request("left", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .r9 }));
     _ = try conflict.register(request("third", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .r9 }));
     try std.testing.expectError(error.ValueUseConflictingDestination, conflict.seal());
+
+    var action_conflict = try Transaction.begin(&selector);
+    defer action_conflict.deinit();
+    _ = try action_conflict.register(preparedRequest(
+        "left",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .emit_copy_to = .{ .gpr64 = .r9 } },
+    ));
+    _ = try action_conflict.register(request("third", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .r9 }));
+    try std.testing.expectError(error.ValueUseConflictingDestination, action_conflict.seal());
 }
 
 test "value-use transaction removes dead aliases and preserves live aliases exactly once before re-resolution" {
@@ -583,35 +534,23 @@ test "value-use transaction exposes every restricted prepared-view member and bo
     var transaction = try Transaction.begin(&selector);
     defer transaction.deinit();
     const handles = [_]Transaction.RequestHandle{
-        try transaction.register(request("reg", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view)),
-        try transaction.register(request("spill", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view)),
-        try transaction.register(request("stack", .ptr, .stack_object, .stack_object_address, .prepared_view)),
-        try transaction.register(request("address", .ptr, .stack_pointer, .pointer, .prepared_view)),
-        try transaction.register(request("table", .ptr, .stack_pointer, .pointer, .prepared_view)),
-        try transaction.register(request("table-reg", .ptr, .stack_pointer, .pointer, .prepared_view)),
-        try transaction.register(request("pair-lo", .{ .int = 128 }, .gpr128, .pair_low_high, .prepared_view)),
-        try transaction.register(request("pair-hi", .{ .int = 128 }, .gpr128, .pair_high_low, .prepared_view)),
+        try transaction.register(preparedRequest("reg", .{ .int = 64 }, .gpr64, .gpr64, .{ .validate_shape = .{ .register_gpr64 = .rdi } })),
+        try transaction.register(preparedRequest("spill", .{ .int = 64 }, .gpr64, .gpr64, .{ .validate_shape = .{ .scalar_spill = .slot0 } })),
+        try transaction.register(preparedRequest("stack", .ptr, .stack_object, .stack_object_address, .{ .validate_shape = .{ .stack_scalar = 16 } })),
+        try transaction.register(preparedRequest("address", .ptr, .stack_pointer, .pointer, .{ .validate_shape = .{ .address_descriptor = .{ .has_index = true, .has_addend = true } } })),
+        try transaction.register(preparedRequest("table", .ptr, .stack_pointer, .pointer, .{ .validate_shape = .{ .table_spill = .slot2 } })),
+        try transaction.register(preparedRequest("table-reg", .ptr, .stack_pointer, .pointer, .{ .validate_shape = .{ .table_register = .r9 } })),
+        try transaction.register(preparedRequest("pair-lo", .{ .int = 128 }, .gpr128, .pair_low_high, .{ .validate_shape = .{ .pair_register = .{ .lo = .rcx, .hi = .rdx } } })),
+        try transaction.register(preparedRequest("pair-hi", .{ .int = 128 }, .gpr128, .pair_high_low, .{ .validate_shape = .{ .pair_spill = .{ .lo = .slot4, .hi = .slot3 } } })),
     };
     try transaction.seal();
     try std.testing.expectError(error.ValueUsePreparedViewUnavailable, transaction.preparedView(handles[0]));
     try transaction.prepare();
     try transaction.materializeAll();
 
-    const expectations = [_]PreparedExpectation{
-        .{ .register_gpr64 = .rdi },
-        .{ .spill = .slot0 },
-        .{ .stack_scalar = 16 },
-        .{ .address = .{ .index = "index", .addend = "addend" } },
-        .{ .table_spill = .{ .frame_index = .slot2, .symbol = "@prepared-table" } },
-        .{ .table_register = .{ .reg = .r9, .symbol = "@prepared-table-reg" } },
-        .{ .pair_register = .{ .lo = .rcx, .hi = .rdx } },
-        .{ .pair_spill = .{ .lo = .slot4, .hi = .slot3 } },
-    };
-    for (handles, expectations) |handle, expected_view| {
+    for (handles) |handle| {
         const lease = try transaction.preparedView(handle);
-        var consumer = PreparedConsumer{ .expected_view = expected_view };
-        try transaction.consumePreparedView(lease, &consumer);
-        try std.testing.expectEqual(@as(usize, 1), consumer.calls);
+        try transaction.executePreparedAction(lease);
     }
     try transaction.commit();
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
@@ -660,7 +599,13 @@ test "value-use prepared capabilities reject source relocation before production
 
     var transaction = try Transaction.begin(&selector);
     defer transaction.deinit();
-    const handle = try transaction.register(request("source", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    const handle = try transaction.register(preparedRequest(
+        "source",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .validate_shape = .{ .register_gpr64 = .rdi } },
+    ));
     try transaction.seal();
     try transaction.prepare();
     try transaction.materializeAll();
@@ -670,28 +615,57 @@ test "value-use prepared capabilities reject source relocation before production
 
     var invalidated = try Transaction.begin(&selector);
     defer invalidated.deinit();
-    const invalidated_handle = try invalidated.register(request("source", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    const invalidated_handle = try invalidated.register(preparedRequest(
+        "source",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .emit_copy_to = .rax },
+    ));
     try invalidated.seal();
     try invalidated.prepare();
     try invalidated.materializeAll();
     const lease = try invalidated.preparedView(invalidated_handle);
-    var first_consumer = CountingPreparedConsumer{};
-    try invalidated.consumePreparedView(lease, &first_consumer);
-    try std.testing.expectEqual(@as(usize, 1), first_consumer.calls);
 
     // Use the production binding authority to relocate the source after the
     // capability is acquired. Canonical-record validation must reject the old
-    // capability before the consumer can append an instruction.
+    // capability before the closed action can append an instruction.
     try selector_state.bindValueLoc(&selector, "source", .{ .arg64 = .rsi });
-    var emitting_consumer = EmittingPreparedConsumer{ .machine = &machine };
-    try std.testing.expectError(error.ValueUsePreparedViewStale, invalidated.consumePreparedView(lease, &emitting_consumer));
-    try std.testing.expectEqual(@as(usize, 0), emitting_consumer.calls);
+    try std.testing.expectError(error.ValueUsePreparedViewStale, invalidated.executePreparedAction(lease));
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
     try std.testing.expectEqual(ValueLoc{ .arg64 = .rdi }, selector.values.get("source").?.loc);
 
+    // The same typed action emits from the internally held view when the
+    // canonical source remains unchanged. No location crosses the API.
+    var internal_emit = try Transaction.begin(&selector);
+    defer internal_emit.deinit();
+    const emit_handle = try internal_emit.register(preparedRequest(
+        "source",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .emit_copy_to = .rax },
+    ));
+    try internal_emit.seal();
+    try internal_emit.prepare();
+    try internal_emit.materializeAll();
+    const emit_lease = try internal_emit.preparedView(emit_handle);
+    try internal_emit.executePreparedAction(emit_lease);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expect(machine.instructions.items[0] == .mov_arg_rax);
+    try std.testing.expectEqual(selector_types.ArgReg.rdi, machine.instructions.items[0].mov_arg_rax);
+    try std.testing.expectError(error.ValueUsePreparedViewMissing, internal_emit.executePreparedAction(emit_lease));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+
     var foreign = try Transaction.begin(&selector);
     defer foreign.deinit();
-    const foreign_handle = try foreign.register(request("source", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    const foreign_handle = try foreign.register(preparedRequest(
+        "source",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .validate_shape = .{ .register_gpr64 = .rdi } },
+    ));
     try foreign.seal();
     try foreign.prepare();
     try foreign.materializeAll();
@@ -715,19 +689,23 @@ test "value-use mixed fixed and prepared requests resolve views only after fixed
     var transaction = try Transaction.begin(&selector);
     defer transaction.deinit();
     _ = try transaction.register(request("fixed", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rsi }));
-    const view_handle = try transaction.register(request("view", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    const view_handle = try transaction.register(preparedRequest(
+        "view",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .validate_shape = .{ .scalar_spill = .slot0 } },
+    ));
     try transaction.seal();
     try transaction.prepare();
     try std.testing.expect(selector.values.get("view").?.loc == .spill64);
     try transaction.materializeAll();
     const lease = try transaction.preparedView(view_handle);
-    var consumer = PreparedConsumer{ .expected_view = .{ .spill = selector.values.get("view").?.loc.spill64 } };
-    try transaction.consumePreparedView(lease, &consumer);
-    try std.testing.expectEqual(@as(usize, 1), consumer.calls);
+    try transaction.executePreparedAction(lease);
     try transaction.commit();
 }
 
-test "value-use prepared views revalidate type class and canonical dependencies on every read" {
+test "value-use prepared actions revalidate type class and canonical dependencies on every execution" {
     var machine = MachineFunction.init("value-use-view-revalidation", .ptr);
     defer machine.deinit(std.testing.allocator);
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
@@ -746,28 +724,36 @@ test "value-use prepared views revalidate type class and canonical dependencies 
     const scalar_binding = selector.values.get("scalar").?;
     var type_transaction = try Transaction.begin(&selector);
     defer type_transaction.deinit();
-    const scalar_handle = try type_transaction.register(request("scalar", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    const scalar_handle = try type_transaction.register(preparedRequest(
+        "scalar",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .validate_shape = .{ .register_gpr64 = .rdi } },
+    ));
     try type_transaction.seal();
     try type_transaction.prepare();
     try type_transaction.materializeAll();
     const scalar_lease = try type_transaction.preparedView(scalar_handle);
     selector.values.getPtr("scalar").?.vreg.class = .gpr32;
-    var scalar_consumer = CountingPreparedConsumer{};
-    try std.testing.expectError(error.ValueUseRegisterClassMismatch, type_transaction.consumePreparedView(scalar_lease, &scalar_consumer));
-    try std.testing.expectEqual(@as(usize, 0), scalar_consumer.calls);
+    try std.testing.expectError(error.ValueUseRegisterClassMismatch, type_transaction.executePreparedAction(scalar_lease));
     try std.testing.expectEqual(scalar_binding, selector.values.get("scalar").?);
 
     var dependency_transaction = try Transaction.begin(&selector);
     defer dependency_transaction.deinit();
-    const address_handle = try dependency_transaction.register(request("address", .ptr, .stack_pointer, .pointer, .prepared_view));
+    const address_handle = try dependency_transaction.register(preparedRequest(
+        "address",
+        .ptr,
+        .stack_pointer,
+        .pointer,
+        .{ .validate_shape = .{ .address_descriptor = .{ .has_index = true, .has_addend = false } } },
+    ));
     try dependency_transaction.seal();
     try dependency_transaction.prepare();
     try dependency_transaction.materializeAll();
     const address_lease = try dependency_transaction.preparedView(address_handle);
     _ = selector.values.remove("index");
-    var address_consumer = CountingPreparedConsumer{};
-    try std.testing.expectError(error.AddressDependencyMissingBinding, dependency_transaction.consumePreparedView(address_lease, &address_consumer));
-    try std.testing.expectEqual(@as(usize, 0), address_consumer.calls);
+    try std.testing.expectError(error.AddressDependencyMissingBinding, dependency_transaction.executePreparedAction(address_lease));
     try std.testing.expect(selector.values.get("index") != null);
 }
 
@@ -788,13 +774,18 @@ test "value-use rollback releases speculative owned labels after instructions an
 
     var rollback_transaction = try Transaction.begin(&selector);
     defer rollback_transaction.deinit();
-    const rollback_handle = try rollback_transaction.register(request("source", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    const rollback_handle = try rollback_transaction.register(preparedRequest(
+        "source",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .validate_shape = .{ .register_gpr64 = .rdi } },
+    ));
     try rollback_transaction.seal();
     try rollback_transaction.prepare();
     try rollback_transaction.materializeAll();
     const rollback_lease = try rollback_transaction.preparedView(rollback_handle);
-    var rollback_consumer = CountingPreparedConsumer{};
-    try rollback_transaction.consumePreparedView(rollback_lease, &rollback_consumer);
+    try rollback_transaction.executePreparedAction(rollback_lease);
     const first = try selector_state.allocateEdgeLabel(&selector);
     const second = try selector_state.allocateEdgeLabel(&selector);
     try machine.instructions.append(std.testing.allocator, .{ .label = first });
@@ -807,7 +798,13 @@ test "value-use rollback releases speculative owned labels after instructions an
 
     var failure_transaction = try Transaction.begin(&selector);
     defer failure_transaction.deinit();
-    const failure_handle = try failure_transaction.register(request("source", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    const failure_handle = try failure_transaction.register(preparedRequest(
+        "source",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .validate_shape = .{ .register_gpr64 = .rdi } },
+    ));
     try failure_transaction.seal();
     try failure_transaction.prepare();
     try failure_transaction.materializeAll();
@@ -817,8 +814,7 @@ test "value-use rollback releases speculative owned labels after instructions an
     try machine.instructions.append(std.testing.allocator, .{ .label = third });
     try machine.instructions.append(std.testing.allocator, .{ .label = fourth });
     _ = selector.values.remove("source");
-    var failure_consumer = CountingPreparedConsumer{};
-    try std.testing.expectError(error.ValueUseUnresolvedSource, failure_transaction.consumePreparedView(failure_lease, &failure_consumer));
+    try std.testing.expectError(error.ValueUseUnresolvedSource, failure_transaction.executePreparedAction(failure_lease));
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
     try std.testing.expectEqual(@as(usize, 1), machine.owned_labels.items.len);
     try std.testing.expectEqual(retained_pointer, machine.owned_labels.items[0].ptr);
@@ -826,7 +822,13 @@ test "value-use rollback releases speculative owned labels after instructions an
 
     var commit_transaction = try Transaction.begin(&selector);
     defer commit_transaction.deinit();
-    const commit_handle = try commit_transaction.register(request("source", .{ .int = 64 }, .gpr64, .gpr64, .prepared_view));
+    const commit_handle = try commit_transaction.register(preparedRequest(
+        "source",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .validate_shape = .{ .register_gpr64 = .rdi } },
+    ));
     try commit_transaction.seal();
     try commit_transaction.prepare();
     try commit_transaction.materializeAll();
