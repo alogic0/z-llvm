@@ -18,7 +18,6 @@ composed_selector_calls.zig	lowerFpAbs	materializeLocIntoLoc×1, resolveValue×1
 composed_selector_calls.zig	lowerFpBarrier	resolveValue×2
 composed_selector_calls.zig	lowerFshlI32	emitValueIntoScratch×1
 composed_selector_calls.zig	lowerI128Compare	resolvePairValue×2
-composed_selector_calls.zig	lowerInlineMemcpy	emitValueIntoScratch×3
 composed_selector_calls.zig	lowerIntByteSizeCall	emitValueIntoScratch×1
 composed_selector_calls.zig	lowerSmulOverflowI64	emitValueIntoAccumulator×1, emitValueIntoScratch×1
 composed_selector_calls.zig	lowerUnsignedOverflowI32	emitValueIntoEax×1, emitValueIntoScratch×1, resolveValue×1

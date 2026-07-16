@@ -1,7 +1,7 @@
 slice	file	function	gateway	occurrence	expected_before	expected_after	semantic_owner	disposition
-M-B	composed_selector_calls.zig	lowerInlineMemcpy	emitValueIntoScratch	1	3	0	destination pointer -> RDI	migrate only with complete lowerInlineMemcpy authority
-M-B	composed_selector_calls.zig	lowerInlineMemcpy	emitValueIntoScratch	2	3	0	source pointer -> RSI	migrate only with complete lowerInlineMemcpy authority
-M-B	composed_selector_calls.zig	lowerInlineMemcpy	emitValueIntoScratch	3	3	0	length i64 -> RDX	migrate only with complete lowerInlineMemcpy authority
+M-B	composed_selector_calls.zig	lowerInlineMemcpy	emitValueIntoScratch	1	3	0	destination pointer -> RDI	migrated with complete lowerInlineMemcpy authority
+M-B	composed_selector_calls.zig	lowerInlineMemcpy	emitValueIntoScratch	2	3	0	source pointer -> RSI	migrated with complete lowerInlineMemcpy authority
+M-B	composed_selector_calls.zig	lowerInlineMemcpy	emitValueIntoScratch	3	3	0	length i64 -> RDX	migrated with complete lowerInlineMemcpy authority
 # frozen_global_bypass_occurrences_before=231
 # frozen_global_bypass_occurrences_after_M-B=228
 # M-A production occurrence change=0

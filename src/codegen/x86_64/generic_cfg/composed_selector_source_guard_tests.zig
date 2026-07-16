@@ -40,7 +40,7 @@ const classified_sources = [_]ClassifiedSource{
 };
 
 const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-const frozen_bypass_inventory_sha256 = "3bac06156864f8cc276f816bfa8ceb904f1d0766fa22d13a8cf0af15489f447d";
+const frozen_bypass_inventory_sha256 = "a3cb560135662ded6f0a9abe004e9c4d2d5a5d43b4afc5c4bc666fdea0796abc";
 const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -444,16 +444,42 @@ fn validateFailureProvenanceProductionSites(source_name: []const u8, source: [:0
 }
 
 fn validateMemcpyActionProductionSites(source_name: []const u8, source: [:0]const u8) !void {
-    _ = source_name;
-    const forbidden = [_][]const u8{
-        ".form = .memcpy_pointer",
-        ".form = .memcpy_length",
-        ".inline_memcpy",
-        ".setMemcpyTestFailure(",
-    };
-    for (forbidden) |pattern| {
-        if (std.mem.indexOf(u8, source, pattern) != null)
-            return error.ValueUseMemcpyActionWiredBeforeReview;
+    const pointer_pattern = ".form = .memcpy_pointer";
+    const length_pattern = ".form = .memcpy_length";
+    const action_pattern = ".inline_memcpy";
+    const pointer_total = countPattern(source, pointer_pattern);
+    const length_total = countPattern(source, length_pattern);
+    const action_total = countPattern(source, action_pattern);
+    if (std.mem.indexOf(u8, source, ".setMemcpyTestFailure(") != null)
+        return error.ValueUseMemcpyTestHookInProduction;
+    if (!std.mem.eql(u8, source_name, "composed_selector_calls.zig")) {
+        if (pointer_total != 0 or length_total != 0 or action_total != 0)
+            return error.ValueUseMemcpyActionOutsideAllowlist;
+        return;
+    }
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const body = functionBodyNamed(bodies, "lowerInlineMemcpy") orelse
+        return error.ValueUseMemcpyActionAllowlistMismatch;
+    const function_source = source[body.start..body.end];
+    if (countPattern(function_source, pointer_pattern) != 2 or
+        countPattern(function_source, length_pattern) != 1 or
+        countPattern(function_source, action_pattern) != 1 or
+        pointer_total != 2 or length_total != 1 or action_total != 1)
+    {
+        return error.ValueUseMemcpyActionAllowlistMismatch;
+    }
+    const operand_validation = std.mem.indexOf(u8, function_source, "if (dst.ty != .ptr") orelse
+        return error.ValueUseMemcpyDispatchOrderingMismatch;
+    const transaction_begin = std.mem.indexOf(u8, function_source, "ValueUseTransaction.begin(selector)") orelse
+        return error.ValueUseMemcpyDispatchOrderingMismatch;
+    if (operand_validation >= transaction_begin or
+        countPattern(function_source, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(function_source, "spillLiveCallerClobbersForCall(") != 0 or
+        countPattern(function_source, "emitValueIntoScratch(") != 0)
+    {
+        return error.ValueUseMemcpyDispatchOrderingMismatch;
     }
 }
 
@@ -1533,14 +1559,14 @@ test "composed selector source guard rejects callback escapes and raw operations
         ),
     );
     try std.testing.expectError(
-        error.ValueUseMemcpyActionWiredBeforeReview,
+        error.ValueUseMemcpyActionOutsideAllowlist,
         validatePreparedViewLeafDiscipline(
-            "composed_selector_calls.zig",
+            "composed_selector_fixture.zig",
             "fn lowerInlineMemcpy() void { const action: Transaction.PreparedAction = .{ .inline_memcpy = intent }; _ = action; }",
         ),
     );
     try std.testing.expectError(
-        error.ValueUseMemcpyActionWiredBeforeReview,
+        error.ValueUseMemcpyTestHookInProduction,
         validatePreparedViewLeafDiscipline(
             "composed_selector_calls.zig",
             "fn lowerInlineMemcpy() void { _ = transaction.setMemcpyTestFailure(.after_source); }",
@@ -1584,6 +1610,31 @@ test "composed selector source guard confines failure provenance to the memcpy m
         validateFailureProvenanceProductionSites(
             "composed_selector_calls.zig",
             accepted ++ " fn successPath() void { _ = transaction.failedRequestIs(source); }",
+        ),
+    );
+}
+
+test "composed selector source guard freezes memcpy action to lowerInlineMemcpy" {
+    const accepted: [:0]const u8 =
+        "fn lowerInlineMemcpy() void { if (dst.ty != .ptr) return; " ++
+        "_ = ValueUseTransaction.begin(selector); " ++
+        "_ = .{ .form = .memcpy_pointer }; _ = .{ .form = .memcpy_length }; " ++
+        "_ = .{ .form = .memcpy_pointer, .inline_memcpy = intent }; }";
+    try validateMemcpyActionProductionSites("composed_selector_calls.zig", accepted);
+    try std.testing.expectError(
+        error.ValueUseMemcpyActionAllowlistMismatch,
+        validateMemcpyActionProductionSites(
+            "composed_selector_calls.zig",
+            accepted ++ " fn relocated() void { _ = .{ .form = .memcpy_pointer }; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseMemcpyDispatchOrderingMismatch,
+        validateMemcpyActionProductionSites(
+            "composed_selector_calls.zig",
+            "fn lowerInlineMemcpy() void { _ = ValueUseTransaction.begin(selector); " ++
+                "if (dst.ty != .ptr) return; _ = .{ .form = .memcpy_pointer }; " ++
+                "_ = .{ .form = .memcpy_length }; _ = .{ .form = .memcpy_pointer, .inline_memcpy = intent }; }",
         ),
     );
 }

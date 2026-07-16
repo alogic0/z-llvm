@@ -21,7 +21,7 @@ composed_selector_calls.zig	lowerFpAbs	resolveValue	1	1	4	O3-FP-XMM	retain_for_f
 composed_selector_calls.zig	lowerFpBarrier	resolveValue	1-2	2	4	O3-FP-XMM	retain_for_fp_migration	-
 composed_selector_calls.zig	lowerFshlI32	emitValueIntoScratch	1	1	3	O2-3B-O1	compose_with_accumulator_result_transaction	o1_fshl_i32
 composed_selector_calls.zig	lowerI128Compare	resolvePairValue	1-2	2	3	O2-3B-O1	compose_readonly_pair_uses_with_accumulator_result_transaction	o1_i128_compare
-composed_selector_calls.zig	lowerInlineMemcpy	emitValueIntoScratch	1-3	3	1	O2-3B+	migrate_complete_memcpy_consumer	use_inline_memcpy
+composed_selector_calls.zig	lowerInlineMemcpy	emitValueIntoScratch	1-3	3	1	O2-3M-B	migrated_complete_memcpy_consumer	use_inline_memcpy
 composed_selector_calls.zig	lowerIntByteSizeCall	emitValueIntoScratch	1	1	3	O2-3B-O1	compose_call_argument_with_call_result_transaction	o1_int_byte_size
 composed_selector_calls.zig	lowerSmulOverflowI64	emitValueIntoAccumulator	1	1	3	O2-3B-O1	compose_operands_with_full_product_result_interaction	o1_smul_overflow_i64
 composed_selector_calls.zig	lowerSmulOverflowI64	emitValueIntoScratch	1	1	3	O2-3B-O1	compose_operands_with_full_product_result_interaction	o1_smul_overflow_i64

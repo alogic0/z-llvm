@@ -13,6 +13,7 @@ const selector_scalar = @import("composed_selector_scalar.zig");
 const selector_frame = @import("composed_selector_frame.zig");
 const selector_fp = @import("composed_selector_fp.zig");
 const selector_memory = @import("composed_selector_memory.zig");
+const value_use = @import("composed_selector_value_use_transaction.zig");
 const intrinsic_attrs = @import("intrinsic_attrs.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
@@ -42,6 +43,7 @@ const PlannedValueAssignment = stage2_planning.PlannedValueAssignment;
 const SelectorAllocationPlan = stage2_planning.SelectorAllocationPlan;
 const SelectorValueInterval = stage2_planning.SelectorValueInterval;
 const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
+const ValueUseTransaction = value_use.ValueUseTransaction;
 const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const analyzeStageTwoNoSpillEnvelope = stage2_planning.analyzeStageTwoNoSpillEnvelope;
 const buildSelectorAllocationPlan = stage2_planning.buildSelectorAllocationPlan;
@@ -525,11 +527,85 @@ pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, 
         return .{ .no_emitter = "composed-block-memcpy-args" };
     }
 
-    if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
-    selector_state.emitValueIntoScratch(selector, dst.value, .rdi, 64) catch return .{ .unsupported_value = "composed-block-memcpy-dst" };
-    selector_state.emitValueIntoScratch(selector, src.value, .rsi, 64) catch return .{ .unsupported_value = "composed-block-memcpy-src" };
-    selector_state.emitValueIntoScratch(selector, len.value, .rdx, 64) catch return .{ .unsupported_value = "composed-block-memcpy-len" };
-    try selector.machine.instructions.append(selector.allocator, .memcpy_rdi_rsi_rdx_rax);
+    var authority = try ValueUseTransaction.begin(selector);
+    defer authority.deinit();
+    const source_request = authority.register(.{
+        .source = src.value,
+        .expected = .{ .ty = .ptr, .register_class = .gpr64, .pointer_address_space = 0 },
+        .form = .memcpy_pointer,
+        .destination = .prepared_source,
+    }) catch return .{ .unsupported_value = "composed-block-memcpy-src" };
+    const length_request = authority.register(.{
+        .source = len.value,
+        .expected = .{ .ty = .{ .int = 64 }, .register_class = .gpr64 },
+        .form = .memcpy_length,
+        .destination = .prepared_source,
+    }) catch return .{ .unsupported_value = "composed-block-memcpy-len" };
+    const destination_request = authority.register(.{
+        .source = dst.value,
+        .expected = .{ .ty = .ptr, .register_class = .gpr64, .pointer_address_space = 0 },
+        .form = .memcpy_pointer,
+        .destination = .prepared_view,
+        .prepared_action = .{ .inline_memcpy = .{
+            .source = source_request,
+            .length = length_request,
+        } },
+    }) catch return .{ .unsupported_value = "composed-block-memcpy-dst" };
+    authority.seal() catch |err| return inlineMemcpyValueUseDiagnostic(
+        &authority,
+        err,
+        destination_request,
+        source_request,
+        length_request,
+    ) orelse return err;
+    authority.prepare() catch |err| return inlineMemcpyValueUseDiagnostic(
+        &authority,
+        err,
+        destination_request,
+        source_request,
+        length_request,
+    ) orelse return err;
+    authority.materializeAll() catch |err| return inlineMemcpyValueUseDiagnostic(
+        &authority,
+        err,
+        destination_request,
+        source_request,
+        length_request,
+    ) orelse return err;
+    const lease = authority.preparedView(destination_request) catch |err|
+        return inlineMemcpyValueUseDiagnostic(
+            &authority,
+            err,
+            destination_request,
+            source_request,
+            length_request,
+        ) orelse return err;
+    authority.executePreparedAction(lease) catch |err|
+        return inlineMemcpyValueUseDiagnostic(
+            &authority,
+            err,
+            destination_request,
+            source_request,
+            length_request,
+        ) orelse return err;
+    try authority.commit();
+    return null;
+}
+
+fn inlineMemcpyValueUseDiagnostic(
+    transaction: *const ValueUseTransaction,
+    err: anyerror,
+    destination: ValueUseTransaction.RequestHandle,
+    source: ValueUseTransaction.RequestHandle,
+    length: ValueUseTransaction.RequestHandle,
+) ?Diagnostic {
+    if (err == error.ValueUseActionDiagnostic) return transaction.actionDiagnostic();
+    if (transaction.failedRequestIs(destination))
+        return .{ .unsupported_value = "composed-block-memcpy-dst" };
+    if (transaction.failedRequestIs(source))
+        return .{ .unsupported_value = "composed-block-memcpy-src" };
+    if (transaction.failedRequestIs(length))
+        return .{ .unsupported_value = "composed-block-memcpy-len" };
     return null;
 }
 

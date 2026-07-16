@@ -26,6 +26,52 @@ const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
 const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
 
+fn appendInlineMemcpyArgs(
+    call: *ir.CallInst,
+    destination: ir.Value,
+    source: ir.Value,
+    length: ir.Value,
+    is_volatile: ir.Value,
+) !void {
+    try call.args.append(std.testing.allocator, .{ .ty = .ptr, .value = destination });
+    try call.args.append(std.testing.allocator, .{ .ty = .ptr, .value = source });
+    try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 64 }, .value = length });
+    try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 1 }, .value = is_volatile });
+}
+
+const MissingMemcpyOperand = enum { destination, source, length };
+
+fn expectUnresolvedInlineMemcpyDiagnostic(
+    missing: MissingMemcpyOperand,
+    expected_detail: []const u8,
+) !void {
+    var machine = MachineFunction.init("inline-memcpy-unresolved-production", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "dst", "src", "len" }) |name| try plan.interval_ends.put(name, 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "dst", .{ .arg64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "src", .{ .arg64 = .r9 });
+    try selector_state.bindValueLoc(&selector, "len", .rax);
+
+    var call = ir.CallInst{ .ret_ty = .void, .callee = "llvm.memcpy.inline.p0.p0.i64", .args = .empty };
+    defer call.deinit(std.testing.allocator);
+    try appendInlineMemcpyArgs(
+        &call,
+        .{ .named = if (missing == .destination) "missing-dst" else "dst" },
+        .{ .named = if (missing == .source) "missing-src" else "src" },
+        .{ .named = if (missing == .length) "missing-len" else "len" },
+        .{ .int = 0 },
+    );
+    const diagnostic = (try selector_calls.lowerInlineMemcpy(&selector, null, call)).?;
+    try std.testing.expectEqualStrings(expected_detail, diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+}
+
 test "generic cfg selector lowers lifetime markers as checked no-ops" {
     var machine = MachineFunction.init("lifetime-markers", .void);
     defer machine.deinit(std.testing.allocator);
@@ -46,6 +92,142 @@ test "generic cfg selector lowers lifetime markers as checked no-ops" {
     }
 
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "production inline memcpy transaction preserves exact staging and call clobber" {
+    var machine = MachineFunction.init("inline-memcpy-production", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "dst", "src", "len" }) |name| try plan.interval_ends.put(name, 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "dst", .{ .arg64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "src", .{ .spill64 = .slot3 });
+    try selector_state.bindValueLoc(&selector, "len", .rax);
+
+    var call = ir.CallInst{
+        .ret_ty = .void,
+        .callee = "llvm.memcpy.inline.p0.p0.i64",
+        .tail_kind = "tail",
+        .args = .empty,
+    };
+    defer call.deinit(std.testing.allocator);
+    try appendInlineMemcpyArgs(
+        &call,
+        .{ .named = "dst" },
+        .{ .named = "src" },
+        .{ .named = "len" },
+        .{ .int = 0 },
+    );
+    try std.testing.expect((try selector_calls.lowerInlineMemcpy(&selector, null, call)) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .spill_rax_rsp = .slot0 },
+        .{ .mov_arg64_arg = .{ .dst = .rdi, .src = .r8 } },
+        .{ .reload_arg64_rsp = .{ .reg = .rsi, .frame_index = .slot3 } },
+        .{ .reload_arg64_rsp = .{ .reg = .rdx, .frame_index = .slot0 } },
+        .memcpy_rdi_rsi_rdx_rax,
+    }, machine.instructions.items);
+    try std.testing.expectEqual(@as(usize, 1), selector.eflags_semantics.items.len);
+    try std.testing.expectEqual(selector_state.EflagsEffect.clobber, selector.eflags_semantics.items[0].effect);
+}
+
+test "production inline memcpy maps unresolved destination through request provenance" {
+    try expectUnresolvedInlineMemcpyDiagnostic(.destination, "composed-block-memcpy-dst");
+}
+
+test "production inline memcpy maps unresolved source through request provenance" {
+    try expectUnresolvedInlineMemcpyDiagnostic(.source, "composed-block-memcpy-src");
+}
+
+test "production inline memcpy maps unresolved length through request provenance" {
+    try expectUnresolvedInlineMemcpyDiagnostic(.length, "composed-block-memcpy-len");
+}
+
+test "production inline memcpy rejects cycles and operand forms before mutation" {
+    var machine = MachineFunction.init("inline-memcpy-production-negative", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "dst", "src", "len" }) |name| try plan.interval_ends.put(name, 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "dst", .{ .arg64 = .rsi });
+    try selector_state.bindValueLoc(&selector, "src", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "len", .{ .arg64 = .rdx });
+
+    var cycle = ir.CallInst{ .ret_ty = .void, .callee = "llvm.memcpy.inline.p0.p0.i64", .args = .empty };
+    defer cycle.deinit(std.testing.allocator);
+    try appendInlineMemcpyArgs(&cycle, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" }, .{ .int = 0 });
+    try std.testing.expectError(error.ValueUseCopyCycleRequiresO4, selector_calls.lowerInlineMemcpy(&selector, null, cycle));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+
+    const bad_operands = [_]struct { dst: ir.Value, src: ir.Value, len: ir.Value, detail: []const u8 }{
+        .{ .dst = .null_value, .src = .{ .named = "src" }, .len = .{ .named = "len" }, .detail = "composed-block-memcpy-dst" },
+        .{ .dst = .{ .named = "dst" }, .src = .null_value, .len = .{ .named = "len" }, .detail = "composed-block-memcpy-src" },
+        .{ .dst = .{ .named = "dst" }, .src = .{ .named = "missing-src" }, .len = .{ .named = "len" }, .detail = "composed-block-memcpy-src" },
+        .{ .dst = .{ .named = "dst" }, .src = .{ .named = "src" }, .len = .{ .int = 16 }, .detail = "composed-block-memcpy-len" },
+    };
+    for (bad_operands) |case| {
+        var call = ir.CallInst{ .ret_ty = .void, .callee = "llvm.memcpy.inline.p0.p0.i64", .args = .empty };
+        defer call.deinit(std.testing.allocator);
+        try appendInlineMemcpyArgs(&call, case.dst, case.src, case.len, .{ .int = 0 });
+        const diagnostic = (try selector_calls.lowerInlineMemcpy(&selector, null, call)).?;
+        try std.testing.expectEqualStrings(case.detail, diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
+test "production inline memcpy preserves pre-transaction diagnostics and rolls back preservation" {
+    var machine = MachineFunction.init("inline-memcpy-production-rollback", .void);
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+
+    var volatile_call = ir.CallInst{ .ret_ty = .void, .callee = "llvm.memcpy.inline.p0.p0.i64", .args = .empty };
+    defer volatile_call.deinit(std.testing.allocator);
+    try appendInlineMemcpyArgs(
+        &volatile_call,
+        .{ .named = "dst" },
+        .{ .named = "src" },
+        .{ .named = "len" },
+        .{ .int = 1 },
+    );
+    const volatile_diagnostic = (try selector_calls.lowerInlineMemcpy(&selector, null, volatile_call)).?;
+    try std.testing.expectEqualStrings("composed-block-memcpy-args", volatile_diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "dst", "src", "len" }) |name| try plan.interval_ends.put(name, 1);
+    try plan.interval_ends.put("live-rcx", 10);
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "dst", .{ .arg64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "src", .{ .arg64 = .r9 });
+    try selector_state.bindValueLoc(&selector, "len", .rax);
+    try selector_state.bindValueLoc(&selector, "live-rcx", .{ .arg64 = .rcx });
+    const dst_before = selector.values.get("dst").?;
+    const src_before = selector.values.get("src").?;
+    const len_before = selector.values.get("len").?;
+    const live_before = selector.values.get("live-rcx").?;
+
+    var call = ir.CallInst{ .ret_ty = .void, .callee = "llvm.memcpy.inline.p0.p0.i64", .args = .empty };
+    defer call.deinit(std.testing.allocator);
+    try appendInlineMemcpyArgs(&call, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" }, .{ .int = 0 });
+    const diagnostic = (try selector_calls.lowerInlineMemcpy(&selector, null, call)).?;
+    try std.testing.expectEqualStrings("composed-block-spill-frame", diagnostic.detail());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(dst_before, selector.values.get("dst").?);
+    try std.testing.expectEqual(src_before, selector.values.get("src").?);
+    try std.testing.expectEqual(len_before, selector.values.get("len").?);
+    try std.testing.expectEqual(live_before, selector.values.get("live-rcx").?);
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
 }
 
 test "generic cfg selector lowers exact i64 unsigned saturating subtraction" {
