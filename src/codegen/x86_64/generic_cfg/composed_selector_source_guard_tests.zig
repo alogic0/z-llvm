@@ -359,6 +359,16 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     {
         return error.ValueUsePreparedLocationEscape;
     }
+    if (std.mem.indexOf(u8, source, "pub fn failedRequestHandle") != null or
+        std.mem.indexOf(u8, source, "pub fn failedRequestIndex") != null or
+        std.mem.indexOf(u8, source, "pub fn failedRequestRole") != null or
+        std.mem.indexOf(u8, source, "pub fn failedRequestSource") != null or
+        std.mem.indexOf(u8, source, "pub fn failedRequestLocation") != null or
+        std.mem.indexOf(u8, source, "pub fn failedRequestBinding") != null or
+        std.mem.indexOf(u8, source, "pub fn retryFailedRequest") != null)
+    {
+        return error.ValueUseFailureProvenanceEscape;
+    }
     try validateNoPublicPreparedPointer(source);
     const required = [_]struct { function: []const u8, pattern: []const u8, count: usize }{
         .{ .function = "resolveNamedCurrent", .pattern = "resolveValue(", .count = 1 },
@@ -390,6 +400,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     try validateBranchActionProductionSites(source_name, source);
     try validateStoreActionProductionSites(source_name, source);
     try validateMemcpyActionProductionSites(source_name, source);
+    try validateFailureProvenanceProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -412,6 +423,23 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
             if (std.mem.indexOf(u8, function_source, pattern) != null)
                 return error.ValueUsePreparedLeafRawOperation;
         }
+    }
+}
+
+fn validateFailureProvenanceProductionSites(source_name: []const u8, source: [:0]const u8) !void {
+    const query_count = countPattern(source, ".failedRequestIs(");
+    if (query_count == 0) return;
+    if (!std.mem.eql(u8, source_name, "composed_selector_calls.zig"))
+        return error.ValueUseFailureProvenanceOutsideAllowlist;
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const mapper = functionBodyNamed(bodies, "inlineMemcpyValueUseDiagnostic") orelse
+        return error.ValueUseFailureProvenanceOutsideAllowlist;
+    if (countPattern(source[mapper.start..mapper.end], ".failedRequestIs(") != 3 or
+        query_count != 3)
+    {
+        return error.ValueUseFailureProvenanceAllowlistMismatch;
     }
 }
 
@@ -1440,6 +1468,14 @@ test "composed selector source guard rejects function predicates in the value-us
         error.ValueUseConsumerOrderingForbidden,
         validateValueUseAuthoritySource(accepted ++ "const Request = struct { ordering_priority: u8 };"),
     );
+    try std.testing.expectError(
+        error.ValueUseFailureProvenanceEscape,
+        validateValueUseAuthoritySource(accepted ++ "pub fn failedRequestHandle() usize { return 0; }"),
+    );
+    try std.testing.expectError(
+        error.ValueUseFailureProvenanceEscape,
+        validateValueUseAuthoritySource(accepted ++ "pub fn retryFailedRequest() void {}"),
+    );
 }
 
 test "composed selector source guard rejects callback escapes and raw operations around closed actions" {
@@ -1508,6 +1544,46 @@ test "composed selector source guard rejects callback escapes and raw operations
         validatePreparedViewLeafDiscipline(
             "composed_selector_calls.zig",
             "fn lowerInlineMemcpy() void { _ = transaction.setMemcpyTestFailure(.after_source); }",
+        ),
+    );
+}
+
+test "composed selector source guard confines failure provenance to the memcpy mapper" {
+    const accepted: [:0]const u8 =
+        "fn inlineMemcpyValueUseDiagnostic() void { " ++
+        "_ = transaction.failedRequestIs(destination); " ++
+        "_ = transaction.failedRequestIs(source); " ++
+        "_ = transaction.failedRequestIs(length); }";
+    try validateFailureProvenanceProductionSites("composed_selector_calls.zig", accepted);
+    try validateFailureProvenanceProductionSites("composed_selector_calls.zig", "fn lowerInlineMemcpy() void {}");
+    try std.testing.expectError(
+        error.ValueUseFailureProvenanceOutsideAllowlist,
+        validateFailureProvenanceProductionSites(
+            "composed_selector_memory.zig",
+            "fn lowerStore() void { _ = transaction.failedRequestIs(value); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseFailureProvenanceOutsideAllowlist,
+        validateFailureProvenanceProductionSites(
+            "composed_selector_calls.zig",
+            "fn lowerInlineMemcpy() void { _ = transaction.failedRequestIs(source); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseFailureProvenanceAllowlistMismatch,
+        validateFailureProvenanceProductionSites(
+            "composed_selector_calls.zig",
+            "fn inlineMemcpyValueUseDiagnostic() void { " ++
+                "_ = transaction.failedRequestIs(destination); " ++
+                "_ = transaction.failedRequestIs(source); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseFailureProvenanceAllowlistMismatch,
+        validateFailureProvenanceProductionSites(
+            "composed_selector_calls.zig",
+            accepted ++ " fn successPath() void { _ = transaction.failedRequestIs(source); }",
         ),
     );
 }

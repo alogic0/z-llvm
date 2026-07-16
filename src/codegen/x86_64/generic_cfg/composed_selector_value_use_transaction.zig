@@ -53,6 +53,9 @@ pub const ValueUseTransaction = struct {
     switch_boundary_applied: [max_requests]bool = [_]bool{false} ** max_requests,
     view_generation: u32 = 1,
     action_diagnostic: ?Diagnostic = null,
+    /// First request to which a transaction failure can be attributed. This
+    /// diagnostic-only identity deliberately survives automatic rollback.
+    failed_request: ?RequestHandle = null,
     memcpy_test_failure: if (builtin.is_test) ?MemcpyTestFailure else void = if (builtin.is_test) null else {},
 
     pub const Expected = struct {
@@ -751,18 +754,28 @@ pub const ValueUseTransaction = struct {
         var mappings: [max_mappings]Mapping = undefined;
         var mapping_count: usize = 0;
 
-        for (transaction.requests[0..transaction.request_count], 0..) |*request, request_index| {
+        for (transaction.requests[0..transaction.request_count], 0..) |*request, request_index_usize| {
+            const request_index: u8 = @intCast(request_index_usize);
             const deferred_switch = request.prepared_action != null and
                 request.prepared_action.? == .switch_compare_chain;
-            if (deferred_switch) try validateDeferredSwitchRequest(request);
-            const current = if (deferred_switch) null else try transaction.validateRequest(request);
-            const destination_nodes = try requestDestinationNodes(transaction, request, current);
+            if (deferred_switch) validateDeferredSwitchRequest(request) catch |err| {
+                transaction.noteRequestBoundaryError(request_index, err);
+                return err;
+            };
+            const current = if (deferred_switch) null else try transaction.validateRequestAt(request_index);
+            const destination_nodes = requestDestinationNodes(transaction, request, current) catch |err| {
+                transaction.noteRequestBoundaryError(request_index, err);
+                return err;
+            };
             for (destination_nodes.slice()) |destination_node| {
                 const node_index = @intFromEnum(destination_node);
                 if (destinations[node_index]) return error.ValueUseConflictingDestination;
                 destinations[node_index] = true;
             }
-            const request_mappings = try requestMappings(transaction, request, @intCast(request_index), current);
+            const request_mappings = requestMappings(transaction, request, request_index, current) catch |err| {
+                transaction.noteRequestBoundaryError(request_index, err);
+                return err;
+            };
             const deferred_writes = request.prepared_action != null and
                 actionOwnsOrderedWrites(request.prepared_action.?);
             for (request_mappings.slice()) |mapping| {
@@ -804,12 +817,16 @@ pub const ValueUseTransaction = struct {
 
         try transaction.materializeEarlyPlans();
         var nodes = transaction.write_nodes;
-        for (transaction.requests[0..transaction.request_count]) |*request| {
+        for (transaction.requests[0..transaction.request_count], 0..) |*request, request_index_usize| {
             if (request.destination == .prepared_source) continue;
             if (request.destination == .prepared_view and request.prepared_action.? != .emit_copy_to) continue;
             if (request.form != .pointer and request.form != .stack_object_address) continue;
+            const request_index: u8 = @intCast(request_index_usize);
             const current = switch (request.source) {
-                .named => |*name| try transaction.resolveNamedCurrent(name.slice()),
+                .named => |*name| transaction.resolveNamedCurrent(name.slice()) catch |err| {
+                    transaction.noteRequestBoundaryError(request_index, err);
+                    return err;
+                },
                 .int, .null_value, .unsupported => continue,
             };
             if (current == .stack_i32_ptr or current == .stack_scalar or current == .stack128 or current == .stack_i32_array) {
@@ -852,7 +869,7 @@ pub const ValueUseTransaction = struct {
         } else {
             try restoreSwitchDisplacedPhiDestinations(transaction.selector);
         }
-        _ = try transaction.validateRequest(&transaction.requests[index]);
+        _ = try transaction.validateRequestAt(index);
         transaction.switch_boundary_applied[index] = true;
     }
 
@@ -868,7 +885,7 @@ pub const ValueUseTransaction = struct {
                 try transaction.validateEarlyHome(@intCast(index));
                 continue;
             }
-            try transaction.materializeRequest(request);
+            try transaction.materializeRequest(@intCast(index), request);
         }
         // Only now expose source-derived views from canonical current state.
         for (transaction.requests[0..transaction.request_count], 0..) |*request, index| {
@@ -885,8 +902,10 @@ pub const ValueUseTransaction = struct {
             return error.ValueUsePreparedViewUnavailable;
         errdefer transaction.rollbackInternal();
         const index = try transaction.validateHandle(handle);
-        if (transaction.requests[index].destination != .prepared_view or !transaction.prepared_view_valid[index])
+        if (transaction.requests[index].destination != .prepared_view or !transaction.prepared_view_valid[index]) {
+            transaction.recordRequestFailure(index);
             return error.ValueUsePreparedViewMissing;
+        }
         transaction.request_phase = .views_exposed;
         return .{ .request = handle, .view_generation = transaction.view_generation };
     }
@@ -903,22 +922,34 @@ pub const ValueUseTransaction = struct {
             return error.ValueUsePreparedViewUnavailable;
         errdefer transaction.rollbackInternal();
         const index = try transaction.validateHandle(lease.request);
-        if (!transaction.prepared_view_valid[index]) return error.ValueUsePreparedViewMissing;
+        if (!transaction.prepared_view_valid[index]) {
+            transaction.recordRequestFailure(index);
+            return error.ValueUsePreparedViewMissing;
+        }
         const refreshed = try transaction.buildPreparedRecord(index);
-        if (!preparedRecordEql(&transaction.prepared_views[index], &refreshed))
+        if (!preparedRecordEql(&transaction.prepared_views[index], &refreshed)) {
+            transaction.recordRequestFailure(index);
             return error.ValueUsePreparedViewStale;
-        const action = transaction.requests[index].prepared_action orelse
+        }
+        const action = transaction.requests[index].prepared_action orelse {
+            transaction.recordRequestFailure(index);
             return error.ValueUsePreparedActionMissing;
+        };
         try transaction.validateActionDependenciesCanonical(action);
-        try executePreparedActionInternal(transaction, index, &refreshed.view, &transaction.requests[index], action);
+        executePreparedActionInternal(transaction, index, &refreshed.view, &transaction.requests[index], action) catch |err| {
+            transaction.noteRequestBoundaryError(index, err);
+            return err;
+        };
         // Defense in depth: even the closed internal action must not relocate
         // or rebind its source. Any violation rolls back speculative emission.
         if (actionOwnsOrderedWrites(action)) {
             try transaction.validateConsumedActionAfter(index, action);
         } else {
             const after_consumption = try transaction.buildPreparedRecord(index);
-            if (!preparedRecordEql(&transaction.prepared_views[index], &after_consumption))
+            if (!preparedRecordEql(&transaction.prepared_views[index], &after_consumption)) {
+                transaction.recordRequestFailure(index);
                 return error.ValueUsePreparedViewStale;
+            }
             try transaction.validateActionDependenciesCanonical(action);
         }
         transaction.prepared_view_valid[index] = false;
@@ -950,6 +981,19 @@ pub const ValueUseTransaction = struct {
     /// already rolled back when this is observed.
     pub fn actionDiagnostic(transaction: *const ValueUseTransaction) ?Diagnostic {
         return transaction.action_diagnostic;
+    }
+
+    /// Answers only whether `handle` is the first request-specific failure.
+    /// No request identity, index, source, home, or retry capability escapes.
+    pub fn failedRequestIs(
+        transaction: *const ValueUseTransaction,
+        handle: RequestHandle,
+    ) bool {
+        const failed = transaction.failed_request orelse return false;
+        return failed.authority == @intFromPtr(transaction) and
+            failed.authority == handle.authority and
+            failed.index == handle.index and
+            failed.generation == handle.generation;
     }
 
     /// White-box rollback boundary control. This is unavailable in every
@@ -996,6 +1040,50 @@ pub const ValueUseTransaction = struct {
         return handle.index;
     }
 
+    fn recordRequestFailure(transaction: *ValueUseTransaction, index: u8) void {
+        if (transaction.failed_request == null)
+            transaction.failed_request = transaction.handleFor(index);
+    }
+
+    fn noteRequestBoundaryError(
+        transaction: *ValueUseTransaction,
+        index: u8,
+        err: anyerror,
+    ) void {
+        if (std.mem.startsWith(u8, @errorName(err), "Eflags")) return;
+        // These errors describe the authority or complete plan rather than a
+        // unique operand. They intentionally leave provenance empty.
+        switch (err) {
+            error.OutOfMemory,
+            error.ValueUseRequestCapacityExceeded,
+            error.ValueUseMappingCapacityExceeded,
+            error.ValueUseConflictingDestination,
+            error.ValueUseCopyCycleRequiresO4,
+            error.ValueUseEarlyOrderingConflict,
+            error.ValueUseEarlyOrderingCycle,
+            error.ValueUseActionDiagnostic,
+            error.ValueUseMemcpyTestFailure,
+            error.ValueUseLateRegistration,
+            error.ValueUsePlanAlreadySealed,
+            error.ValueUsePrepareBeforeSeal,
+            error.ValueUseMaterializeBeforePrepare,
+            error.ValueUseCommitBeforeMaterialization,
+            error.ValueUseTransactionClosed,
+            error.ValueUseSwitchBoundaryPhase,
+            error.ValueUseSwitchBoundaryAlreadyApplied,
+            error.ValueUseSwitchBoundaryRequired,
+            => {},
+            else => transaction.recordRequestFailure(index),
+        }
+    }
+
+    fn validateRequestAt(transaction: *ValueUseTransaction, index: u8) !?ValueLoc {
+        return transaction.validateRequest(&transaction.requests[index]) catch |err| {
+            transaction.noteRequestBoundaryError(index, err);
+            return err;
+        };
+    }
+
     fn validateActionRegistration(transaction: *ValueUseTransaction, action: PreparedAction) !void {
         switch (action) {
             .validate_shape, .emit_copy_to => {},
@@ -1023,7 +1111,10 @@ pub const ValueUseTransaction = struct {
             .store_scalar => |store| {
                 if (store.bits != 1 and store.bits != 32) return error.ValueUseStoreWidthUnsupported;
                 const index = try transaction.validateRegisteredOperandHandle(store.pointer);
-                try validateStorePointerOperand(&transaction.requests[index], true);
+                validateStorePointerOperand(&transaction.requests[index], true) catch |err| {
+                    transaction.noteRequestBoundaryError(index, err);
+                    return err;
+                };
             },
             .store_immediate => |store| {
                 if (store.bits != 1 and store.bits != 32) return error.ValueUseStoreWidthUnsupported;
@@ -1032,19 +1123,31 @@ pub const ValueUseTransaction = struct {
             },
             .store_i64 => |store| {
                 const index = try transaction.validateRegisteredOperandHandle(store.value);
-                try validateStoreI64ValueOperand(&transaction.requests[index]);
+                validateStoreI64ValueOperand(&transaction.requests[index]) catch |err| {
+                    transaction.noteRequestBoundaryError(index, err);
+                    return err;
+                };
             },
             .store_stack_pointer => |store| {
                 const index = try transaction.validateRegisteredOperandHandle(store.destination);
-                try validateStoreStackObjectOperand(&transaction.requests[index]);
+                validateStoreStackObjectOperand(&transaction.requests[index]) catch |err| {
+                    transaction.noteRequestBoundaryError(index, err);
+                    return err;
+                };
             },
             .branch_condition => {},
             .switch_compare_chain => |*switch_action| try switch_action.validate(),
             .inline_memcpy => |memcpy| {
                 const source = try transaction.validateRegisteredOperandHandle(memcpy.source);
                 const length = try transaction.validateRegisteredOperandHandle(memcpy.length);
-                try validateMemcpyPointerOperand(&transaction.requests[source]);
-                try validateMemcpyLengthOperand(&transaction.requests[length]);
+                validateMemcpyPointerOperand(&transaction.requests[source]) catch |err| {
+                    transaction.noteRequestBoundaryError(source, err);
+                    return err;
+                };
+                validateMemcpyLengthOperand(&transaction.requests[length]) catch |err| {
+                    transaction.noteRequestBoundaryError(length, err);
+                    return err;
+                };
                 if (source == length) return error.ValueUseIncompatibleDuplicate;
             },
         }
@@ -1061,10 +1164,21 @@ pub const ValueUseTransaction = struct {
         return handle.index;
     }
 
+    fn noteRegisteredOperandBoundaryError(
+        transaction: *ValueUseTransaction,
+        handle: RequestHandle,
+        err: anyerror,
+    ) void {
+        const index = transaction.validateRegisteredOperandHandle(handle) catch return;
+        transaction.noteRequestBoundaryError(index, err);
+    }
+
     fn registeredOperandCurrent(transaction: *ValueUseTransaction, handle: RequestHandle) !ValueLoc {
         const index = try transaction.validateRegisteredOperandHandle(handle);
-        return (try transaction.validateRequest(&transaction.requests[index])) orelse
-            error.ValueUseUnsupportedSource;
+        return (try transaction.validateRequestAt(index)) orelse {
+            transaction.recordRequestFailure(index);
+            return error.ValueUseUnsupportedSource;
+        };
     }
 
     fn registeredOperandView(
@@ -1072,7 +1186,10 @@ pub const ValueUseTransaction = struct {
         handle: RequestHandle,
     ) !*const PreparedView {
         const index = try transaction.validateRegisteredOperandHandle(handle);
-        if (!transaction.prepared_view_valid[index]) return error.ValueUsePreparedViewMissing;
+        if (!transaction.prepared_view_valid[index]) {
+            transaction.recordRequestFailure(index);
+            return error.ValueUsePreparedViewMissing;
+        }
         return &transaction.prepared_views[index].view;
     }
 
@@ -1116,6 +1233,13 @@ pub const ValueUseTransaction = struct {
     }
 
     fn validateConsumedOperandAfter(transaction: *ValueUseTransaction, index: u8) !void {
+        return transaction.validateConsumedOperandAfterUnchecked(index) catch |err| {
+            transaction.noteRequestBoundaryError(index, err);
+            return err;
+        };
+    }
+
+    fn validateConsumedOperandAfterUnchecked(transaction: *ValueUseTransaction, index: u8) !void {
         const request = &transaction.requests[index];
         const name = switch (request.source) {
             .named => |*identity| identity.slice(),
@@ -1140,10 +1264,15 @@ pub const ValueUseTransaction = struct {
 
     fn validateOperandCanonical(transaction: *ValueUseTransaction, handle: RequestHandle) !void {
         const index = try transaction.validateRegisteredOperandHandle(handle);
-        if (!transaction.prepared_view_valid[index]) return error.ValueUsePreparedViewMissing;
+        if (!transaction.prepared_view_valid[index]) {
+            transaction.recordRequestFailure(index);
+            return error.ValueUsePreparedViewMissing;
+        }
         const refreshed = try transaction.buildPreparedRecord(index);
-        if (!preparedRecordEql(&transaction.prepared_views[index], &refreshed))
+        if (!preparedRecordEql(&transaction.prepared_views[index], &refreshed)) {
+            transaction.recordRequestFailure(index);
             return error.ValueUsePreparedViewStale;
+        }
     }
 
     fn validateRequest(transaction: *ValueUseTransaction, request: *const StoredRequest) !?ValueLoc {
@@ -1393,7 +1522,7 @@ pub const ValueUseTransaction = struct {
             {
                 const request = &transaction.requests[request_index];
                 const current = switch (request.source) {
-                    .named => try transaction.validateRequest(request) orelse null,
+                    .named => try transaction.validateRequestAt(request_index) orelse null,
                     .int, .null_value, .unsupported => null,
                 };
                 if (current != null and earlySequencingCandidate(current.?, request.form)) {
@@ -1484,46 +1613,60 @@ pub const ValueUseTransaction = struct {
         for (transaction.ordered_operands[0..transaction.ordered_operand_count]) |ordered| {
             if (ordered.phase != .safe_early) continue;
             const index = ordered.request_index;
-            const plan = transaction.early_plans[index];
-            const destination_reg = plan.destination orelse continue;
-            if (!selector_state.scratchRegIsProvenFree(transaction.selector, destination_reg))
-                return error.ValueUseEarlyDestinationNoLongerFree;
-            const request = &transaction.requests[index];
-            const name = switch (request.source) {
-                .named => |*identity| identity.slice(),
-                .int, .null_value, .unsupported => return error.ValueUseEarlySourceNotNamed,
+            transaction.materializeEarlyPlan(index) catch |err| {
+                transaction.noteRequestBoundaryError(index, err);
+                return err;
             };
-            const binding = transaction.selector.values.get(name) orelse
-                return error.ValueUseUnresolvedSource;
-            const current = (try transaction.validateRequest(request)) orelse
-                return error.ValueUseUnsupportedSource;
-            if (!earlyCopyIsFlagsPreserving(current, request.form))
-                return error.ValueUseEarlyMaterializationNotFlagsPreserving;
-
-            const instruction_start = transaction.selector.machine.instructions.items.len;
-            const destination: Destination = switch (request.form) {
-                .gpr32 => .{ .gpr32 = destination_reg },
-                .gpr64, .pointer => .{ .gpr64 = destination_reg },
-                else => return error.ValueUseEarlyMaterializationNotFlagsPreserving,
-            };
-            try transaction.materializeRequestFromLoc(request, current, destination);
-            for (transaction.selector.machine.instructions.items[instruction_start..]) |instruction| {
-                if (eflags.instructionEffect(instruction) != .preserve)
-                    return error.ValueUseEarlyMaterializationClobbersEflags;
-            }
-            transaction.early_homes[index] = .{
-                .loc = switch (request.form) {
-                    .gpr32 => .{ .scratch32 = destination_reg },
-                    .gpr64, .pointer => .{ .scratch64 = destination_reg },
-                    else => unreachable,
-                },
-                .source_vreg = binding.vreg,
-            };
-            transaction.early_home_valid[index] = true;
         }
     }
 
+    fn materializeEarlyPlan(transaction: *ValueUseTransaction, index: u8) !void {
+        const plan = transaction.early_plans[index];
+        const destination_reg = plan.destination orelse return;
+        if (!selector_state.scratchRegIsProvenFree(transaction.selector, destination_reg))
+            return error.ValueUseEarlyDestinationNoLongerFree;
+        const request = &transaction.requests[index];
+        const name = switch (request.source) {
+            .named => |*identity| identity.slice(),
+            .int, .null_value, .unsupported => return error.ValueUseEarlySourceNotNamed,
+        };
+        const binding = transaction.selector.values.get(name) orelse
+            return error.ValueUseUnresolvedSource;
+        const current = (try transaction.validateRequestAt(index)) orelse
+            return error.ValueUseUnsupportedSource;
+        if (!earlyCopyIsFlagsPreserving(current, request.form))
+            return error.ValueUseEarlyMaterializationNotFlagsPreserving;
+
+        const instruction_start = transaction.selector.machine.instructions.items.len;
+        const destination: Destination = switch (request.form) {
+            .gpr32 => .{ .gpr32 = destination_reg },
+            .gpr64, .pointer => .{ .gpr64 = destination_reg },
+            else => return error.ValueUseEarlyMaterializationNotFlagsPreserving,
+        };
+        try transaction.materializeRequestFromLoc(request, current, destination);
+        for (transaction.selector.machine.instructions.items[instruction_start..]) |instruction| {
+            if (eflags.instructionEffect(instruction) != .preserve)
+                return error.ValueUseEarlyMaterializationClobbersEflags;
+        }
+        transaction.early_homes[index] = .{
+            .loc = switch (request.form) {
+                .gpr32 => .{ .scratch32 = destination_reg },
+                .gpr64, .pointer => .{ .scratch64 = destination_reg },
+                else => unreachable,
+            },
+            .source_vreg = binding.vreg,
+        };
+        transaction.early_home_valid[index] = true;
+    }
+
     fn validateEarlyHome(transaction: *ValueUseTransaction, index: u8) !void {
+        return transaction.validateEarlyHomeUnchecked(index) catch |err| {
+            transaction.noteRequestBoundaryError(index, err);
+            return err;
+        };
+    }
+
+    fn validateEarlyHomeUnchecked(transaction: *ValueUseTransaction, index: u8) !void {
         if (!transaction.early_home_valid[index]) return error.ValueUseEarlyHomeMissing;
         const request = &transaction.requests[index];
         const name = switch (request.source) {
@@ -1534,12 +1677,23 @@ pub const ValueUseTransaction = struct {
             return error.ValueUseUnresolvedSource;
         if (!std.meta.eql(binding.vreg, transaction.early_homes[index].source_vreg))
             return error.ValueUsePreparedViewStale;
-        _ = try transaction.validateRequest(request);
+        _ = try transaction.validateRequestAt(index);
         try validateExpectedType(request.expected, request.form);
         try validateSourceView(transaction.early_homes[index].loc, request.form);
     }
 
-    fn materializeRequest(transaction: *ValueUseTransaction, request: *const StoredRequest) !void {
+    fn materializeRequest(
+        transaction: *ValueUseTransaction,
+        index: u8,
+        request: *const StoredRequest,
+    ) !void {
+        return transaction.materializeRequestUnchecked(request) catch |err| {
+            transaction.noteRequestBoundaryError(index, err);
+            return err;
+        };
+    }
+
+    fn materializeRequestUnchecked(transaction: *ValueUseTransaction, request: *const StoredRequest) !void {
         const current = switch (request.source) {
             .named => |*name| blk: {
                 // Deliberately resolve after all preparation/spill mutations.
@@ -1588,6 +1742,13 @@ pub const ValueUseTransaction = struct {
     }
 
     fn buildPreparedRecord(transaction: *ValueUseTransaction, index: u8) !PreparedRecord {
+        return transaction.buildPreparedRecordUnchecked(index) catch |err| {
+            transaction.noteRequestBoundaryError(index, err);
+            return err;
+        };
+    }
+
+    fn buildPreparedRecordUnchecked(transaction: *ValueUseTransaction, index: u8) !PreparedRecord {
         const request = &transaction.requests[index];
         if (request.destination != .prepared_source and request.destination != .prepared_view)
             return error.ValueUsePreparedViewMissing;
@@ -1615,7 +1776,7 @@ pub const ValueUseTransaction = struct {
             else => return error.ValueUsePreparedViewUnsupported,
         };
         const binding = transaction.selector.values.get(name) orelse return error.ValueUseUnresolvedSource;
-        const current = (try transaction.validateRequest(request)) orelse
+        const current = (try transaction.validateRequestAt(index)) orelse
             return error.ValueUsePreparedViewUnsupported;
         const prepared_loc = if (transaction.early_home_valid[index]) blk: {
             try transaction.validateEarlyHome(index);
@@ -1848,14 +2009,13 @@ fn executePreparedActionInternal(
         .store_stack_pointer => |store| try executeStoreStackPointer(transaction, view, store),
         .branch_condition => try executeBranchCondition(transaction, view),
         .switch_compare_chain => |switch_action| try executeSwitchCompareChain(transaction, view, &switch_action),
-        .inline_memcpy => |memcpy| try executeInlineMemcpy(transaction, request_index, request, memcpy),
+        .inline_memcpy => |memcpy| try executeInlineMemcpy(transaction, request_index, memcpy),
     }
 }
 
 fn executeInlineMemcpy(
     transaction: *ValueUseTransaction,
     destination_index: u8,
-    destination_request: *const ValueUseTransaction.StoredRequest,
     action: ValueUseTransaction.MemcpyAction,
 ) !void {
     // Validate the final call clobber before caller preservation or argument
@@ -1878,7 +2038,7 @@ fn executeInlineMemcpy(
     try refreshMemcpyPreparedOperand(transaction, action.length.index);
     try failMemcpyForTest(transaction, .after_preservation);
 
-    try materializeMemcpyRequest(transaction, destination_request, .rdi);
+    try materializeMemcpyRequest(transaction, destination_index, .rdi);
     try failMemcpyForTest(transaction, .after_destination);
     try materializeMemcpyHandle(transaction, action.source, .rsi);
     try failMemcpyForTest(transaction, .after_source);
@@ -1894,7 +2054,10 @@ fn executeInlineMemcpy(
 }
 
 fn refreshMemcpyPreparedOperand(transaction: *ValueUseTransaction, index: u8) !void {
-    if (!transaction.prepared_view_valid[index]) return error.ValueUsePreparedViewMissing;
+    if (!transaction.prepared_view_valid[index]) {
+        transaction.recordRequestFailure(index);
+        return error.ValueUsePreparedViewMissing;
+    }
     transaction.prepared_views[index] = try transaction.buildPreparedRecord(index);
 }
 
@@ -1904,16 +2067,29 @@ fn materializeMemcpyHandle(
     destination: ArgReg,
 ) !void {
     const index = try transaction.validateRegisteredOperandHandle(handle);
-    try materializeMemcpyRequest(transaction, &transaction.requests[index], destination);
+    try materializeMemcpyRequest(transaction, index, destination);
 }
 
 fn materializeMemcpyRequest(
     transaction: *ValueUseTransaction,
-    request: *const ValueUseTransaction.StoredRequest,
+    index: u8,
     destination: ArgReg,
 ) !void {
-    const current = (try transaction.validateRequest(request)) orelse
+    return materializeMemcpyRequestUnchecked(transaction, index, destination) catch |err| {
+        transaction.noteRequestBoundaryError(index, err);
+        return err;
+    };
+}
+
+fn materializeMemcpyRequestUnchecked(
+    transaction: *ValueUseTransaction,
+    index: u8,
+    destination: ArgReg,
+) !void {
+    const current = (try transaction.validateRequestAt(index)) orelse {
+        transaction.recordRequestFailure(index);
         return error.ValueUseUnsupportedSource;
+    };
     switch (current) {
         .arg128, .scratch128 => |pair| {
             if (pair.lo == destination) return;
@@ -2082,7 +2258,10 @@ fn executeStoreScalar(
 ) !void {
     try materializeActionScalar32(transaction, value_view, .accumulator);
     const pointer_view = try transaction.registeredOperandView(action.pointer);
-    try executeStoreEaxToPointer(transaction, pointer_view, action.bits);
+    executeStoreEaxToPointer(transaction, pointer_view, action.bits) catch |err| {
+        transaction.noteRegisteredOperandBoundaryError(action.pointer, err);
+        return err;
+    };
 }
 
 fn executeStoreImmediate(
@@ -2109,7 +2288,10 @@ fn executeStoreI64(
     }
     try materializeActionPointer(transaction, pointer, .rcx);
     const value_view = try transaction.registeredOperandView(action.value);
-    try materializeActionScalar64(transaction, value_view, .accumulator);
+    materializeActionScalar64(transaction, value_view, .accumulator) catch |err| {
+        transaction.noteRegisteredOperandBoundaryError(action.value, err);
+        return err;
+    };
     try transaction.selector.machine.instructions.append(
         transaction.selector.allocator,
         .store_rax_rcx_ptr,
@@ -2123,8 +2305,15 @@ fn executeStoreStackPointer(
 ) !void {
     const source = try stackScalarFromPreparedView(source_view);
     const destination_view = try transaction.registeredOperandView(action.destination);
-    const destination = try stackScalarFromPreparedView(destination_view);
+    const destination = stackScalarFromPreparedView(destination_view) catch |err| {
+        transaction.noteRegisteredOperandBoundaryError(action.destination, err);
+        return err;
+    };
     if (destination.kind != .integer or destination.bits != 64) {
+        transaction.noteRegisteredOperandBoundaryError(
+            action.destination,
+            error.ValueUseStorePointerFormUnsupported,
+        );
         return error.ValueUseStorePointerFormUnsupported;
     }
 
@@ -2142,9 +2331,14 @@ fn executeStoreStackPointer(
             .write,
         );
     }
-    if (destination.base_disp % 4 != 0) return error.ValueUseStorePointerAlignment;
-    const frame_index = FrameIndex.fromSlot(destination.base_disp / 4) catch
+    if (destination.base_disp % 4 != 0) {
+        transaction.noteRegisteredOperandBoundaryError(action.destination, error.ValueUseStorePointerAlignment);
+        return error.ValueUseStorePointerAlignment;
+    }
+    const frame_index = FrameIndex.fromSlot(destination.base_disp / 4) catch {
+        transaction.noteRegisteredOperandBoundaryError(action.destination, error.ValueUseStorePointerFrame);
         return error.ValueUseStorePointerFrame;
+    };
     try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
         .spill_arg64_rsp = .{ .frame_index = frame_index, .reg = .rcx },
     });
@@ -2359,7 +2553,14 @@ fn executeByteAddress(
         .request => |offset_handle| {
             const offset_view = try transaction.registeredOperandView(offset_handle);
             try materializeByteAddressPointer(transaction.selector, try preparedViewLoc(base_view), .r8);
-            try materializeScalar64(transaction.selector, try preparedViewLoc(offset_view), .{ .gpr64 = .rcx });
+            const offset_loc = preparedViewLoc(offset_view) catch |err| {
+                transaction.noteRegisteredOperandBoundaryError(offset_handle, err);
+                return err;
+            };
+            materializeScalar64(transaction.selector, offset_loc, .{ .gpr64 = .rcx }) catch |err| {
+                transaction.noteRegisteredOperandBoundaryError(offset_handle, err);
+                return err;
+            };
             try selector_state.emitEflagsInstruction(transaction.selector, .add_r8_rcx, .write);
             try selector_state.bindScratch(transaction.selector, result_name, .rcx, 64);
         },
@@ -2397,7 +2598,14 @@ fn executeScaledAddress(
                 .request => |index_handle| {
                     const index_name = try ownRegisteredOperandName(transaction, index_handle);
                     const index_view = try transaction.registeredOperandView(index_handle);
-                    try materializeScalar64(transaction.selector, try preparedViewLoc(index_view), .{ .gpr64 = .rcx });
+                    const index_loc = preparedViewLoc(index_view) catch |err| {
+                        transaction.noteRegisteredOperandBoundaryError(index_handle, err);
+                        return err;
+                    };
+                    materializeScalar64(transaction.selector, index_loc, .{ .gpr64 = .rcx }) catch |err| {
+                        transaction.noteRegisteredOperandBoundaryError(index_handle, err);
+                        return err;
+                    };
                     try selector_state.bindValueLoc(transaction.selector, result_name, .{ .stack_i32_ptr = .{
                         .disp = array.base_disp,
                         .index = .{ .reg = .rcx, .name = index_name },
@@ -2447,7 +2655,14 @@ fn executeScaledAddress(
                 },
                 .request => |index_handle| {
                     const index_view = try transaction.registeredOperandView(index_handle);
-                    try materializeScalar64(transaction.selector, try preparedViewLoc(index_view), .{ .gpr64 = .r8 });
+                    const index_loc = preparedViewLoc(index_view) catch |err| {
+                        transaction.noteRegisteredOperandBoundaryError(index_handle, err);
+                        return err;
+                    };
+                    materializeScalar64(transaction.selector, index_loc, .{ .gpr64 = .r8 }) catch |err| {
+                        transaction.noteRegisteredOperandBoundaryError(index_handle, err);
+                        return err;
+                    };
                     const shift = try scaleShift(action.scale);
                     if (shift != 0) try selector_state.emitEflagsInstruction(
                         transaction.selector,
@@ -2506,7 +2721,10 @@ fn ownRegisteredOperandName(
     const index = try transaction.validateRegisteredOperandHandle(handle);
     const source = switch (transaction.requests[index].source) {
         .named => |*identity| identity.slice(),
-        .int, .null_value, .unsupported => return error.ValueUseActionOperandNotNamed,
+        .int, .null_value, .unsupported => {
+            transaction.recordRequestFailure(index);
+            return error.ValueUseActionOperandNotNamed;
+        },
     };
     const owned = try transaction.selector.allocator.dupe(u8, source);
     errdefer transaction.selector.allocator.free(owned);
@@ -3079,11 +3297,14 @@ fn requestDestinationNodes(
             },
             .store_scalar => |store| {
                 try result.append(.accumulator);
-                try appendStorePointerDestinationNodes(
+                appendStorePointerDestinationNodes(
                     &result,
                     try transaction.registeredOperandCurrent(store.pointer),
                     store.bits,
-                );
+                ) catch |err| {
+                    transaction.noteRegisteredOperandBoundaryError(store.pointer, err);
+                    return err;
+                };
             },
             .store_immediate => |store| {
                 try result.append(.accumulator);
@@ -3196,13 +3417,16 @@ fn requestMappings(
                     .destination = .accumulator,
                     .source_request_index = request_index,
                 });
-                try appendStorePointerMappings(
+                appendStorePointerMappings(
                     transaction,
                     &mappings,
                     try transaction.registeredOperandCurrent(store.pointer),
                     store.pointer.index,
                     store.bits,
-                );
+                ) catch |err| {
+                    transaction.noteRegisteredOperandBoundaryError(store.pointer, err);
+                    return err;
+                };
             },
             .store_immediate => |store| {
                 mappings.append(.{ .source = null, .destination = .accumulator, .source_request_index = null });

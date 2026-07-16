@@ -69,12 +69,18 @@ fn actionIdentity(name: []const u8) !Transaction.ActionIdentity {
     return Transaction.ActionIdentity.init(name);
 }
 
-fn registerMemcpyAction(
+const MemcpyRequests = struct {
+    destination: Transaction.RequestHandle,
+    source: Transaction.RequestHandle,
+    length: Transaction.RequestHandle,
+};
+
+fn registerMemcpyRequests(
     transaction: *Transaction,
     destination: ir.Value,
     source: ir.Value,
     length: ir.Value,
-) !Transaction.RequestHandle {
+) !MemcpyRequests {
     const source_handle = try transaction.register(.{
         .source = source,
         .expected = expected(.ptr, .gpr64),
@@ -87,7 +93,7 @@ fn registerMemcpyAction(
         .form = .memcpy_length,
         .destination = .prepared_source,
     });
-    return transaction.register(.{
+    const destination_handle = try transaction.register(.{
         .source = destination,
         .expected = expected(.ptr, .gpr64),
         .form = .memcpy_pointer,
@@ -97,6 +103,30 @@ fn registerMemcpyAction(
             .length = length_handle,
         } },
     });
+    return .{
+        .destination = destination_handle,
+        .source = source_handle,
+        .length = length_handle,
+    };
+}
+
+fn registerMemcpyAction(
+    transaction: *Transaction,
+    destination: ir.Value,
+    source: ir.Value,
+    length: ir.Value,
+) !Transaction.RequestHandle {
+    return (try registerMemcpyRequests(transaction, destination, source, length)).destination;
+}
+
+fn inlineMemcpyValueUseDiagnosticForTest(
+    transaction: *const Transaction,
+    requests: MemcpyRequests,
+) ?[]const u8 {
+    if (transaction.failedRequestIs(requests.destination)) return "composed-block-memcpy-dst";
+    if (transaction.failedRequestIs(requests.source)) return "composed-block-memcpy-src";
+    if (transaction.failedRequestIs(requests.length)) return "composed-block-memcpy-len";
+    return null;
 }
 
 fn prepareAndExecuteAction(
@@ -1484,8 +1514,10 @@ test "value-use transaction phase capacity identity and coalescing rules fail be
     }
     var transaction = try Transaction.begin(&selector);
     defer transaction.deinit();
+    var capacity_first: ?Transaction.RequestHandle = null;
     for (names, 0..) |name, index| {
-        _ = try transaction.register(request(name, .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = @enumFromInt(index % 6) }));
+        const handle = try transaction.register(request(name, .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = @enumFromInt(index % 6) }));
+        if (capacity_first == null) capacity_first = handle;
     }
     try std.testing.expectError(error.ValueUseRequestCapacityExceeded, transaction.register(request(
         "overflow",
@@ -1494,6 +1526,7 @@ test "value-use transaction phase capacity identity and coalescing rules fail be
         .gpr64,
         .rax,
     )));
+    try std.testing.expect(!transaction.failedRequestIs(capacity_first.?));
 
     var phase = try Transaction.begin(&selector);
     defer phase.deinit();
@@ -1516,6 +1549,7 @@ test "value-use transaction phase capacity identity and coalescing rules fail be
     @memset(&transient_name, 'x');
     try phase.seal();
     try std.testing.expectError(error.ValueUseLateRegistration, phase.register(stable_request));
+    try std.testing.expect(!phase.failedRequestIs(first));
 
     var unsealed = try Transaction.begin(&selector);
     defer unsealed.deinit();
@@ -3222,9 +3256,13 @@ test "value-use inline memcpy action owns exact preservation staging and call cl
 
     var transaction = try Transaction.begin(&selector);
     defer transaction.deinit();
-    const action = try registerMemcpyAction(&transaction, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
-    try prepareAndExecuteAction(&transaction, action);
+    const requests = try registerMemcpyRequests(&transaction, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+    try prepareAndExecuteAction(&transaction, requests.destination);
+    try std.testing.expect(!transaction.failedRequestIs(requests.destination));
+    try std.testing.expect(!transaction.failedRequestIs(requests.source));
+    try std.testing.expect(!transaction.failedRequestIs(requests.length));
     try transaction.commit();
+    try std.testing.expect(!transaction.failedRequestIs(requests.destination));
 
     const expected_stream = [_]machine_module.Instruction{
         .{ .spill_rax_rsp = .slot0 },
@@ -3282,8 +3320,11 @@ test "value-use inline memcpy rejects unsupported forms and genuine copy cycles 
 
     var cycle = try Transaction.begin(&selector);
     defer cycle.deinit();
-    _ = try registerMemcpyAction(&cycle, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+    const cycle_requests = try registerMemcpyRequests(&cycle, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
     try std.testing.expectError(error.ValueUseCopyCycleRequiresO4, cycle.seal());
+    try std.testing.expect(!cycle.failedRequestIs(cycle_requests.destination));
+    try std.testing.expect(!cycle.failedRequestIs(cycle_requests.source));
+    try std.testing.expect(!cycle.failedRequestIs(cycle_requests.length));
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 
     var immediate = try Transaction.begin(&selector);
@@ -3297,6 +3338,154 @@ test "value-use inline memcpy rejects unsupported forms and genuine copy cycles 
     defer narrow.deinit();
     _ = try registerMemcpyAction(&narrow, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
     try std.testing.expectError(error.ValueUseMemcpyLengthWidthMismatch, narrow.seal());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use failure provenance distinguishes every memcpy request and foreign handles" {
+    var machine = MachineFunction.init("value-use-memcpy-provenance", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "dst", "src", "len" }) |name| try addAtCurrent(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "dst", .{ .arg64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "src", .{ .arg64 = .r9 });
+    try selector_state.bindValueLoc(&selector, "len", .rax);
+
+    const cases = [_]struct {
+        destination: ir.Value,
+        source: ir.Value,
+        length: ir.Value,
+        failing: enum { destination, source, length },
+        detail: []const u8,
+    }{
+        .{ .destination = .{ .named = "missing-dst" }, .source = .{ .named = "src" }, .length = .{ .named = "len" }, .failing = .destination, .detail = "composed-block-memcpy-dst" },
+        .{ .destination = .{ .named = "dst" }, .source = .{ .named = "missing-src" }, .length = .{ .named = "len" }, .failing = .source, .detail = "composed-block-memcpy-src" },
+        .{ .destination = .{ .named = "dst" }, .source = .{ .named = "src" }, .length = .{ .named = "missing-len" }, .failing = .length, .detail = "composed-block-memcpy-len" },
+    };
+    for (cases) |case| {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const requests = try registerMemcpyRequests(&transaction, case.destination, case.source, case.length);
+        try std.testing.expectError(error.ValueUseUnresolvedSource, transaction.seal());
+        try std.testing.expectEqualStrings(case.detail, inlineMemcpyValueUseDiagnosticForTest(&transaction, requests).?);
+        try std.testing.expectEqual(case.failing == .destination, transaction.failedRequestIs(requests.destination));
+        try std.testing.expectEqual(case.failing == .source, transaction.failedRequestIs(requests.source));
+        try std.testing.expectEqual(case.failing == .length, transaction.failedRequestIs(requests.length));
+
+        var foreign = try Transaction.begin(&selector);
+        defer foreign.deinit();
+        const foreign_requests = try registerMemcpyRequests(&foreign, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+        try std.testing.expect(!transaction.failedRequestIs(foreign_requests.destination));
+        try std.testing.expect(!transaction.failedRequestIs(foreign_requests.source));
+        try std.testing.expect(!transaction.failedRequestIs(foreign_requests.length));
+    }
+}
+
+test "value-use action-registration provenance records first secondary exactly once" {
+    var machine = MachineFunction.init("value-use-registration-provenance", .void);
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+
+    const bad_source = try transaction.register(.{
+        .source = .{ .named = "bad-source" },
+        .expected = expected(.{ .int = 64 }, .gpr64),
+        .form = .memcpy_pointer,
+        .destination = .prepared_source,
+    });
+    const good_source = try transaction.register(.{
+        .source = .{ .named = "good-source" },
+        .expected = expected(.ptr, .gpr64),
+        .form = .memcpy_pointer,
+        .destination = .prepared_source,
+    });
+    const bad_length = try transaction.register(.{
+        .source = .{ .named = "bad-length" },
+        .expected = expected(.{ .int = 32 }, .gpr32),
+        .form = .memcpy_length,
+        .destination = .prepared_source,
+    });
+    try std.testing.expectError(error.ValueUsePreparedActionFormMismatch, transaction.register(.{
+        .source = .{ .named = "dst-a" },
+        .expected = expected(.ptr, .gpr64),
+        .form = .memcpy_pointer,
+        .destination = .prepared_view,
+        .prepared_action = .{ .inline_memcpy = .{ .source = bad_source, .length = bad_length } },
+    }));
+    try std.testing.expect(transaction.failedRequestIs(bad_source));
+    try std.testing.expect(!transaction.failedRequestIs(bad_length));
+
+    try std.testing.expectError(error.ValueUsePreparedActionFormMismatch, transaction.register(.{
+        .source = .{ .named = "dst-b" },
+        .expected = expected(.ptr, .gpr64),
+        .form = .memcpy_pointer,
+        .destination = .prepared_view,
+        .prepared_action = .{ .inline_memcpy = .{ .source = good_source, .length = bad_length } },
+    }));
+    try std.testing.expect(transaction.failedRequestIs(bad_source));
+    try std.testing.expect(!transaction.failedRequestIs(bad_length));
+}
+
+test "value-use secondary materialization provenance is first and survives rollback" {
+    var machine = MachineFunction.init("value-use-memcpy-secondary-provenance", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "dst", "src", "len" }) |name| try addAtCurrent(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "dst", .{ .arg64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "src", .{ .spill64 = .slot3 });
+    try selector_state.bindValueLoc(&selector, "len", .rax);
+    const saved_source = selector.values.get("src").?;
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const requests = try registerMemcpyRequests(&transaction, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+    try transaction.seal();
+    try transaction.prepare();
+    selector.values.getPtr("src").?.loc = .{ .xmm = .{ .reg = .xmm0, .bits = 64 } };
+    try std.testing.expectError(error.ValueUseMemcpyPointerHomeUnsupported, transaction.materializeAll());
+    try std.testing.expect(transaction.failedRequestIs(requests.source));
+    try std.testing.expect(!transaction.failedRequestIs(requests.destination));
+    try std.testing.expect(!transaction.failedRequestIs(requests.length));
+    try std.testing.expectEqual(saved_source, selector.values.get("src").?);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use nested secondary failure does not get overwritten by its action owner" {
+    var machine = MachineFunction.init("value-use-memcpy-first-provenance", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "dst", "src", "len" }) |name| try addAtCurrent(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "dst", .{ .arg64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "src", .{ .arg64 = .r9 });
+    try selector_state.bindValueLoc(&selector, "len", .rax);
+    const saved_source = selector.values.get("src").?;
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const requests = try registerMemcpyRequests(&transaction, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    const lease = try transaction.preparedView(requests.destination);
+    _ = selector.values.remove("src");
+    try std.testing.expectError(error.ValueUseUnresolvedSource, transaction.executePreparedAction(lease));
+    try std.testing.expect(transaction.failedRequestIs(requests.source));
+    try std.testing.expect(!transaction.failedRequestIs(requests.destination));
+    try std.testing.expect(!transaction.failedRequestIs(requests.length));
+    try std.testing.expectEqual(saved_source, selector.values.get("src").?);
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
@@ -3327,12 +3516,15 @@ test "value-use inline memcpy rolls back preservation every stage and call appen
 
         var transaction = try Transaction.begin(&selector);
         defer transaction.deinit();
-        const action = try registerMemcpyAction(&transaction, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+        const requests = try registerMemcpyRequests(&transaction, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
         try transaction.setMemcpyTestFailure(failure);
         try transaction.seal();
         try transaction.prepare();
         try transaction.materializeAll();
-        try std.testing.expectError(error.ValueUseMemcpyTestFailure, transaction.executePreparedAction(try transaction.preparedView(action)));
+        try std.testing.expectError(error.ValueUseMemcpyTestFailure, transaction.executePreparedAction(try transaction.preparedView(requests.destination)));
+        try std.testing.expect(!transaction.failedRequestIs(requests.destination));
+        try std.testing.expect(!transaction.failedRequestIs(requests.source));
+        try std.testing.expect(!transaction.failedRequestIs(requests.length));
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
         try std.testing.expectEqual(dst_binding, selector.values.get("dst").?);
         try std.testing.expectEqual(src_binding, selector.values.get("src").?);
@@ -3364,11 +3556,14 @@ test "value-use inline memcpy preserves caller diagnostics and validates flags b
 
     var diagnostic = try Transaction.begin(&selector);
     defer diagnostic.deinit();
-    const diagnostic_action = try registerMemcpyAction(&diagnostic, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+    const diagnostic_requests = try registerMemcpyRequests(&diagnostic, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
     try diagnostic.seal();
     try diagnostic.prepare();
     try diagnostic.materializeAll();
-    try std.testing.expectError(error.ValueUseActionDiagnostic, diagnostic.executePreparedAction(try diagnostic.preparedView(diagnostic_action)));
+    try std.testing.expectError(error.ValueUseActionDiagnostic, diagnostic.executePreparedAction(try diagnostic.preparedView(diagnostic_requests.destination)));
+    try std.testing.expect(!diagnostic.failedRequestIs(diagnostic_requests.destination));
+    try std.testing.expect(!diagnostic.failedRequestIs(diagnostic_requests.source));
+    try std.testing.expect(!diagnostic.failedRequestIs(diagnostic_requests.length));
     switch (diagnostic.actionDiagnostic().?) {
         .no_spill_envelope => |detail| try std.testing.expectEqualStrings("composed-block-spill-frame", detail),
         else => return error.TestUnexpectedResult,
@@ -3380,11 +3575,14 @@ test "value-use inline memcpy preserves caller diagnostics and validates flags b
     const saved_flags = selector.eflags.snapshot();
     var flags = try Transaction.begin(&selector);
     defer flags.deinit();
-    const flags_action = try registerMemcpyAction(&flags, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+    const flags_requests = try registerMemcpyRequests(&flags, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
     try flags.seal();
     try flags.prepare();
     try flags.materializeAll();
-    try std.testing.expectError(error.EflagsClobberedWhileLive, flags.executePreparedAction(try flags.preparedView(flags_action)));
+    try std.testing.expectError(error.EflagsClobberedWhileLive, flags.executePreparedAction(try flags.preparedView(flags_requests.destination)));
+    try std.testing.expect(!flags.failedRequestIs(flags_requests.destination));
+    try std.testing.expect(!flags.failedRequestIs(flags_requests.source));
+    try std.testing.expect(!flags.failedRequestIs(flags_requests.length));
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
     try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
     try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
