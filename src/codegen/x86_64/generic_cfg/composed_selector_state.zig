@@ -1174,6 +1174,19 @@ pub fn valueBits(selector: *const ComposedBlockSelector, name: []const u8) ?u16 
     return binding.vreg.bits;
 }
 
+/// Returns only the typed register-class contract needed to register a
+/// ValueUseTransaction request. No physical ValueLoc escapes the state
+/// authority, and consumers must still let the transaction resolve the
+/// canonical current home after preparation.
+pub fn valueRegisterClass(selector: *const ComposedBlockSelector, value: ir.Value) ?VirtualRegClass {
+    const name = switch (value) {
+        .named => |name| name,
+        else => return null,
+    };
+    const binding = selector.values.get(name) orelse return null;
+    return binding.vreg.class;
+}
+
 pub const Scratch64InPlaceSource = struct {
     name: []const u8,
     reg: ArgReg,

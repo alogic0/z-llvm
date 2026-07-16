@@ -11,6 +11,7 @@ const selector_state = @import("composed_selector_state.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
 const selector_fp = @import("composed_selector_fp.zig");
 const aggregate_object = @import("aggregate_object.zig");
+const value_use = @import("composed_selector_value_use_transaction.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
@@ -25,6 +26,7 @@ const ValueLoc = selector_types.ValueLoc;
 const VirtualReg = selector_types.VirtualReg;
 const VirtualRegClass = selector_types.VirtualRegClass;
 const VirtualRegMetadata = selector_types.VirtualRegMetadata;
+const ValueUseTransaction = value_use.ValueUseTransaction;
 const pair_a = selector_types.pair_a;
 const pair_b = selector_types.pair_b;
 const selector_allocatable_pairs = selector_types.selector_allocatable_pairs;
@@ -495,6 +497,78 @@ fn lowerStoreI64(selector: *ComposedBlockSelector, ptr: ValueLoc, value: ir.Valu
     return null;
 }
 
+fn valueUseExpected(ty: ir.Type, register_class: VirtualRegClass) ValueUseTransaction.Expected {
+    return .{
+        .ty = ty,
+        .register_class = register_class,
+        .pointer_address_space = if (ty == .ptr) 0 else null,
+    };
+}
+
+fn valueUseActionIdentity(name: []const u8) !ValueUseTransaction.ActionIdentity {
+    return ValueUseTransaction.ActionIdentity.init(name);
+}
+
+fn registerValueUseSource(
+    transaction: *ValueUseTransaction,
+    source: ir.Value,
+    ty: ir.Type,
+    register_class: VirtualRegClass,
+    form: ValueUseTransaction.UseForm,
+) !ValueUseTransaction.RequestHandle {
+    return transaction.register(.{
+        .source = source,
+        .expected = valueUseExpected(ty, register_class),
+        .form = form,
+        .destination = .prepared_source,
+    });
+}
+
+fn registerValueUseAction(
+    transaction: *ValueUseTransaction,
+    source: ir.Value,
+    ty: ir.Type,
+    register_class: VirtualRegClass,
+    form: ValueUseTransaction.UseForm,
+    action: ValueUseTransaction.PreparedAction,
+) !ValueUseTransaction.RequestHandle {
+    return transaction.register(.{
+        .source = source,
+        .expected = valueUseExpected(ty, register_class),
+        .form = form,
+        .destination = .prepared_view,
+        .prepared_action = action,
+    });
+}
+
+fn executeValueUseAction(
+    authority: *ValueUseTransaction,
+    action: ValueUseTransaction.RequestHandle,
+) !void {
+    try authority.seal();
+    try authority.prepare();
+    try authority.materializeAll();
+    try authority.executePreparedAction(try authority.preparedView(action));
+    try authority.commit();
+}
+
+fn pointerUseForm(
+    selector: *const ComposedBlockSelector,
+    value: ir.Value,
+    bounded_f32_pair: bool,
+) ?struct { class: VirtualRegClass, form: ValueUseTransaction.UseForm } {
+    const register_class = selector_state.valueRegisterClass(selector, value) orelse return null;
+    if (bounded_f32_pair) {
+        if (register_class != .stack_pointer) return null;
+        return .{ .class = .stack_pointer, .form = .stack_f32_pair_byte_address };
+    }
+    return switch (register_class) {
+        .gpr64, .stack_pointer => .{ .class = register_class, .form = .pointer },
+        .stack_object => .{ .class = .stack_object, .form = .stack_object_address },
+        else => null,
+    };
+}
+
 pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.GepInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (gep.ptr == .named and std.mem.startsWith(u8, gep.ptr.named, "@"))
@@ -512,32 +586,54 @@ pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.G
         return diagnostic;
     }
     const len = parseI32ArrayType(gep.source_ty) orelse return .{ .no_emitter = "composed-block-gep-source" };
-    const base = selector_state.resolveValue(selector, gep.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-array-gep-ptr" };
-    const stack_array = switch (base) {
-        .stack_i32_array => |stack_array| stack_array,
-        .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-gep-ptr" },
-    };
-    if (stack_array.len != len) return .{ .no_emitter = "composed-block-gep-len" };
+    const base_class = selector_state.valueRegisterClass(selector, gep.ptr) orelse
+        return .{ .unsupported_value = "composed-block-unknown-array-gep-ptr" };
+    if (base_class != .stack_object) return .{ .no_emitter = "composed-block-gep-ptr" };
     if (gep.ptr_addrspace != null) return .{ .no_emitter = "composed-block-gep-addrspace" };
     if (gep.indices.items.len != 2) return .{ .no_emitter = "composed-block-gep-index-count" };
     const first_index = gep.indices.items[0];
     if (!first_index.ty.eql(.{ .int = 64 }) or !first_index.value.eql(.{ .int = 0 })) return .{ .no_emitter = "composed-block-gep-base-index" };
     const elem_index = gep.indices.items[1];
     if (!elem_index.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-gep-elem-index-ty" };
-    const stack_ptr = switch (elem_index.value) {
-        .int => |int| blk: {
-            const index = std.math.cast(u32, int) orelse return .{ .no_emitter = "composed-block-gep-index-range" };
-            if (index >= stack_array.len) return .{ .no_emitter = "composed-block-gep-index-range" };
-            const byte_offset = std.math.mul(u32, index, 4) catch return .{ .no_spill_envelope = "composed-block-gep-offset" };
-            break :blk StackPtrLoc{ .disp = stack_array.base_disp + byte_offset };
-        },
-        .named => |name| blk: {
-            try selector_state.emitValueIntoScratch(selector, elem_index.value, .rcx, 64);
-            break :blk StackPtrLoc{ .disp = stack_array.base_disp, .index = .{ .reg = .rcx, .name = name } };
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const action_index: ValueUseTransaction.AddressOffset = switch (elem_index.value) {
+        .int => |int| .{ .constant = std.math.cast(i32, int) orelse return .{ .no_emitter = "composed-block-gep-index-range" } },
+        .named => blk: {
+            const index_class = selector_state.valueRegisterClass(selector, elem_index.value) orelse
+                return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
+            if (index_class != .gpr64)
+                return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
+            break :blk .{ .request = registerValueUseSource(
+                &transaction,
+                elem_index.value,
+                .{ .int = 64 },
+                .gpr64,
+                .gpr64,
+            ) catch return .{ .unsupported_value = "composed-block-gep-dynamic-index" } };
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-gep-dynamic-index" },
     };
-    try selector_state.bindValueLoc(selector, result_name, .{ .stack_i32_ptr = stack_ptr });
+    const action = try registerValueUseAction(
+        &transaction,
+        gep.ptr,
+        .ptr,
+        .stack_object,
+        .stack_object_address,
+        .{ .form_scaled_address = .{
+            .result = try valueUseActionIdentity(result_name),
+            .index = action_index,
+            .scale = 4,
+            .expected_stack_array_len = len,
+        } },
+    );
+    executeValueUseAction(&transaction, action) catch |err| return switch (err) {
+        error.ValueUseAddressDescriptorLengthMismatch => .{ .no_emitter = "composed-block-gep-len" },
+        error.ValueUseAddressOffsetOutOfRange => .{ .no_emitter = "composed-block-gep-index-range" },
+        error.ValueUseUnresolvedSource, error.ValueUseExpiredSource => .{ .unsupported_value = "composed-block-gep-dynamic-index" },
+        error.ValueUseSourceViewMismatch, error.ValueUseRegisterClassMismatch, error.ValueUseTypeMismatch => .{ .no_emitter = "composed-block-gep-ptr" },
+        else => return err,
+    };
     return null;
 }
 
@@ -547,42 +643,39 @@ pub fn lowerI32ElementPointerGep(selector: *ComposedBlockSelector, result_name: 
     const index = gep.indices.items[0];
     if (!index.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-gep-elem-index-ty" };
     if (index.value != .named) return .{ .no_emitter = "composed-block-gep-index-form" };
+    const base_use = pointerUseForm(selector, gep.ptr, false) orelse
+        return .{ .unsupported_value = "composed-block-unknown-i32-element-gep-ptr" };
+    const index_class = selector_state.valueRegisterClass(selector, index.value) orelse
+        return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
+    if (index_class != .gpr64) return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
 
-    if (selector_state.resolveValue(selector, gep.ptr)) |base| switch (base) {
-        .stack_i32_array => |stack_array| {
-            selector_state.emitValueIntoScratch(selector, index.value, .rcx, 64) catch return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
-            const index_name = switch (index.value) {
-                .named => |name| name,
-                else => unreachable,
-            };
-            try selector_state.bindValueLoc(selector, result_name, .{ .stack_i32_ptr = .{
-                .disp = stack_array.base_disp,
-                .index = .{ .reg = .rcx, .name = index_name },
-            } });
-            return null;
-        },
-        .stack_i32_ptr => |stack_ptr| {
-            const stack_index = stack_ptr.index orelse return .{ .no_emitter = "composed-block-gep-ptr" };
-            if (stack_index.reg != .rcx) return .{ .no_emitter = "composed-block-gep-ptr" };
-            if (stack_index.addend_name != null) return .{ .no_emitter = "composed-block-gep-index-depth" };
-            const addend_name = switch (index.value) {
-                .named => |name| name,
-                else => unreachable,
-            };
-            try selector_state.bindValueLoc(selector, result_name, .{ .stack_i32_ptr = .{
-                .disp = stack_ptr.disp,
-                .index = .{ .reg = .rcx, .name = stack_index.name, .addend_name = addend_name },
-            } });
-            return null;
-        },
-        else => {},
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const index_handle = registerValueUseSource(
+        &transaction,
+        index.value,
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+    ) catch return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
+    const action = try registerValueUseAction(
+        &transaction,
+        gep.ptr,
+        .ptr,
+        base_use.class,
+        base_use.form,
+        .{ .form_scaled_address = .{
+            .result = try valueUseActionIdentity(result_name),
+            .index = .{ .request = index_handle },
+            .scale = 4,
+        } },
+    );
+    executeValueUseAction(&transaction, action) catch |err| return switch (err) {
+        error.ValueUseUnresolvedSource, error.ValueUseExpiredSource => .{ .unsupported_value = "composed-block-gep-dynamic-index" },
+        error.ValueUseUnsupportedAddressForm => .{ .no_emitter = "composed-block-gep-ptr" },
+        error.ValueUseSourceViewMismatch, error.ValueUseRegisterClassMismatch, error.ValueUseTypeMismatch => .{ .unsupported_value = "composed-block-unknown-i32-element-gep-ptr" },
+        else => return err,
     };
-
-    selector_state.emitValueIntoScratch(selector, gep.ptr, .rcx, 64) catch return .{ .unsupported_value = "composed-block-unknown-i32-element-gep-ptr" };
-    selector_state.emitValueIntoScratch(selector, index.value, .r8, 64) catch return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
-    try selector.machine.instructions.append(selector.allocator, .{ .shl_r8_imm6 = 2 });
-    try selector.machine.instructions.append(selector.allocator, .add_r8_rcx);
-    try selector_state.bindScratch(selector, result_name, .rcx, 64);
     return null;
 }
 
@@ -591,49 +684,51 @@ pub fn lowerBytePointerGep(selector: *ComposedBlockSelector, result_name: []cons
     if (gep.indices.items.len != 1) return .{ .no_emitter = "composed-block-gep-index-count" };
     const index = gep.indices.items[0];
     if (!index.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-gep-elem-index-ty" };
+    const bounded_f32_pair = aggregatePointerView(selector, gep.ptr) != null;
+    const base_use = pointerUseForm(selector, gep.ptr, bounded_f32_pair) orelse
+        return .{ .unsupported_value = "composed-block-unknown-byte-gep-ptr" };
+    if (base_use.form == .stack_object_address)
+        return .{ .unsupported_value = "composed-block-unknown-byte-gep-ptr" };
 
-    switch (index.value) {
-        .int => |int| {
-            const offset = std.math.cast(i32, int) orelse return .{ .no_emitter = "composed-block-gep-index-range" };
-            if (selector_state.resolveValue(selector, gep.ptr)) |base| switch (base) {
-                .stack_f32_pair_ptr => |ptr| {
-                    const adjusted = std.math.add(i64, ptr.disp, offset) catch return .{ .no_emitter = "composed-block-gep-index-range" };
-                    const disp = std.math.cast(u32, adjusted) orelse return .{ .no_emitter = "composed-block-gep-index-range" };
-                    const object_end = std.math.add(u32, ptr.object_base_disp, aggregate_object.byte_size) catch return .{ .no_emitter = "composed-block-gep-index-range" };
-                    if (disp < ptr.object_base_disp or disp > object_end) return .{ .no_emitter = "composed-block-gep-index-range" };
-                    try selector_state.bindValueLoc(selector, result_name, .{ .stack_f32_pair_ptr = .{
-                        .object_base_disp = ptr.object_base_disp,
-                        .disp = disp,
-                    } });
-                    return null;
-                },
-                .readonly_table_ptr => |ptr| {
-                    if (offset != 8 or ptr.offset != 0 or !ptr.shape.allowsOffset(8)) return .{ .no_emitter = "composed-block-gep-readonly-table-offset" };
-                    var adjusted = ptr;
-                    adjusted.offset = 8;
-                    try selector_state.bindValueLoc(selector, result_name, .{ .readonly_table_ptr = adjusted });
-                    return null;
-                },
-                .stack_i32_ptr => |stack_ptr| {
-                    const adjusted = std.math.add(i64, stack_ptr.disp, offset) catch return .{ .no_emitter = "composed-block-gep-index-range" };
-                    const disp = std.math.cast(u32, adjusted) orelse return .{ .no_emitter = "composed-block-gep-index-range" };
-                    try selector_state.bindValueLoc(selector, result_name, .{ .stack_i32_ptr = .{ .disp = disp, .index = stack_ptr.index } });
-                    return null;
-                },
-                else => {},
-            };
-            selector_state.emitValueIntoScratch(selector, gep.ptr, .rcx, 64) catch return .{ .unsupported_value = "composed-block-unknown-byte-gep-ptr" };
-            if (offset != 0) try selector.machine.instructions.append(selector.allocator, .{ .add_rcx_imm32 = offset });
-            try selector_state.bindScratch(selector, result_name, .rcx, 64);
-        },
-        .named => {
-            selector_state.emitValueIntoScratch(selector, gep.ptr, .r8, 64) catch return .{ .unsupported_value = "composed-block-unknown-byte-gep-ptr" };
-            selector_state.emitValueIntoScratch(selector, index.value, .rcx, 64) catch return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
-            try selector.machine.instructions.append(selector.allocator, .add_r8_rcx);
-            try selector_state.bindScratch(selector, result_name, .rcx, 64);
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const action_offset: ValueUseTransaction.AddressOffset = switch (index.value) {
+        .int => |int| .{ .constant = std.math.cast(i32, int) orelse return .{ .no_emitter = "composed-block-gep-index-range" } },
+        .named => blk: {
+            const index_class = selector_state.valueRegisterClass(selector, index.value) orelse
+                return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
+            if (index_class != .gpr64) return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
+            const handle = registerValueUseSource(
+                &transaction,
+                index.value,
+                .{ .int = 64 },
+                .gpr64,
+                .gpr64,
+            ) catch return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
+            break :blk .{ .request = handle };
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-gep-dynamic-index" },
-    }
+    };
+    const action = try registerValueUseAction(
+        &transaction,
+        gep.ptr,
+        .ptr,
+        base_use.class,
+        base_use.form,
+        .{ .form_byte_address = .{
+            .result = try valueUseActionIdentity(result_name),
+            .offset = action_offset,
+        } },
+    );
+    executeValueUseAction(&transaction, action) catch |err| return switch (err) {
+        error.ValueUseAddressOffsetOutOfRange => if (gep.ptr == .named and selector.readonly_pointer_params.contains(gep.ptr.named))
+            .{ .no_emitter = "composed-block-gep-readonly-table-offset" }
+        else
+            .{ .no_emitter = "composed-block-gep-index-range" },
+        error.ValueUseUnresolvedSource, error.ValueUseExpiredSource => .{ .unsupported_value = "composed-block-gep-dynamic-index" },
+        error.ValueUseUnsupportedAddressForm, error.ValueUseSourceViewMismatch, error.ValueUseRegisterClassMismatch, error.ValueUseTypeMismatch => .{ .unsupported_value = "composed-block-unknown-byte-gep-ptr" },
+        else => return err,
+    };
     return null;
 }
 
@@ -656,19 +751,36 @@ fn lowerReadOnlyTableGep(selector: *ComposedBlockSelector, result_name: []const 
         return .{ .no_emitter = "composed-block-gep-readonly-table-global" };
     defer decoded.deinit(selector.allocator);
     if (!sourceStrideMatchesShape(gep.source_ty, decoded.shape)) return .{ .no_emitter = "composed-block-gep-readonly-table-source" };
-    const shift = tableIndexShift(decoded.shape);
     if (!hasAdmittedIndexProof(selector, index.value.named, decoded.shape)) return .{ .no_emitter = "composed-block-gep-readonly-table-range" };
+    const index_class = selector_state.valueRegisterClass(selector, index.value) orelse
+        return .{ .unsupported_value = "composed-block-gep-readonly-table-index" };
+    if (index_class != .gpr64)
+        return .{ .unsupported_value = "composed-block-gep-readonly-table-index" };
 
-    selector_state.emitValueIntoScratch(selector, index.value, .r8, 64) catch return .{ .unsupported_value = "composed-block-gep-readonly-table-index" };
-    try selector_state.clobberArgReg(selector, .rcx);
-    try selector.machine.instructions.append(selector.allocator, .{ .lea_global_arg64 = .{ .reg = .rcx, .symbol = decoded.symbol } });
-    try selector.machine.instructions.append(selector.allocator, .{ .shl_r8_imm6 = shift });
-    try selector.machine.instructions.append(selector.allocator, .add_r8_rcx);
-    try selector_state.bindValueLoc(selector, result_name, .{ .readonly_table_ptr = .{
-        .storage = .{ .reg = .rcx },
-        .symbol = decoded.symbol,
-        .shape = decoded.shape,
-    } });
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const action = registerValueUseAction(
+        &transaction,
+        index.value,
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .form_readonly_table_address = .{
+            .result = try valueUseActionIdentity(result_name),
+            .symbol = try valueUseActionIdentity(decoded.symbol),
+            .shape = decoded.shape,
+            .scale = decoded.shape.stride(),
+        } },
+    ) catch return .{ .unsupported_value = "composed-block-gep-readonly-table-index" };
+    executeValueUseAction(&transaction, action) catch |err| return switch (err) {
+        error.ValueUseUnresolvedSource,
+        error.ValueUseExpiredSource,
+        error.ValueUseSourceViewMismatch,
+        error.ValueUseRegisterClassMismatch,
+        error.ValueUseTypeMismatch,
+        => .{ .unsupported_value = "composed-block-gep-readonly-table-index" },
+        else => return err,
+    };
     return null;
 }
 
@@ -710,14 +822,6 @@ fn sourceStrideMatchesShape(source_ty: ir.Type, shape: constant_table.Shape) boo
     return switch (source_ty) {
         .aggregate => |text| std.mem.eql(u8, std.mem.trim(u8, text, " \t"), expected),
         else => false,
-    };
-}
-
-fn tableIndexShift(shape: constant_table.Shape) u6 {
-    return switch (shape) {
-        .i16_128 => 1,
-        .f64_16, .f64_512_pairs => 3,
-        .f64_pair_128 => 4,
     };
 }
 

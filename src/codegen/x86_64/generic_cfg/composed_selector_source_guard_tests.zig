@@ -40,7 +40,7 @@ const classified_sources = [_]ClassifiedSource{
 };
 
 const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-const frozen_bypass_inventory_sha256 = "1590b6d3fe37c79ed04829a74271095ab6524f6c1bdc8aaa83ceb6f174b63e54";
+const frozen_bypass_inventory_sha256 = "d928d02a154aeda3f4cb0b2269a0c4ca40cb70cada1f539849c2ea40fddd2249";
 const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -150,10 +150,6 @@ const residual_accumulator_allowlist = [_]ResidualAllowlistEntry{
 
     .{ .source = "composed_selector_memory.zig", .function = "lowerLoad", .operation = .bind_value_loc, .structural_role = "fixed stack128 aggregate load binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 1 },
     .{ .source = "composed_selector_memory.zig", .function = "lowerStoreFp", .operation = .clobber_accumulator, .structural_role = "FP store address/value transfer temporary", .classification = .internal_temporary, .future_slice = .none, .expected_count = 2 },
-    .{ .source = "composed_selector_memory.zig", .function = "lowerGep", .operation = .bind_value_loc, .structural_role = "fixed stack i32 pointer alias binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 1 },
-    .{ .source = "composed_selector_memory.zig", .function = "lowerI32ElementPointerGep", .operation = .bind_value_loc, .structural_role = "fixed stack i32 element pointer alias binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 2 },
-    .{ .source = "composed_selector_memory.zig", .function = "lowerBytePointerGep", .operation = .bind_value_loc, .structural_role = "fixed stack/readonly byte pointer alias binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 3 },
-    .{ .source = "composed_selector_memory.zig", .function = "lowerReadOnlyTableGep", .operation = .bind_value_loc, .structural_role = "fixed readonly-table pointer alias binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 1 },
     .{ .source = "composed_selector_memory.zig", .function = "loadStackU64IntoRax", .operation = .clobber_accumulator, .structural_role = "stack-to-RAX helper temporary with no result binding", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
 
     .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .operation = .bind_value_loc, .structural_role = "computed no-emission cast alias binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
@@ -252,10 +248,6 @@ const residual_function_fingerprints = [_]FunctionFingerprint{
 
     .{ .source = "composed_selector_memory.zig", .function = "lowerLoad", .body_sha256 = "22736bb4f166cedae30f077d2f5a8daeccc8293a83f016401b092b595bbd1526" },
     .{ .source = "composed_selector_memory.zig", .function = "lowerStoreFp", .body_sha256 = "08773e5639dfcc22a932d0a4d702bbe8ff4b3ecb5e398c3b06a9de056fb8a81d" },
-    .{ .source = "composed_selector_memory.zig", .function = "lowerGep", .body_sha256 = "27fb6d9820346eb3b3e20aae1a9abb29875a9a6df30f9b793dc016d723dcd203" },
-    .{ .source = "composed_selector_memory.zig", .function = "lowerI32ElementPointerGep", .body_sha256 = "63a8f52f1abf750d00286104d79577d6a39cb4c1e50209b740ecd5ac86d523b3" },
-    .{ .source = "composed_selector_memory.zig", .function = "lowerBytePointerGep", .body_sha256 = "2b3a2e0da2ecbab1b40062000122d50a0943673d6feb968c22b7c2683ebfe863" },
-    .{ .source = "composed_selector_memory.zig", .function = "lowerReadOnlyTableGep", .body_sha256 = "1a62f83a6009ed69f9ef1cc4cd721fb525b4cc5082fc1a73c1f95a27ac33320b" },
     .{ .source = "composed_selector_memory.zig", .function = "loadStackU64IntoRax", .body_sha256 = "3fd7fcf3653b5083f8123224f83a04abd16bbb7411dac2d4279079a74cf7648d" },
 
     .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .body_sha256 = "84e76037ccb926b8edcfd5965355fcb81461d96318b71ae6e47ae96b74e3766d" },

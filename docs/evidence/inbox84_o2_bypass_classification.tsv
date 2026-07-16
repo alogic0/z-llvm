@@ -88,12 +88,12 @@ composed_selector_icmp.zig	lowerIcmp	resolvePairValue	1	1	3	O2-3B-O1	compose_rea
 composed_selector_icmp.zig	lowerIcmp	resolveValue	1	1	3	O2-3B-O1	compose_compare_use_with_accumulator_result_transaction	o1_icmp
 composed_selector_impl.zig	stabilizeFramedParams	valueLoc	1	1	5	O5-frame-ABI	retain_for_frame_stabilization_migration	-
 composed_selector_memory.zig	lowerAlloca	valueLoc	1	1	5	O5-frame-ABI	retain_for_frame_plan_migration	-
-composed_selector_memory.zig	lowerBytePointerGep	emitValueIntoScratch	1-3	3	1	O2-3B+	migrate_complete_byte_gep_consumer	use_byte_gep
-composed_selector_memory.zig	lowerBytePointerGep	resolveValue	1	1	1	O2-3B+	migrate_complete_byte_gep_consumer	use_byte_gep
-composed_selector_memory.zig	lowerGep	emitValueIntoScratch	1	1	1	O2-3B+	migrate_complete_stack_array_gep_consumer	use_gep
-composed_selector_memory.zig	lowerGep	resolveValue	1	1	1	O2-3B+	migrate_complete_stack_array_gep_consumer	use_gep
-composed_selector_memory.zig	lowerI32ElementPointerGep	emitValueIntoScratch	1-3	3	1	O2-3B+	migrate_complete_i32_gep_consumer	use_i32_gep
-composed_selector_memory.zig	lowerI32ElementPointerGep	resolveValue	1	1	1	O2-3B+	migrate_complete_i32_gep_consumer	use_i32_gep
+composed_selector_memory.zig	lowerBytePointerGep	emitValueIntoScratch	1-3	3	1	O2-3B1B	migrated_complete_byte_gep_consumer	use_byte_gep
+composed_selector_memory.zig	lowerBytePointerGep	resolveValue	1	1	1	O2-3B1B	migrated_complete_byte_gep_consumer	use_byte_gep
+composed_selector_memory.zig	lowerGep	emitValueIntoScratch	1	1	1	O2-3B1B	migrated_complete_stack_array_gep_consumer	use_gep
+composed_selector_memory.zig	lowerGep	resolveValue	1	1	1	O2-3B1B	migrated_complete_stack_array_gep_consumer	use_gep
+composed_selector_memory.zig	lowerI32ElementPointerGep	emitValueIntoScratch	1-3	3	1	O2-3B1B	migrated_complete_i32_gep_consumer	use_i32_gep
+composed_selector_memory.zig	lowerI32ElementPointerGep	resolveValue	1	1	1	O2-3B1B	migrated_complete_i32_gep_consumer	use_i32_gep
 composed_selector_memory.zig	lowerLoad	materializeLocIntoLoc	1	1	3	O2-3B-O1	compose_pointer_use_with_accumulator_load_result_transaction	o1_scalar_load
 composed_selector_memory.zig	lowerLoad	resolveValue	1-2	2	3	O2-3B-O1	compose_pointer_use_with_accumulator_load_result_transaction	o1_scalar_load
 composed_selector_memory.zig	lowerLoadF32Pair	materializeLocIntoLoc	1	1	4	O3-FP-XMM	retain_for_fp_aggregate_load_migration	-
@@ -101,7 +101,7 @@ composed_selector_memory.zig	lowerLoadF32Pair	resolveValue	1	1	4	O3-FP-XMM	retai
 composed_selector_memory.zig	lowerLoadFp	resolveValue	1	1	4	O3-FP-XMM	retain_for_fp_load_migration	-
 composed_selector_memory.zig	lowerReadOnlyPointerIntegerLoad	materializeLocIntoLoc	1-2	2	3	O2-3B-O1	compose_pointer_use_with_scalar_load_result_transaction	o1_readonly_pointer_load
 composed_selector_memory.zig	lowerReadOnlyPointerIntegerLoad	resolveValue	1	1	3	O2-3B-O1	compose_pointer_use_with_scalar_load_result_transaction	o1_readonly_pointer_load
-composed_selector_memory.zig	lowerReadOnlyTableGep	emitValueIntoScratch	1	1	1	O2-3B+	migrate_complete_table_gep_consumer	use_table_gep
+composed_selector_memory.zig	lowerReadOnlyTableGep	emitValueIntoScratch	1	1	1	O2-3B1B	migrated_complete_table_gep_consumer	use_table_gep
 composed_selector_memory.zig	lowerReadOnlyTableLoad	materializeLocIntoLoc	1	1	3	O2-3B-O1	compose_table_pointer_use_with_accumulator_load_result_transaction	o1_table_load
 composed_selector_memory.zig	lowerStore	emitValueIntoEax	1	1	1	O2-3B+	migrate_complete_scalar_store_consumer	use_scalar_store
 composed_selector_memory.zig	lowerStore	lowerStoreI64	1	1	6	parent-consumer	collapse_with_lowerStore	-
