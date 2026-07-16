@@ -7,6 +7,7 @@ const source_suffix = ".zig";
 const SourceKind = enum {
     authority,
     address_dependency_domain,
+    value_use_authority,
     lifecycle,
     consumer,
 };
@@ -34,7 +35,33 @@ const classified_sources = [_]ClassifiedSource{
     .{ .name = "composed_selector_scalar.zig", .kind = .consumer },
     .{ .name = "composed_selector_state.zig", .kind = .authority },
     .{ .name = "composed_selector_state_data.zig", .kind = .lifecycle },
+    .{ .name = "composed_selector_value_use_transaction.zig", .kind = .value_use_authority },
     .{ .name = "composed_selector_vector.zig", .kind = .consumer },
+};
+
+const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
+const frozen_bypass_inventory_sha256 = "1590b6d3fe37c79ed04829a74271095ab6524f6c1bdc8aaa83ceb6f174b63e54";
+const bypass_operations = [_][]const u8{
+    "directValueLocInstructionMaterializer",
+    "emitBinaryLocIntoAccumulator",
+    "emitValueIntoAccumulator",
+    "emitValueIntoEax",
+    "emitValueIntoFpReturn",
+    "emitValueIntoI128Return",
+    "emitValueIntoLoc",
+    "emitValueIntoRax",
+    "emitValueIntoScratch",
+    "emitValueIntoScratchAndRelocate",
+    "lowerHalfLocToFloatXmm0",
+    "lowerStoreI64",
+    "materializeF64Loc",
+    "materializeLocIntoLoc",
+    "materializeLocIntoLocWithBits",
+    "materializePairValue",
+    "materializeScalarPhiSnapshot",
+    "resolvePairValue",
+    "resolveValue",
+    "valueLoc",
 };
 
 const DirectOperation = enum {
@@ -284,6 +311,9 @@ fn validateCurrentTree(allocator: std.mem.Allocator) !void {
     for (seen) |was_seen| {
         if (!was_seen) return error.MissingClassifiedComposedSelectorSource;
     }
+    const inventory = try readFrozenBypassInventory(allocator);
+    defer allocator.free(inventory);
+    try validateFrozenBypassInventoryHash(inventory);
 }
 
 fn validateProductionSource(name: []const u8, source: [:0]const u8) !void {
@@ -291,9 +321,13 @@ fn validateProductionSource(name: []const u8, source: [:0]const u8) !void {
     switch (classified_sources[index].kind) {
         .authority => try validateAddressDependencyStateAuthority(source),
         .address_dependency_domain => try validateAddressDependencyDomainSource(source),
+        .value_use_authority => try validateValueUseAuthoritySource(source),
         .lifecycle => try validateStateDataLifecycle(source),
         .consumer => {
             if (std.mem.indexOf(u8, source, ".values") != null) return error.RawSelectorValuesAccess;
+            const inventory = try readFrozenBypassInventory(std.testing.allocator);
+            defer std.testing.allocator.free(inventory);
+            try validateFrozenBypassInventoryForSource(inventory, name, source);
             try validateFunctionFingerprintInventory(name, source);
             try validateResidualAccumulatorAllowlist(&residual_accumulator_allowlist, &residual_function_fingerprints, name, source);
             try validateArchitecturalExclusionAllowlist(name, source);
@@ -303,17 +337,35 @@ fn validateProductionSource(name: []const u8, source: [:0]const u8) !void {
     }
 }
 
-fn validateAddressDependencyStateAuthority(source: [:0]const u8) !void {
-    var body_storage: [max_function_bodies]FunctionBody = undefined;
-    const bodies = try collectFunctionBodies(source, &body_storage);
-    const body = functionBodyNamed(bodies, "valueIsLiveAfterCurrent") orelse
-        return error.AddressDependencyLivenessAuthorityMissing;
-    const liveness_body = source[body.start..body.end];
-    if (std.mem.indexOf(u8, liveness_body, "stack_i32_ptr") != null)
-        return error.StackPointerLivenessSpecialCaseReintroduced;
+fn readFrozenBypassInventory(allocator: std.mem.Allocator) ![:0]u8 {
+    return std.Io.Dir.cwd().readFileAllocOptions(
+        std.testing.io,
+        frozen_bypass_inventory_path,
+        allocator,
+        .limited(128 * 1024),
+        .of(u8),
+        0,
+    );
 }
 
-fn validateAddressDependencyDomainSource(source: [:0]const u8) !void {
+fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
+    try validateNoFunctionFamilyPredicate(source, error.ValueUseFunctionPredicateForbidden);
+    const required = [_]struct { function: []const u8, pattern: []const u8, count: usize }{
+        .{ .function = "prepare", .pattern = "resolveValue(", .count = 1 },
+        .{ .function = "validateRequest", .pattern = "resolveValue(", .count = 1 },
+        .{ .function = "materializeRequest", .pattern = "resolveValue(", .count = 1 },
+    };
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    for (required) |entry| {
+        const body = functionBodyNamed(bodies, entry.function) orelse return error.ValueUseResolutionAuthorityMissing;
+        if (countPattern(source[body.start..body.end], entry.pattern) != entry.count)
+            return error.ValueUseResolutionAuthorityMismatch;
+    }
+    if (countPattern(source, "resolveValue(") != 3) return error.ValueUseResolutionAuthorityMismatch;
+}
+
+fn validateNoFunctionFamilyPredicate(source: [:0]const u8, forbidden_error: anyerror) !void {
     var tokenizer = std.zig.Tokenizer.init(source);
     while (true) {
         const token = tokenizer.next();
@@ -330,12 +382,146 @@ fn validateAddressDependencyDomainSource(source: [:0]const u8) !void {
                     std.mem.indexOf(u8, identifier, "Callee") != null or
                     std.mem.startsWith(u8, identifier, "isExact"))
                 {
-                    return error.AddressDependencyFunctionPredicateForbidden;
+                    return forbidden_error;
                 }
             },
             else => {},
         }
     }
+}
+
+fn validateAddressDependencyStateAuthority(source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const body = functionBodyNamed(bodies, "valueIsLiveAfterCurrent") orelse
+        return error.AddressDependencyLivenessAuthorityMissing;
+    const liveness_body = source[body.start..body.end];
+    if (std.mem.indexOf(u8, liveness_body, "stack_i32_ptr") != null)
+        return error.StackPointerLivenessSpecialCaseReintroduced;
+}
+
+fn validateAddressDependencyDomainSource(source: [:0]const u8) !void {
+    try validateNoFunctionFamilyPredicate(source, error.AddressDependencyFunctionPredicateForbidden);
+}
+
+fn validateFrozenBypassInventoryHash(inventory: []const u8) !void {
+    var digest: [std.crypto.hash.sha2.Sha256.digest_length]u8 = undefined;
+    std.crypto.hash.sha2.Sha256.hash(inventory, &digest, .{});
+    const actual = std.fmt.bytesToHex(digest, .lower);
+    if (!std.mem.eql(u8, &actual, frozen_bypass_inventory_sha256))
+        return error.FrozenBypassInventoryHashMismatch;
+}
+
+fn validateFrozenBypassInventoryForSource(
+    inventory: []const u8,
+    source_name: []const u8,
+    source: [:0]const u8,
+) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+
+    for (bodies) |body| {
+        for (bypass_operations) |operation| {
+            var pattern_storage: [96]u8 = undefined;
+            const pattern = try std.fmt.bufPrint(&pattern_storage, "{s}(", .{operation});
+            const actual = if (std.mem.eql(u8, operation, "directValueLocInstructionMaterializer"))
+                @as(usize, if (std.mem.eql(u8, body.name, "materializeF64Loc")) 1 else 0)
+            else
+                countPattern(source[body.start..body.end], pattern);
+            const expected_count = try frozenBypassExpectedCount(
+                inventory,
+                source_name,
+                body.name,
+                operation,
+            ) orelse 0;
+            if (actual != expected_count) return error.FrozenBypassOccurrenceMismatch;
+        }
+    }
+
+    var lines = std.mem.splitScalar(u8, inventory, '\n');
+    _ = lines.next();
+    while (lines.next()) |line| {
+        if (line.len == 0) continue;
+        var fields = std.mem.splitScalar(u8, line, '\t');
+        const file = fields.next() orelse return error.MalformedFrozenBypassInventory;
+        const function = fields.next() orelse return error.MalformedFrozenBypassInventory;
+        const sites = fields.next() orelse return error.MalformedFrozenBypassInventory;
+        if (fields.next() != null) return error.MalformedFrozenBypassInventory;
+        if (!std.mem.eql(u8, file, source_name)) continue;
+        if (std.mem.eql(u8, function, "-")) {
+            if (!std.mem.eql(u8, sites, "none×0")) return error.MalformedFrozenBypassInventory;
+            continue;
+        }
+        if (functionBodyNamed(bodies, function) == null) return error.FrozenBypassFunctionMissing;
+        var site_it = std.mem.splitSequence(u8, sites, ", ");
+        while (site_it.next()) |site| {
+            const parsed = try parseFrozenBypassSite(site);
+            if (!isBypassOperation(parsed.operation)) return error.FrozenBypassOperationUnclassified;
+        }
+    }
+}
+
+const ParsedBypassSite = struct {
+    operation: []const u8,
+    count: usize,
+};
+
+fn parseFrozenBypassSite(site: []const u8) !ParsedBypassSite {
+    const separator = std.mem.lastIndexOf(u8, site, "×") orelse
+        return error.MalformedFrozenBypassInventory;
+    const operation = site[0..separator];
+    const count_text = site[separator + "×".len ..];
+    if (operation.len == 0 or count_text.len == 0) return error.MalformedFrozenBypassInventory;
+    return .{
+        .operation = operation,
+        .count = std.fmt.parseUnsigned(usize, count_text, 10) catch
+            return error.MalformedFrozenBypassInventory,
+    };
+}
+
+fn frozenBypassExpectedCount(
+    inventory: []const u8,
+    source_name: []const u8,
+    function_name: []const u8,
+    operation: []const u8,
+) !?usize {
+    var matching_row = false;
+    var result: ?usize = null;
+    var lines = std.mem.splitScalar(u8, inventory, '\n');
+    _ = lines.next();
+    while (lines.next()) |line| {
+        if (line.len == 0) continue;
+        var fields = std.mem.splitScalar(u8, line, '\t');
+        const file = fields.next() orelse return error.MalformedFrozenBypassInventory;
+        const function = fields.next() orelse return error.MalformedFrozenBypassInventory;
+        const sites = fields.next() orelse return error.MalformedFrozenBypassInventory;
+        if (!std.mem.eql(u8, file, source_name) or !std.mem.eql(u8, function, function_name)) continue;
+        if (matching_row) return error.DuplicateFrozenBypassInventoryRow;
+        matching_row = true;
+        var site_it = std.mem.splitSequence(u8, sites, ", ");
+        while (site_it.next()) |site| {
+            const parsed = try parseFrozenBypassSite(site);
+            if (!std.mem.eql(u8, parsed.operation, operation)) continue;
+            if (result != null) return error.DuplicateFrozenBypassOperation;
+            result = parsed.count;
+        }
+    }
+    return if (matching_row) result orelse 0 else null;
+}
+
+fn isBypassOperation(operation: []const u8) bool {
+    for (bypass_operations) |allowed| if (std.mem.eql(u8, allowed, operation)) return true;
+    return false;
+}
+
+fn countPattern(source: []const u8, pattern: []const u8) usize {
+    var count: usize = 0;
+    var search_from: usize = 0;
+    while (std.mem.indexOfPos(u8, source, search_from, pattern)) |offset| {
+        count += 1;
+        search_from = offset + pattern.len;
+    }
+    return count;
 }
 
 fn validateEflagsEmissionAuthority(name: []const u8, source: []const u8) !void {
@@ -1032,6 +1218,43 @@ test "composed selector source guard rejects function and family predicates in t
             validateProductionSource("composed_selector_address_dependencies.zig", fixture),
         );
     }
+}
+
+test "composed selector source guard rejects frozen bypass inventory growth" {
+    const inventory =
+        "file\tenclosing_function\tresolution_or_materialization_sites\n" ++
+        "composed_selector_fixture.zig\tkeep\tresolveValue×1\n";
+    const accepted: [:0]const u8 =
+        "fn keep() void { _ = selector_state.resolveValue(undefined, undefined); }";
+    try validateFrozenBypassInventoryForSource(inventory, "composed_selector_fixture.zig", accepted);
+    try std.testing.expectError(
+        error.FrozenBypassOccurrenceMismatch,
+        validateFrozenBypassInventoryForSource(
+            inventory,
+            "composed_selector_fixture.zig",
+            "fn keep() void { _ = selector_state.resolveValue(undefined, undefined); _ = selector_state.resolveValue(undefined, undefined); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.FrozenBypassOccurrenceMismatch,
+        validateFrozenBypassInventoryForSource(
+            inventory,
+            "composed_selector_fixture.zig",
+            "fn keep() void { _ = selector_state.resolveValue(undefined, undefined); } fn added() void { _ = selector_state.valueLoc(undefined, \"x\"); }",
+        ),
+    );
+}
+
+test "composed selector source guard rejects function predicates in the value-use authority" {
+    const accepted =
+        "fn prepare() void { _ = resolveValue(undefined, undefined); }" ++
+        "fn validateRequest() void { _ = resolveValue(undefined, undefined); }" ++
+        "fn materializeRequest() void { _ = resolveValue(undefined, undefined); }";
+    try validateValueUseAuthoritySource(accepted);
+    try std.testing.expectError(
+        error.ValueUseFunctionPredicateForbidden,
+        validateValueUseAuthoritySource(accepted ++ "fn bad(function_family: []const u8) void { _ = function_family; }"),
+    );
 }
 
 test "composed selector source guard accepts the fully classified current tree" {

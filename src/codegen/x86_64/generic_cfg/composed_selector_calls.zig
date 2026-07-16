@@ -198,7 +198,7 @@ pub fn lowerUsubSatI64(selector: *ComposedBlockSelector, result: ?[]const u8, ca
     defer transaction.deinit();
     if (try transaction.prepare(
         .preserve,
-        selector_scalar.accumulatorPreserveCurrentDisplacement(selector, lhs.value, .spill_live),
+        try selector_scalar.accumulatorPreserveCurrentDisplacement(selector, lhs.value, .spill_live),
     )) |diagnostic| return diagnostic;
     transaction.materialize(lhs.value, .fullRax()) catch return .{ .unsupported_value = "composed-block-usub-sat-lhs" };
     try selector_state.clobberArgReg(selector, .rcx);

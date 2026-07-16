@@ -135,7 +135,7 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-ei-shift-rhs" };
         var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
         defer transaction.deinit();
-        if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+        if (try transaction.prepare(.preserve, try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
         transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-ei-shift-lhs" };
         try emitArithmeticWrite(selector, switch (binary.op) {
             .shl => .shl_rax_cl,
@@ -151,7 +151,7 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-ei-binary-rhs" };
         var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
         defer transaction.deinit();
-        if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+        if (try transaction.prepare(.preserve, try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
         transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-ei-binary-lhs" };
         try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = op, .reg = .rcx } });
         try finishArithmeticResult(&transaction, result_name, bits);
@@ -310,7 +310,7 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
                 const amount = try shiftAmount6(rhs);
                 var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
                 defer transaction.deinit();
-                if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                if (try transaction.prepare(.preserve, try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
                 try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
                 if (amount != 0) try emitArithmeticWrite(selector, .{ .shl_rax_imm6 = amount });
                 try finishArithmeticResult(&transaction, result_name, bits);
@@ -368,7 +368,7 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
             if (bits == 64 and rhs == std.math.maxInt(u32)) {
                 var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
                 defer transaction.deinit();
-                if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                if (try transaction.prepare(.preserve, try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
                 transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch |err| switch (err) {
                     error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-and64-lhs" },
                     else => return err,
@@ -381,7 +381,7 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
             if (bits == 64) {
                 var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
                 defer transaction.deinit();
-                if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                if (try transaction.prepare(.preserve, try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
                 transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch |err| switch (err) {
                     error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-and64-lhs" },
                     else => return err,
@@ -404,7 +404,7 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
             if (bits == 64) {
                 var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
                 defer transaction.deinit();
-                if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                if (try transaction.prepare(.preserve, try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
                 transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-or64-lhs" };
                 try selector_state.clobberArgReg(selector, .rcx);
                 try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs) });
@@ -425,7 +425,7 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
                 const imm = i32Value(rhs) catch {
                     var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
                     defer transaction.deinit();
-                    if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                    if (try transaction.prepare(.preserve, try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
                     transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-add64-lhs" };
                     try selector_state.clobberArgReg(selector, .rcx);
                     try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs) });
@@ -466,7 +466,7 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
             if (bits == 64) {
                 var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
                 defer transaction.deinit();
-                if (try transaction.prepare(.preserve, accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+                if (try transaction.prepare(.preserve, try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
                 transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-xor64-lhs" };
                 try selector_state.clobberArgReg(selector, .rcx);
                 try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs) });
@@ -957,7 +957,7 @@ fn lowerI52Binary(selector: *ComposedBlockSelector, result_name: []const u8, bin
     defer transaction.deinit();
     if (try transaction.prepare(
         .preserve,
-        accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live),
+        try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live),
     )) |diagnostic| return diagnostic;
     selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch
         return .{ .unsupported_value = "composed-block-i52-shift-rhs" };
@@ -1091,7 +1091,7 @@ pub fn accumulatorPreserveCurrentDisplacement(
     selector: *const ComposedBlockSelector,
     value: ir.Value,
     fallback: selector_state.AccumulatorDisplacementPolicy,
-) selector_state.AccumulatorDisplacementPolicy {
+) !selector_state.AccumulatorDisplacementPolicy {
     if (try selector_state.liveAccumulatorName(selector)) |name| return .{ .spill_source = name };
     const name = switch (value) {
         .named => |name| name,

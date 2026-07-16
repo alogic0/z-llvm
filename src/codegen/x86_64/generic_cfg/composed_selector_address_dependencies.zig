@@ -204,6 +204,20 @@ pub const AddressDependencyDomain = struct {
         return false;
     }
 
+    /// Validates the canonical dependency closure for `owner_name` when that
+    /// identity is a registered derived-address owner. Non-owner identities
+    /// have no outgoing edges and therefore require no owner-closure work.
+    pub fn validateOwnerClosure(
+        domain: *const AddressDependencyDomain,
+        owner_name: []const u8,
+        live_context: anytype,
+    ) !void {
+        try domain.validate();
+        const owner_index = domain.ownerIndex(owner_name) orelse return;
+        var visited = [_]bool{false} ** max_owners;
+        try domain.validateOwnerClosureAt(owner_index, &visited, live_context);
+    }
+
     pub fn eql(domain: *const AddressDependencyDomain, other: *const AddressDependencyDomain) bool {
         if (domain.owner_count != other.owner_count) return false;
         for (domain.owners[0..domain.owner_count], other.owners[0..other.owner_count]) |*lhs, *rhs| {
@@ -308,5 +322,27 @@ pub const AddressDependencyDomain = struct {
             }
         }
         return false;
+    }
+
+    fn validateOwnerClosureAt(
+        domain: *const AddressDependencyDomain,
+        owner_index: usize,
+        visited: *[max_owners]bool,
+        live_context: anytype,
+    ) !void {
+        if (visited[owner_index]) return;
+        visited[owner_index] = true;
+        const owner = &domain.owners[owner_index];
+        try live_context.validateOwner(ownerView(owner));
+        for (owner.dependencies[0..owner.dependency_count]) |*dependency| {
+            try live_context.validateDependency(.{
+                .name = dependency.identity.slice(),
+                .identity_type = dependency.identity_type,
+                .role = dependency.role,
+            });
+            if (domain.ownerIndex(dependency.identity.slice())) |dependency_owner| {
+                try domain.validateOwnerClosureAt(dependency_owner, visited, live_context);
+            }
+        }
     }
 };

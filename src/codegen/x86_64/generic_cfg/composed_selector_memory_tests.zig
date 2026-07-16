@@ -184,16 +184,16 @@ test "migrated load production rollback restores full state before and after par
     selector.allocation_plan = &plan;
     selector.stack_frame_bytes = 24;
     try selector_state.bindValueLoc(&selector, "ptr", .{ .arg64 = .rdi });
-    try selector_state.bindValueLoc(&selector, "bad-index-ptr", .{ .stack_i32_ptr = .{
-        .disp = 0,
-        .index = .{ .reg = .rcx, .name = "missing-index" },
-    } });
     try selector_state.bindValueLoc(&selector, "occupied", .{ .scratch32 = .rsi });
     var seed = try selector_state.AccumulatorDefinitionTransaction.begin(&selector);
     _ = try seed.prepare(.preserve, .spill_live);
     try seed.define("old", .zeroExtending(32));
     try seed.commit();
     seed.deinit();
+    try selector_state.bindValueLoc(&selector, "bad-index-ptr", .{ .stack_i32_ptr = .{
+        .disp = 0,
+        .index = .{ .reg = .rcx, .name = "missing-index" },
+    } });
     try selector.spill_slots.put("seed", .{ .base = 0, .slots = 1 });
     selector.next_spill_slot = 1;
     try machine.instructions.append(std.testing.allocator, .{ .mov_imm_eax = 11 });

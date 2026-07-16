@@ -2089,7 +2089,7 @@ fn fpNameInReg(selector: *const ComposedBlockSelector, reg: XmmReg) ?[]const u8 
 pub fn valueMustSurviveClobber(selector: *const ComposedBlockSelector, name: []const u8) !bool {
     if (selector.phi_results.contains(name)) return true;
     return if (selector.preserve_current_position_values)
-        valueIsLiveAtOrAfterCurrent(selector, name)
+        try valueIsLiveAtOrAfterCurrent(selector, name)
     else
         try valueIsLiveAfterCurrent(selector, name);
 }
@@ -2106,16 +2106,16 @@ pub fn spillAccumulatorAliasesExcept(selector: *ComposedBlockSelector, value: ir
         .named => |name| name,
         else => return,
     };
-    while (liveAccumulatorNameExcept(selector, ignored)) |name| {
+    while (try liveAccumulatorNameExcept(selector, ignored)) |name| {
         try spillValueOrError(selector, name);
     }
 }
 
-pub fn liveAccumulatorNameExcept(selector: *const ComposedBlockSelector, ignored: []const u8) ?[]const u8 {
+pub fn liveAccumulatorNameExcept(selector: *const ComposedBlockSelector, ignored: []const u8) !?[]const u8 {
     var it = selector.values.iterator();
     while (it.next()) |entry| {
         if (std.mem.eql(u8, entry.key_ptr.*, ignored)) continue;
-        if (!valueIsLiveAtOrAfterCurrent(selector, entry.key_ptr.*)) continue;
+        if (!try valueIsLiveAtOrAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .eax, .rax => return entry.key_ptr.*,
             .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => {},
@@ -2203,7 +2203,7 @@ fn liveFpNameInReg(selector: *const ComposedBlockSelector, reg: XmmReg) !?[]cons
 pub fn liveAccumulatorName(selector: *const ComposedBlockSelector) !?[]const u8 {
     var it = selector.values.iterator();
     while (it.next()) |entry| {
-        if (!valueIsLiveAtOrAfterCurrent(selector, entry.key_ptr.*)) continue;
+        if (!try valueIsLiveAtOrAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .eax, .rax => return entry.key_ptr.*,
             .arg32, .arg64, .arg128, .scratch32, .scratch64, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => {},
@@ -2224,10 +2224,8 @@ pub fn liveAccumulatorNameAfterCurrent(selector: *const ComposedBlockSelector) !
     return null;
 }
 
-pub fn valueIsLiveAtOrAfterCurrent(selector: *const ComposedBlockSelector, name: []const u8) bool {
-    const plan = selector.allocation_plan orelse return false;
-    const end = plan.intervalEnd(name) orelse return true;
-    return end >= selector.current_position;
+pub fn valueIsLiveAtOrAfterCurrent(selector: *const ComposedBlockSelector, name: []const u8) !bool {
+    return valueIsLiveAtBoundary(selector, name, .at_or_after_current);
 }
 
 pub fn liveEaxName(selector: *const ComposedBlockSelector) !?[]const u8 {
@@ -2329,17 +2327,48 @@ pub fn livePairNameContainingRegExcept(selector: *const ComposedBlockSelector, r
 }
 
 pub fn valueIsLiveAfterCurrent(selector: *const ComposedBlockSelector, name: []const u8) !bool {
+    return valueIsLiveAtBoundary(selector, name, .after_current);
+}
+
+pub const LivenessBoundary = enum {
+    after_current,
+    at_or_after_current,
+};
+
+pub fn valueIsLiveAtBoundary(
+    selector: *const ComposedBlockSelector,
+    name: []const u8,
+    boundary: LivenessBoundary,
+) !bool {
     if (selector.address_dependencies.count() != 0 and selector.allocation_plan == null)
         return error.AddressDependencyMissingPlan;
     const plan = selector.allocation_plan orelse return false;
-    const context = AddressDependencyLivenessContext{ .selector = selector };
+    const context = AddressDependencyLivenessContext{ .selector = selector, .boundary = boundary };
     if (try selector.address_dependencies.dependencyIsRequired(name, context)) return true;
     const end = plan.intervalEnd(name) orelse return true;
-    return end > selector.current_position;
+    return intervalIsLiveAtBoundary(end, selector.current_position, boundary);
+}
+
+/// Validates both the live dependency graph and the named source's canonical
+/// outgoing address edges without copying or accepting a caller-owned list.
+pub fn validateAddressDependenciesForUse(
+    selector: *const ComposedBlockSelector,
+    name: []const u8,
+) !void {
+    if (selector.address_dependencies.count() != 0 and selector.allocation_plan == null)
+        return error.AddressDependencyMissingPlan;
+    if (selector.address_dependencies.count() == 0) return;
+    const context = AddressDependencyLivenessContext{
+        .selector = selector,
+        .boundary = .at_or_after_current,
+    };
+    _ = try selector.address_dependencies.dependencyIsRequired(name, context);
+    try selector.address_dependencies.validateOwnerClosure(name, context);
 }
 
 const AddressDependencyLivenessContext = struct {
     selector: *const ComposedBlockSelector,
+    boundary: LivenessBoundary,
 
     pub fn validateOwner(context: AddressDependencyLivenessContext, owner: AddressDependencyDomain.OwnerView) !void {
         const binding = context.selector.values.get(owner.name) orelse
@@ -2355,7 +2384,7 @@ const AddressDependencyLivenessContext = struct {
             return error.AddressDependencyMissingPlan;
         const end = plan.intervalEnd(owner_name) orelse
             return error.AddressDependencyMissingOwnerPlanEntry;
-        return end > context.selector.current_position;
+        return intervalIsLiveAtBoundary(end, context.selector.current_position, context.boundary);
     }
 
     pub fn validateDependency(
@@ -2380,6 +2409,13 @@ const AddressDependencyLivenessContext = struct {
         if (!valid) return error.AddressDependencyInvalidBindingType;
     }
 };
+
+fn intervalIsLiveAtBoundary(end: usize, current: usize, boundary: LivenessBoundary) bool {
+    return switch (boundary) {
+        .after_current => end > current,
+        .at_or_after_current => end >= current,
+    };
+}
 
 fn addressOwnerMatchesBinding(owner: AddressDependencyDomain.OwnerView, loc: ValueLoc) bool {
     const stack_ptr = switch (loc) {

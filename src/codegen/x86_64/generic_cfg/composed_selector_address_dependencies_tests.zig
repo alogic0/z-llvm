@@ -292,3 +292,76 @@ test "generic cfg selector address dependency liveness distinguishes missing pla
         selector_state.valueIsLiveAfterCurrent(&selector, "index"),
     );
 }
+
+test "generic cfg selector unified liveness boundary includes dependencies whose owner ends at current" {
+    var machine = MachineFunction.init("address-dependency-boundary", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("index", 1);
+    try plan.interval_ends.put("pointer", 5);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 5;
+    try selector_state.bindValueLoc(&selector, "index", .{ .scratch64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "pointer", .{ .stack_i32_ptr = .{
+        .disp = 4,
+        .index = .{ .reg = .r8, .name = "index" },
+    } });
+
+    try std.testing.expect(!try selector_state.valueIsLiveAfterCurrent(&selector, "index"));
+    try std.testing.expect(try selector_state.valueIsLiveAtOrAfterCurrent(&selector, "index"));
+}
+
+test "generic cfg selector address dependencies remain transitive through the at-or-after boundary" {
+    var domain: AddressDependencyDomain = .{};
+    try domain.replaceAddress("outer", &.{
+        .{ .name = "inner", .identity_type = .address, .role = .base },
+    });
+    try domain.replaceAddress("inner", &.{
+        .{ .name = "root", .identity_type = .pointer, .role = .base },
+    });
+    const identities = [_]TypedIdentity{
+        .{ .name = "outer", .identity_type = .address },
+        .{ .name = "inner", .identity_type = .address },
+        .{ .name = "root", .identity_type = .pointer },
+    };
+    const after_live = [_][]const u8{};
+    try std.testing.expect(!try domain.dependencyIsRequired(
+        "root",
+        TestLiveness{ .live_owners = &after_live, .identities = &identities },
+    ));
+    const at_or_after_live = [_][]const u8{"outer"};
+    try std.testing.expect(try domain.dependencyIsRequired(
+        "root",
+        TestLiveness{ .live_owners = &at_or_after_live, .identities = &identities },
+    ));
+}
+
+test "generic cfg selector malformed dependency plans propagate through preservation callers" {
+    var machine = MachineFunction.init("address-dependency-preservation-errors", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try selector_state.bindValueLoc(&selector, "ignored", .eax);
+    try selector_state.bindValueLoc(&selector, "alias", .rax);
+    try selector.address_dependencies.replaceAddress("owner", &.{
+        .{ .name = "dependency", .identity_type = .integer, .role = .index },
+    });
+
+    selector.preserve_current_position_values = true;
+    try std.testing.expectError(
+        error.AddressDependencyMissingPlan,
+        selector_state.valueMustSurviveClobber(&selector, "alias"),
+    );
+    try std.testing.expectError(
+        error.AddressDependencyMissingPlan,
+        selector_state.liveAccumulatorName(&selector),
+    );
+    try std.testing.expectError(
+        error.AddressDependencyMissingPlan,
+        selector_state.liveAccumulatorNameExcept(&selector, "ignored"),
+    );
+}
