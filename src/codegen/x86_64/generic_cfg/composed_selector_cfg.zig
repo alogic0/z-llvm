@@ -14,6 +14,7 @@ const sysv_abi = @import("../sysv_abi.zig");
 const selector_frame = @import("composed_selector_frame.zig");
 const selector_memory = @import("composed_selector_memory.zig");
 const selector_calls = @import("composed_selector_calls.zig");
+const value_use = @import("composed_selector_value_use_transaction.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
@@ -43,6 +44,7 @@ const PlannedValueAssignment = stage2_planning.PlannedValueAssignment;
 const SelectorAllocationPlan = stage2_planning.SelectorAllocationPlan;
 const SelectorValueInterval = stage2_planning.SelectorValueInterval;
 const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
+const ValueUseTransaction = value_use.ValueUseTransaction;
 const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const analyzeStageTwoNoSpillEnvelope = stage2_planning.analyzeStageTwoNoSpillEnvelope;
 const buildSelectorAllocationPlan = stage2_planning.buildSelectorAllocationPlan;
@@ -1264,16 +1266,38 @@ pub fn emitValueIntoLoc(selector: *ComposedBlockSelector, value: ir.Value, dst: 
 }
 
 pub fn emitBranchCondition(selector: *ComposedBlockSelector, value: ir.Value) !?Diagnostic {
-    const loc = selector_state.resolveValue(selector, value) orelse return .{ .unsupported_value = "stage2-unknown-cond" };
-    switch (loc) {
-        .eax => try selector_state.emitEflagsInstruction(selector, .test_eax_eax, .definition),
-        .arg32, .scratch32 => |reg| try selector_state.emitEflagsInstruction(selector, .{ .test_arg8 = reg }, .definition),
-        .spill64 => |frame_index| {
-            try selector_state.clobberArgReg(selector, .rcx);
-            try selector.machine.instructions.append(selector.allocator, .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = frame_index } });
-            try selector_state.emitEflagsInstruction(selector, .{ .test_arg8 = .rcx }, .definition);
-        },
-        .arg64, .scratch64, .arg128, .scratch128, .xmm, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "stage2-cond-loc" },
-    }
+    var authority = try ValueUseTransaction.begin(selector);
+    defer authority.deinit();
+    const action = try authority.register(.{
+        .source = value,
+        .expected = .{ .ty = .{ .int = 1 }, .register_class = .gpr32 },
+        .form = .branch_condition,
+        .destination = .prepared_view,
+        .prepared_action = .branch_condition,
+    });
+    authority.seal() catch |err| return branchConditionValueUseDiagnostic(err) orelse return err;
+    authority.prepare() catch |err| return branchConditionValueUseDiagnostic(err) orelse return err;
+    authority.materializeAll() catch |err| return branchConditionValueUseDiagnostic(err) orelse return err;
+    authority.executePreparedAction(try authority.preparedView(action)) catch |err|
+        return branchConditionValueUseDiagnostic(err) orelse return err;
+    try authority.commit();
     return null;
+}
+
+fn branchConditionValueUseDiagnostic(err: anyerror) ?Diagnostic {
+    return switch (err) {
+        error.ValueUseUnsupportedSource,
+        error.ValueUseUnresolvedSource,
+        error.ValueUseExpiredSource,
+        error.ValueUseUntypedNullPointer,
+        error.ValueUsePreparedViewUnsupported,
+        => .{ .unsupported_value = "stage2-unknown-cond" },
+        error.ValueUseBranchConditionHomeUnsupported,
+        error.ValueUseBranchConditionWidthMismatch,
+        error.ValueUseRegisterClassMismatch,
+        error.ValueUseTypeMismatch,
+        error.ValueUseSourceViewMismatch,
+        => .{ .no_emitter = "stage2-cond-loc" },
+        else => null,
+    };
 }

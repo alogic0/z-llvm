@@ -40,7 +40,7 @@ const classified_sources = [_]ClassifiedSource{
 };
 
 const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-const frozen_bypass_inventory_sha256 = "62888e477a39ce8de36f386051dff1049a06f321764da4c02a1211ff0272371b";
+const frozen_bypass_inventory_sha256 = "86c9f49f4eca03860336fae2ae09dfdda3f2c35100931740dbafbcfa43da91b9";
 const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -386,12 +386,12 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     }
     if (std.mem.indexOf(u8, source, ".validate_shape") != null)
         return error.ValueUsePreparedTestActionInProduction;
-    if (std.mem.indexOf(u8, source, ".branch_condition") != null or
-        std.mem.indexOf(u8, source, ".switch_condition") != null or
+    if (std.mem.indexOf(u8, source, ".switch_condition") != null or
         std.mem.indexOf(u8, source, ".switch_compare_chain") != null)
     {
         return error.ValueUseDormantBranchSwitchActionInProduction;
     }
+    try validateBranchActionProductionSites(source_name, source);
     try validateStoreActionProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
@@ -415,6 +415,30 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
             if (std.mem.indexOf(u8, function_source, pattern) != null)
                 return error.ValueUsePreparedLeafRawOperation;
         }
+    }
+}
+
+fn validateBranchActionProductionSites(source_name: []const u8, source: [:0]const u8) !void {
+    const form_pattern = ".form = .branch_condition";
+    const action_pattern = ".prepared_action = .branch_condition";
+    const total = countPattern(source, ".branch_condition");
+    if (!std.mem.eql(u8, source_name, "composed_selector_cfg.zig")) {
+        if (total != 0) return error.ValueUseBranchActionOutsideAllowlist;
+        return;
+    }
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const body = functionBodyNamed(bodies, "emitBranchCondition") orelse
+        return error.ValueUseBranchActionAllowlistMismatch;
+    const function_source = source[body.start..body.end];
+    if (countPattern(function_source, form_pattern) != 1 or
+        countPattern(function_source, action_pattern) != 1 or
+        countPattern(source, form_pattern) != 1 or
+        countPattern(source, action_pattern) != 1 or
+        total != 2)
+    {
+        return error.ValueUseBranchActionAllowlistMismatch;
     }
 }
 
@@ -1453,9 +1477,9 @@ test "composed selector source guard freezes production store actions by functio
     );
 }
 
-test "composed selector source guard keeps branch and switch actions dormant" {
+test "composed selector source guard freezes branch action and keeps switch dormant" {
     try std.testing.expectError(
-        error.ValueUseDormantBranchSwitchActionInProduction,
+        error.ValueUseBranchActionOutsideAllowlist,
         validatePreparedViewLeafDiscipline(
             "composed_selector_fixture.zig",
             "fn lower() void { _ = .branch_condition; }",
@@ -1466,6 +1490,17 @@ test "composed selector source guard keeps branch and switch actions dormant" {
         validatePreparedViewLeafDiscipline(
             "composed_selector_fixture.zig",
             "fn lower() void { _ = .switch_condition; _ = .switch_compare_chain; }",
+        ),
+    );
+
+    const accepted: [:0]const u8 =
+        "fn emitBranchCondition() void { _ = .{ .form = .branch_condition, .prepared_action = .branch_condition }; }";
+    try validateBranchActionProductionSites("composed_selector_cfg.zig", accepted);
+    try std.testing.expectError(
+        error.ValueUseBranchActionAllowlistMismatch,
+        validateBranchActionProductionSites(
+            "composed_selector_cfg.zig",
+            accepted ++ " fn relocated() void { _ = .branch_condition; }",
         ),
     );
 }

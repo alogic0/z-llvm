@@ -476,6 +476,99 @@ test "composed selector executes reduced compare setcc test branch phi sequence"
     try std.testing.expectEqual(@as(u32, 9), compare_branch_phi(std.math.maxInt(u32)));
 }
 
+test "production branch transaction preserves live rcx and caller consumes committed flags" {
+    const input =
+        \\define i32 @spill_branch(i1 %condition, i64 %live) {
+        \\entry:
+        \\  br i1 %condition, label %taken, label %other
+        \\taken:
+        \\  ret i32 1
+        \\other:
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const function = module.functions.items[0];
+
+    var machine = MachineFunction.init(function.name, function.ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("condition", 1);
+    try plan.interval_ends.put("live", 10);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    selector.stack_frame_bytes = 24;
+    try selector_state.bindValueLoc(&selector, "condition", .{ .spill64 = .slot2 });
+    selector.values.getPtr("condition").?.vreg.class = .gpr64;
+    selector.values.getPtr("condition").?.vreg.bits = 64;
+    try selector_state.bindValueLoc(&selector, "live", .{ .scratch64 = .rcx });
+
+    const diagnostic = try selector_cfg.lowerCfgTerminator(
+        &selector,
+        function,
+        0,
+        function.blocks.items[0].terminator.?,
+    );
+    try std.testing.expect(diagnostic == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .spill_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot0 } },
+        .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = .slot2 } },
+        .{ .test_arg8 = .rcx },
+    }, machine.instructions.items[0..3]);
+    try std.testing.expect(machine.instructions.items[3] == .jne);
+    try std.testing.expectEqualStrings("taken", machine.instructions.items[3].jne);
+    try std.testing.expect(machine.instructions.items[4] == .jmp);
+    try std.testing.expectEqualStrings("other", machine.instructions.items[4].jmp);
+    try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.values.get("live").?.loc);
+    try std.testing.expectEqual(@as(usize, 2), selector.eflags_semantics.items.len);
+    try std.testing.expectEqual(@as(usize, 2), selector.eflags_semantics.items[0].instruction_index);
+    try std.testing.expect(selector.eflags_semantics.items[0].effect == .definition);
+    try std.testing.expectEqual(@as(usize, 3), selector.eflags_semantics.items[1].instruction_index);
+    try std.testing.expect(selector.eflags_semantics.items[1].effect == .use);
+}
+
+test "production branch failure before test rolls back staging and EFLAGS record" {
+    var machine = MachineFunction.init("branch-condition-rollback", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("condition", 1);
+    try plan.interval_ends.put("live", 10);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    selector.stack_frame_bytes = 24;
+    try selector_state.bindValueLoc(&selector, "condition", .{ .spill64 = .slot2 });
+    selector.values.getPtr("condition").?.vreg.class = .gpr64;
+    selector.values.getPtr("condition").?.vreg.bits = 64;
+    try selector_state.bindValueLoc(&selector, "live", .{ .scratch64 = .rcx });
+    try selector_state.emitEflagsInstruction(&selector, .{ .cmp_eax_imm32 = 0 }, .definition);
+    const condition_before = selector.values.get("condition").?;
+    const live_before = selector.values.get("live").?;
+
+    try std.testing.expectError(
+        error.EflagsDefinitionOverwrittenWhileLive,
+        selector_cfg.emitBranchCondition(&selector, .{ .named = "condition" }),
+    );
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .cmp_eax_imm32 = 0 },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(condition_before, selector.values.get("condition").?);
+    try std.testing.expectEqual(live_before, selector.values.get("live").?);
+    try std.testing.expectEqual(@as(usize, 0), selector.next_spill_slot);
+    try std.testing.expectEqual(@as(u32, 24), selector.stack_frame_bytes);
+    try std.testing.expectEqual(@as(usize, 1), selector.eflags_semantics.items.len);
+    try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items[0].instruction_index);
+    try std.testing.expect(selector.eflags_semantics.items[0].effect == .definition);
+}
+
 test "generic cfg selector restores only live displaced phi destinations" {
     var machine = MachineFunction.init("live-phi-restore", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);

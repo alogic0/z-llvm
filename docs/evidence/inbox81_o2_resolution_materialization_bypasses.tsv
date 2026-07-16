@@ -22,7 +22,6 @@ composed_selector_calls.zig	lowerInlineMemcpy	emitValueIntoScratch×3
 composed_selector_calls.zig	lowerIntByteSizeCall	emitValueIntoScratch×1
 composed_selector_calls.zig	lowerSmulOverflowI64	emitValueIntoAccumulator×1, emitValueIntoScratch×1
 composed_selector_calls.zig	lowerUnsignedOverflowI32	emitValueIntoEax×1, emitValueIntoScratch×1, resolveValue×1
-composed_selector_cfg.zig	emitBranchCondition	resolveValue×1
 composed_selector_cfg.zig	emitPhiEdgeMoves	emitValueIntoLoc×1, materializeLocIntoLoc×1, materializeScalarPhiSnapshot×1
 composed_selector_cfg.zig	emitScalarSelectValue	emitValueIntoAccumulator×1
 composed_selector_cfg.zig	emitValueIntoLoc	materializeLocIntoLoc×2, materializeLocIntoLocWithBits×2, resolveValue×3
