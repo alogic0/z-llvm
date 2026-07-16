@@ -389,6 +389,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     try validateSwitchActionProductionSites(source_name, source);
     try validateBranchActionProductionSites(source_name, source);
     try validateStoreActionProductionSites(source_name, source);
+    try validateMemcpyActionProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -411,6 +412,20 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
             if (std.mem.indexOf(u8, function_source, pattern) != null)
                 return error.ValueUsePreparedLeafRawOperation;
         }
+    }
+}
+
+fn validateMemcpyActionProductionSites(source_name: []const u8, source: [:0]const u8) !void {
+    _ = source_name;
+    const forbidden = [_][]const u8{
+        ".form = .memcpy_pointer",
+        ".form = .memcpy_length",
+        ".inline_memcpy",
+        ".setMemcpyTestFailure(",
+    };
+    for (forbidden) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseMemcpyActionWiredBeforeReview;
     }
 }
 
@@ -1479,6 +1494,20 @@ test "composed selector source guard rejects callback escapes and raw operations
         validatePreparedViewLeafDiscipline(
             "composed_selector_fixture.zig",
             "fn lowerStore() void { const action: Transaction.PreparedAction = .{ .store_i64 = intent }; _ = action; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseMemcpyActionWiredBeforeReview,
+        validatePreparedViewLeafDiscipline(
+            "composed_selector_calls.zig",
+            "fn lowerInlineMemcpy() void { const action: Transaction.PreparedAction = .{ .inline_memcpy = intent }; _ = action; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseMemcpyActionWiredBeforeReview,
+        validatePreparedViewLeafDiscipline(
+            "composed_selector_calls.zig",
+            "fn lowerInlineMemcpy() void { _ = transaction.setMemcpyTestFailure(.after_source); }",
         ),
     );
 }

@@ -69,6 +69,46 @@ fn actionIdentity(name: []const u8) !Transaction.ActionIdentity {
     return Transaction.ActionIdentity.init(name);
 }
 
+fn registerMemcpyAction(
+    transaction: *Transaction,
+    destination: ir.Value,
+    source: ir.Value,
+    length: ir.Value,
+) !Transaction.RequestHandle {
+    const source_handle = try transaction.register(.{
+        .source = source,
+        .expected = expected(.ptr, .gpr64),
+        .form = .memcpy_pointer,
+        .destination = .prepared_source,
+    });
+    const length_handle = try transaction.register(.{
+        .source = length,
+        .expected = expected(.{ .int = 64 }, .gpr64),
+        .form = .memcpy_length,
+        .destination = .prepared_source,
+    });
+    return transaction.register(.{
+        .source = destination,
+        .expected = expected(.ptr, .gpr64),
+        .form = .memcpy_pointer,
+        .destination = .prepared_view,
+        .prepared_action = .{ .inline_memcpy = .{
+            .source = source_handle,
+            .length = length_handle,
+        } },
+    });
+}
+
+fn prepareAndExecuteAction(
+    transaction: *Transaction,
+    action: Transaction.RequestHandle,
+) !void {
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(action));
+}
+
 fn executeBranchConditionCase(
     loc: ValueLoc,
     binding_class: selector_types.VirtualRegClass,
@@ -3164,4 +3204,189 @@ test "value-use GEP actions preserve accepted descriptor preconditions" {
         table_wrong_offset.executePreparedAction(try table_wrong_offset.preparedView(wrong_action)),
     );
     try std.testing.expect(selector.values.get("wrong-table-result") == null);
+}
+
+test "value-use inline memcpy action owns exact preservation staging and call clobber" {
+    var machine = MachineFunction.init("value-use-inline-memcpy", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "dst", "src", "len" }) |name| try addAtCurrent(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "dst", .{ .arg64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "src", .{ .spill64 = .slot3 });
+    try selector_state.bindValueLoc(&selector, "len", .rax);
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const action = try registerMemcpyAction(&transaction, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+    try prepareAndExecuteAction(&transaction, action);
+    try transaction.commit();
+
+    const expected_stream = [_]machine_module.Instruction{
+        .{ .spill_rax_rsp = .slot0 },
+        .{ .mov_arg64_arg = .{ .dst = .rdi, .src = .r8 } },
+        .{ .reload_arg64_rsp = .{ .reg = .rsi, .frame_index = .slot3 } },
+        .{ .reload_arg64_rsp = .{ .reg = .rdx, .frame_index = .slot0 } },
+        .memcpy_rdi_rsi_rdx_rax,
+    };
+    try std.testing.expectEqualSlices(machine_module.Instruction, &expected_stream, machine.instructions.items);
+    try std.testing.expectEqual(@as(usize, 1), selector.eflags_semantics.items.len);
+    try std.testing.expectEqual(selector_state.EflagsEffect.clobber, selector.eflags_semantics.items[0].effect);
+}
+
+test "value-use inline memcpy supports same-source destinations and audited pair low views" {
+    var machine = MachineFunction.init("value-use-inline-memcpy-alias", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "pointer", "len" }) |name| try addAtCurrent(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "pointer", .{ .arg64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "len", .{ .scratch128 = selector_types.pair_a });
+    selector.values.getPtr("len").?.vreg.class = .gpr128;
+    selector.values.getPtr("len").?.vreg.bits = 128;
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const action = try registerMemcpyAction(&transaction, .{ .named = "pointer" }, .{ .named = "pointer" }, .{ .named = "len" });
+    try prepareAndExecuteAction(&transaction, action);
+    try transaction.commit();
+
+    const expected_stream = [_]machine_module.Instruction{
+        .{ .mov_arg64_arg = .{ .dst = .rdi, .src = .r8 } },
+        .{ .mov_arg64_arg = .{ .dst = .rsi, .src = .r8 } },
+        .{ .mov_arg64_arg = .{ .dst = .rdx, .src = .rcx } },
+        .memcpy_rdi_rsi_rdx_rax,
+    };
+    try std.testing.expectEqualSlices(machine_module.Instruction, &expected_stream, machine.instructions.items);
+}
+
+test "value-use inline memcpy rejects unsupported forms and genuine copy cycles before mutation" {
+    var machine = MachineFunction.init("value-use-inline-memcpy-negative", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "dst", "src", "len" }) |name| try addAtCurrent(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "dst", .{ .arg64 = .rsi });
+    try selector_state.bindValueLoc(&selector, "src", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "len", .{ .arg64 = .r8 });
+
+    var cycle = try Transaction.begin(&selector);
+    defer cycle.deinit();
+    _ = try registerMemcpyAction(&cycle, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+    try std.testing.expectError(error.ValueUseCopyCycleRequiresO4, cycle.seal());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+
+    var immediate = try Transaction.begin(&selector);
+    defer immediate.deinit();
+    _ = try registerMemcpyAction(&immediate, .null_value, .{ .named = "src" }, .{ .int = 4 });
+    try std.testing.expectError(error.ValueUseUnsupportedSource, immediate.seal());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+
+    selector.values.getPtr("len").?.vreg.bits = 32;
+    var narrow = try Transaction.begin(&selector);
+    defer narrow.deinit();
+    _ = try registerMemcpyAction(&narrow, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+    try std.testing.expectError(error.ValueUseMemcpyLengthWidthMismatch, narrow.seal());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use inline memcpy rolls back preservation every stage and call append" {
+    inline for (std.meta.tags(Transaction.MemcpyTestFailure)) |failure| {
+        var machine = MachineFunction.init("value-use-inline-memcpy-rollback", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "dst", "src", "len" }) |name| try addAtCurrent(&plan, name);
+        try addLive(&plan, "live-rcx");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "dst", .{ .arg64 = .r8 });
+        try selector_state.bindValueLoc(&selector, "src", .{ .spill64 = .slot3 });
+        try selector_state.bindValueLoc(&selector, "len", .rax);
+        try selector_state.bindValueLoc(&selector, "live-rcx", .{ .arg64 = .rcx });
+        const dst_binding = selector.values.get("dst").?;
+        const src_binding = selector.values.get("src").?;
+        const len_binding = selector.values.get("len").?;
+        const live_binding = selector.values.get("live-rcx").?;
+        const saved_next_vreg = selector.next_virtual_reg;
+        const saved_next_spill = selector.next_spill_slot;
+        const saved_domain = selector.address_dependencies;
+        const saved_eflags = selector.eflags.snapshot();
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const action = try registerMemcpyAction(&transaction, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+        try transaction.setMemcpyTestFailure(failure);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try std.testing.expectError(error.ValueUseMemcpyTestFailure, transaction.executePreparedAction(try transaction.preparedView(action)));
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(dst_binding, selector.values.get("dst").?);
+        try std.testing.expectEqual(src_binding, selector.values.get("src").?);
+        try std.testing.expectEqual(len_binding, selector.values.get("len").?);
+        try std.testing.expectEqual(live_binding, selector.values.get("live-rcx").?);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+        try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+        try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+        try std.testing.expect(selector.address_dependencies.eql(&saved_domain));
+        try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+        try selector.eflags.validateSnapshot(saved_eflags);
+    }
+}
+
+test "value-use inline memcpy preserves caller diagnostics and validates flags before mutation" {
+    var machine = MachineFunction.init("value-use-inline-memcpy-diagnostic", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "dst", "src", "len" }) |name| try addAtCurrent(&plan, name);
+    try addLive(&plan, "live-rcx");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "dst", .{ .arg64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "src", .{ .arg64 = .r9 });
+    try selector_state.bindValueLoc(&selector, "len", .rax);
+    try selector_state.bindValueLoc(&selector, "live-rcx", .{ .arg64 = .rcx });
+
+    var diagnostic = try Transaction.begin(&selector);
+    defer diagnostic.deinit();
+    const diagnostic_action = try registerMemcpyAction(&diagnostic, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+    try diagnostic.seal();
+    try diagnostic.prepare();
+    try diagnostic.materializeAll();
+    try std.testing.expectError(error.ValueUseActionDiagnostic, diagnostic.executePreparedAction(try diagnostic.preparedView(diagnostic_action)));
+    switch (diagnostic.actionDiagnostic().?) {
+        .no_spill_envelope => |detail| try std.testing.expectEqualStrings("composed-block-spill-frame", detail),
+        else => return error.TestUnexpectedResult,
+    }
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+
+    selector.stack_frame_bytes = 128;
+    try selector.eflags.apply(.definition);
+    const saved_flags = selector.eflags.snapshot();
+    var flags = try Transaction.begin(&selector);
+    defer flags.deinit();
+    const flags_action = try registerMemcpyAction(&flags, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
+    try flags.seal();
+    try flags.prepare();
+    try flags.materializeAll();
+    try std.testing.expectError(error.EflagsClobberedWhileLive, flags.executePreparedAction(try flags.preparedView(flags_action)));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+    try selector.eflags.validateSnapshot(saved_flags);
 }

@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
 const x86_64_types = @import("../types.zig");
@@ -21,6 +22,7 @@ const VirtualReg = selector_types.VirtualReg;
 const VirtualRegClass = selector_types.VirtualRegClass;
 const ComposedBlockSelector = state_data.ComposedBlockSelector;
 const AddressDependencyDomain = address_dependencies.AddressDependencyDomain;
+const Diagnostic = @import("inspection.zig").Diagnostic;
 
 /// Instruction-level authority for planning several value uses before any
 /// selector mutation. Newly added action variants remain dormant until their
@@ -50,6 +52,8 @@ pub const ValueUseTransaction = struct {
     prepared_view_valid: [max_requests]bool = [_]bool{false} ** max_requests,
     switch_boundary_applied: [max_requests]bool = [_]bool{false} ** max_requests,
     view_generation: u32 = 1,
+    action_diagnostic: ?Diagnostic = null,
+    memcpy_test_failure: if (builtin.is_test) ?MemcpyTestFailure else void = if (builtin.is_test) null else {},
 
     pub const Expected = struct {
         ty: ir.Type,
@@ -79,6 +83,11 @@ pub const ValueUseTransaction = struct {
         /// Exact legacy compare-chain switch homes, including the read-only
         /// low limb of an existing pair and an action-owned immediate.
         switch_condition,
+        /// Exact legacy inline-memcpy pointer homes. This action-specific form
+        /// deliberately excludes generic stack/table/null pointer capability.
+        memcpy_pointer,
+        /// Exact legacy inline-memcpy i64 length homes.
+        memcpy_length,
         stack_argument,
         new_pair_ownership,
     };
@@ -215,6 +224,23 @@ pub const ValueUseTransaction = struct {
         destination: RequestHandle,
     };
 
+    /// Complete inline-memcpy semantic intent. The action is owned by the
+    /// destination-pointer request; source and length are already-registered
+    /// operands. No discovered home, call result, or general-call detail is
+    /// supplied by the consumer.
+    pub const MemcpyAction = struct {
+        source: RequestHandle,
+        length: RequestHandle,
+    };
+
+    pub const MemcpyTestFailure = enum {
+        after_preservation,
+        after_destination,
+        after_source,
+        after_length,
+        after_call_append,
+    };
+
     pub const max_switch_cases = 8;
 
     pub const SwitchCaseIntent = struct {
@@ -294,6 +320,7 @@ pub const ValueUseTransaction = struct {
         store_stack_pointer: StoreStackPointerAction,
         branch_condition,
         switch_compare_chain: SwitchCompareChainAction,
+        inline_memcpy: MemcpyAction,
 
         fn eql(action: PreparedAction, other: PreparedAction) bool {
             return std.meta.eql(action, other);
@@ -439,6 +466,7 @@ pub const ValueUseTransaction = struct {
     const SemanticRole = enum(u8) {
         primary,
         secondary,
+        tertiary,
     };
 
     const EarlyPreparedHome = struct {
@@ -882,7 +910,7 @@ pub const ValueUseTransaction = struct {
         const action = transaction.requests[index].prepared_action orelse
             return error.ValueUsePreparedActionMissing;
         try transaction.validateActionDependenciesCanonical(action);
-        try executePreparedActionInternal(transaction, &refreshed.view, &transaction.requests[index], action);
+        try executePreparedActionInternal(transaction, index, &refreshed.view, &transaction.requests[index], action);
         // Defense in depth: even the closed internal action must not relocate
         // or rebind its source. Any violation rolls back speculative emission.
         if (actionOwnsOrderedWrites(action)) {
@@ -915,6 +943,23 @@ pub const ValueUseTransaction = struct {
 
     pub fn phase(transaction: *const ValueUseTransaction) RequestPhase {
         return transaction.request_phase;
+    }
+
+    /// Returns the original caller-clobber preservation diagnostic when a
+    /// closed action reports ValueUseActionDiagnostic. The transaction has
+    /// already rolled back when this is observed.
+    pub fn actionDiagnostic(transaction: *const ValueUseTransaction) ?Diagnostic {
+        return transaction.action_diagnostic;
+    }
+
+    /// White-box rollback boundary control. This is unavailable in every
+    /// production build and is guarded from production consumers.
+    pub fn setMemcpyTestFailure(
+        transaction: *ValueUseTransaction,
+        failure: ?MemcpyTestFailure,
+    ) !void {
+        if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
+        transaction.memcpy_test_failure = failure;
     }
 
     fn requireActive(transaction: *const ValueUseTransaction) !void {
@@ -995,6 +1040,13 @@ pub const ValueUseTransaction = struct {
             },
             .branch_condition => {},
             .switch_compare_chain => |*switch_action| try switch_action.validate(),
+            .inline_memcpy => |memcpy| {
+                const source = try transaction.validateRegisteredOperandHandle(memcpy.source);
+                const length = try transaction.validateRegisteredOperandHandle(memcpy.length);
+                try validateMemcpyPointerOperand(&transaction.requests[source]);
+                try validateMemcpyLengthOperand(&transaction.requests[length]);
+                if (source == length) return error.ValueUseIncompatibleDuplicate;
+            },
         }
     }
 
@@ -1037,6 +1089,10 @@ pub const ValueUseTransaction = struct {
             .store_scalar => |store| try transaction.validateOperandCanonical(store.pointer),
             .store_i64 => |store| try transaction.validateOperandCanonical(store.value),
             .store_stack_pointer => |store| try transaction.validateOperandCanonical(store.destination),
+            .inline_memcpy => |memcpy| {
+                try transaction.validateOperandCanonical(memcpy.source);
+                try transaction.validateOperandCanonical(memcpy.length);
+            },
             .validate_shape,
             .emit_copy_to,
             .form_readonly_table_address,
@@ -1055,6 +1111,8 @@ pub const ValueUseTransaction = struct {
         try transaction.validateConsumedOperandAfter(owner_index);
         if (try transaction.actionSecondaryOperand(action)) |secondary|
             try transaction.validateConsumedOperandAfter(secondary);
+        if (try transaction.actionTertiaryOperand(action)) |tertiary|
+            try transaction.validateConsumedOperandAfter(tertiary);
     }
 
     fn validateConsumedOperandAfter(transaction: *ValueUseTransaction, index: u8) !void {
@@ -1143,6 +1201,14 @@ pub const ValueUseTransaction = struct {
             }
             owners[secondary] = index;
             edges[index][secondary] = true;
+            if (try transaction.actionTertiaryOperand(action)) |tertiary| {
+                if (tertiary == index or tertiary == secondary) return error.ValueUseEarlyOrderingCycle;
+                if (owners[tertiary]) |owner| {
+                    if (owner != index) return error.ValueUseEarlyOrderingConflict;
+                }
+                owners[tertiary] = index;
+                edges[secondary][tertiary] = true;
+            }
         }
         try rejectSemanticOrderCycles(edges, transaction.request_count);
     }
@@ -1163,10 +1229,32 @@ pub const ValueUseTransaction = struct {
             .store_scalar => |store| try transaction.validateRegisteredOperandHandle(store.pointer),
             .store_i64 => |store| try transaction.validateRegisteredOperandHandle(store.value),
             .store_stack_pointer => |store| try transaction.validateRegisteredOperandHandle(store.destination),
+            .inline_memcpy => |memcpy| try transaction.validateRegisteredOperandHandle(memcpy.source),
             .validate_shape,
             .emit_copy_to,
             .form_readonly_table_address,
             .store_immediate,
+            .branch_condition,
+            .switch_compare_chain,
+            => null,
+        };
+    }
+
+    fn actionTertiaryOperand(
+        transaction: *ValueUseTransaction,
+        action: PreparedAction,
+    ) !?u8 {
+        return switch (action) {
+            .inline_memcpy => |memcpy| try transaction.validateRegisteredOperandHandle(memcpy.length),
+            .validate_shape,
+            .emit_copy_to,
+            .form_byte_address,
+            .form_scaled_address,
+            .form_readonly_table_address,
+            .store_scalar,
+            .store_immediate,
+            .store_i64,
+            .store_stack_pointer,
             .branch_condition,
             .switch_compare_chain,
             => null,
@@ -1214,6 +1302,15 @@ pub const ValueUseTransaction = struct {
                 owners[secondary] = index;
                 transaction.semantic_order_edges[index][secondary] = true;
             }
+            if (try transaction.actionTertiaryOperand(action)) |tertiary| {
+                const secondary = (try transaction.actionSecondaryOperand(action)) orelse
+                    return error.ValueUseEarlyOrderingConflict;
+                if (owners[tertiary]) |owner| {
+                    if (owner != index) return error.ValueUseEarlyOrderingConflict;
+                }
+                owners[tertiary] = index;
+                transaction.semantic_order_edges[secondary][tertiary] = true;
+            }
         }
         for (transaction.requests[0..transaction.request_count], 0..) |_, index_usize| {
             const index: u8 = @intCast(index_usize);
@@ -1239,6 +1336,14 @@ pub const ValueUseTransaction = struct {
                 if (try transaction.actionSecondaryOperand(action)) |secondary| try transaction.appendOrderedOperand(
                     secondary,
                     .secondary,
+                    &prefix_open,
+                    mappings,
+                    source_counts,
+                    source_nodes,
+                );
+                if (try transaction.actionTertiaryOperand(action)) |tertiary| try transaction.appendOrderedOperand(
+                    tertiary,
+                    .tertiary,
                     &prefix_open,
                     mappings,
                     source_counts,
@@ -1465,7 +1570,12 @@ pub const ValueUseTransaction = struct {
             .gpr32 => try materializeScalar32(transaction.selector, current, destination),
             .gpr64 => try materializeScalar64(transaction.selector, current, destination),
             .pointer, .stack_object_address => try materializePointer(transaction.selector, current, destination),
-            .stack_f32_pair_byte_address, .branch_condition, .switch_condition => return error.ValueUsePreparedActionRequired,
+            .stack_f32_pair_byte_address,
+            .branch_condition,
+            .switch_condition,
+            .memcpy_pointer,
+            .memcpy_length,
+            => return error.ValueUsePreparedActionRequired,
             .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, destination),
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -1541,8 +1651,19 @@ fn preparedViewFromLoc(
         .stack_object_address => preparedStackObjectView(loc),
         .pair_low_high, .pair_high_low => preparedPairView(loc, request.form),
         .branch_condition, .switch_condition => preparedConditionView(loc),
+        .memcpy_pointer, .memcpy_length => preparedMemcpyScalarView(loc),
         .stack_argument => error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
+    };
+}
+
+fn preparedMemcpyScalarView(loc: ValueLoc) !ValueUseTransaction.PreparedView {
+    return switch (loc) {
+        .arg64, .scratch64, .rax, .spill64 => preparedScalarView(loc),
+        .arg128, .scratch128 => |pair| .{
+            .register = .{ .register = .{ .gpr64 = pair.lo }, .bits = 64 },
+        },
+        else => error.ValueUseSourceViewMismatch,
     };
 }
 
@@ -1692,6 +1813,7 @@ fn preparedPairView(
 
 fn executePreparedActionInternal(
     transaction: *ValueUseTransaction,
+    request_index: u8,
     view: *const ValueUseTransaction.PreparedView,
     request: *const ValueUseTransaction.StoredRequest,
     action: ValueUseTransaction.PreparedAction,
@@ -1710,6 +1832,8 @@ fn executePreparedActionInternal(
                 .pair_high_low,
                 .branch_condition,
                 .switch_condition,
+                .memcpy_pointer,
+                .memcpy_length,
                 => return error.ValueUsePreparedActionFormMismatch,
                 .stack_argument => return error.ValueUseStackArgumentUnsupported,
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -1724,6 +1848,95 @@ fn executePreparedActionInternal(
         .store_stack_pointer => |store| try executeStoreStackPointer(transaction, view, store),
         .branch_condition => try executeBranchCondition(transaction, view),
         .switch_compare_chain => |switch_action| try executeSwitchCompareChain(transaction, view, &switch_action),
+        .inline_memcpy => |memcpy| try executeInlineMemcpy(transaction, request_index, request, memcpy),
+    }
+}
+
+fn executeInlineMemcpy(
+    transaction: *ValueUseTransaction,
+    destination_index: u8,
+    destination_request: *const ValueUseTransaction.StoredRequest,
+    action: ValueUseTransaction.MemcpyAction,
+) !void {
+    // Validate the final call clobber before caller preservation or argument
+    // staging mutates selector state. The emission authority repeats this
+    // check while applying the semantic record immediately before append.
+    var next_eflags = transaction.selector.eflags;
+    try next_eflags.apply(.clobber);
+
+    if (try selector_state.spillLiveCallerClobbersForCall(transaction.selector)) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+    // Caller preservation may durably relocate an operand that dies at this
+    // call (the legacy accumulator path is the notable case). Refresh the
+    // transaction-owned canonical records immediately after that sole
+    // authority, so later argument staging remains subject to strict
+    // no-rebind post-validation without inventing post-call liveness.
+    try refreshMemcpyPreparedOperand(transaction, destination_index);
+    try refreshMemcpyPreparedOperand(transaction, action.source.index);
+    try refreshMemcpyPreparedOperand(transaction, action.length.index);
+    try failMemcpyForTest(transaction, .after_preservation);
+
+    try materializeMemcpyRequest(transaction, destination_request, .rdi);
+    try failMemcpyForTest(transaction, .after_destination);
+    try materializeMemcpyHandle(transaction, action.source, .rsi);
+    try failMemcpyForTest(transaction, .after_source);
+    try materializeMemcpyHandle(transaction, action.length, .rdx);
+    try failMemcpyForTest(transaction, .after_length);
+
+    try selector_state.emitEflagsInstruction(
+        transaction.selector,
+        .memcpy_rdi_rsi_rdx_rax,
+        .clobber,
+    );
+    try failMemcpyForTest(transaction, .after_call_append);
+}
+
+fn refreshMemcpyPreparedOperand(transaction: *ValueUseTransaction, index: u8) !void {
+    if (!transaction.prepared_view_valid[index]) return error.ValueUsePreparedViewMissing;
+    transaction.prepared_views[index] = try transaction.buildPreparedRecord(index);
+}
+
+fn materializeMemcpyHandle(
+    transaction: *ValueUseTransaction,
+    handle: ValueUseTransaction.RequestHandle,
+    destination: ArgReg,
+) !void {
+    const index = try transaction.validateRegisteredOperandHandle(handle);
+    try materializeMemcpyRequest(transaction, &transaction.requests[index], destination);
+}
+
+fn materializeMemcpyRequest(
+    transaction: *ValueUseTransaction,
+    request: *const ValueUseTransaction.StoredRequest,
+    destination: ArgReg,
+) !void {
+    const current = (try transaction.validateRequest(request)) orelse
+        return error.ValueUseUnsupportedSource;
+    switch (current) {
+        .arg128, .scratch128 => |pair| {
+            if (pair.lo == destination) return;
+            try selector_state.clobberArgReg(transaction.selector, destination);
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .mov_arg64_arg = .{ .dst = destination, .src = pair.lo },
+            });
+        },
+        else => try materializeScalar64(
+            transaction.selector,
+            current,
+            .{ .gpr64 = destination },
+        ),
+    }
+}
+
+fn failMemcpyForTest(
+    transaction: *ValueUseTransaction,
+    boundary: ValueUseTransaction.MemcpyTestFailure,
+) !void {
+    if (builtin.is_test) {
+        if (transaction.memcpy_test_failure == boundary)
+            return error.ValueUseMemcpyTestFailure;
     }
 }
 
@@ -2496,7 +2709,15 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
     if (request.destination == .prepared_source) {
         if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
         return switch (request.form) {
-            .gpr32, .gpr64, .pointer, .stack_object_address, .pair_low_high, .pair_high_low => {},
+            .gpr32,
+            .gpr64,
+            .pointer,
+            .stack_object_address,
+            .pair_low_high,
+            .pair_high_low,
+            .memcpy_pointer,
+            .memcpy_length,
+            => {},
             .stack_f32_pair_byte_address, .branch_condition, .switch_condition => error.ValueUsePreparedActionRequired,
             .stack_argument => error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
@@ -2514,6 +2735,8 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .pair_high_low,
             .branch_condition,
             .switch_condition,
+            .memcpy_pointer,
+            .memcpy_length,
             => {},
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2542,6 +2765,9 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
                 error.ValueUsePreparedActionFormMismatch,
             .switch_compare_chain => if (request.form != .switch_condition)
                 error.ValueUsePreparedActionFormMismatch,
+            .inline_memcpy => if (request.form != .memcpy_pointer or
+                request.expected.ty != .ptr or request.expected.register_class != .gpr64)
+                error.ValueUsePreparedActionFormMismatch,
         };
     }
     if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
@@ -2549,7 +2775,12 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
         .gpr32 => request.destination == .gpr32 or request.destination == .eax,
         .gpr64 => request.destination == .gpr64 or request.destination == .rax,
         .pointer, .stack_object_address => request.destination == .gpr64 or request.destination == .rax,
-        .stack_f32_pair_byte_address, .branch_condition, .switch_condition => false,
+        .stack_f32_pair_byte_address,
+        .branch_condition,
+        .switch_condition,
+        .memcpy_pointer,
+        .memcpy_length,
+        => false,
         .pair_low_high, .pair_high_low => request.destination == .pair,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2568,6 +2799,24 @@ fn validateBindingCompatibility(
     request: *const ValueUseTransaction.StoredRequest,
     current: ValueLoc,
 ) !void {
+    if (request.form == .memcpy_pointer or request.form == .memcpy_length) {
+        try validateExpectedType(request.expected, request.form);
+        if (binding.vreg.bits < 64) return if (request.form == .memcpy_pointer)
+            error.ValueUseMemcpyPointerWidthMismatch
+        else
+            error.ValueUseMemcpyLengthWidthMismatch;
+        const accepted_class = binding.vreg.class == .gpr64 or binding.vreg.class == .gpr128;
+        const accepted_home = switch (current) {
+            .arg64, .scratch64, .rax, .spill64, .arg128, .scratch128 => true,
+            else => false,
+        };
+        if (!accepted_class or !accepted_home)
+            return if (request.form == .memcpy_pointer)
+                error.ValueUseMemcpyPointerHomeUnsupported
+            else
+                error.ValueUseMemcpyLengthHomeUnsupported;
+        return;
+    }
     if (request.form == .branch_condition) {
         try validateExpectedType(request.expected, request.form);
         if (binding.vreg.bits < 1) return error.ValueUseBranchConditionWidthMismatch;
@@ -2652,6 +2901,15 @@ fn validateExpectedType(expected: ValueUseTransaction.Expected, form: ValueUseTr
         {
             return error.ValueUseTypeMismatch;
         },
+        .memcpy_pointer => {
+            if (expected.ty != .ptr or expected.register_class != .gpr64 or
+                expected.pointer_address_space == null or expected.pointer_address_space.? != 0)
+            {
+                return error.ValueUseTypeMismatch;
+            }
+        },
+        .memcpy_length => if (!expected.ty.eql(.{ .int = 64 }) or expected.register_class != .gpr64)
+            return error.ValueUseTypeMismatch,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -2705,6 +2963,10 @@ fn validateSourceView(loc: ValueLoc, form: ValueUseTransaction.UseForm) !void {
             => {},
             else => return error.ValueUseSwitchConditionHomeUnsupported,
         },
+        .memcpy_pointer, .memcpy_length => switch (loc) {
+            .arg64, .scratch64, .rax, .spill64, .arg128, .scratch128 => {},
+            else => return error.ValueUseSourceViewMismatch,
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -2734,6 +2996,8 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: ValueUseTransaction.UseForm) 
         .pair_high_low,
         .branch_condition,
         .switch_condition,
+        .memcpy_pointer,
+        .memcpy_length,
         .stack_argument,
         .new_pair_ownership,
         => false,
@@ -2839,6 +3103,11 @@ fn requestDestinationNodes(
                 else => {},
             },
             .switch_compare_chain => try result.append(.accumulator),
+            .inline_memcpy => {
+                try result.append(.rdi);
+                try result.append(.rsi);
+                try result.append(.rdx);
+            },
         },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2975,6 +3244,23 @@ fn requestMappings(
                 else => {},
             },
             .switch_compare_chain => return mappings,
+            .inline_memcpy => |memcpy| {
+                mappings.append(.{
+                    .source = scalarSourceNode(current orelse return error.ValueUseUnresolvedSource),
+                    .destination = .rdi,
+                    .source_request_index = request_index,
+                });
+                mappings.append(.{
+                    .source = scalarSourceNode(try transaction.registeredOperandCurrent(memcpy.source)),
+                    .destination = .rsi,
+                    .source_request_index = memcpy.source.index,
+                });
+                mappings.append(.{
+                    .source = scalarSourceNode(try transaction.registeredOperandCurrent(memcpy.length)),
+                    .destination = .rdx,
+                    .source_request_index = memcpy.length.index,
+                });
+            },
             .validate_shape, .emit_copy_to => {},
         }
         if (action != .emit_copy_to) return mappings;
@@ -3017,6 +3303,7 @@ fn actionOwnsOrderedWrites(action: ValueUseTransaction.PreparedAction) bool {
         .store_stack_pointer,
         .branch_condition,
         .switch_compare_chain,
+        .inline_memcpy,
         => true,
         .validate_shape,
         .emit_copy_to,
@@ -3055,6 +3342,23 @@ fn validateStoreStackObjectOperand(request: *const ValueUseTransaction.StoredReq
         request.expected.register_class != .stack_object or
         request.expected.pointer_address_space != 0)
         return error.ValueUsePreparedActionFormMismatch;
+}
+
+fn validateMemcpyPointerOperand(request: *const ValueUseTransaction.StoredRequest) !void {
+    if (request.form != .memcpy_pointer or request.expected.ty != .ptr or
+        request.expected.register_class != .gpr64 or
+        request.expected.pointer_address_space != 0)
+    {
+        return error.ValueUsePreparedActionFormMismatch;
+    }
+}
+
+fn validateMemcpyLengthOperand(request: *const ValueUseTransaction.StoredRequest) !void {
+    if (request.form != .memcpy_length or !request.expected.ty.eql(.{ .int = 64 }) or
+        request.expected.register_class != .gpr64 or request.expected.pointer_address_space != null)
+    {
+        return error.ValueUsePreparedActionFormMismatch;
+    }
 }
 
 fn appendStorePointerDestinationNodes(
@@ -3155,6 +3459,8 @@ fn validateCopyActionForm(
         .pair_high_low,
         .branch_condition,
         .switch_condition,
+        .memcpy_pointer,
+        .memcpy_length,
         => false,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -3165,6 +3471,7 @@ fn validateCopyActionForm(
 fn scalarSourceNode(loc: ValueLoc) ?ValueUseTransaction.PhysicalNode {
     return switch (loc) {
         .arg32, .arg64, .scratch32, .scratch64 => |reg| nodeForArgReg(reg),
+        .arg128, .scratch128 => |pair| nodeForArgReg(pair.lo),
         .eax, .rax => .accumulator,
         .readonly_table_ptr => |ptr| switch (ptr.storage) {
             .reg => |reg| nodeForArgReg(reg),
