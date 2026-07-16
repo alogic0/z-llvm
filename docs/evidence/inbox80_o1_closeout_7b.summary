@@ -125,6 +125,6 @@ Durable raw evidence:
 - serial run id: `d20bf190ade3360ebd43ac9fe5375079`
 - real-row group run id: `2891ac898283e24912cd3bc94498e0b8`
 
-The run recorded no nonzero gate exit, `local_fail=1`, object movement, owner
-movement, report movement, or route movement. This is the one O1 Tier 3. Stop
-for Supervisor/Reviewer review; no successor work is authorized here.
+The run recorded `local_fail=0`; no nonzero gate exit or identity movement (no
+object, owner, report, or route movement). This is the one O1 Tier 3. Reviewer
+accepted 7B and O1 as complete (2026-07-16).
