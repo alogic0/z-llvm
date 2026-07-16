@@ -3,6 +3,7 @@ const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
 const encoding = @import("../../../mc/encoding.zig");
 const selector_types = @import("selector_types.zig");
+const stage2_planning = @import("stage2_planning.zig");
 const impl = @import("composed_selector_impl.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_icmp = @import("composed_selector_icmp.zig");
@@ -10,6 +11,41 @@ const selector_icmp = @import("composed_selector_icmp.zig");
 const MachineFunction = impl.MachineFunction;
 const ComposedBlockSelector = impl.ComposedBlockSelector;
 const ValueLoc = selector_types.ValueLoc;
+const SelectorAllocationPlan = stage2_planning.SelectorAllocationPlan;
+
+test "migrated accumulator-resident compare preserves same-register logical aliases" {
+    var machine = MachineFunction.init("icmp-accumulator-aliases", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("lhs", 5);
+    try plan.interval_ends.put("alias", 5);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    selector.stack_frame_bytes = 24;
+    try selector_state.bindValueLoc(&selector, "lhs", .eax);
+    try selector_state.bindValueLoc(&selector, "alias", .eax);
+
+    const diagnostic = try selector_icmp.lowerIcmp(&selector, "comparison", .{
+        .predicate = .eq,
+        .operand_ty = .{ .int = 32 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .int = 0 },
+    });
+
+    try std.testing.expect(diagnostic == null);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "comparison").?);
+    const lhs_loc = selector_state.valueLoc(&selector, "lhs").?;
+    const alias_loc = selector_state.valueLoc(&selector, "alias").?;
+    try std.testing.expect(lhs_loc == .scratch32);
+    try std.testing.expect(alias_loc == .scratch32);
+    try std.testing.expect(lhs_loc.scratch32 != alias_loc.scratch32);
+    try std.testing.expectEqual(@as(usize, 4), machine.instructions.items.len);
+    try std.testing.expectEqual(x86_64_machine.Instruction.sete_eax, machine.instructions.items[3]);
+}
 
 test "generic cfg selector executes signed i16 less-than zero" {
     const input =

@@ -386,6 +386,10 @@ pub const AccumulatorDefinitionTransaction = struct {
         }
     }
 
+    pub fn isPrepared(transaction: *const AccumulatorDefinitionTransaction) bool {
+        return transaction.phase == .prepared;
+    }
+
     fn requirePrepared(transaction: *const AccumulatorDefinitionTransaction) !void {
         switch (transaction.phase) {
             .prepared => {},

@@ -756,26 +756,32 @@ fn lowerI128Compare(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     const high_diff = try selector_state.allocateEdgeLabel(selector);
     const low_diff = try selector_state.allocateEdgeLabel(selector);
     const done = try selector_state.allocateEaxJoinLabel(selector);
-    try selector_state.clobberAccumulator(selector);
-    try selector.machine.instructions.appendSlice(selector.allocator, &.{
-        .{ .cmp_rcx_arg64 = .rsi },
-        .{ .jne = high_diff },
-        .cmp_rdx_rdi,
-        .{ .jne = low_diff },
-        .{ .mov_imm_eax = 0 },
-        .{ .jmp = done },
-        .{ .label = high_diff },
-        if (signed) .setg_eax else .seta_eax,
-        .{ .shl_eax_imm5 = 1 },
-        .{ .add_eax_imm32 = -1 },
-        .{ .jmp = done },
-        .{ .label = low_diff },
-        .setb_eax,
-        .{ .shl_eax_imm5 = 1 },
-        .{ .add_eax_imm32 = -1 },
-        .{ .label = done },
-    });
-    try selector_state.bindEax(selector, result_name);
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+
+    try selector_state.emitEflagsInstruction(selector, .{ .cmp_rcx_arg64 = .rsi }, .definition);
+    const high_flags = selector.eflags.snapshot();
+    try selector_state.emitEflagsInstruction(selector, .{ .jne = high_diff }, .use);
+    try selector_state.emitEflagsInstruction(selector, .cmp_rdx_rdi, .definition);
+    const low_flags = selector.eflags.snapshot();
+    try selector_state.emitEflagsInstruction(selector, .{ .jne = low_diff }, .use);
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = 0 });
+    try selector.machine.instructions.append(selector.allocator, .{ .jmp = done });
+    try selector.machine.instructions.append(selector.allocator, .{ .label = high_diff });
+    selector.eflags.restore(high_flags);
+    try selector_state.emitEflagsInstruction(selector, if (signed) .setg_eax else .seta_eax, .use);
+    try selector_state.emitEflagsInstruction(selector, .{ .shl_eax_imm5 = 1 }, .write);
+    try selector_state.emitEflagsInstruction(selector, .{ .add_eax_imm32 = -1 }, .write);
+    try selector.machine.instructions.append(selector.allocator, .{ .jmp = done });
+    try selector.machine.instructions.append(selector.allocator, .{ .label = low_diff });
+    selector.eflags.restore(low_flags);
+    try selector_state.emitEflagsInstruction(selector, .setb_eax, .use);
+    try selector_state.emitEflagsInstruction(selector, .{ .shl_eax_imm5 = 1 }, .write);
+    try selector_state.emitEflagsInstruction(selector, .{ .add_eax_imm32 = -1 }, .write);
+    try selector.machine.instructions.append(selector.allocator, .{ .label = done });
+    try transaction.define(result_name, .zeroExtending(32));
+    try transaction.commit();
     return null;
 }
 
