@@ -67,6 +67,7 @@ pub fn build(b: *std.Build) void {
     addToolStepWithArgs(b, "zig-corpus", "Run accepted Zig IR corpus rows; pass optional manifest after --", "tools/run_zig_corpus.zig");
     addToolStep(b, "generated-scalar-diff", "Run generated scalar differential checks", "tools/run_generated_scalar_diff.zig");
     addToolStep(b, "check-zig-stage4-emitter", "Check the authoritative Zig stage4 emitter", "tools/check_zig_stage4_emitter.zig");
+    addToolStep(b, "focused-codegen-canaries", "Run procedural fma and __multi3 codegen canaries (non-gating)", "tools/run_focused_codegen_canaries.zig");
     addToolStepWithArgs(b, "real-candidates-v2", "Build the mode-stable real-row candidate denominator", "tools/build_real_candidates_v2.zig");
     addToolStep(b, "readiness", "Run the full readiness gate", "tools/run_readiness_checks.zig");
     addToolStep(b, "handoff", "Run optimizer/codegen handoff validation", "tools/run_handoff_validation.zig");

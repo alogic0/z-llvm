@@ -3,9 +3,9 @@
 schema_version: 1
 directive: `INBOX-75`
 target: `x86_64-linux-gnu`
-status: delivered; review requested
+status: corrected relocation follow-up delivered; review requested
 baseline_code: `6b74acea`
-validated_parent: `86bd90cc`
+validated_parent: `2d2de2ab`
 
 INBOX-75 is acknowledged by id. Commit 5 was re-sliced after the INBOX-74
 blast-radius ratchet. This commit contains only slice 5A and stops for review;
@@ -60,9 +60,34 @@ definedness, and rollback of flags, semantic records, instructions, bindings,
 spills, counters, and accumulator domain.
 
 Permanent canaries freeze the commit-4 __multi3 IR, selection result, instruction
-stream, exact symbol bytes, and executable edge cases. The integrated fma proof
-now additionally freezes its machine stream, exact symbol bytes, internal ldexp
-and add_and_denorm helper bytes, and absence of a host fallback.
+stream, exact symbol bytes, and executable edge cases. The fma proof freezes its
+machine stream, exact symbol bytes, internal ldexp and add_and_denorm helper
+bytes, and absence of a host fallback.
+
+## Canary Relocation Follow-Up
+
+Reviewer review found that the provisional 5A delivery had placed the new
+canary checks inside the tracked distribution-all integrated-executable
+subgate. Resolution A restores
+`tools/run_distribution_zig_integrated_exe.zig` byte-for-byte to commit 4:
+
+```text
+cadf4e7bfaa4c9a3b552ffb1bd5e969fdd1e2ae549184d87c56768f55893ed36
+```
+
+The fma and __multi3 checks now live in
+`tools/run_focused_codegen_canaries.zig`, directly exposed only as
+`zig build focused-codegen-canaries`. Repository reference inspection finds
+only that standalone build declaration and the tool itself. No
+distribution-all entry, strengthened Tier-2 command, mandatory-runner
+inventory, ratchet, or counter depends on it. The fixtures remain tracked and
+unchanged. This tool is procedural evidence for INBOX-75, INBOX-76, and
+INBOX-77; it is not a product gate.
+
+Commit 7 has an explicit deferred action: promote these focused checks into the
+mandatory integrated-executable runner and run the required serial Tier 3 in
+the same commit. Until that coupled promotion, the standalone canaries remain
+non-gating procedural evidence.
 
 ## Validation
 
@@ -78,9 +103,9 @@ abi_diff_real_functions_matched=30
 result=pass
 ```
 
-- log: `tmp/inbox75_5a_unit.log`
+- corrected-follow-up log: `tmp/inbox75_relocation_unit.log`
 - log SHA-256:
-  `de137ce9ac38c5b2ae8369186c3f4e159b1b2e18891cf1146de97adaa49128d5`
+  `a976139fbe1c0ca8ac3f9cdc16708907acb4c537b6c608da19383ca29c339bf7`
 
 The decisive whole-capture report is byte-identical to the accepted baseline:
 
@@ -88,7 +113,7 @@ The decisive whole-capture report is byte-identical to the accepted baseline:
 summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emitted_functions=285 failed_functions=158 first_failing_function=compiler_rt.trunc.truncl first_failing_diagnostic=UnsupportedLongDoubleAbi first_failing_selector_tag=unsupported_type first_failing_selector_detail=unsupported-return-type local_fail=1
 ```
 
-- report: `tmp/inbox75_5a_full_capture_report.log`
+- report: `tmp/inbox75_relocation_full_capture_report.log`
 - report SHA-256:
   `49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681`
 - complete accepted cohort: 285 selected / 285 emitted / 0 failed;
@@ -98,16 +123,32 @@ summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emit
   `5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d`;
 - live ledger: `167 / 17 / 101` composed / legacy / fallback.
 
-The complete integrated executable gate passed all seven cases, including the
-permanent __multi3 and fma canaries:
+The standalone focused canaries passed directly:
+
+```text
+ok focused-codegen-canary name=__multi3 object=ok stream=ok symbol=ok execution_cases=6
+ok focused-codegen-canary name=fma object=ok stream=ok symbol=ok helpers=ok execution_cases=29 host_libc_substitution=absent
+summary focused-codegen-canaries target=x86_64-linux-gnu canaries=2 execution_cases=35 local_fail=0
+```
+
+- direct log: `tmp/inbox75_relocation_focused_canaries_direct.log`
+- direct log SHA-256:
+  `7671352de65ca9f993fcd8be0e0038bbded33f2fb36be581ffcaa6fb9f15c133`
+- own build step: `zig build focused-codegen-canaries --summary all`, 2/2;
+- this covers exact commit-4 instruction streams, exact fma/__multi3 symbol
+  bytes, exact fma helper bytes, no host-libc fma substitution, and both
+  executable harnesses.
+
+With the mandatory runner restored to its pre-5A behavior, the standard
+integrated executable gate passed its original seven cases:
 
 ```text
 summary zig-integrated-exe total=7 build_ok=7 run_ok=7 stdout_ok=7 exit_ok=7 minimal_inline_asm_syscall_rows=3 compiler_rt_i128_arithmetic_rows=1 compiler_rt_fma_rows=1 setcc_predicate_rows=1 aggregate_sse_return_rows=1 local_fail=0
 ```
 
-- log: `tmp/inbox75_5a_integrated_exe.log`
+- log: `tmp/inbox75_relocation_integrated_exe.log`
 - log SHA-256:
-  `46003978d45f38407f056c5ee7a5ef20f51e75df29628ec446880e659b86957e`
+  `784e1131e741467ffb160c6891dda77a739696ac2253b49daa4138bb0ec98593`
 
 Strengthened Tier 2 passed:
 
@@ -115,9 +156,9 @@ Strengthened Tier 2 passed:
 Build Summary: 28/28 steps succeeded; 1076/1076 tests passed
 ```
 
-- log: `tmp/inbox75_5a_tier2.log`
+- log: `tmp/inbox75_relocation_tier2.log`
 - log SHA-256:
-  `5ca0443b9f54bfd056ab1430f381dd49eb049f73ee51b93f67ac5d85e4385005`
+  `15a72c5fac270bd34e54bb214ac34f708e7a0d8ea628d68bc623ee3e2ae5955d`
 
 Frozen identities are exact: `49a19f04` / `443-285-158-truncl` /
 `061a64e4` / `5d91960e` / `167-17-101`. No Tier 3 was run. Stop for

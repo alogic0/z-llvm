@@ -1,13 +1,6 @@
 const std = @import("std");
 const common = @import("tool_common.zig");
 
-const multi3_instruction_stream_sha256 = "8f962b4bda72349aac1464efd86f13daf18ae3595171d7f32548feb46ee82e61";
-const multi3_symbol_bytes_sha256 = "f1c97aee4bb07d1ef27ebd12ec2236a2a390faaa95514436dfb282af5e2149ec";
-const fma_instruction_stream_sha256 = "cc791b46ef93f564040e5245874216a7aa267df7319e84135862177f4eff776a";
-const fma_symbol_bytes_sha256 = "3571863e4438990f77b5a159b95a85de16dea0d50db7a935406b54b09bee9abb";
-const fma_ldexp_symbol_bytes_sha256 = "d8653232177f52c3636bdfb9746b44bd16259a762e82ac0cec43d9e4798c1689";
-const fma_add_and_denorm_symbol_bytes_sha256 = "639a29b4ba8eae68fc0b87e7a9be45541616146c5ee14b651129b2eaf427054c";
-
 const Case = struct {
     id: []const u8,
     mode: []const u8,
@@ -207,7 +200,6 @@ pub fn main(init: std.process.Init) !void {
             if (case.generic_cfg_selector) {
                 try focused_env.put("ZLLVM_GENERIC_CFG_SELECTOR", "1");
             }
-            try runFocusedCompilerRtMulti3Canary(allocator, io, temp, zllvm_exe, zig_emitter, target, &focused_env);
             const builtins_obj = try common.allocTempFile(allocator, temp, case.id, ".builtins.o");
             errdefer allocator.free(builtins_obj);
             const helper_obj = try common.allocTempFile(allocator, temp, case.id, ".helper.o");
@@ -314,17 +306,6 @@ fn emitFocusedCompilerRtFmaObject(
     const result = try common.runCaptureEnv(allocator, io, &argv, "z_llvm focused compiler_rt fma", env_map);
     defer common.freeRunResult(allocator, result);
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = object_path, .data = result.stdout });
-
-    const assembly_argv = [_][]const u8{
-        zllvm_exe,
-        "--emit=asm",
-        target_arg,
-        "--input-limit=1048576",
-        "test/zig/integrated/compiler_rt_fma.ll",
-    };
-    const assembly_result = try common.runCaptureEnv(allocator, io, &assembly_argv, "z_llvm focused compiler_rt fma assembly", env_map);
-    defer common.freeRunResult(allocator, assembly_result);
-    try requireSha256(io, "fma canonical machine instruction stream", assembly_result.stdout, fma_instruction_stream_sha256);
 }
 
 fn buildCompilerRtFmaHelpers(
@@ -361,11 +342,6 @@ fn inspectFocusedCompilerRtFmaObjects(
     fma_object_path: []const u8,
     helper_object_path: []const u8,
 ) !void {
-    const fma_text_path = try std.fmt.allocPrint(allocator, "{s}.text", .{fma_object_path});
-    defer allocator.free(fma_text_path);
-    const helper_text_path = try std.fmt.allocPrint(allocator, "{s}.text", .{helper_object_path});
-    defer allocator.free(helper_text_path);
-
     const defined_argv = [_][]const u8{ "llvm-nm-22", "--defined-only", fma_object_path };
     const defined = try common.runCapture(allocator, io, &defined_argv, "compiler_rt fma defined-symbol inspection");
     defer common.freeRunResult(allocator, defined);
@@ -407,37 +383,12 @@ fn inspectFocusedCompilerRtFmaObjects(
         try common.validationError(io, "compiler_rt fma object expected exactly two frozen internal helper references, found {}\n", .{undefined_count});
     }
 
-    const fma_dump_arg = try std.fmt.allocPrint(allocator, "--dump-section=.text={s}", .{fma_text_path});
-    defer allocator.free(fma_dump_arg);
-    const fma_dump_argv = [_][]const u8{ "llvm-objcopy-22", fma_dump_arg, fma_object_path };
-    const fma_dump = try common.runCapture(allocator, io, &fma_dump_argv, "compiler_rt fma symbol-byte extraction");
-    defer common.freeRunResult(allocator, fma_dump);
-    const fma_symbol_bytes = try std.Io.Dir.cwd().readFileAlloc(io, fma_text_path, allocator, .limited(1024 * 1024));
-    defer allocator.free(fma_symbol_bytes);
-    if (fma_symbol_bytes.len != 4114) {
-        try common.validationError(io, "compiler_rt fma symbol size changed: expected 4114, got {}\n", .{fma_symbol_bytes.len});
-    }
-    try requireSha256(io, "fma exact symbol bytes", fma_symbol_bytes, fma_symbol_bytes_sha256);
-
     const helper_undefined_argv = [_][]const u8{ "llvm-nm-22", "--undefined-only", helper_object_path };
     const helper_undefined = try common.runCapture(allocator, io, &helper_undefined_argv, "compiler_rt fma helper undefined-symbol inspection");
     defer common.freeRunResult(allocator, helper_undefined);
     if (std.mem.trim(u8, helper_undefined.stdout, " \t\r\n").len != 0) {
         try common.validationError(io, "compiler_rt fma helper object has external dependencies (host fallback forbidden):\n{s}\n", .{helper_undefined.stdout});
     }
-
-    const helper_dump_arg = try std.fmt.allocPrint(allocator, "--dump-section=.text={s}", .{helper_text_path});
-    defer allocator.free(helper_dump_arg);
-    const helper_dump_argv = [_][]const u8{ "llvm-objcopy-22", helper_dump_arg, helper_object_path };
-    const helper_dump = try common.runCapture(allocator, io, &helper_dump_argv, "compiler_rt fma helper symbol-byte extraction");
-    defer common.freeRunResult(allocator, helper_dump);
-    const helper_text = try std.Io.Dir.cwd().readFileAlloc(io, helper_text_path, allocator, .limited(1024 * 1024));
-    defer allocator.free(helper_text);
-    if (helper_text.len != 501) {
-        try common.validationError(io, "compiler_rt fma helper text size changed: expected 501, got {}\n", .{helper_text.len});
-    }
-    try requireSha256(io, "fma internal ldexp exact symbol bytes", helper_text[0x000..0x15e], fma_ldexp_symbol_bytes_sha256);
-    try requireSha256(io, "fma internal add_and_denorm exact symbol bytes", helper_text[0x160..0x1db], fma_add_and_denorm_symbol_bytes_sha256);
 
     const disassembly_argv = [_][]const u8{ "llvm-objdump-22", "-dr", fma_object_path };
     const disassembly = try common.runCapture(allocator, io, &disassembly_argv, "compiler_rt fma recursive-call inspection");
@@ -575,130 +526,6 @@ fn emitFocusedCompilerRtI128Builtins(
     const result = try common.runCaptureEnv(allocator, io, &argv, "z_llvm focused compiler_rt i128 builtins", env_map);
     defer common.freeRunResult(allocator, result);
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = object_path, .data = result.stdout });
-}
-
-fn runFocusedCompilerRtMulti3Canary(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    temp: common.TempDir,
-    zllvm_exe: []const u8,
-    zig_emitter: []const u8,
-    target: []const u8,
-    env_map: *const std.process.Environ.Map,
-) !void {
-    const object_path = try common.allocTempFile(allocator, temp, "compiler_rt_multi3_canary", ".o");
-    defer allocator.free(object_path);
-    const text_path = try common.allocTempFile(allocator, temp, "compiler_rt_multi3_canary", ".text");
-    defer allocator.free(text_path);
-    const start_object_path = try common.allocTempFile(allocator, temp, "compiler_rt_multi3_canary", ".start.o");
-    defer allocator.free(start_object_path);
-    const executable_path = try common.allocTempFile(allocator, temp, "compiler_rt_multi3_canary", ".exe");
-    defer allocator.free(executable_path);
-    const target_arg = try std.fmt.allocPrint(allocator, "--target={s}", .{zllvmTarget(target)});
-    defer allocator.free(target_arg);
-
-    const object_argv = [_][]const u8{
-        zllvm_exe,
-        "--emit=obj",
-        target_arg,
-        "--input-limit=1048576",
-        "src/codegen/x86_64/generic_cfg/testdata/compiler_rt_multi3.ll",
-    };
-    const object_result = try common.runCaptureEnv(allocator, io, &object_argv, "z_llvm focused compiler_rt __multi3 canary object", env_map);
-    defer common.freeRunResult(allocator, object_result);
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = object_path, .data = object_result.stdout });
-
-    const assembly_argv = [_][]const u8{
-        zllvm_exe,
-        "--emit=asm",
-        target_arg,
-        "--input-limit=1048576",
-        "src/codegen/x86_64/generic_cfg/testdata/compiler_rt_multi3.ll",
-    };
-    const assembly_result = try common.runCaptureEnv(allocator, io, &assembly_argv, "z_llvm focused compiler_rt __multi3 canary assembly", env_map);
-    defer common.freeRunResult(allocator, assembly_result);
-    try requireSha256(io, "__multi3 canonical machine instruction stream", assembly_result.stdout, multi3_instruction_stream_sha256);
-
-    const dump_arg = try std.fmt.allocPrint(allocator, "--dump-section=.text={s}", .{text_path});
-    defer allocator.free(dump_arg);
-    const dump_argv = [_][]const u8{ "llvm-objcopy-22", dump_arg, object_path };
-    const dump_result = try common.runCapture(allocator, io, &dump_argv, "compiler_rt __multi3 symbol-byte extraction");
-    defer common.freeRunResult(allocator, dump_result);
-    const symbol_bytes = try std.Io.Dir.cwd().readFileAlloc(io, text_path, allocator, .limited(1024 * 1024));
-    defer allocator.free(symbol_bytes);
-    if (symbol_bytes.len != 536) {
-        try common.validationError(io, "compiler_rt __multi3 symbol size changed: expected 536, got {}\n", .{symbol_bytes.len});
-    }
-    try requireSha256(io, "__multi3 exact symbol bytes", symbol_bytes, multi3_symbol_bytes_sha256);
-
-    const nm_argv = [_][]const u8{ "llvm-nm-22", "-S", "--defined-only", object_path };
-    const nm_result = try common.runCapture(allocator, io, &nm_argv, "compiler_rt __multi3 symbol inspection");
-    defer common.freeRunResult(allocator, nm_result);
-    if (!std.mem.eql(u8, std.mem.trim(u8, nm_result.stdout, " \r\n"), "0000000000000000 0000000000000218 T __multi3")) {
-        try common.validationError(io, "compiler_rt __multi3 canary object has unexpected defined symbols: {s}\n", .{nm_result.stdout});
-    }
-
-    const start_emit_arg = try std.fmt.allocPrint(allocator, "-femit-bin={s}", .{start_object_path});
-    defer allocator.free(start_emit_arg);
-    const start_argv = [_][]const u8{
-        zig_emitter,
-        "build-obj",
-        "-fllvm",
-        "-flibllvm",
-        "-fno-compiler-rt",
-        "-fno-stack-protector",
-        "-fno-unwind-tables",
-        "-O",
-        "ReleaseFast",
-        "-target",
-        target,
-        "test/zig/integrated/compiler_rt_multi3_canary_start.zig",
-        start_emit_arg,
-    };
-    const start_result = try common.runCapture(allocator, io, &start_argv, "pinned Zig compiler_rt __multi3 canary start object");
-    defer common.freeRunResult(allocator, start_result);
-
-    const executable_emit_arg = try std.fmt.allocPrint(allocator, "-femit-bin={s}", .{executable_path});
-    defer allocator.free(executable_emit_arg);
-    const link_argv = [_][]const u8{
-        zig_emitter,
-        "build-exe",
-        "-fllvm",
-        "-flibllvm",
-        "-fno-lld",
-        "-fno-compiler-rt",
-        "-fno-stack-protector",
-        "-fno-unwind-tables",
-        "-fentry=_start",
-        "-O",
-        "ReleaseFast",
-        "-target",
-        target,
-        start_object_path,
-        object_path,
-        executable_emit_arg,
-    };
-    const link_result = try common.runCapture(allocator, io, &link_argv, "pinned Zig compiler_rt __multi3 canary link");
-    defer common.freeRunResult(allocator, link_result);
-
-    const canary_case: Case = .{
-        .id = "compiler_rt_multi3_focused_canary",
-        .mode = "ReleaseFast",
-        .source = "test/zig/integrated/compiler_rt_multi3_canary_start.zig",
-        .expected_stdout = "",
-        .expected_exit = 0,
-        .proof = .compiler_rt_i128_arithmetic,
-    };
-    try runExecutable(allocator, io, executable_path, canary_case);
-}
-
-fn requireSha256(io: std.Io, label: []const u8, contents: []const u8, expected: []const u8) !void {
-    var digest: [std.crypto.hash.sha2.Sha256.digest_length]u8 = undefined;
-    std.crypto.hash.sha2.Sha256.hash(contents, &digest, .{});
-    const actual = std.fmt.bytesToHex(digest, .lower);
-    if (!std.mem.eql(u8, &actual, expected)) {
-        try common.validationError(io, "{s} sha256 changed: expected {s}, got {s}\n", .{ label, expected, &actual });
-    }
 }
 
 fn emitFocusedCompilerRtObject(
