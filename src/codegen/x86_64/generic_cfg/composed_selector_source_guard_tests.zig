@@ -381,6 +381,13 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
             return error.ValueUseResolutionAuthorityMismatch;
     }
     if (countPattern(source, "resolveValue(") != 1) return error.ValueUseResolutionAuthorityMismatch;
+    if (countPattern(source, "Snapshot.init(selector)") != 1 or
+        countPattern(source, "AccumulatorDefinitionSession.init(transaction.selector)") != 1)
+    {
+        return error.ValueUseCompositionSnapshotContractMismatch;
+    }
+    if (std.mem.indexOf(u8, source, "AccumulatorDefinitionTransaction.begin(") != null)
+        return error.ValueUseNestedAccumulatorSnapshot;
 }
 
 fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const u8) !void {
@@ -401,6 +408,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     try validateStoreActionProductionSites(source_name, source);
     try validateMemcpyActionProductionSites(source_name, source);
     try validateFailureProvenanceProductionSites(source_name, source);
+    try validateAccumulatorCompositionProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -423,6 +431,26 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
             if (std.mem.indexOf(u8, function_source, pattern) != null)
                 return error.ValueUsePreparedLeafRawOperation;
         }
+    }
+}
+
+fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source: [:0]const u8) !void {
+    _ = source_name;
+    const dormant_api = [_][]const u8{
+        "beginAccumulatorSession(",
+        "prepareAccumulator(",
+        "prepareAccumulatorCallBeforeArguments(",
+        "finishAccumulatorCallPreparationAfterArguments(",
+        "materializeAccumulator(",
+        "spillAccumulatorValue(",
+        "defineAccumulatorResult(",
+        "finalizeAccumulatorResult(",
+        "commitAccumulatorSession(",
+        "AccumulatorDefinitionSession.init(",
+    };
+    for (dormant_api) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseAccumulatorCompositionConsumerPremature;
     }
 }
 
@@ -1464,7 +1492,9 @@ test "composed selector source guard rejects frozen bypass inventory growth" {
 
 test "composed selector source guard rejects function predicates in the value-use authority" {
     const accepted =
-        "fn resolveNamedCurrent() void { _ = resolveValue(undefined, undefined); }";
+        "fn resolveNamedCurrent() void { _ = resolveValue(undefined, undefined); }" ++
+        "fn begin() void { _ = Snapshot.init(selector); " ++
+        "_ = AccumulatorDefinitionSession.init(transaction.selector); }";
     try validateValueUseAuthoritySource(accepted);
     try std.testing.expectError(
         error.ValueUseFunctionPredicateForbidden,
@@ -1501,6 +1531,14 @@ test "composed selector source guard rejects function predicates in the value-us
     try std.testing.expectError(
         error.ValueUseFailureProvenanceEscape,
         validateValueUseAuthoritySource(accepted ++ "pub fn retryFailedRequest() void {}"),
+    );
+    try std.testing.expectError(
+        error.ValueUseNestedAccumulatorSnapshot,
+        validateValueUseAuthoritySource(accepted ++ "fn nested() void { _ = AccumulatorDefinitionTransaction.begin(selector); }"),
+    );
+    try std.testing.expectError(
+        error.ValueUseCompositionSnapshotContractMismatch,
+        validateValueUseAuthoritySource(accepted ++ "fn second() void { _ = Snapshot.init(selector); }"),
     );
 }
 
@@ -1702,6 +1740,25 @@ test "composed selector source guard freezes branch and ordinary switch actions"
                 "const exhaustive_case = maskedSwitchExhaustiveCaseIndex(); }",
         ),
     );
+}
+
+test "composed selector source guard keeps accumulator composition dormant" {
+    try validateAccumulatorCompositionProductionSites(
+        "composed_selector_scalar.zig",
+        "fn lowerUnary() void {}",
+    );
+    const fixtures = [_][:0]const u8{
+        "fn lowerUnary() void { _ = transaction.beginAccumulatorSession(); }",
+        "fn lowerUnary() void { _ = transaction.prepareAccumulator(handle, .preserve, .spill_live); }",
+        "fn lowerUnary() void { _ = transaction.defineAccumulatorResult(handle, \"result\", definition); }",
+        "fn lowerUnary() void { _ = AccumulatorDefinitionSession.init(selector); }",
+    };
+    for (fixtures) |fixture| {
+        try std.testing.expectError(
+            error.ValueUseAccumulatorCompositionConsumerPremature,
+            validateAccumulatorCompositionProductionSites("composed_selector_scalar.zig", fixture),
+        );
+    }
 }
 
 test "composed selector source guard accepts the fully classified current tree" {

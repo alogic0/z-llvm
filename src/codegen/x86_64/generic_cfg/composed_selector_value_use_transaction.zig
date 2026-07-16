@@ -23,6 +23,10 @@ const VirtualRegClass = selector_types.VirtualRegClass;
 const ComposedBlockSelector = state_data.ComposedBlockSelector;
 const AddressDependencyDomain = address_dependencies.AddressDependencyDomain;
 const Diagnostic = @import("inspection.zig").Diagnostic;
+const AccumulatorDefinition = selector_state.AccumulatorDefinition;
+const AccumulatorDefinitionSession = selector_state.AccumulatorDefinitionSession;
+const AccumulatorDisplacementPolicy = selector_state.AccumulatorDisplacementPolicy;
+const AccumulatorPreparationEffect = selector_state.AccumulatorPreparationEffect;
 
 /// Instruction-level authority for planning several value uses before any
 /// selector mutation. Newly added action variants remain dormant until their
@@ -56,6 +60,7 @@ pub const ValueUseTransaction = struct {
     /// First request to which a transaction failure can be attributed. This
     /// diagnostic-only identity deliberately survives automatic rollback.
     failed_request: ?RequestHandle = null,
+    accumulator_session: ?AccumulatorDefinitionSession = null,
     memcpy_test_failure: if (builtin.is_test) ?MemcpyTestFailure else void = if (builtin.is_test) null else {},
 
     pub const Expected = struct {
@@ -123,6 +128,13 @@ pub const ValueUseTransaction = struct {
     pub const RequestHandle = struct {
         authority: usize,
         index: u8,
+        generation: u32,
+    };
+
+    /// Opaque identity for the snapshot-free accumulator state-transition
+    /// session owned by this instruction authority.
+    pub const AccumulatorSessionHandle = struct {
+        authority: usize,
         generation: u32,
     };
 
@@ -910,6 +922,112 @@ pub const ValueUseTransaction = struct {
         return .{ .request = handle, .view_generation = transaction.view_generation };
     }
 
+    /// Opens the subordinate result-definition core only after the complete
+    /// use plan has sealed. No selector state or address domain is copied.
+    pub fn beginAccumulatorSession(
+        transaction: *ValueUseTransaction,
+    ) !AccumulatorSessionHandle {
+        try transaction.requireActive();
+        if (transaction.request_phase != .sealed)
+            return error.ValueUseAccumulatorSessionRequiresSealedPlan;
+        if (transaction.accumulator_session != null)
+            return error.ValueUseAccumulatorSessionAlreadyOpen;
+        transaction.accumulator_session = AccumulatorDefinitionSession.init(transaction.selector);
+        return .{
+            .authority = @intFromPtr(transaction),
+            .generation = transaction.view_generation,
+        };
+    }
+
+    pub fn prepareAccumulator(
+        transaction: *ValueUseTransaction,
+        handle: AccumulatorSessionHandle,
+        effect: AccumulatorPreparationEffect,
+        displacement: AccumulatorDisplacementPolicy,
+    ) !?Diagnostic {
+        const session = try transaction.validateAccumulatorSession(handle);
+        errdefer transaction.rollbackInternal();
+        if (try session.prepare(effect, displacement)) |diagnostic| {
+            transaction.rollbackInternal();
+            return diagnostic;
+        }
+        return null;
+    }
+
+    pub fn prepareAccumulatorCallBeforeArguments(
+        transaction: *ValueUseTransaction,
+        handle: AccumulatorSessionHandle,
+        effect: AccumulatorPreparationEffect,
+    ) !?Diagnostic {
+        const session = try transaction.validateAccumulatorSession(handle);
+        errdefer transaction.rollbackInternal();
+        if (try session.prepareCallBeforeArguments(effect)) |diagnostic| {
+            transaction.rollbackInternal();
+            return diagnostic;
+        }
+        return null;
+    }
+
+    pub fn finishAccumulatorCallPreparationAfterArguments(
+        transaction: *ValueUseTransaction,
+        handle: AccumulatorSessionHandle,
+    ) !void {
+        const session = try transaction.validateAccumulatorSession(handle);
+        errdefer transaction.rollbackInternal();
+        try session.finishCallPreparationAfterArguments();
+    }
+
+    pub fn materializeAccumulator(
+        transaction: *ValueUseTransaction,
+        handle: AccumulatorSessionHandle,
+        source: ir.Value,
+        definition: AccumulatorDefinition,
+    ) !void {
+        const session = try transaction.validateAccumulatorSession(handle);
+        errdefer transaction.rollbackInternal();
+        try session.materialize(source, definition);
+    }
+
+    pub fn spillAccumulatorValue(
+        transaction: *ValueUseTransaction,
+        handle: AccumulatorSessionHandle,
+        name: []const u8,
+    ) !void {
+        const session = try transaction.validateAccumulatorSession(handle);
+        errdefer transaction.rollbackInternal();
+        try session.spill(name);
+    }
+
+    pub fn defineAccumulatorResult(
+        transaction: *ValueUseTransaction,
+        handle: AccumulatorSessionHandle,
+        name: []const u8,
+        definition: AccumulatorDefinition,
+    ) !void {
+        const session = try transaction.validateAccumulatorSession(handle);
+        errdefer transaction.rollbackInternal();
+        try session.define(name, definition);
+    }
+
+    pub fn finalizeAccumulatorResult(
+        transaction: *ValueUseTransaction,
+        handle: AccumulatorSessionHandle,
+    ) !void {
+        const session = try transaction.validateAccumulatorSession(handle);
+        errdefer transaction.rollbackInternal();
+        try session.finalize();
+    }
+
+    /// The subordinate session never owns commit. This explicit rejection is
+    /// stable even after definition; only the outer transaction may commit.
+    pub fn commitAccumulatorSession(
+        transaction: *ValueUseTransaction,
+        handle: AccumulatorSessionHandle,
+    ) !void {
+        _ = try transaction.validateAccumulatorSession(handle);
+        return error.ValueUseAccumulatorIndependentCommit;
+    }
+
     /// Executes the request's sealed, typed action entirely inside the
     /// transaction authority. No private representation or source location
     /// crosses this API. Canonical pre/post derivation remains defense in
@@ -959,6 +1077,9 @@ pub const ValueUseTransaction = struct {
         try transaction.requireActive();
         if (transaction.request_phase != .materialized and transaction.request_phase != .views_exposed)
             return error.ValueUseCommitBeforeMaterialization;
+        if (transaction.accumulator_session) |*session| {
+            if (!session.isFinalized()) return error.ValueUseAccumulatorResultNotFinalized;
+        }
         transaction.request_phase = .committed;
         transaction.lifecycle = .committed;
     }
@@ -1012,6 +1133,7 @@ pub const ValueUseTransaction = struct {
 
     fn rollbackInternal(transaction: *ValueUseTransaction) void {
         transaction.snapshot.restore(transaction.selector);
+        transaction.accumulator_session = null;
         transaction.request_count = 0;
         transaction.request_phase = .registering;
         transaction.write_nodes = [_]bool{false} ** physical_node_count;
@@ -1023,6 +1145,22 @@ pub const ValueUseTransaction = struct {
         transaction.view_generation +%= 1;
         if (transaction.view_generation == 0) transaction.view_generation = 1;
         transaction.lifecycle = .rolled_back;
+    }
+
+    fn validateAccumulatorSession(
+        transaction: *ValueUseTransaction,
+        handle: AccumulatorSessionHandle,
+    ) !*AccumulatorDefinitionSession {
+        try transaction.requireActive();
+        if (handle.authority != @intFromPtr(transaction) or
+            handle.generation != transaction.view_generation)
+        {
+            return error.ValueUseAccumulatorSessionStale;
+        }
+        return if (transaction.accumulator_session) |*session|
+            session
+        else
+            error.ValueUseAccumulatorSessionMissing;
     }
 
     fn handleFor(transaction: *ValueUseTransaction, index: u8) RequestHandle {

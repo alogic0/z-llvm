@@ -162,22 +162,15 @@ pub const AccumulatorDefinition = struct {
     }
 };
 
-/// The sole state-transition authority for composed EAX/RAX definitions.
-///
-/// Commit 2 deliberately leaves production emitters on their accepted path;
-/// this transaction is exercised by its focused tests until emitter migration
-/// begins in a later authorized commit.
-pub const AccumulatorDefinitionTransaction = struct {
+/// Snapshot-free EAX/RAX state-transition core. A standalone O1 transaction
+/// wraps this session in its historical snapshot; an O1/O2 composition stores
+/// it under the ValueUseTransaction snapshot. The session never owns rollback
+/// and cannot independently commit selector state.
+pub const AccumulatorDefinitionSession = struct {
+    pub const snapshot_copies: usize = 0;
+    pub const address_domain_snapshot_copies: usize = 0;
+
     selector: *ComposedBlockSelector,
-    instruction_len: usize,
-    values: []ValueEntry,
-    spill_slots: []SpillEntry,
-    next_virtual_reg: usize,
-    next_spill_slot: usize,
-    accumulator_domain: AccumulatorDomain,
-    address_dependencies: AddressDependencyDomain,
-    eflags_snapshot: EflagsLiveness.Snapshot,
-    eflags_semantics_len: usize,
     phase: Phase = .begun,
     pending: ?PendingDefinition = null,
     reused_source: ?[]const u8 = null,
@@ -187,18 +180,7 @@ pub const AccumulatorDefinitionTransaction = struct {
         preparing_call,
         prepared,
         defined,
-        committed,
-        rolled_back,
-    };
-
-    const ValueEntry = struct {
-        name: []const u8,
-        binding: ValueBinding,
-    };
-
-    const SpillEntry = struct {
-        name: []const u8,
-        assignment: SpillSlotAssignment,
+        finalized,
     };
 
     const PendingDefinition = struct {
@@ -207,280 +189,175 @@ pub const AccumulatorDefinitionTransaction = struct {
         binding: ValueBinding,
     };
 
-    pub fn begin(selector: *ComposedBlockSelector) !AccumulatorDefinitionTransaction {
-        const values = try selector.allocator.alloc(ValueEntry, selector.values.count());
-        errdefer selector.allocator.free(values);
-        const spill_slots = try selector.allocator.alloc(SpillEntry, selector.spill_slots.count());
-        errdefer selector.allocator.free(spill_slots);
-
-        var value_index: usize = 0;
-        var value_it = selector.values.iterator();
-        while (value_it.next()) |entry| : (value_index += 1) {
-            values[value_index] = .{
-                .name = entry.key_ptr.*,
-                .binding = entry.value_ptr.*,
-            };
-        }
-
-        var spill_index: usize = 0;
-        var spill_it = selector.spill_slots.iterator();
-        while (spill_it.next()) |entry| : (spill_index += 1) {
-            spill_slots[spill_index] = .{
-                .name = entry.key_ptr.*,
-                .assignment = entry.value_ptr.*,
-            };
-        }
-
-        return .{
-            .selector = selector,
-            .instruction_len = selector.machine.instructions.items.len,
-            .values = values,
-            .spill_slots = spill_slots,
-            .next_virtual_reg = selector.next_virtual_reg,
-            .next_spill_slot = selector.next_spill_slot,
-            .accumulator_domain = selector.accumulator_domain,
-            .address_dependencies = selector.address_dependencies,
-            .eflags_snapshot = selector.eflags.snapshot(),
-            .eflags_semantics_len = selector.eflags_semantics.items.len,
-        };
-    }
-
-    pub fn deinit(transaction: *AccumulatorDefinitionTransaction) void {
-        switch (transaction.phase) {
-            .begun, .preparing_call, .prepared, .defined => transaction.restore(.rolled_back),
-            .committed, .rolled_back => {},
-        }
-        transaction.selector.allocator.free(transaction.spill_slots);
-        transaction.selector.allocator.free(transaction.values);
+    pub fn init(selector: *ComposedBlockSelector) AccumulatorDefinitionSession {
+        return .{ .selector = selector };
     }
 
     pub fn prepare(
-        transaction: *AccumulatorDefinitionTransaction,
+        session: *AccumulatorDefinitionSession,
         effect: AccumulatorPreparationEffect,
         displacement: AccumulatorDisplacementPolicy,
     ) !?Diagnostic {
-        try transaction.beginPreparation(effect);
-        errdefer transaction.restore(.rolled_back);
+        try session.beginPreparation(effect);
+        if (try session.applyDisplacement(displacement)) |diagnostic| return diagnostic;
+        try session.finishPreparation();
+        return null;
+    }
+
+    pub fn prepareCallBeforeArguments(
+        session: *AccumulatorDefinitionSession,
+        effect: AccumulatorPreparationEffect,
+    ) !?Diagnostic {
+        if (effect != .clobber) return error.AccumulatorCallMustClobberEflags;
+        try session.beginPreparation(effect);
+        if (try spillLiveCallerClobbersForCall(session.selector)) |diagnostic| return diagnostic;
+        session.phase = .preparing_call;
+        return null;
+    }
+
+    pub fn finishCallPreparationAfterArguments(session: *AccumulatorDefinitionSession) !void {
+        if (session.phase != .preparing_call) return error.AccumulatorCallPreparationOrder;
+        try dropExpiredAccumulatorBindings(session.selector);
+        try session.requireAccumulatorUnbound();
+        session.selector.accumulator_domain.invalidate();
+        session.phase = .prepared;
+    }
+
+    pub fn materialize(
+        session: *AccumulatorDefinitionSession,
+        source: ir.Value,
+        definition: AccumulatorDefinition,
+    ) !void {
+        try session.requirePrepared();
+        try definition.validate();
+        try session.materializeValidated(source, definition);
+    }
+
+    pub fn spill(session: *AccumulatorDefinitionSession, name: []const u8) !void {
+        try session.requirePrepared();
+        if (try spillValue(session.selector, name)) |_| return error.AccumulatorSpillUnsupported;
+    }
+
+    pub fn define(
+        session: *AccumulatorDefinitionSession,
+        name: []const u8,
+        definition: AccumulatorDefinition,
+    ) !void {
+        switch (session.phase) {
+            .begun, .preparing_call => return error.AccumulatorTransactionNotPrepared,
+            .prepared => {},
+            .defined => return error.AccumulatorAlreadyDefined,
+            .finalized => return error.AccumulatorTransactionClosed,
+        }
+        try definition.validate();
+        if (session.selector.values.contains(name)) return error.AccumulatorDefinitionAlreadyBound;
+
+        const vreg: VirtualReg = .{
+            .index = session.selector.next_virtual_reg,
+            .class = definition.virtualRegClass(),
+            .bits = definition.bindingBits(),
+        };
+        session.selector.next_virtual_reg += 1;
+        session.pending = .{
+            .name = name,
+            .definition = definition,
+            .binding = .{ .vreg = vreg, .loc = definition.physicalLoc() },
+        };
+        session.phase = .defined;
+    }
+
+    pub fn finalize(session: *AccumulatorDefinitionSession) !void {
+        try session.requireDefinition();
+        try session.finalizeValidated();
+    }
+
+    pub fn isPrepared(session: *const AccumulatorDefinitionSession) bool {
+        return session.phase == .prepared;
+    }
+
+    pub fn isFinalized(session: *const AccumulatorDefinitionSession) bool {
+        return session.phase == .finalized;
+    }
+
+    fn beginPreparation(
+        session: *AccumulatorDefinitionSession,
+        effect: AccumulatorPreparationEffect,
+    ) !void {
+        switch (session.phase) {
+            .begun => {},
+            .preparing_call, .prepared, .defined => return error.AccumulatorTransactionAlreadyPrepared,
+            .finalized => return error.AccumulatorTransactionClosed,
+        }
+
+        var next_eflags = session.selector.eflags;
+        try next_eflags.apply(effect.eflagsEffect());
+        session.selector.eflags = next_eflags;
+    }
+
+    fn applyDisplacement(
+        session: *AccumulatorDefinitionSession,
+        displacement: AccumulatorDisplacementPolicy,
+    ) !?Diagnostic {
         switch (displacement) {
-            .spill_live => try clobberAccumulator(transaction.selector),
+            .spill_live => try clobberAccumulator(session.selector),
             .spill_source => |source_name| {
-                const source = transaction.selector.values.get(source_name) orelse
+                const source = session.selector.values.get(source_name) orelse
                     return error.AccumulatorSpillSourceUnknown;
                 switch (source.loc) {
                     .eax, .rax => {},
                     else => return error.AccumulatorSpillSourceNotResident,
                 }
-                try spillValueOrError(transaction.selector, source_name);
-                try clobberAccumulator(transaction.selector);
+                try spillValueOrError(session.selector, source_name);
+                try clobberAccumulator(session.selector);
             },
             .scratch_preferred => {
-                while (try liveAccumulatorNameAfterCurrent(transaction.selector)) |live_name| {
-                    if (try preserveLiveAccumulatorValue(transaction.selector, live_name)) |diagnostic| {
-                        transaction.restore(.rolled_back);
+                while (try liveAccumulatorNameAfterCurrent(session.selector)) |live_name| {
+                    if (try preserveLiveAccumulatorValue(session.selector, live_name)) |diagnostic|
                         return diagnostic;
-                    }
                 }
-                try dropExpiredAccumulatorBindings(transaction.selector);
+                try dropExpiredAccumulatorBindings(session.selector);
             },
             .reuse_source => |source_name| {
-                const source = transaction.selector.values.get(source_name) orelse
+                const source = session.selector.values.get(source_name) orelse
                     return error.AccumulatorReuseSourceUnknown;
                 switch (source.loc) {
                     .eax, .rax => {},
                     else => return error.AccumulatorReuseSourceNotResident,
                 }
-                try spillAccumulatorAliasesExcept(transaction.selector, .{ .named = source_name });
-                try dropExpiredAccumulatorBindingsExcept(transaction.selector, source_name);
-                transaction.reused_source = source_name;
+                try spillAccumulatorAliasesExcept(session.selector, .{ .named = source_name });
+                try dropExpiredAccumulatorBindingsExcept(session.selector, source_name);
+                session.reused_source = source_name;
             },
         }
-        try transaction.finishPreparation();
         return null;
     }
 
-    /// Validate the call's EFLAGS clobber before the first call-sequence
-    /// mutation, then preserve every genuinely live caller-clobbered value in
-    /// the established accumulator/GPR/XMM order. Arguments are deliberately
-    /// staged only after this method returns.
-    pub fn prepareCallBeforeArguments(
-        transaction: *AccumulatorDefinitionTransaction,
-        effect: AccumulatorPreparationEffect,
-    ) !?Diagnostic {
-        if (effect != .clobber) return error.AccumulatorCallMustClobberEflags;
-        try transaction.beginPreparation(effect);
-        errdefer transaction.restore(.rolled_back);
-        if (try spillLiveCallerClobbersForCall(transaction.selector)) |diagnostic| {
-            transaction.restore(.rolled_back);
-            return diagnostic;
-        }
-        transaction.phase = .preparing_call;
-        return null;
+    fn finishPreparation(session: *AccumulatorDefinitionSession) !void {
+        try session.requireAccumulatorReadyForCommit();
+        if (session.reused_source == null) session.selector.accumulator_domain.invalidate();
+        session.phase = .prepared;
     }
 
-    /// Complete call preparation only after every argument has been staged.
-    /// Expired EAX/RAX bindings are pure bookkeeping and may now be discarded;
-    /// a live or protected binding that survived caller-clobber preservation
-    /// remains a hard failure.
-    pub fn finishCallPreparationAfterArguments(transaction: *AccumulatorDefinitionTransaction) !void {
-        if (transaction.phase != .preparing_call) return error.AccumulatorCallPreparationOrder;
-        errdefer transaction.restore(.rolled_back);
-        try dropExpiredAccumulatorBindings(transaction.selector);
-        try transaction.requireAccumulatorUnbound();
-        transaction.selector.accumulator_domain.invalidate();
-        transaction.phase = .prepared;
-    }
-
-    pub fn materialize(
-        transaction: *AccumulatorDefinitionTransaction,
-        source: ir.Value,
-        definition: AccumulatorDefinition,
-    ) !void {
-        try transaction.requirePrepared();
-        try definition.validate();
-        errdefer transaction.restore(.rolled_back);
-        switch (source) {
-            .named => {
-                const current = resolveValue(transaction.selector, source) orelse
-                    return error.UnsupportedCodegenValue;
-                try transaction.materializeCurrentLocIntoAccumulator(current, definition);
-            },
-            .int => |int| {
-                try transaction.selector.machine.instructions.append(
-                    transaction.selector.allocator,
-                    switch (definition.physicalLoc()) {
-                        .eax => .{ .mov_imm_eax = try i32Value(int) },
-                        .rax => .{ .mov_imm_rax = try i64Value(int) },
-                        else => unreachable,
-                    },
-                );
-            },
-            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-        }
-    }
-
-    pub fn spill(transaction: *AccumulatorDefinitionTransaction, name: []const u8) !void {
-        try transaction.requirePrepared();
-        errdefer transaction.restore(.rolled_back);
-        if (try spillValue(transaction.selector, name)) |_| return error.AccumulatorSpillUnsupported;
-    }
-
-    pub fn define(
-        transaction: *AccumulatorDefinitionTransaction,
-        name: []const u8,
-        definition: AccumulatorDefinition,
-    ) !void {
-        switch (transaction.phase) {
-            .begun, .preparing_call => return error.AccumulatorTransactionNotPrepared,
+    fn requirePrepared(session: *const AccumulatorDefinitionSession) !void {
+        switch (session.phase) {
             .prepared => {},
+            .begun, .preparing_call => return error.AccumulatorTransactionNotPrepared,
             .defined => return error.AccumulatorAlreadyDefined,
-            .committed, .rolled_back => return error.AccumulatorTransactionClosed,
+            .finalized => return error.AccumulatorTransactionClosed,
         }
-        try definition.validate();
-        if (transaction.selector.values.contains(name)) return error.AccumulatorDefinitionAlreadyBound;
-
-        const vreg: VirtualReg = .{
-            .index = transaction.selector.next_virtual_reg,
-            .class = definition.virtualRegClass(),
-            .bits = definition.bindingBits(),
-        };
-        transaction.selector.next_virtual_reg += 1;
-        transaction.pending = .{
-            .name = name,
-            .definition = definition,
-            .binding = .{ .vreg = vreg, .loc = definition.physicalLoc() },
-        };
-        transaction.phase = .defined;
     }
 
-    pub fn commit(transaction: *AccumulatorDefinitionTransaction) !void {
-        switch (transaction.phase) {
+    fn requireDefinition(session: *const AccumulatorDefinitionSession) !void {
+        switch (session.phase) {
             .begun, .preparing_call, .prepared => return error.AccumulatorCommitWithoutDefinition,
             .defined => {},
-            .committed, .rolled_back => return error.AccumulatorTransactionClosed,
-        }
-        errdefer transaction.restore(.rolled_back);
-        try transaction.requireAccumulatorReadyForCommit();
-
-        const pending = transaction.pending.?;
-        const physical = pending.definition.physicalLoc();
-        const target = plannedResultLoc(transaction.selector, pending.name, physical) orelse physical;
-        if (!valueLocEql(physical, target)) {
-            try materializeLocIntoLocWithBits(
-                transaction.selector,
-                physical,
-                target,
-                pending.definition.bindingBits(),
-            );
-        }
-        try putValueBinding(transaction.selector, pending.name, .{
-            .vreg = pending.binding.vreg,
-            .loc = target,
-        });
-
-        if (locIsAccumulator(target)) {
-            const binding = transaction.selector.values.get(pending.name).?;
-            transaction.selector.accumulator_domain = .{
-                .occupant = .{
-                    .binding = binding,
-                    .logical_bits = pending.definition.logical_bits,
-                },
-                // Any EAX write in this authority is a 32-bit zero-extending
-                // definition; RAX writes define all 64 bits directly.
-                .defined_bits = 64,
-            };
-        } else {
-            transaction.selector.accumulator_domain.invalidate();
-        }
-        transaction.phase = .committed;
-    }
-
-    pub fn rollback(transaction: *AccumulatorDefinitionTransaction) !void {
-        switch (transaction.phase) {
-            .begun, .preparing_call, .prepared, .defined => transaction.restore(.rolled_back),
-            .committed, .rolled_back => return error.AccumulatorTransactionClosed,
+            .finalized => return error.AccumulatorTransactionClosed,
         }
     }
 
-    pub fn isPrepared(transaction: *const AccumulatorDefinitionTransaction) bool {
-        return transaction.phase == .prepared;
-    }
-
-    fn requirePrepared(transaction: *const AccumulatorDefinitionTransaction) !void {
-        switch (transaction.phase) {
-            .prepared => {},
-            .begun, .preparing_call => return error.AccumulatorTransactionNotPrepared,
-            .defined => return error.AccumulatorAlreadyDefined,
-            .committed, .rolled_back => return error.AccumulatorTransactionClosed,
-        }
-    }
-
-    fn beginPreparation(
-        transaction: *AccumulatorDefinitionTransaction,
-        effect: AccumulatorPreparationEffect,
-    ) !void {
-        switch (transaction.phase) {
-            .begun => {},
-            .preparing_call, .prepared, .defined => return error.AccumulatorTransactionAlreadyPrepared,
-            .committed, .rolled_back => return error.AccumulatorTransactionClosed,
-        }
-
-        // Validate the declared EFLAGS effect against a copy first. A live
-        // flags rejection therefore cannot partially mutate accumulator or
-        // value state.
-        var next_eflags = transaction.selector.eflags;
-        try next_eflags.apply(effect.eflagsEffect());
-        transaction.selector.eflags = next_eflags;
-    }
-
-    fn finishPreparation(transaction: *AccumulatorDefinitionTransaction) !void {
-        try transaction.requireAccumulatorReadyForCommit();
-        if (transaction.reused_source == null) transaction.selector.accumulator_domain.invalidate();
-        transaction.phase = .prepared;
-    }
-
-    fn requireAccumulatorReadyForCommit(transaction: *const AccumulatorDefinitionTransaction) !void {
-        const reused_source = transaction.reused_source;
-        var it = transaction.selector.values.iterator();
+    fn requireAccumulatorReadyForCommit(session: *const AccumulatorDefinitionSession) !void {
+        const reused_source = session.reused_source;
+        var it = session.selector.values.iterator();
         while (it.next()) |entry| switch (entry.value_ptr.loc) {
             .eax, .rax => if (reused_source == null or
                 !std.mem.eql(u8, entry.key_ptr.*, reused_source.?))
@@ -491,20 +368,43 @@ pub const AccumulatorDefinitionTransaction = struct {
         };
     }
 
-    fn requireAccumulatorUnbound(transaction: *const AccumulatorDefinitionTransaction) !void {
-        var it = transaction.selector.values.iterator();
+    fn requireAccumulatorUnbound(session: *const AccumulatorDefinitionSession) !void {
+        var it = session.selector.values.iterator();
         while (it.next()) |entry| switch (entry.value_ptr.loc) {
             .eax, .rax => return error.AccumulatorAliasConflict,
             else => {},
         };
     }
 
+    fn materializeValidated(
+        session: *AccumulatorDefinitionSession,
+        source: ir.Value,
+        definition: AccumulatorDefinition,
+    ) !void {
+        switch (source) {
+            .named => {
+                const current = resolveValue(session.selector, source) orelse
+                    return error.UnsupportedCodegenValue;
+                try session.materializeCurrentLocIntoAccumulator(current, definition);
+            },
+            .int => |int| try session.selector.machine.instructions.append(
+                session.selector.allocator,
+                switch (definition.physicalLoc()) {
+                    .eax => .{ .mov_imm_eax = try i32Value(int) },
+                    .rax => .{ .mov_imm_rax = try i64Value(int) },
+                    else => unreachable,
+                },
+            ),
+            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        }
+    }
+
     fn materializeCurrentLocIntoAccumulator(
-        transaction: *AccumulatorDefinitionTransaction,
+        session: *AccumulatorDefinitionSession,
         source: ValueLoc,
         definition: AccumulatorDefinition,
     ) !void {
-        const selector = transaction.selector;
+        const selector = session.selector;
         switch (definition.physicalLoc()) {
             .eax => switch (source) {
                 .arg32, .scratch32, .arg64, .scratch64 => |reg| try selector.machine.instructions.append(
@@ -534,27 +434,214 @@ pub const AccumulatorDefinitionTransaction = struct {
         }
     }
 
-    fn restore(transaction: *AccumulatorDefinitionTransaction, phase: Phase) void {
+    fn finalizeValidated(session: *AccumulatorDefinitionSession) !void {
+        try session.requireAccumulatorReadyForCommit();
+        const pending = session.pending.?;
+        const physical = pending.definition.physicalLoc();
+        const target = plannedResultLoc(session.selector, pending.name, physical) orelse physical;
+        if (!valueLocEql(physical, target)) {
+            try materializeLocIntoLocWithBits(
+                session.selector,
+                physical,
+                target,
+                pending.definition.bindingBits(),
+            );
+        }
+        try putValueBinding(session.selector, pending.name, .{
+            .vreg = pending.binding.vreg,
+            .loc = target,
+        });
+
+        if (locIsAccumulator(target)) {
+            const binding = session.selector.values.get(pending.name).?;
+            session.selector.accumulator_domain = .{
+                .occupant = .{
+                    .binding = binding,
+                    .logical_bits = pending.definition.logical_bits,
+                },
+                .defined_bits = 64,
+            };
+        } else {
+            session.selector.accumulator_domain.invalidate();
+        }
+        session.phase = .finalized;
+    }
+
+    fn reset(session: *AccumulatorDefinitionSession) void {
+        session.phase = .begun;
+        session.pending = null;
+        session.reused_source = null;
+    }
+};
+
+/// Standalone O1 authority. Its public lifecycle and snapshot semantics remain
+/// unchanged while the state-transition core is shared with O1/O2 composition.
+pub const AccumulatorDefinitionTransaction = struct {
+    selector: *ComposedBlockSelector,
+    instruction_len: usize,
+    values: []ValueEntry,
+    spill_slots: []SpillEntry,
+    next_virtual_reg: usize,
+    next_spill_slot: usize,
+    accumulator_domain: AccumulatorDomain,
+    address_dependencies: AddressDependencyDomain,
+    eflags_snapshot: EflagsLiveness.Snapshot,
+    eflags_semantics_len: usize,
+    session: AccumulatorDefinitionSession,
+    lifecycle: Lifecycle = .active,
+
+    const Lifecycle = enum { active, committed, rolled_back };
+
+    const ValueEntry = struct {
+        name: []const u8,
+        binding: ValueBinding,
+    };
+
+    const SpillEntry = struct {
+        name: []const u8,
+        assignment: SpillSlotAssignment,
+    };
+
+    pub fn begin(selector: *ComposedBlockSelector) !AccumulatorDefinitionTransaction {
+        const values = try selector.allocator.alloc(ValueEntry, selector.values.count());
+        errdefer selector.allocator.free(values);
+        const spill_slots = try selector.allocator.alloc(SpillEntry, selector.spill_slots.count());
+        errdefer selector.allocator.free(spill_slots);
+
+        var value_index: usize = 0;
+        var value_it = selector.values.iterator();
+        while (value_it.next()) |entry| : (value_index += 1)
+            values[value_index] = .{ .name = entry.key_ptr.*, .binding = entry.value_ptr.* };
+        var spill_index: usize = 0;
+        var spill_it = selector.spill_slots.iterator();
+        while (spill_it.next()) |entry| : (spill_index += 1)
+            spill_slots[spill_index] = .{ .name = entry.key_ptr.*, .assignment = entry.value_ptr.* };
+
+        return .{
+            .selector = selector,
+            .instruction_len = selector.machine.instructions.items.len,
+            .values = values,
+            .spill_slots = spill_slots,
+            .next_virtual_reg = selector.next_virtual_reg,
+            .next_spill_slot = selector.next_spill_slot,
+            .accumulator_domain = selector.accumulator_domain,
+            .address_dependencies = selector.address_dependencies,
+            .eflags_snapshot = selector.eflags.snapshot(),
+            .eflags_semantics_len = selector.eflags_semantics.items.len,
+            .session = AccumulatorDefinitionSession.init(selector),
+        };
+    }
+
+    pub fn deinit(transaction: *AccumulatorDefinitionTransaction) void {
+        if (transaction.lifecycle == .active) transaction.restore(.rolled_back);
+        transaction.selector.allocator.free(transaction.spill_slots);
+        transaction.selector.allocator.free(transaction.values);
+    }
+
+    pub fn prepare(
+        transaction: *AccumulatorDefinitionTransaction,
+        effect: AccumulatorPreparationEffect,
+        displacement: AccumulatorDisplacementPolicy,
+    ) !?Diagnostic {
+        try transaction.requireActive();
+        try transaction.session.beginPreparation(effect);
+        errdefer transaction.restore(.rolled_back);
+        if (try transaction.session.applyDisplacement(displacement)) |diagnostic| {
+            transaction.restore(.rolled_back);
+            return diagnostic;
+        }
+        try transaction.session.finishPreparation();
+        return null;
+    }
+
+    pub fn prepareCallBeforeArguments(
+        transaction: *AccumulatorDefinitionTransaction,
+        effect: AccumulatorPreparationEffect,
+    ) !?Diagnostic {
+        if (effect != .clobber) return error.AccumulatorCallMustClobberEflags;
+        try transaction.requireActive();
+        try transaction.session.beginPreparation(effect);
+        errdefer transaction.restore(.rolled_back);
+        if (try spillLiveCallerClobbersForCall(transaction.selector)) |diagnostic| {
+            transaction.restore(.rolled_back);
+            return diagnostic;
+        }
+        transaction.session.phase = .preparing_call;
+        return null;
+    }
+
+    pub fn finishCallPreparationAfterArguments(transaction: *AccumulatorDefinitionTransaction) !void {
+        if (transaction.session.phase != .preparing_call) return error.AccumulatorCallPreparationOrder;
+        try transaction.requireActive();
+        errdefer transaction.restore(.rolled_back);
+        try transaction.session.finishCallPreparationAfterArguments();
+    }
+
+    pub fn materialize(
+        transaction: *AccumulatorDefinitionTransaction,
+        source: ir.Value,
+        definition: AccumulatorDefinition,
+    ) !void {
+        try transaction.requireActive();
+        try transaction.session.requirePrepared();
+        try definition.validate();
+        errdefer transaction.restore(.rolled_back);
+        try transaction.session.materializeValidated(source, definition);
+    }
+
+    pub fn spill(transaction: *AccumulatorDefinitionTransaction, name: []const u8) !void {
+        try transaction.requireActive();
+        try transaction.session.requirePrepared();
+        errdefer transaction.restore(.rolled_back);
+        if (try spillValue(transaction.selector, name)) |_| return error.AccumulatorSpillUnsupported;
+    }
+
+    pub fn define(
+        transaction: *AccumulatorDefinitionTransaction,
+        name: []const u8,
+        definition: AccumulatorDefinition,
+    ) !void {
+        try transaction.requireActive();
+        try transaction.session.define(name, definition);
+    }
+
+    pub fn commit(transaction: *AccumulatorDefinitionTransaction) !void {
+        try transaction.requireActive();
+        try transaction.session.requireDefinition();
+        errdefer transaction.restore(.rolled_back);
+        try transaction.session.finalizeValidated();
+        transaction.lifecycle = .committed;
+    }
+
+    pub fn rollback(transaction: *AccumulatorDefinitionTransaction) !void {
+        try transaction.requireActive();
+        transaction.restore(.rolled_back);
+    }
+
+    pub fn isPrepared(transaction: *const AccumulatorDefinitionTransaction) bool {
+        return transaction.lifecycle == .active and transaction.session.isPrepared();
+    }
+
+    fn requireActive(transaction: *const AccumulatorDefinitionTransaction) !void {
+        if (transaction.lifecycle != .active) return error.AccumulatorTransactionClosed;
+    }
+
+    fn restore(transaction: *AccumulatorDefinitionTransaction, lifecycle: Lifecycle) void {
         transaction.selector.machine.instructions.items.len = transaction.instruction_len;
-
         transaction.selector.values.clearRetainingCapacity();
-        for (transaction.values) |entry| {
+        for (transaction.values) |entry|
             transaction.selector.values.putAssumeCapacity(entry.name, entry.binding);
-        }
         transaction.selector.spill_slots.clearRetainingCapacity();
-        for (transaction.spill_slots) |entry| {
+        for (transaction.spill_slots) |entry|
             transaction.selector.spill_slots.putAssumeCapacity(entry.name, entry.assignment);
-        }
-
         transaction.selector.next_virtual_reg = transaction.next_virtual_reg;
         transaction.selector.next_spill_slot = transaction.next_spill_slot;
         transaction.selector.accumulator_domain = transaction.accumulator_domain;
         transaction.selector.address_dependencies = transaction.address_dependencies;
         transaction.selector.eflags.restore(transaction.eflags_snapshot);
         transaction.selector.eflags_semantics.items.len = transaction.eflags_semantics_len;
-        transaction.pending = null;
-        transaction.reused_source = null;
-        transaction.phase = phase;
+        transaction.session.reset();
+        transaction.lifecycle = lifecycle;
     }
 };
 
