@@ -1,3 +1,3 @@
 slice	file	function	gateway	occurrence	expected_count	semantic_owner	disposition
 B3B	composed_selector_cfg.zig	emitBranchCondition	resolveValue	1	0	complete branch-condition definition leaf	migrated in O2-3B3B through branch_condition; exact single-occurrence ratchet closed
-B3C	composed_selector_cfg.zig	lowerSwitch	emitValueIntoEax	1	1	ordinary non-PHI compare-chain switch	remove only when ordinary lowerSwitch is wired; exact PHI paths remain O4 outside the transaction
+B3C	composed_selector_cfg.zig	lowerSwitch	emitValueIntoEax	1	0	ordinary non-PHI compare-chain switch	migrated in O2-3B3C; exact PHI paths remain O4 outside the transaction

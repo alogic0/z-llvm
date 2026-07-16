@@ -347,24 +347,68 @@ fn lowerSwitch(
     }
 
     const exhaustive_case = maskedSwitchExhaustiveCaseIndex(function, switch_term, bits, case_values[0..switch_term.cases.items.len]);
-    if (selector.stack_frame_bytes != 0) {
-        selector_state.spillLiveValuesForCfgBoundary(selector) catch return .{ .no_spill_envelope = "stage2-cfg-boundary-spill" };
-    } else if (try restoreDisplacedPhiDestinations(selector)) |diagnostic| {
-        return diagnostic;
+    var action_cases: [ValueUseTransaction.max_switch_cases]ValueUseTransaction.SwitchCaseIntent = undefined;
+    for (switch_term.cases.items, case_values[0..switch_term.cases.items.len], 0..) |case, value, index| {
+        action_cases[index] = .{ .value = value, .target = case.target };
     }
-    selector_state.emitValueIntoEax(selector, switch_term.cond) catch return .{ .unsupported_value = "stage2-switch-cond" };
-    if (bits < 32) try selector_state.emitEflagsInstruction(selector, .{ .and_eax_imm32 = switchValueMask(bits) }, .write);
-
-    for (switch_term.cases.items, case_values[0..switch_term.cases.items.len], 0..) |case, value, case_index| {
-        if (exhaustive_case != null and exhaustive_case.? == case_index) continue;
-        try selector_state.emitEflagsInstruction(selector, .{ .cmp_eax_imm32 = value }, .definition);
-        try selector_state.emitEflagsInstruction(selector, .{ .je = case.target }, .use);
-    }
-    try selector.machine.instructions.append(selector.allocator, .{ .jmp = if (exhaustive_case) |case_index|
-        switch_term.cases.items[case_index].target
-    else
-        switch_term.default_target });
+    const switch_action = try ValueUseTransaction.SwitchCompareChainAction.init(
+        @intCast(bits),
+        action_cases[0..switch_term.cases.items.len],
+        switch_term.default_target,
+        if (exhaustive_case) |index| @intCast(index) else null,
+    );
+    var authority = try ValueUseTransaction.begin(selector);
+    defer authority.deinit();
+    const action = try authority.register(.{
+        .source = switch_term.cond,
+        .expected = .{ .ty = switch_term.cond_ty, .register_class = .gpr32 },
+        .form = .switch_condition,
+        .destination = .prepared_view,
+        .prepared_action = .{ .switch_compare_chain = switch_action },
+    });
+    authority.seal() catch |err| return switchConditionValueUseDiagnostic(err) orelse return err;
+    const framed_boundary = selector.stack_frame_bytes != 0;
+    authority.applySwitchBoundary(action) catch |err| {
+        if (switchConditionValueUseDiagnostic(err)) |diagnostic| return diagnostic;
+        if (framed_boundary) return .{ .no_spill_envelope = "stage2-cfg-boundary-spill" };
+        return switch (err) {
+            error.ValueUseSwitchPhiDestinationMissing,
+            error.ValueUseSwitchPhiDestinationBitsMissing,
+            => .{ .unsupported_value = "stage2-phi-dst" },
+            error.UnsupportedCodegenValue => .{ .no_emitter = "stage2-phi-restore-loc" },
+            else => return err,
+        };
+    };
+    authority.prepare() catch |err| return switchConditionMaterializationDiagnostic(err) orelse return err;
+    authority.materializeAll() catch |err| return switchConditionMaterializationDiagnostic(err) orelse return err;
+    authority.executePreparedAction(try authority.preparedView(action)) catch |err|
+        return switchConditionMaterializationDiagnostic(err) orelse return err;
+    try authority.commit();
     return null;
+}
+
+fn switchConditionValueUseDiagnostic(err: anyerror) ?Diagnostic {
+    return switch (err) {
+        error.ValueUseUnsupportedSource,
+        error.ValueUseUnresolvedSource,
+        error.ValueUseExpiredSource,
+        error.ValueUseSwitchImmediateOutOfRange,
+        error.ValueUseSwitchConditionHomeUnsupported,
+        error.ValueUseSwitchConditionWidthMismatch,
+        error.ValueUseRegisterClassMismatch,
+        error.ValueUseTypeMismatch,
+        error.ValueUseSourceViewMismatch,
+        => .{ .unsupported_value = "stage2-switch-cond" },
+        else => null,
+    };
+}
+
+fn switchConditionMaterializationDiagnostic(err: anyerror) ?Diagnostic {
+    if (switchConditionValueUseDiagnostic(err)) |diagnostic| return diagnostic;
+    return switch (err) {
+        error.UnsupportedCodegenValue => .{ .unsupported_value = "stage2-switch-cond" },
+        else => null,
+    };
 }
 
 fn isExactFrexpSwitchPhiShape(

@@ -44,7 +44,7 @@ composed_selector_cfg.zig	lowerReturn	emitValueIntoFpReturn	1	1	5	O5-ABI	retain_
 composed_selector_cfg.zig	lowerReturn	emitValueIntoI128Return	1	1	5	O5-ABI	retain_for_abi_return_migration	-
 composed_selector_cfg.zig	lowerReturn	resolveValue	1	1	5	O5-ABI	retain_for_abi_return_migration	-
 composed_selector_cfg.zig	lowerSelect	resolveValue	1-2	2	5	O4-conditional-copy	retain_for_conditional_destination_authority	use_scalar_select
-composed_selector_cfg.zig	lowerSwitch	emitValueIntoEax	1	1	1	O2-3B+	migrate_complete_switch_condition_consumer	use_switch_condition
+composed_selector_cfg.zig	lowerSwitch	emitValueIntoEax	1	1	1	O2-3B3C	migrated_complete_ordinary_switch_consumer	use_switch_condition
 composed_selector_cfg.zig	materializeScalarPhiSnapshot	materializeLocIntoLocWithBits	1-3	3	6	parent-consumer	collapse_with_phi_snapshot_owner	-
 composed_selector_cfg.zig	restoreDisplacedPhiDestinations	materializeLocIntoLocWithBits	1	1	5	O4-PHI-cycle	retain_for_phi_restore_migration	-
 composed_selector_cfg.zig	restoreDisplacedPhiDestinations	valueLoc	1	1	5	O4-PHI-cycle	retain_for_phi_restore_migration	-

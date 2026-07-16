@@ -30,7 +30,6 @@ composed_selector_cfg.zig	lowerExactEiEntrySwitchPhiEdges	emitValueIntoEax×1
 composed_selector_cfg.zig	lowerExactFrexpSwitchPhiEdge	emitValueIntoEax×1
 composed_selector_cfg.zig	lowerReturn	emitValueIntoAccumulator×1, emitValueIntoFpReturn×1, emitValueIntoI128Return×1, resolveValue×1
 composed_selector_cfg.zig	lowerSelect	resolveValue×2
-composed_selector_cfg.zig	lowerSwitch	emitValueIntoEax×1
 composed_selector_cfg.zig	materializeScalarPhiSnapshot	materializeLocIntoLocWithBits×3
 composed_selector_cfg.zig	restoreDisplacedPhiDestinations	materializeLocIntoLocWithBits×1, valueLoc×1
 composed_selector_cfg.zig	snapshotScalarPhiSources	materializeLocIntoLocWithBits×2, resolveValue×3

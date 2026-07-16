@@ -569,6 +569,206 @@ test "production branch failure before test rolls back staging and EFLAGS record
     try std.testing.expect(selector.eflags_semantics.items[0].effect == .definition);
 }
 
+test "production ordinary switch retains exact existing target identities after transaction teardown" {
+    const input =
+        \\define i32 @ordinary_switch(i8 %condition) {
+        \\entry:
+        \\  switch i8 %condition, label %default [
+        \\    i8 1, label %one
+        \\    i8 2, label %two
+        \\  ]
+        \\one:
+        \\  ret i32 1
+        \\two:
+        \\  ret i32 2
+        \\default:
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const function = module.functions.items[0];
+
+    var machine = MachineFunction.init(function.name, function.ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("condition", 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    selector.edge_label_count = 9;
+    try selector_state.bindValueLoc(&selector, "condition", .{ .arg32 = .rdi });
+
+    const diagnostic = try selector_cfg.lowerCfgTerminator(
+        &selector,
+        function,
+        0,
+        function.blocks.items[0].terminator.?,
+    );
+    try std.testing.expect(diagnostic == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg_eax = .rdi },
+        .{ .and_eax_imm32 = 255 },
+        .{ .cmp_eax_imm32 = 1 },
+    }, machine.instructions.items[0..3]);
+    try std.testing.expect(machine.instructions.items[3] == .je);
+    try std.testing.expectEqualStrings("one", machine.instructions.items[3].je);
+    try std.testing.expectEqual(x86_64_machine.Instruction{ .cmp_eax_imm32 = 2 }, machine.instructions.items[4]);
+    try std.testing.expect(machine.instructions.items[5] == .je);
+    try std.testing.expectEqualStrings("two", machine.instructions.items[5].je);
+    try std.testing.expect(machine.instructions.items[6] == .jmp);
+    try std.testing.expectEqualStrings("default", machine.instructions.items[6].jmp);
+    try std.testing.expectEqual(@as(usize, 3), machine.owned_labels.items.len);
+    try std.testing.expect(machine.instructions.items[3].je.ptr == machine.owned_labels.items[0].ptr);
+    try std.testing.expect(machine.instructions.items[5].je.ptr == machine.owned_labels.items[1].ptr);
+    try std.testing.expect(machine.instructions.items[6].jmp.ptr == machine.owned_labels.items[2].ptr);
+    try std.testing.expectEqual(@as(usize, 9), selector.edge_label_count);
+    try std.testing.expectEqual(@as(usize, 5), selector.eflags_semantics.items.len);
+}
+
+test "production ordinary switch rollback restores boundary state and frees speculative targets once" {
+    const input =
+        \\define i32 @ordinary_switch_rollback(i8 %condition) {
+        \\entry:
+        \\  switch i8 %condition, label %default [
+        \\    i8 1, label %one
+        \\    i8 2, label %two
+        \\  ]
+        \\one:
+        \\  ret i32 1
+        \\two:
+        \\  ret i32 2
+        \\default:
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const function = module.functions.items[0];
+
+    var machine = MachineFunction.init(function.name, function.ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    const retained = try std.testing.allocator.dupe(u8, "retained");
+    machine.owned_labels.append(std.testing.allocator, retained) catch |err| {
+        std.testing.allocator.free(retained);
+        return err;
+    };
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("condition", 1);
+    try plan.interval_ends.put("phi", 10);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    selector.next_spill_slot = 3;
+    selector.edge_label_count = 7;
+    try selector_state.bindValueLoc(&selector, "condition", .{ .arg32 = .rdi });
+    try selector_state.bindValueLoc(&selector, "phi", .{ .spill64 = .slot2 });
+    try selector.phi_destinations.put("phi", .{ .scratch64 = .rcx });
+    try selector_state.emitEflagsInstruction(&selector, .{ .cmp_eax_imm32 = 0 }, .definition);
+    const condition_before = selector.values.get("condition").?;
+    const phi_before = selector.values.get("phi").?;
+
+    try std.testing.expectError(
+        error.EflagsClobberedWhileLive,
+        selector_cfg.lowerCfgTerminator(
+            &selector,
+            function,
+            0,
+            function.blocks.items[0].terminator.?,
+        ),
+    );
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .cmp_eax_imm32 = 0 },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(condition_before, selector.values.get("condition").?);
+    try std.testing.expectEqual(phi_before, selector.values.get("phi").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.phi_destinations.get("phi").?);
+    try std.testing.expectEqual(@as(usize, 3), selector.next_spill_slot);
+    try std.testing.expectEqual(@as(usize, 7), selector.edge_label_count);
+    try std.testing.expectEqual(@as(usize, 1), machine.owned_labels.items.len);
+    try std.testing.expect(machine.owned_labels.items[0].ptr == retained.ptr);
+    try std.testing.expectEqualStrings("retained", machine.owned_labels.items[0]);
+    try std.testing.expectEqual(@as(usize, 1), selector.eflags_semantics.items.len);
+    try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items[0].instruction_index);
+    try std.testing.expect(selector.eflags_semantics.items[0].effect == .definition);
+}
+
+test "production ordinary switch preserves framed spill and PHI restoration diagnostics" {
+    const input =
+        \\define i32 @ordinary_switch_diagnostics() {
+        \\entry:
+        \\  switch i8 1, label %default [
+        \\    i8 1, label %one
+        \\  ]
+        \\one:
+        \\  ret i32 1
+        \\default:
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const function = module.functions.items[0];
+
+    {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("live", 10);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        selector.stack_frame_bytes = 24;
+        selector.next_spill_slot = 64;
+        try selector_state.bindValueLoc(&selector, "live", .{ .arg64 = .rdi });
+        const diagnostic = (try selector_cfg.lowerCfgTerminator(
+            &selector,
+            function,
+            0,
+            function.blocks.items[0].terminator.?,
+        )).?;
+        try std.testing.expect(diagnostic == .no_spill_envelope);
+        try std.testing.expectEqualStrings("stage2-cfg-boundary-spill", diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(ValueLoc{ .arg64 = .rdi }, selector.values.get("live").?.loc);
+    }
+
+    {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("missing", 10);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        try selector.phi_destinations.put("missing", .{ .scratch64 = .rcx });
+        const diagnostic = (try selector_cfg.lowerCfgTerminator(
+            &selector,
+            function,
+            0,
+            function.blocks.items[0].terminator.?,
+        )).?;
+        try std.testing.expect(diagnostic == .unsupported_value);
+        try std.testing.expectEqualStrings("stage2-phi-dst", diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+    }
+}
+
 test "generic cfg selector restores only live displaced phi destinations" {
     var machine = MachineFunction.init("live-phi-restore", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
