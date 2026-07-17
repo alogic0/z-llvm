@@ -7,6 +7,8 @@ const stage2_planning = @import("stage2_planning.zig");
 const impl = @import("composed_selector_impl.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_icmp = @import("composed_selector_icmp.zig");
+const ValueUseTransaction =
+    @import("composed_selector_value_use_transaction.zig").ValueUseTransaction;
 
 const MachineFunction = impl.MachineFunction;
 const ComposedBlockSelector = impl.ComposedBlockSelector;
@@ -127,12 +129,15 @@ test "I13 current-home eq-zero production path preserves dispatch precedence and
             .hi = .slot1,
         } });
 
-        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
+        const icmp: ir.IcmpInst = .{
             .predicate = .eq,
             .operand_ty = .{ .int = 128 },
             .lhs = .{ .named = "lhs" },
             .rhs = .{ .int = 0 },
-        })).?;
+        };
+        try std.testing.expect(!ValueUseTransaction.isI128EqMinIcmp(icmp));
+        try std.testing.expect(!ValueUseTransaction.isI128SignBitIcmp(icmp));
+        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", icmp)).?;
         try std.testing.expectEqualStrings("composed-block-icmp-lhs-loc", diagnostic.detail());
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
     }

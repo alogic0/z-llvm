@@ -950,9 +950,12 @@ fn validateI128PairSequence(source: [:0]const u8) !void {
         return error.ValueUseI128PairSequenceMismatch;
     const home_body = functionBodyNamed(bodies, "validateI128PairHome") orelse
         return error.ValueUseI128PairSequenceMismatch;
+    const destinations_body = functionBodyNamed(bodies, "requestDestinationNodes") orelse
+        return error.ValueUseI128PairSequenceMismatch;
     const eq = source[eq_body.start..eq_body.end];
     const sign = source[sign_body.start..sign_body.end];
     const home = source[home_body.start..home_body.end];
+    const destinations = source[destinations_body.start..destinations_body.end];
 
     const eq_order = [_][]const u8{
         "try preserveScratchCompareLiveAccumulator(transaction);",
@@ -1037,7 +1040,8 @@ fn validateI128PairSequence(source: [:0]const u8) !void {
         countPattern(home, ".arg128") != 1 or
         countPattern(home, ".scratch128") != 1 or
         countPattern(home, ".stack128_value") != 1 or
-        countPattern(home, ".spill128") != 0)
+        countPattern(home, ".spill128") != 1 or
+        countPattern(destinations, ".stack128_value, .spill128 => null") != 1)
     {
         return error.ValueUseI128PairSequenceMismatch;
     }
@@ -4052,7 +4056,7 @@ test "composed selector source guard keeps current-home sign-bit production wiri
     );
 }
 
-test "composed selector source guard keeps dormant i128 pair wrappers semantic and fenced" {
+test "composed selector source guard keeps dormant i128 pair wrappers semantic and structurally admitted" {
     try validateI128PairIntentSurface(
         "pub const I128EqMinAction = struct { result: ActionIdentity, }; " ++
             "pub const I128SignBitAction = struct { result: ActionIdentity, };",

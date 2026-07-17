@@ -3760,7 +3760,7 @@ fn validateI128PairHome(
         return error.ValueUseI128PairWidthUnsupported;
     }
     switch (current) {
-        .arg128, .scratch128, .stack128_value => {},
+        .arg128, .scratch128, .stack128_value, .spill128 => {},
         else => return error.ValueUseI128PairLocationUnsupported,
     }
 }
@@ -5659,7 +5659,8 @@ fn validateSourceView(loc: ValueLoc, form: ValueUseTransaction.UseForm) !void {
         // canonical i32/i64 home only after re-resolution.
         .current_home_sign_bit_operand => {},
         // Strict pair-home admission follows the established preamble and
-        // canonical refresh inside the two closed wrapper actions.
+        // canonical refresh inside the two closed wrapper actions. Their
+        // exact semantic classifiers fence the admitted spill128 view.
         .i128_icmp_pair_operand => {},
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -5892,7 +5893,7 @@ fn requestDestinationNodes(
                 const source_pair: ?RegPair = switch (current orelse
                     return error.ValueUseUnresolvedSource) {
                     .arg128, .scratch128 => |pair| pair,
-                    .stack128_value => null,
+                    .stack128_value, .spill128 => null,
                     else => return error.ValueUseI128PairLocationUnsupported,
                 };
                 const pair = if (source_pair) |source|

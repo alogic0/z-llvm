@@ -7268,6 +7268,22 @@ test "value-use dormant i128 equality action preserves pair chooser sequence and
         },
         &.{ .write, .write, .definition, .use },
     );
+    try executeI128PairActionCase(
+        .eq_min,
+        .{ .spill128 = .{ .lo = .slot0, .hi = .slot1 } },
+        &.{
+            .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot0 } },
+            .{ .reload_arg64_rsp = .{ .reg = .rdx, .frame_index = .slot1 } },
+            .{ .mov_arg_rax = .rdx },
+            .{ .mov_imm_r8 = std.math.minInt(i64) },
+            .{ .binary_arg_rax = .{ .op = .xor, .reg = .r8 } },
+            .{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } },
+            .{ .mov_rax_to_arg = .r8 },
+            .{ .cmp_arg64_imm64 = .{ .reg = .r8, .imm = 0 } },
+            .sete_eax,
+        },
+        &.{ .write, .write, .definition, .use },
+    );
 }
 
 test "value-use dormant i128 sign-bit action wraps high-limb helper and logical SHR" {
@@ -7289,19 +7305,79 @@ test "value-use dormant i128 sign-bit action wraps high-limb helper and logical 
         &.{ .{ .load_stack_disp8_rax = 40 }, .{ .shr_rax_imm6 = 63 } },
         &.{.write},
     );
+    try executeI128PairActionCase(
+        .sign_bit,
+        .{ .spill128 = .{ .lo = .slot0, .hi = .slot1 } },
+        &.{
+            .{ .reload_rsp_rax = .slot1 },
+            .{ .shr_rax_imm6 = 63 },
+        },
+        &.{.write},
+    );
 }
 
-test "value-use i128 pair wrappers reject fenced homes and malformed semantic requests without mutation" {
+test "value-use i128 spill pair actions reproduce __muloti4 __negvti2 and framed negation streams" {
+    const eq_min_stream = [_]machine_module.Instruction{
+        .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot0 } },
+        .{ .reload_arg64_rsp = .{ .reg = .rdx, .frame_index = .slot1 } },
+        .{ .mov_arg_rax = .rdx },
+        .{ .mov_imm_r8 = std.math.minInt(i64) },
+        .{ .binary_arg_rax = .{ .op = .xor, .reg = .r8 } },
+        .{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } },
+        .{ .mov_rax_to_arg = .r8 },
+        .{ .cmp_arg64_imm64 = .{ .reg = .r8, .imm = 0 } },
+        .sete_eax,
+    };
+
+    // __muloti4 sign-bit comparison over the first spill-backed operand.
+    try executeI128PairActionCase(
+        .sign_bit,
+        .{ .spill128 = .{ .lo = .slot0, .hi = .slot1 } },
+        &.{
+            .{ .reload_rsp_rax = .slot1 },
+            .{ .shr_rax_imm6 = 63 },
+        },
+        &.{.write},
+    );
+    // __muloti4 eq-min comparison over the second spill-backed operand.
+    try executeI128PairActionCase(
+        .eq_min,
+        .{ .spill128 = .{ .lo = .slot2, .hi = .slot3 } },
+        &.{
+            .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot2 } },
+            .{ .reload_arg64_rsp = .{ .reg = .rdx, .frame_index = .slot3 } },
+            .{ .mov_arg_rax = .rdx },
+            .{ .mov_imm_r8 = std.math.minInt(i64) },
+            .{ .binary_arg_rax = .{ .op = .xor, .reg = .r8 } },
+            .{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } },
+            .{ .mov_rax_to_arg = .r8 },
+            .{ .cmp_arg64_imm64 = .{ .reg = .r8, .imm = 0 } },
+            .sete_eax,
+        },
+        &.{ .write, .write, .definition, .use },
+    );
+    // __negvti2 and the framed i128-negation test share this exact eq-min
+    // spill materialization and comparison stream.
+    try executeI128PairActionCase(
+        .eq_min,
+        .{ .spill128 = .{ .lo = .slot0, .hi = .slot1 } },
+        &eq_min_stream,
+        &.{ .write, .write, .definition, .use },
+    );
+    try executeI128PairActionCase(
+        .eq_min,
+        .{ .spill128 = .{ .lo = .slot0, .hi = .slot1 } },
+        &eq_min_stream,
+        &.{ .write, .write, .definition, .use },
+    );
+}
+
+test "value-use i128 pair wrappers reject unsupported homes and malformed semantic requests without mutation" {
     inline for ([_]struct {
         loc: ValueLoc,
         expected_error: anyerror,
         diagnostic: []const u8,
     }{
-        .{
-            .loc = .{ .spill128 = .{ .lo = .slot0, .hi = .slot1 } },
-            .expected_error = error.ValueUseI128PairLocationUnsupported,
-            .diagnostic = "composed-block-icmp-lhs-loc",
-        },
         .{
             .loc = .{ .arg64 = .rdi },
             .expected_error = error.ValueUseI128PairWidthUnsupported,
@@ -7550,6 +7626,66 @@ test "value-use i128 pair result remains durable after transaction teardown" {
     }, machine.instructions.items);
 }
 
+test "value-use i128 eq-min rolls back after the first spill reload" {
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    const allocator = failing.allocator();
+    var machine = MachineFunction.init("value-use-i128-pair-partial-spill", .{ .int = 1 });
+    defer machine.deinit(allocator);
+    var plan = SelectorAllocationPlan.init(allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "source");
+    try addAtCurrent(&plan, "result");
+    var selector = ComposedBlockSelector.init(allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "source", .{ .spill128 = .{
+        .lo = .slot0,
+        .hi = .slot1,
+    } });
+    const saved_source = selector.values.get("source").?;
+    const saved_accumulator_domain = selector.accumulator_domain;
+    const saved_eflags = selector.eflags.snapshot();
+    const saved_semantics = selector.eflags_semantics.items.len;
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const source = try registerI128PairAction(
+        &transaction,
+        .{ .named = "source" },
+        "result",
+        .eq_min,
+    );
+    try transaction.seal();
+    _ = try transaction.beginAccumulatorSession();
+    try transaction.prepare();
+    try transaction.materializeAll();
+
+    // The first reload fits. Growing for the second reload fails, so the
+    // transaction must roll the already-appended low-limb reload back.
+    try machine.instructions.ensureTotalCapacityPrecise(allocator, 1);
+    failing.fail_index = failing.alloc_index;
+    try std.testing.expectError(
+        error.OutOfMemory,
+        transaction.executePreparedAction(try transaction.preparedView(source)),
+    );
+
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.capacity);
+    try std.testing.expectEqual(
+        machine_module.Instruction{ .reload_arg64_rsp = .{
+            .reg = .rcx,
+            .frame_index = .slot0,
+        } },
+        machine.instructions.items.ptr[0],
+    );
+    try std.testing.expectEqual(saved_source, selector.values.get("source").?);
+    try std.testing.expect(selector.values.get("result") == null);
+    try std.testing.expect(std.meta.eql(saved_accumulator_domain, selector.accumulator_domain));
+    try selector.eflags.validateSnapshot(saved_eflags);
+    try std.testing.expectEqual(saved_semantics, selector.eflags_semantics.items.len);
+}
+
 const I128PairRollbackBoundary = union(enum) {
     eq_min: Transaction.I128EqMinTestFailure,
     sign_bit: Transaction.I128SignBitTestFailure,
@@ -7568,7 +7704,10 @@ fn expectI128PairRollbackExact(boundary: I128PairRollbackBoundary) !void {
     selector.allocation_plan = &plan;
     selector.stack_frame_bytes = 128;
     selector.next_spill_slot = 1;
-    try selector_state.bindValueLoc(&selector, "source", .{ .stack128_value = 32 });
+    try selector_state.bindValueLoc(&selector, "source", .{ .spill128 = .{
+        .lo = .slot0,
+        .hi = .slot1,
+    } });
     try selector_state.bindValueLoc(&selector, "live-accumulator", .eax);
     const saved_source = selector.values.get("source").?;
     const saved_accumulator = selector.values.get("live-accumulator").?;
