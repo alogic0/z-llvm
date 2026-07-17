@@ -397,11 +397,13 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     try validateCurrentHomeEqZeroIntentSurface(source);
     try validateSetccEaxCompareIntentSurface(source);
     try validateCurrentHomeSignBitIntentSurface(source);
+    try validateI128PairIntentSurface(source);
     try validateDurableActionIdentityOwnership(source);
     try validateScratchComparePreservationPreamble(source);
     try validateCurrentHomeEqZeroSequence(source);
     try validateSetccEaxCompareSequence(source);
     try validateCurrentHomeSignBitSequence(source);
+    try validateI128PairSequence(source);
 }
 
 fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const u8) !void {
@@ -429,6 +431,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     try validateCurrentHomeEqZeroProductionSites(source_name, source);
     try validateSetccEaxCompareProductionSites(source_name, source);
     try validateCurrentHomeSignBitProductionSites(source_name, source);
+    try validateI128PairProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -607,6 +610,45 @@ fn validateCurrentHomeSignBitIntentSurface(source: []const u8) !void {
         countPattern(body, "operand_ty: ir.Type") != 1)
     {
         return error.ValueUseCurrentHomeSignBitIntentMismatch;
+    }
+}
+
+fn validateI128PairIntentSurface(source: []const u8) !void {
+    const declarations = [_][]const u8{
+        "pub const I128EqMinAction = struct {",
+        "pub const I128SignBitAction = struct {",
+    };
+    for (declarations) |declaration| {
+        const start = std.mem.indexOf(u8, source, declaration) orelse continue;
+        const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+            return error.InvalidZigSource;
+        const body = source[start .. end + 2];
+        const forbidden = [_][]const u8{
+            "ArgReg",
+            "RegPair",
+            "ValueLoc",
+            "Destination",
+            "FrameIndex",
+            "PreparedView",
+            "predicate",
+            "rhs",
+            "constant",
+            "register",
+            "home",
+            "binding",
+            "pair",
+            "scratch",
+            "spill",
+            "preserve",
+            "sequence",
+            "phase",
+        };
+        for (forbidden) |pattern| {
+            if (std.mem.indexOf(u8, body, pattern) != null)
+                return error.ValueUseI128PairPhysicalIntentEscape;
+        }
+        if (countPattern(body, "result: ActionIdentity") != 1)
+            return error.ValueUseI128PairIntentMismatch;
     }
 }
 
@@ -900,6 +942,130 @@ fn validateCurrentHomeSignBitSequence(source: [:0]const u8) !void {
     }
 }
 
+fn validateI128PairSequence(source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const eq_body = functionBodyNamed(bodies, "executeI128EqMin") orelse return;
+    const sign_body = functionBodyNamed(bodies, "executeI128SignBit") orelse
+        return error.ValueUseI128PairSequenceMismatch;
+    const home_body = functionBodyNamed(bodies, "validateI128PairHome") orelse
+        return error.ValueUseI128PairSequenceMismatch;
+    const eq = source[eq_body.start..eq_body.end];
+    const sign = source[sign_body.start..sign_body.end];
+    const home = source[home_body.start..home_body.end];
+
+    const eq_order = [_][]const u8{
+        "try preserveScratchCompareLiveAccumulator(transaction);",
+        "failI128EqMinForTest(transaction, .after_preamble)",
+        "refreshAndValidateI128PairSource(transaction, source_index)",
+        "failI128EqMinForTest(transaction, .after_canonical_refresh)",
+        "selector_state.resolvePairValue(",
+        "failI128EqMinForTest(transaction, .after_pair_selection)",
+        "selector_state.materializePairValue(",
+        "failI128EqMinForTest(transaction, .after_pair_materialization)",
+        "if (try session.prepare(.preserve, .spill_live))",
+        "failI128EqMinForTest(transaction, .after_accumulator_preparation)",
+        "try selector_state.clobberArgReg(transaction.selector, temp);",
+        "failI128EqMinForTest(transaction, .after_temp_clobber)",
+        ".mov_arg_rax = pair.hi",
+        "failI128EqMinForTest(transaction, .after_high_to_rax)",
+        "std.math.minInt(i64)",
+        "failI128EqMinForTest(transaction, .after_min_int)",
+        ".op = .xor",
+        ".write",
+        "failI128EqMinForTest(transaction, .after_xor)",
+        ".op = .@\"or\"",
+        ".write",
+        "failI128EqMinForTest(transaction, .after_or)",
+        ".mov_rax_to_arg = temp",
+        "failI128EqMinForTest(transaction, .after_temp_copy)",
+        ".cmp_arg64_imm64",
+        ".definition",
+        "failI128EqMinForTest(transaction, .after_cmp)",
+        ".sete_eax",
+        ".use",
+        "failI128EqMinForTest(transaction, .after_sete)",
+        "const result_name = try ownActionIdentity(transaction, &stored_action.result);",
+        "failI128EqMinForTest(transaction, .after_result_identity_ownership)",
+        "try session.define(result_name, .zeroExtending(1));",
+        "failI128EqMinForTest(transaction, .after_result_definition)",
+        "try session.finalize();",
+        "failI128EqMinForTest(transaction, .after_finalization)",
+    };
+    var cursor: usize = 0;
+    for (eq_order) |pattern| {
+        const found = std.mem.indexOfPos(u8, eq, cursor, pattern) orelse
+            return error.ValueUseI128PairSequenceMismatch;
+        cursor = found + pattern.len;
+    }
+
+    const sign_order = [_][]const u8{
+        "try preserveScratchCompareLiveAccumulator(transaction);",
+        "failI128SignBitForTest(transaction, .after_preamble)",
+        "refreshAndValidateI128PairSource(transaction, source_index)",
+        "failI128SignBitForTest(transaction, .after_canonical_refresh)",
+        "selector_state.emitPairHighLaneIntoRax(",
+        "failI128SignBitForTest(transaction, .after_high_limb_load)",
+        "if (try session.prepare(.preserve, .spill_live))",
+        "failI128SignBitForTest(transaction, .after_accumulator_preparation)",
+        ".shr_rax_imm6 = 63",
+        ".write",
+        "failI128SignBitForTest(transaction, .after_shift)",
+        "const result_name = try ownActionIdentity(transaction, &stored_action.result);",
+        "failI128SignBitForTest(transaction, .after_result_identity_ownership)",
+        "try session.define(result_name, .zeroExtending(1));",
+        "failI128SignBitForTest(transaction, .after_result_definition)",
+        "try session.finalize();",
+        "failI128SignBitForTest(transaction, .after_finalization)",
+    };
+    cursor = 0;
+    for (sign_order) |pattern| {
+        const found = std.mem.indexOfPos(u8, sign, cursor, pattern) orelse
+            return error.ValueUseI128PairSequenceMismatch;
+        cursor = found + pattern.len;
+    }
+    if (countPattern(eq, "resolvePairValue(") != 1 or
+        countPattern(eq, "materializePairValue(") != 1 or
+        countPattern(eq, "session.prepare(.preserve, .spill_live)") != 1 or
+        countPattern(eq, "ownActionIdentity(") != 1 or
+        countPattern(sign, "emitPairHighLaneIntoRax(") != 1 or
+        countPattern(sign, "session.prepare(.preserve, .spill_live)") != 1 or
+        countPattern(sign, "ownActionIdentity(") != 1 or
+        countPattern(sign, ".definition") != 0 or
+        countPattern(sign, ".use") != 0 or
+        countPattern(sign, "setcc") != 0 or
+        countPattern(home, ".arg128") != 1 or
+        countPattern(home, ".scratch128") != 1 or
+        countPattern(home, ".stack128_value") != 1 or
+        countPattern(home, ".spill128") != 0)
+    {
+        return error.ValueUseI128PairSequenceMismatch;
+    }
+
+    const classifier_names = [_][]const u8{ "isI128EqMinIcmp", "isI128SignBitIcmp" };
+    for (classifier_names) |name| {
+        const classifier_body = functionBodyNamed(bodies, name) orelse
+            return error.ValueUseI128PairClassifierMissing;
+        const classifier = source[classifier_body.start..classifier_body.end];
+        const forbidden = [_][]const u8{
+            "selector",
+            "resolveValue(",
+            "valueLoc(",
+            "ValueLoc",
+            "function",
+            "family",
+            ".arg128",
+            ".scratch128",
+            ".stack128_value",
+            ".spill128",
+        };
+        for (forbidden) |pattern| {
+            if (std.mem.indexOf(u8, classifier, pattern) != null)
+                return error.ValueUseI128PairClassifierStatePredicate;
+        }
+    }
+}
+
 fn validateDurableActionIdentityOwnership(source: [:0]const u8) !void {
     if (std.mem.indexOf(u8, source, ".result.slice()") != null)
         return error.ValueUseDurableActionIdentityNotOwned;
@@ -962,6 +1128,18 @@ fn validateDurableActionIdentityOwnership(source: [:0]const u8) !void {
             return error.ValueUseDurableActionIdentityOwnershipMissing;
         if (sign_bit_own >= sign_bit_define)
             return error.ValueUseDurableActionIdentityOwnershipOrder;
+    }
+    const i128_functions = [_][]const u8{ "executeI128EqMin", "executeI128SignBit" };
+    for (i128_functions) |name| {
+        if (functionBodyNamed(bodies, name)) |pair_body| {
+            const pair_source = source[pair_body.start..pair_body.end];
+            const pair_own = std.mem.indexOf(u8, pair_source, own_pattern) orelse
+                return error.ValueUseDurableActionIdentityOwnershipMissing;
+            const pair_define = std.mem.indexOf(u8, pair_source, define_pattern) orelse
+                return error.ValueUseDurableActionIdentityOwnershipMissing;
+            if (pair_own >= pair_define)
+                return error.ValueUseDurableActionIdentityOwnershipOrder;
+        }
     }
 }
 
@@ -1480,6 +1658,21 @@ fn validateCurrentHomeSignBitProductionSites(
         {
             return error.ValueUseCurrentHomeSignBitProductionAllowlistMismatch;
         }
+    }
+}
+
+fn validateI128PairProductionSites(source_name: []const u8, source: [:0]const u8) !void {
+    _ = source_name;
+    const dormant_markers = [_][]const u8{
+        ".form = .i128_icmp_pair_operand",
+        ".prepared_action = .{ .i128_eq_min",
+        ".prepared_action = .{ .i128_sign_bit",
+        "ValueUseI128PairWidthUnsupported",
+        "ValueUseI128PairLocationUnsupported",
+    };
+    for (dormant_markers) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseI128PairProductionWiringForbidden;
     }
 }
 
@@ -3855,6 +4048,26 @@ test "composed selector source guard keeps current-home sign-bit production wiri
         validateCurrentHomeSignBitProductionSites(
             "composed_selector_icmp.zig",
             home_check,
+        ),
+    );
+}
+
+test "composed selector source guard keeps dormant i128 pair wrappers semantic and fenced" {
+    try validateI128PairIntentSurface(
+        "pub const I128EqMinAction = struct { result: ActionIdentity, }; " ++
+            "pub const I128SignBitAction = struct { result: ActionIdentity, };",
+    );
+    try std.testing.expectError(
+        error.ValueUseI128PairPhysicalIntentEscape,
+        validateI128PairIntentSurface(
+            "pub const I128EqMinAction = struct { result: ActionIdentity, pair: RegPair, };",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseI128PairProductionWiringForbidden,
+        validateI128PairProductionSites(
+            "composed_selector_icmp.zig",
+            "fn lowerIcmp() void { _ = .{ .form = .i128_icmp_pair_operand }; }",
         ),
     );
 }

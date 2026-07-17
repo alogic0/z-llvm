@@ -67,6 +67,8 @@ pub const ValueUseTransaction = struct {
     current_home_eq_zero_test_failure: if (builtin.is_test) ?CurrentHomeEqZeroTestFailure else void = if (builtin.is_test) null else {},
     setcc_eax_compare_test_failure: if (builtin.is_test) ?SetccEaxCompareTestFailure else void = if (builtin.is_test) null else {},
     current_home_sign_bit_test_failure: if (builtin.is_test) ?CurrentHomeSignBitTestFailure else void = if (builtin.is_test) null else {},
+    i128_eq_min_test_failure: if (builtin.is_test) ?I128EqMinTestFailure else void = if (builtin.is_test) null else {},
+    i128_sign_bit_test_failure: if (builtin.is_test) ?I128SignBitTestFailure else void = if (builtin.is_test) null else {},
 
     pub const Expected = struct {
         ty: ir.Type,
@@ -121,6 +123,10 @@ pub const ValueUseTransaction = struct {
         /// the accumulator width, current-home preservation, and logical
         /// shift internally without exposing a physical source view.
         current_home_sign_bit_operand,
+        /// Action-only read-only i128 source. The closed pair-wrapper actions
+        /// admit only existing arg128, scratch128, and stack128-value homes;
+        /// notably, this is not the broader generic pair/spill capability.
+        i128_icmp_pair_operand,
         stack_argument,
         new_pair_ownership,
     };
@@ -471,6 +477,90 @@ pub const ValueUseTransaction = struct {
         after_finalization,
     };
 
+    /// Closed result identity for the exact `eq i128 lhs, minInt(i128)`
+    /// wrapper. Predicate, constant, pair choice, and physical homes remain
+    /// internal to the action and its future pure semantic dispatcher.
+    pub const I128EqMinAction = struct {
+        result: ActionIdentity,
+    };
+
+    /// Closed result identity for the exact `slt i128 lhs, 0` high-limb
+    /// wrapper. The action owns the logical SHR and exposes no pair state.
+    pub const I128SignBitAction = struct {
+        result: ActionIdentity,
+    };
+
+    pub const I128PairRequestError = error{
+        ValueUseI128PairWidthUnsupported,
+        ValueUseI128PairLocationUnsupported,
+    };
+
+    pub const I128EqMinTestFailure = enum {
+        after_preamble,
+        after_canonical_refresh,
+        after_pair_selection,
+        after_pair_materialization,
+        after_accumulator_preparation,
+        after_temp_clobber,
+        after_high_to_rax,
+        after_min_int,
+        after_xor,
+        after_or,
+        after_temp_copy,
+        after_cmp,
+        after_sete,
+        after_result_identity_ownership,
+        after_result_definition,
+        after_finalization,
+    };
+
+    pub const I128SignBitTestFailure = enum {
+        after_preamble,
+        after_canonical_refresh,
+        after_high_limb_load,
+        after_accumulator_preparation,
+        after_shift,
+        after_result_identity_ownership,
+        after_result_definition,
+        after_finalization,
+    };
+
+    /// Pure future-dispatch classifier for the exact pair equality form.
+    pub fn isI128EqMinIcmp(icmp: ir.IcmpInst) bool {
+        if (icmp.predicate != .eq) return false;
+        if (!icmp.operand_ty.eql(.{ .int = 128 }) or icmp.lhs != .named) return false;
+        return switch (icmp.rhs) {
+            .int => |value| value == std.math.minInt(i128),
+            .named,
+            .fp,
+            .undef,
+            .poison,
+            .null_value,
+            .zero_initializer,
+            .vector,
+            .constant_expr,
+            => false,
+        };
+    }
+
+    /// Pure future-dispatch classifier for the exact pair sign-bit form.
+    pub fn isI128SignBitIcmp(icmp: ir.IcmpInst) bool {
+        if (icmp.predicate != .slt) return false;
+        if (!icmp.operand_ty.eql(.{ .int = 128 }) or icmp.lhs != .named) return false;
+        return switch (icmp.rhs) {
+            .int => |value| value == 0,
+            .named,
+            .fp,
+            .undef,
+            .poison,
+            .null_value,
+            .zero_initializer,
+            .vector,
+            .constant_expr,
+            => false,
+        };
+    }
+
     pub const max_switch_cases = 8;
 
     pub const SwitchCaseIntent = struct {
@@ -559,6 +649,8 @@ pub const ValueUseTransaction = struct {
         current_home_eq_zero: CurrentHomeEqZeroAction,
         setcc_eax_compare: SetccEaxCompareAction,
         current_home_sign_bit: CurrentHomeSignBitAction,
+        i128_eq_min: I128EqMinAction,
+        i128_sign_bit: I128SignBitAction,
 
         fn eql(action: PreparedAction, other: PreparedAction) bool {
             return std.meta.eql(action, other);
@@ -680,6 +772,7 @@ pub const ValueUseTransaction = struct {
         current_home_eq_zero: struct { bits: u16 },
         setcc_eax_compare: struct { bits: u16 },
         current_home_sign_bit: struct { bits: u16 },
+        i128_icmp_pair: void,
     };
 
     const PreparedRecord = struct {
@@ -1437,6 +1530,24 @@ pub const ValueUseTransaction = struct {
         transaction.current_home_sign_bit_test_failure = failure;
     }
 
+    /// White-box i128 equality-wrapper rollback control.
+    pub fn setI128EqMinTestFailure(
+        transaction: *ValueUseTransaction,
+        failure: ?I128EqMinTestFailure,
+    ) !void {
+        if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
+        transaction.i128_eq_min_test_failure = failure;
+    }
+
+    /// White-box i128 sign-bit-wrapper rollback control.
+    pub fn setI128SignBitTestFailure(
+        transaction: *ValueUseTransaction,
+        failure: ?I128SignBitTestFailure,
+    ) !void {
+        if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
+        transaction.i128_sign_bit_test_failure = failure;
+    }
+
     fn requireActive(transaction: *const ValueUseTransaction) !void {
         if (transaction.lifecycle != .active) return error.ValueUseTransactionClosed;
     }
@@ -1518,6 +1629,10 @@ pub const ValueUseTransaction = struct {
             error.ValueUseSetccEaxCompareTestFailure,
             error.ValueUseCurrentHomeSignBitTestFailure,
             error.ValueUseCurrentHomeSignBitAccumulatorSessionRequired,
+            error.ValueUseI128EqMinTestFailure,
+            error.ValueUseI128EqMinAccumulatorSessionRequired,
+            error.ValueUseI128SignBitTestFailure,
+            error.ValueUseI128SignBitAccumulatorSessionRequired,
             error.ValueUseSetccEaxCompareFormUnsupported,
             error.ValueUseSetccEaxCompareImmediateOutOfRange,
             error.ValueUseSetccEaxCompareExactEiWidthUnsupported,
@@ -1622,6 +1737,8 @@ pub const ValueUseTransaction = struct {
             .current_home_eq_zero => |*compare| try compare.result.validate(),
             .setcc_eax_compare => |*compare| try compare.result.validate(),
             .current_home_sign_bit => |*compare| try compare.result.validate(),
+            .i128_eq_min => |*compare| try compare.result.validate(),
+            .i128_sign_bit => |*compare| try compare.result.validate(),
         }
     }
 
@@ -1689,6 +1806,8 @@ pub const ValueUseTransaction = struct {
             .current_home_eq_zero => {},
             .setcc_eax_compare => {},
             .current_home_sign_bit => {},
+            .i128_eq_min => {},
+            .i128_sign_bit => {},
             .validate_shape,
             .emit_copy_to,
             .form_readonly_table_address,
@@ -1849,6 +1968,8 @@ pub const ValueUseTransaction = struct {
             .current_home_eq_zero => null,
             .setcc_eax_compare => null,
             .current_home_sign_bit => null,
+            .i128_eq_min => null,
+            .i128_sign_bit => null,
             .load_scalar,
             .load_readonly_pair,
             .load_stack_i128_alias,
@@ -1889,6 +2010,8 @@ pub const ValueUseTransaction = struct {
             .current_home_eq_zero,
             .setcc_eax_compare,
             .current_home_sign_bit,
+            .i128_eq_min,
+            .i128_sign_bit,
             => null,
         };
     }
@@ -2237,6 +2360,7 @@ pub const ValueUseTransaction = struct {
             .current_home_eq_zero_operand,
             .setcc_eax_compare_operand,
             .current_home_sign_bit_operand,
+            .i128_icmp_pair_operand,
             => return error.ValueUsePreparedActionRequired,
             .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, destination),
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -2331,6 +2455,7 @@ fn preparedViewFromLoc(
         .current_home_sign_bit_operand => .{ .current_home_sign_bit = .{
             .bits = request.expected.ty.int,
         } },
+        .i128_icmp_pair_operand => .{ .i128_icmp_pair = {} },
         .stack_argument => error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
     };
@@ -2661,6 +2786,7 @@ fn executePreparedActionInternal(
                 .current_home_eq_zero_operand,
                 .setcc_eax_compare_operand,
                 .current_home_sign_bit_operand,
+                .i128_icmp_pair_operand,
                 => return error.ValueUsePreparedActionFormMismatch,
                 .stack_argument => return error.ValueUseStackArgumentUnsupported,
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2694,6 +2820,18 @@ fn executePreparedActionInternal(
             &compare,
         ),
         .current_home_sign_bit => |compare| try executeCurrentHomeSignBit(
+            transaction,
+            request_index,
+            view,
+            &compare,
+        ),
+        .i128_eq_min => |compare| try executeI128EqMin(
+            transaction,
+            request_index,
+            view,
+            &compare,
+        ),
+        .i128_sign_bit => |compare| try executeI128SignBit(
             transaction,
             request_index,
             view,
@@ -3435,6 +3573,212 @@ fn failCurrentHomeSignBitForTest(
 ) !void {
     if (builtin.is_test and transaction.current_home_sign_bit_test_failure == boundary)
         return error.ValueUseCurrentHomeSignBitTestFailure;
+}
+
+fn executeI128EqMin(
+    transaction: *ValueUseTransaction,
+    source_index: u8,
+    initial_source_view: *const ValueUseTransaction.PreparedView,
+    action: *const ValueUseTransaction.I128EqMinAction,
+) !void {
+    _ = initial_source_view;
+    _ = action;
+    const session = if (transaction.accumulator_session) |*session|
+        session
+    else
+        return error.ValueUseI128EqMinAccumulatorSessionRequired;
+
+    try preserveScratchCompareLiveAccumulator(transaction);
+    try failI128EqMinForTest(transaction, .after_preamble);
+    const source_name = try refreshAndValidateI128PairSource(transaction, source_index);
+    try failI128EqMinForTest(transaction, .after_canonical_refresh);
+
+    const existing = selector_state.resolvePairValue(
+        transaction.selector,
+        .{ .named = source_name },
+    );
+    const pair = if (existing) |source|
+        if (source.contains(selector_types.pair_a.lo) or
+            source.contains(selector_types.pair_a.hi))
+            selector_types.pair_b
+        else
+            selector_types.pair_a
+    else
+        selector_types.pair_a;
+    try failI128EqMinForTest(transaction, .after_pair_selection);
+
+    _ = selector_state.materializePairValue(
+        transaction.selector,
+        .{ .named = source_name },
+        pair,
+    ) catch |err| {
+        transaction.noteRequestBoundaryError(source_index, err);
+        return err;
+    };
+    try failI128EqMinForTest(transaction, .after_pair_materialization);
+
+    if (try session.prepare(.preserve, .spill_live)) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+    try failI128EqMinForTest(transaction, .after_accumulator_preparation);
+
+    const temp: ArgReg = if (pair.contains(.r8)) .rcx else .r8;
+    try selector_state.clobberArgReg(transaction.selector, temp);
+    try failI128EqMinForTest(transaction, .after_temp_clobber);
+    try transaction.selector.machine.instructions.append(
+        transaction.selector.allocator,
+        .{ .mov_arg_rax = pair.hi },
+    );
+    try failI128EqMinForTest(transaction, .after_high_to_rax);
+    try transaction.selector.machine.instructions.append(
+        transaction.selector.allocator,
+        switch (temp) {
+            .rcx => .{ .mov_imm_rcx = std.math.minInt(i64) },
+            .r8 => .{ .mov_imm_r8 = std.math.minInt(i64) },
+            else => unreachable,
+        },
+    );
+    try failI128EqMinForTest(transaction, .after_min_int);
+    try selector_state.emitEflagsInstruction(
+        transaction.selector,
+        .{ .binary_arg_rax = .{ .op = .xor, .reg = temp } },
+        .write,
+    );
+    try failI128EqMinForTest(transaction, .after_xor);
+    try selector_state.emitEflagsInstruction(
+        transaction.selector,
+        .{ .binary_arg_rax = .{ .op = .@"or", .reg = pair.lo } },
+        .write,
+    );
+    try failI128EqMinForTest(transaction, .after_or);
+    try transaction.selector.machine.instructions.append(
+        transaction.selector.allocator,
+        .{ .mov_rax_to_arg = temp },
+    );
+    try failI128EqMinForTest(transaction, .after_temp_copy);
+    try selector_state.emitEflagsInstruction(
+        transaction.selector,
+        .{ .cmp_arg64_imm64 = .{ .reg = temp, .imm = 0 } },
+        .definition,
+    );
+    try failI128EqMinForTest(transaction, .after_cmp);
+    try selector_state.emitEflagsInstruction(transaction.selector, .sete_eax, .use);
+    try failI128EqMinForTest(transaction, .after_sete);
+
+    const stored_action = &transaction.requests[source_index].prepared_action.?.i128_eq_min;
+    const result_name = try ownActionIdentity(transaction, &stored_action.result);
+    try failI128EqMinForTest(transaction, .after_result_identity_ownership);
+    try session.define(result_name, .zeroExtending(1));
+    try failI128EqMinForTest(transaction, .after_result_definition);
+    try session.finalize();
+    try failI128EqMinForTest(transaction, .after_finalization);
+}
+
+fn executeI128SignBit(
+    transaction: *ValueUseTransaction,
+    source_index: u8,
+    initial_source_view: *const ValueUseTransaction.PreparedView,
+    action: *const ValueUseTransaction.I128SignBitAction,
+) !void {
+    _ = initial_source_view;
+    _ = action;
+    const session = if (transaction.accumulator_session) |*session|
+        session
+    else
+        return error.ValueUseI128SignBitAccumulatorSessionRequired;
+
+    try preserveScratchCompareLiveAccumulator(transaction);
+    try failI128SignBitForTest(transaction, .after_preamble);
+    const source_name = try refreshAndValidateI128PairSource(transaction, source_index);
+    try failI128SignBitForTest(transaction, .after_canonical_refresh);
+
+    selector_state.emitPairHighLaneIntoRax(
+        transaction.selector,
+        .{ .named = source_name },
+    ) catch |err| {
+        transaction.noteRequestBoundaryError(source_index, err);
+        return err;
+    };
+    try failI128SignBitForTest(transaction, .after_high_limb_load);
+
+    if (try session.prepare(.preserve, .spill_live)) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+    try failI128SignBitForTest(transaction, .after_accumulator_preparation);
+    try selector_state.emitEflagsInstruction(
+        transaction.selector,
+        .{ .shr_rax_imm6 = 63 },
+        .write,
+    );
+    try failI128SignBitForTest(transaction, .after_shift);
+
+    const stored_action = &transaction.requests[source_index].prepared_action.?.i128_sign_bit;
+    const result_name = try ownActionIdentity(transaction, &stored_action.result);
+    try failI128SignBitForTest(transaction, .after_result_identity_ownership);
+    try session.define(result_name, .zeroExtending(1));
+    try failI128SignBitForTest(transaction, .after_result_definition);
+    try session.finalize();
+    try failI128SignBitForTest(transaction, .after_finalization);
+}
+
+fn refreshAndValidateI128PairSource(
+    transaction: *ValueUseTransaction,
+    source_index: u8,
+) ![]const u8 {
+    transaction.prepared_views[source_index] = try transaction.buildPreparedRecord(source_index);
+    transaction.prepared_view_valid[source_index] = true;
+    const request = &transaction.requests[source_index];
+    const source_name = switch (request.source) {
+        .named => |*identity| identity.slice(),
+        .int, .null_value, .unsupported => {
+            transaction.recordRequestFailure(source_index);
+            return error.ValueUseUnsupportedSource;
+        },
+    };
+    const binding = transaction.selector.values.get(source_name) orelse {
+        transaction.recordRequestFailure(source_index);
+        return error.ValueUseUnresolvedSource;
+    };
+    const current = transaction.prepared_views[source_index].canonical_source_loc;
+    validateI128PairHome(binding, request.expected, current) catch |err| {
+        transaction.noteRequestBoundaryError(source_index, err);
+        return err;
+    };
+    return source_name;
+}
+
+fn validateI128PairHome(
+    binding: ValueBinding,
+    expected: ValueUseTransaction.Expected,
+    current: ValueLoc,
+) ValueUseTransaction.I128PairRequestError!void {
+    if (!expected.ty.eql(.{ .int = 128 }) or expected.register_class != .gpr128 or
+        binding.vreg.class != .gpr128 or binding.vreg.bits < 128)
+    {
+        return error.ValueUseI128PairWidthUnsupported;
+    }
+    switch (current) {
+        .arg128, .scratch128, .stack128_value => {},
+        else => return error.ValueUseI128PairLocationUnsupported,
+    }
+}
+
+fn failI128EqMinForTest(
+    transaction: *ValueUseTransaction,
+    boundary: ValueUseTransaction.I128EqMinTestFailure,
+) !void {
+    if (builtin.is_test and transaction.i128_eq_min_test_failure == boundary)
+        return error.ValueUseI128EqMinTestFailure;
+}
+
+fn failI128SignBitForTest(
+    transaction: *ValueUseTransaction,
+    boundary: ValueUseTransaction.I128SignBitTestFailure,
+) !void {
+    if (builtin.is_test and transaction.i128_sign_bit_test_failure == boundary)
+        return error.ValueUseI128SignBitTestFailure;
 }
 
 const CurrentHomeEqZeroTest = union(enum) {
@@ -4658,6 +5002,7 @@ fn preparedViewLoc(view: *const ValueUseTransaction.PreparedView) !ValueLoc {
         .current_home_eq_zero,
         .setcc_eax_compare,
         .current_home_sign_bit,
+        .i128_icmp_pair,
         => error.ValueUsePreparedActionFormMismatch,
     };
 }
@@ -4688,6 +5033,7 @@ fn preparedViewEql(
         .current_home_eq_zero => |value| std.meta.eql(value, rhs.current_home_eq_zero),
         .setcc_eax_compare => |value| std.meta.eql(value, rhs.setcc_eax_compare),
         .current_home_sign_bit => |value| std.meta.eql(value, rhs.current_home_sign_bit),
+        .i128_icmp_pair => true,
     };
 }
 
@@ -4790,6 +5136,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .current_home_eq_zero_operand,
             .setcc_eax_compare_operand,
             .current_home_sign_bit_operand,
+            .i128_icmp_pair_operand,
             => error.ValueUsePreparedActionRequired,
             .stack_argument => error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
@@ -4814,6 +5161,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .current_home_eq_zero_operand,
             .setcc_eax_compare_operand,
             .current_home_sign_bit_operand,
+            .i128_icmp_pair_operand,
             => {},
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -4865,6 +5213,10 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .current_home_sign_bit => |compare| if (request.form != .current_home_sign_bit_operand or
                 !request.expected.ty.eql(compare.operand_ty))
                 error.ValueUsePreparedActionFormMismatch,
+            .i128_eq_min, .i128_sign_bit => if (request.form != .i128_icmp_pair_operand or
+                !request.expected.ty.eql(.{ .int = 128 }) or
+                request.expected.register_class != .gpr128)
+                error.ValueUsePreparedActionFormMismatch,
         };
     }
     if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
@@ -4882,6 +5234,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
         .current_home_eq_zero_operand,
         .setcc_eax_compare_operand,
         .current_home_sign_bit_operand,
+        .i128_icmp_pair_operand,
         => false,
         .pair_low_high, .pair_high_low => request.destination == .pair,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -4923,6 +5276,14 @@ fn validateBindingCompatibility(
         // Width and canonical-home admission occur after both action-owned
         // preservation phases. Seal validates only the stable semantic type.
         try validateExpectedType(request.expected, request.form);
+        return;
+    }
+    if (request.form == .i128_icmp_pair_operand) {
+        // The pair wrapper owns the strict post-preamble home fence. Seal
+        // checks only the stable semantic i128 request and its binding width.
+        try validateExpectedType(request.expected, request.form);
+        if (binding.vreg.class != .gpr128 or binding.vreg.bits < 128)
+            return error.ValueUseI128PairWidthUnsupported;
         return;
     }
     if (request.form == .load_address) {
@@ -5197,6 +5558,12 @@ fn validateExpectedType(expected: ValueUseTransaction.Expected, form: ValueUseTr
             },
             else => return error.ValueUseTypeMismatch,
         },
+        .i128_icmp_pair_operand => if (!expected.ty.eql(.{ .int = 128 }) or
+            expected.register_class != .gpr128 or
+            expected.pointer_address_space != null)
+        {
+            return error.ValueUseTypeMismatch;
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -5291,6 +5658,9 @@ fn validateSourceView(loc: ValueLoc, form: ValueUseTransaction.UseForm) !void {
         // The action owns both preservation phases and classifies the
         // canonical i32/i64 home only after re-resolution.
         .current_home_sign_bit_operand => {},
+        // Strict pair-home admission follows the established preamble and
+        // canonical refresh inside the two closed wrapper actions.
+        .i128_icmp_pair_operand => {},
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -5327,6 +5697,7 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: ValueUseTransaction.UseForm) 
         .current_home_eq_zero_operand,
         .setcc_eax_compare_operand,
         .current_home_sign_bit_operand,
+        .i128_icmp_pair_operand,
         .stack_argument,
         .new_pair_ownership,
         => false,
@@ -5351,6 +5722,7 @@ fn earlySequencingCandidate(loc: ValueLoc, form: ValueUseTransaction.UseForm) bo
         .current_home_eq_zero_operand => false,
         .setcc_eax_compare_operand => false,
         .current_home_sign_bit_operand => false,
+        .i128_icmp_pair_operand => false,
         else => false,
     };
 }
@@ -5516,6 +5888,27 @@ fn requestDestinationNodes(
             },
             .setcc_eax_compare => try result.append(.accumulator),
             .current_home_sign_bit => try result.append(.accumulator),
+            .i128_eq_min => {
+                const source_pair: ?RegPair = switch (current orelse
+                    return error.ValueUseUnresolvedSource) {
+                    .arg128, .scratch128 => |pair| pair,
+                    .stack128_value => null,
+                    else => return error.ValueUseI128PairLocationUnsupported,
+                };
+                const pair = if (source_pair) |source|
+                    if (source.contains(selector_types.pair_a.lo) or
+                        source.contains(selector_types.pair_a.hi))
+                        selector_types.pair_b
+                    else
+                        selector_types.pair_a
+                else
+                    selector_types.pair_a;
+                try result.append(nodeForArgReg(pair.lo));
+                try result.append(nodeForArgReg(pair.hi));
+                try result.append(nodeForArgReg(if (pair.contains(.r8)) .rcx else .r8));
+                try result.append(.accumulator);
+            },
+            .i128_sign_bit => try result.append(.accumulator),
         },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair => return error.ValueUseNewPairOwnershipUnsupported,
@@ -5811,6 +6204,14 @@ fn requestMappings(
                 .destination = .accumulator,
                 .source_request_index = request_index,
             }),
+            .i128_eq_min, .i128_sign_bit => {
+                const destinations = try requestDestinationNodes(transaction, request, current);
+                for (destinations.slice()) |destination| mappings.append(.{
+                    .source = null,
+                    .destination = destination,
+                    .source_request_index = null,
+                });
+            },
             .validate_shape, .emit_copy_to => {},
         }
         if (action != .emit_copy_to) return mappings;
@@ -5862,6 +6263,8 @@ fn actionOwnsOrderedWrites(action: ValueUseTransaction.PreparedAction) bool {
         .current_home_eq_zero,
         .setcc_eax_compare,
         .current_home_sign_bit,
+        .i128_eq_min,
+        .i128_sign_bit,
         => true,
         .validate_shape,
         .emit_copy_to,
@@ -6024,6 +6427,7 @@ fn validateCopyActionForm(
         .current_home_eq_zero_operand,
         .setcc_eax_compare_operand,
         .current_home_sign_bit_operand,
+        .i128_icmp_pair_operand,
         => false,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,

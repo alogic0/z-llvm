@@ -193,6 +193,49 @@ fn registerCurrentHomeSignBit(
     });
 }
 
+const I128PairActionKind = enum {
+    eq_min,
+    sign_bit,
+};
+
+fn registerI128PairAction(
+    transaction: *Transaction,
+    source: ir.Value,
+    result: []const u8,
+    kind: I128PairActionKind,
+) !Transaction.RequestHandle {
+    return transaction.register(.{
+        .source = source,
+        .expected = expected(.{ .int = 128 }, .gpr128),
+        .form = .i128_icmp_pair_operand,
+        .destination = .prepared_view,
+        .prepared_action = switch (kind) {
+            .eq_min => .{ .i128_eq_min = .{
+                .result = try actionIdentity(result),
+            } },
+            .sign_bit => .{ .i128_sign_bit = .{
+                .result = try actionIdentity(result),
+            } },
+        },
+    });
+}
+
+fn i128PairDiagnosticForTest(
+    transaction: *const Transaction,
+    source: Transaction.RequestHandle,
+    err: anyerror,
+) ?[]const u8 {
+    if (!transaction.failedRequestIs(source)) return null;
+    return switch (err) {
+        error.ValueUseUnresolvedSource,
+        error.UnsupportedCodegenValue,
+        => "composed-block-icmp-lhs",
+        error.ValueUseI128PairWidthUnsupported => "composed-block-icmp-lhs-width",
+        error.ValueUseI128PairLocationUnsupported => "composed-block-icmp-lhs-loc",
+        else => null,
+    };
+}
+
 fn currentHomeSignBitDiagnosticForTest(
     transaction: *const Transaction,
     source: Transaction.RequestHandle,
@@ -505,6 +548,50 @@ fn executeCurrentHomeSignBitCase(
         selector_state.EflagsEffect.write,
         selector.eflags_semantics.items[0].effect,
     );
+}
+
+fn executeI128PairActionCase(
+    kind: I128PairActionKind,
+    source_loc: ValueLoc,
+    expected_instructions: []const machine_module.Instruction,
+    expected_effects: []const selector_state.EflagsEffect,
+) !void {
+    var machine = MachineFunction.init("value-use-i128-pair-action-case", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "source");
+    try addAtCurrent(&plan, "result");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "source", source_loc);
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const source = try registerI128PairAction(
+        &transaction,
+        .{ .named = "source" },
+        "result",
+        kind,
+    );
+    try transaction.seal();
+    _ = try transaction.beginAccumulatorSession();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(source));
+    try transaction.commit();
+
+    try std.testing.expectEqualSlices(
+        machine_module.Instruction,
+        expected_instructions,
+        machine.instructions.items,
+    );
+    try std.testing.expectEqual(ValueLoc.eax, selector.values.get("result").?.loc);
+    try std.testing.expectEqual(expected_effects.len, selector.eflags_semantics.items.len);
+    for (expected_effects, selector.eflags_semantics.items) |effect, record|
+        try std.testing.expectEqual(effect, record.effect);
 }
 
 fn executeBranchConditionCase(
@@ -7079,4 +7166,467 @@ test "value-use current-home sign-bit rollback is exact at all seven boundaries"
         try std.testing.expectEqual(saved_semantics, selector.eflags_semantics.items.len);
         try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
     }
+}
+
+test "value-use dormant i128 pair classifiers admit only the two corrected semantic forms" {
+    try std.testing.expect(Transaction.isI128EqMinIcmp(.{
+        .predicate = .eq,
+        .operand_ty = .{ .int = 128 },
+        .lhs = .{ .named = "source" },
+        .rhs = .{ .int = std.math.minInt(i128) },
+    }));
+    try std.testing.expect(Transaction.isI128SignBitIcmp(.{
+        .predicate = .slt,
+        .samesign = true,
+        .operand_ty = .{ .int = 128 },
+        .lhs = .{ .named = "source" },
+        .rhs = .{ .int = 0 },
+    }));
+    inline for ([_]ir.IcmpInst{
+        .{
+            .predicate = .ne,
+            .operand_ty = .{ .int = 128 },
+            .lhs = .{ .named = "source" },
+            .rhs = .{ .int = std.math.minInt(i128) },
+        },
+        .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 64 },
+            .lhs = .{ .named = "source" },
+            .rhs = .{ .int = std.math.minInt(i128) },
+        },
+        .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 128 },
+            .lhs = .{ .named = "source" },
+            .rhs = .{ .int = 0 },
+        },
+        .{
+            .predicate = .slt,
+            .operand_ty = .{ .int = 128 },
+            .lhs = .{ .named = "source" },
+            .rhs = .{ .int = 1 },
+        },
+        .{
+            .predicate = .slt,
+            .operand_ty = .{ .int = 128 },
+            .lhs = .{ .int = 0 },
+            .rhs = .{ .int = 0 },
+        },
+    }) |icmp| {
+        try std.testing.expect(!Transaction.isI128EqMinIcmp(icmp));
+        try std.testing.expect(!Transaction.isI128SignBitIcmp(icmp));
+    }
+}
+
+test "value-use dormant i128 equality action preserves pair chooser sequence and EFLAGS" {
+    try executeI128PairActionCase(
+        .eq_min,
+        .{ .arg128 = selector_types.pair_a },
+        &.{
+            .{ .mov_arg64_arg = .{ .dst = .r8, .src = .rcx } },
+            .{ .mov_arg64_arg = .{ .dst = .r9, .src = .rdx } },
+            .{ .mov_arg_rax = .r9 },
+            .{ .mov_imm_rcx = std.math.minInt(i64) },
+            .{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } },
+            .{ .binary_arg_rax = .{ .op = .@"or", .reg = .r8 } },
+            .{ .mov_rax_to_arg = .rcx },
+            .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = 0 } },
+            .sete_eax,
+        },
+        &.{ .write, .write, .definition, .use },
+    );
+    try executeI128PairActionCase(
+        .eq_min,
+        .{ .scratch128 = selector_types.pair_b },
+        &.{
+            .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .r8 } },
+            .{ .mov_arg64_arg = .{ .dst = .rdx, .src = .r9 } },
+            .{ .mov_arg_rax = .rdx },
+            .{ .mov_imm_r8 = std.math.minInt(i64) },
+            .{ .binary_arg_rax = .{ .op = .xor, .reg = .r8 } },
+            .{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } },
+            .{ .mov_rax_to_arg = .r8 },
+            .{ .cmp_arg64_imm64 = .{ .reg = .r8, .imm = 0 } },
+            .sete_eax,
+        },
+        &.{ .write, .write, .definition, .use },
+    );
+    try executeI128PairActionCase(
+        .eq_min,
+        .{ .stack128_value = 32 },
+        &.{
+            .{ .load_stack_disp8_arg64 = .{ .reg = .rcx, .disp = 32 } },
+            .{ .load_stack_disp8_arg64 = .{ .reg = .rdx, .disp = 40 } },
+            .{ .mov_arg_rax = .rdx },
+            .{ .mov_imm_r8 = std.math.minInt(i64) },
+            .{ .binary_arg_rax = .{ .op = .xor, .reg = .r8 } },
+            .{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } },
+            .{ .mov_rax_to_arg = .r8 },
+            .{ .cmp_arg64_imm64 = .{ .reg = .r8, .imm = 0 } },
+            .sete_eax,
+        },
+        &.{ .write, .write, .definition, .use },
+    );
+}
+
+test "value-use dormant i128 sign-bit action wraps high-limb helper and logical SHR" {
+    try executeI128PairActionCase(
+        .sign_bit,
+        .{ .arg128 = selector_types.pair_a },
+        &.{ .{ .mov_arg_rax = .rdx }, .{ .shr_rax_imm6 = 63 } },
+        &.{.write},
+    );
+    try executeI128PairActionCase(
+        .sign_bit,
+        .{ .scratch128 = selector_types.pair_b },
+        &.{ .{ .mov_arg_rax = .r9 }, .{ .shr_rax_imm6 = 63 } },
+        &.{.write},
+    );
+    try executeI128PairActionCase(
+        .sign_bit,
+        .{ .stack128_value = 32 },
+        &.{ .{ .load_stack_disp8_rax = 40 }, .{ .shr_rax_imm6 = 63 } },
+        &.{.write},
+    );
+}
+
+test "value-use i128 pair wrappers reject fenced homes and malformed semantic requests without mutation" {
+    inline for ([_]struct {
+        loc: ValueLoc,
+        expected_error: anyerror,
+        diagnostic: []const u8,
+    }{
+        .{
+            .loc = .{ .spill128 = .{ .lo = .slot0, .hi = .slot1 } },
+            .expected_error = error.ValueUseI128PairLocationUnsupported,
+            .diagnostic = "composed-block-icmp-lhs-loc",
+        },
+        .{
+            .loc = .{ .arg64 = .rdi },
+            .expected_error = error.ValueUseI128PairWidthUnsupported,
+            .diagnostic = "composed-block-icmp-lhs-width",
+        },
+        .{
+            .loc = .{ .stack128 = 32 },
+            .expected_error = error.ValueUseI128PairWidthUnsupported,
+            .diagnostic = "composed-block-icmp-lhs-width",
+        },
+    }) |case| {
+        var machine = MachineFunction.init("value-use-i128-pair-reject-home", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "source");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        try selector_state.bindValueLoc(&selector, "source", case.loc);
+        const saved = selector.values.get("source").?;
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const source = try registerI128PairAction(
+            &transaction,
+            .{ .named = "source" },
+            "result",
+            .eq_min,
+        );
+        try std.testing.expectError(
+            case.expected_error,
+            transaction.seal(),
+        );
+        try std.testing.expect(transaction.failedRequestIs(source));
+        try std.testing.expectEqualStrings(
+            case.diagnostic,
+            i128PairDiagnosticForTest(
+                &transaction,
+                source,
+                case.expected_error,
+            ).?,
+        );
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(saved, selector.values.get("source").?);
+    }
+
+    var machine = MachineFunction.init("value-use-i128-pair-reject-type", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "source");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "source", .{ .arg128 = selector_types.pair_a });
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    _ = try transaction.register(.{
+        .source = .{ .named = "source" },
+        .expected = expected(.{ .int = 64 }, .gpr64),
+        .form = .i128_icmp_pair_operand,
+        .destination = .prepared_view,
+        .prepared_action = .{ .i128_sign_bit = .{
+            .result = try actionIdentity("result"),
+        } },
+    });
+    try std.testing.expectError(error.ValueUsePreparedActionFormMismatch, transaction.seal());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use i128 pair materializer failure maps to lhs while authority failure is unattributed" {
+    {
+        var machine = MachineFunction.init("value-use-i128-pair-helper-failure", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "source");
+        try addLive(&plan, "occupied-pair");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        try selector_state.bindValueLoc(
+            &selector,
+            "source",
+            .{ .arg128 = selector_types.pair_a },
+        );
+        try selector_state.bindValueLoc(
+            &selector,
+            "occupied-pair",
+            .{ .scratch128 = selector_types.pair_b },
+        );
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const source = try registerI128PairAction(
+            &transaction,
+            .{ .named = "source" },
+            "result",
+            .eq_min,
+        );
+        try transaction.seal();
+        _ = try transaction.beginAccumulatorSession();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        const err = transaction.executePreparedAction(
+            try transaction.preparedView(source),
+        );
+        try std.testing.expectError(error.UnsupportedCodegenValue, err);
+        try std.testing.expectEqualStrings(
+            "composed-block-icmp-lhs",
+            i128PairDiagnosticForTest(
+                &transaction,
+                source,
+                error.UnsupportedCodegenValue,
+            ).?,
+        );
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+
+    {
+        var machine = MachineFunction.init("value-use-i128-pair-authority", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "source");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        try selector_state.bindValueLoc(
+            &selector,
+            "source",
+            .{ .arg128 = selector_types.pair_a },
+        );
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const source = try registerI128PairAction(
+            &transaction,
+            .{ .named = "source" },
+            "result",
+            .sign_bit,
+        );
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try std.testing.expectError(
+            error.ValueUseI128SignBitAccumulatorSessionRequired,
+            transaction.executePreparedAction(try transaction.preparedView(source)),
+        );
+        try std.testing.expect(!transaction.failedRequestIs(source));
+    }
+}
+
+test "value-use i128 pair actions run the global preamble once and retain source ownership" {
+    var machine = MachineFunction.init("value-use-i128-pair-preamble", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addLive(&plan, "source");
+    try addLive(&plan, "live-accumulator");
+    try addAtCurrent(&plan, "result");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "source", .{ .stack128_value = 32 });
+    try selector_state.bindValueLoc(&selector, "live-accumulator", .eax);
+    const source_binding = selector.values.get("source").?;
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const source = try registerI128PairAction(
+        &transaction,
+        .{ .named = "source" },
+        "result",
+        .sign_bit,
+    );
+    try transaction.seal();
+    _ = try transaction.beginAccumulatorSession();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(source));
+    try transaction.commit();
+
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .mov_eax_to_arg = .rdi },
+        .{ .load_stack_disp8_rax = 40 },
+        .{ .shr_rax_imm6 = 63 },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(source_binding, selector.values.get("source").?);
+    try std.testing.expectEqual(
+        ValueLoc{ .scratch32 = .rdi },
+        selector.values.get("live-accumulator").?.loc,
+    );
+    try std.testing.expectEqual(@as(usize, 1), selector.eflags_semantics.items.len);
+}
+
+test "value-use i128 pair result remains durable after transaction teardown" {
+    var machine = MachineFunction.init("value-use-i128-pair-then-zext", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("source", 1);
+    try plan.interval_ends.put("%pair-result", 2);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    try selector_state.bindValueLoc(
+        &selector,
+        "source",
+        .{ .arg128 = selector_types.pair_a },
+    );
+
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const source = try registerI128PairAction(
+            &transaction,
+            .{ .named = "source" },
+            "%pair-result",
+            .sign_bit,
+        );
+        try transaction.seal();
+        _ = try transaction.beginAccumulatorSession();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(source));
+        try transaction.commit();
+    }
+    try std.testing.expectEqual(
+        ValueLoc.eax,
+        selector_state.resolveValue(&selector, .{ .named = "%pair-result" }).?,
+    );
+    selector.current_position = 2;
+    try std.testing.expect((try selector_scalar.lowerCast(&selector, "%zext", .{
+        .op = .zext,
+        .value = .{ .named = "%pair-result" },
+        .from_ty = .{ .int = 1 },
+        .to_ty = .{ .int = 32 },
+    })) == null);
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .mov_arg_rax = .rdx },
+        .{ .shr_rax_imm6 = 63 },
+        .{ .and_eax_imm32 = 1 },
+    }, machine.instructions.items);
+}
+
+const I128PairRollbackBoundary = union(enum) {
+    eq_min: Transaction.I128EqMinTestFailure,
+    sign_bit: Transaction.I128SignBitTestFailure,
+};
+
+fn expectI128PairRollbackExact(boundary: I128PairRollbackBoundary) !void {
+    var machine = MachineFunction.init("value-use-i128-pair-rollback", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "source");
+    try addLive(&plan, "live-accumulator");
+    try addAtCurrent(&plan, "result");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    selector.next_spill_slot = 1;
+    try selector_state.bindValueLoc(&selector, "source", .{ .stack128_value = 32 });
+    try selector_state.bindValueLoc(&selector, "live-accumulator", .eax);
+    const saved_source = selector.values.get("source").?;
+    const saved_accumulator = selector.values.get("live-accumulator").?;
+    const saved_next_vreg = selector.next_virtual_reg;
+    const saved_next_spill = selector.next_spill_slot;
+    const saved_domain = selector.address_dependencies;
+    const saved_accumulator_domain = selector.accumulator_domain;
+    const saved_eflags = selector.eflags.snapshot();
+    const saved_semantics = selector.eflags_semantics.items.len;
+    const saved_spills = selector.spill_slots.count();
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const source = try registerI128PairAction(
+        &transaction,
+        .{ .named = "source" },
+        "result",
+        switch (boundary) {
+            .eq_min => .eq_min,
+            .sign_bit => .sign_bit,
+        },
+    );
+    try transaction.seal();
+    _ = try transaction.beginAccumulatorSession();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    switch (boundary) {
+        .eq_min => |value| try transaction.setI128EqMinTestFailure(value),
+        .sign_bit => |value| try transaction.setI128SignBitTestFailure(value),
+    }
+    const action_error = transaction.executePreparedAction(
+        try transaction.preparedView(source),
+    );
+    switch (boundary) {
+        .eq_min => try std.testing.expectError(error.ValueUseI128EqMinTestFailure, action_error),
+        .sign_bit => try std.testing.expectError(error.ValueUseI128SignBitTestFailure, action_error),
+    }
+
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(saved_source, selector.values.get("source").?);
+    try std.testing.expectEqual(saved_accumulator, selector.values.get("live-accumulator").?);
+    try std.testing.expect(selector.values.get("result") == null);
+    try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+    try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+    try std.testing.expectEqual(saved_spills, selector.spill_slots.count());
+    try std.testing.expect(selector.address_dependencies.eql(&saved_domain));
+    try std.testing.expect(std.meta.eql(saved_accumulator_domain, selector.accumulator_domain));
+    try selector.eflags.validateSnapshot(saved_eflags);
+    try std.testing.expectEqual(saved_semantics, selector.eflags_semantics.items.len);
+    try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+}
+
+test "value-use i128 equality wrapper rolls back exactly at every partial stage" {
+    inline for (std.meta.tags(Transaction.I128EqMinTestFailure)) |boundary|
+        try expectI128PairRollbackExact(.{ .eq_min = boundary });
+}
+
+test "value-use i128 sign-bit wrapper rolls back exactly at every partial stage" {
+    inline for (std.meta.tags(Transaction.I128SignBitTestFailure)) |boundary|
+        try expectI128PairRollbackExact(.{ .sign_bit = boundary });
 }
