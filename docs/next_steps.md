@@ -28,6 +28,25 @@ ABI gates run with exact commands recorded, and there is no performance run
 or Tier 3. The Worker must commit immutable evidence and STOP for review.
 Production wiring and the projected 172 -> 166 movement are not authorized.
 
+**Slice 1 LANDED at `211efdcc`** ("codegen: add dormant scalar cast actions")
+and is Supervisor-verified: production lowering/dispatch files byte-identical
+(empty diffs); ratchet recount 172; identities re-hashed EXACT
+(`49a19f04`/`061a64e4`/`5d91960e`); the three actions live in
+`actions/control_compare.zig` (now 1,766 lines — under the 2,000 watch,
+budget recorded in evidence) with model/planning/materialization/core
+extensions; the facade manifest was versioned in place (+9 rows = exactly the
+three actions, their three classifiers, `ScalarCastRequestError`, and the
+test-failure hook pair — deliberate dormant widening per the icmp precedent);
+12 dormant tests cover the exact accepted streams (incl `movsxd` for C06),
+the C02 alias-only/C03 pair-result classifier fence, rollback at every
+partial boundary, allocation failure, and exactly-once release of owned
+results; full unit 1,292/1,292; Worker abi + Supervisor independent abi rerun
+both pass; no perf, no Tier 3; worktree clean. Evidence sent to the Reviewer
+requesting slice-1 acceptance + the production cast-wiring authorization
+(172→166 under the full counterbalanced gate). Cohesion note flagged to the
+Reviewer: scalar casts residing in `control_compare.zig` is a naming stretch
+worth an explicit placement ruling for the remaining scalar slices.
+
 ## Historical operating ledger
 
 ## INBOX-67 tracked serial-runner hardening (O1 prerequisite)
