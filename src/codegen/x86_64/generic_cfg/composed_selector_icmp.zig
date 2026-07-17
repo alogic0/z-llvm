@@ -326,6 +326,113 @@ fn currentHomeEqZeroDiagnostic(
     };
 }
 
+/// Pure semantic dispatch for the nine ordinary setcc-producing EAX forms.
+/// Exact-EI admission remains owned by isExactEiNarrowIcmp and is deliberately
+/// not duplicated here.
+fn isSetccEaxCompareIcmp(icmp: ir.IcmpInst) bool {
+    const bits = intBits(icmp.operand_ty) orelse return false;
+    const immediate = switch (icmp.rhs) {
+        .int => |value| value,
+        .named,
+        .fp,
+        .undef,
+        .poison,
+        .null_value,
+        .zero_initializer,
+        .vector,
+        .constant_expr,
+        => return false,
+    };
+    if (icmp.predicate == .eq and bits <= 32 and immediate != 0) return true;
+    if (icmp.predicate == .sgt and
+        ((immediate == -1 and (bits == 6 or bits == 16 or bits == 32)) or bits == 32))
+    {
+        return true;
+    }
+    if (!icmp.samesign and icmp.predicate == .slt and bits == 32 and immediate != 0)
+        return true;
+    if (icmp.samesign and (icmp.predicate == .ult or icmp.predicate == .ugt) and
+        (bits == 6 or bits == 7))
+    {
+        const mask: i128 = if (bits == 6) 63 else 127;
+        return immediate >= 0 and immediate <= mask;
+    }
+    if (!icmp.samesign and icmp.predicate == .ult and bits == 6 and
+        icmp.lhs == .named and (immediate & 63) == 51)
+    {
+        return true;
+    }
+    return icmp.predicate == .ult and bits == 32;
+}
+
+fn lowerSetccEaxCompare(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    icmp: ir.IcmpInst,
+    structure: ValueUseTransaction.SetccEaxCompareStructure,
+) !?Diagnostic {
+    const bits = intBits(icmp.operand_ty) orelse unreachable;
+    const immediate = switch (icmp.rhs) {
+        .int => |value| value,
+        .named,
+        .fp,
+        .undef,
+        .poison,
+        .null_value,
+        .zero_initializer,
+        .vector,
+        .constant_expr,
+        => unreachable,
+    };
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const lhs_request = try transaction.register(.{
+        .source = icmp.lhs,
+        .expected = .{
+            .ty = icmp.operand_ty,
+            .register_class = if (bits <= 32) .gpr32 else .gpr64,
+        },
+        .form = .setcc_eax_compare_operand,
+        .destination = .prepared_view,
+        .prepared_action = .{ .setcc_eax_compare = .{
+            .result = try ValueUseTransaction.ActionIdentity.init(result_name),
+            .operand_ty = icmp.operand_ty,
+            .predicate = icmp.predicate,
+            .samesign = icmp.samesign,
+            .immediate = immediate,
+            .structure = structure,
+        } },
+    });
+    transaction.seal() catch |err|
+        return setccEaxCompareDiagnostic(&transaction, lhs_request, err) orelse return err;
+    _ = try transaction.beginAccumulatorSession();
+    transaction.prepare() catch |err|
+        return setccEaxCompareDiagnostic(&transaction, lhs_request, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return setccEaxCompareDiagnostic(&transaction, lhs_request, err) orelse return err;
+    const lease = transaction.preparedView(lhs_request) catch |err|
+        return setccEaxCompareDiagnostic(&transaction, lhs_request, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return setccEaxCompareDiagnostic(&transaction, lhs_request, err) orelse return err;
+    try transaction.commit();
+    return null;
+}
+
+fn setccEaxCompareDiagnostic(
+    transaction: *const ValueUseTransaction,
+    lhs_request: ValueUseTransaction.RequestHandle,
+    err: anyerror,
+) ?Diagnostic {
+    if (err == error.ValueUseActionDiagnostic) return transaction.actionDiagnostic();
+    if (!transaction.failedRequestIs(lhs_request)) return null;
+    return switch (err) {
+        error.ValueUseUnresolvedSource => .{ .unsupported_value = "composed-block-icmp-lhs" },
+        error.ValueUseSetccEaxCompareWidthUnsupported => .{ .no_emitter = "composed-block-icmp-lhs-width" },
+        error.ValueUseSetccEaxCompareLocationUnsupported => .{ .no_emitter = "composed-block-icmp-lhs-loc" },
+        else => null,
+    };
+}
+
 pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir.IcmpInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     switch (try classifyScratchCompare(icmp)) {
@@ -334,14 +441,17 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         .action => |action| return lowerScratchCompare(selector, result_name, icmp, action),
     }
     const exact_ei_narrow = isExactEiNarrowIcmp(selector, icmp);
-    if (!exact_ei_narrow and isCurrentHomeEqZeroIcmp(icmp))
+    if (exact_ei_narrow)
+        return lowerSetccEaxCompare(selector, result_name, icmp, .exact_ei);
+    if (isCurrentHomeEqZeroIcmp(icmp))
         return lowerCurrentHomeEqZeroIcmp(selector, result_name, icmp);
+    if (isSetccEaxCompareIcmp(icmp))
+        return lowerSetccEaxCompare(selector, result_name, icmp, .ordinary);
     var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
     defer transaction.deinit();
     while (try selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
         if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
     }
-    if (exact_ei_narrow) return lowerExactEiNarrowIcmp(&transaction, result_name, icmp);
     if (icmp.predicate == .eq and icmp.operand_ty.eql(.{ .int = 128 }) and switch (icmp.rhs) {
         .int => |int| int == std.math.minInt(i128),
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
@@ -366,49 +476,6 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = temp });
         try emitIcmpDefinition(&transaction, .{ .cmp_arg64_imm64 = .{ .reg = temp, .imm = 0 } });
         if (try emitIcmpSetcc(&transaction, .sete_eax)) |diagnostic| return diagnostic;
-    } else if (icmp.predicate == .eq) {
-        const bits = intBits(icmp.operand_ty) orelse return .{ .no_emitter = "composed-block-icmp-type" };
-        const rhs = switch (icmp.rhs) {
-            .int => |int| int,
-            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-icmp-rhs" },
-        };
-        const imm = try i64Value(rhs);
-        std.debug.assert(imm != 0);
-        if (bits <= 32) {
-            selector_state.emitValueIntoEax(selector, icmp.lhs) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
-            try emitIcmpDefinition(&transaction, .{ .cmp_eax_imm32 = try i32Value(rhs) });
-        } else return .{ .no_emitter = "composed-block-icmp-eq-rhs" };
-        if (try emitIcmpSetcc(&transaction, .sete_eax)) |diagnostic| return diagnostic;
-        try finishIcmpResult(&transaction, result_name);
-        return null;
-    } else if (icmp.predicate == .sgt and icmp.operand_ty.eql(.{ .int = 6 }) and switch (icmp.rhs) {
-        .int => |int| try i64Value(int) == -1,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
-    }) {
-        try selector_state.emitValueIntoEax(selector, icmp.lhs);
-        if (try prepareIcmpResult(&transaction)) |diagnostic| return diagnostic;
-        try emitIcmpDefinition(&transaction, .{ .and_eax_imm32 = 1 << 5 });
-        if (try emitIcmpSetcc(&transaction, .sete_eax)) |diagnostic| return diagnostic;
-    } else if (icmp.predicate == .sgt and icmp.operand_ty.eql(.{ .int = 16 }) and switch (icmp.rhs) {
-        .int => |int| try i64Value(int) == -1,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
-    }) {
-        try selector_state.emitValueIntoEax(selector, icmp.lhs);
-        if (try prepareIcmpResult(&transaction)) |diagnostic| return diagnostic;
-        try emitIcmpDefinition(&transaction, .{ .and_eax_imm32 = 1 << 15 });
-        if (try emitIcmpSetcc(&transaction, .sete_eax)) |diagnostic| return diagnostic;
-    } else if (icmp.predicate == .sgt and icmp.operand_ty.eql(.{ .int = 32 }) and switch (icmp.rhs) {
-        .int => |int| try i64Value(int) == -1,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
-    }) {
-        try selector_state.emitValueIntoEax(selector, icmp.lhs);
-        if (try prepareIcmpResult(&transaction)) |diagnostic| return diagnostic;
-        try emitIcmpDefinition(&transaction, .{ .and_eax_imm32 = std.math.minInt(i32) });
-        if (try emitIcmpSetcc(&transaction, .sete_eax)) |diagnostic| return diagnostic;
-    } else if (icmp.predicate == .sgt and icmp.operand_ty.eql(.{ .int = 32 }) and icmp.rhs == .int) {
-        try selector_state.emitValueIntoEax(selector, icmp.lhs);
-        try emitIcmpDefinition(&transaction, .{ .cmp_eax_imm32 = try i32Value(icmp.rhs.int) });
-        if (try emitIcmpSetcc(&transaction, .setg_eax)) |diagnostic| return diagnostic;
     } else if (icmp.predicate == .slt and icmp.operand_ty.eql(.{ .int = 128 }) and switch (icmp.rhs) {
         .int => |int| int == 0,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
@@ -432,36 +499,6 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         try selector_state.emitValueIntoEax(selector, icmp.lhs);
         if (try prepareIcmpResult(&transaction)) |diagnostic| return diagnostic;
         try emitIcmpWrite(&transaction, .{ .shr_eax_imm5 = 31 });
-    } else if (!icmp.samesign and icmp.predicate == .slt and icmp.rhs == .int and
-        icmp.operand_ty.eql(.{ .int = 32 }))
-    {
-        try selector_state.emitValueIntoEax(selector, icmp.lhs);
-        try emitIcmpDefinition(&transaction, .{ .cmp_eax_imm32 = try i32Value(icmp.rhs.int) });
-        if (try emitIcmpSetcc(&transaction, .setl_eax)) |diagnostic| return diagnostic;
-    } else if (icmp.samesign and (icmp.predicate == .ult or icmp.predicate == .ugt) and
-        (icmp.operand_ty.eql(.{ .int = 6 }) or icmp.operand_ty.eql(.{ .int = 7 })) and icmp.rhs == .int)
-    {
-        const bits: u16 = if (icmp.operand_ty.eql(.{ .int = 6 })) 6 else 7;
-        const mask: i32 = if (bits == 6) 63 else 127;
-        const imm = try i64Value(icmp.rhs.int);
-        if (imm < 0 or imm > mask) return .{ .no_emitter = "composed-block-icmp-rhs" };
-        try selector_state.emitValueIntoEax(selector, icmp.lhs);
-        try emitIcmpWrite(&transaction, .{ .and_eax_imm32 = mask });
-        try emitIcmpDefinition(&transaction, .{ .cmp_eax_imm32 = @intCast(imm) });
-        if (try emitIcmpSetcc(&transaction, if (icmp.predicate == .ult) .setb_eax else .seta_eax)) |diagnostic| return diagnostic;
-    } else if (!icmp.samesign and icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 6 }) and
-        icmp.lhs == .named and switch (icmp.rhs) {
-        .int => |value| (value & 63) == 51,
-        else => false,
-    }) {
-        try selector_state.emitValueIntoEax(selector, icmp.lhs);
-        try emitIcmpWrite(&transaction, .{ .and_eax_imm32 = 63 });
-        try emitIcmpDefinition(&transaction, .{ .cmp_eax_imm32 = 51 });
-        if (try emitIcmpSetcc(&transaction, .setb_eax)) |diagnostic| return diagnostic;
-    } else if (icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 32 }) and icmp.rhs == .int) {
-        try selector_state.emitValueIntoEax(selector, icmp.lhs);
-        try emitIcmpDefinition(&transaction, .{ .cmp_eax_imm32 = try i32Value(icmp.rhs.int) });
-        if (try emitIcmpSetcc(&transaction, .setb_eax)) |diagnostic| return diagnostic;
     } else return .{ .no_emitter = "composed-block-icmp-form" };
     try finishIcmpResult(&transaction, result_name);
     return null;
@@ -472,41 +509,6 @@ fn isExactEiNarrowIcmp(selector: *const ComposedBlockSelector, icmp: ir.IcmpInst
     if (!stage2_planning.isExactEiScalarFamily(function.*)) return false;
     const bits = intBits(icmp.operand_ty) orelse return false;
     return bits == 3 or bits == 4 or bits == 5 or bits == 13 or bits == 14 or bits == 26 or bits == 27 or bits == 55 or bits == 56;
-}
-
-fn lowerExactEiNarrowIcmp(transaction: *selector_state.AccumulatorDefinitionTransaction, result_name: []const u8, icmp: ir.IcmpInst) !?Diagnostic {
-    const selector = transaction.selector;
-    const bits = intBits(icmp.operand_ty) orelse unreachable;
-    const rhs = switch (icmp.rhs) {
-        .int => |value| value,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-ei-narrow-icmp-rhs" },
-    };
-    if (bits > 32) return .{ .no_emitter = "composed-block-ei-narrow-icmp-width" };
-    const unsigned_mask: u32 = (@as(u32, 1) << @intCast(bits)) - 1;
-    const rhs_bits: u32 = @intCast(rhs & @as(i128, unsigned_mask));
-    try selector_state.emitValueIntoEax(selector, icmp.lhs);
-    try emitIcmpWrite(transaction, .{ .and_eax_imm32 = @bitCast(unsigned_mask) });
-    const signed = icmp.predicate == .slt or icmp.predicate == .sle or icmp.predicate == .sgt or icmp.predicate == .sge;
-    var compare_rhs: i32 = @bitCast(rhs_bits);
-    if (signed) {
-        const shift: u5 = @intCast(32 - bits);
-        try emitIcmpWrite(transaction, .{ .shl_eax_imm5 = shift });
-        try emitIcmpWrite(transaction, .{ .sar_eax_imm5 = shift });
-        const shifted_rhs: i32 = @bitCast(rhs_bits << shift);
-        compare_rhs = shifted_rhs >> shift;
-    }
-    try emitIcmpDefinition(transaction, .{ .cmp_eax_imm32 = compare_rhs });
-    if (try emitIcmpSetcc(transaction, switch (icmp.predicate) {
-        .eq => .sete_eax,
-        .ne => .setne_eax,
-        .ult => .setb_eax,
-        .ugt => .seta_eax,
-        .slt => .setl_eax,
-        .sgt => .setg_eax,
-        .ule, .uge, .sle, .sge => return .{ .no_emitter = "composed-block-ei-narrow-icmp-predicate" },
-    })) |diagnostic| return diagnostic;
-    try finishIcmpResult(transaction, result_name);
-    return null;
 }
 
 fn prepareIcmpResult(transaction: *selector_state.AccumulatorDefinitionTransaction) !?Diagnostic {

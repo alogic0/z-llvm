@@ -79,8 +79,9 @@ composed_selector_fp.zig	lowerHalfValueToFloatXmm0	lowerHalfLocToFloatXmm0	1	1	6
 composed_selector_fp.zig	lowerHalfValueToFloatXmm0	resolveValue	1	1	6	parent-consumer	collapse_with_half_fp_owner	-
 composed_selector_fp.zig	materializeFpValue	materializeLocIntoLoc	1	1	6	parent-consumer	collapse_with_fp_owner	-
 composed_selector_fp.zig	materializeFpValue	resolveValue	1	1	6	parent-consumer	collapse_with_fp_owner	-
-composed_selector_icmp.zig	lowerExactEiNarrowIcmp	emitValueIntoEax	1	1	3	O2-3B-O1	compose_compare_use_with_accumulator_result_transaction	o1_exact_ei_icmp
-composed_selector_icmp.zig	lowerIcmp	emitValueIntoEax	1-10	10	3	O2-3B-O1	compose_compare_uses_with_accumulator_result_transaction	o1_icmp
+composed_selector_icmp.zig	lowerExactEiNarrowIcmp	emitValueIntoEax	1	1	3	O2-3I-B2b1	migrated_setcc_eax_compare_action	o1_exact_ei_icmp
+composed_selector_icmp.zig	lowerIcmp	emitValueIntoEax	1-5,7-10	9	3	O2-3I-B2b1	migrated_setcc_eax_compare_action	o1_icmp_setcc_eax
+composed_selector_icmp.zig	lowerIcmp	emitValueIntoEax	6	1	3	O2-3I-B2b2	retain_for_sign_extraction_action	o1_icmp_sign_extract_eax
 composed_selector_icmp.zig	lowerIcmp	emitValueIntoRax	1	1	3	O2-3B-O1	compose_compare_uses_with_accumulator_result_transaction	o1_icmp
 composed_selector_icmp.zig	lowerIcmp	emitValueIntoScratch	1-29	29	3	O2-3I-B1	migrated_fixed_scratch_compare_subgroup	o1_icmp_fixed_scratch
 composed_selector_icmp.zig	lowerIcmp	materializePairValue	1	1	3	O2-3B-O1	compose_readonly_pair_use_with_accumulator_result_transaction	o1_icmp

@@ -231,8 +231,13 @@ test "I13 dispatch leaves fixed-scratch i52 and exact-EI eq-zero on their accept
 
     var machine = MachineFunction.init("i13-exact-ei", .{ .int = 1 });
     defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("lhs", 1);
+    try plan.interval_ends.put("cmp", 2);
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
+    selector.allocation_plan = &plan;
     selector.function = &module.functions.items[0];
     try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
 
@@ -248,6 +253,92 @@ test "I13 dispatch leaves fixed-scratch i52 and exact-EI eq-zero on their accept
         .{ .cmp_eax_imm32 = 0 },
         .sete_eax,
     }, machine.instructions.items);
+}
+
+test "setcc EAX production path maps only matching request failures" {
+    {
+        var machine = MachineFunction.init("setcc-eax-unresolved", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("missing", 1);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+
+        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .ult,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "missing" },
+            .rhs = .{ .int = 7 },
+        })).?;
+        try std.testing.expectEqualStrings("composed-block-icmp-lhs", diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+
+    {
+        var machine = MachineFunction.init("setcc-eax-spill128", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("lhs", 1);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .spill128 = .{
+            .lo = .slot0,
+            .hi = .slot1,
+        } });
+
+        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .sgt,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .int = 7 },
+        })).?;
+        try std.testing.expectEqualStrings("composed-block-icmp-lhs-loc", diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+
+    const exact_input =
+        \\define double @exact_unsupported_predicate(ptr readonly %input, i64 %bits) {
+        \\entry:
+        \\  %tag = trunc i64 %bits to i16
+        \\  switch i16 %tag, label %done [
+        \\    i16 0, label %done
+        \\    i16 1, label %done
+        \\    i16 2, label %done
+        \\    i16 3, label %done
+        \\    i16 4, label %done
+        \\  ]
+        \\done:
+        \\  ret double 0.000000e+00
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, exact_input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("setcc-eax-authority-error", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("lhs", 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.function = &module.functions.items[0];
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+    try std.testing.expectError(
+        error.ValueUseSetccEaxComparePredicateUnsupported,
+        selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .ule,
+            .operand_ty = .{ .int = 5 },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .int = 1 },
+        }),
+    );
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
 test "migrated accumulator-resident compare preserves same-register logical aliases" {
@@ -637,9 +728,13 @@ test "generic cfg selector normalizes i6 and i7 before samesign unsigned immedia
     }) |case| {
         var machine = MachineFunction.init("samesign-narrow-unsigned-imm", .{ .int = 1 });
         defer machine.deinit(std.testing.allocator);
-
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("value", 1);
+        try plan.interval_ends.put("cmp", 2);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
+        selector.allocation_plan = &plan;
         try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
 
         const diagnostic = try selector_icmp.lowerIcmp(&selector, "cmp", .{
@@ -675,8 +770,14 @@ test "generic cfg selector keeps other narrow unsigned comparison forms fail clo
     for (cases) |icmp| {
         var machine = MachineFunction.init("narrow-icmp-near-miss", .{ .int = 1 });
         defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("value", 1);
+        try plan.interval_ends.put("rhs", 1);
+        try plan.interval_ends.put("cmp", 2);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
+        selector.allocation_plan = &plan;
         try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
         try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
 
