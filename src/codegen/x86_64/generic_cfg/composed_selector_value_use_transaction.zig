@@ -64,6 +64,7 @@ pub const ValueUseTransaction = struct {
     memcpy_test_failure: if (builtin.is_test) ?MemcpyTestFailure else void = if (builtin.is_test) null else {},
     load_test_failure: if (builtin.is_test) ?LoadTestFailure else void = if (builtin.is_test) null else {},
     scratch_compare_test_failure: if (builtin.is_test) ?ScratchCompareTestFailure else void = if (builtin.is_test) null else {},
+    current_home_eq_zero_test_failure: if (builtin.is_test) ?CurrentHomeEqZeroTestFailure else void = if (builtin.is_test) null else {},
 
     pub const Expected = struct {
         ty: ir.Type,
@@ -106,6 +107,10 @@ pub const ValueUseTransaction = struct {
         /// action derives the accepted low view and fixed scratch assignment;
         /// this form grants no generic materialization capability.
         scratch_compare_operand,
+        /// Action-only generic integer eq-zero current-home test. The action
+        /// classifies the canonical post-preamble home internally and grants
+        /// no generic scalar materialization or prepared-location access.
+        current_home_eq_zero_operand,
         stack_argument,
         new_pair_ownership,
     };
@@ -355,6 +360,28 @@ pub const ValueUseTransaction = struct {
         after_result_finalization,
     };
 
+    /// Generic integer eq-zero current-home intent. No predicate, physical
+    /// home, register, staging choice, or displacement policy is supplied by
+    /// the consumer.
+    pub const CurrentHomeEqZeroAction = struct {
+        result: ActionIdentity,
+        operand_ty: ir.Type,
+    };
+
+    /// Closed request-attributable diagnostic classes for the I13 action.
+    /// Resolution retains ValueUseUnresolvedSource; these two variants
+    /// distinguish the accepted width and location diagnostics without
+    /// exposing the underlying home or binding.
+    pub const CurrentHomeEqZeroRequestError = error{
+        ValueUseCurrentHomeEqZeroWidthUnsupported,
+        ValueUseCurrentHomeEqZeroLocationUnsupported,
+    };
+
+    pub const CurrentHomeEqZeroTestFailure = enum {
+        after_test_definition,
+        after_accumulator_preparation,
+    };
+
     pub const max_switch_cases = 8;
 
     pub const SwitchCaseIntent = struct {
@@ -440,6 +467,7 @@ pub const ValueUseTransaction = struct {
         load_stack_i128_alias: StackI128AliasLoadAction,
         load_readonly_table_i16: ReadOnlyTableI16LoadAction,
         scratch_compare: ScratchCompareAction,
+        current_home_eq_zero: CurrentHomeEqZeroAction,
 
         fn eql(action: PreparedAction, other: PreparedAction) bool {
             return std.meta.eql(action, other);
@@ -558,6 +586,7 @@ pub const ValueUseTransaction = struct {
         table_pointer: PreparedTablePointer,
         read_only_pair: PreparedReadOnlyPair,
         condition: PreparedCondition,
+        current_home_eq_zero: struct { bits: u16 },
     };
 
     const PreparedRecord = struct {
@@ -1285,6 +1314,16 @@ pub const ValueUseTransaction = struct {
         transaction.scratch_compare_test_failure = failure;
     }
 
+    /// White-box current-home eq-zero rollback boundary control. Unavailable
+    /// in every production build and guarded from production consumers.
+    pub fn setCurrentHomeEqZeroTestFailure(
+        transaction: *ValueUseTransaction,
+        failure: ?CurrentHomeEqZeroTestFailure,
+    ) !void {
+        if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
+        transaction.current_home_eq_zero_test_failure = failure;
+    }
+
     fn requireActive(transaction: *const ValueUseTransaction) !void {
         if (transaction.lifecycle != .active) return error.ValueUseTransactionClosed;
     }
@@ -1362,6 +1401,7 @@ pub const ValueUseTransaction = struct {
             error.ValueUseScratchCompareTestFailure,
             error.ValueUseScratchCompareImmediateOutOfRange,
             error.ValueUseScratchCompareFormUnsupported,
+            error.ValueUseCurrentHomeEqZeroTestFailure,
             error.ValueUseLateRegistration,
             error.ValueUsePlanAlreadySealed,
             error.ValueUsePrepareBeforeSeal,
@@ -1459,6 +1499,7 @@ pub const ValueUseTransaction = struct {
             .load_stack_i128_alias => |*load| try load.result.validate(),
             .load_readonly_table_i16 => |*load| try load.result.validate(),
             .scratch_compare => return error.ValueUseScratchCompareAttachRequired,
+            .current_home_eq_zero => |*compare| try compare.result.validate(),
         }
     }
 
@@ -1523,6 +1564,7 @@ pub const ValueUseTransaction = struct {
                 .named => |handle| try transaction.validateOperandCanonical(handle),
                 .immediate, .null_pointer => {},
             },
+            .current_home_eq_zero => {},
             .validate_shape,
             .emit_copy_to,
             .form_readonly_table_address,
@@ -1680,6 +1722,7 @@ pub const ValueUseTransaction = struct {
                 .named => |handle| try transaction.validateRegisteredOperandHandle(handle),
                 .immediate, .null_pointer => null,
             },
+            .current_home_eq_zero => null,
             .load_scalar,
             .load_readonly_pair,
             .load_stack_i128_alias,
@@ -1717,6 +1760,7 @@ pub const ValueUseTransaction = struct {
             .load_stack_i128_alias,
             .load_readonly_table_i16,
             .scratch_compare,
+            .current_home_eq_zero,
             => null,
         };
     }
@@ -2062,6 +2106,7 @@ pub const ValueUseTransaction = struct {
             .memcpy_length,
             .load_address,
             .scratch_compare_operand,
+            .current_home_eq_zero_operand,
             => return error.ValueUsePreparedActionRequired,
             .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, destination),
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -2147,6 +2192,9 @@ fn preparedViewFromLoc(
         .branch_condition, .switch_condition => preparedConditionView(loc),
         .memcpy_pointer, .memcpy_length => preparedMemcpyScalarView(loc),
         .scratch_compare_operand => preparedScratchCompareView(loc, request.expected.ty),
+        .current_home_eq_zero_operand => .{ .current_home_eq_zero = .{
+            .bits = request.expected.ty.int,
+        } },
         .stack_argument => error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
     };
@@ -2474,6 +2522,7 @@ fn executePreparedActionInternal(
                 .memcpy_length,
                 .load_address,
                 .scratch_compare_operand,
+                .current_home_eq_zero_operand,
                 => return error.ValueUsePreparedActionFormMismatch,
                 .stack_argument => return error.ValueUseStackArgumentUnsupported,
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2494,6 +2543,12 @@ fn executePreparedActionInternal(
         .load_stack_i128_alias => |load| try executeStackI128AliasLoad(transaction, view, &load),
         .load_readonly_table_i16 => |load| try executeReadOnlyTableI16Load(transaction, view, &load),
         .scratch_compare => |compare| try executeScratchCompare(transaction, request_index, view, &compare),
+        .current_home_eq_zero => |compare| try executeCurrentHomeEqZero(
+            transaction,
+            request_index,
+            view,
+            &compare,
+        ),
     }
 }
 
@@ -2719,6 +2774,145 @@ fn failScratchCompareForTest(
 ) !void {
     if (builtin.is_test and transaction.scratch_compare_test_failure == boundary)
         return error.ValueUseScratchCompareTestFailure;
+}
+
+fn executeCurrentHomeEqZero(
+    transaction: *ValueUseTransaction,
+    source_index: u8,
+    initial_source_view: *const ValueUseTransaction.PreparedView,
+    action: *const ValueUseTransaction.CurrentHomeEqZeroAction,
+) !void {
+    _ = initial_source_view;
+    _ = action;
+    const session = if (transaction.accumulator_session) |*session|
+        session
+    else
+        return error.ValueUseCurrentHomeEqZeroAccumulatorSessionRequired;
+
+    try preserveScratchCompareLiveAccumulator(transaction);
+    transaction.prepared_views[source_index] = try transaction.buildPreparedRecord(source_index);
+    transaction.prepared_view_valid[source_index] = true;
+
+    const request = &transaction.requests[source_index];
+    const source_name = switch (request.source) {
+        .named => |*identity| identity.slice(),
+        .int, .null_value, .unsupported => return error.ValueUseUnsupportedSource,
+    };
+    const binding = transaction.selector.values.get(source_name) orelse
+        return error.ValueUseUnresolvedSource;
+    const current = transaction.prepared_views[source_index].canonical_source_loc;
+    const test_plan = classifyCurrentHomeEqZero(binding, request.expected, current) catch |err| {
+        transaction.noteRequestBoundaryError(source_index, err);
+        return err;
+    };
+
+    switch (test_plan) {
+        .direct => |instruction| try selector_state.emitEflagsInstruction(
+            transaction.selector,
+            instruction,
+            .definition,
+        ),
+        .spill32 => |frame_index| {
+            try clobberPhysicalNode(transaction.selector, .rcx);
+            try transaction.selector.machine.instructions.append(
+                transaction.selector.allocator,
+                .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = frame_index } },
+            );
+            try selector_state.emitEflagsInstruction(
+                transaction.selector,
+                .{ .test_arg32 = .rcx },
+                .definition,
+            );
+        },
+        .spill64 => |frame_index| {
+            try clobberPhysicalNode(transaction.selector, .rcx);
+            try transaction.selector.machine.instructions.append(
+                transaction.selector.allocator,
+                .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = frame_index } },
+            );
+            try selector_state.emitEflagsInstruction(
+                transaction.selector,
+                .{ .test_arg64 = .rcx },
+                .definition,
+            );
+        },
+    }
+    try failCurrentHomeEqZeroForTest(transaction, .after_test_definition);
+
+    if (try session.prepare(.preserve, .spill_live)) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+    try failCurrentHomeEqZeroForTest(transaction, .after_accumulator_preparation);
+
+    try selector_state.emitEflagsInstruction(transaction.selector, .sete_eax, .use);
+    const stored_action = &transaction.requests[source_index].prepared_action.?.current_home_eq_zero;
+    const result_name = try ownActionIdentity(transaction, &stored_action.result);
+    try session.define(result_name, .zeroExtending(1));
+    try session.finalize();
+}
+
+const CurrentHomeEqZeroTest = union(enum) {
+    direct: x86_64_machine.Instruction,
+    spill32: FrameIndex,
+    spill64: FrameIndex,
+};
+
+fn classifyCurrentHomeEqZero(
+    binding: ValueBinding,
+    expected: ValueUseTransaction.Expected,
+    current: ValueLoc,
+) ValueUseTransaction.CurrentHomeEqZeroRequestError!CurrentHomeEqZeroTest {
+    const bits = switch (expected.ty) {
+        .int => |value| value,
+        else => return error.ValueUseCurrentHomeEqZeroWidthUnsupported,
+    };
+    if (bits == 0 or bits > 64 or binding.vreg.bits < bits)
+        return error.ValueUseCurrentHomeEqZeroWidthUnsupported;
+
+    if (bits <= 32) return switch (current) {
+        .eax => if (binding.vreg.class == .gpr32)
+            .{ .direct = .test_eax_eax }
+        else
+            error.ValueUseCurrentHomeEqZeroLocationUnsupported,
+        .arg32, .scratch32 => |reg| if (binding.vreg.class == .gpr32)
+            .{ .direct = .{ .test_arg32 = reg } }
+        else
+            error.ValueUseCurrentHomeEqZeroLocationUnsupported,
+        .spill64 => |frame_index| if (binding.vreg.class == .gpr32 or binding.vreg.class == .gpr64)
+            .{ .spill32 = frame_index }
+        else
+            error.ValueUseCurrentHomeEqZeroLocationUnsupported,
+        .rax, .arg64, .scratch64 => error.ValueUseCurrentHomeEqZeroWidthUnsupported,
+        .spill128 => error.ValueUseCurrentHomeEqZeroLocationUnsupported,
+        else => error.ValueUseCurrentHomeEqZeroLocationUnsupported,
+    };
+    if (bits != 64) return error.ValueUseCurrentHomeEqZeroWidthUnsupported;
+    return switch (current) {
+        .rax => if (binding.vreg.class == .gpr64)
+            .{ .direct = .test_rax_rax }
+        else
+            error.ValueUseCurrentHomeEqZeroLocationUnsupported,
+        .arg64, .scratch64 => |reg| if (binding.vreg.class == .gpr64)
+            .{ .direct = .{ .test_arg64 = reg } }
+        else
+            error.ValueUseCurrentHomeEqZeroLocationUnsupported,
+        .spill64 => |frame_index| if (binding.vreg.class == .gpr64)
+            .{ .spill64 = frame_index }
+        else
+            error.ValueUseCurrentHomeEqZeroLocationUnsupported,
+        .eax, .arg32, .scratch32 => error.ValueUseCurrentHomeEqZeroWidthUnsupported,
+        .spill128 => error.ValueUseCurrentHomeEqZeroLocationUnsupported,
+        else => error.ValueUseCurrentHomeEqZeroLocationUnsupported,
+    };
+}
+
+fn failCurrentHomeEqZeroForTest(
+    transaction: *ValueUseTransaction,
+    boundary: ValueUseTransaction.CurrentHomeEqZeroTestFailure,
+) !void {
+    if (builtin.is_test and transaction.current_home_eq_zero_test_failure == boundary)
+        return error.ValueUseCurrentHomeEqZeroTestFailure;
 }
 
 fn executeScalarLoad(
@@ -3874,7 +4068,7 @@ fn preparedViewLoc(view: *const ValueUseTransaction.PreparedView) !ValueLoc {
             .shape = table.shape,
             .offset = table.offset,
         } },
-        .read_only_pair, .condition => error.ValueUsePreparedActionFormMismatch,
+        .read_only_pair, .condition, .current_home_eq_zero => error.ValueUsePreparedActionFormMismatch,
     };
 }
 
@@ -3901,6 +4095,7 @@ fn preparedViewEql(
         .table_pointer => |*value| preparedTablePointerEql(value, &rhs.table_pointer),
         .read_only_pair => |value| std.meta.eql(value, rhs.read_only_pair),
         .condition => |value| std.meta.eql(value, rhs.condition),
+        .current_home_eq_zero => |value| std.meta.eql(value, rhs.current_home_eq_zero),
     };
 }
 
@@ -4000,6 +4195,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .branch_condition,
             .switch_condition,
             .load_address,
+            .current_home_eq_zero_operand,
             => error.ValueUsePreparedActionRequired,
             .stack_argument => error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
@@ -4021,6 +4217,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .memcpy_length,
             .load_address,
             .scratch_compare_operand,
+            .current_home_eq_zero_operand,
             => {},
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -4063,6 +4260,9 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .scratch_compare => |compare| if (request.form != .scratch_compare_operand or
                 !request.expected.ty.eql(compare.operand_ty))
                 error.ValueUsePreparedActionFormMismatch,
+            .current_home_eq_zero => |compare| if (request.form != .current_home_eq_zero_operand or
+                !request.expected.ty.eql(compare.operand_ty))
+                error.ValueUsePreparedActionFormMismatch,
         };
     }
     if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
@@ -4077,6 +4277,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
         .memcpy_length,
         .load_address,
         .scratch_compare_operand,
+        .current_home_eq_zero_operand,
         => false,
         .pair_low_high, .pair_high_low => request.destination == .pair,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -4098,6 +4299,13 @@ fn validateBindingCompatibility(
 ) !void {
     if (request.form == .scratch_compare_operand) {
         try validateScratchCompareBinding(binding, request.expected, current);
+        return;
+    }
+    if (request.form == .current_home_eq_zero_operand) {
+        // The canonical post-preamble home is the authority. Resolution and
+        // liveness happen now; width/location classification is intentionally
+        // deferred until the action refreshes after accumulator preservation.
+        try validateExpectedType(request.expected, request.form);
         return;
     }
     if (request.form == .load_address) {
@@ -4333,6 +4541,19 @@ fn validateExpectedType(expected: ValueUseTransaction.Expected, form: ValueUseTr
             },
             else => return error.ValueUseTypeMismatch,
         },
+        .current_home_eq_zero_operand => switch (expected.ty) {
+            .int => |bits| {
+                if (bits == 0 or bits > 64 or
+                    expected.register_class != if (bits <= 32)
+                        VirtualRegClass.gpr32
+                    else
+                        VirtualRegClass.gpr64)
+                {
+                    return error.ValueUseTypeMismatch;
+                }
+            },
+            else => return error.ValueUseTypeMismatch,
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -4417,6 +4638,10 @@ fn validateSourceView(loc: ValueLoc, form: ValueUseTransaction.UseForm) !void {
             => {},
             else => return error.ValueUseScratchCompareHomeUnsupported,
         },
+        // The action must inspect the canonical home only after the accepted
+        // live-accumulator preamble. No home is admitted by this generic
+        // validation layer.
+        .current_home_eq_zero_operand => {},
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -4450,6 +4675,7 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: ValueUseTransaction.UseForm) 
         .memcpy_length,
         .load_address,
         .scratch_compare_operand,
+        .current_home_eq_zero_operand,
         .stack_argument,
         .new_pair_ownership,
         => false,
@@ -4471,6 +4697,7 @@ fn earlySequencingCandidate(loc: ValueLoc, form: ValueUseTransaction.UseForm) bo
         .branch_condition, .switch_condition => false,
         .load_address => false,
         .scratch_compare_operand => false,
+        .current_home_eq_zero_operand => false,
         else => false,
     };
 }
@@ -4629,6 +4856,10 @@ fn requestDestinationNodes(
                     if (plan.rhs_register == null or plan.rhs_register.? != reg)
                         try result.append(nodeForArgReg(reg));
                 }
+            },
+            .current_home_eq_zero => {
+                try result.append(.rcx);
+                try result.append(.accumulator);
             },
         },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -4903,6 +5134,18 @@ fn requestMappings(
                     .source_request_index = null,
                 });
             },
+            .current_home_eq_zero => {
+                mappings.append(.{
+                    .source = null,
+                    .destination = .rcx,
+                    .source_request_index = null,
+                });
+                mappings.append(.{
+                    .source = null,
+                    .destination = .accumulator,
+                    .source_request_index = null,
+                });
+            },
             .validate_shape, .emit_copy_to => {},
         }
         if (action != .emit_copy_to) return mappings;
@@ -4951,6 +5194,7 @@ fn actionOwnsOrderedWrites(action: ValueUseTransaction.PreparedAction) bool {
         .load_stack_i128_alias,
         .load_readonly_table_i16,
         .scratch_compare,
+        .current_home_eq_zero,
         => true,
         .validate_shape,
         .emit_copy_to,
@@ -5110,6 +5354,7 @@ fn validateCopyActionForm(
         .memcpy_length,
         .load_address,
         .scratch_compare_operand,
+        .current_home_eq_zero_operand,
         => false,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,

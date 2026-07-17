@@ -394,8 +394,10 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     if (std.mem.indexOf(u8, source, "AccumulatorDefinitionTransaction.begin(") != null)
         return error.ValueUseNestedAccumulatorSnapshot;
     try validateScratchCompareIntentSurface(source);
+    try validateCurrentHomeEqZeroIntentSurface(source);
     try validateDurableActionIdentityOwnership(source);
     try validateScratchComparePreservationPreamble(source);
+    try validateCurrentHomeEqZeroSequence(source);
 }
 
 fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const u8) !void {
@@ -420,6 +422,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     try validateFailureProvenanceProductionSites(source_name, source);
     try validateAccumulatorCompositionProductionSites(source_name, source);
     try validateScratchCompareProductionSites(source_name, source);
+    try validateDormantCurrentHomeEqZeroProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -485,6 +488,40 @@ fn validateScratchCompareIntentSurface(source: []const u8) !void {
     }
 }
 
+fn validateCurrentHomeEqZeroIntentSurface(source: []const u8) !void {
+    const declaration = "pub const CurrentHomeEqZeroAction = struct {";
+    const start = std.mem.indexOf(u8, source, declaration) orelse return;
+    const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+        return error.InvalidZigSource;
+    const body = source[start .. end + 2];
+    const forbidden = [_][]const u8{
+        "ArgReg",
+        "ValueLoc",
+        "Destination",
+        "FrameIndex",
+        "PreparedView",
+        "home",
+        "binding",
+        "register",
+        "scratch",
+        "spill",
+        "preserve",
+        "displacement",
+        "reuse_source",
+        "early",
+        "phase",
+    };
+    for (forbidden) |pattern| {
+        if (std.mem.indexOf(u8, body, pattern) != null)
+            return error.ValueUseCurrentHomeEqZeroPhysicalIntentEscape;
+    }
+    if (countPattern(body, "result: ActionIdentity") != 1 or
+        countPattern(body, "operand_ty: ir.Type") != 1)
+    {
+        return error.ValueUseCurrentHomeEqZeroIntentMismatch;
+    }
+}
+
 fn validateScratchComparePreservationPreamble(source: [:0]const u8) !void {
     var body_storage: [max_function_bodies]FunctionBody = undefined;
     const bodies = try collectFunctionBodies(source, &body_storage);
@@ -537,6 +574,93 @@ fn validateScratchComparePreservationPreamble(source: [:0]const u8) !void {
     }
 }
 
+fn validateCurrentHomeEqZeroSequence(source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const body = functionBodyNamed(bodies, "executeCurrentHomeEqZero") orelse return;
+    const function_source = source[body.start..body.end];
+    const preserve = std.mem.indexOf(
+        u8,
+        function_source,
+        "try preserveScratchCompareLiveAccumulator(transaction);",
+    ) orelse return error.ValueUseCurrentHomeEqZeroSequenceMismatch;
+    const refresh = std.mem.indexOf(
+        u8,
+        function_source,
+        "transaction.prepared_views[source_index] = try transaction.buildPreparedRecord(source_index);",
+    ) orelse return error.ValueUseCurrentHomeEqZeroSequenceMismatch;
+    const classify = std.mem.indexOf(
+        u8,
+        function_source,
+        "classifyCurrentHomeEqZero(binding, request.expected, current)",
+    ) orelse return error.ValueUseCurrentHomeEqZeroSequenceMismatch;
+    const test_definition = std.mem.indexOf(
+        u8,
+        function_source,
+        "failCurrentHomeEqZeroForTest(transaction, .after_test_definition)",
+    ) orelse return error.ValueUseCurrentHomeEqZeroSequenceMismatch;
+    const prepare = std.mem.indexOf(
+        u8,
+        function_source,
+        "if (try session.prepare(.preserve, .spill_live))",
+    ) orelse return error.ValueUseCurrentHomeEqZeroSequenceMismatch;
+    const after_prepare = std.mem.indexOf(
+        u8,
+        function_source,
+        "failCurrentHomeEqZeroForTest(transaction, .after_accumulator_preparation)",
+    ) orelse return error.ValueUseCurrentHomeEqZeroSequenceMismatch;
+    const setcc = std.mem.indexOf(
+        u8,
+        function_source,
+        "emitEflagsInstruction(transaction.selector, .sete_eax, .use)",
+    ) orelse return error.ValueUseCurrentHomeEqZeroSequenceMismatch;
+    const own = std.mem.indexOf(
+        u8,
+        function_source,
+        "const result_name = try ownActionIdentity(transaction, &stored_action.result);",
+    ) orelse return error.ValueUseCurrentHomeEqZeroSequenceMismatch;
+    const define = std.mem.indexOf(
+        u8,
+        function_source,
+        "try session.define(result_name, .zeroExtending(1));",
+    ) orelse return error.ValueUseCurrentHomeEqZeroSequenceMismatch;
+    const finalize = std.mem.indexOf(
+        u8,
+        function_source,
+        "try session.finalize();",
+    ) orelse return error.ValueUseCurrentHomeEqZeroSequenceMismatch;
+    if (!(preserve < refresh and refresh < classify and classify < test_definition and
+        test_definition < prepare and prepare < after_prepare and after_prepare < setcc and
+        setcc < own and own < define and define < finalize) or
+        countPattern(function_source, "preserveScratchCompareLiveAccumulator(transaction)") != 1 or
+        countPattern(function_source, "buildPreparedRecord(source_index)") != 1 or
+        countPattern(function_source, ".canonical_source_loc") != 1 or
+        countPattern(function_source, ".reuse_source") != 0 or
+        countPattern(function_source, "preparedViewLoc(") != 0 or
+        countPattern(function_source, "resolveValue(") != 0)
+    {
+        return error.ValueUseCurrentHomeEqZeroSequenceMismatch;
+    }
+
+    const classifier = functionBodyNamed(bodies, "classifyCurrentHomeEqZero") orelse
+        return error.ValueUseCurrentHomeEqZeroSequenceMismatch;
+    const classifier_source = source[classifier.start..classifier.end];
+    const required_homes = [_][]const u8{
+        ".eax",
+        ".rax",
+        ".arg32",
+        ".scratch32",
+        ".arg64",
+        ".scratch64",
+        ".spill64",
+        ".spill128 => error.ValueUseCurrentHomeEqZeroLocationUnsupported",
+    };
+    for (required_homes) |pattern| {
+        if (std.mem.indexOf(u8, classifier_source, pattern) == null)
+            return error.ValueUseCurrentHomeEqZeroHomeClassificationMissing;
+    }
+}
+
 fn validateDurableActionIdentityOwnership(source: [:0]const u8) !void {
     if (std.mem.indexOf(u8, source, ".result.slice()") != null)
         return error.ValueUseDurableActionIdentityNotOwned;
@@ -572,6 +696,16 @@ fn validateDurableActionIdentityOwnership(source: [:0]const u8) !void {
     const between = function_source[own_index + own_pattern.len .. define_index];
     if (countPattern(between, "failScratchCompareForTest(transaction, .after_result_identity_ownership);") != 1)
         return error.ValueUseDurableActionIdentityOwnershipOrder;
+
+    if (functionBodyNamed(bodies, "executeCurrentHomeEqZero")) |current_home_body| {
+        const current_home_source = source[current_home_body.start..current_home_body.end];
+        const current_own = std.mem.indexOf(u8, current_home_source, own_pattern) orelse
+            return error.ValueUseDurableActionIdentityOwnershipMissing;
+        const current_define = std.mem.indexOf(u8, current_home_source, define_pattern) orelse
+            return error.ValueUseDurableActionIdentityOwnershipMissing;
+        if (current_own >= current_define)
+            return error.ValueUseDurableActionIdentityOwnershipOrder;
+    }
 }
 
 fn validateScratchCompareProductionSites(source_name: []const u8, source: [:0]const u8) !void {
@@ -650,6 +784,24 @@ fn validateScratchCompareProductionSites(source_name: []const u8, source: [:0]co
         attach_total != 1)
     {
         return error.ValueUseScratchCompareActionAllowlistMismatch;
+    }
+}
+
+fn validateDormantCurrentHomeEqZeroProductionSites(
+    source_name: []const u8,
+    source: [:0]const u8,
+) !void {
+    _ = source_name;
+    const forbidden = [_][]const u8{
+        ".form = .current_home_eq_zero_operand",
+        ".current_home_eq_zero =",
+        "CurrentHomeEqZeroAction",
+        "ValueUseCurrentHomeEqZeroWidthUnsupported",
+        "ValueUseCurrentHomeEqZeroLocationUnsupported",
+    };
+    for (forbidden) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseCurrentHomeEqZeroProductionWiringForbidden;
     }
 }
 
@@ -2653,6 +2805,94 @@ test "composed selector source guard keeps scratch compare intent semantic and p
                 "try session.define(result_name, .zeroExtending(1)); " ++
                 "const result_name = try ownActionIdentity(transaction, &stored_action.result); " ++
                 "try failScratchCompareForTest(transaction, .after_result_identity_ownership); }",
+        ),
+    );
+}
+
+test "composed selector source guard keeps current-home eq-zero action dormant and ordered" {
+    try validateCurrentHomeEqZeroIntentSurface(
+        "pub const CurrentHomeEqZeroAction = struct { " ++
+            "result: ActionIdentity, operand_ty: ir.Type, };",
+    );
+    try std.testing.expectError(
+        error.ValueUseCurrentHomeEqZeroPhysicalIntentEscape,
+        validateCurrentHomeEqZeroIntentSurface(
+            "pub const CurrentHomeEqZeroAction = struct { " ++
+                "result: ActionIdentity, operand_ty: ir.Type, source_home: ValueLoc, };",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseCurrentHomeEqZeroProductionWiringForbidden,
+        validateDormantCurrentHomeEqZeroProductionSites(
+            "composed_selector_icmp.zig",
+            "fn lowerIcmp() void { _ = .{ .form = .current_home_eq_zero_operand }; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseCurrentHomeEqZeroProductionWiringForbidden,
+        validateDormantCurrentHomeEqZeroProductionSites(
+            "composed_selector_calls.zig",
+            "fn lower() void { _ = .{ .current_home_eq_zero = action }; }",
+        ),
+    );
+
+    const classifier =
+        "fn classifyCurrentHomeEqZero() void { " ++
+        "_ = .eax; _ = .rax; _ = .arg32; _ = .scratch32; " ++
+        "_ = .arg64; _ = .scratch64; _ = .spill64; " ++
+        "_ = .spill128 => error.ValueUseCurrentHomeEqZeroLocationUnsupported; }";
+    const accepted: [:0]const u8 =
+        "fn executeCurrentHomeEqZero() void { " ++
+        "try preserveScratchCompareLiveAccumulator(transaction); " ++
+        "transaction.prepared_views[source_index] = try transaction.buildPreparedRecord(source_index); " ++
+        "_ = transaction.prepared_views[source_index].canonical_source_loc; " ++
+        "_ = classifyCurrentHomeEqZero(binding, request.expected, current); " ++
+        "try failCurrentHomeEqZeroForTest(transaction, .after_test_definition); " ++
+        "if (try session.prepare(.preserve, .spill_live)) return; " ++
+        "try failCurrentHomeEqZeroForTest(transaction, .after_accumulator_preparation); " ++
+        "try emitEflagsInstruction(transaction.selector, .sete_eax, .use); " ++
+        "const result_name = try ownActionIdentity(transaction, &stored_action.result); " ++
+        "try session.define(result_name, .zeroExtending(1)); " ++
+        "try session.finalize(); } " ++ classifier;
+    try validateCurrentHomeEqZeroSequence(accepted);
+
+    const reordered: [:0]const u8 =
+        "fn executeCurrentHomeEqZero() void { " ++
+        "try preserveScratchCompareLiveAccumulator(transaction); " ++
+        "transaction.prepared_views[source_index] = try transaction.buildPreparedRecord(source_index); " ++
+        "_ = transaction.prepared_views[source_index].canonical_source_loc; " ++
+        "_ = classifyCurrentHomeEqZero(binding, request.expected, current); " ++
+        "if (try session.prepare(.preserve, .spill_live)) return; " ++
+        "try failCurrentHomeEqZeroForTest(transaction, .after_test_definition); " ++
+        "try failCurrentHomeEqZeroForTest(transaction, .after_accumulator_preparation); " ++
+        "try emitEflagsInstruction(transaction.selector, .sete_eax, .use); " ++
+        "const result_name = try ownActionIdentity(transaction, &stored_action.result); " ++
+        "try session.define(result_name, .zeroExtending(1)); " ++
+        "try session.finalize(); } " ++ classifier;
+    try std.testing.expectError(
+        error.ValueUseCurrentHomeEqZeroSequenceMismatch,
+        validateCurrentHomeEqZeroSequence(reordered),
+    );
+
+    const owned_identity: [:0]const u8 =
+        "fn executeScratchCompare() void { " ++
+        "const result_name = try ownActionIdentity(transaction, &stored_action.result); " ++
+        "try failScratchCompareForTest(transaction, .after_result_identity_ownership); " ++
+        "try session.define(result_name, .zeroExtending(1)); } " ++
+        "fn executeCurrentHomeEqZero() void { " ++
+        "const result_name = try ownActionIdentity(transaction, &stored_action.result); " ++
+        "try session.define(result_name, .zeroExtending(1)); }";
+    try validateDurableActionIdentityOwnership(owned_identity);
+    try std.testing.expectError(
+        error.ValueUseDurableActionIdentityOwnershipOrder,
+        validateDurableActionIdentityOwnership(
+            "fn executeScratchCompare() void { " ++
+                "const result_name = try ownActionIdentity(transaction, &stored_action.result); " ++
+                "try failScratchCompareForTest(transaction, .after_result_identity_ownership); " ++
+                "try session.define(result_name, .zeroExtending(1)); } " ++
+                "fn executeCurrentHomeEqZero() void { " ++
+                "try session.define(result_name, .zeroExtending(1)); " ++
+                "const result_name = try ownActionIdentity(transaction, &stored_action.result); }",
         ),
     );
 }
