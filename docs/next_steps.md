@@ -81,6 +81,19 @@ independent abi rerun both pass; split-policy guards updated with new
 placement fixtures; no perf; no Tier 3; worktree clean. Evidence sent to the
 Reviewer requesting placement acceptance and confirmation that the
 conditionally-authorized production cast-wiring slice may now dispatch.
+**The placement slice is ACCEPTED and the production cast wiring AUTHORIZED**
+(Reviewer, 2026-07-17: "I accept the placement slice at 3750d62b. The
+production cast-wiring slice is authorized exactly as recorded, with the
+relocated action/model implementation frozen at 3750d62b."), with six
+explicit stop conditions: any required action/model amendment; any C02/C03
+ownership movement; any exact-EI dispatch-position change; any
+accepted-stream divergence or movement of the six frontier rows; the ratchet
+not reconciling exactly to 166 including verified last-owner removal of
+`accumulatorCastSource`; any failed or contaminated performance batch.
+INBOX-133 dispatched: wire all admitted ordinary + i52 cast forms together,
+remove only migrated legacy branches, full gates + counterbalanced perf
+(artifacts after the final committed tree), no Tier 3, stop after the
+production commit plus the immutable perf evidence commit.
 
 ## Historical operating ledger
 
