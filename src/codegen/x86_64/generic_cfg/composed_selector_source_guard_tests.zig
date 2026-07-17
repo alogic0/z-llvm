@@ -40,7 +40,7 @@ const classified_sources = [_]ClassifiedSource{
 };
 
 const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-const frozen_bypass_inventory_sha256 = "5a0370e3dd922fd849d6c1e8dbc2da412be4e0251aed0598de1cd16e60088de7";
+const frozen_bypass_inventory_sha256 = "c5cf3caa4f4edfc715d8e139d736b399a4fb0b70a82b82f17af182ec88aace3e";
 const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -484,6 +484,7 @@ fn validateLoadDiagnosticMappingProductionSites(source_name: []const u8, source:
         const approved = std.mem.eql(u8, body.name, "lowerLoad") or
             std.mem.eql(u8, body.name, "ordinaryLoadValueUseDiagnostic") or
             std.mem.eql(u8, body.name, "lowerReadOnlyPointerIntegerLoad") or
+            std.mem.eql(u8, body.name, "readOnlyPointerLoadValueUseDiagnostic") or
             std.mem.eql(u8, body.name, "lowerReadOnlyTableLoad");
         if (!approved) return error.ValueUseLoadDiagnosticMappingOutsideAllowlist;
         const forbidden_home_queries = [_][]const u8{
@@ -543,19 +544,30 @@ fn validateDormantLoadActionProductionSites(source_name: []const u8, source: [:0
 
     var body_storage: [max_function_bodies]FunctionBody = undefined;
     const bodies = try collectFunctionBodies(source, &body_storage);
-    const body = functionBodyNamed(bodies, "lowerLoad") orelse
+    const ordinary_body = functionBodyNamed(bodies, "lowerLoad") orelse
         return error.ValueUseLoadActionNotWired;
-    const function_source = source[body.start..body.end];
-    if (countPattern(function_source, address_pattern) != 1 or
-        countPattern(function_source, scalar_pattern) != 1 or
-        countPattern(function_source, alias_pattern) != 1 or
-        countPattern(function_source, pair_pattern) != 0 or
-        countPattern(function_source, table_pattern) != 0 or
-        countPattern(function_source, "ValueUseTransaction.begin(selector)") != 1 or
-        countPattern(function_source, ".executePreparedAction(") != 1 or
-        countPattern(function_source, ".commit()") != 1 or
-        address_total != 1 or scalar_total != 1 or alias_total != 1 or
-        pair_total != 0 or table_total != 0)
+    const readonly_body = functionBodyNamed(bodies, "lowerReadOnlyPointerIntegerLoad") orelse
+        return error.ValueUseLoadActionNotWired;
+    const ordinary_source = source[ordinary_body.start..ordinary_body.end];
+    const readonly_source = source[readonly_body.start..readonly_body.end];
+    if (countPattern(ordinary_source, address_pattern) != 1 or
+        countPattern(ordinary_source, scalar_pattern) != 1 or
+        countPattern(ordinary_source, alias_pattern) != 1 or
+        countPattern(ordinary_source, pair_pattern) != 0 or
+        countPattern(ordinary_source, table_pattern) != 0 or
+        countPattern(ordinary_source, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(ordinary_source, ".executePreparedAction(") != 1 or
+        countPattern(ordinary_source, ".commit()") != 1 or
+        countPattern(readonly_source, address_pattern) != 1 or
+        countPattern(readonly_source, scalar_pattern) != 1 or
+        countPattern(readonly_source, pair_pattern) != 1 or
+        countPattern(readonly_source, alias_pattern) != 0 or
+        countPattern(readonly_source, table_pattern) != 0 or
+        countPattern(readonly_source, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(readonly_source, ".executePreparedAction(") != 1 or
+        countPattern(readonly_source, ".commit()") != 1 or
+        address_total != 2 or scalar_total != 2 or alias_total != 1 or
+        pair_total != 1 or table_total != 0)
     {
         return error.ValueUseLoadActionNotWired;
     }
@@ -590,7 +602,9 @@ fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source
                 if (std.mem.indexOf(u8, function_source, pattern) != null) contains_api = true;
             }
             if (!contains_api) continue;
-            if (!std.mem.eql(u8, body.name, "lowerLoad") or
+            const allowed = std.mem.eql(u8, body.name, "lowerLoad") or
+                std.mem.eql(u8, body.name, "lowerReadOnlyPointerIntegerLoad");
+            if (!allowed or
                 countPattern(function_source, "beginAccumulatorSession(") != 1 or
                 countPattern(function_source, "defineAccumulatorResult(") != 1 or
                 countPattern(function_source, "finalizeAccumulatorResult(") != 1 or
@@ -609,7 +623,7 @@ fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source
             }
             classified_count += 1;
         }
-        if (classified_count != 1)
+        if (classified_count != 2)
             return error.ValueUseAccumulatorCompositionAllowlistMismatch;
         return;
     }
@@ -686,6 +700,7 @@ fn validateFailureProvenanceProductionSites(source_name: []const u8, source: [:0
             const approved = std.mem.eql(u8, body.name, "lowerLoad") or
                 std.mem.eql(u8, body.name, "ordinaryLoadValueUseDiagnostic") or
                 std.mem.eql(u8, body.name, "lowerReadOnlyPointerIntegerLoad") or
+                std.mem.eql(u8, body.name, "readOnlyPointerLoadValueUseDiagnostic") or
                 std.mem.eql(u8, body.name, "lowerReadOnlyTableLoad");
             if (!approved or std.mem.indexOf(u8, function_source, "ValueUseLoad") == null)
                 return error.ValueUseFailureProvenanceOutsideAllowlist;
@@ -1885,10 +1900,13 @@ test "composed selector source guard rejects callback escapes and raw operations
     );
 }
 
-test "composed selector source guard admits only the complete ordinary lowerLoad action set" {
+test "composed selector source guard admits only the complete ordinary and readonly-pointer load action sets" {
     const accepted: [:0]const u8 =
         "fn lowerLoad() void { _ = .load_address; _ = .load_scalar; " ++
         "_ = .load_stack_i128_alias; _ = ValueUseTransaction.begin(selector); " ++
+        "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } " ++
+        "fn lowerReadOnlyPointerIntegerLoad() void { _ = .load_address; _ = .load_scalar; " ++
+        "_ = .load_readonly_pair; _ = ValueUseTransaction.begin(selector); " ++
         "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); }";
     try validateDormantLoadActionProductionSites("composed_selector_memory.zig", accepted);
     try std.testing.expectError(
@@ -1903,9 +1921,13 @@ test "composed selector source guard admits only the complete ordinary lowerLoad
         validateDormantLoadActionProductionSites(
             "composed_selector_memory.zig",
             "fn lowerLoad() void { _ = .load_address; _ = .load_scalar; " ++
-                "_ = .load_stack_i128_alias; _ = .load_readonly_pair; " ++
+                "_ = .load_stack_i128_alias; " ++
                 "_ = ValueUseTransaction.begin(selector); " ++
-                "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); }",
+                "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } " ++
+                "fn lowerReadOnlyPointerIntegerLoad() void { _ = .load_address; _ = .load_scalar; " ++
+                "_ = .load_readonly_pair; _ = ValueUseTransaction.begin(selector); " ++
+                "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); " ++
+                "_ = .load_readonly_pair; }",
         ),
     );
 }
@@ -1915,11 +1937,15 @@ test "composed selector source guard permits the sole readonly dispatch resolve 
         "fn lowerStoreScalarTransactional() void { _ = .store_scalar; _ = .store_immediate; } " ++
         "fn lowerStoreI64Transactional() void { _ = .store_i64; } " ++
         "fn lowerStoreStackPointer() void { _ = .store_stack_pointer; } ";
+    const readonly_fixture =
+        "fn lowerReadOnlyPointerIntegerLoad() void { _ = .load_address; _ = .load_scalar; " ++
+        "_ = .load_readonly_pair; _ = ValueUseTransaction.begin(selector); " ++
+        "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } ";
     const before: [:0]const u8 = store_fixture ++
         "fn lowerLoad() void { _ = selector_state.resolveValue(selector, pointer); " ++
         "_ = .load_address; _ = .load_scalar; _ = .load_stack_i128_alias; " ++
         "_ = ValueUseTransaction.begin(selector); _ = transaction.executePreparedAction(lease); " ++
-        "_ = transaction.commit(); }";
+        "_ = transaction.commit(); } " ++ readonly_fixture;
     try validatePreparedViewLeafDiscipline("composed_selector_memory.zig", before);
     try std.testing.expectError(
         error.ValueUsePreparedLeafRawOperation,
@@ -1928,7 +1954,8 @@ test "composed selector source guard permits the sole readonly dispatch resolve 
             store_fixture ++ "fn lowerLoad() void { _ = .load_address; _ = .load_scalar; " ++
                 "_ = .load_stack_i128_alias; _ = ValueUseTransaction.begin(selector); " ++
                 "_ = selector_state.resolveValue(selector, pointer); " ++
-                "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); }",
+                "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } " ++
+                readonly_fixture,
         ),
     );
 }
@@ -2108,6 +2135,12 @@ test "composed selector source guard admits only reviewed accumulator compositio
     try validateAccumulatorCompositionProductionSites(
         "composed_selector_memory.zig",
         "fn lowerLoad() void { " ++
+            "_ = ValueUseTransaction.begin(selector); " ++
+            "_ = transaction.beginAccumulatorSession(); " ++
+            "_ = transaction.defineAccumulatorResult(accumulator, \"result\", definition); " ++
+            "_ = transaction.finalizeAccumulatorResult(accumulator); " ++
+            "_ = transaction.commit(); } " ++
+            "fn lowerReadOnlyPointerIntegerLoad() void { " ++
             "_ = ValueUseTransaction.begin(selector); " ++
             "_ = transaction.beginAccumulatorSession(); " ++
             "_ = transaction.defineAccumulatorResult(accumulator, \"result\", definition); " ++

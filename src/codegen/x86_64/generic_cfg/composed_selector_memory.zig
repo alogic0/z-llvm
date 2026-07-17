@@ -186,78 +186,68 @@ fn lowerReadOnlyPointerIntegerLoad(selector: *ComposedBlockSelector, result_name
         else => return .{ .no_emitter = "composed-block-load-readonly-param-provenance" },
     };
     if (!selector.readonly_pointer_params.contains(ptr_name)) return .{ .no_emitter = "composed-block-load-ptr-width" };
-    const ptr = selector_state.resolveValue(selector, load.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-load-ptr" };
-    var ptr_reg: ArgReg = switch (ptr) {
-        .arg64, .scratch64 => |reg| reg,
-        .spill64 => |frame_index| blk: {
-            selector_state.materializeLocIntoLoc(selector, .{ .spill64 = frame_index }, .{ .scratch64 = .rdi }) catch
-                return .{ .unsupported_value = "composed-block-load-readonly-param-spill" };
-            break :blk .rdi;
-        },
-        else => return .{ .no_emitter = "composed-block-load-readonly-param-provenance" },
-    };
-    if (bits == 96 or bits == 128) {
-        const pair = try selector_state.choosePairScratchForClobber(selector, null) orelse
-            return .{ .no_spill_envelope = "composed-block-load-readonly-param-pair" };
-        if (pair.contains(ptr_reg)) {
-            selector_state.materializeLocIntoLoc(selector, ptr, .{ .scratch64 = .rdi }) catch
-                return .{ .unsupported_value = "composed-block-load-readonly-param-alias" };
-            ptr_reg = .rdi;
-        }
-        try selector_state.clobberArgReg(selector, pair.lo);
-        try selector_state.clobberArgReg(selector, pair.hi);
-        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 0 } });
-        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair.lo });
-        if (bits == 96) {
-            try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 8 } });
-        } else {
-            try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 8 } });
-        }
-        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = pair.hi });
-        try selector_state.bindResultLoc(selector, result_name, .{ .scratch128 = pair });
-        return null;
-    }
-
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
-    if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
-    if (bits == 8 or bits == 16 or bits == 32) {
-        try selector.machine.instructions.append(selector.allocator, switch (bits) {
-            8 => .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = ptr_reg, .offset = 0 } },
-            16 => .{ .load_arg_ptr_disp8_u16_eax = .{ .reg = ptr_reg, .offset = 0 } },
-            32 => .{ .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 0 } },
-            else => unreachable,
-        });
-        try transaction.define(result_name, .zeroExtending(bits));
-        try transaction.commit();
-        return null;
-    }
-    if (bits == 56) {
-        const scratch: ArgReg = if (ptr_reg == .rcx) .r8 else .rcx;
-        try selector_state.clobberArgReg(selector, scratch);
-        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_u16_eax = .{ .reg = ptr_reg, .offset = 4 } });
-        try selector.machine.instructions.append(selector.allocator, .{ .shl_rax_imm6 = 32 });
-        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = scratch });
-        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = ptr_reg, .offset = 6 } });
-        try selector.machine.instructions.append(selector.allocator, .{ .shl_rax_imm6 = 48 });
-        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"or", .reg = scratch } });
-        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = scratch });
-        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 0 } });
-        try selector.machine.instructions.append(selector.allocator, .{ .binary_arg_rax = .{ .op = .@"or", .reg = scratch } });
-        // The three loads assemble 56 logical bits and prove the top byte of
-        // the physical RAX transport is zero.
-        try transaction.define(result_name, .zeroExtendedRax(56));
-        try transaction.commit();
-        return null;
-    }
-    if (bits == 64) {
-        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 0 } });
-        try transaction.define(result_name, .fullRax());
-        try transaction.commit();
-        return null;
-    }
+    const pair_result = bits == 96 or bits == 128;
+    const pointer_request = try registerValueUseAction(
+        &transaction,
+        load.ptr,
+        .ptr,
+        .stack_pointer,
+        .load_address,
+        if (pair_result)
+            .{ .load_readonly_pair = .{
+                .result = try valueUseActionIdentity(result_name),
+                .bits = bits,
+            } }
+        else
+            .{ .load_scalar = .{ .kind = .readonly_pointer, .bits = bits } },
+    );
+    transaction.seal() catch |err|
+        return readOnlyPointerLoadValueUseDiagnostic(&transaction, pointer_request, err) orelse return err;
 
-    return .{ .no_emitter = "composed-block-load-width" };
+    const accumulator = if (pair_result)
+        null
+    else
+        try transaction.beginAccumulatorSession();
+    transaction.prepare() catch |err|
+        return readOnlyPointerLoadValueUseDiagnostic(&transaction, pointer_request, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return readOnlyPointerLoadValueUseDiagnostic(&transaction, pointer_request, err) orelse return err;
+    const lease = transaction.preparedView(pointer_request) catch |err|
+        return readOnlyPointerLoadValueUseDiagnostic(&transaction, pointer_request, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return readOnlyPointerLoadValueUseDiagnostic(&transaction, pointer_request, err) orelse return err;
+
+    if (accumulator) |handle| {
+        const definition: selector_state.AccumulatorDefinition = switch (bits) {
+            8, 16, 32 => .zeroExtending(bits),
+            56 => .zeroExtendedRax(56),
+            64 => .fullRax(),
+            else => unreachable,
+        };
+        try transaction.defineAccumulatorResult(handle, result_name, definition);
+        try transaction.finalizeAccumulatorResult(handle);
+    }
+    try transaction.commit();
+    return null;
+}
+
+fn readOnlyPointerLoadValueUseDiagnostic(
+    transaction: *const ValueUseTransaction,
+    pointer_request: ValueUseTransaction.RequestHandle,
+    err: anyerror,
+) ?Diagnostic {
+    if (!transaction.failedRequestIs(pointer_request)) return null;
+    return switch (err) {
+        error.ValueUseUnresolvedSource => .{ .unsupported_value = "composed-block-unknown-load-ptr" },
+        error.ValueUseLoadReadonlyPointerProvenance => .{ .no_emitter = "composed-block-load-readonly-param-provenance" },
+        error.ValueUseLoadReadonlyPointerSpill => .{ .unsupported_value = "composed-block-load-readonly-param-spill" },
+        error.ValueUseLoadReadonlyPointerAlias => .{ .unsupported_value = "composed-block-load-readonly-param-alias" },
+        error.ValueUseLoadReadonlyPairUnavailable => .{ .no_spill_envelope = "composed-block-load-readonly-param-pair" },
+        error.ValueUseLoadReadonlyWidth => .{ .no_emitter = "composed-block-load-width" },
+        else => null,
+    };
 }
 
 fn lowerStoreStackPointer(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {

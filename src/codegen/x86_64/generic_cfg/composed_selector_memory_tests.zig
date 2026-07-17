@@ -64,21 +64,26 @@ const floateidf_i56_fixture =
     \\
 ;
 
-test "migrated i56 load keeps logical domain and physical RAX binding while preserving flags and live value" {
+test "migrated readonly i56 load keeps logical domain and records exact EFLAGS writes" {
     var module = try ir.Module.parse(std.testing.allocator, floateidf_i56_fixture);
     defer module.deinit();
     try module.verify();
 
     var machine = MachineFunction.init("i56-load-binding", .{ .int = 56 });
     defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("p", 1);
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
     selector.function = &module.functions.items[0];
+    selector.allocation_plan = &plan;
     selector.stack_frame_bytes = 24;
     try selector.readonly_pointer_params.put("p", {});
     try selector_state.bindValueLoc(&selector, "p", .{ .arg64 = .rdi });
     try selector.eflags.apply(.definition);
-    const saved_eflags = selector.eflags.snapshot();
+    try selector.eflags.apply(.use);
+    const semantics_before = selector.eflags_semantics.items.len;
 
     try std.testing.expect((try selector_memory.lowerLoad(&selector, "loaded", .{
         .ty = .{ .int = 56 },
@@ -90,8 +95,13 @@ test "migrated i56 load keeps logical domain and physical RAX binding while pres
     try std.testing.expectEqual(ValueLoc.rax, binding.loc);
     try std.testing.expectEqual(@as(u16, 56), selector.accumulator_domain.occupantFor(.rax).?.logical_bits);
     try std.testing.expectEqual(@as(u16, 64), selector.accumulator_domain.defined_bits);
-    try selector.eflags.validateSnapshot(saved_eflags);
+    try std.testing.expectEqual(semantics_before + 4, selector.eflags_semantics.items.len);
+    try std.testing.expectEqual(
+        selector_state.EflagsLiveness.Snapshot{ .status = .undefined, .definition_purpose = null },
+        selector.eflags.snapshot(),
+    );
 
+    _ = selector_state.removeValueBinding(&selector, "p");
     try std.testing.expect((try selector_state.preserveLiveAccumulatorValue(&selector, "loaded")) == null);
     try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, selector.values.get("loaded").?.loc);
     try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_rax_to_arg = .rdi }, machine.instructions.items[machine.instructions.items.len - 1]);
@@ -118,6 +128,60 @@ test "exact floateidf i56 path executes byte-six and maximal low-56-bit patterns
     const maximal_low_56 = [_]u8{0xff} ** 7;
     try std.testing.expectEqual(@as(f64, 281_474_976_710_656), function(&byte_six_set, 56));
     try std.testing.expectEqual(@as(f64, -1), function(&maximal_low_56, 56));
+}
+
+test "migrated readonly pair loads retain post-staging chooser timing and limb widths" {
+    const Case = struct {
+        bits: u16,
+        pointer: ValueLoc,
+        expected: []const x86_64_machine.Instruction,
+    };
+    const cases = [_]Case{
+        .{
+            .bits = 96,
+            .pointer = .{ .arg64 = .rcx },
+            .expected = &.{
+                .{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rcx } },
+                .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = 0 } },
+                .{ .mov_rax_to_arg = .rcx },
+                .{ .load_arg_ptr_disp8_eax = .{ .reg = .rdi, .offset = 8 } },
+                .{ .mov_rax_to_arg = .rdx },
+            },
+        },
+        .{
+            .bits = 128,
+            .pointer = .{ .spill64 = .slot3 },
+            .expected = &.{
+                .{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot3 } },
+                .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = 0 } },
+                .{ .mov_rax_to_arg = .rcx },
+                .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = 8 } },
+                .{ .mov_rax_to_arg = .rdx },
+            },
+        },
+    };
+
+    for (cases) |case| {
+        var machine = MachineFunction.init("readonly-pair-production", .{ .int = case.bits });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("p", 1);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 64;
+        try selector.readonly_pointer_params.put("p", {});
+        try selector_state.bindValueLoc(&selector, "p", case.pointer);
+
+        try std.testing.expect((try selector_memory.lowerLoad(&selector, "loaded", .{
+            .ty = .{ .int = case.bits },
+            .ptr = .{ .named = "p" },
+        })) == null);
+
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, case.expected, machine.instructions.items);
+        try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_a }, selector.values.get("loaded").?.loc);
+    }
 }
 
 test "migrated pointer load displaces one and multiple accumulator aliases instruction-identically" {
