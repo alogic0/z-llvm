@@ -13,6 +13,52 @@ const ComposedBlockSelector = impl.ComposedBlockSelector;
 const ValueLoc = selector_types.ValueLoc;
 const SelectorAllocationPlan = stage2_planning.SelectorAllocationPlan;
 
+test "fixed-scratch compare maps lhs and rhs failures in source order and rolls back" {
+    {
+        var machine = MachineFunction.init("fixed-scratch-missing-lhs", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
+
+        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "missing-lhs" },
+            .rhs = .{ .named = "rhs" },
+        })).?;
+
+        try std.testing.expectEqualStrings("composed-block-icmp-lhs", diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expect(selector_state.valueLoc(&selector, "cmp") == null);
+        try std.testing.expectEqual(ValueLoc{ .arg32 = .rsi }, selector_state.valueLoc(&selector, "rhs").?);
+    }
+
+    {
+        var machine = MachineFunction.init("fixed-scratch-missing-rhs", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("lhs", 1);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+
+        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .named = "missing-rhs" },
+        })).?;
+
+        try std.testing.expectEqualStrings("composed-block-icmp-rhs", diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expect(selector_state.valueLoc(&selector, "cmp") == null);
+        try std.testing.expectEqual(ValueLoc{ .arg32 = .rdi }, selector_state.valueLoc(&selector, "lhs").?);
+    }
+}
+
 test "migrated accumulator-resident compare preserves same-register logical aliases" {
     var machine = MachineFunction.init("icmp-accumulator-aliases", .{ .int = 1 });
     defer machine.deinit(std.testing.allocator);
@@ -88,8 +134,12 @@ test "generic cfg selector admits signed textual i16 constants as unsigned bit p
     }) |case| {
         var machine = MachineFunction.init("i16-negative-literal", .{ .int = 1 });
         defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("value", 1);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
+        selector.allocation_plan = &plan;
         try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
 
         const diagnostic = try selector_icmp.lowerIcmp(&selector, "cmp", .{
@@ -166,8 +216,13 @@ test "generic cfg selector executes unsigned i16 negative-literal boundaries" {
 test "generic cfg selector lowers exact named i64 unsigned less-than" {
     var machine = MachineFunction.init("named-i64-ult", .{ .int = 1 });
     defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("lhs", 1);
+    try plan.interval_ends.put("rhs", 1);
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
+    selector.allocation_plan = &plan;
     try selector_state.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi });
     try selector_state.bindValueLoc(&selector, "rhs", .{ .arg64 = .rsi });
 
@@ -244,8 +299,13 @@ test "generic cfg selector lowers exact named i16 comparisons" {
     inline for (.{ ir.IcmpPredicate.slt, ir.IcmpPredicate.sgt, ir.IcmpPredicate.ne }) |predicate| {
         var machine = MachineFunction.init("named-i16", .{ .int = 1 });
         defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("lhs", 1);
+        try plan.interval_ends.put("rhs", 1);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
+        selector.allocation_plan = &plan;
         try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
         try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
 

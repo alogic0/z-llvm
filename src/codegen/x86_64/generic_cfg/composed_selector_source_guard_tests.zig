@@ -395,6 +395,7 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
         return error.ValueUseNestedAccumulatorSnapshot;
     try validateScratchCompareIntentSurface(source);
     try validateDurableActionIdentityOwnership(source);
+    try validateScratchComparePreservationPreamble(source);
 }
 
 fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const u8) !void {
@@ -468,6 +469,9 @@ fn validateScratchCompareIntentSurface(source: []const u8) !void {
         "FrameIndex",
         "PreparedView",
         "PreparedScalarHome",
+        "preserve",
+        "early",
+        "phase",
     };
     for (declarations) |declaration| {
         const start = std.mem.indexOf(u8, source, declaration).?;
@@ -478,6 +482,58 @@ fn validateScratchCompareIntentSurface(source: []const u8) !void {
             if (std.mem.indexOf(u8, body, pattern) != null)
                 return error.ValueUseScratchComparePhysicalIntentEscape;
         }
+    }
+}
+
+fn validateScratchComparePreservationPreamble(source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const execute_body = functionBodyNamed(bodies, "executeScratchCompare") orelse return;
+    const preserve_body = functionBodyNamed(bodies, "preserveScratchCompareLiveAccumulator") orelse
+        return error.ValueUseScratchComparePreservationPreambleMissing;
+    const refresh_body = functionBodyNamed(bodies, "refreshScratchCompareOperandViews") orelse
+        return error.ValueUseScratchComparePreservationPreambleMissing;
+    const execute_source = source[execute_body.start..execute_body.end];
+    const preserve_source = source[preserve_body.start..preserve_body.end];
+    const refresh_source = source[refresh_body.start..refresh_body.end];
+
+    const preserve_call = std.mem.indexOf(
+        u8,
+        execute_source,
+        "try preserveScratchCompareLiveAccumulator(transaction);",
+    ) orelse return error.ValueUseScratchComparePreservationPreambleMissing;
+    const refresh_call = std.mem.indexOf(
+        u8,
+        execute_source,
+        "try refreshScratchCompareOperandViews(transaction, lhs_index, action);",
+    ) orelse return error.ValueUseScratchCompareCanonicalRefreshMissing;
+    const stage_call = std.mem.indexOf(
+        u8,
+        execute_source,
+        "try stageScratchCompareOperand(",
+    ) orelse return error.ValueUseScratchComparePreservationOrder;
+    const prepare_call = std.mem.indexOf(
+        u8,
+        execute_source,
+        "if (try session.prepare(.preserve, .spill_live))",
+    ) orelse return error.ValueUseScratchComparePreservationOrder;
+    if (!(preserve_call < refresh_call and refresh_call < stage_call and stage_call < prepare_call) or
+        countPattern(execute_source, "preserveScratchCompareLiveAccumulator(transaction)") != 1 or
+        countPattern(execute_source, "refreshScratchCompareOperandViews(transaction, lhs_index, action)") != 1 or
+        countPattern(execute_source, "initial_lhs_view") != 1 or
+        countPattern(execute_source, "after_canonical_view_refresh") != 1 or
+        countPattern(execute_source, "&transaction.prepared_views[lhs_index].view") != 1 or
+        countPattern(preserve_source, "liveAccumulatorNameAfterCurrent(transaction.selector)") != 1 or
+        countPattern(preserve_source, "preserveLiveAccumulatorValue(transaction.selector, live_name)") != 1 or
+        countPattern(preserve_source, "after_first_accumulator_preservation") != 1 or
+        countPattern(preserve_source, "eflags.validateSnapshot(flags_before)") != 1 or
+        countPattern(preserve_source, "eflags_semantics.items.len") != 2 or
+        countPattern(refresh_source, "buildPreparedRecord(lhs_index)") != 1 or
+        countPattern(refresh_source, "buildPreparedRecord(rhs_index)") != 1 or
+        countPattern(source, "liveAccumulatorNameAfterCurrent(transaction.selector)") != 1 or
+        countPattern(source, "preserveLiveAccumulatorValue(transaction.selector, live_name)") != 1)
+    {
+        return error.ValueUseScratchComparePreservationOrder;
     }
 }
 
@@ -2388,6 +2444,48 @@ test "composed selector source guard keeps scratch compare intent semantic and d
             validateDormantScratchCompareProductionSites("composed_selector_icmp.zig", fixture),
         );
     }
+
+    const preamble_helpers =
+        "fn preserveScratchCompareLiveAccumulator() void { " ++
+        "const flags_before = transaction.selector.eflags.snapshot(); " ++
+        "const semantic_records_before = transaction.selector.eflags_semantics.items.len; " ++
+        "while (try liveAccumulatorNameAfterCurrent(transaction.selector)) |live_name| { " ++
+        "_ = try preserveLiveAccumulatorValue(transaction.selector, live_name); " ++
+        "try failScratchCompareForTest(transaction, .after_first_accumulator_preservation); } " ++
+        "try transaction.selector.eflags.validateSnapshot(flags_before); " ++
+        "if (transaction.selector.eflags_semantics.items.len != semantic_records_before) return error.Changed; } " ++
+        "fn refreshScratchCompareOperandViews() void { " ++
+        "transaction.prepared_views[lhs_index] = try transaction.buildPreparedRecord(lhs_index); " ++
+        "transaction.prepared_views[rhs_index] = try transaction.buildPreparedRecord(rhs_index); }";
+    const accepted_preamble: [:0]const u8 =
+        "fn executeScratchCompare() void { " ++
+        "_ = initial_lhs_view; " ++
+        "try preserveScratchCompareLiveAccumulator(transaction); " ++
+        "try refreshScratchCompareOperandViews(transaction, lhs_index, action); " ++
+        "try failScratchCompareForTest(transaction, .after_canonical_view_refresh); " ++
+        "try stageScratchCompareOperand(transaction, lhs_index, &transaction.prepared_views[lhs_index].view); " ++
+        "if (try session.prepare(.preserve, .spill_live)) return; } " ++
+        preamble_helpers;
+    try validateScratchComparePreservationPreamble(accepted_preamble);
+    const reordered_preamble: [:0]const u8 =
+        "fn executeScratchCompare() void { " ++
+        "_ = initial_lhs_view; " ++
+        "try stageScratchCompareOperand(transaction, lhs_index, &transaction.prepared_views[lhs_index].view); " ++
+        "try preserveScratchCompareLiveAccumulator(transaction); " ++
+        "try refreshScratchCompareOperandViews(transaction, lhs_index, action); " ++
+        "try failScratchCompareForTest(transaction, .after_canonical_view_refresh); " ++
+        "if (try session.prepare(.preserve, .spill_live)) return; } " ++
+        preamble_helpers;
+    try std.testing.expectError(
+        error.ValueUseScratchComparePreservationOrder,
+        validateScratchComparePreservationPreamble(reordered_preamble),
+    );
+    try std.testing.expectError(
+        error.ValueUseScratchComparePreservationPreambleMissing,
+        validateScratchComparePreservationPreamble(
+            "fn executeScratchCompare() void { try stageScratchCompareOperand(); }",
+        ),
+    );
 
     const accepted_identity: [:0]const u8 =
         "fn executeScratchCompare() void { " ++

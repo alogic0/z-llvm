@@ -338,6 +338,8 @@ pub const ValueUseTransaction = struct {
     };
 
     pub const ScratchCompareTestFailure = enum {
+        after_first_accumulator_preservation,
+        after_canonical_view_refresh,
         after_lhs_staging,
         after_rhs_staging,
         after_immediate_staging,
@@ -2498,19 +2500,24 @@ fn executePreparedActionInternal(
 fn executeScratchCompare(
     transaction: *ValueUseTransaction,
     lhs_index: u8,
-    lhs_view: *const ValueUseTransaction.PreparedView,
+    initial_lhs_view: *const ValueUseTransaction.PreparedView,
     action: *const ValueUseTransaction.ScratchCompareAction,
 ) !void {
+    _ = initial_lhs_view;
     const plan = try classifyScratchCompare(action);
     const session = if (transaction.accumulator_session) |*session|
         session
     else
         return error.ValueUseScratchCompareAccumulatorSessionRequired;
 
+    try preserveScratchCompareLiveAccumulator(transaction);
+    try refreshScratchCompareOperandViews(transaction, lhs_index, action);
+    try failScratchCompareForTest(transaction, .after_canonical_view_refresh);
+
     try stageScratchCompareOperand(
         transaction,
         lhs_index,
-        lhs_view,
+        &transaction.prepared_views[lhs_index].view,
         plan.lhs_register,
         plan.bits,
     );
@@ -2633,6 +2640,44 @@ fn executeScratchCompare(
     try failScratchCompareForTest(transaction, .after_result_definition);
     try session.finalize();
     try failScratchCompareForTest(transaction, .after_result_finalization);
+}
+
+fn preserveScratchCompareLiveAccumulator(
+    transaction: *ValueUseTransaction,
+) !void {
+    const flags_before = transaction.selector.eflags.snapshot();
+    const semantic_records_before = transaction.selector.eflags_semantics.items.len;
+    var preserved_any = false;
+    while (try selector_state.liveAccumulatorNameAfterCurrent(transaction.selector)) |live_name| {
+        if (try selector_state.preserveLiveAccumulatorValue(transaction.selector, live_name)) |diagnostic| {
+            transaction.action_diagnostic = diagnostic;
+            return error.ValueUseActionDiagnostic;
+        }
+        if (!preserved_any) {
+            preserved_any = true;
+            try failScratchCompareForTest(transaction, .after_first_accumulator_preservation);
+        }
+    }
+    try transaction.selector.eflags.validateSnapshot(flags_before);
+    if (transaction.selector.eflags_semantics.items.len != semantic_records_before)
+        return error.EflagsScratchComparePreservationChanged;
+}
+
+fn refreshScratchCompareOperandViews(
+    transaction: *ValueUseTransaction,
+    lhs_index: u8,
+    action: *const ValueUseTransaction.ScratchCompareAction,
+) !void {
+    transaction.prepared_views[lhs_index] = try transaction.buildPreparedRecord(lhs_index);
+    transaction.prepared_view_valid[lhs_index] = true;
+    switch (action.rhs) {
+        .named => |handle| {
+            const rhs_index = try transaction.validateRegisteredOperandHandle(handle);
+            transaction.prepared_views[rhs_index] = try transaction.buildPreparedRecord(rhs_index);
+            transaction.prepared_view_valid[rhs_index] = true;
+        },
+        .immediate, .null_pointer => {},
+    }
 }
 
 fn stageScratchCompareOperand(

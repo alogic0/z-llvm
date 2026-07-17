@@ -4695,6 +4695,205 @@ test "value-use dormant scratch compare action reproduces representative streams
     );
 }
 
+test "value-use scratch compare preserves a prior result before staging the next operand" {
+    var machine = MachineFunction.init("value-use-scratch-compare-two-phase", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("lhs", 1);
+    try plan.interval_ends.put("rhs", 2);
+    try plan.interval_ends.put("first-result", 3);
+    try plan.interval_ends.put("second-result", 2);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
+
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const requests = try registerScratchCompare(
+            &transaction,
+            .{ .named = "lhs" },
+            .{ .immediate = 0 },
+            "first-result",
+            .{ .int = 32 },
+            .ne,
+            false,
+        );
+        try transaction.seal();
+        _ = try transaction.beginAccumulatorSession();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(requests.lhs));
+        try transaction.commit();
+    }
+
+    selector.current_position = 2;
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const requests = try registerScratchCompare(
+            &transaction,
+            .{ .named = "rhs" },
+            .{ .immediate = 0 },
+            "second-result",
+            .{ .int = 32 },
+            .ne,
+            false,
+        );
+        try transaction.seal();
+        _ = try transaction.beginAccumulatorSession();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(requests.lhs));
+        try transaction.commit();
+    }
+
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
+        .{ .test_arg32 = .rcx },
+        .setne_eax,
+        .{ .mov_eax_to_arg = .rdi },
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
+        .{ .test_arg32 = .rcx },
+        .setne_eax,
+    }, machine.instructions.items);
+    try std.testing.expectEqual(ValueLoc{ .scratch32 = .rdi }, selector.values.get("first-result").?.loc);
+    try std.testing.expectEqual(ValueLoc.eax, selector.values.get("second-result").?.loc);
+    try std.testing.expectEqual(@as(usize, 4), selector.eflags_semantics.items.len);
+}
+
+test "value-use scratch compare refreshes an accumulator operand after preservation" {
+    var machine = MachineFunction.init("value-use-scratch-compare-accumulator-source", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addLive(&plan, "lhs");
+    try addAtCurrent(&plan, "result");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "lhs", .eax);
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const requests = try registerScratchCompare(
+        &transaction,
+        .{ .named = "lhs" },
+        .{ .immediate = 0 },
+        "result",
+        .{ .int = 32 },
+        .ne,
+        false,
+    );
+    try transaction.seal();
+    _ = try transaction.beginAccumulatorSession();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(requests.lhs));
+    try transaction.commit();
+
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .mov_eax_to_arg = .rdi },
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
+        .{ .test_arg32 = .rcx },
+        .setne_eax,
+    }, machine.instructions.items);
+    try std.testing.expectEqual(ValueLoc{ .scratch32 = .rdi }, selector.values.get("lhs").?.loc);
+    try std.testing.expectEqual(ValueLoc.eax, selector.values.get("result").?.loc);
+}
+
+test "value-use scratch compare preserves each live accumulator alias once without duplicate spill" {
+    var machine = MachineFunction.init("value-use-scratch-compare-accumulator-aliases", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "lhs");
+    try addLive(&plan, "alias-a");
+    try addLive(&plan, "alias-b");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdx });
+    try selector_state.bindValueLoc(&selector, "alias-a", .eax);
+    try selector_state.bindValueLoc(&selector, "alias-b", .eax);
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const requests = try registerScratchCompare(
+        &transaction,
+        .{ .named = "lhs" },
+        .{ .immediate = 0 },
+        "result",
+        .{ .int = 32 },
+        .ne,
+        false,
+    );
+    try transaction.seal();
+    _ = try transaction.beginAccumulatorSession();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(requests.lhs));
+    try transaction.commit();
+
+    var preservation_moves: usize = 0;
+    var spills: usize = 0;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .mov_eax_to_arg => preservation_moves += 1,
+        .spill_eax_rsp => spills += 1,
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 2), preservation_moves);
+    try std.testing.expectEqual(@as(usize, 0), spills);
+    try std.testing.expect(selector.values.get("alias-a").?.loc != .eax);
+    try std.testing.expect(selector.values.get("alias-b").?.loc != .eax);
+}
+
+test "value-use scratch compare preservation leaves EFLAGS unchanged through canonical refresh" {
+    var machine = MachineFunction.init("value-use-scratch-compare-preserve-flags", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "lhs");
+    try addLive(&plan, "live-accumulator");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rsi });
+    try selector_state.bindValueLoc(&selector, "live-accumulator", .eax);
+    try selector.eflags.apply(.definition);
+    const flags_before = selector.eflags.snapshot();
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const requests = try registerScratchCompare(
+        &transaction,
+        .{ .named = "lhs" },
+        .{ .immediate = 0 },
+        "result",
+        .{ .int = 32 },
+        .ne,
+        false,
+    );
+    try transaction.seal();
+    _ = try transaction.beginAccumulatorSession();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.setScratchCompareTestFailure(.after_canonical_view_refresh);
+    try std.testing.expectError(
+        error.ValueUseScratchCompareTestFailure,
+        transaction.executePreparedAction(try transaction.preparedView(requests.lhs)),
+    );
+
+    try selector.eflags.validateSnapshot(flags_before);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(ValueLoc.eax, selector.values.get("live-accumulator").?.loc);
+    try std.testing.expectEqual(ValueLoc{ .arg32 = .rsi }, selector.values.get("lhs").?.loc);
+}
+
 test "value-use dormant scratch compare action classifies the complete twenty-form matrix" {
     const RhsKind = enum { immediate, null_pointer, named };
     const Case = struct {
@@ -4915,6 +5114,8 @@ test "value-use scratch compare plans every RCX R8 and EAX physical write" {
 test "value-use scratch compare rollback is exact at every action boundary" {
     const Boundary = Transaction.ScratchCompareTestFailure;
     const boundaries = [_]Boundary{
+        .after_first_accumulator_preservation,
+        .after_canonical_view_refresh,
         .after_lhs_staging,
         .after_rhs_staging,
         .after_lhs_normalize_shl,
