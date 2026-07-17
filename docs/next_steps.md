@@ -186,7 +186,17 @@ transient-EAX write-back; R03 EAX-vs-durable-RCX; R06 sessionless); +636
 dormant test lines; identities EXACT (`49a19f04`/`061a64e4`/`5d91960e`);
 full unit 1,309/1,309; Worker abi + my independent abi rerun both pass; no
 perf; no Tier 3. Evidence sent to the Reviewer requesting dormant acceptance
-+ the immediates wiring authorization (166→153).
++ the immediates wiring authorization (166→153). **ACCEPTED and the wiring
+AUTHORIZED** (Reviewer, 2026-07-17: "I accept the dormant immediates slice
+at b2189cdc and authorize production wiring."), with the action/model frozen
+at `b2189cdc` and the wiring contract: accepted dispatch/validation order
+preserved; L00 + every i128 pair-result form entirely legacy/O4; only the 12
+migrated gateways removed; `tryLowerLshr64SpillThroughRax/resolveValue`
+removed only after proving no remaining owner; ratchet reconciling EXACTLY
+to 153 (any other count = hard stop); identities + six frontier rows
+byte-identical; full correctness + counterbalanced perf gates; uncommitted
+wiring preserved losslessly on any stop; no Tier 3; stop after the
+production + evidence commits. INBOX-135 dispatched.
 
 ## Historical operating ledger
 
