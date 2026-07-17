@@ -1,8 +1,10 @@
 # INBOX-129 O2-R2 tests and source-guard split
 
-Status: implementation, manifests, and performance-omission contract are
-ready for the required committed-tree freeze. Acceptance commands and their
-raw-log hashes are appended only after that immutable commit is created.
+Status: complete. The implementation, manifests, performance-omission
+contract, and draft summary were frozen at commit
+`255cae0f4cbd8fc493784191dd10449845ec00e5`, tree
+`927235c366d4906c5af2067b8aa1a8e1b2c13e73`, before any acceptance
+artifact was generated. This follow-up changes only the tracked summary.
 
 Date: 2026-07-17
 
@@ -156,18 +158,78 @@ for omitting the counterbalanced performance run.
 
 ## Acceptance validation
 
-Pending the committed-tree freeze. The final evidence-only follow-up records
-the frozen commit/tree, every exact command, result, raw-log hash, and the
-required identities:
+Every acceptance command below ran only after commit `255cae0f` was frozen.
+
+### Mechanical provenance and R1 byte contract
 
 ```text
-report=49a19f04 / 443/285/158 / compiler_rt.trunc.truncl
-accepted_object=061a64e4
-owner_manifest=5d91960e / ledger=167/17/101
-abi=60/60+30/30
-focused_canaries=fma+__multi3
-integrated_exe=7/7
-strengthened_tier2=green
+command=python3 tmp/inbox129_validate_manifests.py > tmp/inbox129_o2_r2/validation/manifest_validation.log 2>&1
+result=128_semantic_tests_exact+2_r1_proofs_exact+34_guard_policies_exact
+log_sha256=5347336fe732732c7c07684adf4c0259002a4fa63842404670e52baa147af3ad
+
+command=python3 tmp/inbox129_hash_contract.py > tmp/inbox129_o2_r2/validation/r1_hash_contract.log 2>&1
+result=412_rows/5_classes/all_identical
+log_sha256=308d6dbb07a36ae31299f654f7b1933e9a2079b8cd7a218e3bf65b1fa1e27cbb
 ```
 
-No Tier 3 command will be run.
+The post-commit hash-contract run reproduced the committed TSV byte for byte.
+Performance is therefore omitted under the accepted Reviewer rule.
+
+### Source guard and full unit suite
+
+```text
+command=zig test src/codegen/x86_64/generic_cfg/composed_selector_source_guard_tests.zig > tmp/inbox129_o2_r2/validation/source_guard.log 2>&1
+result=34/34
+log_sha256=0a6081972722a903875d745d1fe497a665c7621d7c7aeb4b73b9281685a7bf29
+
+command=zig build test --summary all > tmp/inbox129_o2_r2/validation/full_unit.log 2>&1
+result=7/7_steps,1278/1278_tests
+log_sha256=179a9e357b04c944fe96643ef1c47bad45232cc1dc21aa582fd6489494780c32
+```
+
+The accepted full-unit count is unchanged.
+
+### Frozen report, object, and owner identities
+
+```text
+command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --report-all-codegen-failures --target=x86_64-linux --input-limit=67108864 tmp/inbox92_second_resume2_perf/compiler_rt_frozen.ll > /dev/null 2> tmp/inbox129_o2_r2/validation/fresh_full_report.log
+expected_exit_status=1
+report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681
+selected/emitted/failed=443/285/158
+first_failure=compiler_rt.trunc.truncl/UnsupportedLongDoubleAbi
+
+command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll > tmp/inbox129_o2_r2/validation/accepted.o 2> tmp/inbox129_o2_r2/validation/accepted.stderr
+accepted_object_sha256=061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be
+stderr_bytes=0
+
+command=LC_ALL=C zig-out/bin/z_llvm --emit=selection-owner-manifest --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll > tmp/inbox129_o2_r2/validation/owner_manifest.tsv 2> tmp/inbox129_o2_r2/validation/owner_manifest.stderr
+owner_manifest_sha256=5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d
+owner_ledger=167/17/101
+owner_breakdown=composed_block:40,composed_cfg:127,legacy_envelope:17,structural_fallback:101
+stderr_bytes=0
+```
+
+No report row, object byte, owner, counter, or target frontier moved. The
+direct-materialization ratchet remains 172.
+
+### ABI, focused canaries, integrated executable, and Tier 2
+
+```text
+command=zig build abi-differential --summary all > tmp/inbox129_o2_r2/validation/abi_differential.log 2>&1
+result=60/60_cases+30/30_real_functions
+log_sha256=139beff480d39d182360446442b1f3171a42cae38a733c952daca6a87c6a882e
+
+command=zig build focused-codegen-canaries --summary all > tmp/inbox129_o2_r2/validation/focused_canaries.log 2>&1
+result=fma+__multi3/35_execution_cases/local_fail=0
+log_sha256=2bf6f68ae7cec068253218a52e4d89d17d0b193396c31e3bca2feb72744e40f8
+
+command=zig build distribution-zig-integrated-exe --summary all > tmp/inbox129_o2_r2/validation/integrated_exe.log 2>&1
+result=7/7
+log_sha256=cb1541032237fc55394ab3fd02285b62125044dfcdac27f5b76ee8cb50f64fcd
+
+command=zig build test structural-smoke compare-codegen-asm compare-codegen-objdump compare-codegen-readelf distribution-object distribution-executable distribution-debug-object distribution-debug-executable distribution-releasesafe-object distribution-zig-integrated-exe abi-differential --summary all > tmp/inbox129_o2_r2/validation/strengthened_tier2.log 2>&1
+result=29/29_steps,1286/1286_tests
+log_sha256=b83467edcf591d46844632b7b243c0f183396a32ea7164e885d2bbcfe3cb7857
+```
+
+No Tier 3 command was run. `stash@{0}` remained untouched throughout R2.
