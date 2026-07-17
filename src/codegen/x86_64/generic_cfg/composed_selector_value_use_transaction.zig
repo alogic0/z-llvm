@@ -65,6 +65,7 @@ pub const ValueUseTransaction = struct {
     load_test_failure: if (builtin.is_test) ?LoadTestFailure else void = if (builtin.is_test) null else {},
     scratch_compare_test_failure: if (builtin.is_test) ?ScratchCompareTestFailure else void = if (builtin.is_test) null else {},
     current_home_eq_zero_test_failure: if (builtin.is_test) ?CurrentHomeEqZeroTestFailure else void = if (builtin.is_test) null else {},
+    setcc_eax_compare_test_failure: if (builtin.is_test) ?SetccEaxCompareTestFailure else void = if (builtin.is_test) null else {},
 
     pub const Expected = struct {
         ty: ir.Type,
@@ -111,6 +112,10 @@ pub const ValueUseTransaction = struct {
         /// classifies the canonical post-preamble home internally and grants
         /// no generic scalar materialization or prepared-location access.
         current_home_eq_zero_operand,
+        /// Action-only named operand for the closed setcc-producing EAX
+        /// compare family. The action owns canonical post-preamble
+        /// re-resolution and never exposes the current home.
+        setcc_eax_compare_operand,
         stack_argument,
         new_pair_ownership,
     };
@@ -382,6 +387,39 @@ pub const ValueUseTransaction = struct {
         after_accumulator_preparation,
     };
 
+    pub const SetccEaxCompareStructure = enum {
+        ordinary,
+        exact_ei,
+    };
+
+    /// Closed semantic intent for setcc-producing EAX comparisons. Immediate
+    /// values remain semantic; no physical home, register, displacement, or
+    /// sequencing choice crosses this boundary.
+    pub const SetccEaxCompareAction = struct {
+        result: ActionIdentity,
+        operand_ty: ir.Type,
+        predicate: ir.IcmpPredicate,
+        samesign: bool,
+        immediate: i128,
+        structure: SetccEaxCompareStructure,
+    };
+
+    pub const SetccEaxCompareRequestError = error{
+        ValueUseSetccEaxCompareWidthUnsupported,
+        ValueUseSetccEaxCompareLocationUnsupported,
+    };
+
+    pub const SetccEaxCompareTestFailure = enum {
+        after_preamble,
+        after_materialization,
+        after_normalization_or_mask,
+        after_eflags_definition,
+        after_accumulator_preparation,
+        after_setcc,
+        after_result_definition,
+        after_finalization,
+    };
+
     pub const max_switch_cases = 8;
 
     pub const SwitchCaseIntent = struct {
@@ -468,6 +506,7 @@ pub const ValueUseTransaction = struct {
         load_readonly_table_i16: ReadOnlyTableI16LoadAction,
         scratch_compare: ScratchCompareAction,
         current_home_eq_zero: CurrentHomeEqZeroAction,
+        setcc_eax_compare: SetccEaxCompareAction,
 
         fn eql(action: PreparedAction, other: PreparedAction) bool {
             return std.meta.eql(action, other);
@@ -587,6 +626,7 @@ pub const ValueUseTransaction = struct {
         read_only_pair: PreparedReadOnlyPair,
         condition: PreparedCondition,
         current_home_eq_zero: struct { bits: u16 },
+        setcc_eax_compare: struct { bits: u16 },
     };
 
     const PreparedRecord = struct {
@@ -1324,6 +1364,16 @@ pub const ValueUseTransaction = struct {
         transaction.current_home_eq_zero_test_failure = failure;
     }
 
+    /// White-box setcc-producing EAX compare rollback control. Unavailable
+    /// in production builds and guarded from production consumers.
+    pub fn setSetccEaxCompareTestFailure(
+        transaction: *ValueUseTransaction,
+        failure: ?SetccEaxCompareTestFailure,
+    ) !void {
+        if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
+        transaction.setcc_eax_compare_test_failure = failure;
+    }
+
     fn requireActive(transaction: *const ValueUseTransaction) !void {
         if (transaction.lifecycle != .active) return error.ValueUseTransactionClosed;
     }
@@ -1402,6 +1452,11 @@ pub const ValueUseTransaction = struct {
             error.ValueUseScratchCompareImmediateOutOfRange,
             error.ValueUseScratchCompareFormUnsupported,
             error.ValueUseCurrentHomeEqZeroTestFailure,
+            error.ValueUseSetccEaxCompareTestFailure,
+            error.ValueUseSetccEaxCompareFormUnsupported,
+            error.ValueUseSetccEaxCompareImmediateOutOfRange,
+            error.ValueUseSetccEaxCompareExactEiWidthUnsupported,
+            error.ValueUseSetccEaxComparePredicateUnsupported,
             error.ValueUseLateRegistration,
             error.ValueUsePlanAlreadySealed,
             error.ValueUsePrepareBeforeSeal,
@@ -1500,6 +1555,7 @@ pub const ValueUseTransaction = struct {
             .load_readonly_table_i16 => |*load| try load.result.validate(),
             .scratch_compare => return error.ValueUseScratchCompareAttachRequired,
             .current_home_eq_zero => |*compare| try compare.result.validate(),
+            .setcc_eax_compare => |*compare| try compare.result.validate(),
         }
     }
 
@@ -1565,6 +1621,7 @@ pub const ValueUseTransaction = struct {
                 .immediate, .null_pointer => {},
             },
             .current_home_eq_zero => {},
+            .setcc_eax_compare => {},
             .validate_shape,
             .emit_copy_to,
             .form_readonly_table_address,
@@ -1723,6 +1780,7 @@ pub const ValueUseTransaction = struct {
                 .immediate, .null_pointer => null,
             },
             .current_home_eq_zero => null,
+            .setcc_eax_compare => null,
             .load_scalar,
             .load_readonly_pair,
             .load_stack_i128_alias,
@@ -1761,6 +1819,7 @@ pub const ValueUseTransaction = struct {
             .load_readonly_table_i16,
             .scratch_compare,
             .current_home_eq_zero,
+            .setcc_eax_compare,
             => null,
         };
     }
@@ -2107,6 +2166,7 @@ pub const ValueUseTransaction = struct {
             .load_address,
             .scratch_compare_operand,
             .current_home_eq_zero_operand,
+            .setcc_eax_compare_operand,
             => return error.ValueUsePreparedActionRequired,
             .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, destination),
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -2193,6 +2253,9 @@ fn preparedViewFromLoc(
         .memcpy_pointer, .memcpy_length => preparedMemcpyScalarView(loc),
         .scratch_compare_operand => preparedScratchCompareView(loc, request.expected.ty),
         .current_home_eq_zero_operand => .{ .current_home_eq_zero = .{
+            .bits = request.expected.ty.int,
+        } },
+        .setcc_eax_compare_operand => .{ .setcc_eax_compare = .{
             .bits = request.expected.ty.int,
         } },
         .stack_argument => error.ValueUseStackArgumentUnsupported,
@@ -2523,6 +2586,7 @@ fn executePreparedActionInternal(
                 .load_address,
                 .scratch_compare_operand,
                 .current_home_eq_zero_operand,
+                .setcc_eax_compare_operand,
                 => return error.ValueUsePreparedActionFormMismatch,
                 .stack_argument => return error.ValueUseStackArgumentUnsupported,
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2544,6 +2608,12 @@ fn executePreparedActionInternal(
         .load_readonly_table_i16 => |load| try executeReadOnlyTableI16Load(transaction, view, &load),
         .scratch_compare => |compare| try executeScratchCompare(transaction, request_index, view, &compare),
         .current_home_eq_zero => |compare| try executeCurrentHomeEqZero(
+            transaction,
+            request_index,
+            view,
+            &compare,
+        ),
+        .setcc_eax_compare => |compare| try executeSetccEaxCompare(
             transaction,
             request_index,
             view,
@@ -2850,6 +2920,252 @@ fn executeCurrentHomeEqZero(
     const result_name = try ownActionIdentity(transaction, &stored_action.result);
     try session.define(result_name, .zeroExtending(1));
     try session.finalize();
+}
+
+const SetccEaxComparePlan = struct {
+    bits: u16,
+    mask: ?i32 = null,
+    signed_shift: ?u5 = null,
+    definition: union(enum) {
+        instruction: x86_64_machine.Instruction,
+        compare_immediate: i128,
+    },
+    setcc: ?x86_64_machine.Instruction,
+    prepare_before_definition: bool = false,
+};
+
+fn classifySetccEaxCompare(
+    action: *const ValueUseTransaction.SetccEaxCompareAction,
+) !SetccEaxComparePlan {
+    const bits = switch (action.operand_ty) {
+        .int => |value| value,
+        else => return error.ValueUseSetccEaxCompareFormUnsupported,
+    };
+    if (bits == 0 or bits > 64) return error.ValueUseSetccEaxCompareFormUnsupported;
+
+    if (action.structure == .exact_ei) {
+        const exact_width = bits == 3 or bits == 4 or bits == 5 or bits == 13 or
+            bits == 14 or bits == 26 or bits == 27 or bits == 55 or bits == 56;
+        if (!exact_width) return error.ValueUseSetccEaxCompareFormUnsupported;
+        if (bits > 32) return error.ValueUseSetccEaxCompareExactEiWidthUnsupported;
+        const mask: u32 = (@as(u32, 1) << @intCast(bits)) - 1;
+        const rhs_bits: u32 = @intCast(action.immediate & @as(i128, mask));
+        const signed = action.predicate == .slt or action.predicate == .sle or
+            action.predicate == .sgt or action.predicate == .sge;
+        const shift: ?u5 = if (signed) @intCast(32 - bits) else null;
+        const compare_rhs: i32 = if (shift) |amount| blk: {
+            const shifted: i32 = @bitCast(rhs_bits << amount);
+            break :blk shifted >> amount;
+        } else @bitCast(rhs_bits);
+        const setcc: ?x86_64_machine.Instruction = switch (action.predicate) {
+            .eq => .sete_eax,
+            .ne => .setne_eax,
+            .ult => .setb_eax,
+            .ugt => .seta_eax,
+            .slt => .setl_eax,
+            .sgt => .setg_eax,
+            .ule, .uge, .sle, .sge => null,
+        };
+        return .{
+            .bits = bits,
+            .mask = @bitCast(mask),
+            .signed_shift = shift,
+            .definition = .{ .instruction = .{ .cmp_eax_imm32 = compare_rhs } },
+            .setcc = setcc,
+        };
+    }
+
+    if (bits > 32) return error.ValueUseSetccEaxCompareFormUnsupported;
+    if (action.predicate == .eq and action.immediate != 0) {
+        _ = std.math.cast(i64, action.immediate) orelse
+            return error.ValueUseSetccEaxCompareImmediateOutOfRange;
+        return .{
+            .bits = bits,
+            .definition = .{ .compare_immediate = action.immediate },
+            .setcc = .sete_eax,
+        };
+    }
+    if (action.predicate == .sgt and (bits == 6 or bits == 16 or bits == 32)) {
+        const immediate = std.math.cast(i64, action.immediate) orelse
+            return error.ValueUseSetccEaxCompareImmediateOutOfRange;
+        if (immediate == -1) {
+            const sign_mask: i32 = switch (bits) {
+                6 => 1 << 5,
+                16 => 1 << 15,
+                32 => std.math.minInt(i32),
+                else => unreachable,
+            };
+            return .{
+                .bits = bits,
+                .definition = .{ .instruction = .{ .and_eax_imm32 = sign_mask } },
+                .setcc = .sete_eax,
+                .prepare_before_definition = true,
+            };
+        }
+        if (bits == 32) return .{
+            .bits = bits,
+            .definition = .{ .compare_immediate = action.immediate },
+            .setcc = .setg_eax,
+        };
+    }
+    if (!action.samesign and action.predicate == .slt and bits == 32) {
+        _ = std.math.cast(i64, action.immediate) orelse
+            return error.ValueUseSetccEaxCompareImmediateOutOfRange;
+        if (action.immediate == 0) return error.ValueUseSetccEaxCompareFormUnsupported;
+        return .{
+            .bits = bits,
+            .definition = .{ .compare_immediate = action.immediate },
+            .setcc = .setl_eax,
+        };
+    }
+    if (action.samesign and (action.predicate == .ult or action.predicate == .ugt) and
+        (bits == 6 or bits == 7))
+    {
+        const mask: i32 = if (bits == 6) 63 else 127;
+        const immediate = std.math.cast(i64, action.immediate) orelse
+            return error.ValueUseSetccEaxCompareImmediateOutOfRange;
+        if (immediate < 0 or immediate > mask)
+            return error.ValueUseSetccEaxCompareImmediateOutOfRange;
+        return .{
+            .bits = bits,
+            .mask = mask,
+            .definition = .{ .instruction = .{ .cmp_eax_imm32 = @intCast(immediate) } },
+            .setcc = if (action.predicate == .ult) .setb_eax else .seta_eax,
+        };
+    }
+    if (!action.samesign and action.predicate == .ult and bits == 6 and
+        (action.immediate & 63) == 51)
+    {
+        return .{
+            .bits = bits,
+            .mask = 63,
+            .definition = .{ .instruction = .{ .cmp_eax_imm32 = 51 } },
+            .setcc = .setb_eax,
+        };
+    }
+    if (action.predicate == .ult and bits == 32) return .{
+        .bits = bits,
+        .definition = .{ .compare_immediate = action.immediate },
+        .setcc = .setb_eax,
+    };
+    return error.ValueUseSetccEaxCompareFormUnsupported;
+}
+
+fn executeSetccEaxCompare(
+    transaction: *ValueUseTransaction,
+    source_index: u8,
+    initial_source_view: *const ValueUseTransaction.PreparedView,
+    action: *const ValueUseTransaction.SetccEaxCompareAction,
+) !void {
+    _ = initial_source_view;
+    const session = if (transaction.accumulator_session) |*session|
+        session
+    else
+        return error.ValueUseSetccEaxCompareAccumulatorSessionRequired;
+    try preserveScratchCompareLiveAccumulator(transaction);
+    try failSetccEaxCompareForTest(transaction, .after_preamble);
+    transaction.prepared_views[source_index] = try transaction.buildPreparedRecord(source_index);
+    transaction.prepared_view_valid[source_index] = true;
+    const plan = try classifySetccEaxCompare(action);
+
+    const request = &transaction.requests[source_index];
+    const source_name = switch (request.source) {
+        .named => |*identity| identity.slice(),
+        .int, .null_value, .unsupported => return error.ValueUseUnsupportedSource,
+    };
+    const binding = transaction.selector.values.get(source_name) orelse
+        return error.ValueUseUnresolvedSource;
+    const current = transaction.prepared_views[source_index].canonical_source_loc;
+    validateSetccEaxCompareHome(binding, request.expected, current) catch |err| {
+        transaction.noteRequestBoundaryError(source_index, err);
+        return err;
+    };
+    selector_state.emitValueIntoEax(transaction.selector, .{ .named = source_name }) catch |err| {
+        transaction.noteRequestBoundaryError(source_index, err);
+        return err;
+    };
+    try failSetccEaxCompareForTest(transaction, .after_materialization);
+
+    if (plan.mask) |mask| try selector_state.emitEflagsInstruction(
+        transaction.selector,
+        .{ .and_eax_imm32 = mask },
+        .write,
+    );
+    if (plan.signed_shift) |shift| {
+        try selector_state.emitEflagsInstruction(
+            transaction.selector,
+            .{ .shl_eax_imm5 = shift },
+            .write,
+        );
+        try selector_state.emitEflagsInstruction(
+            transaction.selector,
+            .{ .sar_eax_imm5 = shift },
+            .write,
+        );
+    }
+    try failSetccEaxCompareForTest(transaction, .after_normalization_or_mask);
+
+    if (plan.prepare_before_definition) {
+        if (try session.prepare(.preserve, .spill_live)) |diagnostic| {
+            transaction.action_diagnostic = diagnostic;
+            return error.ValueUseActionDiagnostic;
+        }
+        try failSetccEaxCompareForTest(transaction, .after_accumulator_preparation);
+    }
+    const definition: x86_64_machine.Instruction = switch (plan.definition) {
+        .instruction => |instruction| instruction,
+        .compare_immediate => |immediate| .{
+            .cmp_eax_imm32 = std.math.cast(i32, immediate) orelse
+                return error.ValueUseSetccEaxCompareImmediateOutOfRange,
+        },
+    };
+    try selector_state.emitEflagsInstruction(transaction.selector, definition, .definition);
+    try failSetccEaxCompareForTest(transaction, .after_eflags_definition);
+    if (!plan.prepare_before_definition) {
+        if (try session.prepare(.preserve, .spill_live)) |diagnostic| {
+            transaction.action_diagnostic = diagnostic;
+            return error.ValueUseActionDiagnostic;
+        }
+        try failSetccEaxCompareForTest(transaction, .after_accumulator_preparation);
+    }
+    const setcc = plan.setcc orelse return error.ValueUseSetccEaxComparePredicateUnsupported;
+    try selector_state.emitEflagsInstruction(transaction.selector, setcc, .use);
+    try failSetccEaxCompareForTest(transaction, .after_setcc);
+
+    const stored_action = &transaction.requests[source_index].prepared_action.?.setcc_eax_compare;
+    const result_name = try ownActionIdentity(transaction, &stored_action.result);
+    try session.define(result_name, .zeroExtending(1));
+    try failSetccEaxCompareForTest(transaction, .after_result_definition);
+    try session.finalize();
+    try failSetccEaxCompareForTest(transaction, .after_finalization);
+}
+
+fn validateSetccEaxCompareHome(
+    binding: ValueBinding,
+    expected: ValueUseTransaction.Expected,
+    current: ValueLoc,
+) ValueUseTransaction.SetccEaxCompareRequestError!void {
+    const bits = switch (expected.ty) {
+        .int => |value| value,
+        else => return error.ValueUseSetccEaxCompareWidthUnsupported,
+    };
+    if (bits == 0 or bits > 32 or binding.vreg.bits < bits)
+        return error.ValueUseSetccEaxCompareWidthUnsupported;
+    const accepted = switch (current) {
+        .eax, .arg32, .scratch32 => binding.vreg.class == .gpr32,
+        .rax, .arg64, .scratch64, .spill64 => binding.vreg.class == .gpr32 or
+            binding.vreg.class == .gpr64,
+        else => false,
+    };
+    if (!accepted) return error.ValueUseSetccEaxCompareLocationUnsupported;
+}
+
+fn failSetccEaxCompareForTest(
+    transaction: *ValueUseTransaction,
+    boundary: ValueUseTransaction.SetccEaxCompareTestFailure,
+) !void {
+    if (builtin.is_test and transaction.setcc_eax_compare_test_failure == boundary)
+        return error.ValueUseSetccEaxCompareTestFailure;
 }
 
 const CurrentHomeEqZeroTest = union(enum) {
@@ -4068,7 +4384,11 @@ fn preparedViewLoc(view: *const ValueUseTransaction.PreparedView) !ValueLoc {
             .shape = table.shape,
             .offset = table.offset,
         } },
-        .read_only_pair, .condition, .current_home_eq_zero => error.ValueUsePreparedActionFormMismatch,
+        .read_only_pair,
+        .condition,
+        .current_home_eq_zero,
+        .setcc_eax_compare,
+        => error.ValueUsePreparedActionFormMismatch,
     };
 }
 
@@ -4096,6 +4416,7 @@ fn preparedViewEql(
         .read_only_pair => |value| std.meta.eql(value, rhs.read_only_pair),
         .condition => |value| std.meta.eql(value, rhs.condition),
         .current_home_eq_zero => |value| std.meta.eql(value, rhs.current_home_eq_zero),
+        .setcc_eax_compare => |value| std.meta.eql(value, rhs.setcc_eax_compare),
     };
 }
 
@@ -4196,6 +4517,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .switch_condition,
             .load_address,
             .current_home_eq_zero_operand,
+            .setcc_eax_compare_operand,
             => error.ValueUsePreparedActionRequired,
             .stack_argument => error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
@@ -4218,6 +4540,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .load_address,
             .scratch_compare_operand,
             .current_home_eq_zero_operand,
+            .setcc_eax_compare_operand,
             => {},
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -4263,6 +4586,9 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .current_home_eq_zero => |compare| if (request.form != .current_home_eq_zero_operand or
                 !request.expected.ty.eql(compare.operand_ty))
                 error.ValueUsePreparedActionFormMismatch,
+            .setcc_eax_compare => |compare| if (request.form != .setcc_eax_compare_operand or
+                !request.expected.ty.eql(compare.operand_ty))
+                error.ValueUsePreparedActionFormMismatch,
         };
     }
     if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
@@ -4278,6 +4604,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
         .load_address,
         .scratch_compare_operand,
         .current_home_eq_zero_operand,
+        .setcc_eax_compare_operand,
         => false,
         .pair_low_high, .pair_high_low => request.destination == .pair,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -4305,6 +4632,13 @@ fn validateBindingCompatibility(
         // The canonical post-preamble home is the authority. Resolution and
         // liveness happen now; width/location classification is intentionally
         // deferred until the action refreshes after accumulator preservation.
+        try validateExpectedType(request.expected, request.form);
+        return;
+    }
+    if (request.form == .setcc_eax_compare_operand) {
+        // The action re-resolves after its live-accumulator preamble. Only
+        // semantic typing is stable at seal; canonical width/home admission
+        // is request-scoped and happens after that relocation.
         try validateExpectedType(request.expected, request.form);
         return;
     }
@@ -4554,6 +4888,19 @@ fn validateExpectedType(expected: ValueUseTransaction.Expected, form: ValueUseTr
             },
             else => return error.ValueUseTypeMismatch,
         },
+        .setcc_eax_compare_operand => switch (expected.ty) {
+            .int => |bits| {
+                if (bits == 0 or bits > 64 or
+                    expected.register_class != if (bits <= 32)
+                        VirtualRegClass.gpr32
+                    else
+                        VirtualRegClass.gpr64)
+                {
+                    return error.ValueUseTypeMismatch;
+                }
+            },
+            else => return error.ValueUseTypeMismatch,
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -4642,6 +4989,9 @@ fn validateSourceView(loc: ValueLoc, form: ValueUseTransaction.UseForm) !void {
         // live-accumulator preamble. No home is admitted by this generic
         // validation layer.
         .current_home_eq_zero_operand => {},
+        // Canonical admission occurs after the action-owned preamble. Pair
+        // and spill128 homes are rejected there, preserving the O2-6 frontier.
+        .setcc_eax_compare_operand => {},
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -4676,6 +5026,7 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: ValueUseTransaction.UseForm) 
         .load_address,
         .scratch_compare_operand,
         .current_home_eq_zero_operand,
+        .setcc_eax_compare_operand,
         .stack_argument,
         .new_pair_ownership,
         => false,
@@ -4698,6 +5049,7 @@ fn earlySequencingCandidate(loc: ValueLoc, form: ValueUseTransaction.UseForm) bo
         .load_address => false,
         .scratch_compare_operand => false,
         .current_home_eq_zero_operand => false,
+        .setcc_eax_compare_operand => false,
         else => false,
     };
 }
@@ -4861,6 +5213,7 @@ fn requestDestinationNodes(
                 try result.append(.rcx);
                 try result.append(.accumulator);
             },
+            .setcc_eax_compare => try result.append(.accumulator),
         },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair => return error.ValueUseNewPairOwnershipUnsupported,
@@ -5146,6 +5499,11 @@ fn requestMappings(
                     .source_request_index = null,
                 });
             },
+            .setcc_eax_compare => mappings.append(.{
+                .source = scalarSourceNode(current orelse return error.ValueUseUnresolvedSource),
+                .destination = .accumulator,
+                .source_request_index = request_index,
+            }),
             .validate_shape, .emit_copy_to => {},
         }
         if (action != .emit_copy_to) return mappings;
@@ -5195,6 +5553,7 @@ fn actionOwnsOrderedWrites(action: ValueUseTransaction.PreparedAction) bool {
         .load_readonly_table_i16,
         .scratch_compare,
         .current_home_eq_zero,
+        .setcc_eax_compare,
         => true,
         .validate_shape,
         .emit_copy_to,
@@ -5355,6 +5714,7 @@ fn validateCopyActionForm(
         .load_address,
         .scratch_compare_operand,
         .current_home_eq_zero_operand,
+        .setcc_eax_compare_operand,
         => false,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,

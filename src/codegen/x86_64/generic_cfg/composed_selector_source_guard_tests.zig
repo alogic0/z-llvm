@@ -395,9 +395,11 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
         return error.ValueUseNestedAccumulatorSnapshot;
     try validateScratchCompareIntentSurface(source);
     try validateCurrentHomeEqZeroIntentSurface(source);
+    try validateSetccEaxCompareIntentSurface(source);
     try validateDurableActionIdentityOwnership(source);
     try validateScratchComparePreservationPreamble(source);
     try validateCurrentHomeEqZeroSequence(source);
+    try validateSetccEaxCompareSequence(source);
 }
 
 fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const u8) !void {
@@ -423,6 +425,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     try validateAccumulatorCompositionProductionSites(source_name, source);
     try validateScratchCompareProductionSites(source_name, source);
     try validateCurrentHomeEqZeroProductionSites(source_name, source);
+    try validateSetccEaxCompareProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -500,6 +503,8 @@ fn validateCurrentHomeEqZeroIntentSurface(source: []const u8) !void {
         "Destination",
         "FrameIndex",
         "PreparedView",
+        "Label",
+        "target",
         "home",
         "binding",
         "register",
@@ -519,6 +524,49 @@ fn validateCurrentHomeEqZeroIntentSurface(source: []const u8) !void {
         countPattern(body, "operand_ty: ir.Type") != 1)
     {
         return error.ValueUseCurrentHomeEqZeroIntentMismatch;
+    }
+}
+
+fn validateSetccEaxCompareIntentSurface(source: []const u8) !void {
+    const declaration = "pub const SetccEaxCompareAction = struct {";
+    const start = std.mem.indexOf(u8, source, declaration) orelse return;
+    const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+        return error.InvalidZigSource;
+    const body = source[start .. end + 2];
+    const forbidden = [_][]const u8{
+        "ArgReg",
+        "ValueLoc",
+        "Destination",
+        "FrameIndex",
+        "PreparedView",
+        "Label",
+        "target",
+        "home",
+        "binding",
+        "register",
+        "scratch",
+        "spill",
+        "preserve",
+        "displacement",
+        "sequence",
+        "early",
+        "phase",
+    };
+    for (forbidden) |pattern| {
+        if (std.mem.indexOf(u8, body, pattern) != null)
+            return error.ValueUseSetccEaxComparePhysicalIntentEscape;
+    }
+    const required = [_][]const u8{
+        "result: ActionIdentity",
+        "operand_ty: ir.Type",
+        "predicate: ir.IcmpPredicate",
+        "samesign: bool",
+        "immediate: i128",
+        "structure: SetccEaxCompareStructure",
+    };
+    for (required) |pattern| {
+        if (countPattern(body, pattern) != 1)
+            return error.ValueUseSetccEaxCompareIntentMismatch;
     }
 }
 
@@ -661,6 +709,48 @@ fn validateCurrentHomeEqZeroSequence(source: [:0]const u8) !void {
     }
 }
 
+fn validateSetccEaxCompareSequence(source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const body = functionBodyNamed(bodies, "executeSetccEaxCompare") orelse return;
+    const function_source = source[body.start..body.end];
+    const required_order = [_][]const u8{
+        "try preserveScratchCompareLiveAccumulator(transaction);",
+        "failSetccEaxCompareForTest(transaction, .after_preamble)",
+        "transaction.prepared_views[source_index] = try transaction.buildPreparedRecord(source_index);",
+        "const plan = try classifySetccEaxCompare(action);",
+        "validateSetccEaxCompareHome(binding, request.expected, current)",
+        "selector_state.emitValueIntoEax(transaction.selector",
+        "failSetccEaxCompareForTest(transaction, .after_materialization)",
+        "failSetccEaxCompareForTest(transaction, .after_normalization_or_mask)",
+        "if (plan.prepare_before_definition)",
+        "selector_state.emitEflagsInstruction(transaction.selector, definition, .definition)",
+        "failSetccEaxCompareForTest(transaction, .after_eflags_definition)",
+        "if (!plan.prepare_before_definition)",
+        "const setcc = plan.setcc orelse",
+        "selector_state.emitEflagsInstruction(transaction.selector, setcc, .use)",
+        "const result_name = try ownActionIdentity(transaction, &stored_action.result);",
+        "try session.define(result_name, .zeroExtending(1));",
+        "try session.finalize();",
+    };
+    var cursor: usize = 0;
+    for (required_order) |pattern| {
+        const found = std.mem.indexOfPos(u8, function_source, cursor, pattern) orelse
+            return error.ValueUseSetccEaxCompareSequenceMismatch;
+        cursor = found + pattern.len;
+    }
+    if (countPattern(function_source, "session.prepare(.preserve, .spill_live)") != 2 or
+        countPattern(function_source, "failSetccEaxCompareForTest(transaction, .after_accumulator_preparation)") != 2 or
+        countPattern(function_source, "buildPreparedRecord(source_index)") != 1 or
+        countPattern(function_source, ".canonical_source_loc") != 1 or
+        countPattern(function_source, "preparedViewLoc(") != 0 or
+        countPattern(function_source, "resolveValue(") != 0 or
+        countPattern(function_source, ".reuse_source") != 0)
+    {
+        return error.ValueUseSetccEaxCompareSequenceMismatch;
+    }
+}
+
 fn validateDurableActionIdentityOwnership(source: [:0]const u8) !void {
     if (std.mem.indexOf(u8, source, ".result.slice()") != null)
         return error.ValueUseDurableActionIdentityNotOwned;
@@ -704,6 +794,15 @@ fn validateDurableActionIdentityOwnership(source: [:0]const u8) !void {
         const current_define = std.mem.indexOf(u8, current_home_source, define_pattern) orelse
             return error.ValueUseDurableActionIdentityOwnershipMissing;
         if (current_own >= current_define)
+            return error.ValueUseDurableActionIdentityOwnershipOrder;
+    }
+    if (functionBodyNamed(bodies, "executeSetccEaxCompare")) |setcc_body| {
+        const setcc_source = source[setcc_body.start..setcc_body.end];
+        const setcc_own = std.mem.indexOf(u8, setcc_source, own_pattern) orelse
+            return error.ValueUseDurableActionIdentityOwnershipMissing;
+        const setcc_define = std.mem.indexOf(u8, setcc_source, define_pattern) orelse
+            return error.ValueUseDurableActionIdentityOwnershipMissing;
+        if (setcc_own >= setcc_define)
             return error.ValueUseDurableActionIdentityOwnershipOrder;
     }
 }
@@ -935,6 +1034,23 @@ fn validateCurrentHomeEqZeroProductionSites(
         {
             return error.ValueUseCurrentHomeEqZeroProductionAllowlistMismatch;
         }
+    }
+}
+
+fn validateSetccEaxCompareProductionSites(
+    source_name: []const u8,
+    source: [:0]const u8,
+) !void {
+    _ = source_name;
+    const dormant_markers = [_][]const u8{
+        ".form = .setcc_eax_compare_operand",
+        ".setcc_eax_compare =",
+        "ValueUseSetccEaxCompareWidthUnsupported",
+        "ValueUseSetccEaxCompareLocationUnsupported",
+    };
+    for (dormant_markers) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseSetccEaxCompareProductionWiringForbidden;
     }
 }
 
@@ -3095,6 +3211,64 @@ test "composed selector source guard keeps current-home eq-zero wiring semantic 
                 "fn executeCurrentHomeEqZero() void { " ++
                 "try session.define(result_name, .zeroExtending(1)); " ++
                 "const result_name = try ownActionIdentity(transaction, &stored_action.result); }",
+        ),
+    );
+}
+
+test "composed selector source guard keeps setcc EAX compare dormant semantic and ordered" {
+    try validateSetccEaxCompareIntentSurface(
+        "pub const SetccEaxCompareAction = struct { " ++
+            "result: ActionIdentity, operand_ty: ir.Type, predicate: ir.IcmpPredicate, " ++
+            "samesign: bool, immediate: i128, structure: SetccEaxCompareStructure, };",
+    );
+    try std.testing.expectError(
+        error.ValueUseSetccEaxComparePhysicalIntentEscape,
+        validateSetccEaxCompareIntentSurface(
+            "pub const SetccEaxCompareAction = struct { " ++
+                "result: ActionIdentity, operand_ty: ir.Type, predicate: ir.IcmpPredicate, " ++
+                "samesign: bool, immediate: i128, structure: SetccEaxCompareStructure, " ++
+                "source_home: ValueLoc, };",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseSetccEaxCompareProductionWiringForbidden,
+        validateSetccEaxCompareProductionSites(
+            "composed_selector_icmp.zig",
+            "fn lowerIcmp() void { _ = .{ .form = .setcc_eax_compare_operand }; }",
+        ),
+    );
+
+    const accepted: [:0]const u8 =
+        "fn executeSetccEaxCompare() void { " ++
+        "try preserveScratchCompareLiveAccumulator(transaction); " ++
+        "try failSetccEaxCompareForTest(transaction, .after_preamble); " ++
+        "transaction.prepared_views[source_index] = try transaction.buildPreparedRecord(source_index); " ++
+        "_ = transaction.prepared_views[source_index].canonical_source_loc; " ++
+        "const plan = try classifySetccEaxCompare(action); " ++
+        "_ = try validateSetccEaxCompareHome(binding, request.expected, current); " ++
+        "try selector_state.emitValueIntoEax(transaction.selector, source); " ++
+        "try failSetccEaxCompareForTest(transaction, .after_materialization); " ++
+        "try failSetccEaxCompareForTest(transaction, .after_normalization_or_mask); " ++
+        "if (plan.prepare_before_definition) { " ++
+        "_ = try session.prepare(.preserve, .spill_live); " ++
+        "try failSetccEaxCompareForTest(transaction, .after_accumulator_preparation); } " ++
+        "try selector_state.emitEflagsInstruction(transaction.selector, definition, .definition); " ++
+        "try failSetccEaxCompareForTest(transaction, .after_eflags_definition); " ++
+        "if (!plan.prepare_before_definition) { " ++
+        "_ = try session.prepare(.preserve, .spill_live); " ++
+        "try failSetccEaxCompareForTest(transaction, .after_accumulator_preparation); } " ++
+        "const setcc = plan.setcc orelse return error.Unsupported; " ++
+        "try selector_state.emitEflagsInstruction(transaction.selector, setcc, .use); " ++
+        "const result_name = try ownActionIdentity(transaction, &stored_action.result); " ++
+        "try session.define(result_name, .zeroExtending(1)); " ++
+        "try session.finalize(); }";
+    try validateSetccEaxCompareSequence(accepted);
+    try std.testing.expectError(
+        error.ValueUseSetccEaxCompareSequenceMismatch,
+        validateSetccEaxCompareSequence(
+            "fn executeSetccEaxCompare() void { " ++
+                "try selector_state.emitValueIntoEax(transaction.selector, source); " ++
+                "try preserveScratchCompareLiveAccumulator(transaction); }",
         ),
     );
 }
