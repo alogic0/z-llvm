@@ -407,6 +407,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     try validateBranchActionProductionSites(source_name, source);
     try validateStoreActionProductionSites(source_name, source);
     try validateMemcpyActionProductionSites(source_name, source);
+    try validateDormantLoadActionProductionSites(source_name, source);
     try validateFailureProvenanceProductionSites(source_name, source);
     try validateAccumulatorCompositionProductionSites(source_name, source);
     const forbidden = [_][]const u8{
@@ -431,6 +432,23 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
             if (std.mem.indexOf(u8, function_source, pattern) != null)
                 return error.ValueUsePreparedLeafRawOperation;
         }
+    }
+}
+
+fn validateDormantLoadActionProductionSites(source_name: []const u8, source: [:0]const u8) !void {
+    _ = source_name;
+    if (std.mem.indexOf(u8, source, ".setLoadTestFailure(") != null)
+        return error.ValueUseLoadTestHookInProduction;
+    const dormant_patterns = [_][]const u8{
+        ".form = .load_address",
+        ".load_scalar",
+        ".load_readonly_pair",
+        ".load_stack_i128_alias",
+        ".load_readonly_table_i16",
+    };
+    for (dormant_patterns) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseLoadActionNotWired;
     }
 }
 
@@ -1671,6 +1689,27 @@ test "composed selector source guard rejects callback escapes and raw operations
         validatePreparedViewLeafDiscipline(
             "composed_selector_calls.zig",
             "fn lowerInlineMemcpy() void { _ = transaction.setMemcpyTestFailure(.after_source); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseLoadActionNotWired,
+        validatePreparedViewLeafDiscipline(
+            "composed_selector_fixture.zig",
+            "fn lowerLoad() void { _ = .{ .form = .load_address, .load_scalar = intent }; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseLoadActionNotWired,
+        validatePreparedViewLeafDiscipline(
+            "composed_selector_fixture.zig",
+            "fn lowerReadOnlyPointerIntegerLoad() void { _ = .load_readonly_pair; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseLoadTestHookInProduction,
+        validatePreparedViewLeafDiscipline(
+            "composed_selector_fixture.zig",
+            "fn lowerLoad() void { _ = transaction.setLoadTestFailure(.after_pointer_staging); }",
         ),
     );
 }

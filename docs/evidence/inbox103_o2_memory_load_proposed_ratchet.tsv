@@ -1,0 +1,13 @@
+subfamily	file	function	gateway	occurrences_before	proposed_occurrences_after	proposed_delta	rationale
+ordinary-integer	composed_selector_memory.zig	lowerLoad	resolveValue	2	1	-1	remove only the ordinary pointer-resolution occurrence; retain readonly-table/XMM dispatch occurrence
+ordinary-integer	composed_selector_memory.zig	lowerLoad	materializeLocIntoLoc	1	0	-1	closed scalar-load action owns spill-pointer staging
+readonly-pointer	composed_selector_memory.zig	lowerReadOnlyPointerIntegerLoad	resolveValue	1	0	-1	closed scalar/pair load actions validate and consume the named pointer
+readonly-pointer	composed_selector_memory.zig	lowerReadOnlyPointerIntegerLoad	materializeLocIntoLoc	2	0	-2	closed actions own spill staging and pair-alias relocation while retaining existing pair authority
+table-i16	composed_selector_memory.zig	lowerLoad	resolveValue	1	1	0	the surviving occurrence remains necessary for the untouched table-double O3 dispatch
+table-i16	composed_selector_memory.zig	lowerReadOnlyTableLoad	materializeLocIntoLoc	1	1	0	the surviving occurrence moves behind the untouched table-double O3 branch; the admitted i16 branch becomes action-owned
+# production_before_L-A=221
+# production_after_L-A=221
+# proposed_after_ordinary=219
+# proposed_after_readonly_pointer=216
+# proposed_after_table_i16=216
+# table_i16_is_a_semantic_migration_with_zero_textual_bypass_delta_while_O3_residuals_remain

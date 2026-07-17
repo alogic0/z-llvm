@@ -62,6 +62,7 @@ pub const ValueUseTransaction = struct {
     failed_request: ?RequestHandle = null,
     accumulator_session: ?AccumulatorDefinitionSession = null,
     memcpy_test_failure: if (builtin.is_test) ?MemcpyTestFailure else void = if (builtin.is_test) null else {},
+    load_test_failure: if (builtin.is_test) ?LoadTestFailure else void = if (builtin.is_test) null else {},
 
     pub const Expected = struct {
         ty: ir.Type,
@@ -96,6 +97,10 @@ pub const ValueUseTransaction = struct {
         memcpy_pointer,
         /// Exact legacy inline-memcpy i64 length homes.
         memcpy_length,
+        /// Action-only load address. Compatibility is derived from the
+        /// closed load action and canonical binding/home; consumers neither
+        /// discover nor choose a physical source representation.
+        load_address,
         stack_argument,
         new_pair_ownership,
     };
@@ -256,6 +261,43 @@ pub const ValueUseTransaction = struct {
         after_call_append,
     };
 
+    pub const ScalarLoadKind = enum {
+        ordinary,
+        readonly_pointer,
+    };
+
+    /// A genuine EAX/RAX integer load. Result ownership remains with the
+    /// subordinate accumulator session; this action owns only the complete
+    /// source-home-dependent load sequence.
+    pub const ScalarLoadAction = struct {
+        kind: ScalarLoadKind,
+        bits: u16,
+    };
+
+    /// Existing readonly-pointer i96/i128 result semantics. The planner
+    /// freezes the pair selected by the pre-existing pair authority; the
+    /// action neither allocates a new pair kind nor changes result ownership.
+    pub const ReadOnlyPairLoadAction = struct {
+        result: ActionIdentity,
+        bits: u16,
+    };
+
+    /// Alias-only i128 load from an existing stack object.
+    pub const StackI128AliasLoadAction = struct {
+        result: ActionIdentity,
+    };
+
+    /// Non-accumulator i16 table load into the accepted R8 scratch result.
+    pub const ReadOnlyTableI16LoadAction = struct {
+        result: ActionIdentity,
+    };
+
+    pub const LoadTestFailure = enum {
+        after_pointer_staging,
+        after_preservation,
+        after_first_partial_load,
+    };
+
     pub const max_switch_cases = 8;
 
     pub const SwitchCaseIntent = struct {
@@ -336,6 +378,10 @@ pub const ValueUseTransaction = struct {
         branch_condition,
         switch_compare_chain: SwitchCompareChainAction,
         inline_memcpy: MemcpyAction,
+        load_scalar: ScalarLoadAction,
+        load_readonly_pair: ReadOnlyPairLoadAction,
+        load_stack_i128_alias: StackI128AliasLoadAction,
+        load_readonly_table_i16: ReadOnlyTableI16LoadAction,
 
         fn eql(action: PreparedAction, other: PreparedAction) bool {
             return std.meta.eql(action, other);
@@ -1127,6 +1173,16 @@ pub const ValueUseTransaction = struct {
         transaction.memcpy_test_failure = failure;
     }
 
+    /// White-box load-action rollback boundary control. Unavailable in every
+    /// production build and guarded from production consumers.
+    pub fn setLoadTestFailure(
+        transaction: *ValueUseTransaction,
+        failure: ?LoadTestFailure,
+    ) !void {
+        if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
+        transaction.load_test_failure = failure;
+    }
+
     fn requireActive(transaction: *const ValueUseTransaction) !void {
         if (transaction.lifecycle != .active) return error.ValueUseTransactionClosed;
     }
@@ -1288,6 +1344,22 @@ pub const ValueUseTransaction = struct {
                 };
                 if (source == length) return error.ValueUseIncompatibleDuplicate;
             },
+            .load_scalar => |load| switch (load.kind) {
+                .ordinary => if (load.bits != 8 and load.bits != 32 and load.bits != 64)
+                    return error.ValueUseLoadWidthUnsupported,
+                .readonly_pointer => if (load.bits != 8 and load.bits != 16 and load.bits != 32 and
+                    load.bits != 56 and load.bits != 64)
+                {
+                    return error.ValueUseLoadWidthUnsupported;
+                },
+            },
+            .load_readonly_pair => |*load| {
+                try load.result.validate();
+                if (load.bits != 96 and load.bits != 128)
+                    return error.ValueUseLoadWidthUnsupported;
+            },
+            .load_stack_i128_alias => |*load| try load.result.validate(),
+            .load_readonly_table_i16 => |*load| try load.result.validate(),
         }
     }
 
@@ -1354,6 +1426,10 @@ pub const ValueUseTransaction = struct {
             .store_immediate,
             .branch_condition,
             .switch_compare_chain,
+            .load_scalar,
+            .load_readonly_pair,
+            .load_stack_i128_alias,
+            .load_readonly_table_i16,
             => {},
         }
     }
@@ -1497,6 +1573,11 @@ pub const ValueUseTransaction = struct {
             .store_i64 => |store| try transaction.validateRegisteredOperandHandle(store.value),
             .store_stack_pointer => |store| try transaction.validateRegisteredOperandHandle(store.destination),
             .inline_memcpy => |memcpy| try transaction.validateRegisteredOperandHandle(memcpy.source),
+            .load_scalar,
+            .load_readonly_pair,
+            .load_stack_i128_alias,
+            .load_readonly_table_i16,
+            => null,
             .validate_shape,
             .emit_copy_to,
             .form_readonly_table_address,
@@ -1524,6 +1605,10 @@ pub const ValueUseTransaction = struct {
             .store_stack_pointer,
             .branch_condition,
             .switch_compare_chain,
+            .load_scalar,
+            .load_readonly_pair,
+            .load_stack_i128_alias,
+            .load_readonly_table_i16,
             => null,
         };
     }
@@ -1867,6 +1952,7 @@ pub const ValueUseTransaction = struct {
             .switch_condition,
             .memcpy_pointer,
             .memcpy_length,
+            .load_address,
             => return error.ValueUsePreparedActionRequired,
             .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, destination),
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -1945,7 +2031,7 @@ fn preparedViewFromLoc(
     try validateSourceView(loc, request.form);
     return switch (request.form) {
         .gpr32, .gpr64 => preparedScalarView(loc),
-        .pointer => preparedPointerView(transaction, request, loc),
+        .pointer, .load_address => preparedPointerView(transaction, request, loc),
         .stack_f32_pair_byte_address => preparedStackF32PairAddressView(loc),
         .stack_object_address => preparedStackObjectView(loc),
         .pair_low_high, .pair_high_low => preparedPairView(loc, request.form),
@@ -2133,6 +2219,7 @@ fn executePreparedActionInternal(
                 .switch_condition,
                 .memcpy_pointer,
                 .memcpy_length,
+                .load_address,
                 => return error.ValueUsePreparedActionFormMismatch,
                 .stack_argument => return error.ValueUseStackArgumentUnsupported,
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2148,6 +2235,355 @@ fn executePreparedActionInternal(
         .branch_condition => try executeBranchCondition(transaction, view),
         .switch_compare_chain => |switch_action| try executeSwitchCompareChain(transaction, view, &switch_action),
         .inline_memcpy => |memcpy| try executeInlineMemcpy(transaction, request_index, memcpy),
+        .load_scalar => |load| try executeScalarLoad(transaction, request_index, view, load),
+        .load_readonly_pair => |load| try executeReadOnlyPairLoad(transaction, request_index, view, &load),
+        .load_stack_i128_alias => |load| try executeStackI128AliasLoad(transaction, view, &load),
+        .load_readonly_table_i16 => |load| try executeReadOnlyTableI16Load(transaction, view, &load),
+    }
+}
+
+fn executeScalarLoad(
+    transaction: *ValueUseTransaction,
+    request_index: u8,
+    view: *const ValueUseTransaction.PreparedView,
+    action: ValueUseTransaction.ScalarLoadAction,
+) !void {
+    const session = if (transaction.accumulator_session) |*session| session else return error.ValueUseLoadAccumulatorSessionRequired;
+
+    switch (action.kind) {
+        .ordinary => {
+            try prepareScalarLoadAccumulator(transaction, session);
+            try refreshLoadPreparedOperand(transaction, request_index);
+            try executeOrdinaryScalarLoad(
+                transaction,
+                &transaction.prepared_views[request_index].view,
+                action.bits,
+            );
+        },
+        .readonly_pointer => {
+            const ptr_reg = try stageReadOnlyScalarLoadPointer(transaction, view);
+            try prepareScalarLoadAccumulator(transaction, session);
+            try refreshLoadPreparedOperand(transaction, request_index);
+            try executeReadOnlyScalarLoad(transaction, ptr_reg, action.bits);
+        },
+    }
+}
+
+fn prepareScalarLoadAccumulator(
+    transaction: *ValueUseTransaction,
+    session: *AccumulatorDefinitionSession,
+) !void {
+    if (try session.prepare(.preserve, .spill_live)) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+    try failLoadForTest(transaction, .after_preservation);
+}
+
+fn refreshLoadPreparedOperand(transaction: *ValueUseTransaction, request_index: u8) !void {
+    if (!transaction.prepared_view_valid[request_index]) {
+        transaction.recordRequestFailure(request_index);
+        return error.ValueUsePreparedViewMissing;
+    }
+    transaction.prepared_views[request_index] = try transaction.buildPreparedRecord(request_index);
+}
+
+fn executeOrdinaryScalarLoad(
+    transaction: *ValueUseTransaction,
+    view: *const ValueUseTransaction.PreparedView,
+    bits: u16,
+) !void {
+    switch (view.*) {
+        .stack_object => |stack| switch (stack) {
+            .scalar => |scalar| switch (bits) {
+                8 => if (scalar.base_disp <= std.math.maxInt(u8))
+                    try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                        .load_stack_disp8_u8_eax = @intCast(scalar.base_disp),
+                    })
+                else
+                    try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                        .load_stack_disp32_u8_eax = scalar.base_disp,
+                    }),
+                64 => try appendPreparedLoadStackU64IntoRax(transaction.selector, scalar.base_disp),
+                else => return error.ValueUseLoadWidthUnsupported,
+            },
+            .integer32_array => |array| try appendPreparedLoadStackI32(
+                transaction,
+                .{ .disp = array.base_disp },
+            ),
+            .integer128 => return error.ValueUseLoadAddressHomeUnsupported,
+        },
+        .address_descriptor => |descriptor| try appendPreparedLoadStackI32(transaction, descriptor),
+        .register => |prepared| {
+            if (bits != 32) return error.ValueUseLoadWidthUnsupported;
+            const reg = switch (prepared.register) {
+                .gpr64 => |reg| reg,
+                else => return error.ValueUseLoadAddressHomeUnsupported,
+            };
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .load_arg_ptr_eax = reg,
+            });
+        },
+        .spill => |spill| {
+            if (bits != 32 or spill.bits < 64) return error.ValueUseLoadWidthUnsupported;
+            try materializeScalar64(
+                transaction.selector,
+                .{ .spill64 = spill.frame_index },
+                .{ .gpr64 = .rcx },
+            );
+            try failLoadForTest(transaction, .after_pointer_staging);
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .load_arg_ptr_eax = .rcx,
+            });
+        },
+        else => return error.ValueUseLoadAddressHomeUnsupported,
+    }
+}
+
+fn appendPreparedLoadStackI32(
+    transaction: *ValueUseTransaction,
+    descriptor: ValueUseTransaction.PreparedAddressDescriptor,
+) !void {
+    if (descriptor.index) |index| {
+        try materializeScalar64(
+            transaction.selector,
+            preparedScalarHomeLoc(index.home),
+            .{ .gpr64 = .rcx },
+        );
+        if (descriptor.addend) |addend| {
+            try materializeScalar64(
+                transaction.selector,
+                preparedScalarHomeLoc(addend.home),
+                .{ .gpr64 = .r8 },
+            );
+            try selector_state.emitEflagsInstruction(transaction.selector, .add_r8_rcx, .write);
+        }
+        if (descriptor.disp <= std.math.maxInt(u8)) {
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .load_stack_rcx4_disp8_eax = @intCast(descriptor.disp),
+            });
+        } else {
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .load_stack_rcx4_disp32_eax = descriptor.disp,
+            });
+        }
+    } else if (descriptor.disp <= std.math.maxInt(u8)) {
+        try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+            .load_stack_disp8_eax = @intCast(descriptor.disp),
+        });
+    } else {
+        try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+            .load_stack_disp32_eax = descriptor.disp,
+        });
+    }
+}
+
+fn appendPreparedLoadStackU64IntoRax(selector: *ComposedBlockSelector, disp: u32) !void {
+    if (disp <= std.math.maxInt(u8)) {
+        try selector.machine.instructions.append(selector.allocator, .{
+            .load_stack_disp8_rax = @intCast(disp),
+        });
+    } else {
+        try selector.machine.instructions.append(selector.allocator, .{
+            .load_stack_disp32_rax = disp,
+        });
+    }
+}
+
+fn preparedScalarHomeLoc(home: ValueUseTransaction.PreparedScalarHome) ValueLoc {
+    return switch (home) {
+        .register => |reg| switch (reg) {
+            .gpr32 => |value| .{ .scratch32 = value },
+            .gpr64 => |value| .{ .scratch64 = value },
+            .eax => .eax,
+            .rax => .rax,
+        },
+        .spill => |frame_index| .{ .spill64 = frame_index },
+    };
+}
+
+fn executeReadOnlyScalarLoad(
+    transaction: *ValueUseTransaction,
+    ptr_reg: ArgReg,
+    bits: u16,
+) !void {
+    switch (bits) {
+        8 => try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+            .load_arg_ptr_disp8_u8_eax = .{ .reg = ptr_reg, .offset = 0 },
+        }),
+        16 => try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+            .load_arg_ptr_disp8_u16_eax = .{ .reg = ptr_reg, .offset = 0 },
+        }),
+        32 => try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+            .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 0 },
+        }),
+        56 => {
+            const scratch: ArgReg = if (ptr_reg == .rcx) .r8 else .rcx;
+            try selector_state.clobberArgReg(transaction.selector, scratch);
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .load_arg_ptr_disp8_u16_eax = .{ .reg = ptr_reg, .offset = 4 },
+            });
+            try failLoadForTest(transaction, .after_first_partial_load);
+            try selector_state.emitEflagsInstruction(transaction.selector, .{ .shl_rax_imm6 = 32 }, .write);
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .mov_rax_to_arg = scratch,
+            });
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .load_arg_ptr_disp8_u8_eax = .{ .reg = ptr_reg, .offset = 6 },
+            });
+            try selector_state.emitEflagsInstruction(transaction.selector, .{ .shl_rax_imm6 = 48 }, .write);
+            try selector_state.emitEflagsInstruction(transaction.selector, .{
+                .binary_arg_rax = .{ .op = .@"or", .reg = scratch },
+            }, .write);
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .mov_rax_to_arg = scratch,
+            });
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 0 },
+            });
+            try selector_state.emitEflagsInstruction(transaction.selector, .{
+                .binary_arg_rax = .{ .op = .@"or", .reg = scratch },
+            }, .write);
+        },
+        64 => try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+            .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 0 },
+        }),
+        else => return error.ValueUseLoadWidthUnsupported,
+    }
+}
+
+fn stageReadOnlyScalarLoadPointer(
+    transaction: *ValueUseTransaction,
+    view: *const ValueUseTransaction.PreparedView,
+) !ArgReg {
+    return materializePreparedLoadPointer(transaction, view, .rdi);
+}
+
+fn materializePreparedLoadPointer(
+    transaction: *ValueUseTransaction,
+    view: *const ValueUseTransaction.PreparedView,
+    spill_destination: ArgReg,
+) !ArgReg {
+    return switch (view.*) {
+        .register => |prepared| switch (prepared.register) {
+            .gpr64 => |reg| reg,
+            else => error.ValueUseLoadAddressHomeUnsupported,
+        },
+        .spill => |spill| blk: {
+            if (spill.bits < 64) return error.ValueUseLoadAddressHomeUnsupported;
+            try materializeScalar64(
+                transaction.selector,
+                .{ .spill64 = spill.frame_index },
+                .{ .gpr64 = spill_destination },
+            );
+            try failLoadForTest(transaction, .after_pointer_staging);
+            break :blk spill_destination;
+        },
+        else => error.ValueUseLoadAddressHomeUnsupported,
+    };
+}
+
+fn executeReadOnlyPairLoad(
+    transaction: *ValueUseTransaction,
+    request_index: u8,
+    view: *const ValueUseTransaction.PreparedView,
+    action: *const ValueUseTransaction.ReadOnlyPairLoadAction,
+) !void {
+    _ = request_index;
+    var ptr_reg = try materializePreparedLoadPointer(transaction, view, .rdi);
+    // Preserve the accepted authority and timing exactly: spill-backed
+    // pointers stage first, then the existing pair chooser observes the
+    // resulting selector/spill state. Seal conservatively declared every
+    // pair register the chooser can return, so this late read-only decision
+    // cannot introduce an unplanned physical write.
+    const pair = try selector_state.choosePairScratchForClobber(transaction.selector, null) orelse
+        return error.ValueUseLoadPairUnavailable;
+    if (pair.contains(ptr_reg)) {
+        const current = switch (view.*) {
+            .register => |prepared| switch (prepared.register) {
+                .gpr64 => |reg| ValueLoc{ .scratch64 = reg },
+                else => return error.ValueUseLoadAddressHomeUnsupported,
+            },
+            else => return error.ValueUseLoadAddressHomeUnsupported,
+        };
+        try materializeScalar64(transaction.selector, current, .{ .gpr64 = .rdi });
+        ptr_reg = .rdi;
+        try failLoadForTest(transaction, .after_pointer_staging);
+    }
+    try selector_state.clobberArgReg(transaction.selector, pair.lo);
+    try selector_state.clobberArgReg(transaction.selector, pair.hi);
+    try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+        .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 0 },
+    });
+    try failLoadForTest(transaction, .after_first_partial_load);
+    try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+        .mov_rax_to_arg = pair.lo,
+    });
+    try transaction.selector.machine.instructions.append(transaction.selector.allocator, if (action.bits == 96)
+        .{ .load_arg_ptr_disp8_eax = .{ .reg = ptr_reg, .offset = 8 } }
+    else
+        .{ .load_arg_ptr_disp8_rax = .{ .reg = ptr_reg, .offset = 8 } });
+    try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+        .mov_rax_to_arg = pair.hi,
+    });
+    const result_name = try ownActionIdentity(transaction, &action.result);
+    try selector_state.bindResultLoc(transaction.selector, result_name, .{ .scratch128 = pair });
+}
+
+fn executeStackI128AliasLoad(
+    transaction: *ValueUseTransaction,
+    view: *const ValueUseTransaction.PreparedView,
+    action: *const ValueUseTransaction.StackI128AliasLoadAction,
+) !void {
+    const disp = switch (view.*) {
+        .stack_object => |stack| switch (stack) {
+            .integer128 => |disp| disp,
+            else => return error.ValueUseLoadAddressHomeUnsupported,
+        },
+        else => return error.ValueUseLoadAddressHomeUnsupported,
+    };
+    const result_name = try ownActionIdentity(transaction, &action.result);
+    try selector_state.bindResultLoc(transaction.selector, result_name, .{ .stack128_value = disp });
+}
+
+fn executeReadOnlyTableI16Load(
+    transaction: *ValueUseTransaction,
+    view: *const ValueUseTransaction.PreparedView,
+    action: *const ValueUseTransaction.ReadOnlyTableI16LoadAction,
+) !void {
+    const table = switch (view.*) {
+        .table_pointer => |table| table,
+        else => return error.ValueUseLoadAddressHomeUnsupported,
+    };
+    if (table.shape != .i16_128 or table.offset != 0)
+        return error.ValueUseLoadAddressHomeUnsupported;
+    const base: ArgReg = switch (table.storage) {
+        .register => |reg| reg,
+        .spill => |frame_index| blk: {
+            try materializeScalar64(
+                transaction.selector,
+                .{ .spill64 = frame_index },
+                .{ .gpr64 = .rcx },
+            );
+            try failLoadForTest(transaction, .after_pointer_staging);
+            break :blk .rcx;
+        },
+    };
+    try selector_state.clobberArgReg(transaction.selector, .r8);
+    try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+        .load_arg_ptr_disp8_u16_arg = .{ .base = base, .dst = .r8, .offset = 0 },
+    });
+    const result_name = try ownActionIdentity(transaction, &action.result);
+    try selector_state.bindResultLoc(transaction.selector, result_name, .{ .scratch32 = .r8 });
+}
+
+fn failLoadForTest(
+    transaction: *ValueUseTransaction,
+    boundary: ValueUseTransaction.LoadTestFailure,
+) !void {
+    if (builtin.is_test) {
+        if (transaction.load_test_failure == boundary)
+            return error.ValueUseLoadTestFailure;
     }
 }
 
@@ -3027,7 +3463,7 @@ fn preparedTablePointerEql(
 }
 
 const NodeList = struct {
-    items: [3]ValueUseTransaction.PhysicalNode = undefined,
+    items: [6]ValueUseTransaction.PhysicalNode = undefined,
     len: u8 = 0,
 
     fn append(list: *NodeList, node: ValueUseTransaction.PhysicalNode) !void {
@@ -3048,7 +3484,7 @@ const Mapping = struct {
 };
 
 const MappingList = struct {
-    items: [3]Mapping = undefined,
+    items: [6]Mapping = undefined,
     len: u8 = 0,
 
     fn append(list: *MappingList, mapping: Mapping) void {
@@ -3074,7 +3510,11 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .memcpy_pointer,
             .memcpy_length,
             => {},
-            .stack_f32_pair_byte_address, .branch_condition, .switch_condition => error.ValueUsePreparedActionRequired,
+            .stack_f32_pair_byte_address,
+            .branch_condition,
+            .switch_condition,
+            .load_address,
+            => error.ValueUsePreparedActionRequired,
             .stack_argument => error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
         };
@@ -3093,6 +3533,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .switch_condition,
             .memcpy_pointer,
             .memcpy_length,
+            .load_address,
             => {},
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -3124,6 +3565,14 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .inline_memcpy => if (request.form != .memcpy_pointer or
                 request.expected.ty != .ptr or request.expected.register_class != .gpr64)
                 error.ValueUsePreparedActionFormMismatch,
+            .load_scalar,
+            .load_readonly_pair,
+            .load_stack_i128_alias,
+            .load_readonly_table_i16,
+            => if (request.form != .load_address or request.expected.ty != .ptr or
+                request.expected.register_class != .stack_pointer or
+                request.expected.pointer_address_space != 0)
+                error.ValueUsePreparedActionFormMismatch,
         };
     }
     if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
@@ -3136,6 +3585,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
         .switch_condition,
         .memcpy_pointer,
         .memcpy_length,
+        .load_address,
         => false,
         .pair_low_high, .pair_high_low => request.destination == .pair,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -3155,6 +3605,59 @@ fn validateBindingCompatibility(
     request: *const ValueUseTransaction.StoredRequest,
     current: ValueLoc,
 ) !void {
+    if (request.form == .load_address) {
+        try validateExpectedType(request.expected, request.form);
+        const action = request.prepared_action orelse
+            return error.ValueUsePreparedActionMissing;
+        switch (action) {
+            .load_scalar => |load| switch (load.kind) {
+                .ordinary => switch (current) {
+                    .stack_scalar => |stack| {
+                        if (binding.vreg.class != .stack_object or stack.kind != .integer or
+                            stack.bits != load.bits or (load.bits != 8 and load.bits != 64))
+                        {
+                            return error.ValueUseLoadAddressHomeUnsupported;
+                        }
+                    },
+                    .stack_i32_array => if (binding.vreg.class != .stack_object or load.bits != 32)
+                        return error.ValueUseLoadAddressHomeUnsupported,
+                    .stack_i32_ptr => if (binding.vreg.class != .stack_pointer or load.bits != 32)
+                        return error.ValueUseLoadAddressHomeUnsupported,
+                    .arg64, .scratch64, .spill64 => if (binding.vreg.class != .gpr64 or
+                        binding.vreg.bits < 64 or load.bits != 32)
+                    {
+                        return error.ValueUseLoadAddressHomeUnsupported;
+                    },
+                    else => return error.ValueUseLoadAddressHomeUnsupported,
+                },
+                .readonly_pointer => switch (current) {
+                    .arg64, .scratch64, .spill64 => if (binding.vreg.class != .gpr64 or binding.vreg.bits < 64)
+                        return error.ValueUseLoadAddressHomeUnsupported,
+                    else => return error.ValueUseLoadAddressHomeUnsupported,
+                },
+            },
+            .load_readonly_pair => switch (current) {
+                .arg64, .scratch64, .spill64 => if (binding.vreg.class != .gpr64 or binding.vreg.bits < 64)
+                    return error.ValueUseLoadAddressHomeUnsupported,
+                else => return error.ValueUseLoadAddressHomeUnsupported,
+            },
+            .load_stack_i128_alias => switch (current) {
+                .stack128 => if (binding.vreg.class != .stack_object)
+                    return error.ValueUseLoadAddressHomeUnsupported,
+                else => return error.ValueUseLoadAddressHomeUnsupported,
+            },
+            .load_readonly_table_i16 => switch (current) {
+                .readonly_table_ptr => |ptr| if (binding.vreg.class != .stack_pointer or
+                    ptr.shape != .i16_128 or ptr.offset != 0)
+                {
+                    return error.ValueUseLoadAddressHomeUnsupported;
+                },
+                else => return error.ValueUseLoadAddressHomeUnsupported,
+            },
+            else => return error.ValueUsePreparedActionFormMismatch,
+        }
+        return;
+    }
     if (request.form == .memcpy_pointer or request.form == .memcpy_length) {
         try validateExpectedType(request.expected, request.form);
         if (binding.vreg.bits < 64) return if (request.form == .memcpy_pointer)
@@ -3266,6 +3769,11 @@ fn validateExpectedType(expected: ValueUseTransaction.Expected, form: ValueUseTr
         },
         .memcpy_length => if (!expected.ty.eql(.{ .int = 64 }) or expected.register_class != .gpr64)
             return error.ValueUseTypeMismatch,
+        .load_address => if (expected.ty != .ptr or expected.register_class != .stack_pointer or
+            expected.pointer_address_space == null or expected.pointer_address_space.? != 0)
+        {
+            return error.ValueUseTypeMismatch;
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -3323,6 +3831,20 @@ fn validateSourceView(loc: ValueLoc, form: ValueUseTransaction.UseForm) !void {
             .arg64, .scratch64, .rax, .spill64, .arg128, .scratch128 => {},
             else => return error.ValueUseSourceViewMismatch,
         },
+        .load_address => switch (loc) {
+            .arg64,
+            .scratch64,
+            .spill64,
+            .stack_scalar,
+            .stack128,
+            .stack_i32_array,
+            .stack_i32_ptr,
+            .readonly_table_ptr,
+            => {},
+            .xmm => return error.ValueUseXmmUnsupported,
+            .aggregate_sse => return error.ValueUseAggregateUnsupported,
+            else => return error.ValueUseLoadAddressHomeUnsupported,
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -3354,6 +3876,7 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: ValueUseTransaction.UseForm) 
         .switch_condition,
         .memcpy_pointer,
         .memcpy_length,
+        .load_address,
         .stack_argument,
         .new_pair_ownership,
         => false,
@@ -3373,6 +3896,7 @@ fn earlySequencingCandidate(loc: ValueLoc, form: ValueUseTransaction.UseForm) bo
             else => false,
         },
         .branch_condition, .switch_condition => false,
+        .load_address => false,
         else => false,
     };
 }
@@ -3466,6 +3990,61 @@ fn requestDestinationNodes(
                 try result.append(.rdi);
                 try result.append(.rsi);
                 try result.append(.rdx);
+            },
+            .load_scalar => |load| {
+                try result.append(.accumulator);
+                const source = current orelse return error.ValueUseUnresolvedSource;
+                switch (load.kind) {
+                    .ordinary => switch (source) {
+                        .spill64 => try result.append(.rcx),
+                        .stack_i32_ptr => |ptr| if (ptr.index != null) {
+                            try result.append(.rcx);
+                            if (ptr.index.?.addend_name != null) try result.append(.r8);
+                        },
+                        else => {},
+                    },
+                    .readonly_pointer => {
+                        const pointer_reg: ?ArgReg = switch (source) {
+                            .arg64, .scratch64 => |reg| reg,
+                            .spill64 => blk: {
+                                try result.append(.rdi);
+                                break :blk .rdi;
+                            },
+                            else => null,
+                        };
+                        if (load.bits == 56) {
+                            try result.append(if (pointer_reg == .rcx) .r8 else .rcx);
+                        }
+                    },
+                }
+            },
+            .load_readonly_pair => {
+                const source = current orelse return error.ValueUseUnresolvedSource;
+                try result.append(.accumulator);
+                for (selector_types.selector_allocatable_pairs) |pair| {
+                    try result.append(nodeForArgReg(pair.lo));
+                    try result.append(nodeForArgReg(pair.hi));
+                }
+                switch (source) {
+                    .spill64 => try result.append(.rdi),
+                    .arg64, .scratch64 => |reg| {
+                        for (selector_types.selector_allocatable_pairs) |pair| {
+                            if (pair.contains(reg)) {
+                                try result.append(.rdi);
+                                break;
+                            }
+                        }
+                    },
+                    else => return error.ValueUseLoadAddressHomeUnsupported,
+                }
+            },
+            .load_stack_i128_alias => {},
+            .load_readonly_table_i16 => {
+                try result.append(.r8);
+                switch (current orelse return error.ValueUseUnresolvedSource) {
+                    .readonly_table_ptr => |ptr| if (ptr.storage == .spill) try result.append(.rcx),
+                    else => return error.ValueUseLoadAddressHomeUnsupported,
+                }
             },
         },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -3623,6 +4202,96 @@ fn requestMappings(
                     .source_request_index = memcpy.length.index,
                 });
             },
+            .load_scalar => |load| {
+                const source = current orelse return error.ValueUseUnresolvedSource;
+                mappings.append(.{ .source = null, .destination = .accumulator, .source_request_index = null });
+                switch (load.kind) {
+                    .ordinary => switch (source) {
+                        .spill64 => mappings.append(.{
+                            .source = scalarSourceNode(source),
+                            .destination = .rcx,
+                            .source_request_index = request_index,
+                        }),
+                        .stack_i32_ptr => |ptr| if (ptr.index) |index| {
+                            const index_loc = try transaction.resolveNamedCurrent(index.name);
+                            mappings.append(.{
+                                .source = scalarSourceNode(index_loc),
+                                .destination = .rcx,
+                                .source_request_index = request_index,
+                            });
+                            if (index.addend_name) |addend_name| {
+                                mappings.append(.{
+                                    .source = scalarSourceNode(try transaction.resolveNamedCurrent(addend_name)),
+                                    .destination = .r8,
+                                    .source_request_index = request_index,
+                                });
+                            }
+                        },
+                        else => {},
+                    },
+                    .readonly_pointer => {
+                        const pointer_reg: ?ArgReg = switch (source) {
+                            .arg64, .scratch64 => |reg| reg,
+                            .spill64 => blk: {
+                                mappings.append(.{
+                                    .source = scalarSourceNode(source),
+                                    .destination = .rdi,
+                                    .source_request_index = request_index,
+                                });
+                                break :blk .rdi;
+                            },
+                            else => null,
+                        };
+                        if (load.bits == 56) mappings.append(.{
+                            .source = null,
+                            .destination = if (pointer_reg == .rcx) .r8 else .rcx,
+                            .source_request_index = null,
+                        });
+                    },
+                }
+            },
+            .load_readonly_pair => {
+                mappings.append(.{ .source = null, .destination = .accumulator, .source_request_index = null });
+                for (selector_types.selector_allocatable_pairs) |pair| {
+                    mappings.append(.{ .source = null, .destination = nodeForArgReg(pair.lo), .source_request_index = null });
+                    mappings.append(.{ .source = null, .destination = nodeForArgReg(pair.hi), .source_request_index = null });
+                }
+                switch (current orelse return error.ValueUseUnresolvedSource) {
+                    .spill64 => |frame_index| mappings.append(.{
+                        .source = scalarSourceNode(.{ .spill64 = frame_index }),
+                        .destination = .rdi,
+                        .source_request_index = request_index,
+                    }),
+                    .arg64, .scratch64 => |reg| {
+                        for (selector_types.selector_allocatable_pairs) |pair| {
+                            if (pair.contains(reg)) {
+                                mappings.append(.{
+                                    .source = scalarSourceNode(current.?),
+                                    .destination = .rdi,
+                                    .source_request_index = request_index,
+                                });
+                                break;
+                            }
+                        }
+                    },
+                    else => return error.ValueUseLoadAddressHomeUnsupported,
+                }
+            },
+            .load_stack_i128_alias => {},
+            .load_readonly_table_i16 => {
+                mappings.append(.{ .source = null, .destination = .r8, .source_request_index = null });
+                switch (current orelse return error.ValueUseUnresolvedSource) {
+                    .readonly_table_ptr => |ptr| switch (ptr.storage) {
+                        .reg => {},
+                        .spill => |frame_index| mappings.append(.{
+                            .source = scalarSourceNode(.{ .spill64 = frame_index }),
+                            .destination = .rcx,
+                            .source_request_index = request_index,
+                        }),
+                    },
+                    else => return error.ValueUseLoadAddressHomeUnsupported,
+                }
+            },
             .validate_shape, .emit_copy_to => {},
         }
         if (action != .emit_copy_to) return mappings;
@@ -3666,6 +4335,10 @@ fn actionOwnsOrderedWrites(action: ValueUseTransaction.PreparedAction) bool {
         .branch_condition,
         .switch_compare_chain,
         .inline_memcpy,
+        .load_scalar,
+        .load_readonly_pair,
+        .load_stack_i128_alias,
+        .load_readonly_table_i16,
         => true,
         .validate_shape,
         .emit_copy_to,
@@ -3823,6 +4496,7 @@ fn validateCopyActionForm(
         .switch_condition,
         .memcpy_pointer,
         .memcpy_length,
+        .load_address,
         => false,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
