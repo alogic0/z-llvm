@@ -95,6 +95,29 @@ remove only migrated legacy branches, full gates + counterbalanced perf
 (artifacts after the final committed tree), no Tier 3, stop after the
 production commit plus the immutable perf evidence commit.
 
+**INBOX-133 HARD-STOPPED CORRECTLY** (stop conditions 1+4): the wired C52-0
+stream (trunc i64→i52, source live in RAX) diverged from the accepted
+spill/reload form — the accepted `lowerI52Cast` hardcodes
+`prepare(.clobber, .spill_live)` (`spill_rax_rsp; reload_rsp_rax;
+mov_imm_rcx; and rax,rcx`, pinned by the byte-exact regression test at
+`composed_selector_scalar_tests.zig:59`) while the frozen action's
+`scalarCastDisplacement` returns `.reuse_source` for every eax/rax-canonical
+named source. 4 unit tests failed (1,288/1,292); nothing committed; the
+wiring preserved at sha `a2f934be` (reapply clean); worktree clean;
+stash@{0} untouched. **The Reviewer authorized the two-step
+amendment/resume** (2026-07-17) with one refinement — no generic
+"destructive cast" rule (C04 also masks destructively but intentionally
+reuses): the action derives displacement from the CLOSED cast-plan variant —
+C52-0 always `.spill_live` matching the legacy hardcoded policy; C04, C05,
+C52-1..3 retain their exact existing source-dependent policies. Step A
+(dormant): explicit per-form displacement table in tests/evidence; the
+live-RAX C52-0 stream pinned; a non-C52-0 accumulator-resident control
+proving `.reuse_source` remains; rollback after spill and after reload;
+production untouched; ratchet 172; identities exact; full unit + ABI; no
+perf; no Tier 3; stop. Step B: resume the wiring from the hash-verified
+patch `a2f934be` under the unchanged INBOX-133 contract. INBOX-133 amended
+in place and re-dispatched.
+
 ## Historical operating ledger
 
 ## INBOX-67 tracked serial-runner hardening (O1 prerequisite)
