@@ -232,7 +232,25 @@ spill-lhs-through-RAX; slice 5: form-table quotient with the fixed RCX/RDX
 order — no generalization); production untouched; ratchet 166; identities
 EXACT; unit 1,313/1,313; Worker abi + my independent abi rerun both pass; no
 perf; no Tier 3. Evidence sent requesting A2 acceptance + the B2 wiring
-resume.
+resume. **A2 ACCEPTED and B2 dispatched — then B2 HARD-STOPPED a second time
+(correctly)** on an UNRELATED live accumulator alias: at `__multi3`,
+`%10 = lshr %9, 32` is a live-after alias of the same RAX as the dying
+source `%9` of `%11 = and %9, mask`; the accepted stream spills the occupant
+before the AND (legacy `accumulatorPreserveCurrentDisplacement`,
+occupant-liveness — a third distinct displacement authority); the frozen
+immediate preamble covered only selected ≤32-bit forms, wide R04/R05 skipped
+it. The wiring is otherwise correct (inventory reconciles exactly 153; the
+lshr helper is ownerless; guards 40/40). Complete stopped state preserved at
+sha `8ab26a97`. **The Reviewer authorized Step A3** with the refinement that
+the preamble derives PER CLOSED PLAN from each plan's destructive
+physical-write set (never merely "can use EAX/RAX"), with the
+first-destructive-write occupant query, exactly-once preservation, canonical
+re-derivation, the A2 rule unchanged afterward, the dying-source-no-alias
+byte-stream invariant, a per-plan first-write/preamble table, and the seven
+coverage classes; then B3 applies patch `8ab26a97` unchanged under the 153
+contract. PROCESS RULE: another distinct lifecycle gap in B3 = no automatic
+A4 — stop and split by complete immediate plan families for architectural
+review. A3 dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
