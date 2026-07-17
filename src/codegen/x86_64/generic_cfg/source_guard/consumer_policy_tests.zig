@@ -78,7 +78,7 @@ const validateCurrentHomeEqZeroProductionSites = support.validateCurrentHomeEqZe
 const validateSetccEaxCompareProductionSites = support.validateSetccEaxCompareProductionSites;
 const validateCurrentHomeSignBitProductionSites = support.validateCurrentHomeSignBitProductionSites;
 const validateI128PairProductionSites = support.validateI128PairProductionSites;
-const validateDormantScalarCastProductionSites = support.validateDormantScalarCastProductionSites;
+const validateScalarCastProductionSites = support.validateScalarCastProductionSites;
 const validateLoadDiagnosticMappingProductionSites = support.validateLoadDiagnosticMappingProductionSites;
 const validateDormantLoadActionProductionSites = support.validateDormantLoadActionProductionSites;
 const validateAccumulatorCompositionProductionSites = support.validateAccumulatorCompositionProductionSites;
@@ -419,7 +419,7 @@ test "composed selector source guard admits only reviewed accumulator compositio
         );
     }
     try std.testing.expectError(
-        error.ValueUseAccumulatorCompositionOutsideAllowlist,
+        error.ValueUseAccumulatorCompositionAllowlistMismatch,
         validateAccumulatorCompositionProductionSites(
             "composed_selector_scalar.zig",
             "fn lowerAbsI32() void { _ = transaction.beginAccumulatorSession(); }",
@@ -427,20 +427,30 @@ test "composed selector source guard admits only reviewed accumulator compositio
     );
 }
 
-test "composed selector source guard keeps scalar cast actions dormant" {
-    const forbidden = [_][:0]const u8{
+test "composed selector source guard confines active scalar cast actions" {
+    const outside = [_][:0]const u8{
         "fn lowerCast() void { _ = .{ .form = .pair_low_scalar_cast_operand }; }",
         "fn lowerCast() void { _ = .{ .prepared_action = .{ .accumulator_scalar_cast = action } }; }",
         "fn lowerCast() void { _ = isSignExtendScratchCast(cast); }",
     };
-    for (forbidden) |fixture| {
+    for (outside) |fixture| {
         try std.testing.expectError(
-            error.ValueUseScalarCastProductionWiringForbidden,
-            validateDormantScalarCastProductionSites("composed_selector_scalar.zig", fixture),
+            error.ValueUseScalarCastActionOutsideAllowlist,
+            validateScalarCastProductionSites("composed_selector_calls.zig", fixture),
         );
     }
-    try validateDormantScalarCastProductionSites(
-        "composed_selector_scalar.zig",
-        "fn lowerCast() void { _ = AccumulatorDefinitionTransaction.begin(selector); }",
+    try std.testing.expectError(
+        error.ValueUseScalarCastActionAllowlistMismatch,
+        validateScalarCastProductionSites(
+            "composed_selector_scalar.zig",
+            "fn lowerCast() void { _ = .{ .form = .pair_low_scalar_cast_operand }; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseScalarCastActionAllowlistMismatch,
+        validateScalarCastProductionSites(
+            "composed_selector_scalar.zig",
+            "fn lowerCast() void { _ = AccumulatorDefinitionTransaction.begin(selector); }",
+        ),
     );
 }

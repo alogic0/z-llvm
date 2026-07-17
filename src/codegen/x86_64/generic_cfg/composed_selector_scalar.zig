@@ -8,6 +8,7 @@ const stage2_planning = @import("stage2_planning.zig");
 const composed_helpers = @import("composed_helpers.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_icmp = @import("composed_selector_icmp.zig");
+const ValueUseTransaction = @import("composed_selector_value_use_transaction.zig").ValueUseTransaction;
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
@@ -774,7 +775,11 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     const from_bits = intBits(cast.from_ty) orelse return .{ .no_emitter = "composed-block-cast-from-not-int" };
     const to_bits = intBits(cast.to_ty) orelse return .{ .no_emitter = "composed-block-cast-to-not-int" };
-    if (from_bits == 52 or to_bits == 52) return lowerI52Cast(selector, result_name, cast, from_bits, to_bits);
+    if (from_bits == 52 or to_bits == 52) {
+        if (ValueUseTransaction.isAccumulatorScalarCast(cast, false))
+            return lowerAccumulatorScalarCast(selector, result_name, cast, from_bits, to_bits, false);
+        return lowerI52Cast(cast);
+    }
     if (from_bits > 128) return .{ .no_emitter = "composed-block-cast-width" };
     if (to_bits > 64 and !(cast.op == .zext and from_bits == 64 and to_bits == 128)) {
         return .{ .no_emitter = "composed-block-cast-width" };
@@ -782,28 +787,20 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
 
     switch (cast.op) {
         .trunc, .bitcast => {
-            if (from_bits == 128) {
-                const dst = plannedScratch64RegForResult(selector, result_name) orelse
-                    if (selector_state.resolvePairValue(selector, cast.value)) |pair|
-                        pair.lo
-                    else
-                        scratch64RegForUseAvoiding(selector, null) orelse return .{ .no_spill_envelope = "composed-block-cast-scratch" };
-                selector_state.emitPairLowLaneIntoScratch(selector, cast.value, dst) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
-                try selector_state.bindScratch(selector, result_name, dst, 64);
-            } else {
-                const loc = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
-                const result_loc: ValueLoc = if (from_bits > 32 and to_bits <= 32) switch (loc) {
-                    .arg64, .scratch64 => |reg| .{ .scratch32 = reg },
-                    .rax => .eax,
-                    .spill64 => |frame_index| .{ .spill64 = frame_index },
-                    .arg32, .scratch32, .eax => loc,
-                    .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-cast-width" },
-                } else loc;
-                try selector_state.bindValueLoc(selector, result_name, result_loc);
-                switch (result_loc) {
-                    .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .spill64 => {},
-                    .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-cast-width" },
-                }
+            if (ValueUseTransaction.isPairLowScalarCast(cast))
+                return lowerPairLowScalarCast(selector, result_name, cast, from_bits, to_bits);
+            const loc = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
+            const result_loc: ValueLoc = if (from_bits > 32 and to_bits <= 32) switch (loc) {
+                .arg64, .scratch64 => |reg| .{ .scratch32 = reg },
+                .rax => .eax,
+                .spill64 => |frame_index| .{ .spill64 = frame_index },
+                .arg32, .scratch32, .eax => loc,
+                .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-cast-width" },
+            } else loc;
+            try selector_state.bindValueLoc(selector, result_name, result_loc);
+            switch (result_loc) {
+                .arg32, .arg64, .eax, .rax, .scratch32, .scratch64, .spill64 => {},
+                .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-cast-width" },
             }
         },
         .zext => {
@@ -815,134 +812,201 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
                 return null;
             }
             const exact_ei_narrow = isExactEiNarrowBits(selector, from_bits) or isExactEiNarrowBits(selector, to_bits);
-            if (from_bits > 32) {
-                if (!exact_ei_narrow or to_bits > 64) return .{ .no_emitter = "composed-block-zext-width" };
-                const source = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
-                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-                defer transaction.deinit();
-                if (try transaction.prepare(
-                    .clobber,
-                    accumulatorLocDisplacement(cast.value, source),
-                )) |diagnostic| return diagnostic;
-                transaction.materialize(cast.value, .zeroExtendedRax(from_bits)) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
-                const mask: u64 = (@as(u64, 1) << @intCast(from_bits)) - 1;
-                try selector_state.clobberArgReg(selector, .rcx);
-                try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = @bitCast(mask) });
-                try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
-                // The mask proves every physical bit above the source domain zero.
-                try transaction.define(result_name, if (to_bits == 64) .fullRax() else .zeroExtendedRax(to_bits));
-                try transaction.commit();
-                return null;
-            }
+            if (from_bits > 32 and (!exact_ei_narrow or to_bits > 64))
+                return .{ .no_emitter = "composed-block-zext-width" };
             if (to_bits > 32 and to_bits != 64 and !exact_ei_narrow) return .{ .no_emitter = "composed-block-zext-width" };
-            const source = try accumulatorCastSource(selector, cast.value);
-            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-            defer transaction.deinit();
-            if (try transaction.prepare(
-                if (from_bits < 32) .clobber else .preserve,
-                accumulatorCastDisplacement(cast.value, source),
-            )) |diagnostic| return diagnostic;
-            transaction.materialize(cast.value, .zeroExtending(from_bits)) catch
-                return .{ .unsupported_value = "composed-block-unknown-cast" };
-            if (from_bits < 32) {
-                const shift: u5 = @intCast(from_bits);
-                const mask = (@as(i32, 1) << shift) - 1;
-                try emitArithmeticWrite(selector, .{ .and_eax_imm32 = mask });
-            }
-            // An EAX definition proves the full physical RAX transport. Wider
-            // logical results therefore have an explicit zero-extension proof.
-            try transaction.define(result_name, if (to_bits <= 32)
-                .zeroExtending(to_bits)
-            else if (to_bits == 64)
-                .fullRax()
-            else
-                .zeroExtendedRax(to_bits));
-            try transaction.commit();
+            if (ValueUseTransaction.isAccumulatorScalarCast(cast, exact_ei_narrow))
+                return lowerAccumulatorScalarCast(selector, result_name, cast, from_bits, to_bits, exact_ei_narrow);
+            return error.UnsupportedCodegenValue;
         },
         .sext => {
             if (from_bits != 32 or to_bits != 64) return .{ .no_emitter = "composed-block-sext-width" };
-            const loc = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-sext" };
-            const src = switch (loc) {
-                .arg32, .scratch32 => |reg| reg,
-                .arg64, .scratch64, .arg128, .scratch128, .xmm, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-sext-source" },
-            };
-            const dst: ArgReg = switch (src) {
-                .rdi => .r8,
-                .rsi => .r9,
-                .rdx => .rcx,
-                .rcx => .r8,
-                .r8 => .r9,
-                .r9 => .r8,
-            };
-            try selector.machine.instructions.append(selector.allocator, .{ .movsxd_arg32_arg64 = .{ .dst = dst, .src = src } });
-            try selector_state.bindScratch(selector, result_name, dst, 64);
+            if (ValueUseTransaction.isSignExtendScratchCast(cast))
+                return lowerSignExtendScratchCast(selector, result_name, cast);
+            return .{ .unsupported_value = "composed-block-unknown-sext" };
         },
         else => return .{ .no_emitter = "composed-block-cast-op" },
     }
     return null;
 }
 
-fn lowerI52Cast(
+const ScalarCastDiagnosticKind = enum {
+    pair_low,
+    accumulator,
+    sign_extend,
+};
+
+fn lowerPairLowScalarCast(
     selector: *ComposedBlockSelector,
     result_name: []const u8,
     cast: ir.CastInst,
     from_bits: u16,
     to_bits: u16,
 ) !?Diagnostic {
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const source_request = try transaction.register(.{
+        .source = cast.value,
+        .expected = .{
+            .ty = cast.from_ty,
+            .register_class = .gpr128,
+        },
+        .form = .pair_low_scalar_cast_operand,
+        .destination = .prepared_view,
+        .prepared_action = .{ .pair_low_scalar_cast = .{
+            .result = try ValueUseTransaction.ActionIdentity.init(result_name),
+            .op = cast.op,
+            .from_bits = from_bits,
+            .to_bits = to_bits,
+        } },
+    });
+    transaction.seal() catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .pair_low, err) orelse return err;
+    transaction.prepare() catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .pair_low, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .pair_low, err) orelse return err;
+    const lease = transaction.preparedView(source_request) catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .pair_low, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .pair_low, err) orelse return err;
+    try transaction.commit();
+    return null;
+}
+
+fn lowerAccumulatorScalarCast(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    cast: ir.CastInst,
+    from_bits: u16,
+    to_bits: u16,
+    exact_ei: bool,
+) !?Diagnostic {
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const source_request = try transaction.register(.{
+        .source = cast.value,
+        .expected = .{
+            .ty = cast.from_ty,
+            .register_class = if (from_bits <= 32) .gpr32 else .gpr64,
+        },
+        .form = .accumulator_scalar_cast_operand,
+        .destination = .prepared_view,
+        .prepared_action = .{ .accumulator_scalar_cast = .{
+            .result = try ValueUseTransaction.ActionIdentity.init(result_name),
+            .op = cast.op,
+            .from_bits = from_bits,
+            .to_bits = to_bits,
+            .immediate = switch (cast.value) {
+                .int => |value| value,
+                else => null,
+            },
+            .exact_ei = exact_ei,
+        } },
+    });
+    transaction.seal() catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .accumulator, err) orelse return err;
+    _ = try transaction.beginAccumulatorSession();
+    transaction.prepare() catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .accumulator, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .accumulator, err) orelse return err;
+    const lease = transaction.preparedView(source_request) catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .accumulator, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .accumulator, err) orelse return err;
+    try transaction.commit();
+    return null;
+}
+
+fn lowerSignExtendScratchCast(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    cast: ir.CastInst,
+) !?Diagnostic {
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const source_request = try transaction.register(.{
+        .source = cast.value,
+        .expected = .{
+            .ty = cast.from_ty,
+            .register_class = .gpr32,
+        },
+        .form = .sign_extend_scratch_operand,
+        .destination = .prepared_view,
+        .prepared_action = .{ .sign_extend_scratch = .{
+            .result = try ValueUseTransaction.ActionIdentity.init(result_name),
+        } },
+    });
+    transaction.seal() catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .sign_extend, err) orelse return err;
+    transaction.prepare() catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .sign_extend, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .sign_extend, err) orelse return err;
+    const lease = transaction.preparedView(source_request) catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .sign_extend, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return scalarCastValueUseDiagnostic(&transaction, source_request, .sign_extend, err) orelse return err;
+    try transaction.commit();
+    return null;
+}
+
+fn scalarCastValueUseDiagnostic(
+    transaction: *const ValueUseTransaction,
+    source_request: ValueUseTransaction.RequestHandle,
+    kind: ScalarCastDiagnosticKind,
+    err: anyerror,
+) ?Diagnostic {
+    if (err == error.ValueUseActionDiagnostic) return transaction.actionDiagnostic();
+    if (!transaction.failedRequestIs(source_request)) return null;
+    return switch (kind) {
+        .pair_low => switch (err) {
+            error.ValueUseScalarCastScratchUnavailable => .{ .no_spill_envelope = "composed-block-cast-scratch" },
+            error.ValueUseUnresolvedSource,
+            error.ValueUseExpiredSource,
+            error.ValueUseUnsupportedSource,
+            error.ValueUseTypeMismatch,
+            error.ValueUseRegisterClassMismatch,
+            error.ValueUseSourceViewMismatch,
+            error.ValueUseScalarCastWidthUnsupported,
+            error.ValueUseScalarCastLocationUnsupported,
+            => .{ .unsupported_value = "composed-block-unknown-cast" },
+            else => null,
+        },
+        .accumulator => switch (err) {
+            error.ValueUseUnresolvedSource,
+            error.ValueUseExpiredSource,
+            error.ValueUseUnsupportedSource,
+            error.ValueUseTypeMismatch,
+            error.ValueUseRegisterClassMismatch,
+            error.ValueUseSourceViewMismatch,
+            error.ValueUseScalarCastWidthUnsupported,
+            error.ValueUseScalarCastLocationUnsupported,
+            error.ValueUseScalarCastImmediateMismatch,
+            => .{ .unsupported_value = "composed-block-unknown-cast" },
+            else => null,
+        },
+        .sign_extend => switch (err) {
+            error.ValueUseUnresolvedSource,
+            error.ValueUseExpiredSource,
+            error.ValueUseUnsupportedSource,
+            => .{ .unsupported_value = "composed-block-unknown-sext" },
+            error.ValueUseTypeMismatch,
+            error.ValueUseRegisterClassMismatch,
+            error.ValueUseSourceViewMismatch,
+            error.ValueUseScalarCastWidthUnsupported,
+            error.ValueUseScalarCastLocationUnsupported,
+            => .{ .no_emitter = "composed-block-sext-source" },
+            else => null,
+        },
+    };
+}
+
+fn lowerI52Cast(
+    cast: ir.CastInst,
+) !?Diagnostic {
     if (cast.value != .named) return .{ .no_emitter = "composed-block-i52-cast-value" };
-    if (cast.op == .trunc and from_bits == 64 and to_bits == 52) {
-        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-        defer transaction.deinit();
-        if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
-        transaction.materialize(cast.value, .fullRax()) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
-        try maskRaxToI52(selector);
-        try transaction.define(result_name, .zeroExtendedRax(52));
-        try transaction.commit();
-        return null;
-    }
-    if (cast.op == .zext and from_bits == 6 and to_bits == 52) {
-        const source = try accumulatorCastSource(selector, cast.value);
-        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-        defer transaction.deinit();
-        if (try transaction.prepare(
-            .clobber,
-            accumulatorCastDisplacement(cast.value, source),
-        )) |diagnostic| return diagnostic;
-        transaction.materialize(cast.value, .zeroExtending(6)) catch
-            return .{ .unsupported_value = "composed-block-unknown-cast" };
-        try emitArithmeticWrite(selector, .{ .and_eax_imm32 = 63 });
-        // The EAX write defines all of RAX with zeroes above bit 31.
-        try transaction.define(result_name, .zeroExtendedRax(52));
-        try transaction.commit();
-        return null;
-    }
-    if (cast.op == .zext and from_bits == 52 and to_bits == 64) {
-        const source = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
-        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-        defer transaction.deinit();
-        if (try transaction.prepare(
-            .preserve,
-            accumulatorLocDisplacement(cast.value, source),
-        )) |diagnostic| return diagnostic;
-        transaction.materialize(cast.value, .zeroExtendedRax(52)) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
-        try transaction.define(result_name, .fullRax());
-        try transaction.commit();
-        return null;
-    }
-    if (cast.op == .trunc and from_bits == 52 and (to_bits == 6 or to_bits == 32)) {
-        const source = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };
-        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-        defer transaction.deinit();
-        if (try transaction.prepare(
-            if (to_bits == 6) .clobber else .preserve,
-            accumulatorLocDisplacement(cast.value, source),
-        )) |diagnostic| return diagnostic;
-        transaction.materialize(cast.value, .zeroExtending(32)) catch return .{ .unsupported_value = "composed-block-unknown-cast" };
-        if (to_bits == 6) try emitArithmeticWrite(selector, .{ .and_eax_imm32 = 63 });
-        try transaction.define(result_name, .zeroExtending(to_bits));
-        try transaction.commit();
-        return null;
-    }
     return .{ .no_emitter = "composed-block-i52-cast-form" };
 }
 
@@ -1038,11 +1102,6 @@ fn maskRaxToI52(selector: *ComposedBlockSelector) !void {
     try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } });
 }
 
-const AccumulatorCastSource = union(enum) {
-    immediate: i32,
-    location: ValueLoc,
-};
-
 fn accumulatorLocDisplacement(
     value: ir.Value,
     source: ValueLoc,
@@ -1124,24 +1183,6 @@ fn finishArithmeticResult(
 ) !void {
     try transaction.define(result_name, accumulatorDefinition(bits));
     try transaction.commit();
-}
-
-fn accumulatorCastDisplacement(
-    value: ir.Value,
-    source: AccumulatorCastSource,
-) selector_state.AccumulatorDisplacementPolicy {
-    return switch (source) {
-        .immediate => .spill_live,
-        .location => |location| accumulatorLocDisplacement(value, location),
-    };
-}
-
-fn accumulatorCastSource(selector: *const ComposedBlockSelector, value: ir.Value) !AccumulatorCastSource {
-    return switch (value) {
-        .int => |int| .{ .immediate = try i32Value(int) },
-        .named => .{ .location = selector_state.resolveValue(selector, value) orelse return error.UnsupportedCodegenValue },
-        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => error.UnsupportedCodegenValue,
-    };
 }
 
 pub fn isExactEiNarrowBits(selector: *const ComposedBlockSelector, bits: u16) bool {

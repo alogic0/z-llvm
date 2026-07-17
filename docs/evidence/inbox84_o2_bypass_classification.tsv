@@ -116,7 +116,6 @@ composed_selector_memory.zig	lowerStoreI64	materializeLocIntoLoc	1-2	2	6	O2-3B2B
 composed_selector_memory.zig	lowerStoreStackPointer	resolveValue	1-2	2	1	O2-3B2B	migrated_complete_pointer_store_consumer	use_pointer_store
 composed_selector_memory.zig	materializeStackIndex	emitValueIntoScratch	1-2	2	6	parent-consumer	collapse_with_stack_i32_memory_owner	-
 composed_selector_scalar.zig	accumulatorArithmeticDisplacement	resolveValue	1	1	6	parent-consumer	collapse_with_o1_scalar_owner	-
-composed_selector_scalar.zig	accumulatorCastSource	resolveValue	1	1	6	parent-consumer	collapse_with_o1_cast_owner	-
 composed_selector_scalar.zig	accumulatorDirectMaterializationDisplacement	resolveValue	1	1	6	parent-consumer	collapse_with_o1_scalar_owner	-
 composed_selector_scalar.zig	accumulatorPreserveCurrentDisplacement	resolveValue	1	1	6	parent-consumer	collapse_with_o1_scalar_owner	-
 composed_selector_scalar.zig	lowerBinary	emitBinaryLocIntoAccumulator	1	1	3	O2-3B-O1	compose_binary_uses_with_accumulator_result_transaction	o1_binary
@@ -128,12 +127,10 @@ composed_selector_scalar.zig	lowerBinaryImmediateLhs	materializePairValue	1	1	3	
 composed_selector_scalar.zig	lowerBinaryImmediateRhs	emitValueIntoEax	1	1	3	O2-3B-O1	compose_named_lhs_with_accumulator_result_transaction	o1_binary_immediate_rhs
 composed_selector_scalar.zig	lowerBinaryImmediateRhs	emitValueIntoScratch	1-5	5	3	O2-3B-O1	compose_named_lhs_with_accumulator_result_transaction	o1_binary_immediate_rhs
 composed_selector_scalar.zig	lowerBinaryImmediateRhs	resolveValue	1	1	3	O2-3B-O1	compose_named_lhs_with_accumulator_result_transaction	o1_binary_immediate_rhs
-composed_selector_scalar.zig	lowerCast	emitValueIntoScratch	1	1	3	O2-3B-O1	compose_cast_source_with_accumulator_result_transaction	o1_cast
-composed_selector_scalar.zig	lowerCast	resolvePairValue	1	1	3	O2-3B-O1	compose_readonly_pair_source_with_result_transaction	o1_cast
-composed_selector_scalar.zig	lowerCast	resolveValue	1-3	3	3	O2-3B-O1	compose_cast_source_with_accumulator_result_transaction	o1_cast
+composed_selector_scalar.zig	lowerCast	emitValueIntoScratch	1	1	5	O4-pair-result	retain_for_pair_result_migration	-
+composed_selector_scalar.zig	lowerCast	resolveValue	1	1	6	O4-alias-copy	retain_as_approved_alias_only_binding	-
 composed_selector_scalar.zig	lowerFreeze	resolveValue	1	1	5	O4-alias-copy	retain_as_approved_alias_only_binding	use_freeze
 composed_selector_scalar.zig	lowerI52Binary	emitValueIntoScratch	1	1	3	O2-3B-O1	compose_binary_use_with_accumulator_result_transaction	o1_i52_binary
-composed_selector_scalar.zig	lowerI52Cast	resolveValue	1-2	2	3	O2-3B-O1	compose_cast_use_with_accumulator_result_transaction	o1_i52_cast
 composed_selector_scalar.zig	lowerMul64	emitValueIntoScratch	1-2	2	3	O2-3B-O1	compose_multiply_uses_with_accumulator_result_transaction	o1_mul64
 composed_selector_scalar.zig	lowerMul64	resolveValue	1-2	2	3	O2-3B-O1	compose_multiply_uses_with_accumulator_result_transaction	o1_mul64
 composed_selector_scalar.zig	lowerMul64SpillLhsThroughRax	resolveValue	1	1	3	O2-3B-O1	compose_multiply_use_with_accumulator_result_transaction	o1_mul64_spill_lhs

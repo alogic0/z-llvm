@@ -28,8 +28,13 @@ const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
 test "flag-writing accumulator cast rejects live EFLAGS before mutating selector state" {
     var machine = MachineFunction.init("live-flags-cast", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("source", 1);
+    try plan.interval_ends.put("result", 1);
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
+    selector.allocation_plan = &plan;
     try selector_state.bindValueLoc(&selector, "source", .{ .arg32 = .rdi });
     try machine.instructions.append(std.testing.allocator, .{ .mov_imm_eax = 7 });
     try selector.eflags.apply(.definition);
@@ -82,6 +87,77 @@ test "i52 destructive cast re-resolves the accepted spill and reload source" {
         .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } },
     }, machine.instructions.items);
     try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "result").?);
+}
+
+test "scalar cast production dispatch keeps alias and pair-result casts on O4 paths" {
+    {
+        var machine = MachineFunction.init("cast-alias-o4", .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "source", .{ .arg64 = .rdi });
+
+        try std.testing.expect((try selector_scalar.lowerCast(&selector, "result", .{
+            .op = .trunc,
+            .value = .{ .named = "source" },
+            .from_ty = .{ .int = 64 },
+            .to_ty = .{ .int = 32 },
+        })) == null);
+        try std.testing.expectEqual(
+            ValueLoc{ .scratch32 = .rdi },
+            selector_state.valueLoc(&selector, "result").?,
+        );
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+    {
+        var machine = MachineFunction.init("cast-pair-result-o4", .{ .int = 128 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "source", .{ .arg64 = .rdi });
+
+        try std.testing.expect((try selector_scalar.lowerCast(&selector, "result", .{
+            .op = .zext,
+            .value = .{ .named = "source" },
+            .from_ty = .{ .int = 64 },
+            .to_ty = .{ .int = 128 },
+        })) == null);
+        try std.testing.expectEqual(
+            ValueLoc{ .scratch128 = pair_a },
+            selector_state.valueLoc(&selector, "result").?,
+        );
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } },
+            .{ .mov_imm_rdx = 0 },
+        }, machine.instructions.items);
+    }
+}
+
+test "sign-extend scratch cast production dispatch is byte exact and durable" {
+    var machine = MachineFunction.init("cast-sign-extend-o2", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("source", 1);
+    try plan.interval_ends.put("result", 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "source", .{ .arg32 = .rdi });
+
+    try std.testing.expect((try selector_scalar.lowerCast(&selector, "result", .{
+        .op = .sext,
+        .value = .{ .named = "source" },
+        .from_ty = .{ .int = 32 },
+        .to_ty = .{ .int = 64 },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .movsxd_arg32_arg64 = .{ .dst = .r8, .src = .rdi } },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(
+        ValueLoc{ .scratch64 = .r8 },
+        selector_state.valueLoc(&selector, "result").?,
+    );
 }
 
 test "generic cfg selector materializes mul64 lhs into planned register" {
@@ -395,8 +471,13 @@ test "generic cfg selector reloads spilled pair for i128 trunc" {
     var machine = MachineFunction.init("spill-pair-trunc", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
 
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("wide", 1);
+    try plan.interval_ends.put("lo", 1);
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
+    selector.allocation_plan = &plan;
 
     try selector_state.bindValueLoc(&selector, "wide", .{ .spill128 = .{ .lo = .slot6, .hi = .slot8 } });
     const diagnostic = try selector_scalar.lowerCast(&selector, "lo", .{

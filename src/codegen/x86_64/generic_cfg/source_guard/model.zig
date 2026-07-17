@@ -134,7 +134,7 @@ pub const value_use_scalar_arithmetic_pub_names = [_][]const u8{
 pub const value_use_calls_pub_names = [_][]const u8{"executeInlineMemcpy"};
 
 pub const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-pub const frozen_bypass_inventory_sha256 = "6e570be808d2aea9275809471f53846af7f54afdd908ab73e51218579ca8112d";
+pub const frozen_bypass_inventory_sha256 = "5b3ac6b5a98184ed0562a2685c82ca8e1e7b5f33be0018b6d24255071c9f34ad";
 pub const value_use_facade_manifest_path = "docs/evidence/inbox128_o2_r1_facade_manifest.tsv";
 pub const value_use_facade_manifest_sha256 = "51527db981eb4da7844856a21e6000fd35caa693b5176685bc40e6a278fe0b1b";
 pub const bypass_operations = [_][]const u8{
@@ -344,7 +344,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_memory.zig", .function = "lowerStoreFp", .body_sha256 = "08773e5639dfcc22a932d0a4d702bbe8ff4b3ecb5e398c3b06a9de056fb8a81d" },
     .{ .source = "composed_selector_memory.zig", .function = "loadStackU64IntoRax", .body_sha256 = "3fd7fcf3653b5083f8123224f83a04abd16bbb7411dac2d4279079a74cf7648d" },
 
-    .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .body_sha256 = "84e76037ccb926b8edcfd5965355fcb81461d96318b71ae6e47ae96b74e3766d" },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .body_sha256 = "5bb1a4a256eccf90ad972a32b0dd512fb6e72ce9868b7b1ff80627ae3fcc1f33" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerFreeze", .body_sha256 = "110d9c541f057cdb2a9a350cb9c16a1f9eac811c9739ed6cda8826d614b70b84" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerUnsignedRem", .body_sha256 = "8536b14d20e330bce4f1717f6dda9d3f6b663664507cf302d1e4d6a68fccf211" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerBinaryImmediateLhs", .body_sha256 = "6db0334ddb212391cd4c3ee92e7aa6fe86768a2196e7235af1fef35a09919626" },

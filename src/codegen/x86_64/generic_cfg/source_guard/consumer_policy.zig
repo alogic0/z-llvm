@@ -86,7 +86,7 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     try validateSetccEaxCompareProductionSites(source_name, source);
     try validateCurrentHomeSignBitProductionSites(source_name, source);
     try validateI128PairProductionSites(source_name, source);
-    try validateDormantScalarCastProductionSites(source_name, source);
+    try validateScalarCastProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -120,22 +120,158 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     }
 }
 
-pub fn validateDormantScalarCastProductionSites(source_name: []const u8, source: [:0]const u8) !void {
-    _ = source_name;
-    const forbidden = [_][]const u8{
-        ".form = .pair_low_scalar_cast_operand",
-        ".form = .accumulator_scalar_cast_operand",
-        ".form = .sign_extend_scratch_operand",
-        ".prepared_action = .{ .pair_low_scalar_cast",
-        ".prepared_action = .{ .accumulator_scalar_cast",
-        ".prepared_action = .{ .sign_extend_scratch",
-        "isPairLowScalarCast(",
-        "isAccumulatorScalarCast(",
-        "isSignExtendScratchCast(",
+pub fn validateScalarCastProductionSites(source_name: []const u8, source: [:0]const u8) !void {
+    const pair_form = ".form = .pair_low_scalar_cast_operand";
+    const accumulator_form = ".form = .accumulator_scalar_cast_operand";
+    const sign_form = ".form = .sign_extend_scratch_operand";
+    const pair_action = ".prepared_action = .{ .pair_low_scalar_cast";
+    const accumulator_action = ".prepared_action = .{ .accumulator_scalar_cast";
+    const sign_action = ".prepared_action = .{ .sign_extend_scratch";
+    const pair_classifier = "isPairLowScalarCast(";
+    const accumulator_classifier = "isAccumulatorScalarCast(";
+    const sign_classifier = "isSignExtendScratchCast(";
+    const marker_total =
+        countPattern(source, pair_form) +
+        countPattern(source, accumulator_form) +
+        countPattern(source, sign_form) +
+        countPattern(source, pair_action) +
+        countPattern(source, accumulator_action) +
+        countPattern(source, sign_action) +
+        countPattern(source, pair_classifier) +
+        countPattern(source, accumulator_classifier) +
+        countPattern(source, sign_classifier);
+    if (!std.mem.eql(u8, source_name, "composed_selector_scalar.zig")) {
+        if (marker_total != 0)
+            return error.ValueUseScalarCastActionOutsideAllowlist;
+        return;
+    }
+
+    if (countPattern(source, pair_form) != 1 or
+        countPattern(source, accumulator_form) != 1 or
+        countPattern(source, sign_form) != 1 or
+        countPattern(source, pair_action) != 1 or
+        countPattern(source, accumulator_action) != 1 or
+        countPattern(source, sign_action) != 1 or
+        countPattern(source, pair_classifier) != 1 or
+        countPattern(source, accumulator_classifier) != 2 or
+        countPattern(source, sign_classifier) != 1 or
+        countPattern(source, "accumulatorCastSource") != 0)
+    {
+        return error.ValueUseScalarCastActionAllowlistMismatch;
+    }
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const lower_cast = functionBodyNamed(bodies, "lowerCast") orelse
+        return error.ValueUseScalarCastActionAllowlistMismatch;
+    const lower_i52_cast = functionBodyNamed(bodies, "lowerI52Cast") orelse
+        return error.ValueUseScalarCastActionAllowlistMismatch;
+    const pair_lowerer = functionBodyNamed(bodies, "lowerPairLowScalarCast") orelse
+        return error.ValueUseScalarCastActionAllowlistMismatch;
+    const accumulator_lowerer = functionBodyNamed(bodies, "lowerAccumulatorScalarCast") orelse
+        return error.ValueUseScalarCastActionAllowlistMismatch;
+    const sign_lowerer = functionBodyNamed(bodies, "lowerSignExtendScratchCast") orelse
+        return error.ValueUseScalarCastActionAllowlistMismatch;
+    const mapper = functionBodyNamed(bodies, "scalarCastValueUseDiagnostic") orelse
+        return error.ValueUseScalarCastActionAllowlistMismatch;
+    const lower_cast_source = source[lower_cast.start..lower_cast.end];
+    const lower_i52_source = source[lower_i52_cast.start..lower_i52_cast.end];
+
+    const LowererContract = struct {
+        body: FunctionBody,
+        form: []const u8,
+        action: []const u8,
+        accumulator_sessions: usize,
     };
-    for (forbidden) |pattern| {
-        if (std.mem.indexOf(u8, source, pattern) != null)
-            return error.ValueUseScalarCastProductionWiringForbidden;
+    const lowerers = [_]LowererContract{
+        .{ .body = pair_lowerer, .form = pair_form, .action = pair_action, .accumulator_sessions = 0 },
+        .{ .body = accumulator_lowerer, .form = accumulator_form, .action = accumulator_action, .accumulator_sessions = 1 },
+        .{ .body = sign_lowerer, .form = sign_form, .action = sign_action, .accumulator_sessions = 0 },
+    };
+    for (lowerers) |lowerer| {
+        const body_source = source[lowerer.body.start..lowerer.body.end];
+        if (countPattern(body_source, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(body_source, "transaction.register(") != 1 or
+            countPattern(body_source, lowerer.form) != 1 or
+            countPattern(body_source, lowerer.action) != 1 or
+            countPattern(body_source, "transaction.seal()") != 1 or
+            countPattern(body_source, "transaction.prepare()") != 1 or
+            countPattern(body_source, "transaction.materializeAll()") != 1 or
+            countPattern(body_source, "transaction.preparedView(") != 1 or
+            countPattern(body_source, "transaction.executePreparedAction(") != 1 or
+            countPattern(body_source, "transaction.commit()") != 1 or
+            countPattern(body_source, "transaction.beginAccumulatorSession()") != lowerer.accumulator_sessions or
+            countPattern(body_source, "scalarCastValueUseDiagnostic(") != 5 or
+            countPattern(body_source, "orelse return err") != 5)
+        {
+            return error.ValueUseScalarCastActionAllowlistMismatch;
+        }
+        const forbidden = [_][]const u8{
+            "resolveValue(",
+            "ValueLoc",
+            "bindValueLoc(",
+            "bindAccumulator(",
+            "emitValueInto",
+            ".spill64",
+            ".spill128",
+            ".eax",
+            ".rax",
+        };
+        for (forbidden) |pattern| {
+            if (std.mem.indexOf(u8, body_source, pattern) != null)
+                return error.ValueUseScalarCastConsumerHomeClassification;
+        }
+    }
+
+    const mapper_source = source[mapper.start..mapper.end];
+    if (countPattern(mapper_source, ".failedRequestIs(") != 1 or
+        countPattern(mapper_source, "error.ValueUseActionDiagnostic") != 1 or
+        countPattern(mapper_source, "transaction.actionDiagnostic()") != 1)
+    {
+        return error.ValueUseScalarCastActionAllowlistMismatch;
+    }
+
+    // C02 remains an alias-only binding and C03 remains a pair-result path.
+    if (countPattern(lower_cast_source, "selector_state.resolveValue(") != 1 or
+        countPattern(lower_cast_source, "selector_state.emitValueIntoScratch(") != 1 or
+        countPattern(lower_cast_source, "selector_state.resolvePairValue(") != 0 or
+        countPattern(lower_cast_source, "selector_state.bindValueLoc(") != 1 or
+        countPattern(lower_cast_source, "selector_state.bindPairScratch(") != 1)
+    {
+        return error.ValueUseScalarCastResidualOwnershipMismatch;
+    }
+    for (bypass_operations) |operation| {
+        if (std.mem.indexOf(u8, lower_i52_source, operation) != null)
+            return error.ValueUseScalarCastResidualOwnershipMismatch;
+    }
+
+    // The exact-EI structural decision remains between the C03 pair-result
+    // branch and the ordinary accumulator-cast classifier.
+    const i52_dispatch = std.mem.indexOf(u8, lower_cast_source, accumulator_classifier) orelse
+        return error.ValueUseScalarCastDispatchOrderMismatch;
+    const i52_fallback = std.mem.indexOf(u8, lower_cast_source, "return lowerI52Cast(cast)") orelse
+        return error.ValueUseScalarCastDispatchOrderMismatch;
+    const pair_dispatch = std.mem.indexOf(u8, lower_cast_source, pair_classifier) orelse
+        return error.ValueUseScalarCastDispatchOrderMismatch;
+    const pair_residual = std.mem.indexOf(u8, lower_cast_source, "const loc = selector_state.resolveValue(") orelse
+        return error.ValueUseScalarCastDispatchOrderMismatch;
+    const c03_residual = std.mem.indexOf(u8, lower_cast_source, "if (from_bits == 64 and to_bits == 128)") orelse
+        return error.ValueUseScalarCastDispatchOrderMismatch;
+    const exact_ei = std.mem.indexOf(u8, lower_cast_source, "const exact_ei_narrow =") orelse
+        return error.ValueUseScalarCastDispatchOrderMismatch;
+    const ordinary_accumulator = std.mem.lastIndexOf(u8, lower_cast_source, accumulator_classifier) orelse
+        return error.ValueUseScalarCastDispatchOrderMismatch;
+    const sign_width = std.mem.indexOf(u8, lower_cast_source, "if (from_bits != 32 or to_bits != 64)") orelse
+        return error.ValueUseScalarCastDispatchOrderMismatch;
+    const sign_dispatch = std.mem.indexOf(u8, lower_cast_source, sign_classifier) orelse
+        return error.ValueUseScalarCastDispatchOrderMismatch;
+    if (!(i52_dispatch < i52_fallback and
+        pair_dispatch < pair_residual and
+        c03_residual < exact_ei and
+        exact_ei < ordinary_accumulator and
+        sign_width < sign_dispatch))
+    {
+        return error.ValueUseScalarCastDispatchOrderMismatch;
     }
 }
 
@@ -1036,6 +1172,23 @@ pub fn validateAccumulatorCompositionProductionSites(source_name: []const u8, so
         }
         return;
     }
+    if (std.mem.eql(u8, source_name, "composed_selector_scalar.zig")) {
+        var body_storage: [max_function_bodies]FunctionBody = undefined;
+        const bodies = try collectFunctionBodies(source, &body_storage);
+        const body = functionBodyNamed(bodies, "lowerAccumulatorScalarCast") orelse
+            return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+        const function_source = source[body.start..body.end];
+        if (countPattern(function_source, "beginAccumulatorSession(") != 1 or
+            countPattern(function_source, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(function_source, ".executePreparedAction(") != 1 or
+            countPattern(function_source, ".commit()") != 1 or
+            countPattern(function_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
+            countPattern(source, "beginAccumulatorSession(") != 1)
+        {
+            return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+        }
+        return;
+    }
     if (std.mem.eql(u8, source_name, "composed_selector_memory.zig")) {
         var body_storage: [max_function_bodies]FunctionBody = undefined;
         const bodies = try collectFunctionBodies(source, &body_storage);
@@ -1134,6 +1287,18 @@ pub fn validateAccumulatorCompositionProductionSites(source_name: []const u8, so
 pub fn validateFailureProvenanceProductionSites(source_name: []const u8, source: [:0]const u8) !void {
     const query_count = countPattern(source, ".failedRequestIs(");
     if (query_count == 0) return;
+    if (std.mem.eql(u8, source_name, "composed_selector_scalar.zig")) {
+        var body_storage: [max_function_bodies]FunctionBody = undefined;
+        const bodies = try collectFunctionBodies(source, &body_storage);
+        const mapper = functionBodyNamed(bodies, "scalarCastValueUseDiagnostic") orelse
+            return error.ValueUseFailureProvenanceOutsideAllowlist;
+        if (countPattern(source[mapper.start..mapper.end], ".failedRequestIs(") != 1 or
+            query_count != 1)
+        {
+            return error.ValueUseFailureProvenanceAllowlistMismatch;
+        }
+        return;
+    }
     if (std.mem.eql(u8, source_name, "composed_selector_icmp.zig")) {
         var body_storage: [max_function_bodies]FunctionBody = undefined;
         const bodies = try collectFunctionBodies(source, &body_storage);
