@@ -719,7 +719,7 @@ fn executeImmediateR00(
     const session = try beginImmediateAccumulatorSession(Authority, transaction);
     if (try session.prepare(
         .preserve,
-        immediateSourceDisplacement(transaction, source_index, .scratch_preferred),
+        try immediateSourceDisplacement(transaction, source_index, .scratch_preferred),
     )) |diagnostic| {
         transaction.action_diagnostic = diagnostic;
         return error.ValueUseActionDiagnostic;
@@ -892,7 +892,7 @@ fn executeImmediateR02(
     const session = try beginImmediateAccumulatorSession(Authority, transaction);
     if (try session.prepare(
         .preserve,
-        immediateSourceDisplacement(
+        try immediateSourceDisplacement(
             transaction,
             source_index,
             if (bits <= 32) .scratch_preferred else .spill_live,
@@ -965,7 +965,7 @@ fn executeImmediateR03(
     const session = try beginImmediateAccumulatorSession(Authority, transaction);
     if (try session.prepare(
         .preserve,
-        immediateSourceDisplacement(transaction, source_index, .spill_live),
+        try immediateSourceDisplacement(transaction, source_index, .spill_live),
     )) |diagnostic| {
         transaction.action_diagnostic = diagnostic;
         return error.ValueUseActionDiagnostic;
@@ -1027,7 +1027,7 @@ fn executeImmediateR04R06(
     const session = try beginImmediateAccumulatorSession(Authority, transaction);
     if (try session.prepare(
         .preserve,
-        immediateSourceDisplacement(
+        try immediateSourceDisplacement(
             transaction,
             source_index,
             if (bits <= 32) .scratch_preferred else .spill_live,
@@ -1262,13 +1262,19 @@ fn immediateSourceDisplacement(
     transaction: anytype,
     source_index: u8,
     fallback: AccumulatorDisplacementPolicy,
-) AccumulatorDisplacementPolicy {
+) !AccumulatorDisplacementPolicy {
     const identity = switch (transaction.requests[source_index].source) {
         .named => |*name| name.slice(),
         else => return fallback,
     };
     return switch (transaction.prepared_views[source_index].canonical_source_loc) {
-        .eax, .rax => .{ .reuse_source = identity },
+        .eax, .rax => if (!try selector_state.valueIsLiveAfterCurrent(
+            transaction.selector,
+            identity,
+        ))
+            .{ .reuse_source = identity }
+        else
+            fallback,
         else => fallback,
     };
 }

@@ -69,6 +69,7 @@ const validateI128PairIntentSurface = support.validateI128PairIntentSurface;
 const validateScalarCastIntentSurface = support.validateScalarCastIntentSurface;
 const validateImmediateScalarIntentSurface = support.validateImmediateScalarIntentSurface;
 const validateScalarCastDisplacementPlan = support.validateScalarCastDisplacementPlan;
+const validateScalarDisplacementAuthorityDistinction = support.validateScalarDisplacementAuthorityDistinction;
 const validateScratchComparePreservationPreamble = support.validateScratchComparePreservationPreamble;
 const validateCurrentHomeEqZeroSequence = support.validateCurrentHomeEqZeroSequence;
 const validateSetccEaxCompareSequence = support.validateSetccEaxCompareSequence;
@@ -388,5 +389,80 @@ test "composed selector source guard freezes the closed scalar cast displacement
         validateScalarCastDisplacementPlan(
             plan_declaration ++ plan ++ widened_displacement ++ source_displacement,
         ),
+    );
+}
+
+test "composed selector source guard freezes distinct cast and arithmetic displacement authorities" {
+    const cast =
+        \\fn scalarCastSourceDisplacement() void {
+        \\    return switch (source) {
+        \\        .named => switch (home) {
+        \\            .eax, .rax => .{ .reuse_source = identity },
+        \\            else => .spill_live,
+        \\        },
+        \\        else => .spill_live,
+        \\    };
+        \\}
+    ;
+    const immediate =
+        \\fn immediateSourceDisplacement() void {
+        \\    const identity = switch (source) {
+        \\        .named => name,
+        \\        else => return fallback,
+        \\    };
+        \\    return switch (home) {
+        \\        .eax, .rax => if (!try selector_state.valueIsLiveAfterCurrent(selector, identity))
+        \\            .{ .reuse_source = identity }
+        \\        else
+        \\            fallback,
+        \\        else => fallback,
+        \\    };
+        \\}
+    ;
+    try validateScalarDisplacementAuthorityDistinction(cast ++ immediate);
+
+    const at_or_after =
+        \\fn scalarCastSourceDisplacement() void {
+        \\    return switch (source) {
+        \\        .named => switch (home) {
+        \\            .eax, .rax => .{ .reuse_source = identity },
+        \\            else => .spill_live,
+        \\        },
+        \\        else => .spill_live,
+        \\    };
+        \\}
+        \\fn immediateSourceDisplacement() void {
+        \\    const identity = switch (source) {
+        \\        .named => name,
+        \\        else => return fallback,
+        \\    };
+        \\    return switch (home) {
+        \\        .eax, .rax => if (!try selector_state.valueIsLiveAtOrAfterCurrent(selector, identity))
+        \\            .{ .reuse_source = identity }
+        \\        else
+        \\            fallback,
+        \\        else => fallback,
+        \\    };
+        \\}
+    ;
+    try std.testing.expectError(
+        error.ValueUseScalarDisplacementAuthorityMismatch,
+        validateScalarDisplacementAuthorityDistinction(at_or_after),
+    );
+    const widened_cast =
+        \\fn scalarCastSourceDisplacement() void {
+        \\    _ = try selector_state.valueIsLiveAfterCurrent(selector, identity);
+        \\    return switch (source) {
+        \\        .named => switch (home) {
+        \\            .eax, .rax => .{ .reuse_source = identity },
+        \\            else => .spill_live,
+        \\        },
+        \\        else => .spill_live,
+        \\    };
+        \\}
+    ++ immediate;
+    try std.testing.expectError(
+        error.ValueUseScalarDisplacementAuthorityMismatch,
+        validateScalarDisplacementAuthorityDistinction(widened_cast),
     );
 }

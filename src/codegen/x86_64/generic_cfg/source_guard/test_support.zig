@@ -75,6 +75,7 @@ pub const validateI128PairIntentSurface = authority.validateI128PairIntentSurfac
 pub const validateScalarCastIntentSurface = authority.validateScalarCastIntentSurface;
 pub const validateImmediateScalarIntentSurface = authority.validateImmediateScalarIntentSurface;
 pub const validateScalarCastDisplacementPlan = authority.validateScalarCastDisplacementPlan;
+pub const validateScalarDisplacementAuthorityDistinction = authority.validateScalarDisplacementAuthorityDistinction;
 pub const validateScratchComparePreservationPreamble = authority.validateScratchComparePreservationPreamble;
 pub const validateCurrentHomeEqZeroSequence = authority.validateCurrentHomeEqZeroSequence;
 pub const validateSetccEaxCompareSequence = authority.validateSetccEaxCompareSequence;

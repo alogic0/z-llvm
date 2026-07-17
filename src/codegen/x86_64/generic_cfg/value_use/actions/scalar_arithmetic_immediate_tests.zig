@@ -466,6 +466,203 @@ test "value-use immediate scalar R01 spill source falls back through RAX when sc
     );
 }
 
+test "value-use immediate scalar displacement distinguishes live-after from dies-at-current RAX" {
+    const row = PlanRow{
+        .id = "R02-i64",
+        .direction = .rhs,
+        .operation = .shl,
+        .bits = 64,
+        .literal = 32,
+        .accumulator = true,
+        .scratch = false,
+        .writes = 1,
+    };
+    inline for (.{
+        .{
+            .id = "live-after",
+            .live_after = true,
+            .expected_source = ValueLoc{ .spill64 = .slot0 },
+            .expected_instructions = &[_]machine_module.Instruction{
+                .{ .spill_rax_rsp = .slot0 },
+                .{ .reload_rsp_rax = .slot0 },
+                .{ .shl_rax_imm6 = 32 },
+            },
+        },
+        .{
+            .id = "dies-at-current",
+            .live_after = false,
+            .expected_source = ValueLoc.rax,
+            .expected_instructions = &[_]machine_module.Instruction{
+                .{ .shl_rax_imm6 = 32 },
+            },
+        },
+    }) |case| {
+        var machine = MachineFunction.init(case.id, .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        if (case.live_after)
+            try support.addLive(&plan, "source")
+        else
+            try addAtCurrent(&plan, "source");
+        try addAtCurrent(&plan, "result");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "source", .rax);
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handle = try registerImmediate(&transaction, row);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(handle));
+        try transaction.commit();
+
+        try std.testing.expectEqualSlices(
+            machine_module.Instruction,
+            case.expected_instructions,
+            machine.instructions.items,
+        );
+        try std.testing.expectEqual(
+            case.expected_source,
+            selector_state.resolveValue(&selector, .{ .named = "source" }).?,
+        );
+        try std.testing.expectEqual(
+            ValueLoc.rax,
+            selector_state.resolveValue(&selector, .{ .named = "result" }).?,
+        );
+    }
+}
+
+test "value-use immediate scalar non-accumulator and literal controls remain exact" {
+    const cases = [_]struct {
+        row: PlanRow,
+        source_loc: ValueLoc,
+        expected_instructions: []const machine_module.Instruction,
+    }{
+        .{
+            .row = .{
+                .id = "R02-non-accumulator",
+                .direction = .rhs,
+                .operation = .shl,
+                .bits = 64,
+                .literal = 7,
+                .accumulator = true,
+                .scratch = false,
+                .writes = 1,
+            },
+            .source_loc = .{ .arg64 = .rdi },
+            .expected_instructions = &.{
+                .{ .mov_arg_rax = .rdi },
+                .{ .shl_rax_imm6 = 7 },
+            },
+        },
+        .{
+            .row = immediate_plan[9],
+            .source_loc = .{ .arg64 = .rdi },
+            .expected_instructions = &.{
+                .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } },
+                .{ .mov_imm_rax = 0x1000 },
+                .shr_rax_cl,
+            },
+        },
+    };
+    for (cases) |case| {
+        var machine = MachineFunction.init(case.row.id, .{ .int = case.row.bits });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try support.addLive(&plan, "source");
+        try addAtCurrent(&plan, "result");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "source", case.source_loc);
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handle = try registerImmediate(&transaction, case.row);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(handle));
+        try transaction.commit();
+
+        try std.testing.expectEqualSlices(
+            machine_module.Instruction,
+            case.expected_instructions,
+            machine.instructions.items,
+        );
+    }
+}
+
+test "value-use immediate scalar malformed dependency liveness fails closed and rolls back" {
+    const row = PlanRow{
+        .id = "R02-malformed-domain",
+        .direction = .rhs,
+        .operation = .shl,
+        .bits = 64,
+        .literal = 32,
+        .accumulator = true,
+        .scratch = false,
+        .writes = 1,
+    };
+    var machine = MachineFunction.init(row.id, .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try support.addLive(&plan, "source");
+    try addAtCurrent(&plan, "result");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "source", .rax);
+    const saved_source = selector.values.get("source").?;
+    const saved_next_vreg = selector.next_virtual_reg;
+    const saved_next_spill = selector.next_spill_slot;
+    const saved_accumulator = selector.accumulator_domain;
+    const saved_dependencies = selector.address_dependencies;
+    const saved_eflags = selector.eflags.snapshot();
+    const saved_semantics = selector.eflags_semantics.items.len;
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const handle = try registerImmediate(&transaction, row);
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    const lease = try transaction.preparedView(handle);
+
+    try selector_state.bindValueLoc(&selector, "malformed-owner", .{ .stack_i32_ptr = .{
+        .disp = 0,
+        .index = .{ .reg = .rdi, .name = "source" },
+    } });
+    try selector.address_dependencies.replaceAddress("malformed-owner", &.{
+        .{ .name = "source", .identity_type = .integer, .role = .index },
+    });
+    try std.testing.expectError(
+        error.AddressDependencyMissingOwnerPlanEntry,
+        transaction.executePreparedAction(lease),
+    );
+
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(saved_source, selector.values.get("source").?);
+    try std.testing.expect(selector.values.get("malformed-owner") == null);
+    try std.testing.expect(selector.values.get("result") == null);
+    try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+    try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+    try std.testing.expectEqual(saved_accumulator, selector.accumulator_domain);
+    try std.testing.expect(selector.address_dependencies.eql(&saved_dependencies));
+    try selector.eflags.validateSnapshot(saved_eflags);
+    try std.testing.expectEqual(saved_semantics, selector.eflags_semantics.items.len);
+    try std.testing.expectError(error.ValueUseTransactionClosed, transaction.rollback());
+}
+
 test "value-use immediate scalar diagnostics preserve request provenance" {
     const cases = [_]struct {
         loc: ValueLoc,

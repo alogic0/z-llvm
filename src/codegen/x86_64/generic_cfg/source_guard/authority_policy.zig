@@ -505,6 +505,7 @@ pub fn validateScalarCastSequence(source: [:0]const u8) !void {
     }
 
     try validateScalarCastDisplacementPlan(source);
+    try validateScalarDisplacementAuthorityDistinction(source);
 
     const classifier_names = [_][]const u8{
         "isPairLowScalarCast",
@@ -582,6 +583,32 @@ pub fn validateScalarCastDisplacementPlan(source: [:0]const u8) !void {
         countPattern(source_displacement, ".spill_live") != 2)
     {
         return error.ValueUseScalarCastSequenceMismatch;
+    }
+}
+
+pub fn validateScalarDisplacementAuthorityDistinction(source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const cast_body = functionBodyNamed(bodies, "scalarCastSourceDisplacement") orelse return;
+    const immediate_body = functionBodyNamed(bodies, "immediateSourceDisplacement") orelse
+        return error.ValueUseScalarDisplacementAuthorityMismatch;
+    const cast = source[cast_body.start..cast_body.end];
+    const immediate = source[immediate_body.start..immediate_body.end];
+
+    // Cast reuse is deliberately location-derived and liveness-independent.
+    // Immediate arithmetic reuse is deliberately the legacy after-current
+    // arithmetic boundary. These authorities must never be generalized.
+    if (countPattern(cast, ".eax, .rax") != 1 or
+        countPattern(cast, ".reuse_source") != 1 or
+        countPattern(cast, "valueIsLiveAfterCurrent(") != 0 or
+        countPattern(cast, "valueIsLiveAtOrAfterCurrent(") != 0 or
+        countPattern(immediate, ".eax, .rax") != 1 or
+        countPattern(immediate, ".reuse_source") != 1 or
+        countPattern(immediate, "selector_state.valueIsLiveAfterCurrent(") != 1 or
+        countPattern(immediate, "valueIsLiveAtOrAfterCurrent(") != 0 or
+        countPattern(immediate, "else\n            fallback") != 1)
+    {
+        return error.ValueUseScalarDisplacementAuthorityMismatch;
     }
 }
 
