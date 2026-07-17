@@ -15,6 +15,15 @@ const model = @import("../model.zig");
 const Types = model;
 const composition = @import("../composition.zig");
 
+const AccumulatorScalarCastPlan = enum {
+    c04_exact_ei,
+    c05_narrow_zext,
+    c52_0_trunc_i64_to_i52,
+    c52_1_zext_i6_to_i52,
+    c52_2_zext_i52_to_i64,
+    c52_3_trunc_i52,
+};
+
 pub fn isPairLowScalarCast(cast: ir.CastInst) bool {
     const from_bits = switch (cast.from_ty) {
         .int => |bits| bits,
@@ -163,7 +172,8 @@ pub fn executeAccumulatorScalarCast(
     else
         return error.ValueUseScalarCastAccumulatorSessionRequired;
     const source = try scalarCastSourceValue(Authority, transaction, source_index, action);
-    const displacement = try scalarCastDisplacement(Authority, transaction, source_index);
+    const plan = scalarCastPlan(action);
+    const displacement = try scalarCastDisplacement(Authority, transaction, source_index, plan);
     const effect: AccumulatorPreparationEffect = if (action.from_bits == 52)
         if (action.to_bits == 32 or action.to_bits == 64) .preserve else .clobber
     else if (action.from_bits < 32 or action.from_bits > 32)
@@ -310,6 +320,16 @@ fn scalarCastDisplacement(
     comptime Authority: type,
     transaction: anytype,
     source_index: u8,
+    plan: AccumulatorScalarCastPlan,
+) !AccumulatorDisplacementPolicy {
+    if (plan == .c52_0_trunc_i64_to_i52) return .spill_live;
+    return scalarCastSourceDisplacement(Authority, transaction, source_index);
+}
+
+fn scalarCastSourceDisplacement(
+    comptime Authority: type,
+    transaction: anytype,
+    source_index: u8,
 ) !AccumulatorDisplacementPolicy {
     return switch (transaction.requests[source_index].source) {
         .int => .spill_live,
@@ -322,6 +342,25 @@ fn scalarCastDisplacement(
             return error.ValueUseUnsupportedSource;
         },
     };
+}
+
+fn scalarCastPlan(action: *const Types.AccumulatorScalarCastAction) AccumulatorScalarCastPlan {
+    if (action.from_bits == 52) {
+        return if (action.op == .zext)
+            .c52_2_zext_i52_to_i64
+        else
+            .c52_3_trunc_i52;
+    }
+    if (action.to_bits == 52) {
+        return if (action.from_bits == 64)
+            .c52_0_trunc_i64_to_i52
+        else
+            .c52_1_zext_i6_to_i52;
+    }
+    return if (action.from_bits > 32)
+        .c04_exact_ei
+    else
+        .c05_narrow_zext;
 }
 
 fn scalarCastResultDefinition(bits: u16) AccumulatorDefinition {

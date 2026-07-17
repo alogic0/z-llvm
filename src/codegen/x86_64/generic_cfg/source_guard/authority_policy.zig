@@ -413,6 +413,8 @@ pub fn validateScalarCastSequence(source: [:0]const u8) !void {
     const accumulator_order = [_][]const u8{
         "validateAccumulatorScalarCastAction(action)",
         "scalarCastSourceValue(",
+        "scalarCastPlan(action)",
+        "scalarCastDisplacement(",
         "session.prepare(",
         "session.materialize(",
         "emitEflagsInstruction(",
@@ -454,6 +456,8 @@ pub fn validateScalarCastSequence(source: [:0]const u8) !void {
         return error.ValueUseScalarCastSequenceMismatch;
     }
 
+    try validateScalarCastDisplacementPlan(source);
+
     const classifier_names = [_][]const u8{
         "isPairLowScalarCast",
         "isAccumulatorScalarCast",
@@ -480,6 +484,56 @@ pub fn validateScalarCastSequence(source: [:0]const u8) !void {
             if (std.mem.indexOf(u8, classifier, pattern) != null)
                 return error.ValueUseScalarCastClassifierStatePredicate;
         }
+    }
+}
+
+pub fn validateScalarCastDisplacementPlan(source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const plan_body = functionBodyNamed(bodies, "scalarCastPlan") orelse
+        return error.ValueUseScalarCastSequenceMismatch;
+    const displacement_body = functionBodyNamed(bodies, "scalarCastDisplacement") orelse
+        return error.ValueUseScalarCastSequenceMismatch;
+    const source_displacement_body = functionBodyNamed(bodies, "scalarCastSourceDisplacement") orelse
+        return error.ValueUseScalarCastSequenceMismatch;
+    const plan = source[plan_body.start..plan_body.end];
+    const displacement = source[displacement_body.start..displacement_body.end];
+    const source_displacement = source[source_displacement_body.start..source_displacement_body.end];
+    const cast_plans = [_][]const u8{
+        "c04_exact_ei",
+        "c05_narrow_zext",
+        "c52_0_trunc_i64_to_i52",
+        "c52_1_zext_i6_to_i52",
+        "c52_2_zext_i52_to_i64",
+        "c52_3_trunc_i52",
+    };
+    if (std.mem.indexOf(u8, source, "const AccumulatorScalarCastPlan = enum {") == null)
+        return error.ValueUseScalarCastSequenceMismatch;
+    for (cast_plans) |cast_plan| {
+        if (std.mem.indexOf(u8, source, cast_plan) == null)
+            return error.ValueUseScalarCastSequenceMismatch;
+    }
+    const plan_forbidden = [_][]const u8{
+        "transaction",
+        "selector",
+        "prepared_views",
+        "ValueLoc",
+        ".eax",
+        ".rax",
+        ".spill",
+    };
+    for (plan_forbidden) |pattern| {
+        if (std.mem.indexOf(u8, plan, pattern) != null)
+            return error.ValueUseScalarCastPhysicalIntentEscape;
+    }
+    if (countPattern(displacement, "plan == .c52_0_trunc_i64_to_i52") != 1 or
+        countPattern(displacement, "return .spill_live") != 1 or
+        countPattern(displacement, "scalarCastSourceDisplacement(") != 1 or
+        countPattern(source_displacement, ".eax, .rax") != 1 or
+        countPattern(source_displacement, ".reuse_source") != 1 or
+        countPattern(source_displacement, ".spill_live") != 2)
+    {
+        return error.ValueUseScalarCastSequenceMismatch;
     }
 }
 

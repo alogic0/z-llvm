@@ -67,6 +67,7 @@ const validateSetccEaxCompareIntentSurface = support.validateSetccEaxCompareInte
 const validateCurrentHomeSignBitIntentSurface = support.validateCurrentHomeSignBitIntentSurface;
 const validateI128PairIntentSurface = support.validateI128PairIntentSurface;
 const validateScalarCastIntentSurface = support.validateScalarCastIntentSurface;
+const validateScalarCastDisplacementPlan = support.validateScalarCastDisplacementPlan;
 const validateScratchComparePreservationPreamble = support.validateScratchComparePreservationPreamble;
 const validateCurrentHomeEqZeroSequence = support.validateCurrentHomeEqZeroSequence;
 const validateSetccEaxCompareSequence = support.validateSetccEaxCompareSequence;
@@ -331,6 +332,40 @@ test "composed selector source guard freezes semantic-only scalar cast intents" 
         error.ValueUseScalarCastIntentMissing,
         validateScalarCastIntentSurface(
             "pub const SignExtendScratchAction = struct { result: ActionIdentity, };",
+        ),
+    );
+}
+
+test "composed selector source guard freezes the closed scalar cast displacement table" {
+    const plan_declaration =
+        "const AccumulatorScalarCastPlan = enum { " ++
+        "c04_exact_ei, c05_narrow_zext, c52_0_trunc_i64_to_i52, " ++
+        "c52_1_zext_i6_to_i52, c52_2_zext_i52_to_i64, c52_3_trunc_i52, };";
+    const plan =
+        "fn scalarCastPlan(action: anytype) void { _ = action; " ++
+        "_ = .c04_exact_ei; _ = .c05_narrow_zext; " ++
+        "_ = .c52_0_trunc_i64_to_i52; _ = .c52_1_zext_i6_to_i52; " ++
+        "_ = .c52_2_zext_i52_to_i64; _ = .c52_3_trunc_i52; }";
+    const source_displacement =
+        "fn scalarCastSourceDisplacement() void { _ = switch (source) { " ++
+        ".int => .spill_live, .named => switch (home) { " ++
+        ".eax, .rax => .reuse_source, else => .spill_live, }, }; }";
+    const accepted_displacement =
+        "fn scalarCastDisplacement() void { " ++
+        "if (plan == .c52_0_trunc_i64_to_i52) return .spill_live; " ++
+        "return scalarCastSourceDisplacement(); }";
+    try validateScalarCastDisplacementPlan(
+        plan_declaration ++ plan ++ accepted_displacement ++ source_displacement,
+    );
+
+    const widened_displacement =
+        "fn scalarCastDisplacement() void { " ++
+        "if (plan == .c04_exact_ei) return .spill_live; " ++
+        "return scalarCastSourceDisplacement(); }";
+    try std.testing.expectError(
+        error.ValueUseScalarCastSequenceMismatch,
+        validateScalarCastDisplacementPlan(
+            plan_declaration ++ plan ++ widened_displacement ++ source_displacement,
         ),
     );
 }

@@ -11,6 +11,7 @@ const SelectorAllocationPlan = support.SelectorAllocationPlan;
 const Transaction = support.Transaction;
 const ValueLoc = support.ValueLoc;
 const addAtCurrent = support.addAtCurrent;
+const addLive = support.addLive;
 const expected = support.expected;
 const actionIdentity = support.actionIdentity;
 
@@ -159,6 +160,214 @@ fn executeAccumulatorCase(
     try std.testing.expectEqual(expected_writes, selector.eflags_semantics.items.len);
     for (selector.eflags_semantics.items) |record|
         try std.testing.expectEqual(selector_state.EflagsEffect.write, record.effect);
+}
+
+const ExpectedScalarCastDisplacement = enum {
+    always_spill_live,
+    source_dependent_reuse,
+};
+
+test "value-use scalar cast displacement table is explicit and byte exact" {
+    const cases = [_]struct {
+        id: []const u8,
+        op: ir.CastOp,
+        from_bits: u16,
+        to_bits: u16,
+        exact_ei: bool,
+        source_loc: ValueLoc,
+        displacement: ExpectedScalarCastDisplacement,
+        expected_instructions: []const machine_module.Instruction,
+    }{
+        .{
+            .id = "C04",
+            .op = .zext,
+            .from_bits = 55,
+            .to_bits = 64,
+            .exact_ei = true,
+            .source_loc = .rax,
+            .displacement = .source_dependent_reuse,
+            .expected_instructions = &.{
+                .{ .mov_imm_rcx = (@as(i64, 1) << 55) - 1 },
+                .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } },
+            },
+        },
+        .{
+            .id = "C05",
+            .op = .zext,
+            .from_bits = 32,
+            .to_bits = 64,
+            .exact_ei = false,
+            .source_loc = .eax,
+            .displacement = .source_dependent_reuse,
+            .expected_instructions = &.{},
+        },
+        .{
+            .id = "C52-0",
+            .op = .trunc,
+            .from_bits = 64,
+            .to_bits = 52,
+            .exact_ei = false,
+            .source_loc = .rax,
+            .displacement = .always_spill_live,
+            .expected_instructions = &.{
+                .{ .spill_rax_rsp = .slot0 },
+                .{ .reload_rsp_rax = .slot0 },
+                .{ .mov_imm_rcx = (@as(i64, 1) << 52) - 1 },
+                .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } },
+            },
+        },
+        .{
+            .id = "C52-1",
+            .op = .zext,
+            .from_bits = 6,
+            .to_bits = 52,
+            .exact_ei = false,
+            .source_loc = .eax,
+            .displacement = .source_dependent_reuse,
+            .expected_instructions = &.{.{ .and_eax_imm32 = 63 }},
+        },
+        .{
+            .id = "C52-2",
+            .op = .zext,
+            .from_bits = 52,
+            .to_bits = 64,
+            .exact_ei = false,
+            .source_loc = .rax,
+            .displacement = .source_dependent_reuse,
+            .expected_instructions = &.{},
+        },
+        .{
+            .id = "C52-3",
+            .op = .trunc,
+            .from_bits = 52,
+            .to_bits = 6,
+            .exact_ei = false,
+            .source_loc = .rax,
+            .displacement = .source_dependent_reuse,
+            .expected_instructions = &.{.{ .and_eax_imm32 = 63 }},
+        },
+    };
+    for (cases) |case| {
+        var machine = MachineFunction.init(case.id, .{ .int = case.to_bits });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addLive(&plan, "source");
+        try addAtCurrent(&plan, "result");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "source", case.source_loc);
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const source = try registerAccumulatorCast(
+            &transaction,
+            .{ .named = "source" },
+            "result",
+            case.op,
+            case.from_bits,
+            case.to_bits,
+            case.exact_ei,
+        );
+        try transaction.seal();
+        _ = try transaction.beginAccumulatorSession();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(source));
+        try transaction.commit();
+
+        try std.testing.expectEqualSlices(
+            machine_module.Instruction,
+            case.expected_instructions,
+            machine.instructions.items,
+        );
+        switch (case.displacement) {
+            .always_spill_live => {
+                try std.testing.expectEqual(@as(usize, 1), selector.spill_slots.count());
+                try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector_state.resolveValue(&selector, .{ .named = "source" }).?);
+            },
+            .source_dependent_reuse => {
+                try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+            },
+        }
+    }
+}
+
+test "value-use C52-0 rollback restores spill and reload boundaries exactly" {
+    const cases = [_]struct {
+        boundary: Transaction.ScalarCastTestFailure,
+        partial_instructions: []const machine_module.Instruction,
+    }{
+        .{
+            .boundary = .after_accumulator_preparation,
+            .partial_instructions = &.{.{ .spill_rax_rsp = .slot0 }},
+        },
+        .{
+            .boundary = .after_accumulator_materialization,
+            .partial_instructions = &.{
+                .{ .spill_rax_rsp = .slot0 },
+                .{ .reload_rsp_rax = .slot0 },
+            },
+        },
+    };
+    for (cases) |case| {
+        var machine = MachineFunction.init("value-use-c52-0-rollback", .{ .int = 52 });
+        defer machine.deinit(std.testing.allocator);
+        try machine.instructions.ensureTotalCapacityPrecise(std.testing.allocator, 2);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addLive(&plan, "source");
+        try addAtCurrent(&plan, "result");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "source", .rax);
+        const saved_source = selector.values.get("source").?;
+        const saved_next_vreg = selector.next_virtual_reg;
+        const saved_next_spill = selector.next_spill_slot;
+        const saved_accumulator_domain = selector.accumulator_domain;
+        const saved_eflags = selector.eflags.snapshot();
+        const saved_semantics = selector.eflags_semantics.items.len;
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const source = try registerAccumulatorCast(
+            &transaction,
+            .{ .named = "source" },
+            "result",
+            .trunc,
+            64,
+            52,
+            false,
+        );
+        try transaction.seal();
+        _ = try transaction.beginAccumulatorSession();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.setScalarCastTestFailure(case.boundary);
+        try std.testing.expectError(
+            error.ValueUseScalarCastTestFailure,
+            transaction.executePreparedAction(try transaction.preparedView(source)),
+        );
+
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqualSlices(
+            machine_module.Instruction,
+            case.partial_instructions,
+            machine.instructions.items.ptr[0..case.partial_instructions.len],
+        );
+        try std.testing.expectEqual(saved_source, selector.values.get("source").?);
+        try std.testing.expect(selector.values.get("result") == null);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+        try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+        try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+        try std.testing.expect(std.meta.eql(saved_accumulator_domain, selector.accumulator_domain));
+        try selector.eflags.validateSnapshot(saved_eflags);
+        try std.testing.expectEqual(saved_semantics, selector.eflags_semantics.items.len);
+    }
 }
 
 test "value-use scalar cast classifiers are pure and fence alias and pair-result casts" {
