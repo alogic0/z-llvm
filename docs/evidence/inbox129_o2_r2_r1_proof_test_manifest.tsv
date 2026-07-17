@@ -1,0 +1,3 @@
+ordinal	test_name	old_line	owner	new_file	block_sha256
+129	value-use generic transaction layout matches frozen R0	7773	core	src/codegen/x86_64/generic_cfg/value_use/core_architecture_proof_tests.zig	f0904f861c6dce65fb74a16cc91377c3b98ca129ebb8dd25c11b780dc5b9cf51
+130	value-use facade methods retain finite reachable error sets	7810	core	src/codegen/x86_64/generic_cfg/value_use/core_architecture_proof_tests.zig	9be49083bb830513f0338a097c400d71ce86736a6428dad9996eac477cbe4b95

@@ -1,0 +1,128 @@
+inbox92 actual wide spill binding uses the semantic low32 view through every phase
+inbox92 valid spill32 request remains available through every transaction phase
+inbox92 wide spilled value live after store reloads once and retains its binding
+inbox92 wide spilled value rollback after preparation restores exact state
+narrow semantic view admits audited wide register and accumulator homes without rebinding
+narrow semantic view compatibility remains fail closed outside audited cells
+narrow semantic view does not relax its request type contract
+standalone accumulator transaction preserves its original lifecycle and stream
+value-use GEP actions preserve accepted descriptor preconditions
+value-use action-registration provenance records first secondary exactly once
+value-use address actions derive stack-array descriptors and roll back durable bindings
+value-use address actions include every physical destination in conflict and cycle planning
+value-use branch action rejects generic narrow homes the accepted path rejects
+value-use branch action reproduces exact accepted homes and commits EFLAGS
+value-use branch action rolls back spill preparation on EFLAGS rejection
+value-use byte-address actions support constant and named offsets with atomic multi-source failure
+value-use closed immediate and i64 stores retain accepted staging order
+value-use closed scalar store preserves same-register aliases and live EFLAGS
+value-use current-home eq-zero keeps unresolved width and location diagnostics distinct
+value-use current-home eq-zero preserves accumulator sources then re-resolves canonically
+value-use current-home eq-zero preserves the test definition through preparation
+value-use current-home eq-zero result remains durable across teardown and zext
+value-use current-home eq-zero rollback is exact after test and preparation
+value-use current-home sign-bit authority failures remain unattributed
+value-use current-home sign-bit diagnostics are provenance scoped and pair homes reject
+value-use current-home sign-bit preserves accumulator aliases without duplicate movement
+value-use current-home sign-bit preserves live source once and re-resolves canonically
+value-use current-home sign-bit result remains durable across teardown and zext
+value-use current-home sign-bit rollback is exact at all seven boundaries
+value-use dormant current-home eq-zero action reproduces every admitted home
+value-use dormant current-home sign-bit action classifies only named i32 i64 slt zero
+value-use dormant current-home sign-bit action reproduces i32 i64 SHR homes
+value-use dormant i128 equality action preserves pair chooser sequence and EFLAGS
+value-use dormant i128 pair classifiers admit only the two corrected semantic forms
+value-use dormant i128 sign-bit action wraps high-limb helper and logical SHR
+value-use dormant indexed and readonly i56 load actions preserve semantic instruction order
+value-use dormant pair and table load actions retain existing non-accumulator ownership
+value-use dormant scalar load actions consume accepted source homes internally
+value-use dormant scratch compare action classifies the complete twenty-form matrix
+value-use dormant scratch compare action reproduces representative streams and EFLAGS semantics
+value-use dormant setcc EAX compare action reproduces all ten audited forms
+value-use dormant stack i128 load is alias-only and table double remains fenced
+value-use early sequencing rollback covers early and preservation failure points with live EFLAGS
+value-use f32-pair byte-address action preserves exact bounded descriptor arithmetic
+value-use f32-pair byte-address form is action-only
+value-use f32-pair dynamic byte address materializes in accepted order and drops bounds
+value-use failure provenance distinguishes every memcpy request and foreign handles
+value-use i128 eq-min rolls back after the first spill reload
+value-use i128 equality wrapper rolls back exactly at every partial stage
+value-use i128 pair actions run the global preamble once and retain source ownership
+value-use i128 pair materializer failure maps to lhs while authority failure is unattributed
+value-use i128 pair result remains durable after transaction teardown
+value-use i128 pair wrappers reject unsupported homes and malformed semantic requests without mutation
+value-use i128 sign-bit wrapper rolls back exactly at every partial stage
+value-use i128 spill pair actions reproduce __muloti4 __negvti2 and framed negation streams
+value-use indexed scalar store emits value index addend and store in semantic order
+value-use inline memcpy action owns exact preservation staging and call clobber
+value-use inline memcpy preserves caller diagnostics and validates flags before mutation
+value-use inline memcpy rejects unsupported forms and genuine copy cycles before mutation
+value-use inline memcpy rolls back preservation every stage and call append
+value-use inline memcpy supports same-source destinations and audited pair low views
+value-use load diagnostic matrix retains all twenty-eight audited rows
+value-use load resolution precedes invalid-width classification
+value-use load rollback restores pointer staging preservation partial loads and definitions
+value-use mixed fixed and prepared requests resolve views only after fixed preparation
+value-use nested secondary failure does not get overwritten by its action owner
+value-use ordinary load errors preserve source-home classification and provenance
+value-use outer rollback restores combined state after accumulator finalization exactly once
+value-use planner handles source aliases and multiple safe early reloads
+value-use planner leaves occupied early destination to ordinary preservation
+value-use planner reloads free r8 before preserving live rcx and does not rematerialize
+value-use prepared actions revalidate type class and canonical dependencies on every execution
+value-use prepared capabilities reject source relocation before production-path emission
+value-use readonly load precedence stages spills before width and maps staging failures first
+value-use readonly load rejects source provenance only after resolution
+value-use readonly-table address action owns semantic symbol and committed result
+value-use repeated sources separate destinations and preserve once before re-resolution
+value-use request provenance survives subordinate accumulator activity and rollback
+value-use rollback releases speculative owned labels after instructions and commit retains them
+value-use scalar store preserves a live source exactly once before pointer staging
+value-use scaled-address action internally resolves both current homes
+value-use scratch compare enforces legacy source order validation timing and provenance
+value-use scratch compare identity allocation failure leaves no binding or owned entry
+value-use scratch compare identity rollback frees one owned result at each durable boundary
+value-use scratch compare owns its result across transaction teardown and following zext
+value-use scratch compare plans every RCX R8 and EAX physical write
+value-use scratch compare preservation leaves EFLAGS unchanged through canonical refresh
+value-use scratch compare preserves a prior result before staging the next operand
+value-use scratch compare preserves each live accumulator alias once without duplicate spill
+value-use scratch compare refreshes an accumulator operand after preservation
+value-use scratch compare requires subordinate accumulator ownership and supports accepted wide homes
+value-use scratch compare rollback is exact at every action boundary
+value-use secondary materialization provenance is first and survives rollback
+value-use semantic ordering rejects shared role ownership before mutation
+value-use semantic-order rollback restores after first and second early copies
+value-use semantic-role early scheduling is prefix closed
+value-use semantic-role planner orders base before secondary for byte and scaled addresses
+value-use setcc EAX compare authority failures are unattributed
+value-use setcc EAX compare keeps exact-EI admission and excluded forms closed
+value-use setcc EAX compare preserves live accumulator then re-resolves canonically
+value-use setcc EAX compare preserves post-materialization immediate failure timing
+value-use setcc EAX compare preserves preparation points and diagnostics
+value-use setcc EAX compare preserves unresolved-source provenance
+value-use setcc EAX compare rejects existing pair homes without mutation
+value-use setcc EAX compare result remains durable across teardown and zext
+value-use setcc EAX compare rollback is exact at all eight boundaries
+value-use stack-pointer store commits closed source and destination descriptors
+value-use store rollback covers scalar dependency and stack-pointer partial stages
+value-use store writes participate in conflict and copy-cycle planning
+value-use subordinate accumulator lifecycle has one outer commit authority
+value-use switch action accepts fixed-owned immediate intent
+value-use switch action owns intent and reproduces ordinary compare chain
+value-use switch action rejects invalid fixed storage and unsupported homes
+value-use switch action reproduces every accepted named condition home
+value-use switch resolves after boundary and rollback restores all boundary state
+value-use switch rollback restores displaced PHI destinations and owned targets
+value-use table load precedence preserves offset staging and type order
+value-use transaction accepts stack addresses and canonical indexed pointer dependencies
+value-use transaction dependency and unsupported-view failures leave selector unmodified
+value-use transaction exposes every restricted prepared-view member and both pair orders
+value-use transaction exposes fixed copy-amplification contract
+value-use transaction materializes GPR EAX RAX scalar spill and pointer views without rebinding sources
+value-use transaction null pointers are typed direct materializations without durable state
+value-use transaction phase capacity identity and coalescing rules fail before mutation
+value-use transaction removes dead aliases and preserves live aliases exactly once before re-resolution
+value-use transaction rollback restores instructions bindings spills counters flags and domains after partial emission
+value-use transaction separates safe overlap from genuine copy cycles and conflicting destinations
+value-use transaction supports register and spill table pointers and read-only pair limb orders

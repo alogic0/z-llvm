@@ -1,0 +1,173 @@
+# INBOX-129 O2-R2 tests and source-guard split
+
+Status: implementation, manifests, and performance-omission contract are
+ready for the required committed-tree freeze. Acceptance commands and their
+raw-log hashes are appended only after that immutable commit is created.
+
+Date: 2026-07-17
+
+## Accepted baseline and scope
+
+R2 starts from the accepted R1 production source commit
+`80198d402f5ce0168b6b2db366d93e22c534e688`, tree
+`376fe433fde1bc719bb8fa392734af6420006290`, plus its accepted evidence and
+Supervisor documentation commits.
+
+This slice changes test and source-guard organization only:
+
+- no production source, tool, build configuration/root, or facade byte moves;
+- no facade or internal production API widens;
+- `PreparedView` is not exposed through the facade or a production consumer;
+- the direct-materialization ratchet remains exactly 172;
+- `stash@{0}` remains untouched;
+- Tier 3 is not authorized and was not invoked.
+
+The stable build-visible entrypoints remain:
+
+```text
+src/codegen/x86_64/generic_cfg/composed_selector_value_use_transaction_tests.zig
+src/codegen/x86_64/generic_cfg/composed_selector_source_guard_tests.zig
+```
+
+Both are thin `comptime` import aggregators, so they add no anonymous test and
+retain the accepted 1278-test full-unit count.
+
+## Transaction-test split and exact provenance
+
+The accepted R1 file contains 128 pre-R1 semantic transaction tests and two
+R1 architecture-proof tests. R2 keeps those populations distinct:
+
+```text
+semantic_manifest=docs/evidence/inbox129_o2_r2_transaction_test_manifest.tsv
+semantic_rows=128_plus_header
+semantic_manifest_sha256=3652c44e09d28035caea0957a8fc1cf0fa224fff701769a5e59c317117c0ac41
+sorted_name_set=docs/evidence/inbox129_o2_r2_transaction_test_names.sorted
+sorted_name_set_rows=128
+sorted_name_set_sha256=c8042bd2869004e40d21fd273d6a7f3cfc3eefb2512fd2af87958761eb93de3f
+r1_proof_manifest=docs/evidence/inbox129_o2_r2_r1_proof_test_manifest.tsv
+r1_proof_rows=2_plus_header
+r1_proof_manifest_sha256=b0cf0b3a97022549837cc6146772cfd3d822a2b306e851f8e5d1a478cc7ed83a
+```
+
+The procedural comparison command is:
+
+```text
+python3 tmp/inbox129_validate_manifests.py
+```
+
+It proves:
+
+```text
+transaction_semantic_tests=128 exact_order=true unique=true body_hashes=true
+transaction_r1_proof_tests=2 exact_order=true unique=true body_hashes=true
+```
+
+Every row records the accepted ordinal/name/line, semantic owner, destination
+file, and exact test-block SHA-256. Concatenating the leaf modules in
+aggregator import order reproduces all 130 accepted-R1 names in exact order.
+The 128-row sorted name set is identical and duplicate-free.
+
+Test-only shared setup is in `value_use/test_support.zig`. Its technically
+public declarations are confined to the test import graph; production still
+imports only the frozen facade. Semantic ownership is split across:
+
+```text
+core: contract, owned-label, and R1 architecture proofs
+core/planning: cross-module lifecycle and rollback behavior
+planning: early/prefix-closed planning
+materialization: supported, prepared, and capability tests
+composition: subordinate accumulator lifecycle
+actions/address_memory: store, GEP, and load groups
+actions/control_compare: branch/switch, scratch, eq-zero, setcc, sign-bit, i128
+actions/calls: inline memcpy and failure provenance
+```
+
+No generated transaction-test leaf exceeds 862 lines; the shared test support
+is 848 lines. The former 7,826-line entrypoint is 21 lines.
+
+## Source-guard split and exact policy provenance
+
+The former 4,775-line guard is split by concern:
+
+```text
+source_guard/model.zig                 473 lines
+source_guard/core.zig                  234 lines
+source_guard/residual_policy.zig       416 lines
+source_guard/authority_policy.zig      819 lines
+source_guard/consumer_policy.zig      1297 lines
+source_guard/split_policy.zig          370 lines
+source_guard/test_support.zig          106 lines
+```
+
+Negative/positive fixtures are separately grouped as residual-structural,
+dependency/value-use-authority, consumer-action, compare-action, and
+tree/split tests. The stable guard aggregator is seven lines. No guard
+implementation or fixture leaf exceeds 1,297 lines.
+
+```text
+guard_manifest=docs/evidence/inbox129_o2_r2_guard_policy_manifest.tsv
+guard_rows=34_plus_header
+guard_manifest_sha256=58686f06f73a1efd1acf75e6aae00e83777a6eacd708738d0e5dc8c6147315ab
+```
+
+For each accepted policy test, the manifest records exact ordinal/name/line,
+concern, policy entrypoint(s), new policy source file(s), normalized policy
+declaration SHA-256, fixture provenance, new fixture file, and exact fixture
+block SHA-256. The same procedural comparison proves:
+
+```text
+guard_policy_tests=34 exact_order=true unique=true fixture_hashes=true policy_hashes=true
+```
+
+The project guard still rejects additions, removals, relocations,
+reclassifications, authority escapes, unreviewed consumer action wiring,
+facade widening, internal production imports, runtime dispatch, extra generic
+instantiations, reverse leaf dependencies, and the control-compare production
+line-budget violation.
+
+## Performance-omission contract
+
+The complete tracked byte comparison is:
+
+```text
+contract=docs/evidence/inbox129_o2_r2_r1_hash_contract.tsv
+contract_rows=412_plus_header
+contract_sha256=088cd0358ea6a685c675e37bd1b4c761e30fae4264418f533d5af384f3e51bda
+accepted_r1_commit=80198d402f5ce0168b6b2db366d93e22c534e688
+production=301/301_identical
+tools=72/72_identical
+build_configuration=1/1_identical
+build_roots=37/37_identical
+facade=1/1_identical
+total=412/412_identical
+```
+
+Generation/verification command:
+
+```text
+python3 tmp/inbox129_hash_contract.py
+```
+
+The script compares SHA-256 over file bytes, rejects class file-set additions
+or removals, includes untracked candidates in the current file-set check, and
+fails on any non-identical row. New files are confined to the test/guard and
+evidence populations. Therefore R2 satisfies the Reviewer’s exact condition
+for omitting the counterbalanced performance run.
+
+## Acceptance validation
+
+Pending the committed-tree freeze. The final evidence-only follow-up records
+the frozen commit/tree, every exact command, result, raw-log hash, and the
+required identities:
+
+```text
+report=49a19f04 / 443/285/158 / compiler_rt.trunc.truncl
+accepted_object=061a64e4
+owner_manifest=5d91960e / ledger=167/17/101
+abi=60/60+30/30
+focused_canaries=fma+__multi3
+integrated_exe=7/7
+strengthened_tier2=green
+```
+
+No Tier 3 command will be run.
