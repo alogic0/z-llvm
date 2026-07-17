@@ -66,6 +66,7 @@ pub const ValueUseTransaction = struct {
     scratch_compare_test_failure: if (builtin.is_test) ?ScratchCompareTestFailure else void = if (builtin.is_test) null else {},
     current_home_eq_zero_test_failure: if (builtin.is_test) ?CurrentHomeEqZeroTestFailure else void = if (builtin.is_test) null else {},
     setcc_eax_compare_test_failure: if (builtin.is_test) ?SetccEaxCompareTestFailure else void = if (builtin.is_test) null else {},
+    current_home_sign_bit_test_failure: if (builtin.is_test) ?CurrentHomeSignBitTestFailure else void = if (builtin.is_test) null else {},
 
     pub const Expected = struct {
         ty: ir.Type,
@@ -116,6 +117,10 @@ pub const ValueUseTransaction = struct {
         /// compare family. The action owns canonical post-preamble
         /// re-resolution and never exposes the current home.
         setcc_eax_compare_operand,
+        /// Action-only i32/i64 sign-bit extraction operand. The action derives
+        /// the accumulator width, current-home preservation, and logical
+        /// shift internally without exposing a physical source view.
+        current_home_sign_bit_operand,
         stack_argument,
         new_pair_ownership,
     };
@@ -420,6 +425,52 @@ pub const ValueUseTransaction = struct {
         after_finalization,
     };
 
+    /// Closed semantic intent for i32/i64 sign-bit extraction. The operand
+    /// type alone determines EAX/RAX and the logical shift count.
+    pub const CurrentHomeSignBitAction = struct {
+        result: ActionIdentity,
+        operand_ty: ir.Type,
+    };
+
+    /// Pure future-dispatch classifier. It observes only the ICMP semantic
+    /// form and admits exactly `slt i32/i64 <named>, 0`.
+    pub fn isCurrentHomeSignBitIcmp(icmp: ir.IcmpInst) bool {
+        if (icmp.predicate != .slt or icmp.samesign) return false;
+        const bits = switch (icmp.operand_ty) {
+            .int => |value| value,
+            else => return false,
+        };
+        if (bits != 32 and bits != 64) return false;
+        if (icmp.lhs != .named) return false;
+        return switch (icmp.rhs) {
+            .int => |value| value == 0,
+            .named,
+            .fp,
+            .undef,
+            .poison,
+            .null_value,
+            .zero_initializer,
+            .vector,
+            .constant_expr,
+            => false,
+        };
+    }
+
+    pub const CurrentHomeSignBitRequestError = error{
+        ValueUseCurrentHomeSignBitWidthUnsupported,
+        ValueUseCurrentHomeSignBitLocationUnsupported,
+    };
+
+    pub const CurrentHomeSignBitTestFailure = enum {
+        after_global_preamble,
+        after_current_home_preservation,
+        after_materialization,
+        after_accumulator_preparation,
+        after_shift,
+        after_result_definition,
+        after_finalization,
+    };
+
     pub const max_switch_cases = 8;
 
     pub const SwitchCaseIntent = struct {
@@ -507,6 +558,7 @@ pub const ValueUseTransaction = struct {
         scratch_compare: ScratchCompareAction,
         current_home_eq_zero: CurrentHomeEqZeroAction,
         setcc_eax_compare: SetccEaxCompareAction,
+        current_home_sign_bit: CurrentHomeSignBitAction,
 
         fn eql(action: PreparedAction, other: PreparedAction) bool {
             return std.meta.eql(action, other);
@@ -627,6 +679,7 @@ pub const ValueUseTransaction = struct {
         condition: PreparedCondition,
         current_home_eq_zero: struct { bits: u16 },
         setcc_eax_compare: struct { bits: u16 },
+        current_home_sign_bit: struct { bits: u16 },
     };
 
     const PreparedRecord = struct {
@@ -1374,6 +1427,16 @@ pub const ValueUseTransaction = struct {
         transaction.setcc_eax_compare_test_failure = failure;
     }
 
+    /// White-box current-home sign-bit rollback control. Unavailable in
+    /// production builds and guarded from production consumers.
+    pub fn setCurrentHomeSignBitTestFailure(
+        transaction: *ValueUseTransaction,
+        failure: ?CurrentHomeSignBitTestFailure,
+    ) !void {
+        if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
+        transaction.current_home_sign_bit_test_failure = failure;
+    }
+
     fn requireActive(transaction: *const ValueUseTransaction) !void {
         if (transaction.lifecycle != .active) return error.ValueUseTransactionClosed;
     }
@@ -1453,6 +1516,8 @@ pub const ValueUseTransaction = struct {
             error.ValueUseScratchCompareFormUnsupported,
             error.ValueUseCurrentHomeEqZeroTestFailure,
             error.ValueUseSetccEaxCompareTestFailure,
+            error.ValueUseCurrentHomeSignBitTestFailure,
+            error.ValueUseCurrentHomeSignBitAccumulatorSessionRequired,
             error.ValueUseSetccEaxCompareFormUnsupported,
             error.ValueUseSetccEaxCompareImmediateOutOfRange,
             error.ValueUseSetccEaxCompareExactEiWidthUnsupported,
@@ -1556,6 +1621,7 @@ pub const ValueUseTransaction = struct {
             .scratch_compare => return error.ValueUseScratchCompareAttachRequired,
             .current_home_eq_zero => |*compare| try compare.result.validate(),
             .setcc_eax_compare => |*compare| try compare.result.validate(),
+            .current_home_sign_bit => |*compare| try compare.result.validate(),
         }
     }
 
@@ -1622,6 +1688,7 @@ pub const ValueUseTransaction = struct {
             },
             .current_home_eq_zero => {},
             .setcc_eax_compare => {},
+            .current_home_sign_bit => {},
             .validate_shape,
             .emit_copy_to,
             .form_readonly_table_address,
@@ -1781,6 +1848,7 @@ pub const ValueUseTransaction = struct {
             },
             .current_home_eq_zero => null,
             .setcc_eax_compare => null,
+            .current_home_sign_bit => null,
             .load_scalar,
             .load_readonly_pair,
             .load_stack_i128_alias,
@@ -1820,6 +1888,7 @@ pub const ValueUseTransaction = struct {
             .scratch_compare,
             .current_home_eq_zero,
             .setcc_eax_compare,
+            .current_home_sign_bit,
             => null,
         };
     }
@@ -2167,6 +2236,7 @@ pub const ValueUseTransaction = struct {
             .scratch_compare_operand,
             .current_home_eq_zero_operand,
             .setcc_eax_compare_operand,
+            .current_home_sign_bit_operand,
             => return error.ValueUsePreparedActionRequired,
             .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, destination),
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -2256,6 +2326,9 @@ fn preparedViewFromLoc(
             .bits = request.expected.ty.int,
         } },
         .setcc_eax_compare_operand => .{ .setcc_eax_compare = .{
+            .bits = request.expected.ty.int,
+        } },
+        .current_home_sign_bit_operand => .{ .current_home_sign_bit = .{
             .bits = request.expected.ty.int,
         } },
         .stack_argument => error.ValueUseStackArgumentUnsupported,
@@ -2587,6 +2660,7 @@ fn executePreparedActionInternal(
                 .scratch_compare_operand,
                 .current_home_eq_zero_operand,
                 .setcc_eax_compare_operand,
+                .current_home_sign_bit_operand,
                 => return error.ValueUsePreparedActionFormMismatch,
                 .stack_argument => return error.ValueUseStackArgumentUnsupported,
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2614,6 +2688,12 @@ fn executePreparedActionInternal(
             &compare,
         ),
         .setcc_eax_compare => |compare| try executeSetccEaxCompare(
+            transaction,
+            request_index,
+            view,
+            &compare,
+        ),
+        .current_home_sign_bit => |compare| try executeCurrentHomeSignBit(
             transaction,
             request_index,
             view,
@@ -3166,6 +3246,195 @@ fn failSetccEaxCompareForTest(
 ) !void {
     if (builtin.is_test and transaction.setcc_eax_compare_test_failure == boundary)
         return error.ValueUseSetccEaxCompareTestFailure;
+}
+
+const CurrentHomeSignBitPlan = struct {
+    bits: u16,
+    shift: x86_64_machine.Instruction,
+};
+
+fn classifyCurrentHomeSignBit(
+    action: *const ValueUseTransaction.CurrentHomeSignBitAction,
+) ValueUseTransaction.CurrentHomeSignBitRequestError!CurrentHomeSignBitPlan {
+    return switch (action.operand_ty) {
+        .int => |bits| switch (bits) {
+            32 => .{ .bits = 32, .shift = .{ .shr_eax_imm5 = 31 } },
+            64 => .{ .bits = 64, .shift = .{ .shr_rax_imm6 = 63 } },
+            else => error.ValueUseCurrentHomeSignBitWidthUnsupported,
+        },
+        else => error.ValueUseCurrentHomeSignBitWidthUnsupported,
+    };
+}
+
+fn executeCurrentHomeSignBit(
+    transaction: *ValueUseTransaction,
+    source_index: u8,
+    initial_source_view: *const ValueUseTransaction.PreparedView,
+    action: *const ValueUseTransaction.CurrentHomeSignBitAction,
+) !void {
+    _ = initial_source_view;
+    const session = if (transaction.accumulator_session) |*session|
+        session
+    else
+        return error.ValueUseCurrentHomeSignBitAccumulatorSessionRequired;
+
+    try preserveCurrentHomeSignBitLiveAccumulator(transaction);
+    try failCurrentHomeSignBitForTest(transaction, .after_global_preamble);
+
+    const plan = classifyCurrentHomeSignBit(action) catch |err| {
+        transaction.noteRequestBoundaryError(source_index, err);
+        return err;
+    };
+    const flags_before = transaction.selector.eflags.snapshot();
+    const semantic_records_before = transaction.selector.eflags_semantics.items.len;
+    const preservation_diagnostic = if (plan.bits == 32)
+        try selector_state.preserveCurrentEaxIntoScratch(transaction.selector)
+    else
+        try selector_state.preserveCurrentRaxIntoScratch(transaction.selector);
+    if (preservation_diagnostic) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+    try transaction.selector.eflags.validateSnapshot(flags_before);
+    if (transaction.selector.eflags_semantics.items.len != semantic_records_before)
+        return error.EflagsCurrentHomeSignBitPreservationChanged;
+    try failCurrentHomeSignBitForTest(transaction, .after_current_home_preservation);
+
+    transaction.prepared_views[source_index] = try transaction.buildPreparedRecord(source_index);
+    transaction.prepared_view_valid[source_index] = true;
+    const request = &transaction.requests[source_index];
+    const source_name = switch (request.source) {
+        .named => |*identity| identity.slice(),
+        .int, .null_value, .unsupported => return error.ValueUseUnsupportedSource,
+    };
+    const binding = transaction.selector.values.get(source_name) orelse {
+        transaction.recordRequestFailure(source_index);
+        return error.ValueUseUnresolvedSource;
+    };
+    const current = transaction.prepared_views[source_index].canonical_source_loc;
+    validateCurrentHomeSignBitHome(binding, request.expected, current) catch |err| {
+        transaction.noteRequestBoundaryError(source_index, err);
+        return err;
+    };
+    if (plan.bits == 32) {
+        selector_state.emitValueIntoEax(
+            transaction.selector,
+            .{ .named = source_name },
+        ) catch |err| {
+            transaction.noteRequestBoundaryError(source_index, err);
+            return err;
+        };
+    } else {
+        selector_state.emitValueIntoRax(
+            transaction.selector,
+            .{ .named = source_name },
+        ) catch |err| {
+            transaction.noteRequestBoundaryError(source_index, err);
+            return err;
+        };
+    }
+    try failCurrentHomeSignBitForTest(transaction, .after_materialization);
+
+    if (try session.prepare(.preserve, .spill_live)) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+    try failCurrentHomeSignBitForTest(transaction, .after_accumulator_preparation);
+
+    try selector_state.emitEflagsInstruction(transaction.selector, plan.shift, .write);
+    try failCurrentHomeSignBitForTest(transaction, .after_shift);
+
+    const stored_action =
+        &transaction.requests[source_index].prepared_action.?.current_home_sign_bit;
+    const result_name = try ownActionIdentity(transaction, &stored_action.result);
+    try session.define(result_name, .zeroExtending(1));
+    try failCurrentHomeSignBitForTest(transaction, .after_result_definition);
+    try session.finalize();
+    try failCurrentHomeSignBitForTest(transaction, .after_finalization);
+}
+
+fn validateCurrentHomeSignBitHome(
+    binding: ValueBinding,
+    expected: ValueUseTransaction.Expected,
+    current: ValueLoc,
+) ValueUseTransaction.CurrentHomeSignBitRequestError!void {
+    const bits = switch (expected.ty) {
+        .int => |value| value,
+        else => return error.ValueUseCurrentHomeSignBitWidthUnsupported,
+    };
+    if ((bits != 32 and bits != 64) or binding.vreg.bits < bits)
+        return error.ValueUseCurrentHomeSignBitWidthUnsupported;
+    const accepted = if (bits == 32) switch (current) {
+        .eax, .rax => binding.vreg.class == .gpr32 or binding.vreg.class == .gpr64,
+        .arg32, .scratch32 => binding.vreg.class == .gpr32,
+        .arg64, .scratch64, .spill64 => binding.vreg.class == .gpr32 or
+            binding.vreg.class == .gpr64,
+        else => false,
+    } else switch (current) {
+        .rax, .arg64, .scratch64, .spill64 => binding.vreg.class == .gpr64,
+        else => false,
+    };
+    if (!accepted) return error.ValueUseCurrentHomeSignBitLocationUnsupported;
+}
+
+fn preserveCurrentHomeSignBitLiveAccumulator(
+    transaction: *ValueUseTransaction,
+) !void {
+    const flags_before = transaction.selector.eflags.snapshot();
+    const semantic_records_before = transaction.selector.eflags_semantics.items.len;
+    while (try selector_state.liveAccumulatorNameAfterCurrent(transaction.selector)) |live_name| {
+        const original = transaction.selector.values.get(live_name) orelse {
+            transaction.action_diagnostic =
+                .{ .unsupported_value = "composed-block-preserve-live-lhs" };
+            return error.ValueUseActionDiagnostic;
+        };
+        const original_loc = original.loc;
+        if (try selector_state.preserveLiveAccumulatorValue(
+            transaction.selector,
+            live_name,
+        )) |diagnostic| {
+            transaction.action_diagnostic = diagnostic;
+            return error.ValueUseActionDiagnostic;
+        }
+        const preserved_loc = transaction.selector.values.get(live_name).?.loc;
+
+        // Logical aliases of one live physical accumulator value share the
+        // single accepted preservation move. Rebinding aliases emits no copy.
+        while (true) {
+            var alias_name: ?[]const u8 = null;
+            var iterator = transaction.selector.values.iterator();
+            while (iterator.next()) |entry| {
+                if (std.mem.eql(u8, entry.key_ptr.*, live_name)) continue;
+                if (!std.meta.eql(entry.value_ptr.loc, original_loc)) continue;
+                if (!try selector_state.valueIsLiveAfterCurrent(
+                    transaction.selector,
+                    entry.key_ptr.*,
+                )) continue;
+                // Selector-map keys are stable IR-owned identities. Reuse
+                // that durable key; never introduce transaction-local name
+                // storage into the binding map.
+                alias_name = entry.key_ptr.*;
+                break;
+            }
+            const name = alias_name orelse break;
+            try selector_state.bindValueLoc(
+                transaction.selector,
+                name,
+                preserved_loc,
+            );
+        }
+    }
+    try transaction.selector.eflags.validateSnapshot(flags_before);
+    if (transaction.selector.eflags_semantics.items.len != semantic_records_before)
+        return error.EflagsCurrentHomeSignBitPreambleChanged;
+}
+
+fn failCurrentHomeSignBitForTest(
+    transaction: *ValueUseTransaction,
+    boundary: ValueUseTransaction.CurrentHomeSignBitTestFailure,
+) !void {
+    if (builtin.is_test and transaction.current_home_sign_bit_test_failure == boundary)
+        return error.ValueUseCurrentHomeSignBitTestFailure;
 }
 
 const CurrentHomeEqZeroTest = union(enum) {
@@ -4388,6 +4657,7 @@ fn preparedViewLoc(view: *const ValueUseTransaction.PreparedView) !ValueLoc {
         .condition,
         .current_home_eq_zero,
         .setcc_eax_compare,
+        .current_home_sign_bit,
         => error.ValueUsePreparedActionFormMismatch,
     };
 }
@@ -4417,6 +4687,7 @@ fn preparedViewEql(
         .condition => |value| std.meta.eql(value, rhs.condition),
         .current_home_eq_zero => |value| std.meta.eql(value, rhs.current_home_eq_zero),
         .setcc_eax_compare => |value| std.meta.eql(value, rhs.setcc_eax_compare),
+        .current_home_sign_bit => |value| std.meta.eql(value, rhs.current_home_sign_bit),
     };
 }
 
@@ -4518,6 +4789,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .load_address,
             .current_home_eq_zero_operand,
             .setcc_eax_compare_operand,
+            .current_home_sign_bit_operand,
             => error.ValueUsePreparedActionRequired,
             .stack_argument => error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
@@ -4541,6 +4813,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .scratch_compare_operand,
             .current_home_eq_zero_operand,
             .setcc_eax_compare_operand,
+            .current_home_sign_bit_operand,
             => {},
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -4589,6 +4862,9 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .setcc_eax_compare => |compare| if (request.form != .setcc_eax_compare_operand or
                 !request.expected.ty.eql(compare.operand_ty))
                 error.ValueUsePreparedActionFormMismatch,
+            .current_home_sign_bit => |compare| if (request.form != .current_home_sign_bit_operand or
+                !request.expected.ty.eql(compare.operand_ty))
+                error.ValueUsePreparedActionFormMismatch,
         };
     }
     if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
@@ -4605,6 +4881,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
         .scratch_compare_operand,
         .current_home_eq_zero_operand,
         .setcc_eax_compare_operand,
+        .current_home_sign_bit_operand,
         => false,
         .pair_low_high, .pair_high_low => request.destination == .pair,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -4639,6 +4916,12 @@ fn validateBindingCompatibility(
         // The action re-resolves after its live-accumulator preamble. Only
         // semantic typing is stable at seal; canonical width/home admission
         // is request-scoped and happens after that relocation.
+        try validateExpectedType(request.expected, request.form);
+        return;
+    }
+    if (request.form == .current_home_sign_bit_operand) {
+        // Width and canonical-home admission occur after both action-owned
+        // preservation phases. Seal validates only the stable semantic type.
         try validateExpectedType(request.expected, request.form);
         return;
     }
@@ -4901,6 +5184,19 @@ fn validateExpectedType(expected: ValueUseTransaction.Expected, form: ValueUseTr
             },
             else => return error.ValueUseTypeMismatch,
         },
+        .current_home_sign_bit_operand => switch (expected.ty) {
+            .int => |bits| {
+                if (bits == 0 or bits > 64 or
+                    expected.register_class != if (bits <= 32)
+                        VirtualRegClass.gpr32
+                    else
+                        VirtualRegClass.gpr64)
+                {
+                    return error.ValueUseTypeMismatch;
+                }
+            },
+            else => return error.ValueUseTypeMismatch,
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -4992,6 +5288,9 @@ fn validateSourceView(loc: ValueLoc, form: ValueUseTransaction.UseForm) !void {
         // Canonical admission occurs after the action-owned preamble. Pair
         // and spill128 homes are rejected there, preserving the O2-6 frontier.
         .setcc_eax_compare_operand => {},
+        // The action owns both preservation phases and classifies the
+        // canonical i32/i64 home only after re-resolution.
+        .current_home_sign_bit_operand => {},
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -5027,6 +5326,7 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: ValueUseTransaction.UseForm) 
         .scratch_compare_operand,
         .current_home_eq_zero_operand,
         .setcc_eax_compare_operand,
+        .current_home_sign_bit_operand,
         .stack_argument,
         .new_pair_ownership,
         => false,
@@ -5050,6 +5350,7 @@ fn earlySequencingCandidate(loc: ValueLoc, form: ValueUseTransaction.UseForm) bo
         .scratch_compare_operand => false,
         .current_home_eq_zero_operand => false,
         .setcc_eax_compare_operand => false,
+        .current_home_sign_bit_operand => false,
         else => false,
     };
 }
@@ -5214,6 +5515,7 @@ fn requestDestinationNodes(
                 try result.append(.accumulator);
             },
             .setcc_eax_compare => try result.append(.accumulator),
+            .current_home_sign_bit => try result.append(.accumulator),
         },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair => return error.ValueUseNewPairOwnershipUnsupported,
@@ -5504,6 +5806,11 @@ fn requestMappings(
                 .destination = .accumulator,
                 .source_request_index = request_index,
             }),
+            .current_home_sign_bit => mappings.append(.{
+                .source = scalarSourceNode(current orelse return error.ValueUseUnresolvedSource),
+                .destination = .accumulator,
+                .source_request_index = request_index,
+            }),
             .validate_shape, .emit_copy_to => {},
         }
         if (action != .emit_copy_to) return mappings;
@@ -5554,6 +5861,7 @@ fn actionOwnsOrderedWrites(action: ValueUseTransaction.PreparedAction) bool {
         .scratch_compare,
         .current_home_eq_zero,
         .setcc_eax_compare,
+        .current_home_sign_bit,
         => true,
         .validate_shape,
         .emit_copy_to,
@@ -5715,6 +6023,7 @@ fn validateCopyActionForm(
         .scratch_compare_operand,
         .current_home_eq_zero_operand,
         .setcc_eax_compare_operand,
+        .current_home_sign_bit_operand,
         => false,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,

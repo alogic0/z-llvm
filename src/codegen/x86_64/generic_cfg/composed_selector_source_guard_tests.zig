@@ -396,10 +396,12 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     try validateScratchCompareIntentSurface(source);
     try validateCurrentHomeEqZeroIntentSurface(source);
     try validateSetccEaxCompareIntentSurface(source);
+    try validateCurrentHomeSignBitIntentSurface(source);
     try validateDurableActionIdentityOwnership(source);
     try validateScratchComparePreservationPreamble(source);
     try validateCurrentHomeEqZeroSequence(source);
     try validateSetccEaxCompareSequence(source);
+    try validateCurrentHomeSignBitSequence(source);
 }
 
 fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const u8) !void {
@@ -426,6 +428,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     try validateScratchCompareProductionSites(source_name, source);
     try validateCurrentHomeEqZeroProductionSites(source_name, source);
     try validateSetccEaxCompareProductionSites(source_name, source);
+    try validateCurrentHomeSignBitProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -570,6 +573,43 @@ fn validateSetccEaxCompareIntentSurface(source: []const u8) !void {
     }
 }
 
+fn validateCurrentHomeSignBitIntentSurface(source: []const u8) !void {
+    const declaration = "pub const CurrentHomeSignBitAction = struct {";
+    const start = std.mem.indexOf(u8, source, declaration) orelse return;
+    const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+        return error.InvalidZigSource;
+    const body = source[start .. end + 2];
+    const forbidden = [_][]const u8{
+        "ArgReg",
+        "ValueLoc",
+        "Destination",
+        "FrameIndex",
+        "PreparedView",
+        "predicate",
+        "rhs",
+        "register",
+        "shift",
+        "home",
+        "binding",
+        "scratch",
+        "spill",
+        "preserve",
+        "displacement",
+        "reuse_source",
+        "early",
+        "phase",
+    };
+    for (forbidden) |pattern| {
+        if (std.mem.indexOf(u8, body, pattern) != null)
+            return error.ValueUseCurrentHomeSignBitPhysicalIntentEscape;
+    }
+    if (countPattern(body, "result: ActionIdentity") != 1 or
+        countPattern(body, "operand_ty: ir.Type") != 1)
+    {
+        return error.ValueUseCurrentHomeSignBitIntentMismatch;
+    }
+}
+
 fn validateScratchComparePreservationPreamble(source: [:0]const u8) !void {
     var body_storage: [max_function_bodies]FunctionBody = undefined;
     const bodies = try collectFunctionBodies(source, &body_storage);
@@ -581,6 +621,11 @@ fn validateScratchComparePreservationPreamble(source: [:0]const u8) !void {
     const execute_source = source[execute_body.start..execute_body.end];
     const preserve_source = source[preserve_body.start..preserve_body.end];
     const refresh_source = source[refresh_body.start..refresh_body.end];
+    const preservation_preamble_count: usize =
+        if (functionBodyNamed(bodies, "preserveCurrentHomeSignBitLiveAccumulator") != null)
+            2
+        else
+            1;
 
     const preserve_call = std.mem.indexOf(
         u8,
@@ -615,8 +660,9 @@ fn validateScratchComparePreservationPreamble(source: [:0]const u8) !void {
         countPattern(preserve_source, "eflags_semantics.items.len") != 2 or
         countPattern(refresh_source, "buildPreparedRecord(lhs_index)") != 1 or
         countPattern(refresh_source, "buildPreparedRecord(rhs_index)") != 1 or
-        countPattern(source, "liveAccumulatorNameAfterCurrent(transaction.selector)") != 1 or
-        countPattern(source, "preserveLiveAccumulatorValue(transaction.selector, live_name)") != 1)
+        countPattern(source, "liveAccumulatorNameAfterCurrent(transaction.selector)") !=
+            preservation_preamble_count or
+        countPattern(source, "preserveLiveAccumulatorValue(") != preservation_preamble_count)
     {
         return error.ValueUseScratchComparePreservationOrder;
     }
@@ -751,6 +797,109 @@ fn validateSetccEaxCompareSequence(source: [:0]const u8) !void {
     }
 }
 
+fn validateCurrentHomeSignBitSequence(source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const body = functionBodyNamed(bodies, "executeCurrentHomeSignBit") orelse return;
+    const function_source = source[body.start..body.end];
+    const required_order = [_][]const u8{
+        "try preserveCurrentHomeSignBitLiveAccumulator(transaction);",
+        "failCurrentHomeSignBitForTest(transaction, .after_global_preamble)",
+        "const plan = classifyCurrentHomeSignBit(action)",
+        "selector_state.preserveCurrentEaxIntoScratch(transaction.selector)",
+        "selector_state.preserveCurrentRaxIntoScratch(transaction.selector)",
+        "failCurrentHomeSignBitForTest(transaction, .after_current_home_preservation)",
+        "transaction.prepared_views[source_index] = try transaction.buildPreparedRecord(source_index);",
+        "validateCurrentHomeSignBitHome(binding, request.expected, current)",
+        "failCurrentHomeSignBitForTest(transaction, .after_materialization)",
+        "if (try session.prepare(.preserve, .spill_live))",
+        "failCurrentHomeSignBitForTest(transaction, .after_accumulator_preparation)",
+        "emitEflagsInstruction(transaction.selector, plan.shift, .write)",
+        "failCurrentHomeSignBitForTest(transaction, .after_shift)",
+        "const result_name = try ownActionIdentity(transaction, &stored_action.result);",
+        "try session.define(result_name, .zeroExtending(1));",
+        "failCurrentHomeSignBitForTest(transaction, .after_result_definition)",
+        "try session.finalize();",
+        "failCurrentHomeSignBitForTest(transaction, .after_finalization)",
+    };
+    var cursor: usize = 0;
+    for (required_order) |pattern| {
+        const found = std.mem.indexOfPos(u8, function_source, cursor, pattern) orelse
+            return error.ValueUseCurrentHomeSignBitSequenceMismatch;
+        cursor = found + pattern.len;
+    }
+    if (countPattern(function_source, "session.prepare(.preserve, .spill_live)") != 1 or
+        countPattern(function_source, "buildPreparedRecord(source_index)") != 1 or
+        countPattern(function_source, ".canonical_source_loc") != 1 or
+        countPattern(function_source, "emitValueIntoEax(") != 1 or
+        countPattern(function_source, "emitValueIntoRax(") != 1 or
+        countPattern(function_source, ".definition") != 0 or
+        countPattern(function_source, ".use") != 0 or
+        countPattern(function_source, "setcc") != 0 or
+        countPattern(function_source, "resolveValue(") != 0 or
+        countPattern(function_source, ".reuse_source") != 0)
+    {
+        return error.ValueUseCurrentHomeSignBitSequenceMismatch;
+    }
+
+    const classifier_body = functionBodyNamed(bodies, "isCurrentHomeSignBitIcmp") orelse
+        return error.ValueUseCurrentHomeSignBitClassifierMissing;
+    const classifier = source[classifier_body.start..classifier_body.end];
+    const classifier_required = [_][]const u8{
+        "icmp.predicate != .slt",
+        "icmp.samesign",
+        "bits != 32 and bits != 64",
+        "icmp.lhs != .named",
+        "value == 0",
+    };
+    for (classifier_required) |pattern| {
+        if (std.mem.indexOf(u8, classifier, pattern) == null)
+            return error.ValueUseCurrentHomeSignBitClassifierMismatch;
+    }
+    const classifier_forbidden = [_][]const u8{
+        "selector",
+        "resolveValue(",
+        "valueLoc(",
+        "ValueLoc",
+        "function",
+        "family",
+        ".eax",
+        ".rax",
+        ".spill64",
+        ".spill128",
+    };
+    for (classifier_forbidden) |pattern| {
+        if (std.mem.indexOf(u8, classifier, pattern) != null)
+            return error.ValueUseCurrentHomeSignBitClassifierStatePredicate;
+    }
+
+    const plan_body = functionBodyNamed(bodies, "classifyCurrentHomeSignBit") orelse
+        return error.ValueUseCurrentHomeSignBitSequenceMismatch;
+    const plan = source[plan_body.start..plan_body.end];
+    if (countPattern(plan, ".shr_eax_imm5 = 31") != 1 or
+        countPattern(plan, ".shr_rax_imm6 = 63") != 1 or
+        countPattern(plan, ".sar_") != 0)
+    {
+        return error.ValueUseCurrentHomeSignBitLogicalShiftMismatch;
+    }
+
+    const preserve_body =
+        functionBodyNamed(bodies, "preserveCurrentHomeSignBitLiveAccumulator") orelse
+        return error.ValueUseCurrentHomeSignBitPreambleMissing;
+    const preserve = source[preserve_body.start..preserve_body.end];
+    const preserve_required = [_][]const u8{
+        "liveAccumulatorNameAfterCurrent(transaction.selector)",
+        "preserveLiveAccumulatorValue(",
+        "valueIsLiveAfterCurrent(",
+        "selector_state.bindValueLoc(",
+        "eflags.validateSnapshot(flags_before)",
+    };
+    for (preserve_required) |pattern| {
+        if (std.mem.indexOf(u8, preserve, pattern) == null)
+            return error.ValueUseCurrentHomeSignBitPreambleMissing;
+    }
+}
+
 fn validateDurableActionIdentityOwnership(source: [:0]const u8) !void {
     if (std.mem.indexOf(u8, source, ".result.slice()") != null)
         return error.ValueUseDurableActionIdentityNotOwned;
@@ -803,6 +952,15 @@ fn validateDurableActionIdentityOwnership(source: [:0]const u8) !void {
         const setcc_define = std.mem.indexOf(u8, setcc_source, define_pattern) orelse
             return error.ValueUseDurableActionIdentityOwnershipMissing;
         if (setcc_own >= setcc_define)
+            return error.ValueUseDurableActionIdentityOwnershipOrder;
+    }
+    if (functionBodyNamed(bodies, "executeCurrentHomeSignBit")) |sign_bit_body| {
+        const sign_bit_source = source[sign_bit_body.start..sign_bit_body.end];
+        const sign_bit_own = std.mem.indexOf(u8, sign_bit_source, own_pattern) orelse
+            return error.ValueUseDurableActionIdentityOwnershipMissing;
+        const sign_bit_define = std.mem.indexOf(u8, sign_bit_source, define_pattern) orelse
+            return error.ValueUseDurableActionIdentityOwnershipMissing;
+        if (sign_bit_own >= sign_bit_define)
             return error.ValueUseDurableActionIdentityOwnershipOrder;
     }
 }
@@ -1193,6 +1351,24 @@ fn validateSetccEaxCompareProductionSites(
         {
             return error.ValueUseSetccEaxCompareProductionAllowlistMismatch;
         }
+    }
+}
+
+fn validateCurrentHomeSignBitProductionSites(
+    source_name: []const u8,
+    source: [:0]const u8,
+) !void {
+    _ = source_name;
+    const dormant_markers = [_][]const u8{
+        ".form = .current_home_sign_bit_operand",
+        ".current_home_sign_bit =",
+        "ValueUseCurrentHomeSignBitWidthUnsupported",
+        "ValueUseCurrentHomeSignBitLocationUnsupported",
+        "isCurrentHomeSignBitIcmp(",
+    };
+    for (dormant_markers) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseCurrentHomeSignBitProductionWiringForbidden;
     }
 }
 
@@ -3464,6 +3640,34 @@ test "composed selector source guard keeps setcc EAX compare production wiring s
             "fn executeSetccEaxCompare() void { " ++
                 "try selector_state.emitValueIntoEax(transaction.selector, source); " ++
                 "try preserveScratchCompareLiveAccumulator(transaction); }",
+        ),
+    );
+}
+
+test "composed selector source guard keeps current-home sign-bit intent closed and dormant" {
+    try validateCurrentHomeSignBitIntentSurface(
+        "pub const CurrentHomeSignBitAction = struct { " ++
+            "result: ActionIdentity, operand_ty: ir.Type, };",
+    );
+    try std.testing.expectError(
+        error.ValueUseCurrentHomeSignBitPhysicalIntentEscape,
+        validateCurrentHomeSignBitIntentSurface(
+            "pub const CurrentHomeSignBitAction = struct { " ++
+                "result: ActionIdentity, operand_ty: ir.Type, register: ArgReg, };",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseCurrentHomeSignBitProductionWiringForbidden,
+        validateCurrentHomeSignBitProductionSites(
+            "composed_selector_icmp.zig",
+            "fn lowerIcmp() void { _ = .{ .form = .current_home_sign_bit_operand }; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseCurrentHomeSignBitProductionWiringForbidden,
+        validateCurrentHomeSignBitProductionSites(
+            "composed_selector_calls.zig",
+            "fn lowerCall() void { _ = ValueUseCurrentHomeSignBitWidthUnsupported; }",
         ),
     );
 }
