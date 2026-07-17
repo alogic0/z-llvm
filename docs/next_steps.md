@@ -129,6 +129,16 @@ is in the evidence; guard extended (authority policy +54 with fixtures);
 full unit 1,295/1,295; Worker abi + my independent abi rerun both pass; no
 perf; no Tier 3. Evidence sent to the Reviewer requesting Step-A acceptance
 + the Step-B wiring resume from the hash-verified patch `a2f934be`.
+**Step A is ACCEPTED and Step B AUTHORIZED** (Reviewer, 2026-07-17: "I
+accept Step A at 83110e82 and authorize Step B. Proceed exactly as proposed,
+with the action/model implementation frozen at 83110e82"), with one
+additional integrity rule: if patch `a2f934be` cannot be applied without
+manual reconciliation, STOP rather than reconstructing it. All six stop
+conditions remain active (ratchet exactly 166; `accumulatorCastSource` must
+have no remaining owner before removal; C02/C03 + exact-EI placement
+unchanged; identities + six frontier rows byte-identical; any action/model
+change, failed gate, or contaminated perf batch = review). Step B
+dispatched.
 
 ## Historical operating ledger
 
