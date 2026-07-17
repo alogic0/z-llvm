@@ -6,13 +6,6 @@ composed_selector_aggregate.zig	materializePackedLeaf	valueLoc×1
 composed_selector_aggregate.zig	requireLeafShape	valueLoc×1
 composed_selector_calls.zig	accumulatorInputDisplacement	resolveValue×1
 composed_selector_calls.zig	lowerAbsI128	materializePairValue×1
-composed_selector_calls.zig	lowerAbsI32	emitValueIntoScratch×1
-composed_selector_calls.zig	lowerAbsI64	emitValueIntoScratch×1
-composed_selector_calls.zig	lowerCtlzI32	emitValueIntoScratch×1
-composed_selector_calls.zig	lowerCtlzI52	emitValueIntoScratch×1
-composed_selector_calls.zig	lowerCtlzI64	emitValueIntoScratch×1
-composed_selector_calls.zig	lowerCttzI32	emitValueIntoScratch×1
-composed_selector_calls.zig	lowerCttzI64	emitValueIntoScratch×1
 composed_selector_calls.zig	lowerDirectCallArg	resolveValue×2
 composed_selector_calls.zig	lowerFpAbs	materializeLocIntoLoc×1, resolveValue×1
 composed_selector_calls.zig	lowerFpBarrier	resolveValue×2

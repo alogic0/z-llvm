@@ -1,0 +1,10 @@
+slice	file	function	gateway	occurrence	expected_before	expected_after	semantic_owner	disposition
+C1	composed_selector_calls.zig	lowerAbsI32	emitValueIntoScratch	1	1	0	fixed unary i32 operand -> EDI	migrated with outer ValueUseTransaction and subordinate accumulator session
+C1	composed_selector_calls.zig	lowerAbsI64	emitValueIntoScratch	1	1	0	fixed unary i64 operand -> RDI	migrated with outer ValueUseTransaction and subordinate accumulator session
+C1	composed_selector_calls.zig	lowerCtlzI32	emitValueIntoScratch	1	1	0	fixed unary i32 operand -> EDI	migrated with outer ValueUseTransaction and subordinate accumulator session
+C1	composed_selector_calls.zig	lowerCtlzI52	emitValueIntoScratch	1	1	0	fixed unary i52 operand -> RDI	migrated with outer ValueUseTransaction and subordinate accumulator session
+C1	composed_selector_calls.zig	lowerCtlzI64	emitValueIntoScratch	1	1	0	fixed unary i64 operand -> RDI	migrated with outer ValueUseTransaction and subordinate accumulator session
+C1	composed_selector_calls.zig	lowerCttzI32	emitValueIntoScratch	1	1	0	fixed unary i32 operand -> EDI	migrated with outer ValueUseTransaction and subordinate accumulator session
+C1	composed_selector_calls.zig	lowerCttzI64	emitValueIntoScratch	1	1	0	fixed unary i64 operand -> RDI	migrated with outer ValueUseTransaction and subordinate accumulator session
+# frozen_global_bypass_occurrences_before=228
+# frozen_global_bypass_occurrences_after_C1=221

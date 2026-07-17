@@ -621,12 +621,22 @@ pub fn lowerCtlzI32(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     if (!value_arg.ty.eql(.{ .int = 32 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !valid_zero_flag) {
         return .{ .no_emitter = "composed-block-ctlz-args" };
     }
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
-    selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 32) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
-    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    _ = transaction.register(.{
+        .source = value_arg.value,
+        .expected = .{ .ty = value_arg.ty, .register_class = .gpr32 },
+        .form = .gpr32,
+        .destination = .{ .gpr32 = .rdi },
+    }) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    transaction.seal() catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    const accumulator = try transaction.beginAccumulatorSession();
+    transaction.prepare() catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    transaction.materializeAll() catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    if (try transaction.prepareAccumulator(accumulator, .clobber, .spill_live)) |diagnostic| return diagnostic;
     try selector_state.emitEflagsInstruction(selector, .clz_i32_edi_eax, .clobber);
-    try transaction.define(result_name, .zeroExtending(32));
+    try transaction.defineAccumulatorResult(accumulator, result_name, .zeroExtending(32));
+    try transaction.finalizeAccumulatorResult(accumulator);
     try transaction.commit();
     return null;
 }
@@ -659,12 +669,22 @@ pub fn lowerCtlzI64(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     if (!value_arg.ty.eql(.{ .int = 64 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !valid_zero_flag) {
         return .{ .no_emitter = "composed-block-ctlz-args" };
     }
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
-    selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 64) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
-    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    _ = transaction.register(.{
+        .source = value_arg.value,
+        .expected = .{ .ty = value_arg.ty, .register_class = .gpr64 },
+        .form = .gpr64,
+        .destination = .{ .gpr64 = .rdi },
+    }) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    transaction.seal() catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    const accumulator = try transaction.beginAccumulatorSession();
+    transaction.prepare() catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    transaction.materializeAll() catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    if (try transaction.prepareAccumulator(accumulator, .clobber, .spill_live)) |diagnostic| return diagnostic;
     try selector_state.emitEflagsInstruction(selector, .clz_i64_rdi_eax, .clobber);
-    try transaction.define(result_name, .fullRax());
+    try transaction.defineAccumulatorResult(accumulator, result_name, .fullRax());
+    try transaction.finalizeAccumulatorResult(accumulator);
     try transaction.commit();
     return null;
 }
@@ -672,14 +692,23 @@ pub fn lowerCtlzI64(selector: *ComposedBlockSelector, result: ?[]const u8, call:
 pub fn lowerCtlzI52(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (!isExactCtlzI52Call(call)) return .{ .no_emitter = "composed-block-ctlz-i52-envelope" };
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
-    selector_state.emitValueIntoScratch(selector, call.args.items[0].value, .rdi, 64) catch
-        return .{ .unsupported_value = "composed-block-ctlz-value" };
-    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    _ = transaction.register(.{
+        .source = call.args.items[0].value,
+        .expected = .{ .ty = call.args.items[0].ty, .register_class = .gpr64 },
+        .form = .gpr64,
+        .destination = .{ .gpr64 = .rdi },
+    }) catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    transaction.seal() catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    const accumulator = try transaction.beginAccumulatorSession();
+    transaction.prepare() catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    transaction.materializeAll() catch return .{ .unsupported_value = "composed-block-ctlz-value" };
+    if (try transaction.prepareAccumulator(accumulator, .clobber, .spill_live)) |diagnostic| return diagnostic;
     try selector_state.emitEflagsInstruction(selector, .clz_i64_rdi_eax, .clobber);
     try selector_state.emitEflagsInstruction(selector, .{ .add_eax_imm32 = -12 }, .write);
-    try transaction.define(result_name, .zeroExtendedRax(52));
+    try transaction.defineAccumulatorResult(accumulator, result_name, .zeroExtendedRax(52));
+    try transaction.finalizeAccumulatorResult(accumulator);
     try transaction.commit();
     return null;
 }
@@ -723,12 +752,22 @@ pub fn lowerCttzI32(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     if (!value_arg.ty.eql(.{ .int = 32 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !valid_zero_flag) {
         return .{ .no_emitter = "composed-block-cttz-args" };
     }
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
-    selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 32) catch return .{ .unsupported_value = "composed-block-cttz-value" };
-    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    _ = transaction.register(.{
+        .source = value_arg.value,
+        .expected = .{ .ty = value_arg.ty, .register_class = .gpr32 },
+        .form = .gpr32,
+        .destination = .{ .gpr32 = .rdi },
+    }) catch return .{ .unsupported_value = "composed-block-cttz-value" };
+    transaction.seal() catch return .{ .unsupported_value = "composed-block-cttz-value" };
+    const accumulator = try transaction.beginAccumulatorSession();
+    transaction.prepare() catch return .{ .unsupported_value = "composed-block-cttz-value" };
+    transaction.materializeAll() catch return .{ .unsupported_value = "composed-block-cttz-value" };
+    if (try transaction.prepareAccumulator(accumulator, .clobber, .spill_live)) |diagnostic| return diagnostic;
     try selector_state.emitEflagsInstruction(selector, .ctz_i32_edi_eax, .clobber);
-    try transaction.define(result_name, .zeroExtending(32));
+    try transaction.defineAccumulatorResult(accumulator, result_name, .zeroExtending(32));
+    try transaction.finalizeAccumulatorResult(accumulator);
     try transaction.commit();
     return null;
 }
@@ -745,12 +784,22 @@ pub fn lowerCttzI64(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     if (!value_arg.ty.eql(.{ .int = 64 }) or !undef_arg.ty.eql(.{ .int = 1 }) or !valid_zero_flag) {
         return .{ .no_emitter = "composed-block-cttz-args" };
     }
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
-    selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 64) catch return .{ .unsupported_value = "composed-block-cttz-value" };
-    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    _ = transaction.register(.{
+        .source = value_arg.value,
+        .expected = .{ .ty = value_arg.ty, .register_class = .gpr64 },
+        .form = .gpr64,
+        .destination = .{ .gpr64 = .rdi },
+    }) catch return .{ .unsupported_value = "composed-block-cttz-value" };
+    transaction.seal() catch return .{ .unsupported_value = "composed-block-cttz-value" };
+    const accumulator = try transaction.beginAccumulatorSession();
+    transaction.prepare() catch return .{ .unsupported_value = "composed-block-cttz-value" };
+    transaction.materializeAll() catch return .{ .unsupported_value = "composed-block-cttz-value" };
+    if (try transaction.prepareAccumulator(accumulator, .clobber, .spill_live)) |diagnostic| return diagnostic;
     try selector_state.emitEflagsInstruction(selector, .ctz_i64_rdi_eax, .clobber);
-    try transaction.define(result_name, .fullRax());
+    try transaction.defineAccumulatorResult(accumulator, result_name, .fullRax());
+    try transaction.finalizeAccumulatorResult(accumulator);
     try transaction.commit();
     return null;
 }
@@ -1052,12 +1101,22 @@ pub fn lowerAbsI32(selector: *ComposedBlockSelector, result: ?[]const u8, call: 
     };
     if (!poison_ok) return .{ .no_emitter = "composed-block-abs-poison-mode" };
 
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
-    try selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 32);
-    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    _ = try transaction.register(.{
+        .source = value_arg.value,
+        .expected = .{ .ty = value_arg.ty, .register_class = .gpr32 },
+        .form = .gpr32,
+        .destination = .{ .gpr32 = .rdi },
+    });
+    try transaction.seal();
+    const accumulator = try transaction.beginAccumulatorSession();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    if (try transaction.prepareAccumulator(accumulator, .clobber, .spill_live)) |diagnostic| return diagnostic;
     try selector_state.emitEflagsInstruction(selector, .abs_i32_edi_eax, .clobber);
-    try transaction.define(result_name, .zeroExtending(32));
+    try transaction.defineAccumulatorResult(accumulator, result_name, .zeroExtending(32));
+    try transaction.finalizeAccumulatorResult(accumulator);
     try transaction.commit();
     return null;
 }
@@ -1078,12 +1137,22 @@ pub fn lowerAbsI64(selector: *ComposedBlockSelector, result: ?[]const u8, call: 
     };
     if (!poison_ok) return .{ .no_emitter = "composed-block-abs-poison-mode" };
 
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
-    try selector_state.emitValueIntoScratch(selector, value_arg.value, .rdi, 64);
-    if (try transaction.prepare(.clobber, .spill_live)) |diagnostic| return diagnostic;
+    _ = try transaction.register(.{
+        .source = value_arg.value,
+        .expected = .{ .ty = value_arg.ty, .register_class = .gpr64 },
+        .form = .gpr64,
+        .destination = .{ .gpr64 = .rdi },
+    });
+    try transaction.seal();
+    const accumulator = try transaction.beginAccumulatorSession();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    if (try transaction.prepareAccumulator(accumulator, .clobber, .spill_live)) |diagnostic| return diagnostic;
     try selector_state.emitEflagsInstruction(selector, .abs_i64_rdi_rax, .clobber);
-    try transaction.define(result_name, .fullRax());
+    try transaction.defineAccumulatorResult(accumulator, result_name, .fullRax());
+    try transaction.finalizeAccumulatorResult(accumulator);
     try transaction.commit();
     return null;
 }

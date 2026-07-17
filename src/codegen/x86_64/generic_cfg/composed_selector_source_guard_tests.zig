@@ -40,7 +40,7 @@ const classified_sources = [_]ClassifiedSource{
 };
 
 const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-const frozen_bypass_inventory_sha256 = "a3cb560135662ded6f0a9abe004e9c4d2d5a5d43b4afc5c4bc666fdea0796abc";
+const frozen_bypass_inventory_sha256 = "1cc1fbc62a1478008189b5e33a3ae33ae177a96ebf8d625cec537c6c0754315a";
 const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -435,8 +435,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
 }
 
 fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source: [:0]const u8) !void {
-    _ = source_name;
-    const dormant_api = [_][]const u8{
+    const composition_api = [_][]const u8{
         "beginAccumulatorSession(",
         "prepareAccumulator(",
         "prepareAccumulatorCallBeforeArguments(",
@@ -448,9 +447,67 @@ fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source
         "commitAccumulatorSession(",
         "AccumulatorDefinitionSession.init(",
     };
-    for (dormant_api) |pattern| {
-        if (std.mem.indexOf(u8, source, pattern) != null)
-            return error.ValueUseAccumulatorCompositionConsumerPremature;
+    var has_composition_api = false;
+    for (composition_api) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null) has_composition_api = true;
+    }
+    if (!has_composition_api) return;
+    if (!std.mem.eql(u8, source_name, "composed_selector_calls.zig"))
+        return error.ValueUseAccumulatorCompositionOutsideAllowlist;
+
+    const allowed_functions = [_][]const u8{
+        "lowerAbsI32",
+        "lowerAbsI64",
+        "lowerCtlzI32",
+        "lowerCtlzI52",
+        "lowerCtlzI64",
+        "lowerCttzI32",
+        "lowerCttzI64",
+    };
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    var seen = [_]bool{false} ** allowed_functions.len;
+    for (bodies) |body| {
+        const function_source = source[body.start..body.end];
+        var contains_api = false;
+        for (composition_api) |pattern| {
+            if (std.mem.indexOf(u8, function_source, pattern) != null) contains_api = true;
+        }
+        if (!contains_api) continue;
+
+        var allowed_index: ?usize = null;
+        for (allowed_functions, 0..) |function_name, index| {
+            if (std.mem.eql(u8, body.name, function_name)) allowed_index = index;
+        }
+        const index = allowed_index orelse
+            return error.ValueUseAccumulatorCompositionOutsideAllowlist;
+        if (seen[index]) return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+        seen[index] = true;
+
+        if (countPattern(function_source, "beginAccumulatorSession(") != 1 or
+            countPattern(function_source, "prepareAccumulator(") != 1 or
+            countPattern(function_source, "defineAccumulatorResult(") != 1 or
+            countPattern(function_source, "finalizeAccumulatorResult(") != 1 or
+            countPattern(function_source, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(function_source, "transaction.commit()") != 1 or
+            countPattern(function_source, "prepareAccumulatorCallBeforeArguments(") != 0 or
+            countPattern(function_source, "finishAccumulatorCallPreparationAfterArguments(") != 0 or
+            countPattern(function_source, "materializeAccumulator(") != 0 or
+            countPattern(function_source, "spillAccumulatorValue(") != 0 or
+            countPattern(function_source, "commitAccumulatorSession(") != 0 or
+            countPattern(function_source, "AccumulatorDefinitionSession.init(") != 0 or
+            countPattern(function_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
+            countPattern(function_source, "emitValueIntoScratch(") != 0)
+        {
+            return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+        }
+    }
+
+    // The real production source must contain the complete seven-function
+    // pilot. Small guard fixtures may intentionally exercise one function.
+    if (std.mem.indexOf(u8, source, "pub fn lowerAbsI32(selector: *ComposedBlockSelector") != null) {
+        for (seen) |present| if (!present)
+            return error.ValueUseAccumulatorCompositionAllowlistMismatch;
     }
 }
 
@@ -1113,6 +1170,12 @@ fn validateAccumulatorDisplacementPolicies(source: []const u8) !void {
         }
         const end = call_end orelse return error.MalformedAccumulatorPrepareCall;
         const call = source[call_start..end];
+        // ValueUseTransaction preparation has no accumulator displacement;
+        // its subordinate accumulator session carries the explicit policy.
+        if (std.mem.eql(u8, call, "transaction.prepare()")) {
+            search_from = end;
+            continue;
+        }
         if (std.mem.indexOf(u8, call, ".spill_live") == null and
             std.mem.indexOf(u8, call, ".spill_source") == null and
             std.mem.indexOf(u8, call, ".scratch_preferred") == null and
@@ -1742,23 +1805,50 @@ test "composed selector source guard freezes branch and ordinary switch actions"
     );
 }
 
-test "composed selector source guard keeps accumulator composition dormant" {
+test "composed selector source guard admits only the fixed unary accumulator composition pilot" {
     try validateAccumulatorCompositionProductionSites(
-        "composed_selector_scalar.zig",
-        "fn lowerUnary() void {}",
+        "composed_selector_calls.zig",
+        "fn lowerAbsI32() void { " ++
+            "_ = ValueUseTransaction.begin(selector); " ++
+            "_ = transaction.beginAccumulatorSession(); " ++
+            "_ = transaction.prepareAccumulator(accumulator, .clobber, .spill_live); " ++
+            "_ = transaction.defineAccumulatorResult(accumulator, \"result\", definition); " ++
+            "_ = transaction.finalizeAccumulatorResult(accumulator); " ++
+            "_ = transaction.commit(); }",
     );
-    const fixtures = [_][:0]const u8{
+    const rejected = [_][:0]const u8{
         "fn lowerUnary() void { _ = transaction.beginAccumulatorSession(); }",
-        "fn lowerUnary() void { _ = transaction.prepareAccumulator(handle, .preserve, .spill_live); }",
-        "fn lowerUnary() void { _ = transaction.defineAccumulatorResult(handle, \"result\", definition); }",
-        "fn lowerUnary() void { _ = AccumulatorDefinitionSession.init(selector); }",
+        "fn lowerAbsI32() void { _ = transaction.beginAccumulatorSession(); }",
+        "fn lowerAbsI32() void { _ = ValueUseTransaction.begin(selector); " ++
+            "_ = transaction.beginAccumulatorSession(); " ++
+            "_ = transaction.prepareAccumulator(accumulator, .clobber, .spill_live); " ++
+            "_ = transaction.defineAccumulatorResult(accumulator, \"result\", definition); " ++
+            "_ = transaction.finalizeAccumulatorResult(accumulator); " ++
+            "_ = transaction.commitAccumulatorSession(accumulator); }",
+        "fn lowerAbsI32() void { _ = ValueUseTransaction.begin(selector); " ++
+            "_ = transaction.beginAccumulatorSession(); " ++
+            "_ = transaction.prepareAccumulator(accumulator, .clobber, .spill_live); " ++
+            "_ = transaction.defineAccumulatorResult(accumulator, \"result\", definition); " ++
+            "_ = transaction.finalizeAccumulatorResult(accumulator); " ++
+            "_ = AccumulatorDefinitionTransaction.begin(selector); " ++
+            "_ = transaction.commit(); }",
     };
-    for (fixtures) |fixture| {
+    for (rejected) |fixture| {
         try std.testing.expectError(
-            error.ValueUseAccumulatorCompositionConsumerPremature,
-            validateAccumulatorCompositionProductionSites("composed_selector_scalar.zig", fixture),
+            if (std.mem.indexOf(u8, fixture, "lowerUnary") != null)
+                error.ValueUseAccumulatorCompositionOutsideAllowlist
+            else
+                error.ValueUseAccumulatorCompositionAllowlistMismatch,
+            validateAccumulatorCompositionProductionSites("composed_selector_calls.zig", fixture),
         );
     }
+    try std.testing.expectError(
+        error.ValueUseAccumulatorCompositionOutsideAllowlist,
+        validateAccumulatorCompositionProductionSites(
+            "composed_selector_scalar.zig",
+            "fn lowerAbsI32() void { _ = transaction.beginAccumulatorSession(); }",
+        ),
+    );
 }
 
 test "composed selector source guard accepts the fully classified current tree" {

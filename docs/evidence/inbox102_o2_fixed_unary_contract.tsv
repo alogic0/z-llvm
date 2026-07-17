@@ -1,0 +1,8 @@
+function	operand_ir_type	accepted_destination	accepted_staging_order	accumulator_definition	displacement_policy	eflags_effect	legacy_operand_diagnostic
+lowerAbsI32	i32	edi	stage value into edi; prepare accumulator; emit abs_i32_edi_eax; define result	zeroExtending(32)	spill_live	clobber	propagate emitValueIntoScratch error
+lowerAbsI64	i64	rdi	stage value into rdi; prepare accumulator; emit abs_i64_rdi_rax; define result	fullRax()	spill_live	clobber	propagate emitValueIntoScratch error
+lowerCtlzI32	i32	edi	stage value into edi; prepare accumulator; emit clz_i32_edi_eax; define result	zeroExtending(32)	spill_live	clobber	composed-block-ctlz-value
+lowerCtlzI52	i52	rdi	stage value into rdi as 64-bit physical view; prepare accumulator; emit clz_i64_rdi_eax; emit add_eax_imm32(-12); define result	zeroExtendedRax(52)	spill_live	clobber then write	composed-block-ctlz-value
+lowerCtlzI64	i64	rdi	stage value into rdi; prepare accumulator; emit clz_i64_rdi_eax; define result	fullRax()	spill_live	clobber	composed-block-ctlz-value
+lowerCttzI32	i32	edi	stage value into edi; prepare accumulator; emit ctz_i32_edi_eax; define result	zeroExtending(32)	spill_live	clobber	composed-block-cttz-value
+lowerCttzI64	i64	rdi	stage value into rdi; prepare accumulator; emit ctz_i64_rdi_eax; define result	fullRax()	spill_live	clobber	composed-block-cttz-value

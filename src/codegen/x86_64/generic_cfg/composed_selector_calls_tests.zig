@@ -12,10 +12,12 @@ const selector_scalar = @import("composed_selector_scalar.zig");
 const selector_cfg = @import("composed_selector_cfg.zig");
 const selector_frame = @import("composed_selector_frame.zig");
 const selector_memory = @import("composed_selector_memory.zig");
+const value_use = @import("composed_selector_value_use_transaction.zig");
 
 const MachineFunction = impl.MachineFunction;
 const ComposedBlockSelector = impl.ComposedBlockSelector;
 const ValueLoc = selector_types.ValueLoc;
+const ValueUseTransaction = value_use.ValueUseTransaction;
 const VirtualRegMetadata = selector_types.VirtualRegMetadata;
 const pair_a = selector_types.pair_a;
 const pair_b = selector_types.pair_b;
@@ -392,8 +394,12 @@ test "generic cfg selector lowers only exact i32 count-trailing-zeros forms" {
         var machine = MachineFunction.init("cttz-i32", .{ .int = 32 });
         defer machine.deinit(std.testing.allocator);
 
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("value", 1);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
+        selector.allocation_plan = &plan;
         try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rsi });
 
         var call = ir.CallInst{
@@ -432,13 +438,80 @@ test "generic cfg selector lowers only exact i32 count-trailing-zeros forms" {
     try std.testing.expectEqual(@as(usize, 0), bad_machine.instructions.items.len);
 }
 
+test "fixed unary composite authority rolls back before and after subordinate finalization" {
+    inline for (.{ false, true }) |after_finalization| {
+        var machine = MachineFunction.init("fixed-unary-combined-rollback", .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("value", 1);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = stage2SpillReservedBytes();
+        try selector_state.bindValueLoc(&selector, "value", .{ .arg64 = .rsi });
+        const saved_binding = selector.values.get("value").?;
+        const saved_dependencies = selector.address_dependencies;
+        const saved_domain = selector.accumulator_domain;
+        const saved_eflags = selector.eflags.snapshot();
+        const saved_semantics = selector.eflags_semantics.items.len;
+        const saved_next_vreg = selector.next_virtual_reg;
+        const saved_next_spill = selector.next_spill_slot;
+        const saved_edge_labels = selector.edge_label_count;
+        const saved_owned_labels = machine.owned_labels.items.len;
+
+        var transaction = try ValueUseTransaction.begin(&selector);
+        _ = try transaction.register(.{
+            .source = .{ .named = "value" },
+            .expected = .{ .ty = .{ .int = 64 }, .register_class = .gpr64 },
+            .form = .gpr64,
+            .destination = .{ .gpr64 = .rdi },
+        });
+        try transaction.seal();
+        const accumulator = try transaction.beginAccumulatorSession();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try std.testing.expect((try transaction.prepareAccumulator(
+            accumulator,
+            .clobber,
+            .spill_live,
+        )) == null);
+        try selector_state.emitEflagsInstruction(&selector, .clz_i64_rdi_eax, .clobber);
+        try transaction.defineAccumulatorResult(accumulator, "result", .fullRax());
+        if (after_finalization) try transaction.finalizeAccumulatorResult(accumulator);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_arg64_arg = .{ .dst = .rdi, .src = .rsi } },
+            .clz_i64_rdi_eax,
+        }, machine.instructions.items);
+        transaction.deinit();
+
+        try std.testing.expectEqual(@as(usize, 1), selector.values.count());
+        try std.testing.expectEqual(saved_binding, selector.values.get("value").?);
+        try std.testing.expect(selector.values.get("result") == null);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+        try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+        try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+        try std.testing.expectEqual(saved_edge_labels, selector.edge_label_count);
+        try std.testing.expectEqual(saved_owned_labels, machine.owned_labels.items.len);
+        try std.testing.expectEqual(saved_domain, selector.accumulator_domain);
+        try std.testing.expect(selector.address_dependencies.eql(&saved_dependencies));
+        try selector.eflags.validateSnapshot(saved_eflags);
+        try std.testing.expectEqual(saved_semantics, selector.eflags_semantics.items.len);
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
 test "generic cfg selector lowers only exact i64 count-leading-zeros forms" {
     inline for (.{ 0, 1 }) |zero_is_poison| {
         var machine = MachineFunction.init("ctlz-i64", .{ .int = 64 });
         defer machine.deinit(std.testing.allocator);
 
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("value", 1);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
+        selector.allocation_plan = &plan;
         try selector_state.bindValueLoc(&selector, "value", .{ .arg64 = .rsi });
 
         var call = ir.CallInst{
@@ -482,8 +555,12 @@ test "generic cfg selector lowers only exact i64 count-trailing-zeros forms" {
         var machine = MachineFunction.init("cttz-i64", .{ .int = 64 });
         defer machine.deinit(std.testing.allocator);
 
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("value", 1);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
+        selector.allocation_plan = &plan;
         try selector_state.bindValueLoc(&selector, "value", .{ .arg64 = .rsi });
 
         var call = ir.CallInst{
