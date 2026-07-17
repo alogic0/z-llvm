@@ -317,7 +317,7 @@ pub fn validateValueUseFacadeSurfaceManifest(source: [:0]const u8) !void {
         previous = name;
         manifest_count += 1;
     }
-    if (declaration_count != manifest_count or manifest_count != 100)
+    if (declaration_count != manifest_count or manifest_count != 107)
         return error.ValueUseFacadeManifestMismatch;
 }
 
@@ -341,7 +341,7 @@ pub fn validateValueUseDirectForwardingWrappers(transaction_source: [:0]const u8
         wrapper_count += 1;
         cursor = close + 1;
     }
-    if (wrapper_count != 40) return error.ValueUseWrapperNotDirectForward;
+    if (wrapper_count != 43) return error.ValueUseWrapperNotDirectForward;
 }
 
 pub fn validateExactTopLevelPubNames(source: []const u8, expected: []const []const u8) !void {

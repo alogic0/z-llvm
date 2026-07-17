@@ -78,6 +78,7 @@ const I128PairRequestError = Types.I128PairRequestError;
 const I128EqMinTestFailure = Types.I128EqMinTestFailure;
 const I128SignBitTestFailure = Types.I128SignBitTestFailure;
 const ScalarCastTestFailure = Types.ScalarCastTestFailure;
+const ImmediateScalarTestFailure = Types.ImmediateScalarTestFailure;
 const max_switch_cases = Types.max_switch_cases;
 const SwitchCaseIntent = Types.SwitchCaseIntent;
 const SwitchCompareChainAction = Types.SwitchCompareChainAction;
@@ -484,6 +485,14 @@ fn core_setScalarCastTestFailure(
     if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
     transaction.scalar_cast_test_failure = failure;
 }
+fn core_setImmediateScalarTestFailure(
+    comptime _: type,
+    transaction: anytype,
+    failure: ?ImmediateScalarTestFailure,
+) !void {
+    if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
+    transaction.immediate_scalar_test_failure = failure;
+}
 fn core_requireActive(comptime _: type, transaction: anytype) !void {
     if (transaction.lifecycle != .active) return error.ValueUseTransactionClosed;
 }
@@ -656,6 +665,8 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
             try scalar_arithmetic_module.validateAccumulatorScalarCastAction(cast);
         },
         .sign_extend_scratch => |*cast| try cast.result.validate(),
+        .immediate_rhs_scalar => |*immediate| try scalar_arithmetic_module.validateImmediateRhsScalarAction(immediate),
+        .immediate_lhs_scalar => |*immediate| try scalar_arithmetic_module.validateImmediateLhsScalarAction(immediate),
     }
 }
 fn core_validateRegisteredOperandHandle(comptime _: type, transaction: anytype, handle: RequestHandle) !u8 {
@@ -706,6 +717,8 @@ fn core_validateActionDependenciesCanonical(comptime Authority: type, transactio
         .pair_low_scalar_cast => {},
         .accumulator_scalar_cast => {},
         .sign_extend_scratch => {},
+        .immediate_rhs_scalar => {},
+        .immediate_lhs_scalar => {},
         .validate_shape,
         .emit_copy_to,
         .form_readonly_table_address,
@@ -804,6 +817,8 @@ fn executePreparedActionInternal(
                 .pair_low_scalar_cast_operand,
                 .accumulator_scalar_cast_operand,
                 .sign_extend_scratch_operand,
+                .immediate_rhs_scalar_operand,
+                .immediate_lhs_scalar_operand,
                 => return error.ValueUsePreparedActionFormMismatch,
                 .stack_argument => return error.ValueUseStackArgumentUnsupported,
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -880,6 +895,20 @@ fn executePreparedActionInternal(
             view,
             &cast,
         ),
+        .immediate_rhs_scalar => |immediate| try scalar_arithmetic_module.executeImmediateRhsScalar(
+            Authority,
+            transaction,
+            request_index,
+            view,
+            &immediate,
+        ),
+        .immediate_lhs_scalar => |immediate| try scalar_arithmetic_module.executeImmediateLhsScalar(
+            Authority,
+            transaction,
+            request_index,
+            view,
+            &immediate,
+        ),
     }
 }
 fn core_registeredOperandCurrent(comptime Authority: type, transaction: anytype, handle: RequestHandle) !ValueLoc {
@@ -919,6 +948,8 @@ fn actionSecondaryOperand(
         .pair_low_scalar_cast => null,
         .accumulator_scalar_cast => null,
         .sign_extend_scratch => null,
+        .immediate_rhs_scalar => null,
+        .immediate_lhs_scalar => null,
         .load_scalar,
         .load_readonly_pair,
         .load_stack_i128_alias,
@@ -981,6 +1012,8 @@ fn actionTertiaryOperand(
         .pair_low_scalar_cast,
         .accumulator_scalar_cast,
         .sign_extend_scratch,
+        .immediate_rhs_scalar,
+        .immediate_lhs_scalar,
         => null,
     };
 }
@@ -1090,6 +1123,7 @@ const Implementation = struct {
     pub const setI128EqMinTestFailure = core_setI128EqMinTestFailure;
     pub const setI128SignBitTestFailure = core_setI128SignBitTestFailure;
     pub const setScalarCastTestFailure = core_setScalarCastTestFailure;
+    pub const setImmediateScalarTestFailure = core_setImmediateScalarTestFailure;
     pub const requireActive = core_requireActive;
     pub const rollbackInternal = core_rollbackInternal;
     pub const handleFor = core_handleFor;

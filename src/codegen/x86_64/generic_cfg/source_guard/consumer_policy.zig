@@ -87,6 +87,7 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     try validateCurrentHomeSignBitProductionSites(source_name, source);
     try validateI128PairProductionSites(source_name, source);
     try validateScalarCastProductionSites(source_name, source);
+    try validateDormantImmediateScalarProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -117,6 +118,26 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
             if (std.mem.indexOf(u8, function_source, pattern) != null)
                 return error.ValueUsePreparedLeafRawOperation;
         }
+    }
+}
+
+pub fn validateDormantImmediateScalarProductionSites(
+    source_name: []const u8,
+    source: [:0]const u8,
+) !void {
+    _ = source_name;
+    const forbidden = [_][]const u8{
+        ".immediate_rhs_scalar_operand",
+        ".immediate_lhs_scalar_operand",
+        ".immediate_rhs_scalar",
+        ".immediate_lhs_scalar",
+        "isImmediateRhsScalar(",
+        "isImmediateLhsScalar(",
+        "setImmediateScalarTestFailure(",
+    };
+    for (forbidden) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseImmediateScalarActionNotWired;
     }
 }
 

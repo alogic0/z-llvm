@@ -79,6 +79,7 @@ const validateSetccEaxCompareProductionSites = support.validateSetccEaxComparePr
 const validateCurrentHomeSignBitProductionSites = support.validateCurrentHomeSignBitProductionSites;
 const validateI128PairProductionSites = support.validateI128PairProductionSites;
 const validateScalarCastProductionSites = support.validateScalarCastProductionSites;
+const validateDormantImmediateScalarProductionSites = support.validateDormantImmediateScalarProductionSites;
 const validateLoadDiagnosticMappingProductionSites = support.validateLoadDiagnosticMappingProductionSites;
 const validateDormantLoadActionProductionSites = support.validateDormantLoadActionProductionSites;
 const validateAccumulatorCompositionProductionSites = support.validateAccumulatorCompositionProductionSites;
@@ -452,5 +453,27 @@ test "composed selector source guard confines active scalar cast actions" {
             "composed_selector_scalar.zig",
             "fn lowerCast() void { _ = AccumulatorDefinitionTransaction.begin(selector); }",
         ),
+    );
+}
+
+test "composed selector source guard keeps immediate scalar actions dormant" {
+    const fixtures = [_][:0]const u8{
+        "fn lowerBinaryImmediateRhs() void { _ = .immediate_rhs_scalar_operand; }",
+        "fn lowerBinaryImmediateLhs() void { _ = .{ .immediate_lhs_scalar = action }; }",
+        "fn lowerBinary() void { _ = isImmediateRhsScalar(binary); }",
+        "fn lowerBinary() void { _ = isImmediateLhsScalar(binary); }",
+    };
+    for (fixtures) |fixture| {
+        try std.testing.expectError(
+            error.ValueUseImmediateScalarActionNotWired,
+            validateDormantImmediateScalarProductionSites(
+                "composed_selector_scalar.zig",
+                fixture,
+            ),
+        );
+    }
+    try validateDormantImmediateScalarProductionSites(
+        "composed_selector_scalar.zig",
+        "fn lowerBinary() void { _ = legacy; }",
     );
 }

@@ -315,6 +315,8 @@ fn actionSecondaryOperand(
         .pair_low_scalar_cast => null,
         .accumulator_scalar_cast => null,
         .sign_extend_scratch => null,
+        .immediate_rhs_scalar => null,
+        .immediate_lhs_scalar => null,
         .load_scalar,
         .load_readonly_pair,
         .load_stack_i128_alias,
@@ -360,6 +362,8 @@ fn actionTertiaryOperand(
         .pair_low_scalar_cast,
         .accumulator_scalar_cast,
         .sign_extend_scratch,
+        .immediate_rhs_scalar,
+        .immediate_lhs_scalar,
         => null,
     };
 }
@@ -645,6 +649,8 @@ pub fn validateFormAndDestination(request: *const Types.StoredRequest) !void {
             .pair_low_scalar_cast_operand,
             .accumulator_scalar_cast_operand,
             .sign_extend_scratch_operand,
+            .immediate_rhs_scalar_operand,
+            .immediate_lhs_scalar_operand,
             => error.ValueUsePreparedActionRequired,
             .stack_argument => error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
@@ -673,6 +679,8 @@ pub fn validateFormAndDestination(request: *const Types.StoredRequest) !void {
             .pair_low_scalar_cast_operand,
             .accumulator_scalar_cast_operand,
             .sign_extend_scratch_operand,
+            .immediate_rhs_scalar_operand,
+            .immediate_lhs_scalar_operand,
             => {},
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -739,6 +747,12 @@ pub fn validateFormAndDestination(request: *const Types.StoredRequest) !void {
                 !request.expected.ty.eql(.{ .int = 32 }) or
                 request.expected.register_class != .gpr32)
                 error.ValueUsePreparedActionFormMismatch,
+            .immediate_rhs_scalar => |immediate| if (request.form != .immediate_rhs_scalar_operand or
+                !request.expected.ty.eql(immediate.integer_ty))
+                error.ValueUsePreparedActionFormMismatch,
+            .immediate_lhs_scalar => |immediate| if (request.form != .immediate_lhs_scalar_operand or
+                !request.expected.ty.eql(immediate.integer_ty))
+                error.ValueUsePreparedActionFormMismatch,
         };
     }
     if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
@@ -760,6 +774,8 @@ pub fn validateFormAndDestination(request: *const Types.StoredRequest) !void {
         .pair_low_scalar_cast_operand,
         .accumulator_scalar_cast_operand,
         .sign_extend_scratch_operand,
+        .immediate_rhs_scalar_operand,
+        .immediate_lhs_scalar_operand,
         => false,
         .pair_low_high, .pair_high_low => request.destination == .pair,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -785,6 +801,8 @@ fn earlySequencingCandidate(loc: ValueLoc, form: Types.UseForm) bool {
         .pair_low_scalar_cast_operand => false,
         .accumulator_scalar_cast_operand => false,
         .sign_extend_scratch_operand => false,
+        .immediate_rhs_scalar_operand => false,
+        .immediate_lhs_scalar_operand => false,
         else => false,
     };
 }
@@ -985,11 +1003,121 @@ pub fn requestDestinationNodes(
             .sign_extend_scratch => try result.append(nodeForArgReg(
                 try signExtendScratchDestination(current orelse return error.ValueUseUnresolvedSource),
             )),
+            .immediate_rhs_scalar => |*immediate| try appendImmediateRhsDestinationNodes(
+                transaction.selector,
+                current orelse return error.ValueUseUnresolvedSource,
+                &request.source,
+                immediate,
+                &result,
+            ),
+            .immediate_lhs_scalar => {
+                try result.append(.rcx);
+                try result.append(.accumulator);
+            },
         },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair => return error.ValueUseNewPairOwnershipUnsupported,
     }
     return result;
+}
+
+fn appendImmediateRhsDestinationNodes(
+    selector: *ComposedBlockSelector,
+    current: ValueLoc,
+    source: *const Types.Source,
+    action: *const Types.ImmediateRhsScalarAction,
+    result: *NodeList,
+) !void {
+    const bits = switch (action.integer_ty) {
+        .int => |value| value,
+        else => return error.ValueUseImmediateScalarWidthUnsupported,
+    };
+    switch (action.operation) {
+        .sdiv => {
+            try result.append(.rcx);
+            try result.append(.accumulator);
+        },
+        .lshr => if (bits <= 32) {
+            try result.append(.rcx);
+        } else {
+            const destination = immediateScratch64PlanningDestination(
+                selector,
+                current,
+                source,
+                &action.result,
+            );
+            if (destination) |reg|
+                try result.append(nodeForArgReg(reg))
+            else if (current == .spill64)
+                try result.append(.accumulator)
+            else
+                return error.ValueUseImmediateScalarScratchUnavailable;
+        },
+        .shl => if (bits <= 32 and current == .scratch32) {
+            try result.append(.accumulator);
+            try result.append(nodeForArgReg(current.scratch32));
+        } else {
+            try result.append(.accumulator);
+        },
+        .ashr => if (bits <= 32)
+            try result.append(.accumulator)
+        else
+            try result.append(.rcx),
+        .@"and" => if (bits <= 32 or action.literal == std.math.maxInt(u32)) {
+            try result.append(.accumulator);
+        } else {
+            try result.append(.accumulator);
+            try result.append(.rcx);
+        },
+        .@"or", .xor => if (bits <= 32) {
+            try result.append(.accumulator);
+            if (action.operation == .xor) try result.append(.rcx);
+        } else {
+            try result.append(.accumulator);
+            try result.append(.rcx);
+        },
+        .add, .sub => if (bits == 64 and immediateFitsI32(action.literal)) {
+            try result.append(.rcx);
+        } else if (bits <= 32) {
+            try result.append(.accumulator);
+        } else {
+            try result.append(.accumulator);
+            try result.append(.rcx);
+        },
+        else => return error.ValueUseImmediateScalarFormUnsupported,
+    }
+}
+
+fn immediateScratch64PlanningDestination(
+    selector: *ComposedBlockSelector,
+    current: ValueLoc,
+    source: *const Types.Source,
+    result: *const ActionIdentity,
+) ?ArgReg {
+    if (selector.allocation_plan) |plan| {
+        if (plan.assignment(result.slice())) |assignment| {
+            if (assignment == .gpr64 and scalarCastScratchAvailable(selector, assignment.gpr64))
+                return assignment.gpr64;
+        }
+    }
+    for (selector_types.selector_allocatable_regs) |reg|
+        if (scalarCastScratchAvailable(selector, reg)) return reg;
+    switch (current) {
+        .scratch64 => |reg| if (selector_state.regConflictStatus(selector, reg) orelse true)
+            return reg,
+        else => {},
+    }
+    const source_value: ir.Value = switch (source.*) {
+        .named => |*identity| .{ .named = identity.slice() },
+        else => return null,
+    };
+    if (selector_state.spillScratch64SourceForInPlace(selector, source_value)) |spill_source|
+        return spill_source.reg;
+    return null;
+}
+
+fn immediateFitsI32(value: i128) bool {
+    return value >= std.math.minInt(i32) and value <= std.math.maxInt(i32);
 }
 
 fn pairLowScalarCastDestination(
@@ -1335,6 +1463,8 @@ pub fn requestMappings(
             .pair_low_scalar_cast,
             .accumulator_scalar_cast,
             .sign_extend_scratch,
+            .immediate_rhs_scalar,
+            .immediate_lhs_scalar,
             => {
                 const destinations = try requestDestinationNodes(Authority, transaction, request, current);
                 for (destinations.slice()) |destination| mappings.append(.{
@@ -1398,6 +1528,8 @@ pub fn actionOwnsOrderedWrites(action: Types.PreparedAction) bool {
         .pair_low_scalar_cast,
         .accumulator_scalar_cast,
         .sign_extend_scratch,
+        .immediate_rhs_scalar,
+        .immediate_lhs_scalar,
         => true,
         .validate_shape,
         .emit_copy_to,
@@ -1555,6 +1687,8 @@ fn validateCopyActionForm(
         .pair_low_scalar_cast_operand,
         .accumulator_scalar_cast_operand,
         .sign_extend_scratch_operand,
+        .immediate_rhs_scalar_operand,
+        .immediate_lhs_scalar_operand,
         => false,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -1682,6 +1816,19 @@ pub fn validateBindingCompatibility(
         try validateExpectedType(request.expected, request.form);
         if (binding.vreg.class != .gpr32 or binding.vreg.bits < 32)
             return error.ValueUseScalarCastWidthUnsupported;
+        return;
+    }
+    if (request.form == .immediate_rhs_scalar_operand or
+        request.form == .immediate_lhs_scalar_operand)
+    {
+        try validateExpectedType(request.expected, request.form);
+        const bits = request.expected.ty.int;
+        const valid_class = if (bits <= 32)
+            binding.vreg.class == .gpr32 or binding.vreg.class == .gpr64
+        else
+            binding.vreg.class == .gpr64;
+        if (!valid_class or binding.vreg.bits < bits)
+            return error.ValueUseImmediateScalarWidthUnsupported;
         return;
     }
     if (request.form == .load_address) {
@@ -1979,6 +2126,19 @@ fn validateExpectedType(expected: Types.Expected, form: Types.UseForm) !void {
         {
             return error.ValueUseTypeMismatch;
         },
+        .immediate_rhs_scalar_operand, .immediate_lhs_scalar_operand => switch (expected.ty) {
+            .int => |bits| {
+                if (bits == 0 or bits > 64 or
+                    expected.register_class != if (bits <= 32)
+                        VirtualRegClass.gpr32
+                    else
+                        VirtualRegClass.gpr64)
+                {
+                    return error.ValueUseTypeMismatch;
+                }
+            },
+            else => return error.ValueUseTypeMismatch,
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -2079,6 +2239,8 @@ fn validateSourceView(loc: ValueLoc, form: Types.UseForm) !void {
         .pair_low_scalar_cast_operand,
         .accumulator_scalar_cast_operand,
         .sign_extend_scratch_operand,
+        .immediate_rhs_scalar_operand,
+        .immediate_lhs_scalar_operand,
         => {},
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2115,6 +2277,8 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: Types.UseForm) bool {
         .pair_low_scalar_cast_operand,
         .accumulator_scalar_cast_operand,
         .sign_extend_scratch_operand,
+        .immediate_rhs_scalar_operand,
+        .immediate_lhs_scalar_operand,
         .stack_argument,
         .new_pair_ownership,
         => false,

@@ -129,6 +129,7 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateCurrentHomeSignBitIntentSurface(source);
     try validateI128PairIntentSurface(source);
     try validateScalarCastIntentSurface(source);
+    try validateImmediateScalarIntentSurface(source);
     try validateDurableActionIdentityOwnership(source);
     try validateScratchComparePreservationPreamble(source);
     try validateCurrentHomeEqZeroSequence(source);
@@ -385,6 +386,53 @@ pub fn validateScalarCastIntentSurface(source: []const u8) !void {
         return error.ValueUseScalarCastIntentMissing;
 }
 
+pub fn validateImmediateScalarIntentSurface(source: []const u8) !void {
+    const declarations = [_][]const u8{
+        "pub const ImmediateRhsScalarAction = struct {",
+        "pub const ImmediateLhsScalarAction = struct {",
+    };
+    var present: usize = 0;
+    for (declarations) |declaration| {
+        const start = std.mem.indexOf(u8, source, declaration) orelse continue;
+        present += 1;
+        const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+            return error.InvalidZigSource;
+        const body = source[start .. end + 2];
+        const required = [_][]const u8{
+            "result: ActionIdentity",
+            "operation: ir.BinaryOp",
+            "integer_ty: ir.Type",
+            "literal: i128",
+        };
+        for (required) |pattern| {
+            if (countPattern(body, pattern) != 1)
+                return error.ValueUseImmediateScalarIntentMismatch;
+        }
+        const forbidden = [_][]const u8{
+            "ArgReg",
+            "RegPair",
+            "ValueLoc",
+            "Destination",
+            "PreparedView",
+            "register",
+            "home",
+            "binding",
+            "scratch",
+            "spill",
+            "displacement",
+            "sequence",
+            "phase",
+            "request",
+        };
+        for (forbidden) |pattern| {
+            if (std.mem.indexOf(u8, body, pattern) != null)
+                return error.ValueUseImmediateScalarPhysicalIntentEscape;
+        }
+    }
+    if (present != 0 and present != declarations.len)
+        return error.ValueUseImmediateScalarIntentMissing;
+}
+
 pub fn validateScalarCastSequence(source: [:0]const u8) !void {
     var body_storage: [max_function_bodies]FunctionBody = undefined;
     const bodies = try collectFunctionBodies(source, &body_storage);
@@ -549,10 +597,9 @@ pub fn validateScratchComparePreservationPreamble(source: [:0]const u8) !void {
     const preserve_source = source[preserve_body.start..preserve_body.end];
     const refresh_source = source[refresh_body.start..refresh_body.end];
     const preservation_preamble_count: usize =
-        if (functionBodyNamed(bodies, "preserveCurrentHomeSignBitLiveAccumulator") != null)
-            2
-        else
-            1;
+        1 +
+        @as(usize, @intFromBool(functionBodyNamed(bodies, "preserveCurrentHomeSignBitLiveAccumulator") != null)) +
+        @as(usize, @intFromBool(functionBodyNamed(bodies, "executeImmediateRhsScalar") != null));
 
     const preserve_call = std.mem.indexOf(
         u8,

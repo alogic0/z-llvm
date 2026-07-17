@@ -301,6 +301,8 @@ fn materializeRequestFromLoc(
         .pair_low_scalar_cast_operand,
         .accumulator_scalar_cast_operand,
         .sign_extend_scratch_operand,
+        .immediate_rhs_scalar_operand,
+        .immediate_lhs_scalar_operand,
         => return error.ValueUsePreparedActionRequired,
         .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, destination),
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -401,6 +403,8 @@ pub fn preparedViewFromLoc(
         .pair_low_scalar_cast_operand => .{ .pair_low_scalar_cast = {} },
         .accumulator_scalar_cast_operand => .{ .accumulator_scalar_cast = {} },
         .sign_extend_scratch_operand => .{ .sign_extend_scratch = {} },
+        .immediate_rhs_scalar_operand => .{ .immediate_rhs_scalar = {} },
+        .immediate_lhs_scalar_operand => .{ .immediate_lhs_scalar = {} },
         .stack_argument => error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
     };
@@ -649,6 +653,8 @@ pub fn preparedViewLoc(view: *const Types.PreparedView) !ValueLoc {
         .pair_low_scalar_cast,
         .accumulator_scalar_cast,
         .sign_extend_scratch,
+        .immediate_rhs_scalar,
+        .immediate_lhs_scalar,
         => error.ValueUsePreparedActionFormMismatch,
     };
 }
@@ -681,6 +687,8 @@ fn preparedViewEql(
         .pair_low_scalar_cast => true,
         .accumulator_scalar_cast => true,
         .sign_extend_scratch => true,
+        .immediate_rhs_scalar => true,
+        .immediate_lhs_scalar => true,
     };
 }
 fn preparedStackObjectEql(
@@ -917,6 +925,19 @@ fn validateBindingCompatibility(
         try validateExpectedType(request.expected, request.form);
         if (binding.vreg.class != .gpr32 or binding.vreg.bits < 32)
             return error.ValueUseScalarCastWidthUnsupported;
+        return;
+    }
+    if (request.form == .immediate_rhs_scalar_operand or
+        request.form == .immediate_lhs_scalar_operand)
+    {
+        try validateExpectedType(request.expected, request.form);
+        const bits = request.expected.ty.int;
+        const valid_class = if (bits <= 32)
+            binding.vreg.class == .gpr32 or binding.vreg.class == .gpr64
+        else
+            binding.vreg.class == .gpr64;
+        if (!valid_class or binding.vreg.bits < bits)
+            return error.ValueUseImmediateScalarWidthUnsupported;
         return;
     }
     if (request.form == .load_address) {
@@ -1214,6 +1235,19 @@ fn validateExpectedType(expected: Types.Expected, form: Types.UseForm) !void {
         {
             return error.ValueUseTypeMismatch;
         },
+        .immediate_rhs_scalar_operand, .immediate_lhs_scalar_operand => switch (expected.ty) {
+            .int => |bits| {
+                if (bits == 0 or bits > 64 or
+                    expected.register_class != if (bits <= 32)
+                        VirtualRegClass.gpr32
+                    else
+                        VirtualRegClass.gpr64)
+                {
+                    return error.ValueUseTypeMismatch;
+                }
+            },
+            else => return error.ValueUseTypeMismatch,
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -1314,6 +1348,8 @@ fn validateSourceView(loc: ValueLoc, form: Types.UseForm) !void {
         .pair_low_scalar_cast_operand,
         .accumulator_scalar_cast_operand,
         .sign_extend_scratch_operand,
+        .immediate_rhs_scalar_operand,
+        .immediate_lhs_scalar_operand,
         => {},
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -1350,6 +1386,8 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: Types.UseForm) bool {
         .pair_low_scalar_cast_operand,
         .accumulator_scalar_cast_operand,
         .sign_extend_scratch_operand,
+        .immediate_rhs_scalar_operand,
+        .immediate_lhs_scalar_operand,
         .stack_argument,
         .new_pair_ownership,
         => false,

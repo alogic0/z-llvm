@@ -119,11 +119,30 @@ pub fn beginAccumulatorSession(
         return error.ValueUseAccumulatorSessionRequiresSealedPlan;
     if (transaction.accumulator_session != null)
         return error.ValueUseAccumulatorSessionAlreadyOpen;
-    transaction.accumulator_session = AccumulatorDefinitionSession.init(transaction.selector);
+    openAccumulatorSession(transaction);
     return .{
         .authority = @intFromPtr(transaction),
         .generation = transaction.view_generation,
     };
+}
+
+/// Internal action-owned session opening for closed actions whose private
+/// semantic plan decides whether an accumulator result exists. This is not
+/// part of the production facade.
+pub fn beginAccumulatorSessionForPreparedAction(
+    comptime Authority: type,
+    transaction: anytype,
+) !void {
+    try Authority.requireActive(Authority, transaction);
+    if (transaction.request_phase != .views_exposed)
+        return error.ValueUseAccumulatorSessionRequiresPreparedAction;
+    if (transaction.accumulator_session != null)
+        return error.ValueUseAccumulatorSessionAlreadyOpen;
+    openAccumulatorSession(transaction);
+}
+
+fn openAccumulatorSession(transaction: anytype) void {
+    transaction.accumulator_session = AccumulatorDefinitionSession.init(transaction.selector);
 }
 pub fn prepareAccumulator(
     comptime Authority: type,

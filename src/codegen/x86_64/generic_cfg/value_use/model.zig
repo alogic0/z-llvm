@@ -107,6 +107,12 @@ pub const UseForm = enum {
     /// Action-only i32 source for the exact sessionless sign-extension cast.
     /// Only canonical G32/S32 homes are admitted by the action.
     sign_extend_scratch_operand,
+    /// Action-only named lhs for a closed scalar operation with an inline
+    /// typed rhs literal. The action owns all physical staging decisions.
+    immediate_rhs_scalar_operand,
+    /// Action-only named rhs for a closed scalar operation with an inline
+    /// typed lhs literal. The action owns all physical staging decisions.
+    immediate_lhs_scalar_operand,
     stack_argument,
     new_pair_ownership,
 };
@@ -524,6 +530,43 @@ pub const ScalarCastTestFailure = enum {
     after_finalization,
 };
 
+pub const ImmediateRhsScalarAction = struct {
+    result: ActionIdentity,
+    operation: ir.BinaryOp,
+    integer_ty: ir.Type,
+    literal: i128,
+};
+
+pub const ImmediateLhsScalarAction = struct {
+    result: ActionIdentity,
+    operation: ir.BinaryOp,
+    integer_ty: ir.Type,
+    literal: i128,
+};
+
+pub const ImmediateScalarRequestError = error{
+    ValueUseImmediateScalarFormUnsupported,
+    ValueUseImmediateScalarWidthUnsupported,
+    ValueUseImmediateScalarLocationUnsupported,
+    ValueUseImmediateScalarLiteralOutOfRange,
+    ValueUseImmediateScalarScratchUnavailable,
+};
+
+pub const ImmediateScalarTestFailure = enum {
+    after_preservation,
+    after_scratch_selection,
+    after_rcx_staging,
+    after_accumulator_preparation,
+    after_eax_staging,
+    after_rax_staging,
+    after_first_instruction,
+    after_second_instruction,
+    after_third_instruction,
+    after_result_identity_ownership,
+    after_result_definition,
+    after_finalization,
+};
+
 /// Pure future-dispatch classifier for the exact pair equality form.
 pub const max_switch_cases = 8;
 
@@ -618,6 +661,8 @@ pub const PreparedAction = union(enum) {
     pair_low_scalar_cast: PairLowScalarCastAction,
     accumulator_scalar_cast: AccumulatorScalarCastAction,
     sign_extend_scratch: SignExtendScratchAction,
+    immediate_rhs_scalar: ImmediateRhsScalarAction,
+    immediate_lhs_scalar: ImmediateLhsScalarAction,
 
     pub fn eql(action: PreparedAction, other: PreparedAction) bool {
         return std.meta.eql(action, other);
@@ -743,6 +788,8 @@ pub const PreparedView = union(enum) {
     pair_low_scalar_cast: void,
     accumulator_scalar_cast: void,
     sign_extend_scratch: void,
+    immediate_rhs_scalar: void,
+    immediate_lhs_scalar: void,
 };
 
 pub const PreparedRecord = struct {
@@ -984,6 +1031,10 @@ pub fn Transaction(comptime Impl: type) type {
         pub const SignExtendScratchAction = Model.SignExtendScratchAction;
         pub const ScalarCastRequestError = Model.ScalarCastRequestError;
         pub const ScalarCastTestFailure = Model.ScalarCastTestFailure;
+        pub const ImmediateRhsScalarAction = Model.ImmediateRhsScalarAction;
+        pub const ImmediateLhsScalarAction = Model.ImmediateLhsScalarAction;
+        pub const ImmediateScalarRequestError = Model.ImmediateScalarRequestError;
+        pub const ImmediateScalarTestFailure = Model.ImmediateScalarTestFailure;
         pub const max_switch_cases = Model.max_switch_cases;
         pub const SwitchCaseIntent = Model.SwitchCaseIntent;
         pub const SwitchCompareChainAction = Model.SwitchCompareChainAction;
@@ -1049,6 +1100,7 @@ pub fn Transaction(comptime Impl: type) type {
         i128_eq_min_test_failure: if (builtin.is_test) ?Self.I128EqMinTestFailure else void = if (builtin.is_test) null else {},
         i128_sign_bit_test_failure: if (builtin.is_test) ?Self.I128SignBitTestFailure else void = if (builtin.is_test) null else {},
         scalar_cast_test_failure: if (builtin.is_test) ?Self.ScalarCastTestFailure else void = if (builtin.is_test) null else {},
+        immediate_scalar_test_failure: if (builtin.is_test) ?Self.ImmediateScalarTestFailure else void = if (builtin.is_test) null else {},
 
         pub fn begin(selector: *ComposedBlockSelector) !Self {
             return Impl.begin(Self, selector);
@@ -1257,6 +1309,13 @@ pub fn Transaction(comptime Impl: type) type {
             return Impl.setScalarCastTestFailure(Impl, transaction, failure);
         }
 
+        pub fn setImmediateScalarTestFailure(
+            transaction: *Self,
+            failure: ?Self.ImmediateScalarTestFailure,
+        ) !void {
+            return Impl.setImmediateScalarTestFailure(Impl, transaction, failure);
+        }
+
         fn requireActive(transaction: *const Self) !void {
             return Impl.requireActive(Impl, transaction);
         }
@@ -1422,6 +1481,14 @@ pub fn Transaction(comptime Impl: type) type {
 
         pub fn isSignExtendScratchCast(cast: ir.CastInst) bool {
             return Impl.scalar_arithmetic.isSignExtendScratchCast(cast);
+        }
+
+        pub fn isImmediateRhsScalar(binary: ir.BinaryInst) bool {
+            return Impl.scalar_arithmetic.isImmediateRhsScalar(binary);
+        }
+
+        pub fn isImmediateLhsScalar(binary: ir.BinaryInst) bool {
+            return Impl.scalar_arithmetic.isImmediateLhsScalar(binary);
         }
     };
 }

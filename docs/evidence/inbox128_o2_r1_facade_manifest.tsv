@@ -18,6 +18,10 @@ I128EqMinTestFailure
 I128PairRequestError
 I128SignBitAction
 I128SignBitTestFailure
+ImmediateLhsScalarAction
+ImmediateRhsScalarAction
+ImmediateScalarRequestError
+ImmediateScalarTestFailure
 LoadRequestError
 LoadTestFailure
 MemcpyAction
@@ -73,6 +77,8 @@ isAccumulatorScalarCast
 isCurrentHomeSignBitIcmp
 isI128EqMinIcmp
 isI128SignBitIcmp
+isImmediateLhsScalar
+isImmediateRhsScalar
 isPairLowScalarCast
 isSignExtendScratchCast
 materializeAccumulator
@@ -93,6 +99,7 @@ setCurrentHomeEqZeroTestFailure
 setCurrentHomeSignBitTestFailure
 setI128EqMinTestFailure
 setI128SignBitTestFailure
+setImmediateScalarTestFailure
 setLoadTestFailure
 setMemcpyTestFailure
 setScalarCastTestFailure

@@ -67,6 +67,7 @@ const validateSetccEaxCompareIntentSurface = support.validateSetccEaxCompareInte
 const validateCurrentHomeSignBitIntentSurface = support.validateCurrentHomeSignBitIntentSurface;
 const validateI128PairIntentSurface = support.validateI128PairIntentSurface;
 const validateScalarCastIntentSurface = support.validateScalarCastIntentSurface;
+const validateImmediateScalarIntentSurface = support.validateImmediateScalarIntentSurface;
 const validateScalarCastDisplacementPlan = support.validateScalarCastDisplacementPlan;
 const validateScratchComparePreservationPreamble = support.validateScratchComparePreservationPreamble;
 const validateCurrentHomeEqZeroSequence = support.validateCurrentHomeEqZeroSequence;
@@ -332,6 +333,26 @@ test "composed selector source guard freezes semantic-only scalar cast intents" 
         error.ValueUseScalarCastIntentMissing,
         validateScalarCastIntentSurface(
             "pub const SignExtendScratchAction = struct { result: ActionIdentity, };",
+        ),
+    );
+}
+
+test "composed selector source guard freezes semantic-only immediate scalar intents" {
+    const accepted =
+        "pub const ImmediateRhsScalarAction = struct { result: ActionIdentity, operation: ir.BinaryOp, integer_ty: ir.Type, literal: i128, };" ++
+        "pub const ImmediateLhsScalarAction = struct { result: ActionIdentity, operation: ir.BinaryOp, integer_ty: ir.Type, literal: i128, };";
+    try validateImmediateScalarIntentSurface(accepted);
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarPhysicalIntentEscape,
+        validateImmediateScalarIntentSurface(
+            "pub const ImmediateRhsScalarAction = struct { result: ActionIdentity, operation: ir.BinaryOp, integer_ty: ir.Type, literal: i128, destination: ArgReg, };" ++
+                "pub const ImmediateLhsScalarAction = struct { result: ActionIdentity, operation: ir.BinaryOp, integer_ty: ir.Type, literal: i128, };",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarIntentMissing,
+        validateImmediateScalarIntentSurface(
+            "pub const ImmediateRhsScalarAction = struct { result: ActionIdentity, operation: ir.BinaryOp, integer_ty: ir.Type, literal: i128, };",
         ),
     );
 }
