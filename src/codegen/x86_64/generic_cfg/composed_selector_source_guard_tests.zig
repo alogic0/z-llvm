@@ -40,7 +40,7 @@ const classified_sources = [_]ClassifiedSource{
 };
 
 const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-const frozen_bypass_inventory_sha256 = "293163330d24a90904db1f9fb94474493ba4bf55c04fdad91682138d0c7209d0";
+const frozen_bypass_inventory_sha256 = "281ef86923fbc72fd4254bfadc6586030bab00dd73aeeb528556622a0803a9b1";
 const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -1358,17 +1358,128 @@ fn validateCurrentHomeSignBitProductionSites(
     source_name: []const u8,
     source: [:0]const u8,
 ) !void {
-    _ = source_name;
-    const dormant_markers = [_][]const u8{
+    const production_markers = [_][]const u8{
         ".form = .current_home_sign_bit_operand",
         ".current_home_sign_bit =",
         "ValueUseCurrentHomeSignBitWidthUnsupported",
         "ValueUseCurrentHomeSignBitLocationUnsupported",
         "isCurrentHomeSignBitIcmp(",
     };
-    for (dormant_markers) |pattern| {
-        if (std.mem.indexOf(u8, source, pattern) != null)
-            return error.ValueUseCurrentHomeSignBitProductionWiringForbidden;
+    var has_wiring = false;
+    for (production_markers) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null) has_wiring = true;
+    }
+    if (!has_wiring) return;
+    if (!std.mem.eql(u8, source_name, "composed_selector_icmp.zig"))
+        return error.ValueUseCurrentHomeSignBitProductionWiringForbidden;
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const action_body = functionBodyNamed(bodies, "lowerCurrentHomeSignBitIcmp") orelse
+        return error.ValueUseCurrentHomeSignBitProductionAllowlistMismatch;
+    const mapper_body = functionBodyNamed(bodies, "currentHomeSignBitDiagnostic") orelse
+        return error.ValueUseCurrentHomeSignBitProductionAllowlistMismatch;
+    const dispatch_body = functionBodyNamed(bodies, "lowerIcmp") orelse
+        return error.ValueUseCurrentHomeSignBitProductionAllowlistMismatch;
+    const action = source[action_body.start..action_body.end];
+    const mapper = source[mapper_body.start..mapper_body.end];
+    const dispatch = source[dispatch_body.start..dispatch_body.end];
+
+    const scratch_dispatch = std.mem.indexOf(u8, dispatch, "classifyScratchCompare(icmp)") orelse
+        return error.ValueUseCurrentHomeSignBitDispatchMismatch;
+    const exact_dispatch = std.mem.indexOf(
+        u8,
+        dispatch,
+        "const exact_ei_narrow = isExactEiNarrowIcmp(selector, icmp);",
+    ) orelse return error.ValueUseCurrentHomeSignBitDispatchMismatch;
+    const current_dispatch = std.mem.indexOf(
+        u8,
+        dispatch,
+        "isCurrentHomeEqZeroIcmp(icmp)",
+    ) orelse return error.ValueUseCurrentHomeSignBitDispatchMismatch;
+    const setcc_dispatch = std.mem.indexOf(
+        u8,
+        dispatch,
+        "isSetccEaxCompareIcmp(icmp)",
+    ) orelse return error.ValueUseCurrentHomeSignBitDispatchMismatch;
+    const sign_bit_dispatch = std.mem.indexOf(
+        u8,
+        dispatch,
+        "ValueUseTransaction.isCurrentHomeSignBitIcmp(icmp)",
+    ) orelse return error.ValueUseCurrentHomeSignBitDispatchMismatch;
+    const legacy_begin = std.mem.indexOf(
+        u8,
+        dispatch,
+        "AccumulatorDefinitionTransaction.begin(selector)",
+    ) orelse return error.ValueUseCurrentHomeSignBitDispatchMismatch;
+    if (!(scratch_dispatch < exact_dispatch and exact_dispatch < current_dispatch and
+        current_dispatch < setcc_dispatch and setcc_dispatch < sign_bit_dispatch and
+        sign_bit_dispatch < legacy_begin) or
+        countPattern(dispatch, "ValueUseTransaction.isCurrentHomeSignBitIcmp(icmp)") != 1 or
+        countPattern(dispatch, "lowerCurrentHomeSignBitIcmp(selector, result_name, icmp)") != 1 or
+        countPattern(dispatch, "AccumulatorDefinitionTransaction.begin(selector)") != 1 or
+        countPattern(dispatch, "ValueUseTransaction.begin(selector)") != 0 or
+        countPattern(dispatch, "emitValueIntoEax(selector, icmp.lhs)") != 0 or
+        countPattern(dispatch, "emitValueIntoRax(selector, icmp.lhs)") != 0)
+    {
+        return error.ValueUseCurrentHomeSignBitDispatchMismatch;
+    }
+
+    if (countPattern(action, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(action, ".form = .current_home_sign_bit_operand") != 1 or
+        countPattern(action, ".current_home_sign_bit =") != 1 or
+        countPattern(action, ".register(") != 1 or
+        countPattern(action, ".seal()") != 1 or
+        countPattern(action, ".beginAccumulatorSession()") != 1 or
+        countPattern(action, ".prepare()") != 1 or
+        countPattern(action, ".materializeAll()") != 1 or
+        countPattern(action, ".preparedView(") != 1 or
+        countPattern(action, ".executePreparedAction(") != 1 or
+        countPattern(action, ".commit()") != 1 or
+        countPattern(action, "AccumulatorDefinitionTransaction.begin(") != 0 or
+        countPattern(action, "resolveValue(") != 0 or
+        countPattern(action, "valueLoc(") != 0 or
+        countPattern(action, ".eax") != 0 or
+        countPattern(action, ".rax") != 0 or
+        countPattern(action, ".spill64") != 0 or
+        countPattern(action, ".spill128") != 0)
+    {
+        return error.ValueUseCurrentHomeSignBitProductionAllowlistMismatch;
+    }
+
+    const mapper_required = [_][]const u8{
+        "failedRequestIs(lhs_request)",
+        "ValueUseUnresolvedSource",
+        "ValueUseCurrentHomeSignBitWidthUnsupported",
+        "ValueUseCurrentHomeSignBitLocationUnsupported",
+        "composed-block-icmp-lhs",
+        "composed-block-icmp-lhs-width",
+        "composed-block-icmp-lhs-loc",
+    };
+    for (mapper_required) |pattern| {
+        if (std.mem.indexOf(u8, mapper, pattern) == null)
+            return error.ValueUseCurrentHomeSignBitDiagnosticMapperMismatch;
+    }
+    if (countPattern(mapper, "failedRequestIs(") != 1 or
+        countPattern(mapper, "resolveValue(") != 0 or
+        countPattern(mapper, "valueLoc(") != 0)
+    {
+        return error.ValueUseCurrentHomeSignBitDiagnosticMapperMismatch;
+    }
+
+    for (bodies) |body| {
+        const body_source = source[body.start..body.end];
+        var contains_marker = false;
+        for (production_markers) |pattern| {
+            if (std.mem.indexOf(u8, body_source, pattern) != null) contains_marker = true;
+        }
+        if (!contains_marker) continue;
+        if (!std.mem.eql(u8, body.name, "lowerCurrentHomeSignBitIcmp") and
+            !std.mem.eql(u8, body.name, "currentHomeSignBitDiagnostic") and
+            !std.mem.eql(u8, body.name, "lowerIcmp"))
+        {
+            return error.ValueUseCurrentHomeSignBitProductionAllowlistMismatch;
+        }
     }
 }
 
@@ -1566,9 +1677,12 @@ fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source
             return error.ValueUseAccumulatorCompositionAllowlistMismatch;
         const setcc_body = functionBodyNamed(bodies, "lowerSetccEaxCompare") orelse
             return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+        const sign_bit_body = functionBodyNamed(bodies, "lowerCurrentHomeSignBitIcmp") orelse
+            return error.ValueUseAccumulatorCompositionAllowlistMismatch;
         const scratch_source = source[action_body.start..action_body.end];
         const current_home_source = source[current_home_body.start..current_home_body.end];
         const setcc_source = source[setcc_body.start..setcc_body.end];
+        const sign_bit_source = source[sign_bit_body.start..sign_bit_body.end];
         if (countPattern(scratch_source, "beginAccumulatorSession(") != 1 or
             countPattern(scratch_source, "ValueUseTransaction.begin(selector)") != 1 or
             countPattern(scratch_source, ".executePreparedAction(") != 1 or
@@ -1584,7 +1698,12 @@ fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source
             countPattern(setcc_source, ".executePreparedAction(") != 1 or
             countPattern(setcc_source, ".commit()") != 1 or
             countPattern(setcc_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
-            countPattern(source, "beginAccumulatorSession(") != 3)
+            countPattern(sign_bit_source, "beginAccumulatorSession(") != 1 or
+            countPattern(sign_bit_source, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(sign_bit_source, ".executePreparedAction(") != 1 or
+            countPattern(sign_bit_source, ".commit()") != 1 or
+            countPattern(sign_bit_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
+            countPattern(source, "beginAccumulatorSession(") != 4)
         {
             return error.ValueUseAccumulatorCompositionAllowlistMismatch;
         }
@@ -1697,10 +1816,13 @@ fn validateFailureProvenanceProductionSites(source_name: []const u8, source: [:0
             return error.ValueUseFailureProvenanceOutsideAllowlist;
         const setcc_mapper = functionBodyNamed(bodies, "setccEaxCompareDiagnostic") orelse
             return error.ValueUseFailureProvenanceOutsideAllowlist;
+        const sign_bit_mapper = functionBodyNamed(bodies, "currentHomeSignBitDiagnostic") orelse
+            return error.ValueUseFailureProvenanceOutsideAllowlist;
         if (countPattern(source[scratch_mapper.start..scratch_mapper.end], ".failedRequestIs(") != 2 or
             countPattern(source[current_home_mapper.start..current_home_mapper.end], ".failedRequestIs(") != 1 or
             countPattern(source[setcc_mapper.start..setcc_mapper.end], ".failedRequestIs(") != 1 or
-            query_count != 4)
+            countPattern(source[sign_bit_mapper.start..sign_bit_mapper.end], ".failedRequestIs(") != 1 or
+            query_count != 5)
         {
             return error.ValueUseFailureProvenanceAllowlistMismatch;
         }
@@ -3644,7 +3766,7 @@ test "composed selector source guard keeps setcc EAX compare production wiring s
     );
 }
 
-test "composed selector source guard keeps current-home sign-bit intent closed and dormant" {
+test "composed selector source guard keeps current-home sign-bit production wiring closed and ordered" {
     try validateCurrentHomeSignBitIntentSurface(
         "pub const CurrentHomeSignBitAction = struct { " ++
             "result: ActionIdentity, operand_ty: ir.Type, };",
@@ -3656,11 +3778,42 @@ test "composed selector source guard keeps current-home sign-bit intent closed a
                 "result: ActionIdentity, operand_ty: ir.Type, register: ArgReg, };",
         ),
     );
+    const accepted_wiring: [:0]const u8 =
+        "fn lowerCurrentHomeSignBitIcmp() void { " ++
+        "var transaction = try ValueUseTransaction.begin(selector); " ++
+        "const lhs_request = try transaction.register(.{ " ++
+        ".form = .current_home_sign_bit_operand, " ++
+        ".prepared_action = .{ .current_home_sign_bit = action }, }); " ++
+        "try transaction.seal(); _ = try transaction.beginAccumulatorSession(); " ++
+        "try transaction.prepare(); try transaction.materializeAll(); " ++
+        "const lease = try transaction.preparedView(lhs_request); " ++
+        "try transaction.executePreparedAction(lease); try transaction.commit(); } " ++
+        "fn currentHomeSignBitDiagnostic() void { " ++
+        "_ = transaction.failedRequestIs(lhs_request); " ++
+        "_ = error.ValueUseUnresolvedSource; " ++
+        "_ = error.ValueUseCurrentHomeSignBitWidthUnsupported; " ++
+        "_ = error.ValueUseCurrentHomeSignBitLocationUnsupported; " ++
+        "_ = \"composed-block-icmp-lhs\"; " ++
+        "_ = \"composed-block-icmp-lhs-width\"; " ++
+        "_ = \"composed-block-icmp-lhs-loc\"; } " ++
+        "fn lowerIcmp() void { " ++
+        "_ = classifyScratchCompare(icmp); " ++
+        "const exact_ei_narrow = isExactEiNarrowIcmp(selector, icmp); " ++
+        "if (isCurrentHomeEqZeroIcmp(icmp)) return; " ++
+        "if (isSetccEaxCompareIcmp(icmp)) return; " ++
+        "if (ValueUseTransaction.isCurrentHomeSignBitIcmp(icmp)) " ++
+        "_ = lowerCurrentHomeSignBitIcmp(selector, result_name, icmp); " ++
+        "_ = AccumulatorDefinitionTransaction.begin(selector); }";
+    try validateCurrentHomeSignBitProductionSites(
+        "composed_selector_icmp.zig",
+        accepted_wiring,
+    );
     try std.testing.expectError(
-        error.ValueUseCurrentHomeSignBitProductionWiringForbidden,
+        error.ValueUseCurrentHomeSignBitProductionAllowlistMismatch,
         validateCurrentHomeSignBitProductionSites(
             "composed_selector_icmp.zig",
-            "fn lowerIcmp() void { _ = .{ .form = .current_home_sign_bit_operand }; }",
+            accepted_wiring ++
+                " fn lowerOther() void { _ = .{ .form = .current_home_sign_bit_operand }; }",
         ),
     );
     try std.testing.expectError(
@@ -3668,6 +3821,40 @@ test "composed selector source guard keeps current-home sign-bit intent closed a
         validateCurrentHomeSignBitProductionSites(
             "composed_selector_calls.zig",
             "fn lowerCall() void { _ = ValueUseCurrentHomeSignBitWidthUnsupported; }",
+        ),
+    );
+    const home_check: [:0]const u8 =
+        "fn lowerCurrentHomeSignBitIcmp() void { " ++
+        "var transaction = try ValueUseTransaction.begin(selector); " ++
+        "_ = selector.valueLoc(source); " ++
+        "const lhs_request = try transaction.register(.{ " ++
+        ".form = .current_home_sign_bit_operand, " ++
+        ".prepared_action = .{ .current_home_sign_bit = action }, }); " ++
+        "try transaction.seal(); _ = try transaction.beginAccumulatorSession(); " ++
+        "try transaction.prepare(); try transaction.materializeAll(); " ++
+        "const lease = try transaction.preparedView(lhs_request); " ++
+        "try transaction.executePreparedAction(lease); try transaction.commit(); } " ++
+        "fn currentHomeSignBitDiagnostic() void { " ++
+        "_ = transaction.failedRequestIs(lhs_request); " ++
+        "_ = error.ValueUseUnresolvedSource; " ++
+        "_ = error.ValueUseCurrentHomeSignBitWidthUnsupported; " ++
+        "_ = error.ValueUseCurrentHomeSignBitLocationUnsupported; " ++
+        "_ = \"composed-block-icmp-lhs\"; " ++
+        "_ = \"composed-block-icmp-lhs-width\"; " ++
+        "_ = \"composed-block-icmp-lhs-loc\"; } " ++
+        "fn lowerIcmp() void { " ++
+        "_ = classifyScratchCompare(icmp); " ++
+        "const exact_ei_narrow = isExactEiNarrowIcmp(selector, icmp); " ++
+        "if (isCurrentHomeEqZeroIcmp(icmp)) return; " ++
+        "if (isSetccEaxCompareIcmp(icmp)) return; " ++
+        "if (ValueUseTransaction.isCurrentHomeSignBitIcmp(icmp)) " ++
+        "_ = lowerCurrentHomeSignBitIcmp(selector, result_name, icmp); " ++
+        "_ = AccumulatorDefinitionTransaction.begin(selector); }";
+    try std.testing.expectError(
+        error.ValueUseCurrentHomeSignBitProductionAllowlistMismatch,
+        validateCurrentHomeSignBitProductionSites(
+            "composed_selector_icmp.zig",
+            home_check,
         ),
     );
 }

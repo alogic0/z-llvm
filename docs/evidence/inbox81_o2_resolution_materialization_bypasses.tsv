@@ -42,7 +42,7 @@ composed_selector_fp.zig	lowerHalfOeqZero	materializeLocIntoLoc×1, resolveValue
 composed_selector_fp.zig	lowerHalfValueToFloatXmm0	lowerHalfLocToFloatXmm0×1, resolveValue×1
 composed_selector_fp.zig	materializeFpValue	materializeLocIntoLoc×1, resolveValue×1
 composed_selector_frame.zig	-	none×0
-composed_selector_icmp.zig	lowerIcmp	emitValueIntoEax×1, emitValueIntoRax×1, materializePairValue×1, resolvePairValue×1
+composed_selector_icmp.zig	lowerIcmp	materializePairValue×1, resolvePairValue×1
 composed_selector_impl.zig	stabilizeFramedParams	valueLoc×1
 composed_selector_memory.zig	lowerAlloca	valueLoc×1
 composed_selector_memory.zig	lowerLoad	resolveValue×1

@@ -618,6 +618,94 @@ test "generic cfg selector lowers exact named i16 comparisons" {
     }
 }
 
+test "current-home sign-bit production path emits logical SHR with incidental flags writes" {
+    {
+        var machine = MachineFunction.init("sign-bit-i32", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("lhs", 1);
+        try plan.interval_ends.put("cmp", 2);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+
+        try std.testing.expect((try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .slt,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .int = 0 },
+        })) == null);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_arg_eax = .rdi },
+            .{ .shr_eax_imm5 = 31 },
+        }, machine.instructions.items);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "cmp").?);
+        try std.testing.expectEqual(@as(usize, 1), selector.eflags_semantics.items.len);
+        try std.testing.expectEqual(
+            selector_state.EflagsEffect.write,
+            selector.eflags_semantics.items[0].effect,
+        );
+    }
+
+    {
+        var machine = MachineFunction.init("sign-bit-i64-spill", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("lhs", 1);
+        try plan.interval_ends.put("cmp", 2);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .spill64 = .slot3 });
+
+        try std.testing.expect((try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .slt,
+            .operand_ty = .{ .int = 64 },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .int = 0 },
+        })) == null);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .reload_rsp_rax = .slot3 },
+            .{ .shr_rax_imm6 = 63 },
+        }, machine.instructions.items);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "cmp").?);
+        try std.testing.expectEqual(@as(usize, 1), selector.eflags_semantics.items.len);
+        try std.testing.expectEqual(
+            selector_state.EflagsEffect.write,
+            selector.eflags_semantics.items[0].effect,
+        );
+    }
+}
+
+test "current-home sign-bit production mapping preserves unresolved provenance" {
+    {
+        var machine = MachineFunction.init("sign-bit-unresolved", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("missing", 1);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+
+        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .slt,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "missing" },
+            .rhs = .{ .int = 0 },
+        })).?;
+        try std.testing.expectEqualStrings("composed-block-icmp-lhs", diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
 test "generic cfg selector keeps neighboring named integer comparison widths fail closed" {
     inline for (.{ ir.IcmpPredicate.slt, ir.IcmpPredicate.sgt, ir.IcmpPredicate.ne }) |predicate| {
         inline for (.{ 15, 17 }) |bits| {

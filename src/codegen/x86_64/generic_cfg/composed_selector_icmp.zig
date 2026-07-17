@@ -433,6 +433,57 @@ fn setccEaxCompareDiagnostic(
     };
 }
 
+fn lowerCurrentHomeSignBitIcmp(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    icmp: ir.IcmpInst,
+) !?Diagnostic {
+    const bits = intBits(icmp.operand_ty) orelse unreachable;
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const lhs_request = try transaction.register(.{
+        .source = icmp.lhs,
+        .expected = .{
+            .ty = icmp.operand_ty,
+            .register_class = if (bits <= 32) .gpr32 else .gpr64,
+        },
+        .form = .current_home_sign_bit_operand,
+        .destination = .prepared_view,
+        .prepared_action = .{ .current_home_sign_bit = .{
+            .result = try ValueUseTransaction.ActionIdentity.init(result_name),
+            .operand_ty = icmp.operand_ty,
+        } },
+    });
+    transaction.seal() catch |err|
+        return currentHomeSignBitDiagnostic(&transaction, lhs_request, err) orelse return err;
+    _ = try transaction.beginAccumulatorSession();
+    transaction.prepare() catch |err|
+        return currentHomeSignBitDiagnostic(&transaction, lhs_request, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return currentHomeSignBitDiagnostic(&transaction, lhs_request, err) orelse return err;
+    const lease = transaction.preparedView(lhs_request) catch |err|
+        return currentHomeSignBitDiagnostic(&transaction, lhs_request, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return currentHomeSignBitDiagnostic(&transaction, lhs_request, err) orelse return err;
+    try transaction.commit();
+    return null;
+}
+
+fn currentHomeSignBitDiagnostic(
+    transaction: *const ValueUseTransaction,
+    lhs_request: ValueUseTransaction.RequestHandle,
+    err: anyerror,
+) ?Diagnostic {
+    if (err == error.ValueUseActionDiagnostic) return transaction.actionDiagnostic();
+    if (!transaction.failedRequestIs(lhs_request)) return null;
+    return switch (err) {
+        error.ValueUseUnresolvedSource => .{ .unsupported_value = "composed-block-icmp-lhs" },
+        error.ValueUseCurrentHomeSignBitWidthUnsupported => .{ .no_emitter = "composed-block-icmp-lhs-width" },
+        error.ValueUseCurrentHomeSignBitLocationUnsupported => .{ .no_emitter = "composed-block-icmp-lhs-loc" },
+        else => null,
+    };
+}
+
 pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir.IcmpInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     switch (try classifyScratchCompare(icmp)) {
@@ -447,6 +498,8 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         return lowerCurrentHomeEqZeroIcmp(selector, result_name, icmp);
     if (isSetccEaxCompareIcmp(icmp))
         return lowerSetccEaxCompare(selector, result_name, icmp, .ordinary);
+    if (ValueUseTransaction.isCurrentHomeSignBitIcmp(icmp))
+        return lowerCurrentHomeSignBitIcmp(selector, result_name, icmp);
     var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
     defer transaction.deinit();
     while (try selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
@@ -483,22 +536,6 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         selector_state.emitPairHighLaneIntoRax(selector, icmp.lhs) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
         if (try prepareIcmpResult(&transaction)) |diagnostic| return diagnostic;
         try emitIcmpWrite(&transaction, .{ .shr_rax_imm6 = 63 });
-    } else if (icmp.predicate == .slt and icmp.operand_ty.eql(.{ .int = 64 }) and switch (icmp.rhs) {
-        .int => |int| try i64Value(int) == 0,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
-    }) {
-        if (try selector_state.preserveCurrentRaxIntoScratch(selector)) |diagnostic| return diagnostic;
-        try selector_state.emitValueIntoRax(selector, icmp.lhs);
-        if (try prepareIcmpResult(&transaction)) |diagnostic| return diagnostic;
-        try emitIcmpWrite(&transaction, .{ .shr_rax_imm6 = 63 });
-    } else if (icmp.predicate == .slt and icmp.operand_ty.eql(.{ .int = 32 }) and switch (icmp.rhs) {
-        .int => |int| try i64Value(int) == 0,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
-    }) {
-        if (try selector_state.preserveCurrentEaxIntoScratch(selector)) |diagnostic| return diagnostic;
-        try selector_state.emitValueIntoEax(selector, icmp.lhs);
-        if (try prepareIcmpResult(&transaction)) |diagnostic| return diagnostic;
-        try emitIcmpWrite(&transaction, .{ .shr_eax_imm5 = 31 });
     } else return .{ .no_emitter = "composed-block-icmp-form" };
     try finishIcmpResult(&transaction, result_name);
     return null;
