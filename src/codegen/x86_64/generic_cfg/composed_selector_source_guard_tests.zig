@@ -369,6 +369,13 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     {
         return error.ValueUseFailureProvenanceEscape;
     }
+    if (std.mem.indexOf(u8, source, "pub fn loadHome") != null or
+        std.mem.indexOf(u8, source, "pub fn loadSourceHome") != null or
+        std.mem.indexOf(u8, source, "pub fn loadBinding") != null or
+        std.mem.indexOf(u8, source, "pub const LoadHome") != null)
+    {
+        return error.ValueUseLoadHomeClassificationEscape;
+    }
     try validateNoPublicPreparedPointer(source);
     const required = [_]struct { function: []const u8, pattern: []const u8, count: usize }{
         .{ .function = "resolveNamedCurrent", .pattern = "resolveValue(", .count = 1 },
@@ -407,6 +414,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     try validateBranchActionProductionSites(source_name, source);
     try validateStoreActionProductionSites(source_name, source);
     try validateMemcpyActionProductionSites(source_name, source);
+    try validateLoadDiagnosticMappingProductionSites(source_name, source);
     try validateDormantLoadActionProductionSites(source_name, source);
     try validateFailureProvenanceProductionSites(source_name, source);
     try validateAccumulatorCompositionProductionSites(source_name, source);
@@ -431,6 +439,79 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
         for (forbidden) |pattern| {
             if (std.mem.indexOf(u8, function_source, pattern) != null)
                 return error.ValueUsePreparedLeafRawOperation;
+        }
+    }
+}
+
+fn validateLoadDiagnosticMappingProductionSites(source_name: []const u8, source: [:0]const u8) !void {
+    const semantic_errors = [_][]const u8{
+        "ValueUseLoadOrdinaryStackWidth",
+        "ValueUseLoadOrdinaryStackArrayWidth",
+        "ValueUseLoadOrdinaryPointerWidth",
+        "ValueUseLoadOrdinaryPointerRejected",
+        "ValueUseLoadReadonlyPointerProvenance",
+        "ValueUseLoadReadonlyPointerSpill",
+        "ValueUseLoadReadonlyPointerAlias",
+        "ValueUseLoadReadonlyWidth",
+        "ValueUseLoadReadonlyPairUnavailable",
+        "ValueUseLoadReadonlyTableOffset",
+        "ValueUseLoadReadonlyTableType",
+        "ValueUseLoadReadonlyTableSpill",
+    };
+    var has_mapping = false;
+    for (semantic_errors) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null) has_mapping = true;
+    }
+    if (!has_mapping) return;
+    if (!std.mem.eql(u8, source_name, "composed_selector_memory.zig"))
+        return error.ValueUseLoadDiagnosticMappingOutsideAllowlist;
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    for (bodies) |body| {
+        const function_source = source[body.start..body.end];
+        var body_has_mapping = false;
+        for (semantic_errors) |pattern| {
+            if (std.mem.indexOf(u8, function_source, pattern) != null) body_has_mapping = true;
+        }
+        if (!body_has_mapping) continue;
+        const approved = std.mem.eql(u8, body.name, "lowerLoad") or
+            std.mem.eql(u8, body.name, "lowerReadOnlyPointerIntegerLoad") or
+            std.mem.eql(u8, body.name, "lowerReadOnlyTableLoad");
+        if (!approved) return error.ValueUseLoadDiagnosticMappingOutsideAllowlist;
+        const forbidden_home_queries = [_][]const u8{
+            "valueLoc(",
+            "storePointerDiagnosticClass(",
+            "switch (ptr)",
+            "switch (current)",
+            ".stack_scalar =>",
+            ".stack128 =>",
+            ".stack_i32_array =>",
+            ".stack_i32_ptr =>",
+            ".arg32 =>",
+            ".arg64 =>",
+            ".arg128 =>",
+            ".scratch32 =>",
+            ".scratch64 =>",
+            ".scratch128 =>",
+            ".eax =>",
+            ".rax =>",
+            ".xmm =>",
+            ".spill64 =>",
+            ".spill128 =>",
+            ".spill_fp =>",
+            ".spill_vector =>",
+            ".aggregate_sse =>",
+            "== .stack_scalar",
+            "== .stack128",
+            "== .stack_i32_array",
+            "== .stack_i32_ptr",
+            "== .arg64",
+            "== .spill64",
+        };
+        for (forbidden_home_queries) |pattern| {
+            if (std.mem.indexOf(u8, function_source, pattern) != null)
+                return error.ValueUseLoadConsumerHomeClassification;
         }
     }
 }
@@ -532,6 +613,25 @@ fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source
 fn validateFailureProvenanceProductionSites(source_name: []const u8, source: [:0]const u8) !void {
     const query_count = countPattern(source, ".failedRequestIs(");
     if (query_count == 0) return;
+    if (std.mem.eql(u8, source_name, "composed_selector_memory.zig")) {
+        var body_storage: [max_function_bodies]FunctionBody = undefined;
+        const bodies = try collectFunctionBodies(source, &body_storage);
+        var classified_count: usize = 0;
+        for (bodies) |body| {
+            const function_source = source[body.start..body.end];
+            const body_count = countPattern(function_source, ".failedRequestIs(");
+            if (body_count == 0) continue;
+            const approved = std.mem.eql(u8, body.name, "lowerLoad") or
+                std.mem.eql(u8, body.name, "lowerReadOnlyPointerIntegerLoad") or
+                std.mem.eql(u8, body.name, "lowerReadOnlyTableLoad");
+            if (!approved or std.mem.indexOf(u8, function_source, "ValueUseLoad") == null)
+                return error.ValueUseFailureProvenanceOutsideAllowlist;
+            classified_count += body_count;
+        }
+        if (classified_count != query_count)
+            return error.ValueUseFailureProvenanceAllowlistMismatch;
+        return;
+    }
     if (!std.mem.eql(u8, source_name, "composed_selector_calls.zig"))
         return error.ValueUseFailureProvenanceOutsideAllowlist;
 
@@ -1614,6 +1714,14 @@ test "composed selector source guard rejects function predicates in the value-us
         validateValueUseAuthoritySource(accepted ++ "pub fn retryFailedRequest() void {}"),
     );
     try std.testing.expectError(
+        error.ValueUseLoadHomeClassificationEscape,
+        validateValueUseAuthoritySource(accepted ++ "pub fn loadSourceHome() void {}"),
+    );
+    try std.testing.expectError(
+        error.ValueUseLoadHomeClassificationEscape,
+        validateValueUseAuthoritySource(accepted ++ "pub const LoadHome = enum { stack, pointer };"),
+    );
+    try std.testing.expectError(
         error.ValueUseNestedAccumulatorSnapshot,
         validateValueUseAuthoritySource(accepted ++ "fn nested() void { _ = AccumulatorDefinitionTransaction.begin(selector); }"),
     );
@@ -1710,6 +1818,47 @@ test "composed selector source guard rejects callback escapes and raw operations
         validatePreparedViewLeafDiscipline(
             "composed_selector_fixture.zig",
             "fn lowerLoad() void { _ = transaction.setLoadTestFailure(.after_pointer_staging); }",
+        ),
+    );
+}
+
+test "composed selector source guard confines load diagnostic mapping without home queries" {
+    const accepted: [:0]const u8 =
+        "fn lowerLoad() void { _ = transaction.failedRequestIs(pointer); " ++
+        "_ = switch (err) { error.ValueUseLoadOrdinaryStackWidth => diagnostic, " ++
+        "error.ValueUseLoadOrdinaryStackArrayWidth => diagnostic, " ++
+        "error.ValueUseLoadOrdinaryPointerWidth => diagnostic, " ++
+        "error.ValueUseLoadOrdinaryPointerRejected => diagnostic, else => null }; }";
+    try validateLoadDiagnosticMappingProductionSites("composed_selector_memory.zig", accepted);
+    try validateFailureProvenanceProductionSites("composed_selector_memory.zig", accepted);
+    try std.testing.expectError(
+        error.ValueUseLoadDiagnosticMappingOutsideAllowlist,
+        validateLoadDiagnosticMappingProductionSites(
+            "composed_selector_calls.zig",
+            "fn lowerCall() void { _ = error.ValueUseLoadOrdinaryPointerWidth; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseLoadDiagnosticMappingOutsideAllowlist,
+        validateLoadDiagnosticMappingProductionSites(
+            "composed_selector_memory.zig",
+            "fn lowerStore() void { _ = error.ValueUseLoadOrdinaryPointerWidth; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseLoadConsumerHomeClassification,
+        validateLoadDiagnosticMappingProductionSites(
+            "composed_selector_memory.zig",
+            "fn lowerLoad() void { _ = error.ValueUseLoadOrdinaryPointerWidth; " ++
+                "switch (ptr) { .stack_scalar => {}, else => {} } }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseFailureProvenanceOutsideAllowlist,
+        validateFailureProvenanceProductionSites(
+            "composed_selector_memory.zig",
+            "fn lowerStore() void { _ = transaction.failedRequestIs(pointer); " ++
+                "_ = error.ValueUseLoadOrdinaryPointerWidth; }",
         ),
     );
 }

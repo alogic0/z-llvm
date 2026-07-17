@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
+const constant_table = @import("../constant_table.zig");
 const machine_module = @import("../machine.zig");
 const selector_types = @import("selector_types.zig");
 const state_data = @import("composed_selector_state_data.zig");
@@ -3829,6 +3830,161 @@ fn accumulatorLoadDefinition(bits: u16) selector_state.AccumulatorDefinition {
     };
 }
 
+fn loadDiagnosticForTest(err: Transaction.LoadRequestError) []const u8 {
+    return switch (err) {
+        error.ValueUseLoadOrdinaryStackWidth => "composed-block-load-stack-width",
+        error.ValueUseLoadOrdinaryStackArrayWidth => "composed-block-load-stack-array-width",
+        error.ValueUseLoadOrdinaryPointerWidth => "composed-block-load-ptr-width",
+        error.ValueUseLoadOrdinaryPointerRejected => "composed-block-load-ptr",
+        error.ValueUseLoadReadonlyPointerProvenance => "composed-block-load-readonly-param-provenance",
+        error.ValueUseLoadReadonlyPointerSpill => "composed-block-load-readonly-param-spill",
+        error.ValueUseLoadReadonlyPointerAlias => "composed-block-load-readonly-param-alias",
+        error.ValueUseLoadReadonlyWidth => "composed-block-load-width",
+        error.ValueUseLoadReadonlyPairUnavailable => "composed-block-load-readonly-param-pair",
+        error.ValueUseLoadReadonlyTableOffset => "composed-block-load-readonly-table-offset",
+        error.ValueUseLoadReadonlyTableType => "composed-block-load-readonly-table-type",
+        error.ValueUseLoadReadonlyTableSpill => "composed-block-load-readonly-table-spill",
+    };
+}
+
+test "value-use load diagnostic matrix retains all twenty-eight audited rows" {
+    const rows = [_][]const u8{
+        "ordinary-barrier",
+        "ordinary-readonly-table-dispatch",
+        "ordinary-readonly-pointer-dispatch",
+        "ordinary-fp-dispatch",
+        "ordinary-unsupported-width",
+        "ordinary-stack-i8",
+        "ordinary-stack-i64",
+        "ordinary-stack-i128-alias",
+        "ordinary-stack-i32-pointer",
+        "ordinary-stack-i32-pointer-indexed",
+        "ordinary-stack-i32-array",
+        "ordinary-gpr-pointer",
+        "ordinary-spill-pointer",
+        "ordinary-i16-rejections",
+        "ordinary-rejected-homes",
+        "readonly-address-provenance",
+        "readonly-scalar-direct",
+        "readonly-scalar-spill",
+        "readonly-unsupported-width",
+        "readonly-i56-direct",
+        "readonly-i56-spill",
+        "readonly-i64",
+        "readonly-i96-pair",
+        "readonly-i128-pair",
+        "table-shape-offset-address-space",
+        "table-i16-register",
+        "table-i16-spill",
+        "table-double-o3",
+    };
+    try std.testing.expectEqual(@as(usize, 28), rows.len);
+    for (rows, 0..) |row, index| {
+        try std.testing.expect(row.len != 0);
+        for (rows[0..index]) |prior| try std.testing.expect(!std.mem.eql(u8, row, prior));
+    }
+}
+
+test "value-use ordinary load errors preserve source-home classification and provenance" {
+    const Case = struct {
+        name: []const u8,
+        loc: ValueLoc,
+        expected_error: Transaction.LoadRequestError,
+        diagnostic: []const u8,
+    };
+    const cases = [_]Case{
+        .{
+            .name = "stack-scalar",
+            .loc = .{ .stack_scalar = .{ .base_disp = 8, .bits = 8 } },
+            .expected_error = error.ValueUseLoadOrdinaryStackWidth,
+            .diagnostic = "composed-block-load-stack-width",
+        },
+        .{
+            .name = "stack-i128",
+            .loc = .{ .stack128 = 16 },
+            .expected_error = error.ValueUseLoadOrdinaryStackWidth,
+            .diagnostic = "composed-block-load-stack-width",
+        },
+        .{
+            .name = "stack-array",
+            .loc = .{ .stack_i32_array = .{ .base_disp = 24, .len = 4 } },
+            .expected_error = error.ValueUseLoadOrdinaryStackArrayWidth,
+            .diagnostic = "composed-block-load-stack-array-width",
+        },
+        .{
+            .name = "stack-pointer",
+            .loc = .{ .stack_i32_ptr = .{ .disp = 32 } },
+            .expected_error = error.ValueUseLoadOrdinaryStackArrayWidth,
+            .diagnostic = "composed-block-load-stack-array-width",
+        },
+        .{
+            .name = "gpr-pointer",
+            .loc = .{ .arg64 = .rdi },
+            .expected_error = error.ValueUseLoadOrdinaryPointerWidth,
+            .diagnostic = "composed-block-load-ptr-width",
+        },
+        .{
+            .name = "rejected-home",
+            .loc = .{ .arg32 = .rdi },
+            .expected_error = error.ValueUseLoadOrdinaryPointerRejected,
+            .diagnostic = "composed-block-load-ptr",
+        },
+    };
+
+    for (cases) |case| {
+        var machine = MachineFunction.init(case.name, .{ .int = 16 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "pointer");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        try selector_state.bindValueLoc(&selector, "pointer", case.loc);
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const action = try transaction.register(loadActionRequest(
+            "pointer",
+            .{ .load_scalar = .{ .kind = .ordinary, .bits = 16 } },
+        ));
+        try std.testing.expectError(case.expected_error, transaction.seal());
+        try std.testing.expect(transaction.failedRequestIs(action));
+        try std.testing.expectEqualStrings(case.diagnostic, loadDiagnosticForTest(case.expected_error));
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
+test "value-use load resolution precedes invalid-width classification" {
+    var machine = MachineFunction.init("value-use-load-resolution-precedence", .{ .int = 24 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "missing");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+
+    var missing = try Transaction.begin(&selector);
+    defer missing.deinit();
+    const missing_action = try missing.register(loadActionRequest(
+        "missing",
+        .{ .load_scalar = .{ .kind = .ordinary, .bits = 24 } },
+    ));
+    try std.testing.expectError(error.ValueUseUnresolvedSource, missing.seal());
+    try std.testing.expect(missing.failedRequestIs(missing_action));
+
+    try selector_state.bindValueLoc(&selector, "missing", .{ .arg64 = .rdi });
+    var resolved = try Transaction.begin(&selector);
+    defer resolved.deinit();
+    const resolved_action = try resolved.register(loadActionRequest(
+        "missing",
+        .{ .load_scalar = .{ .kind = .ordinary, .bits = 24 } },
+    ));
+    try std.testing.expectError(error.ValueUseLoadOrdinaryPointerWidth, resolved.seal());
+    try std.testing.expect(resolved.failedRequestIs(resolved_action));
+}
+
 test "value-use dormant scalar load actions consume accepted source homes internally" {
     const Case = struct {
         name: []const u8,
@@ -3920,6 +4076,186 @@ test "value-use dormant scalar load actions consume accepted source homes intern
         const expected_result: ValueLoc = if (case.action.bits <= 32) .eax else .rax;
         try std.testing.expectEqual(expected_result, selector.values.get("result").?.loc);
     }
+}
+
+fn expectReadOnlyScalarLoadFailure(
+    loc: ValueLoc,
+    failure: ?Transaction.LoadTestFailure,
+    expected_error: Transaction.LoadRequestError,
+) !void {
+    var machine = MachineFunction.init("value-use-readonly-load-precedence", .{ .int = 24 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "pointer");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "pointer", loc);
+    const saved_pointer = selector.values.get("pointer").?;
+    const saved_next_vreg = selector.next_virtual_reg;
+    const saved_next_spill = selector.next_spill_slot;
+    const saved_eflags = selector.eflags.snapshot();
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const action = try transaction.register(loadActionRequest(
+        "pointer",
+        .{ .load_scalar = .{ .kind = .readonly_pointer, .bits = 24 } },
+    ));
+    try transaction.seal();
+    _ = try transaction.beginAccumulatorSession();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    if (failure) |boundary| try transaction.setLoadTestFailure(boundary);
+    try std.testing.expectError(
+        expected_error,
+        transaction.executePreparedAction(try transaction.preparedView(action)),
+    );
+    try std.testing.expect(transaction.failedRequestIs(action));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(saved_pointer, selector.values.get("pointer").?);
+    try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+    try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+    try selector.eflags.validateSnapshot(saved_eflags);
+}
+
+test "value-use readonly load precedence stages spills before width and maps staging failures first" {
+    try expectReadOnlyScalarLoadFailure(
+        .{ .arg64 = .rdi },
+        null,
+        error.ValueUseLoadReadonlyWidth,
+    );
+    try expectReadOnlyScalarLoadFailure(
+        .{ .spill64 = .slot3 },
+        null,
+        error.ValueUseLoadReadonlyWidth,
+    );
+    try expectReadOnlyScalarLoadFailure(
+        .{ .spill64 = .slot3 },
+        .after_pointer_staging,
+        error.ValueUseLoadReadonlyPointerSpill,
+    );
+    try std.testing.expectEqualStrings(
+        "composed-block-load-width",
+        loadDiagnosticForTest(error.ValueUseLoadReadonlyWidth),
+    );
+    try std.testing.expectEqualStrings(
+        "composed-block-load-readonly-param-spill",
+        loadDiagnosticForTest(error.ValueUseLoadReadonlyPointerSpill),
+    );
+}
+
+test "value-use readonly load rejects source provenance only after resolution" {
+    var machine = MachineFunction.init("value-use-readonly-load-provenance", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "pointer");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "pointer", .{ .arg32 = .rdi });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const action = try transaction.register(loadActionRequest(
+        "pointer",
+        .{ .load_scalar = .{ .kind = .readonly_pointer, .bits = 32 } },
+    ));
+    try std.testing.expectError(error.ValueUseLoadReadonlyPointerProvenance, transaction.seal());
+    try std.testing.expect(transaction.failedRequestIs(action));
+    try std.testing.expectEqualStrings(
+        "composed-block-load-readonly-param-provenance",
+        loadDiagnosticForTest(error.ValueUseLoadReadonlyPointerProvenance),
+    );
+}
+
+fn expectTableLoadFailure(
+    shape: constant_table.Shape,
+    offset: u8,
+    failure: ?Transaction.LoadTestFailure,
+    expected_error: Transaction.LoadRequestError,
+    fails_at_seal: bool,
+) !void {
+    var machine = MachineFunction.init("value-use-table-load-precedence", .{ .int = 16 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "table");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "table", .{ .readonly_table_ptr = .{
+        .storage = .{ .spill = .slot2 },
+        .symbol = "@table",
+        .shape = shape,
+        .offset = offset,
+    } });
+    const saved_table = selector.values.get("table").?;
+    const saved_next_vreg = selector.next_virtual_reg;
+    const saved_next_spill = selector.next_spill_slot;
+    const saved_eflags = selector.eflags.snapshot();
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const action = try transaction.register(loadActionRequest(
+        "table",
+        .{ .load_readonly_table_i16 = .{ .result = try actionIdentity("table-result") } },
+    ));
+    if (fails_at_seal) {
+        try std.testing.expectError(expected_error, transaction.seal());
+    } else {
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        if (failure) |boundary| try transaction.setLoadTestFailure(boundary);
+        try std.testing.expectError(
+            expected_error,
+            transaction.executePreparedAction(try transaction.preparedView(action)),
+        );
+    }
+    try std.testing.expect(transaction.failedRequestIs(action));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(saved_table, selector.values.get("table").?);
+    try std.testing.expect(selector.values.get("table-result") == null);
+    try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+    try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+    try selector.eflags.validateSnapshot(saved_eflags);
+}
+
+test "value-use table load precedence preserves offset staging and type order" {
+    try expectTableLoadFailure(
+        .i16_128,
+        8,
+        null,
+        error.ValueUseLoadReadonlyTableOffset,
+        true,
+    );
+    try expectTableLoadFailure(
+        .f64_16,
+        0,
+        null,
+        error.ValueUseLoadReadonlyTableType,
+        false,
+    );
+    try expectTableLoadFailure(
+        .f64_16,
+        0,
+        .after_pointer_staging,
+        error.ValueUseLoadReadonlyTableSpill,
+        false,
+    );
+    try std.testing.expectEqualStrings(
+        "composed-block-load-readonly-table-offset",
+        loadDiagnosticForTest(error.ValueUseLoadReadonlyTableOffset),
+    );
+    try std.testing.expectEqualStrings(
+        "composed-block-load-readonly-table-type",
+        loadDiagnosticForTest(error.ValueUseLoadReadonlyTableType),
+    );
 }
 
 test "value-use dormant indexed and readonly i56 load actions preserve semantic instruction order" {
@@ -4099,11 +4435,17 @@ test "value-use dormant stack i128 load is alias-only and table double remains f
 
     var double = try Transaction.begin(&selector);
     defer double.deinit();
-    _ = try double.register(loadActionRequest(
+    const double_action = try double.register(loadActionRequest(
         "double-table",
         .{ .load_readonly_table_i16 = .{ .result = try actionIdentity("must-not-bind") } },
     ));
-    try std.testing.expectError(error.ValueUseLoadAddressHomeUnsupported, double.seal());
+    try double.seal();
+    try double.prepare();
+    try double.materializeAll();
+    try std.testing.expectError(
+        error.ValueUseLoadReadonlyTableType,
+        double.executePreparedAction(try double.preparedView(double_action)),
+    );
     try std.testing.expect(selector.values.get("must-not-bind") == null);
 }
 
@@ -4176,7 +4518,11 @@ test "value-use load rollback restores pointer staging preservation partial load
                 try transaction.rollback();
             } else {
                 try std.testing.expectError(
-                    error.ValueUseLoadTestFailure,
+                    switch (boundary) {
+                        .pointer => error.ValueUseLoadReadonlyPointerSpill,
+                        .table => error.ValueUseLoadReadonlyTableSpill,
+                        else => error.ValueUseLoadTestFailure,
+                    },
                     transaction.executePreparedAction(try transaction.preparedView(action)),
                 );
             }
