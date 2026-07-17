@@ -85,7 +85,7 @@ composed_selector_icmp.zig	lowerIcmp	emitValueIntoRax	1	1	3	O2-3B-O1	compose_com
 composed_selector_icmp.zig	lowerIcmp	emitValueIntoScratch	1-29	29	3	O2-3I-B1	migrated_fixed_scratch_compare_subgroup	o1_icmp_fixed_scratch
 composed_selector_icmp.zig	lowerIcmp	materializePairValue	1	1	3	O2-3B-O1	compose_readonly_pair_use_with_accumulator_result_transaction	o1_icmp
 composed_selector_icmp.zig	lowerIcmp	resolvePairValue	1	1	3	O2-3B-O1	compose_readonly_pair_use_with_accumulator_result_transaction	o1_icmp
-composed_selector_icmp.zig	lowerIcmp	resolveValue	1	1	3	O2-3B-O1	compose_compare_use_with_accumulator_result_transaction	o1_icmp
+composed_selector_icmp.zig	lowerIcmp	resolveValue	1	1	3	O2-3I-B2a	migrated_current_home_eq_zero_test_action	o1_icmp_current_home_eq0
 composed_selector_impl.zig	stabilizeFramedParams	valueLoc	1	1	5	O5-frame-ABI	retain_for_frame_stabilization_migration	-
 composed_selector_memory.zig	lowerAlloca	valueLoc	1	1	5	O5-frame-ABI	retain_for_frame_plan_migration	-
 composed_selector_memory.zig	lowerBytePointerGep	emitValueIntoScratch	1-3	3	1	O2-3B1B	migrated_complete_byte_gep_consumer	use_byte_gep

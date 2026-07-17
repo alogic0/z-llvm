@@ -249,6 +249,83 @@ fn scratchCompareDiagnostic(
     return null;
 }
 
+/// Pure semantic dispatch for audit row I13. Fixed-scratch and exact-EI
+/// precedence is enforced by the caller before this classifier is consulted.
+fn isCurrentHomeEqZeroIcmp(icmp: ir.IcmpInst) bool {
+    if (icmp.predicate != .eq or icmp.operand_ty != .int) return false;
+    return switch (icmp.rhs) {
+        .int => |value| value == 0,
+        .named,
+        .fp,
+        .undef,
+        .poison,
+        .null_value,
+        .zero_initializer,
+        .vector,
+        .constant_expr,
+        => false,
+    };
+}
+
+fn lowerCurrentHomeEqZeroIcmp(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    icmp: ir.IcmpInst,
+) !?Diagnostic {
+    const bits = intBits(icmp.operand_ty) orelse unreachable;
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const lhs_request = try transaction.register(.{
+        .source = icmp.lhs,
+        .expected = .{
+            .ty = icmp.operand_ty,
+            .register_class = if (bits <= 32) .gpr32 else .gpr64,
+        },
+        .form = .current_home_eq_zero_operand,
+        .destination = .prepared_view,
+        .prepared_action = .{ .current_home_eq_zero = .{
+            .result = try ValueUseTransaction.ActionIdentity.init(result_name),
+            .operand_ty = icmp.operand_ty,
+        } },
+    });
+    transaction.seal() catch |err|
+        return currentHomeEqZeroDiagnostic(&transaction, lhs_request, icmp.operand_ty, err) orelse return err;
+    _ = try transaction.beginAccumulatorSession();
+    transaction.prepare() catch |err|
+        return currentHomeEqZeroDiagnostic(&transaction, lhs_request, icmp.operand_ty, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return currentHomeEqZeroDiagnostic(&transaction, lhs_request, icmp.operand_ty, err) orelse return err;
+    const lease = transaction.preparedView(lhs_request) catch |err|
+        return currentHomeEqZeroDiagnostic(&transaction, lhs_request, icmp.operand_ty, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return currentHomeEqZeroDiagnostic(&transaction, lhs_request, icmp.operand_ty, err) orelse return err;
+    try transaction.commit();
+    return null;
+}
+
+fn currentHomeEqZeroDiagnostic(
+    transaction: *const ValueUseTransaction,
+    lhs_request: ValueUseTransaction.RequestHandle,
+    operand_ty: ir.Type,
+    err: anyerror,
+) ?Diagnostic {
+    if (err == error.ValueUseActionDiagnostic) return transaction.actionDiagnostic();
+    if (!transaction.failedRequestIs(lhs_request)) return null;
+    return switch (err) {
+        error.ValueUseUnresolvedSource => .{ .unsupported_value = "composed-block-icmp-lhs" },
+        error.ValueUseCurrentHomeEqZeroWidthUnsupported => .{ .no_emitter = "composed-block-icmp-lhs-width" },
+        error.ValueUseCurrentHomeEqZeroLocationUnsupported => .{ .no_emitter = "composed-block-icmp-lhs-loc" },
+        // The frozen request validator rejects widths above 64 before the
+        // action observes a home. Canonical i128 bindings use pair homes, all
+        // of which the legacy I13 branch classified as a location failure.
+        error.ValueUseTypeMismatch => if (operand_ty == .int and operand_ty.int > 64)
+            .{ .no_emitter = "composed-block-icmp-lhs-loc" }
+        else
+            .{ .no_emitter = "composed-block-icmp-lhs-width" },
+        else => null,
+    };
+}
+
 pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir.IcmpInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     switch (try classifyScratchCompare(icmp)) {
@@ -256,12 +333,15 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         .diagnostic => |diagnostic| return diagnostic,
         .action => |action| return lowerScratchCompare(selector, result_name, icmp, action),
     }
+    const exact_ei_narrow = isExactEiNarrowIcmp(selector, icmp);
+    if (!exact_ei_narrow and isCurrentHomeEqZeroIcmp(icmp))
+        return lowerCurrentHomeEqZeroIcmp(selector, result_name, icmp);
     var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
     defer transaction.deinit();
     while (try selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
         if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
     }
-    if (isExactEiNarrowIcmp(selector, icmp)) return lowerExactEiNarrowIcmp(&transaction, result_name, icmp);
+    if (exact_ei_narrow) return lowerExactEiNarrowIcmp(&transaction, result_name, icmp);
     if (icmp.predicate == .eq and icmp.operand_ty.eql(.{ .int = 128 }) and switch (icmp.rhs) {
         .int => |int| int == std.math.minInt(i128),
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
@@ -293,44 +373,14 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .no_emitter = "composed-block-icmp-rhs" },
         };
         const imm = try i64Value(rhs);
-        if (imm != 0) {
-            if (bits <= 32) {
-                selector_state.emitValueIntoEax(selector, icmp.lhs) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
-                try emitIcmpDefinition(&transaction, .{ .cmp_eax_imm32 = try i32Value(rhs) });
-            } else return .{ .no_emitter = "composed-block-icmp-eq-rhs" };
-            if (try emitIcmpSetcc(&transaction, .sete_eax)) |diagnostic| return diagnostic;
-            try finishIcmpResult(&transaction, result_name);
-            return null;
-        }
-        const loc = selector_state.resolveValue(selector, icmp.lhs) orelse return .{ .unsupported_value = "composed-block-icmp-lhs" };
-        switch (loc) {
-            .eax => try emitIcmpDefinition(&transaction, .test_eax_eax),
-            .rax => {
-                if (bits != 64) return .{ .no_emitter = "composed-block-icmp-lhs-width" };
-                try emitIcmpDefinition(&transaction, .test_rax_rax);
-            },
-            .arg32, .scratch32 => |reg| {
-                if (bits > 32) return .{ .no_emitter = "composed-block-icmp-lhs-width" };
-                try emitIcmpDefinition(&transaction, .{ .test_arg32 = reg });
-            },
-            .arg64, .scratch64 => |reg| {
-                if (bits != 64) return .{ .no_emitter = "composed-block-icmp-lhs-width" };
-                try emitIcmpDefinition(&transaction, .{ .test_arg64 = reg });
-            },
-            .spill64 => |frame_index| {
-                try selector_state.clobberArgReg(selector, .rcx);
-                if (bits == 64) {
-                    try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = frame_index } });
-                    try emitIcmpDefinition(&transaction, .{ .test_arg64 = .rcx });
-                } else if (bits <= 32) {
-                    try selector.machine.instructions.append(selector.allocator, .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = frame_index } });
-                    try emitIcmpDefinition(&transaction, .{ .test_arg32 = .rcx });
-                } else return .{ .no_emitter = "composed-block-icmp-lhs-width" };
-            },
-            .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-icmp-lhs-loc" },
-        }
-        if (try prepareIcmpResult(&transaction)) |diagnostic| return diagnostic;
+        std.debug.assert(imm != 0);
+        if (bits <= 32) {
+            selector_state.emitValueIntoEax(selector, icmp.lhs) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
+            try emitIcmpDefinition(&transaction, .{ .cmp_eax_imm32 = try i32Value(rhs) });
+        } else return .{ .no_emitter = "composed-block-icmp-eq-rhs" };
         if (try emitIcmpSetcc(&transaction, .sete_eax)) |diagnostic| return diagnostic;
+        try finishIcmpResult(&transaction, result_name);
+        return null;
     } else if (icmp.predicate == .sgt and icmp.operand_ty.eql(.{ .int = 6 }) and switch (icmp.rhs) {
         .int => |int| try i64Value(int) == -1,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,

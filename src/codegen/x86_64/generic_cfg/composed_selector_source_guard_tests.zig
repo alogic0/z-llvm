@@ -40,7 +40,7 @@ const classified_sources = [_]ClassifiedSource{
 };
 
 const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-const frozen_bypass_inventory_sha256 = "0df5eb738ae883dd7703bb2303d9c2c3d39ff133d854aca7ab5fa894cbabe829";
+const frozen_bypass_inventory_sha256 = "708222884aaffc54577e264990c9069cf6edcd23f6c35fdcbf8463779a794acb";
 const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -422,7 +422,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     try validateFailureProvenanceProductionSites(source_name, source);
     try validateAccumulatorCompositionProductionSites(source_name, source);
     try validateScratchCompareProductionSites(source_name, source);
-    try validateDormantCurrentHomeEqZeroProductionSites(source_name, source);
+    try validateCurrentHomeEqZeroProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -787,21 +787,154 @@ fn validateScratchCompareProductionSites(source_name: []const u8, source: [:0]co
     }
 }
 
-fn validateDormantCurrentHomeEqZeroProductionSites(
+fn validateCurrentHomeEqZeroProductionSites(
     source_name: []const u8,
     source: [:0]const u8,
 ) !void {
-    _ = source_name;
-    const forbidden = [_][]const u8{
+    const production_markers = [_][]const u8{
         ".form = .current_home_eq_zero_operand",
         ".current_home_eq_zero =",
-        "CurrentHomeEqZeroAction",
         "ValueUseCurrentHomeEqZeroWidthUnsupported",
         "ValueUseCurrentHomeEqZeroLocationUnsupported",
     };
-    for (forbidden) |pattern| {
-        if (std.mem.indexOf(u8, source, pattern) != null)
-            return error.ValueUseCurrentHomeEqZeroProductionWiringForbidden;
+    var has_wiring = false;
+    for (production_markers) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null) has_wiring = true;
+    }
+    if (!has_wiring) return;
+    if (!std.mem.eql(u8, source_name, "composed_selector_icmp.zig"))
+        return error.ValueUseCurrentHomeEqZeroProductionWiringForbidden;
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const classifier_body = functionBodyNamed(bodies, "isCurrentHomeEqZeroIcmp") orelse
+        return error.ValueUseCurrentHomeEqZeroProductionAllowlistMismatch;
+    const action_body = functionBodyNamed(bodies, "lowerCurrentHomeEqZeroIcmp") orelse
+        return error.ValueUseCurrentHomeEqZeroProductionAllowlistMismatch;
+    const mapper_body = functionBodyNamed(bodies, "currentHomeEqZeroDiagnostic") orelse
+        return error.ValueUseCurrentHomeEqZeroProductionAllowlistMismatch;
+    const dispatch_body = functionBodyNamed(bodies, "lowerIcmp") orelse
+        return error.ValueUseCurrentHomeEqZeroProductionAllowlistMismatch;
+    const classifier = source[classifier_body.start..classifier_body.end];
+    const action = source[action_body.start..action_body.end];
+    const mapper = source[mapper_body.start..mapper_body.end];
+    const dispatch = source[dispatch_body.start..dispatch_body.end];
+
+    const classifier_forbidden = [_][]const u8{
+        "selector",
+        "resolveValue(",
+        "valueLoc(",
+        "allocation_plan",
+        "ValueLoc",
+        "function",
+        "Function",
+        "family",
+        "Family",
+        "callee",
+        "Callee",
+        "isExact",
+        ".eax",
+        ".rax",
+        ".arg32",
+        ".arg64",
+        ".scratch32",
+        ".scratch64",
+        ".spill64",
+        ".spill128",
+    };
+    for (classifier_forbidden) |pattern| {
+        if (std.mem.indexOf(u8, classifier, pattern) != null)
+            return error.ValueUseCurrentHomeEqZeroClassifierStatePredicate;
+    }
+    const classifier_required = [_][]const u8{
+        "icmp.predicate != .eq",
+        "icmp.operand_ty != .int",
+        ".int => |value| value == 0",
+    };
+    for (classifier_required) |pattern| {
+        if (std.mem.indexOf(u8, classifier, pattern) == null)
+            return error.ValueUseCurrentHomeEqZeroClassifierMismatch;
+    }
+
+    const scratch_dispatch = std.mem.indexOf(u8, dispatch, "classifyScratchCompare(icmp)") orelse
+        return error.ValueUseCurrentHomeEqZeroDispatchMismatch;
+    const exact_dispatch = std.mem.indexOf(
+        u8,
+        dispatch,
+        "const exact_ei_narrow = isExactEiNarrowIcmp(selector, icmp);",
+    ) orelse return error.ValueUseCurrentHomeEqZeroDispatchMismatch;
+    const current_dispatch = std.mem.indexOf(
+        u8,
+        dispatch,
+        "if (!exact_ei_narrow and isCurrentHomeEqZeroIcmp(icmp))",
+    ) orelse return error.ValueUseCurrentHomeEqZeroDispatchMismatch;
+    const legacy_begin = std.mem.indexOf(
+        u8,
+        dispatch,
+        "AccumulatorDefinitionTransaction.begin(selector)",
+    ) orelse return error.ValueUseCurrentHomeEqZeroDispatchMismatch;
+    if (!(scratch_dispatch < exact_dispatch and exact_dispatch < current_dispatch and
+        current_dispatch < legacy_begin) or
+        countPattern(dispatch, "isExactEiNarrowIcmp(selector, icmp)") != 1 or
+        countPattern(dispatch, "isCurrentHomeEqZeroIcmp(icmp)") != 1 or
+        countPattern(dispatch, "lowerCurrentHomeEqZeroIcmp(selector, result_name, icmp)") != 1 or
+        countPattern(dispatch, "AccumulatorDefinitionTransaction.begin(selector)") != 1 or
+        countPattern(dispatch, "ValueUseTransaction.begin(selector)") != 0)
+    {
+        return error.ValueUseCurrentHomeEqZeroDispatchMismatch;
+    }
+
+    if (countPattern(action, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(action, ".form = .current_home_eq_zero_operand") != 1 or
+        countPattern(action, ".current_home_eq_zero =") != 1 or
+        countPattern(action, ".register(") != 1 or
+        countPattern(action, ".seal()") != 1 or
+        countPattern(action, ".beginAccumulatorSession()") != 1 or
+        countPattern(action, ".prepare()") != 1 or
+        countPattern(action, ".materializeAll()") != 1 or
+        countPattern(action, ".preparedView(") != 1 or
+        countPattern(action, ".executePreparedAction(") != 1 or
+        countPattern(action, ".commit()") != 1 or
+        countPattern(action, "AccumulatorDefinitionTransaction.begin(") != 0 or
+        countPattern(action, "resolveValue(") != 0 or
+        countPattern(action, "valueLoc(") != 0)
+    {
+        return error.ValueUseCurrentHomeEqZeroProductionAllowlistMismatch;
+    }
+
+    const mapper_required = [_][]const u8{
+        "failedRequestIs(lhs_request)",
+        "ValueUseUnresolvedSource",
+        "ValueUseCurrentHomeEqZeroWidthUnsupported",
+        "ValueUseCurrentHomeEqZeroLocationUnsupported",
+        "ValueUseTypeMismatch",
+        "composed-block-icmp-lhs",
+        "composed-block-icmp-lhs-width",
+        "composed-block-icmp-lhs-loc",
+    };
+    for (mapper_required) |pattern| {
+        if (std.mem.indexOf(u8, mapper, pattern) == null)
+            return error.ValueUseCurrentHomeEqZeroDiagnosticMapperMismatch;
+    }
+    if (countPattern(mapper, "failedRequestIs(") != 1 or
+        countPattern(mapper, "resolveValue(") != 0 or
+        countPattern(mapper, "valueLoc(") != 0)
+    {
+        return error.ValueUseCurrentHomeEqZeroDiagnosticMapperMismatch;
+    }
+
+    for (bodies) |body| {
+        const body_source = source[body.start..body.end];
+        var contains_marker = false;
+        for (production_markers) |pattern| {
+            if (std.mem.indexOf(u8, body_source, pattern) != null) contains_marker = true;
+        }
+        if (!contains_marker) continue;
+        if (!std.mem.eql(u8, body.name, "lowerCurrentHomeEqZeroIcmp") and
+            !std.mem.eql(u8, body.name, "currentHomeEqZeroDiagnostic"))
+        {
+            return error.ValueUseCurrentHomeEqZeroProductionAllowlistMismatch;
+        }
     }
 }
 
@@ -995,13 +1128,21 @@ fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source
         const bodies = try collectFunctionBodies(source, &body_storage);
         const action_body = functionBodyNamed(bodies, "lowerScratchCompare") orelse
             return error.ValueUseAccumulatorCompositionAllowlistMismatch;
-        const function_source = source[action_body.start..action_body.end];
-        if (countPattern(function_source, "beginAccumulatorSession(") != 1 or
-            countPattern(function_source, "ValueUseTransaction.begin(selector)") != 1 or
-            countPattern(function_source, ".executePreparedAction(") != 1 or
-            countPattern(function_source, ".commit()") != 1 or
-            countPattern(function_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
-            countPattern(source, "beginAccumulatorSession(") != 1)
+        const current_home_body = functionBodyNamed(bodies, "lowerCurrentHomeEqZeroIcmp") orelse
+            return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+        const scratch_source = source[action_body.start..action_body.end];
+        const current_home_source = source[current_home_body.start..current_home_body.end];
+        if (countPattern(scratch_source, "beginAccumulatorSession(") != 1 or
+            countPattern(scratch_source, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(scratch_source, ".executePreparedAction(") != 1 or
+            countPattern(scratch_source, ".commit()") != 1 or
+            countPattern(scratch_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
+            countPattern(current_home_source, "beginAccumulatorSession(") != 1 or
+            countPattern(current_home_source, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(current_home_source, ".executePreparedAction(") != 1 or
+            countPattern(current_home_source, ".commit()") != 1 or
+            countPattern(current_home_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
+            countPattern(source, "beginAccumulatorSession(") != 2)
         {
             return error.ValueUseAccumulatorCompositionAllowlistMismatch;
         }
@@ -1108,10 +1249,13 @@ fn validateFailureProvenanceProductionSites(source_name: []const u8, source: [:0
     if (std.mem.eql(u8, source_name, "composed_selector_icmp.zig")) {
         var body_storage: [max_function_bodies]FunctionBody = undefined;
         const bodies = try collectFunctionBodies(source, &body_storage);
-        const mapper = functionBodyNamed(bodies, "scratchCompareDiagnostic") orelse
+        const scratch_mapper = functionBodyNamed(bodies, "scratchCompareDiagnostic") orelse
             return error.ValueUseFailureProvenanceOutsideAllowlist;
-        if (countPattern(source[mapper.start..mapper.end], ".failedRequestIs(") != 2 or
-            query_count != 2)
+        const current_home_mapper = functionBodyNamed(bodies, "currentHomeEqZeroDiagnostic") orelse
+            return error.ValueUseFailureProvenanceOutsideAllowlist;
+        if (countPattern(source[scratch_mapper.start..scratch_mapper.end], ".failedRequestIs(") != 2 or
+            countPattern(source[current_home_mapper.start..current_home_mapper.end], ".failedRequestIs(") != 1 or
+            query_count != 3)
         {
             return error.ValueUseFailureProvenanceAllowlistMismatch;
         }
@@ -2809,7 +2953,7 @@ test "composed selector source guard keeps scratch compare intent semantic and p
     );
 }
 
-test "composed selector source guard keeps current-home eq-zero action dormant and ordered" {
+test "composed selector source guard keeps current-home eq-zero wiring semantic narrow and ordered" {
     try validateCurrentHomeEqZeroIntentSurface(
         "pub const CurrentHomeEqZeroAction = struct { " ++
             "result: ActionIdentity, operand_ty: ir.Type, };",
@@ -2821,18 +2965,76 @@ test "composed selector source guard keeps current-home eq-zero action dormant a
                 "result: ActionIdentity, operand_ty: ir.Type, source_home: ValueLoc, };",
         ),
     );
-    try std.testing.expectError(
-        error.ValueUseCurrentHomeEqZeroProductionWiringForbidden,
-        validateDormantCurrentHomeEqZeroProductionSites(
-            "composed_selector_icmp.zig",
-            "fn lowerIcmp() void { _ = .{ .form = .current_home_eq_zero_operand }; }",
-        ),
+    const accepted_wiring: [:0]const u8 =
+        "fn isCurrentHomeEqZeroIcmp() void { " ++
+        "_ = icmp.predicate != .eq; _ = icmp.operand_ty != .int; " ++
+        "_ = .int => |value| value == 0; } " ++
+        "fn lowerCurrentHomeEqZeroIcmp() void { " ++
+        "var transaction = try ValueUseTransaction.begin(selector); " ++
+        "const lhs_request = try transaction.register(.{ " ++
+        ".form = .current_home_eq_zero_operand, " ++
+        ".current_home_eq_zero = action, }); " ++
+        "try transaction.seal(); _ = try transaction.beginAccumulatorSession(); " ++
+        "try transaction.prepare(); try transaction.materializeAll(); " ++
+        "const lease = try transaction.preparedView(lhs_request); " ++
+        "try transaction.executePreparedAction(lease); try transaction.commit(); } " ++
+        "fn currentHomeEqZeroDiagnostic() void { " ++
+        "_ = transaction.failedRequestIs(lhs_request); " ++
+        "_ = error.ValueUseUnresolvedSource; " ++
+        "_ = error.ValueUseCurrentHomeEqZeroWidthUnsupported; " ++
+        "_ = error.ValueUseCurrentHomeEqZeroLocationUnsupported; " ++
+        "_ = error.ValueUseTypeMismatch; " ++
+        "_ = \"composed-block-icmp-lhs\"; " ++
+        "_ = \"composed-block-icmp-lhs-width\"; " ++
+        "_ = \"composed-block-icmp-lhs-loc\"; } " ++
+        "fn lowerIcmp() void { " ++
+        "_ = classifyScratchCompare(icmp); " ++
+        "const exact_ei_narrow = isExactEiNarrowIcmp(selector, icmp); " ++
+        "if (!exact_ei_narrow and isCurrentHomeEqZeroIcmp(icmp)) " ++
+        "_ = lowerCurrentHomeEqZeroIcmp(selector, result_name, icmp); " ++
+        "_ = AccumulatorDefinitionTransaction.begin(selector); }";
+    try validateCurrentHomeEqZeroProductionSites(
+        "composed_selector_icmp.zig",
+        accepted_wiring,
     );
     try std.testing.expectError(
         error.ValueUseCurrentHomeEqZeroProductionWiringForbidden,
-        validateDormantCurrentHomeEqZeroProductionSites(
+        validateCurrentHomeEqZeroProductionSites(
             "composed_selector_calls.zig",
             "fn lower() void { _ = .{ .current_home_eq_zero = action }; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseCurrentHomeEqZeroClassifierStatePredicate,
+        validateCurrentHomeEqZeroProductionSites(
+            "composed_selector_icmp.zig",
+            "fn isCurrentHomeEqZeroIcmp() void { _ = selector.valueLoc(source); " ++
+                "_ = icmp.predicate != .eq; _ = icmp.operand_ty != .int; " ++
+                "_ = .int => |value| value == 0; } " ++
+                "fn lowerCurrentHomeEqZeroIcmp() void { " ++
+                "var transaction = try ValueUseTransaction.begin(selector); " ++
+                "const lhs_request = try transaction.register(.{ " ++
+                ".form = .current_home_eq_zero_operand, " ++
+                ".current_home_eq_zero = action, }); " ++
+                "try transaction.seal(); _ = try transaction.beginAccumulatorSession(); " ++
+                "try transaction.prepare(); try transaction.materializeAll(); " ++
+                "const lease = try transaction.preparedView(lhs_request); " ++
+                "try transaction.executePreparedAction(lease); try transaction.commit(); } " ++
+                "fn currentHomeEqZeroDiagnostic() void { " ++
+                "_ = transaction.failedRequestIs(lhs_request); " ++
+                "_ = error.ValueUseUnresolvedSource; " ++
+                "_ = error.ValueUseCurrentHomeEqZeroWidthUnsupported; " ++
+                "_ = error.ValueUseCurrentHomeEqZeroLocationUnsupported; " ++
+                "_ = error.ValueUseTypeMismatch; " ++
+                "_ = \"composed-block-icmp-lhs\"; " ++
+                "_ = \"composed-block-icmp-lhs-width\"; " ++
+                "_ = \"composed-block-icmp-lhs-loc\"; } " ++
+                "fn lowerIcmp() void { " ++
+                "_ = classifyScratchCompare(icmp); " ++
+                "const exact_ei_narrow = isExactEiNarrowIcmp(selector, icmp); " ++
+                "if (!exact_ei_narrow and isCurrentHomeEqZeroIcmp(icmp)) " ++
+                "_ = lowerCurrentHomeEqZeroIcmp(selector, result_name, icmp); " ++
+                "_ = AccumulatorDefinitionTransaction.begin(selector); }",
         ),
     );
 

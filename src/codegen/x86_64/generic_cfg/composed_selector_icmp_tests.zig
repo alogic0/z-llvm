@@ -59,6 +59,197 @@ test "fixed-scratch compare maps lhs and rhs failures in source order and rolls 
     }
 }
 
+test "I13 current-home eq-zero production path preserves dispatch precedence and diagnostics" {
+    {
+        var machine = MachineFunction.init("i13-direct", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("lhs", 1);
+        try plan.interval_ends.put("cmp", 2);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+
+        try std.testing.expect((try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .int = 0 },
+        })) == null);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .test_arg32 = .rdi },
+            .sete_eax,
+        }, machine.instructions.items);
+    }
+
+    {
+        var machine = MachineFunction.init("i13-spill", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("lhs", 1);
+        try plan.interval_ends.put("cmp", 2);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .spill64 = .slot3 });
+
+        try std.testing.expect((try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 64 },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .int = 0 },
+        })) == null);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot3 } },
+            .{ .test_arg64 = .rcx },
+            .sete_eax,
+        }, machine.instructions.items);
+    }
+
+    {
+        var machine = MachineFunction.init("i13-i128-spill", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("lhs", 1);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .spill128 = .{
+            .lo = .slot0,
+            .hi = .slot1,
+        } });
+
+        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 128 },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .int = 0 },
+        })).?;
+        try std.testing.expectEqualStrings("composed-block-icmp-lhs-loc", diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+
+    {
+        var machine = MachineFunction.init("i13-width", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("lhs", 1);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi });
+
+        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 40 },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .int = 0 },
+        })).?;
+        try std.testing.expectEqualStrings("composed-block-icmp-lhs-width", diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+
+    {
+        var machine = MachineFunction.init("i13-unresolved", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("missing", 1);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+
+        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "missing" },
+            .rhs = .{ .int = 0 },
+        })).?;
+        try std.testing.expectEqualStrings("composed-block-icmp-lhs", diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
+test "I13 dispatch leaves fixed-scratch i52 and exact-EI eq-zero on their accepted authorities" {
+    {
+        var machine = MachineFunction.init("i13-fixed-scratch-i52", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("lhs", 1);
+        try plan.interval_ends.put("cmp", 2);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi });
+
+        try std.testing.expect((try selector_icmp.lowerIcmp(&selector, "cmp", .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 52 },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .int = 0 },
+        })) == null);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } },
+            .{ .test_arg64 = .rcx },
+            .sete_eax,
+        }, machine.instructions.items);
+    }
+
+    const exact_input =
+        \\define double @exact(ptr readonly %input, i64 %bits) {
+        \\entry:
+        \\  %tag = trunc i64 %bits to i16
+        \\  switch i16 %tag, label %done [
+        \\    i16 0, label %done
+        \\    i16 1, label %done
+        \\    i16 2, label %done
+        \\    i16 3, label %done
+        \\    i16 4, label %done
+        \\  ]
+        \\done:
+        \\  ret double 0.000000e+00
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, exact_input);
+    defer module.deinit();
+    try module.verify();
+    try std.testing.expect(stage2_planning.isExactEiScalarFamily(module.functions.items[0]));
+
+    var machine = MachineFunction.init("i13-exact-ei", .{ .int = 1 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.function = &module.functions.items[0];
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+
+    try std.testing.expect((try selector_icmp.lowerIcmp(&selector, "cmp", .{
+        .predicate = .eq,
+        .operand_ty = .{ .int = 3 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .int = 0 },
+    })) == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .mov_arg_eax = .rdi },
+        .{ .and_eax_imm32 = 7 },
+        .{ .cmp_eax_imm32 = 0 },
+        .sete_eax,
+    }, machine.instructions.items);
+}
+
 test "migrated accumulator-resident compare preserves same-register logical aliases" {
     var machine = MachineFunction.init("icmp-accumulator-aliases", .{ .int = 1 });
     defer machine.deinit(std.testing.allocator);
