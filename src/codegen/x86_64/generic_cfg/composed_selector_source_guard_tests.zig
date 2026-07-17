@@ -485,7 +485,8 @@ fn validateLoadDiagnosticMappingProductionSites(source_name: []const u8, source:
             std.mem.eql(u8, body.name, "ordinaryLoadValueUseDiagnostic") or
             std.mem.eql(u8, body.name, "lowerReadOnlyPointerIntegerLoad") or
             std.mem.eql(u8, body.name, "readOnlyPointerLoadValueUseDiagnostic") or
-            std.mem.eql(u8, body.name, "lowerReadOnlyTableLoad");
+            std.mem.eql(u8, body.name, "lowerReadOnlyTableLoad") or
+            std.mem.eql(u8, body.name, "readOnlyTableLoadValueUseDiagnostic");
         if (!approved) return error.ValueUseLoadDiagnosticMappingOutsideAllowlist;
         const forbidden_home_queries = [_][]const u8{
             "valueLoc(",
@@ -548,8 +549,33 @@ fn validateDormantLoadActionProductionSites(source_name: []const u8, source: [:0
         return error.ValueUseLoadActionNotWired;
     const readonly_body = functionBodyNamed(bodies, "lowerReadOnlyPointerIntegerLoad") orelse
         return error.ValueUseLoadActionNotWired;
+    const table_dispatch_body = functionBodyNamed(bodies, "lowerReadOnlyTableLoad") orelse
+        return error.ValueUseLoadActionNotWired;
+    const table_i16_body = functionBodyNamed(bodies, "lowerReadOnlyTableI16Transactional") orelse
+        return error.ValueUseLoadActionNotWired;
     const ordinary_source = source[ordinary_body.start..ordinary_body.end];
     const readonly_source = source[readonly_body.start..readonly_body.end];
+    const table_dispatch_source = source[table_dispatch_body.start..table_dispatch_body.end];
+    const table_i16_source = source[table_i16_body.start..table_i16_body.end];
+    const table_branch =
+        "if (ptr.shape == .i16_128 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 }))";
+    const table_branch_index = std.mem.indexOf(u8, table_dispatch_source, table_branch) orelse
+        return error.ValueUseLoadActionNotWired;
+    const table_call_index = std.mem.indexOf(
+        u8,
+        table_dispatch_source,
+        "return lowerReadOnlyTableI16Transactional(selector, result_name, load);",
+    ) orelse return error.ValueUseLoadActionNotWired;
+    const direct_materialization_index = std.mem.indexOf(
+        u8,
+        table_dispatch_source,
+        "selector_state.materializeLocIntoLoc(",
+    ) orelse return error.ValueUseLoadActionNotWired;
+    const double_type_index = std.mem.indexOf(
+        u8,
+        table_dispatch_source,
+        "if (load.ty != .double)",
+    ) orelse return error.ValueUseLoadActionNotWired;
     if (countPattern(ordinary_source, address_pattern) != 1 or
         countPattern(ordinary_source, scalar_pattern) != 1 or
         countPattern(ordinary_source, alias_pattern) != 1 or
@@ -566,8 +592,25 @@ fn validateDormantLoadActionProductionSites(source_name: []const u8, source: [:0
         countPattern(readonly_source, "ValueUseTransaction.begin(selector)") != 1 or
         countPattern(readonly_source, ".executePreparedAction(") != 1 or
         countPattern(readonly_source, ".commit()") != 1 or
-        address_total != 2 or scalar_total != 2 or alias_total != 1 or
-        pair_total != 1 or table_total != 0)
+        countPattern(table_dispatch_source, address_pattern) != 0 or
+        countPattern(table_dispatch_source, table_pattern) != 0 or
+        countPattern(table_dispatch_source, "ValueUseTransaction.begin(selector)") != 0 or
+        countPattern(table_dispatch_source, "selector_state.materializeLocIntoLoc(") != 1 or
+        countPattern(table_dispatch_source, "selector_state.clobberXmmReg(") != 1 or
+        countPattern(table_i16_source, address_pattern) != 1 or
+        countPattern(table_i16_source, table_pattern) != 1 or
+        countPattern(table_i16_source, scalar_pattern) != 0 or
+        countPattern(table_i16_source, pair_pattern) != 0 or
+        countPattern(table_i16_source, alias_pattern) != 0 or
+        countPattern(table_i16_source, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(table_i16_source, ".executePreparedAction(") != 1 or
+        countPattern(table_i16_source, ".commit()") != 1 or
+        countPattern(source, "lowerReadOnlyTableI16Transactional(") != 2 or
+        table_branch_index >= table_call_index or
+        table_call_index >= direct_materialization_index or
+        direct_materialization_index >= double_type_index or
+        address_total != 3 or scalar_total != 2 or alias_total != 1 or
+        pair_total != 1 or table_total != 1)
     {
         return error.ValueUseLoadActionNotWired;
     }
@@ -701,7 +744,8 @@ fn validateFailureProvenanceProductionSites(source_name: []const u8, source: [:0
                 std.mem.eql(u8, body.name, "ordinaryLoadValueUseDiagnostic") or
                 std.mem.eql(u8, body.name, "lowerReadOnlyPointerIntegerLoad") or
                 std.mem.eql(u8, body.name, "readOnlyPointerLoadValueUseDiagnostic") or
-                std.mem.eql(u8, body.name, "lowerReadOnlyTableLoad");
+                std.mem.eql(u8, body.name, "lowerReadOnlyTableLoad") or
+                std.mem.eql(u8, body.name, "readOnlyTableLoadValueUseDiagnostic");
             if (!approved or std.mem.indexOf(u8, function_source, "ValueUseLoad") == null)
                 return error.ValueUseFailureProvenanceOutsideAllowlist;
             classified_count += body_count;
@@ -1900,14 +1944,24 @@ test "composed selector source guard rejects callback escapes and raw operations
     );
 }
 
-test "composed selector source guard admits only the complete ordinary and readonly-pointer load action sets" {
+test "composed selector source guard admits only the complete ordinary readonly-pointer and table-i16 load action sets" {
+    const table_fixture =
+        "fn lowerReadOnlyTableLoad() void { " ++
+        "if (ptr.shape == .i16_128 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) { " ++
+        "return lowerReadOnlyTableI16Transactional(selector, result_name, load); } " ++
+        "_ = selector_state.materializeLocIntoLoc(selector, source, destination); " ++
+        "if (load.ty != .double) return; _ = selector_state.clobberXmmReg(selector, .xmm0); } " ++
+        "fn lowerReadOnlyTableI16Transactional() void { _ = .load_address; " ++
+        "_ = .load_readonly_table_i16; _ = ValueUseTransaction.begin(selector); " ++
+        "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); }";
     const accepted: [:0]const u8 =
         "fn lowerLoad() void { _ = .load_address; _ = .load_scalar; " ++
         "_ = .load_stack_i128_alias; _ = ValueUseTransaction.begin(selector); " ++
         "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } " ++
         "fn lowerReadOnlyPointerIntegerLoad() void { _ = .load_address; _ = .load_scalar; " ++
         "_ = .load_readonly_pair; _ = ValueUseTransaction.begin(selector); " ++
-        "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); }";
+        "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } " ++
+        table_fixture;
     try validateDormantLoadActionProductionSites("composed_selector_memory.zig", accepted);
     try std.testing.expectError(
         error.ValueUseLoadActionNotWired,
@@ -1927,7 +1981,29 @@ test "composed selector source guard admits only the complete ordinary and reado
                 "fn lowerReadOnlyPointerIntegerLoad() void { _ = .load_address; _ = .load_scalar; " ++
                 "_ = .load_readonly_pair; _ = ValueUseTransaction.begin(selector); " ++
                 "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); " ++
-                "_ = .load_readonly_pair; }",
+                "_ = .load_readonly_pair; } " ++ table_fixture,
+        ),
+    );
+    const misplaced_direct_materialization: [:0]const u8 =
+        "fn lowerLoad() void { _ = .load_address; _ = .load_scalar; " ++
+        "_ = .load_stack_i128_alias; _ = ValueUseTransaction.begin(selector); " ++
+        "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } " ++
+        "fn lowerReadOnlyPointerIntegerLoad() void { _ = .load_address; _ = .load_scalar; " ++
+        "_ = .load_readonly_pair; _ = ValueUseTransaction.begin(selector); " ++
+        "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } " ++
+        "fn lowerReadOnlyTableLoad() void { " ++
+        "if (ptr.shape == .i16_128 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) { " ++
+        "_ = selector_state.materializeLocIntoLoc(selector, source, destination); " ++
+        "return lowerReadOnlyTableI16Transactional(selector, result_name, load); } " ++
+        "if (load.ty != .double) return; _ = selector_state.clobberXmmReg(selector, .xmm0); } " ++
+        "fn lowerReadOnlyTableI16Transactional() void { _ = .load_address; " ++
+        "_ = .load_readonly_table_i16; _ = ValueUseTransaction.begin(selector); " ++
+        "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); }";
+    try std.testing.expectError(
+        error.ValueUseLoadActionNotWired,
+        validateDormantLoadActionProductionSites(
+            "composed_selector_memory.zig",
+            misplaced_direct_materialization,
         ),
     );
 }
@@ -1941,11 +2017,20 @@ test "composed selector source guard permits the sole readonly dispatch resolve 
         "fn lowerReadOnlyPointerIntegerLoad() void { _ = .load_address; _ = .load_scalar; " ++
         "_ = .load_readonly_pair; _ = ValueUseTransaction.begin(selector); " ++
         "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } ";
+    const table_fixture =
+        "fn lowerReadOnlyTableLoad() void { " ++
+        "if (ptr.shape == .i16_128 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) { " ++
+        "return lowerReadOnlyTableI16Transactional(selector, result_name, load); } " ++
+        "_ = selector_state.materializeLocIntoLoc(selector, source, destination); " ++
+        "if (load.ty != .double) return; _ = selector_state.clobberXmmReg(selector, .xmm0); } " ++
+        "fn lowerReadOnlyTableI16Transactional() void { _ = .load_address; " ++
+        "_ = .load_readonly_table_i16; _ = ValueUseTransaction.begin(selector); " ++
+        "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } ";
     const before: [:0]const u8 = store_fixture ++
         "fn lowerLoad() void { _ = selector_state.resolveValue(selector, pointer); " ++
         "_ = .load_address; _ = .load_scalar; _ = .load_stack_i128_alias; " ++
         "_ = ValueUseTransaction.begin(selector); _ = transaction.executePreparedAction(lease); " ++
-        "_ = transaction.commit(); } " ++ readonly_fixture;
+        "_ = transaction.commit(); } " ++ readonly_fixture ++ table_fixture;
     try validatePreparedViewLeafDiscipline("composed_selector_memory.zig", before);
     try std.testing.expectError(
         error.ValueUsePreparedLeafRawOperation,
@@ -1955,7 +2040,7 @@ test "composed selector source guard permits the sole readonly dispatch resolve 
                 "_ = .load_stack_i128_alias; _ = ValueUseTransaction.begin(selector); " ++
                 "_ = selector_state.resolveValue(selector, pointer); " ++
                 "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } " ++
-                readonly_fixture,
+                readonly_fixture ++ table_fixture,
         ),
     );
 }

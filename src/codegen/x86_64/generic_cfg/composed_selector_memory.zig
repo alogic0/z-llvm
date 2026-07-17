@@ -853,6 +853,12 @@ fn lowerReadOnlyTableLoad(
 ) !?Diagnostic {
     if (load.ty_addrspace != null or load.ptr_addrspace != null) return .{ .no_emitter = "composed-block-load-readonly-table-addrspace" };
     if (!ptr.shape.allowsOffset(ptr.offset)) return .{ .no_emitter = "composed-block-load-readonly-table-offset" };
+    if (ptr.shape == .i16_128 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) {
+        return lowerReadOnlyTableI16Transactional(selector, result_name, load);
+    }
+
+    // The surviving direct materialization belongs to the untouched
+    // double/XMM O3 tail (and its legacy rejected-type diagnostics).
     const base: ArgReg = switch (ptr.storage) {
         .reg => |reg| reg,
         .spill => |frame_index| blk: {
@@ -861,17 +867,59 @@ fn lowerReadOnlyTableLoad(
         },
     };
     if (ptr.shape == .i16_128) {
-        if (!load.ty.eql(.{ .int = 16 }) or ptr.offset != 0) return .{ .no_emitter = "composed-block-load-readonly-table-type" };
-        try selector_state.clobberArgReg(selector, .r8);
-        try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_u16_arg = .{ .base = base, .dst = .r8, .offset = 0 } });
-        try selector_state.bindResultLoc(selector, result_name, .{ .scratch32 = .r8 });
-        return null;
+        return .{ .no_emitter = "composed-block-load-readonly-table-type" };
     }
     if (load.ty != .double) return .{ .no_emitter = "composed-block-load-readonly-table-type" };
     try selector_state.clobberXmmReg(selector, .xmm0);
     try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_xmm = .{ .base = base, .dst = .xmm0, .offset = ptr.offset } });
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = 64 } });
     return null;
+}
+
+fn lowerReadOnlyTableI16Transactional(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    load: ir.LoadInst,
+) !?Diagnostic {
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const table_request = try registerValueUseAction(
+        &transaction,
+        load.ptr,
+        .ptr,
+        .stack_pointer,
+        .load_address,
+        .{ .load_readonly_table_i16 = .{
+            .result = try valueUseActionIdentity(result_name),
+        } },
+    );
+    transaction.seal() catch |err|
+        return readOnlyTableLoadValueUseDiagnostic(&transaction, table_request, err) orelse return err;
+    transaction.prepare() catch |err|
+        return readOnlyTableLoadValueUseDiagnostic(&transaction, table_request, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return readOnlyTableLoadValueUseDiagnostic(&transaction, table_request, err) orelse return err;
+    const lease = transaction.preparedView(table_request) catch |err|
+        return readOnlyTableLoadValueUseDiagnostic(&transaction, table_request, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return readOnlyTableLoadValueUseDiagnostic(&transaction, table_request, err) orelse return err;
+    try transaction.commit();
+    return null;
+}
+
+fn readOnlyTableLoadValueUseDiagnostic(
+    transaction: *const ValueUseTransaction,
+    table_request: ValueUseTransaction.RequestHandle,
+    err: anyerror,
+) ?Diagnostic {
+    if (!transaction.failedRequestIs(table_request)) return null;
+    return switch (err) {
+        error.ValueUseUnresolvedSource => .{ .unsupported_value = "composed-block-unknown-load-ptr" },
+        error.ValueUseLoadReadonlyTableOffset => .{ .no_emitter = "composed-block-load-readonly-table-offset" },
+        error.ValueUseLoadReadonlyTableType => .{ .no_emitter = "composed-block-load-readonly-table-type" },
+        error.ValueUseLoadReadonlyTableSpill => .{ .unsupported_value = "composed-block-load-readonly-table-spill" },
+        else => null,
+    };
 }
 
 fn sourceStrideMatchesShape(source_ty: ir.Type, shape: constant_table.Shape) bool {

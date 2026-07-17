@@ -184,6 +184,119 @@ test "migrated readonly pair loads retain post-staging chooser timing and limb w
     }
 }
 
+test "migrated readonly table i16 load retains register spill and R8 result forms" {
+    const Case = struct {
+        storage: selector_types.ReadOnlyTablePtrLoc.Storage,
+        expected: []const x86_64_machine.Instruction,
+    };
+    const cases = [_]Case{
+        .{
+            .storage = .{ .reg = .rsi },
+            .expected = &.{
+                .{ .load_arg_ptr_disp8_u16_arg = .{ .base = .rsi, .dst = .r8, .offset = 0 } },
+            },
+        },
+        .{
+            .storage = .{ .spill = .slot2 },
+            .expected = &.{
+                .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot2 } },
+                .{ .load_arg_ptr_disp8_u16_arg = .{ .base = .rcx, .dst = .r8, .offset = 0 } },
+            },
+        },
+    };
+
+    for (cases) |case| {
+        var machine = MachineFunction.init("readonly-table-i16-production", .{ .int = 16 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("table", 1);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 64;
+        try selector_state.bindValueLoc(&selector, "table", .{ .readonly_table_ptr = .{
+            .storage = case.storage,
+            .symbol = "@table",
+            .shape = .i16_128,
+        } });
+        const saved_accumulator = selector.accumulator_domain;
+        const saved_eflags = selector.eflags.snapshot();
+
+        try std.testing.expect((try selector_memory.lowerLoad(&selector, "loaded", .{
+            .ty = .{ .int = 16 },
+            .ptr = .{ .named = "table" },
+        })) == null);
+
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, case.expected, machine.instructions.items);
+        try std.testing.expectEqual(ValueLoc{ .scratch32 = .r8 }, selector.values.get("loaded").?.loc);
+        try std.testing.expectEqual(saved_accumulator, selector.accumulator_domain);
+        try selector.eflags.validateSnapshot(saved_eflags);
+    }
+}
+
+test "readonly table double load remains on the direct O3 path instruction-identically" {
+    var machine = MachineFunction.init("readonly-table-double-production", .double);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("table", 2);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 64;
+    try selector_state.bindValueLoc(&selector, "table", .{ .readonly_table_ptr = .{
+        .storage = .{ .spill = .slot2 },
+        .symbol = "@table",
+        .shape = .f64_pair_128,
+        .offset = 8,
+    } });
+
+    try std.testing.expect((try selector_memory.lowerLoad(&selector, "loaded", .{
+        .ty = .double,
+        .ptr = .{ .named = "table" },
+    })) == null);
+
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot2 } },
+        .{ .load_arg_ptr_disp8_xmm = .{ .base = .rcx, .dst = .xmm0, .offset = 8 } },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(
+        ValueLoc{ .xmm = .{ .reg = .xmm0, .bits = 64 } },
+        selector.values.get("loaded").?.loc,
+    );
+}
+
+test "readonly table i16 rejected type preserves spill-before-type diagnostic precedence" {
+    var machine = MachineFunction.init("readonly-table-i16-rejected-type", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("table", 2);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 64;
+    try selector_state.bindValueLoc(&selector, "table", .{ .readonly_table_ptr = .{
+        .storage = .{ .spill = .slot2 },
+        .symbol = "@table",
+        .shape = .i16_128,
+    } });
+
+    const diagnostic = (try selector_memory.lowerLoad(&selector, "loaded", .{
+        .ty = .{ .int = 32 },
+        .ptr = .{ .named = "table" },
+    })).?;
+    try std.testing.expectEqualStrings(
+        "composed-block-load-readonly-table-type",
+        diagnostic.no_emitter,
+    );
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+        .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot2 } },
+    }, machine.instructions.items);
+    try std.testing.expect(selector.values.get("loaded") == null);
+}
+
 test "migrated pointer load displaces one and multiple accumulator aliases instruction-identically" {
     inline for (.{ @as(usize, 1), @as(usize, 2) }) |alias_count| {
         var baseline_machine = MachineFunction.init("load-alias-baseline", .{ .int = 32 });
