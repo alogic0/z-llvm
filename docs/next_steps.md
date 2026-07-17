@@ -47,6 +47,26 @@ requesting slice-1 acceptance + the production cast-wiring authorization
 Reviewer: scalar casts residing in `control_compare.zig` is a naming stretch
 worth an explicit placement ruling for the remaining scalar slices.
 
+**Slice 1 is ACCEPTED** (Reviewer, 2026-07-17: "I accept slice 1 at
+211efdcc, including the reviewed nine-entry facade expansion"). **Placement
+ruling adopted**: the cast implementation MOVES before production wiring, in
+a dedicated dormant placement slice (INBOX-132, dispatched) — add
+`actions/scalar_arithmetic.zig`; move the three cast executors, classifiers,
+helpers, test hooks, and co-located tests out of control_compare; payload
+types stay in model; facade manifest/action tags/error sets/signatures/
+bodies/dispatch order preserved EXACTLY with R1-style provenance; core
+imports + split-policy guards updated without a planning/core edge from the
+new leaf; production untouched; ratchet 172; identities exact; full unit +
+ABI; no perf; no Tier 3; stop. Future placement recorded: casts, immediates,
+named binary/shift, and exact-i52 belong in scalar_arithmetic.zig; multiply
+and fixed-register division later get a separate
+actions/scalar_multiply_divide.zig; both leaves carry the 2,000-line hard
+ceiling. The production cast-wiring slice is CONDITIONALLY authorized after
+placement acceptance (all admitted forms together; C02/C03 stay O4; exact-EI
+gate preserved; only migrated branches removed; 172→166 only on the honest
+last-owner collapse else hard stop; full gates + counterbalanced perf; no
+Tier 3).
+
 ## Historical operating ledger
 
 ## INBOX-67 tracked serial-runner hardening (O1 prerequisite)
