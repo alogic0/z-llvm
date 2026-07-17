@@ -170,6 +170,69 @@ test "migrated pointer load displaces one and multiple accumulator aliases instr
     }
 }
 
+test "migrated ordinary load maps only attributed closed variants to the four legacy i16 diagnostics" {
+    const cases = [_]struct {
+        name: []const u8,
+        loc: ValueLoc,
+        detail: []const u8,
+    }{
+        .{
+            .name = "stack-scalar",
+            .loc = .{ .stack_scalar = .{ .base_disp = 0, .bits = 8, .kind = .integer } },
+            .detail = "composed-block-load-stack-width",
+        },
+        .{
+            .name = "stack-array",
+            .loc = .{ .stack_i32_array = .{ .base_disp = 0, .len = 4 } },
+            .detail = "composed-block-load-stack-array-width",
+        },
+        .{
+            .name = "stack-pointer",
+            .loc = .{ .stack_i32_ptr = .{ .disp = 0 } },
+            .detail = "composed-block-load-stack-array-width",
+        },
+        .{
+            .name = "gpr-pointer",
+            .loc = .{ .arg64 = .rdi },
+            .detail = "composed-block-load-ptr-width",
+        },
+        .{
+            .name = "rejected-home",
+            .loc = .{ .arg32 = .rdi },
+            .detail = "composed-block-load-ptr",
+        },
+    };
+    for (cases) |case| {
+        var machine = MachineFunction.init(case.name, .{ .int = 16 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("pointer", 1);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        try selector_state.bindValueLoc(&selector, "pointer", case.loc);
+
+        const diagnostic = (try selector_memory.lowerLoad(&selector, "loaded", .{
+            .ty = .{ .int = 16 },
+            .ptr = .{ .named = "pointer" },
+        })).?;
+        try std.testing.expectEqualStrings(case.detail, diagnostic.no_emitter);
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expect(selector.values.get("loaded") == null);
+    }
+
+    var unresolved_machine = MachineFunction.init("unresolved", .{ .int = 32 });
+    defer unresolved_machine.deinit(std.testing.allocator);
+    var unresolved = ComposedBlockSelector.init(std.testing.allocator, &unresolved_machine);
+    defer unresolved.deinit();
+    const diagnostic = (try selector_memory.lowerLoad(&unresolved, "loaded", .{
+        .ty = .{ .int = 32 },
+        .ptr = .{ .named = "missing" },
+    })).?;
+    try std.testing.expectEqualStrings("composed-block-unknown-load-ptr", diagnostic.unsupported_value);
+}
+
 test "migrated load production rollback restores full state before and after partial emission" {
     var machine = MachineFunction.init("load-production-rollback", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

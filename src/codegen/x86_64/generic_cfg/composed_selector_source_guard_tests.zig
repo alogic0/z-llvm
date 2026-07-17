@@ -40,7 +40,7 @@ const classified_sources = [_]ClassifiedSource{
 };
 
 const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-const frozen_bypass_inventory_sha256 = "1cc1fbc62a1478008189b5e33a3ae33ae177a96ebf8d625cec537c6c0754315a";
+const frozen_bypass_inventory_sha256 = "5a0370e3dd922fd849d6c1e8dbc2da412be4e0251aed0598de1cd16e60088de7";
 const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -148,7 +148,6 @@ const residual_accumulator_allowlist = [_]ResidualAllowlistEntry{
     .{ .source = "composed_selector_impl.zig", .function = "stabilizeFramedPhiDestinations", .operation = .bind_value_loc, .structural_role = "computed stabilized PHI destination alias binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
     .{ .source = "composed_selector_impl.zig", .function = "enterBlock", .operation = .bind_value_loc, .structural_role = "computed predecessor PHI location alias binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
 
-    .{ .source = "composed_selector_memory.zig", .function = "lowerLoad", .operation = .bind_value_loc, .structural_role = "fixed stack128 aggregate load binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 1 },
     .{ .source = "composed_selector_memory.zig", .function = "lowerStoreFp", .operation = .clobber_accumulator, .structural_role = "FP store address/value transfer temporary", .classification = .internal_temporary, .future_slice = .none, .expected_count = 2 },
     .{ .source = "composed_selector_memory.zig", .function = "loadStackU64IntoRax", .operation = .clobber_accumulator, .structural_role = "stack-to-RAX helper temporary with no result binding", .classification = .internal_temporary, .future_slice = .none, .expected_count = 1 },
 
@@ -246,7 +245,6 @@ const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_impl.zig", .function = "stabilizeFramedPhiDestinations", .body_sha256 = "84522a7d762d08de43dcffc4c9284f642605be75b0078f0bf74516df20f1196f" },
     .{ .source = "composed_selector_impl.zig", .function = "enterBlock", .body_sha256 = "edb2e130813a5ca0847f5e5060f9088d196db18deaec281dbd95a58b7db92b1f" },
 
-    .{ .source = "composed_selector_memory.zig", .function = "lowerLoad", .body_sha256 = "22736bb4f166cedae30f077d2f5a8daeccc8293a83f016401b092b595bbd1526" },
     .{ .source = "composed_selector_memory.zig", .function = "lowerStoreFp", .body_sha256 = "08773e5639dfcc22a932d0a4d702bbe8ff4b3ecb5e398c3b06a9de056fb8a81d" },
     .{ .source = "composed_selector_memory.zig", .function = "loadStackU64IntoRax", .body_sha256 = "3fd7fcf3653b5083f8123224f83a04abd16bbb7411dac2d4279079a74cf7648d" },
 
@@ -433,8 +431,16 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
         if (std.mem.indexOf(u8, function_source, ".preparedView(") == null and
             std.mem.indexOf(u8, function_source, ".executePreparedAction(") == null) continue;
         for (bypass_operations) |operation| {
-            if (std.mem.indexOf(u8, function_source, operation) != null)
-                return error.ValueUsePreparedLeafRawOperation;
+            const occurrence = std.mem.indexOf(u8, function_source, operation) orelse continue;
+            if (std.mem.eql(u8, body.name, "lowerLoad") and
+                std.mem.eql(u8, operation, "resolveValue") and
+                countPattern(function_source, operation) == 1)
+            {
+                const begin = std.mem.indexOf(u8, function_source, "ValueUseTransaction.begin(selector)") orelse
+                    return error.ValueUsePreparedLeafRawOperation;
+                if (occurrence < begin) continue;
+            }
+            return error.ValueUsePreparedLeafRawOperation;
         }
         for (forbidden) |pattern| {
             if (std.mem.indexOf(u8, function_source, pattern) != null)
@@ -476,6 +482,7 @@ fn validateLoadDiagnosticMappingProductionSites(source_name: []const u8, source:
         }
         if (!body_has_mapping) continue;
         const approved = std.mem.eql(u8, body.name, "lowerLoad") or
+            std.mem.eql(u8, body.name, "ordinaryLoadValueUseDiagnostic") or
             std.mem.eql(u8, body.name, "lowerReadOnlyPointerIntegerLoad") or
             std.mem.eql(u8, body.name, "lowerReadOnlyTableLoad");
         if (!approved) return error.ValueUseLoadDiagnosticMappingOutsideAllowlist;
@@ -517,19 +524,40 @@ fn validateLoadDiagnosticMappingProductionSites(source_name: []const u8, source:
 }
 
 fn validateDormantLoadActionProductionSites(source_name: []const u8, source: [:0]const u8) !void {
-    _ = source_name;
     if (std.mem.indexOf(u8, source, ".setLoadTestFailure(") != null)
         return error.ValueUseLoadTestHookInProduction;
-    const dormant_patterns = [_][]const u8{
-        ".form = .load_address",
-        ".load_scalar",
-        ".load_readonly_pair",
-        ".load_stack_i128_alias",
-        ".load_readonly_table_i16",
-    };
-    for (dormant_patterns) |pattern| {
-        if (std.mem.indexOf(u8, source, pattern) != null)
-            return error.ValueUseLoadActionNotWired;
+    const address_pattern = ".load_address";
+    const scalar_pattern = ".load_scalar";
+    const pair_pattern = ".load_readonly_pair";
+    const alias_pattern = ".load_stack_i128_alias";
+    const table_pattern = ".load_readonly_table_i16";
+    const address_total = countPattern(source, address_pattern);
+    const scalar_total = countPattern(source, scalar_pattern);
+    const pair_total = countPattern(source, pair_pattern);
+    const alias_total = countPattern(source, alias_pattern);
+    const table_total = countPattern(source, table_pattern);
+    const action_total = scalar_total + pair_total + alias_total + table_total;
+    if (address_total == 0 and action_total == 0) return;
+    if (!std.mem.eql(u8, source_name, "composed_selector_memory.zig"))
+        return error.ValueUseLoadActionNotWired;
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const body = functionBodyNamed(bodies, "lowerLoad") orelse
+        return error.ValueUseLoadActionNotWired;
+    const function_source = source[body.start..body.end];
+    if (countPattern(function_source, address_pattern) != 1 or
+        countPattern(function_source, scalar_pattern) != 1 or
+        countPattern(function_source, alias_pattern) != 1 or
+        countPattern(function_source, pair_pattern) != 0 or
+        countPattern(function_source, table_pattern) != 0 or
+        countPattern(function_source, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(function_source, ".executePreparedAction(") != 1 or
+        countPattern(function_source, ".commit()") != 1 or
+        address_total != 1 or scalar_total != 1 or alias_total != 1 or
+        pair_total != 0 or table_total != 0)
+    {
+        return error.ValueUseLoadActionNotWired;
     }
 }
 
@@ -551,6 +579,40 @@ fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source
         if (std.mem.indexOf(u8, source, pattern) != null) has_composition_api = true;
     }
     if (!has_composition_api) return;
+    if (std.mem.eql(u8, source_name, "composed_selector_memory.zig")) {
+        var body_storage: [max_function_bodies]FunctionBody = undefined;
+        const bodies = try collectFunctionBodies(source, &body_storage);
+        var classified_count: usize = 0;
+        for (bodies) |body| {
+            const function_source = source[body.start..body.end];
+            var contains_api = false;
+            for (composition_api) |pattern| {
+                if (std.mem.indexOf(u8, function_source, pattern) != null) contains_api = true;
+            }
+            if (!contains_api) continue;
+            if (!std.mem.eql(u8, body.name, "lowerLoad") or
+                countPattern(function_source, "beginAccumulatorSession(") != 1 or
+                countPattern(function_source, "defineAccumulatorResult(") != 1 or
+                countPattern(function_source, "finalizeAccumulatorResult(") != 1 or
+                countPattern(function_source, "ValueUseTransaction.begin(selector)") != 1 or
+                countPattern(function_source, "transaction.commit()") != 1 or
+                countPattern(function_source, "prepareAccumulator(") != 0 or
+                countPattern(function_source, "prepareAccumulatorCallBeforeArguments(") != 0 or
+                countPattern(function_source, "finishAccumulatorCallPreparationAfterArguments(") != 0 or
+                countPattern(function_source, "materializeAccumulator(") != 0 or
+                countPattern(function_source, "spillAccumulatorValue(") != 0 or
+                countPattern(function_source, "commitAccumulatorSession(") != 0 or
+                countPattern(function_source, "AccumulatorDefinitionSession.init(") != 0 or
+                countPattern(function_source, "AccumulatorDefinitionTransaction.begin(") != 0)
+            {
+                return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+            }
+            classified_count += 1;
+        }
+        if (classified_count != 1)
+            return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+        return;
+    }
     if (!std.mem.eql(u8, source_name, "composed_selector_calls.zig"))
         return error.ValueUseAccumulatorCompositionOutsideAllowlist;
 
@@ -622,6 +684,7 @@ fn validateFailureProvenanceProductionSites(source_name: []const u8, source: [:0
             const body_count = countPattern(function_source, ".failedRequestIs(");
             if (body_count == 0) continue;
             const approved = std.mem.eql(u8, body.name, "lowerLoad") or
+                std.mem.eql(u8, body.name, "ordinaryLoadValueUseDiagnostic") or
                 std.mem.eql(u8, body.name, "lowerReadOnlyPointerIntegerLoad") or
                 std.mem.eql(u8, body.name, "lowerReadOnlyTableLoad");
             if (!approved or std.mem.indexOf(u8, function_source, "ValueUseLoad") == null)
@@ -1822,6 +1885,54 @@ test "composed selector source guard rejects callback escapes and raw operations
     );
 }
 
+test "composed selector source guard admits only the complete ordinary lowerLoad action set" {
+    const accepted: [:0]const u8 =
+        "fn lowerLoad() void { _ = .load_address; _ = .load_scalar; " ++
+        "_ = .load_stack_i128_alias; _ = ValueUseTransaction.begin(selector); " ++
+        "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); }";
+    try validateDormantLoadActionProductionSites("composed_selector_memory.zig", accepted);
+    try std.testing.expectError(
+        error.ValueUseLoadActionNotWired,
+        validateDormantLoadActionProductionSites(
+            "composed_selector_memory.zig",
+            accepted ++ " fn relocated() void { _ = .load_scalar; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseLoadActionNotWired,
+        validateDormantLoadActionProductionSites(
+            "composed_selector_memory.zig",
+            "fn lowerLoad() void { _ = .load_address; _ = .load_scalar; " ++
+                "_ = .load_stack_i128_alias; _ = .load_readonly_pair; " ++
+                "_ = ValueUseTransaction.begin(selector); " ++
+                "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); }",
+        ),
+    );
+}
+
+test "composed selector source guard permits the sole readonly dispatch resolve only before lowerLoad transaction mutation" {
+    const store_fixture =
+        "fn lowerStoreScalarTransactional() void { _ = .store_scalar; _ = .store_immediate; } " ++
+        "fn lowerStoreI64Transactional() void { _ = .store_i64; } " ++
+        "fn lowerStoreStackPointer() void { _ = .store_stack_pointer; } ";
+    const before: [:0]const u8 = store_fixture ++
+        "fn lowerLoad() void { _ = selector_state.resolveValue(selector, pointer); " ++
+        "_ = .load_address; _ = .load_scalar; _ = .load_stack_i128_alias; " ++
+        "_ = ValueUseTransaction.begin(selector); _ = transaction.executePreparedAction(lease); " ++
+        "_ = transaction.commit(); }";
+    try validatePreparedViewLeafDiscipline("composed_selector_memory.zig", before);
+    try std.testing.expectError(
+        error.ValueUsePreparedLeafRawOperation,
+        validatePreparedViewLeafDiscipline(
+            "composed_selector_memory.zig",
+            store_fixture ++ "fn lowerLoad() void { _ = .load_address; _ = .load_scalar; " ++
+                "_ = .load_stack_i128_alias; _ = ValueUseTransaction.begin(selector); " ++
+                "_ = selector_state.resolveValue(selector, pointer); " ++
+                "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); }",
+        ),
+    );
+}
+
 test "composed selector source guard confines load diagnostic mapping without home queries" {
     const accepted: [:0]const u8 =
         "fn lowerLoad() void { _ = transaction.failedRequestIs(pointer); " ++
@@ -1993,7 +2104,16 @@ test "composed selector source guard freezes branch and ordinary switch actions"
     );
 }
 
-test "composed selector source guard admits only the fixed unary accumulator composition pilot" {
+test "composed selector source guard admits only reviewed accumulator composition consumers" {
+    try validateAccumulatorCompositionProductionSites(
+        "composed_selector_memory.zig",
+        "fn lowerLoad() void { " ++
+            "_ = ValueUseTransaction.begin(selector); " ++
+            "_ = transaction.beginAccumulatorSession(); " ++
+            "_ = transaction.defineAccumulatorResult(accumulator, \"result\", definition); " ++
+            "_ = transaction.finalizeAccumulatorResult(accumulator); " ++
+            "_ = transaction.commit(); }",
+    );
     try validateAccumulatorCompositionProductionSites(
         "composed_selector_calls.zig",
         "fn lowerAbsI32() void { " ++

@@ -109,73 +109,61 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
     if (isF32x2(load.ty)) return lowerLoadF32Pair(selector, result_name, load);
     if (scalarFpBits(load.ty)) |bits| return lowerLoadFp(selector, result_name, load, bits);
     if (!load.ty.eql(.{ .int = 8 }) and !load.ty.eql(.{ .int = 16 }) and !load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-load-width" };
-    const ptr = selector_state.resolveValue(selector, load.ptr) orelse return .{ .unsupported_value = "composed-block-unknown-load-ptr" };
-    switch (ptr) {
-        .stack_scalar => |stack| {
-            if (stack.bits == 64 and load.ty.eql(.{ .int = 64 })) {
-                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-                defer transaction.deinit();
-                if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
-                try appendLoadStackU64IntoRax(selector, stack.base_disp);
-                try transaction.define(result_name, .fullRax());
-                try transaction.commit();
-            } else if (stack.bits == 8 and load.ty.eql(.{ .int = 8 })) {
-                var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-                defer transaction.deinit();
-                if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
-                if (stack.base_disp <= std.math.maxInt(u8)) {
-                    try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp8_u8_eax = @intCast(stack.base_disp) });
-                } else {
-                    try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_u8_eax = stack.base_disp });
-                }
-                try transaction.define(result_name, .zeroExtending(8));
-                try transaction.commit();
-            } else return .{ .no_emitter = "composed-block-load-stack-width" };
-        },
-        .stack128 => |disp| {
-            if (!load.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-load-stack-width" };
-            try selector_state.bindValueLoc(selector, result_name, .{ .stack128_value = disp });
-        },
-        .stack_i32_ptr => |stack_ptr| {
-            if (!load.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-load-stack-array-width" };
-            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-            defer transaction.deinit();
-            if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
-            try appendLoadStackI32(selector, stack_ptr);
-            try transaction.define(result_name, .zeroExtending(32));
-            try transaction.commit();
-        },
-        .stack_i32_array => |stack_array| {
-            if (!load.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-load-stack-array-width" };
-            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-            defer transaction.deinit();
-            if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
-            try appendLoadStackI32(selector, .{ .disp = stack_array.base_disp });
-            try transaction.define(result_name, .zeroExtending(32));
-            try transaction.commit();
-        },
-        .arg64, .scratch64 => |reg| {
-            if (!load.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-load-ptr-width" };
-            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-            defer transaction.deinit();
-            if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
-            try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_eax = reg });
-            try transaction.define(result_name, .zeroExtending(32));
-            try transaction.commit();
-        },
-        .spill64 => |frame_index| {
-            if (!load.ty.eql(.{ .int = 32 })) return .{ .no_emitter = "composed-block-load-ptr-width" };
-            var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-            defer transaction.deinit();
-            if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
-            try selector_state.materializeLocIntoLoc(selector, .{ .spill64 = frame_index }, .{ .scratch64 = .rcx });
-            try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_eax = .rcx });
-            try transaction.define(result_name, .zeroExtending(32));
-            try transaction.commit();
-        },
-        .arg32, .arg128, .xmm, .eax, .rax, .scratch32, .scratch128, .stack128_value, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-load-ptr" },
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const alias_i128 = load.ty.eql(.{ .int = 128 });
+    const bits: u16 = @intCast(load.ty.int);
+    const pointer_request = try registerValueUseAction(
+        &transaction,
+        load.ptr,
+        .ptr,
+        .stack_pointer,
+        .load_address,
+        if (alias_i128)
+            .{ .load_stack_i128_alias = .{ .result = try valueUseActionIdentity(result_name) } }
+        else
+            .{ .load_scalar = .{ .kind = .ordinary, .bits = bits } },
+    );
+    transaction.seal() catch |err| return ordinaryLoadValueUseDiagnostic(&transaction, pointer_request, err) orelse return err;
+
+    const accumulator = if (alias_i128)
+        null
+    else
+        try transaction.beginAccumulatorSession();
+    transaction.prepare() catch |err| return ordinaryLoadValueUseDiagnostic(&transaction, pointer_request, err) orelse return err;
+    transaction.materializeAll() catch |err| return ordinaryLoadValueUseDiagnostic(&transaction, pointer_request, err) orelse return err;
+    const lease = transaction.preparedView(pointer_request) catch |err|
+        return ordinaryLoadValueUseDiagnostic(&transaction, pointer_request, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return ordinaryLoadValueUseDiagnostic(&transaction, pointer_request, err) orelse return err;
+
+    if (accumulator) |handle| {
+        const definition: selector_state.AccumulatorDefinition = switch (bits) {
+            8, 32 => .zeroExtending(bits),
+            64 => .fullRax(),
+            else => unreachable,
+        };
+        try transaction.defineAccumulatorResult(handle, result_name, definition);
+        try transaction.finalizeAccumulatorResult(handle);
     }
+    try transaction.commit();
     return null;
+}
+
+fn ordinaryLoadValueUseDiagnostic(
+    transaction: *const ValueUseTransaction,
+    pointer_request: ValueUseTransaction.RequestHandle,
+    err: anyerror,
+) ?Diagnostic {
+    if (!transaction.failedRequestIs(pointer_request)) return null;
+    return switch (err) {
+        error.ValueUseUnresolvedSource => .{ .unsupported_value = "composed-block-unknown-load-ptr" },
+        error.ValueUseLoadOrdinaryStackWidth => .{ .no_emitter = "composed-block-load-stack-width" },
+        error.ValueUseLoadOrdinaryStackArrayWidth => .{ .no_emitter = "composed-block-load-stack-array-width" },
+        error.ValueUseLoadOrdinaryPointerWidth => .{ .no_emitter = "composed-block-load-ptr-width" },
+        error.ValueUseLoadOrdinaryPointerRejected => .{ .no_emitter = "composed-block-load-ptr" },
+        else => null,
+    };
 }
 
 pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {

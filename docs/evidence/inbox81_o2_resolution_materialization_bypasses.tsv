@@ -46,7 +46,7 @@ composed_selector_icmp.zig	lowerExactEiNarrowIcmp	emitValueIntoEax×1
 composed_selector_icmp.zig	lowerIcmp	emitValueIntoEax×10, emitValueIntoRax×1, emitValueIntoScratch×29, materializePairValue×1, resolvePairValue×1, resolveValue×1
 composed_selector_impl.zig	stabilizeFramedParams	valueLoc×1
 composed_selector_memory.zig	lowerAlloca	valueLoc×1
-composed_selector_memory.zig	lowerLoad	materializeLocIntoLoc×1, resolveValue×2
+composed_selector_memory.zig	lowerLoad	resolveValue×1
 composed_selector_memory.zig	lowerLoadF32Pair	materializeLocIntoLoc×1, resolveValue×1
 composed_selector_memory.zig	lowerLoadFp	resolveValue×1
 composed_selector_memory.zig	lowerReadOnlyPointerIntegerLoad	materializeLocIntoLoc×2, resolveValue×1
