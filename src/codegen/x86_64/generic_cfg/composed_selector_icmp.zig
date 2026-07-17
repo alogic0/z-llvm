@@ -1,17 +1,12 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
-const x86_64_types = @import("../types.zig");
 const inspection = @import("inspection.zig");
-const selector_types = @import("selector_types.zig");
 const stage2_planning = @import("stage2_planning.zig");
 const composed_helpers = @import("composed_helpers.zig");
 const selector_state = @import("composed_selector_state.zig");
 const value_use = @import("composed_selector_value_use_transaction.zig");
 
-const ArgReg = x86_64_types.ArgReg;
 const ValueUseTransaction = value_use.ValueUseTransaction;
-const pair_a = selector_types.pair_a;
-const pair_b = selector_types.pair_b;
 const intBits = composed_helpers.intBits;
 const i32Value = composed_helpers.i32Value;
 const i64Value = composed_helpers.i64Value;
@@ -484,6 +479,91 @@ fn currentHomeSignBitDiagnostic(
     };
 }
 
+fn lowerI128EqMinIcmp(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    icmp: ir.IcmpInst,
+) !?Diagnostic {
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const lhs_request = try transaction.register(.{
+        .source = icmp.lhs,
+        .expected = .{
+            .ty = .{ .int = 128 },
+            .register_class = .gpr128,
+        },
+        .form = .i128_icmp_pair_operand,
+        .destination = .prepared_view,
+        .prepared_action = .{ .i128_eq_min = .{
+            .result = try ValueUseTransaction.ActionIdentity.init(result_name),
+        } },
+    });
+    transaction.seal() catch |err|
+        return i128PairDiagnostic(&transaction, lhs_request, err) orelse return err;
+    _ = try transaction.beginAccumulatorSession();
+    transaction.prepare() catch |err|
+        return i128PairDiagnostic(&transaction, lhs_request, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return i128PairDiagnostic(&transaction, lhs_request, err) orelse return err;
+    const lease = transaction.preparedView(lhs_request) catch |err|
+        return i128PairDiagnostic(&transaction, lhs_request, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return i128PairDiagnostic(&transaction, lhs_request, err) orelse return err;
+    try transaction.commit();
+    return null;
+}
+
+fn lowerI128SignBitIcmp(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    icmp: ir.IcmpInst,
+) !?Diagnostic {
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const lhs_request = try transaction.register(.{
+        .source = icmp.lhs,
+        .expected = .{
+            .ty = .{ .int = 128 },
+            .register_class = .gpr128,
+        },
+        .form = .i128_icmp_pair_operand,
+        .destination = .prepared_view,
+        .prepared_action = .{ .i128_sign_bit = .{
+            .result = try ValueUseTransaction.ActionIdentity.init(result_name),
+        } },
+    });
+    transaction.seal() catch |err|
+        return i128PairDiagnostic(&transaction, lhs_request, err) orelse return err;
+    _ = try transaction.beginAccumulatorSession();
+    transaction.prepare() catch |err|
+        return i128PairDiagnostic(&transaction, lhs_request, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return i128PairDiagnostic(&transaction, lhs_request, err) orelse return err;
+    const lease = transaction.preparedView(lhs_request) catch |err|
+        return i128PairDiagnostic(&transaction, lhs_request, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return i128PairDiagnostic(&transaction, lhs_request, err) orelse return err;
+    try transaction.commit();
+    return null;
+}
+
+fn i128PairDiagnostic(
+    transaction: *const ValueUseTransaction,
+    lhs_request: ValueUseTransaction.RequestHandle,
+    err: anyerror,
+) ?Diagnostic {
+    if (err == error.ValueUseActionDiagnostic) return transaction.actionDiagnostic();
+    if (!transaction.failedRequestIs(lhs_request)) return null;
+    return switch (err) {
+        error.ValueUseUnresolvedSource,
+        error.UnsupportedCodegenValue,
+        => .{ .unsupported_value = "composed-block-icmp-lhs" },
+        error.ValueUseI128PairWidthUnsupported => .{ .no_emitter = "composed-block-icmp-lhs-width" },
+        error.ValueUseI128PairLocationUnsupported => .{ .no_emitter = "composed-block-icmp-lhs-loc" },
+        else => null,
+    };
+}
+
 pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir.IcmpInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     switch (try classifyScratchCompare(icmp)) {
@@ -500,45 +580,16 @@ pub fn lowerIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, icmp: ir
         return lowerSetccEaxCompare(selector, result_name, icmp, .ordinary);
     if (ValueUseTransaction.isCurrentHomeSignBitIcmp(icmp))
         return lowerCurrentHomeSignBitIcmp(selector, result_name, icmp);
+    if (ValueUseTransaction.isI128EqMinIcmp(icmp))
+        return lowerI128EqMinIcmp(selector, result_name, icmp);
+    if (ValueUseTransaction.isI128SignBitIcmp(icmp))
+        return lowerI128SignBitIcmp(selector, result_name, icmp);
     var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
     defer transaction.deinit();
     while (try selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
         if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
     }
-    if (icmp.predicate == .eq and icmp.operand_ty.eql(.{ .int = 128 }) and switch (icmp.rhs) {
-        .int => |int| int == std.math.minInt(i128),
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
-    }) {
-        const existing = selector_state.resolvePairValue(selector, icmp.lhs);
-        const pair = if (existing) |source|
-            if (source.contains(pair_a.lo) or source.contains(pair_a.hi)) pair_b else pair_a
-        else
-            pair_a;
-        _ = selector_state.materializePairValue(selector, icmp.lhs, pair) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
-        const temp: ArgReg = if (pair.contains(.r8)) .rcx else .r8;
-        if (try prepareIcmpResult(&transaction)) |diagnostic| return diagnostic;
-        try selector_state.clobberArgReg(selector, temp);
-        try selector.machine.instructions.append(selector.allocator, .{ .mov_arg_rax = pair.hi });
-        try selector.machine.instructions.append(selector.allocator, switch (temp) {
-            .rcx => .{ .mov_imm_rcx = std.math.minInt(i64) },
-            .r8 => .{ .mov_imm_r8 = std.math.minInt(i64) },
-            else => unreachable,
-        });
-        try emitIcmpWrite(&transaction, .{ .binary_arg_rax = .{ .op = .xor, .reg = temp } });
-        try emitIcmpWrite(&transaction, .{ .binary_arg_rax = .{ .op = .@"or", .reg = pair.lo } });
-        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = temp });
-        try emitIcmpDefinition(&transaction, .{ .cmp_arg64_imm64 = .{ .reg = temp, .imm = 0 } });
-        if (try emitIcmpSetcc(&transaction, .sete_eax)) |diagnostic| return diagnostic;
-    } else if (icmp.predicate == .slt and icmp.operand_ty.eql(.{ .int = 128 }) and switch (icmp.rhs) {
-        .int => |int| int == 0,
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
-    }) {
-        selector_state.emitPairHighLaneIntoRax(selector, icmp.lhs) catch return .{ .unsupported_value = "composed-block-icmp-lhs" };
-        if (try prepareIcmpResult(&transaction)) |diagnostic| return diagnostic;
-        try emitIcmpWrite(&transaction, .{ .shr_rax_imm6 = 63 });
-    } else return .{ .no_emitter = "composed-block-icmp-form" };
-    try finishIcmpResult(&transaction, result_name);
-    return null;
+    return .{ .no_emitter = "composed-block-icmp-form" };
 }
 
 fn isExactEiNarrowIcmp(selector: *const ComposedBlockSelector, icmp: ir.IcmpInst) bool {

@@ -40,7 +40,7 @@ const classified_sources = [_]ClassifiedSource{
 };
 
 const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-const frozen_bypass_inventory_sha256 = "281ef86923fbc72fd4254bfadc6586030bab00dd73aeeb528556622a0803a9b1";
+const frozen_bypass_inventory_sha256 = "6e570be808d2aea9275809471f53846af7f54afdd908ab73e51218579ca8112d";
 const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -1666,17 +1666,139 @@ fn validateCurrentHomeSignBitProductionSites(
 }
 
 fn validateI128PairProductionSites(source_name: []const u8, source: [:0]const u8) !void {
-    _ = source_name;
-    const dormant_markers = [_][]const u8{
+    const production_markers = [_][]const u8{
         ".form = .i128_icmp_pair_operand",
         ".prepared_action = .{ .i128_eq_min",
         ".prepared_action = .{ .i128_sign_bit",
         "ValueUseI128PairWidthUnsupported",
         "ValueUseI128PairLocationUnsupported",
     };
-    for (dormant_markers) |pattern| {
-        if (std.mem.indexOf(u8, source, pattern) != null)
-            return error.ValueUseI128PairProductionWiringForbidden;
+    var has_wiring = false;
+    for (production_markers) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null) has_wiring = true;
+    }
+    if (!has_wiring) return;
+    if (!std.mem.eql(u8, source_name, "composed_selector_icmp.zig"))
+        return error.ValueUseI128PairProductionWiringForbidden;
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const eq_body = functionBodyNamed(bodies, "lowerI128EqMinIcmp") orelse
+        return error.ValueUseI128PairProductionAllowlistMismatch;
+    const sign_body = functionBodyNamed(bodies, "lowerI128SignBitIcmp") orelse
+        return error.ValueUseI128PairProductionAllowlistMismatch;
+    const mapper_body = functionBodyNamed(bodies, "i128PairDiagnostic") orelse
+        return error.ValueUseI128PairProductionAllowlistMismatch;
+    const dispatch_body = functionBodyNamed(bodies, "lowerIcmp") orelse
+        return error.ValueUseI128PairProductionAllowlistMismatch;
+    const eq = source[eq_body.start..eq_body.end];
+    const sign = source[sign_body.start..sign_body.end];
+    const mapper = source[mapper_body.start..mapper_body.end];
+    const dispatch = source[dispatch_body.start..dispatch_body.end];
+
+    const action_functions = [_][]const u8{ eq, sign };
+    for (action_functions) |action| {
+        if (countPattern(action, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(action, ".form = .i128_icmp_pair_operand") != 1 or
+            countPattern(action, ".register(") != 1 or
+            countPattern(action, ".seal()") != 1 or
+            countPattern(action, ".beginAccumulatorSession()") != 1 or
+            countPattern(action, ".prepare()") != 1 or
+            countPattern(action, ".materializeAll()") != 1 or
+            countPattern(action, ".preparedView(") != 1 or
+            countPattern(action, ".executePreparedAction(") != 1 or
+            countPattern(action, ".commit()") != 1 or
+            countPattern(action, "AccumulatorDefinitionTransaction.begin(") != 0 or
+            countPattern(action, "resolveValue(") != 0 or
+            countPattern(action, "valueLoc(") != 0 or
+            countPattern(action, "resolvePairValue(") != 0 or
+            countPattern(action, "materializePairValue(") != 0 or
+            countPattern(action, "emitPairHighLaneIntoRax(") != 0)
+        {
+            return error.ValueUseI128PairProductionAllowlistMismatch;
+        }
+    }
+    if (countPattern(eq, ".prepared_action = .{ .i128_eq_min") != 1 or
+        countPattern(eq, ".prepared_action = .{ .i128_sign_bit") != 0 or
+        countPattern(sign, ".prepared_action = .{ .i128_sign_bit") != 1 or
+        countPattern(sign, ".prepared_action = .{ .i128_eq_min") != 0 or
+        countPattern(source, ".form = .i128_icmp_pair_operand") != 2 or
+        countPattern(source, ".prepared_action = .{ .i128_eq_min") != 1 or
+        countPattern(source, ".prepared_action = .{ .i128_sign_bit") != 1)
+    {
+        return error.ValueUseI128PairProductionAllowlistMismatch;
+    }
+
+    const mapper_required = [_][]const u8{
+        "transaction.actionDiagnostic()",
+        "transaction.failedRequestIs(lhs_request)",
+        "ValueUseUnresolvedSource",
+        "UnsupportedCodegenValue",
+        "ValueUseI128PairWidthUnsupported",
+        "ValueUseI128PairLocationUnsupported",
+        "composed-block-icmp-lhs",
+        "composed-block-icmp-lhs-width",
+        "composed-block-icmp-lhs-loc",
+    };
+    for (mapper_required) |pattern| {
+        if (std.mem.indexOf(u8, mapper, pattern) == null)
+            return error.ValueUseI128PairDiagnosticMapperMismatch;
+    }
+    if (countPattern(mapper, "failedRequestIs(") != 1 or
+        countPattern(mapper, "resolveValue(") != 0 or
+        countPattern(mapper, "valueLoc(") != 0)
+    {
+        return error.ValueUseI128PairDiagnosticMapperMismatch;
+    }
+
+    const current_sign_bit = std.mem.indexOf(
+        u8,
+        dispatch,
+        "ValueUseTransaction.isCurrentHomeSignBitIcmp(icmp)",
+    ) orelse return error.ValueUseI128PairDispatchMismatch;
+    const eq_dispatch = std.mem.indexOf(
+        u8,
+        dispatch,
+        "ValueUseTransaction.isI128EqMinIcmp(icmp)",
+    ) orelse return error.ValueUseI128PairDispatchMismatch;
+    const sign_dispatch = std.mem.indexOf(
+        u8,
+        dispatch,
+        "ValueUseTransaction.isI128SignBitIcmp(icmp)",
+    ) orelse return error.ValueUseI128PairDispatchMismatch;
+    const legacy_begin = std.mem.indexOf(
+        u8,
+        dispatch,
+        "AccumulatorDefinitionTransaction.begin(selector)",
+    ) orelse return error.ValueUseI128PairDispatchMismatch;
+    if (!(current_sign_bit < eq_dispatch and eq_dispatch < sign_dispatch and
+        sign_dispatch < legacy_begin) or
+        countPattern(dispatch, "ValueUseTransaction.isI128EqMinIcmp(icmp)") != 1 or
+        countPattern(dispatch, "ValueUseTransaction.isI128SignBitIcmp(icmp)") != 1 or
+        countPattern(dispatch, "lowerI128EqMinIcmp(selector, result_name, icmp)") != 1 or
+        countPattern(dispatch, "lowerI128SignBitIcmp(selector, result_name, icmp)") != 1 or
+        countPattern(dispatch, "AccumulatorDefinitionTransaction.begin(selector)") != 1 or
+        countPattern(dispatch, "ValueUseTransaction.begin(selector)") != 0 or
+        countPattern(dispatch, "resolvePairValue(") != 0 or
+        countPattern(dispatch, "materializePairValue(") != 0 or
+        countPattern(dispatch, "emitPairHighLaneIntoRax(") != 0)
+    {
+        return error.ValueUseI128PairDispatchMismatch;
+    }
+
+    for (bodies) |body| {
+        const body_source = source[body.start..body.end];
+        var contains_marker = false;
+        for (production_markers) |pattern| {
+            if (std.mem.indexOf(u8, body_source, pattern) != null) contains_marker = true;
+        }
+        if (!contains_marker) continue;
+        if (!std.mem.eql(u8, body.name, "lowerI128EqMinIcmp") and
+            !std.mem.eql(u8, body.name, "lowerI128SignBitIcmp") and
+            !std.mem.eql(u8, body.name, "i128PairDiagnostic"))
+        {
+            return error.ValueUseI128PairProductionAllowlistMismatch;
+        }
     }
 }
 
@@ -1876,10 +1998,16 @@ fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source
             return error.ValueUseAccumulatorCompositionAllowlistMismatch;
         const sign_bit_body = functionBodyNamed(bodies, "lowerCurrentHomeSignBitIcmp") orelse
             return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+        const i128_eq_min_body = functionBodyNamed(bodies, "lowerI128EqMinIcmp") orelse
+            return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+        const i128_sign_bit_body = functionBodyNamed(bodies, "lowerI128SignBitIcmp") orelse
+            return error.ValueUseAccumulatorCompositionAllowlistMismatch;
         const scratch_source = source[action_body.start..action_body.end];
         const current_home_source = source[current_home_body.start..current_home_body.end];
         const setcc_source = source[setcc_body.start..setcc_body.end];
         const sign_bit_source = source[sign_bit_body.start..sign_bit_body.end];
+        const i128_eq_min_source = source[i128_eq_min_body.start..i128_eq_min_body.end];
+        const i128_sign_bit_source = source[i128_sign_bit_body.start..i128_sign_bit_body.end];
         if (countPattern(scratch_source, "beginAccumulatorSession(") != 1 or
             countPattern(scratch_source, "ValueUseTransaction.begin(selector)") != 1 or
             countPattern(scratch_source, ".executePreparedAction(") != 1 or
@@ -1900,7 +2028,17 @@ fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source
             countPattern(sign_bit_source, ".executePreparedAction(") != 1 or
             countPattern(sign_bit_source, ".commit()") != 1 or
             countPattern(sign_bit_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
-            countPattern(source, "beginAccumulatorSession(") != 4)
+            countPattern(i128_eq_min_source, "beginAccumulatorSession(") != 1 or
+            countPattern(i128_eq_min_source, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(i128_eq_min_source, ".executePreparedAction(") != 1 or
+            countPattern(i128_eq_min_source, ".commit()") != 1 or
+            countPattern(i128_eq_min_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
+            countPattern(i128_sign_bit_source, "beginAccumulatorSession(") != 1 or
+            countPattern(i128_sign_bit_source, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(i128_sign_bit_source, ".executePreparedAction(") != 1 or
+            countPattern(i128_sign_bit_source, ".commit()") != 1 or
+            countPattern(i128_sign_bit_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
+            countPattern(source, "beginAccumulatorSession(") != 6)
         {
             return error.ValueUseAccumulatorCompositionAllowlistMismatch;
         }
@@ -2015,11 +2153,14 @@ fn validateFailureProvenanceProductionSites(source_name: []const u8, source: [:0
             return error.ValueUseFailureProvenanceOutsideAllowlist;
         const sign_bit_mapper = functionBodyNamed(bodies, "currentHomeSignBitDiagnostic") orelse
             return error.ValueUseFailureProvenanceOutsideAllowlist;
+        const i128_pair_mapper = functionBodyNamed(bodies, "i128PairDiagnostic") orelse
+            return error.ValueUseFailureProvenanceOutsideAllowlist;
         if (countPattern(source[scratch_mapper.start..scratch_mapper.end], ".failedRequestIs(") != 2 or
             countPattern(source[current_home_mapper.start..current_home_mapper.end], ".failedRequestIs(") != 1 or
             countPattern(source[setcc_mapper.start..setcc_mapper.end], ".failedRequestIs(") != 1 or
             countPattern(source[sign_bit_mapper.start..sign_bit_mapper.end], ".failedRequestIs(") != 1 or
-            query_count != 5)
+            countPattern(source[i128_pair_mapper.start..i128_pair_mapper.end], ".failedRequestIs(") != 1 or
+            query_count != 6)
         {
             return error.ValueUseFailureProvenanceAllowlistMismatch;
         }
@@ -4056,7 +4197,7 @@ test "composed selector source guard keeps current-home sign-bit production wiri
     );
 }
 
-test "composed selector source guard keeps dormant i128 pair wrappers semantic and structurally admitted" {
+test "composed selector source guard keeps i128 pair wrappers semantic and production wiring narrow" {
     try validateI128PairIntentSurface(
         "pub const I128EqMinAction = struct { result: ActionIdentity, }; " ++
             "pub const I128SignBitAction = struct { result: ActionIdentity, };",
@@ -4067,11 +4208,86 @@ test "composed selector source guard keeps dormant i128 pair wrappers semantic a
             "pub const I128EqMinAction = struct { result: ActionIdentity, pair: RegPair, };",
         ),
     );
+
+    const eq_action =
+        "fn lowerI128EqMinIcmp() void { " ++
+        "_ = ValueUseTransaction.begin(selector); _ = transaction.register(.{ " ++
+        ".form = .i128_icmp_pair_operand, " ++
+        ".prepared_action = .{ .i128_eq_min = intent }, }); " ++
+        "_ = transaction.seal(); _ = transaction.beginAccumulatorSession(); " ++
+        "_ = transaction.prepare(); _ = transaction.materializeAll(); " ++
+        "_ = transaction.preparedView(lhs_request); " ++
+        "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } ";
+    const sign_action =
+        "fn lowerI128SignBitIcmp() void { " ++
+        "_ = ValueUseTransaction.begin(selector); _ = transaction.register(.{ " ++
+        ".form = .i128_icmp_pair_operand, " ++
+        ".prepared_action = .{ .i128_sign_bit = intent }, }); " ++
+        "_ = transaction.seal(); _ = transaction.beginAccumulatorSession(); " ++
+        "_ = transaction.prepare(); _ = transaction.materializeAll(); " ++
+        "_ = transaction.preparedView(lhs_request); " ++
+        "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } ";
+    const mapper =
+        "fn i128PairDiagnostic() void { _ = transaction.actionDiagnostic(); " ++
+        "_ = transaction.failedRequestIs(lhs_request); " ++
+        "_ = error.ValueUseUnresolvedSource; _ = error.UnsupportedCodegenValue; " ++
+        "_ = error.ValueUseI128PairWidthUnsupported; " ++
+        "_ = error.ValueUseI128PairLocationUnsupported; " ++
+        "_ = \"composed-block-icmp-lhs\"; _ = \"composed-block-icmp-lhs-width\"; " ++
+        "_ = \"composed-block-icmp-lhs-loc\"; } ";
+    const dispatch =
+        "fn lowerIcmp() void { " ++
+        "if (ValueUseTransaction.isCurrentHomeSignBitIcmp(icmp)) return; " ++
+        "if (ValueUseTransaction.isI128EqMinIcmp(icmp)) " ++
+        "_ = lowerI128EqMinIcmp(selector, result_name, icmp); " ++
+        "if (ValueUseTransaction.isI128SignBitIcmp(icmp)) " ++
+        "_ = lowerI128SignBitIcmp(selector, result_name, icmp); " ++
+        "_ = AccumulatorDefinitionTransaction.begin(selector); }";
+    const accepted: [:0]const u8 = eq_action ++ sign_action ++ mapper ++ dispatch;
+    try validateI128PairProductionSites("composed_selector_icmp.zig", accepted);
+
     try std.testing.expectError(
         error.ValueUseI128PairProductionWiringForbidden,
         validateI128PairProductionSites(
-            "composed_selector_icmp.zig",
+            "composed_selector_calls.zig",
             "fn lowerIcmp() void { _ = .{ .form = .i128_icmp_pair_operand }; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseI128PairProductionAllowlistMismatch,
+        validateI128PairProductionSites(
+            "composed_selector_icmp.zig",
+            accepted ++
+                " fn relocated() void { _ = .{ .form = .i128_icmp_pair_operand }; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseI128PairDispatchMismatch,
+        validateI128PairProductionSites(
+            "composed_selector_icmp.zig",
+            eq_action ++ sign_action ++ mapper ++
+                "fn lowerIcmp() void { " ++
+                "if (ValueUseTransaction.isCurrentHomeSignBitIcmp(icmp)) return; " ++
+                "if (ValueUseTransaction.isI128SignBitIcmp(icmp)) " ++
+                "_ = lowerI128SignBitIcmp(selector, result_name, icmp); " ++
+                "if (ValueUseTransaction.isI128EqMinIcmp(icmp)) " ++
+                "_ = lowerI128EqMinIcmp(selector, result_name, icmp); " ++
+                "_ = AccumulatorDefinitionTransaction.begin(selector); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseI128PairProductionAllowlistMismatch,
+        validateI128PairProductionSites(
+            "composed_selector_icmp.zig",
+            "fn lowerI128EqMinIcmp() void { _ = ValueUseTransaction.begin(selector); " ++
+                "_ = selector.valueLoc(source); _ = transaction.register(.{ " ++
+                ".form = .i128_icmp_pair_operand, " ++
+                ".prepared_action = .{ .i128_eq_min = intent }, }); " ++
+                "_ = transaction.seal(); _ = transaction.beginAccumulatorSession(); " ++
+                "_ = transaction.prepare(); _ = transaction.materializeAll(); " ++
+                "_ = transaction.preparedView(lhs_request); " ++
+                "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } " ++
+                sign_action ++ mapper ++ dispatch,
         ),
     );
 }
