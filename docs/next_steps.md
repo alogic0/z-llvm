@@ -138,7 +138,23 @@ conditions remain active (ratchet exactly 166; `accumulatorCastSource` must
 have no remaining owner before removal; C02/C03 + exact-EI placement
 unchanged; identities + six frontier rows byte-identical; any action/model
 change, failed gate, or contaminated perf batch = review). Step B
-dispatched.
+dispatched. **Step B LANDED (wiring `3d829cd4` + evidence `08bb2251`)** and
+Supervisor-verified (all checklist items green): the `value_use/` action
+model is byte-identical to the frozen Step-A tree; the wiring touched only
+`composed_selector_scalar.zig` (+355/-194, the three dispatch stages,
+consumer mapping, and legacy cast branch removals), its regression tests
+(+81), the two ratchet TSVs, and the guard consumer policy; the honest
+ratchet recount is **EXACTLY 166** and `accumulatorCastSource` is verified
+gone from production with the guard now rejecting its reappearance;
+identities re-hashed EXACT (`49a19f04`/`061a64e4`/`5d91960e`) with exactly
+six `composed-block-icmp-lhs-loc` rows; full unit 1,297/1,297; Worker abi +
+my independent abi rerun both pass; counterbalanced perf PASSED all three
+criteria (median B 51.160s vs A 51.295s — B faster; paired ratio 0.99913 vs
+1.05; RSS −396 KiB vs the +16 MiB limit; 16/16 reports at `49a19f04`; no
+sample removed, no discretionary rerun); exact commands per log; no Tier 3.
+**The scalar CASTS slice is complete at ratchet 166 pending Reviewer
+acceptance.** Evidence sent requesting acceptance + slice-2 (immediates →
+153) agreement.
 
 ## Historical operating ledger
 
