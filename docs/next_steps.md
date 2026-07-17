@@ -216,6 +216,22 @@ every remaining scalar action to its exact legacy displacement authority
 between categories). Step B2 resumes the wiring from patch `39aa6d53` under
 the unchanged contract. INBOX-135 amended in place; Step A2 dispatched.
 
+**USER DIRECTIVE (2026-07-17): a REFACTORING CHECKPOINT before scalar slice
+3.** Concrete size pressure: `value_use/planning.zig` 2,298 lines (already
+past the 2,000 watch); `composed_selector_scalar_tests.zig` 2,354;
+`actions/scalar_arithmetic.zig` 1,374 and slice 3 could push it past 2,000;
+`src/tests/codegen_x86_64_generic_cfg_selector_planning.zig` 4,384;
+`composed_selector_state.zig` 2,684 (riskier central authority). Timing: (1)
+let A2 finish and be reviewed; (2) resume and close the INBOX-135 wiring at
+ratchet 153; (3) BEFORE scalar slice 3, hold the checkpoint with the
+Reviewer. Scope: make scalar_arithmetic.zig a stable facade over cast,
+immediate, and future named-arithmetic leaves; split planning.zig by
+ownership preserving its API and import DAG; split the 2,354-line scalar
+test file behind a stable test aggregator; handle the 4,384-line planning
+test file as a separate low-risk test-only slice; DEFER
+composed_selector_state.zig unless an evidence-only dependency plan proves a
+safe boundary.
+
 ## Historical operating ledger
 
 ## INBOX-67 tracked serial-runner hardening (O1 prerequisite)
