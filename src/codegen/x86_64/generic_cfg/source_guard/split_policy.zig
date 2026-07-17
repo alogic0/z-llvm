@@ -17,6 +17,7 @@ const value_use_materialization_pub_names = model.value_use_materialization_pub_
 const value_use_composition_pub_names = model.value_use_composition_pub_names;
 const value_use_address_pub_names = model.value_use_address_pub_names;
 const value_use_control_pub_names = model.value_use_control_pub_names;
+const value_use_scalar_arithmetic_pub_names = model.value_use_scalar_arithmetic_pub_names;
 const value_use_calls_pub_names = model.value_use_calls_pub_names;
 const frozen_bypass_inventory_path = model.frozen_bypass_inventory_path;
 const frozen_bypass_inventory_sha256 = model.frozen_bypass_inventory_sha256;
@@ -125,8 +126,10 @@ pub fn appendNormalizedValueUseSource(writer: *std.Io.Writer, source: []const u8
         "materialization_module.",
         "composition_module.",
         "control_compare_module.",
+        "scalar_arithmetic_module.",
         "address_memory.",
         "control_compare.",
+        "scalar_arithmetic.",
         "materialization.",
         "composition.",
         "planning.",
@@ -176,6 +179,7 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
     const is_composition = std.mem.endsWith(u8, path, "/composition.zig");
     const is_address = std.mem.endsWith(u8, path, "/actions/address_memory.zig");
     const is_control = std.mem.endsWith(u8, path, "/actions/control_compare.zig");
+    const is_scalar_arithmetic = std.mem.endsWith(u8, path, "/actions/scalar_arithmetic.zig");
     const is_calls = std.mem.endsWith(u8, path, "/actions/calls.zig");
 
     const public_names: []const []const u8 = if (is_model)
@@ -192,6 +196,8 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
         &value_use_address_pub_names
     else if (is_control)
         &value_use_control_pub_names
+    else if (is_scalar_arithmetic)
+        &value_use_scalar_arithmetic_pub_names
     else if (is_calls)
         &value_use_calls_pub_names
     else
@@ -229,7 +235,7 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
             std.mem.indexOf(u8, source, "@import(\"planning.zig\")") != null or
             std.mem.indexOf(u8, source, "@import(\"actions/") != null)
             return error.ValueUseImportDagMismatch;
-    } else if (is_address or is_control or is_calls) {
+    } else if (is_address or is_control or is_scalar_arithmetic or is_calls) {
         if (std.mem.indexOf(u8, source, "@import(\"../core.zig\")") != null or
             std.mem.indexOf(u8, source, "@import(\"../planning.zig\")") != null or
             std.mem.indexOf(u8, source, "@import(\"../actions/") != null or
@@ -239,6 +245,8 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
 
     if (is_control and countPattern(source, "\n") + 1 > 2000)
         return error.ValueUseControlCompareLineBudgetExceeded;
+    if (is_scalar_arithmetic and countPattern(source, "\n") + 1 > 2000)
+        return error.ValueUseScalarArithmeticLineBudgetExceeded;
     try validateExactTopLevelPubNames(source, public_names);
 }
 

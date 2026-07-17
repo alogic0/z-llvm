@@ -115,6 +115,7 @@ const materialization_module = @import("materialization.zig");
 const composition_module = @import("composition.zig");
 const address_memory = @import("actions/address_memory.zig");
 const control_compare_module = @import("actions/control_compare.zig");
+const scalar_arithmetic_module = @import("actions/scalar_arithmetic.zig");
 const calls = @import("actions/calls.zig");
 
 const ValueEntry = struct {
@@ -648,11 +649,11 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
         .i128_sign_bit => |*compare| try compare.result.validate(),
         .pair_low_scalar_cast => |*cast| {
             try cast.result.validate();
-            try control_compare_module.validatePairLowScalarCastAction(cast);
+            try scalar_arithmetic_module.validatePairLowScalarCastAction(cast);
         },
         .accumulator_scalar_cast => |*cast| {
             try cast.result.validate();
-            try control_compare_module.validateAccumulatorScalarCastAction(cast);
+            try scalar_arithmetic_module.validateAccumulatorScalarCastAction(cast);
         },
         .sign_extend_scratch => |*cast| try cast.result.validate(),
     }
@@ -858,21 +859,21 @@ fn executePreparedActionInternal(
             view,
             &compare,
         ),
-        .pair_low_scalar_cast => |cast| try control_compare_module.executePairLowScalarCast(
+        .pair_low_scalar_cast => |cast| try scalar_arithmetic_module.executePairLowScalarCast(
             Authority,
             transaction,
             request_index,
             view,
             &cast,
         ),
-        .accumulator_scalar_cast => |cast| try control_compare_module.executeAccumulatorScalarCast(
+        .accumulator_scalar_cast => |cast| try scalar_arithmetic_module.executeAccumulatorScalarCast(
             Authority,
             transaction,
             request_index,
             view,
             &cast,
         ),
-        .sign_extend_scratch => |cast| try control_compare_module.executeSignExtendScratch(
+        .sign_extend_scratch => |cast| try scalar_arithmetic_module.executeSignExtendScratch(
             Authority,
             transaction,
             request_index,
@@ -1061,6 +1062,7 @@ const Implementation = struct {
     pub const materialization = materialization_module;
     pub const composition = composition_module;
     pub const control_compare = control_compare_module;
+    pub const scalar_arithmetic = scalar_arithmetic_module;
     pub const registeredOperandCurrent = core_registeredOperandCurrent;
     pub const registeredOperandView = core_registeredOperandView;
     pub const validateRequest = planning_module.validateRequest;

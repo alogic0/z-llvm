@@ -20,6 +20,7 @@ pub const value_use_materialization_pub_names = model.value_use_materialization_
 pub const value_use_composition_pub_names = model.value_use_composition_pub_names;
 pub const value_use_address_pub_names = model.value_use_address_pub_names;
 pub const value_use_control_pub_names = model.value_use_control_pub_names;
+pub const value_use_scalar_arithmetic_pub_names = model.value_use_scalar_arithmetic_pub_names;
 pub const value_use_calls_pub_names = model.value_use_calls_pub_names;
 pub const frozen_bypass_inventory_path = model.frozen_bypass_inventory_path;
 pub const frozen_bypass_inventory_sha256 = model.frozen_bypass_inventory_sha256;

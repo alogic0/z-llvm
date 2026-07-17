@@ -1413,15 +1413,15 @@ pub fn Transaction(comptime Impl: type) type {
         }
 
         pub fn isPairLowScalarCast(cast: ir.CastInst) bool {
-            return Impl.control_compare.isPairLowScalarCast(cast);
+            return Impl.scalar_arithmetic.isPairLowScalarCast(cast);
         }
 
         pub fn isAccumulatorScalarCast(cast: ir.CastInst, exact_ei: bool) bool {
-            return Impl.control_compare.isAccumulatorScalarCast(cast, exact_ei);
+            return Impl.scalar_arithmetic.isAccumulatorScalarCast(cast, exact_ei);
         }
 
         pub fn isSignExtendScratchCast(cast: ir.CastInst) bool {
-            return Impl.control_compare.isSignExtendScratchCast(cast);
+            return Impl.scalar_arithmetic.isSignExtendScratchCast(cast);
         }
     };
 }

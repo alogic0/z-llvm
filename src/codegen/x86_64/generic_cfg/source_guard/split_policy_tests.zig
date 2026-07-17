@@ -15,6 +15,7 @@ const value_use_materialization_pub_names = support.value_use_materialization_pu
 const value_use_composition_pub_names = support.value_use_composition_pub_names;
 const value_use_address_pub_names = support.value_use_address_pub_names;
 const value_use_control_pub_names = support.value_use_control_pub_names;
+const value_use_scalar_arithmetic_pub_names = support.value_use_scalar_arithmetic_pub_names;
 const value_use_calls_pub_names = support.value_use_calls_pub_names;
 const frozen_bypass_inventory_path = support.frozen_bypass_inventory_path;
 const frozen_bypass_inventory_sha256 = support.frozen_bypass_inventory_sha256;
@@ -164,6 +165,34 @@ test "value-use split guard rejects reverse imports and control-compare budget g
         validateValueUseLeaf(
             "src/codegen/x86_64/generic_cfg/value_use/actions/control_compare.zig",
             oversized,
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseImportDagMismatch,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_arithmetic.zig",
+            "const planning = @import(\"../planning.zig\");",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseImportDagMismatch,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_arithmetic.zig",
+            "fn reverse(comptime Authority: type) void { _ = Authority.planning; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseScalarArithmeticLineBudgetExceeded,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_arithmetic.zig",
+            oversized,
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseTechnicalPubBudgetMismatch,
+        validateExactTopLevelPubNames(
+            "pub fn executeAccumulatorScalarCast() void {}\n",
+            &value_use_scalar_arithmetic_pub_names,
         ),
     );
     try std.testing.expectError(
