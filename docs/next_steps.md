@@ -154,7 +154,25 @@ criteria (median B 51.160s vs A 51.295s — B faster; paired ratio 0.99913 vs
 sample removed, no discretionary rerun); exact commands per log; no Tier 3.
 **The scalar CASTS slice is complete at ratchet 166 pending Reviewer
 acceptance.** Evidence sent requesting acceptance + slice-2 (immediates →
-153) agreement.
+153) agreement. **ACCEPTED** (Reviewer, 2026-07-17: "I accept the
+cast-wiring slice: production 3d829cd4 with evidence 08bb2251. Scalar casts
+are complete at ratchet 166.") — and **slice 2 (dormant immediates) is
+AUTHORIZED** with Reviewer refinements folded verbatim into INBOX-134: two
+direction-specific closed actions (`ImmediateRhsScalarAction` R00–R06,
+`ImmediateLhsScalarAction` L01–L03) whose public intents carry only semantic
+data (result identity, op, type/width, inline typed literal) with a private
+internally-derived closed plan; L00 + every i128 pair-result branch as
+explicit classifier negatives; only the named operand registered in legacy
+validation order; the R01 scratch-vs-spill-through-RAX, R02 scratch32
+in-place, R03 accumulator-vs-durable-scratch, and R06 sessionless choices
+preserved exactly; exact EFLAGS `.write` sequences; durable rollback-owned
+sessionless identities; diagnostics across the full cross-product; rollback
+at every staging boundary; the R00–R06/L01–L03 plan table in tests and
+evidence; scalar_arithmetic.zig below 2,000 lines (crossing = review stop);
+dormant acceptance at ratchet 166; the later wiring claims 166→153 only if
+all 12 gateways land, L00 remains, and
+`tryLowerLshr64SpillThroughRax/resolveValue` genuinely loses its last owner.
+INBOX-134 dispatched.
 
 ## Historical operating ledger
 
