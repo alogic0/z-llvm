@@ -6,6 +6,30 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
+## INBOX-131 dormant scalar-cast actions — dispatched
+
+INBOX-130 at `101ac07c` is **ACCEPTED**. Its honest scalar terminal is 129:
+39 removable bypass occurrences plus four last-owner helper collapses, with
+three O4-owned residuals and all semantic-only transitions retained.
+
+The sole authorized Worker action is **INBOX-131**, agreed by the Supervisor
+and Reviewer on 2026-07-17: implement three dormant, ownership-specific cast
+actions—`PairLowScalarCastAction` for C01, `AccumulatorScalarCastAction` for
+C04/C05 and C52-0 through C52-3, and `SignExtendScratchAction` for exactly
+C06 i32-to-i64 over G32/S32 homes. C02 alias-only and C03 pair-result forms
+remain with their existing O4 owners. All semantic inputs and result
+identities must be transaction-owned before seal; C01 is a read-only low-limb
+view only; C01/C06 durable binding creation and rollback belong solely to the
+outer transaction.
+
+This is a dormant slice: production lowering/dispatch files remain
+byte-identical, ratchet stays 172, frozen identities stay exact, full unit and
+ABI gates run with exact commands recorded, and there is no performance run
+or Tier 3. The Worker must commit immutable evidence and STOP for review.
+Production wiring and the projected 172 -> 166 movement are not authorized.
+
+## Historical operating ledger
+
 ## INBOX-67 tracked serial-runner hardening (O1 prerequisite)
 
 | Field | Authoritative state |
