@@ -250,7 +250,19 @@ byte-stream invariant, a per-plan first-write/preamble table, and the seven
 coverage classes; then B3 applies patch `8ab26a97` unchanged under the 153
 contract. PROCESS RULE: another distinct lifecycle gap in B3 = no automatic
 A4 — stop and split by complete immediate plan families for architectural
-review. A3 dispatched.
+review. A3 dispatched. **Step A3 LANDED at `137894b5`** ("O2: preserve
+immediate accumulator aliases") and is Supervisor-verified: production
+untouched; ratchet 166; the A2 source-liveness rule and
+`scalarCastSourceDisplacement` untouched (zero diff hits); the per-plan
+first-write/preamble table is exact (R05 `spill_source`; R04, narrow R02/R03
+`scratch_preferred`; R00/R01/R06 + L01–L03 none — their existing authorities
+remain) and frozen in tests + the guard (which now rejects changing R05 to
+none); +302 test lines pin the `__multi3` unrelated-alias-spilled-once
+stream, no-alias and multiple-alias exactness, the rollback preserving flags
+and state, and the fails-closed malformed-liveness case; identities EXACT;
+unit 1,318/1,318; Worker abi + my independent abi rerun both pass; no perf;
+no Tier 3. Evidence sent requesting A3 acceptance + the B3 resume (patch
+`8ab26a97` unchanged, 153 contract).
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
