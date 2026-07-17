@@ -394,6 +394,7 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     if (std.mem.indexOf(u8, source, "AccumulatorDefinitionTransaction.begin(") != null)
         return error.ValueUseNestedAccumulatorSnapshot;
     try validateScratchCompareIntentSurface(source);
+    try validateDurableActionIdentityOwnership(source);
 }
 
 fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const u8) !void {
@@ -478,6 +479,43 @@ fn validateScratchCompareIntentSurface(source: []const u8) !void {
                 return error.ValueUseScratchComparePhysicalIntentEscape;
         }
     }
+}
+
+fn validateDurableActionIdentityOwnership(source: [:0]const u8) !void {
+    if (std.mem.indexOf(u8, source, ".result.slice()") != null)
+        return error.ValueUseDurableActionIdentityNotOwned;
+    const durable_apis = [_][]const u8{
+        "session.define(",
+        "selector_state.bindValueLoc(",
+        "selector_state.bindResultLoc(",
+        "selector_state.bindScratch(",
+        "selector_state.bindPairScratch(",
+    };
+    for (durable_apis) |api| {
+        var cursor: usize = 0;
+        while (std.mem.indexOfPos(u8, source, cursor, api)) |start| {
+            const end = std.mem.indexOfPos(u8, source, start, ";") orelse
+                return error.InvalidZigSource;
+            if (std.mem.indexOf(u8, source[start..end], ".slice()") != null)
+                return error.ValueUseDurableActionIdentityNotOwned;
+            cursor = end + 1;
+        }
+    }
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const body = functionBodyNamed(bodies, "executeScratchCompare") orelse return;
+    const function_source = source[body.start..body.end];
+    const own_pattern = "const result_name = try ownActionIdentity(transaction, &stored_action.result);";
+    const define_pattern = "try session.define(result_name, .zeroExtending(1));";
+    const own_index = std.mem.indexOf(u8, function_source, own_pattern) orelse
+        return error.ValueUseDurableActionIdentityOwnershipMissing;
+    const define_index = std.mem.indexOf(u8, function_source, define_pattern) orelse
+        return error.ValueUseDurableActionIdentityOwnershipMissing;
+    if (own_index >= define_index) return error.ValueUseDurableActionIdentityOwnershipOrder;
+    const between = function_source[own_index + own_pattern.len .. define_index];
+    if (countPattern(between, "failScratchCompareForTest(transaction, .after_result_identity_ownership);") != 1)
+        return error.ValueUseDurableActionIdentityOwnershipOrder;
 }
 
 fn validateDormantScratchCompareProductionSites(source_name: []const u8, source: []const u8) !void {
@@ -2350,6 +2388,40 @@ test "composed selector source guard keeps scratch compare intent semantic and d
             validateDormantScratchCompareProductionSites("composed_selector_icmp.zig", fixture),
         );
     }
+
+    const accepted_identity: [:0]const u8 =
+        "fn executeScratchCompare() void { " ++
+        "const result_name = try ownActionIdentity(transaction, &stored_action.result); " ++
+        "try failScratchCompareForTest(transaction, .after_result_identity_ownership); " ++
+        "try session.define(result_name, .zeroExtending(1)); }";
+    try validateDurableActionIdentityOwnership(accepted_identity);
+    try std.testing.expectError(
+        error.ValueUseDurableActionIdentityNotOwned,
+        validateDurableActionIdentityOwnership(
+            "fn executeScratchCompare() void { try session.define(stored_action.result.slice(), .zeroExtending(1)); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseDurableActionIdentityNotOwned,
+        validateDurableActionIdentityOwnership(
+            "fn durable() void { try selector_state.bindValueLoc(selector, action.symbol.slice(), .rax); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseDurableActionIdentityOwnershipMissing,
+        validateDurableActionIdentityOwnership(
+            "fn executeScratchCompare() void { try session.define(result_name, .zeroExtending(1)); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseDurableActionIdentityOwnershipOrder,
+        validateDurableActionIdentityOwnership(
+            "fn executeScratchCompare() void { " ++
+                "try session.define(result_name, .zeroExtending(1)); " ++
+                "const result_name = try ownActionIdentity(transaction, &stored_action.result); " ++
+                "try failScratchCompareForTest(transaction, .after_result_identity_ownership); }",
+        ),
+    );
 }
 
 test "composed selector source guard accepts the fully classified current tree" {

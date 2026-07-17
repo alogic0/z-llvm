@@ -5,6 +5,7 @@ const machine_module = @import("../machine.zig");
 const selector_types = @import("selector_types.zig");
 const state_data = @import("composed_selector_state_data.zig");
 const selector_state = @import("composed_selector_state.zig");
+const selector_scalar = @import("composed_selector_scalar.zig");
 const stage2_planning = @import("stage2_planning.zig");
 const value_use = @import("composed_selector_value_use_transaction.zig");
 
@@ -4923,6 +4924,8 @@ test "value-use scratch compare rollback is exact at every action boundary" {
         .after_accumulator_preparation,
         .after_flags_definition,
         .after_setcc,
+        .after_result_identity_ownership,
+        .after_result_definition,
         .after_result_finalization,
     };
     for (boundaries) |boundary| {
@@ -4979,6 +4982,7 @@ test "value-use scratch compare rollback is exact at every action boundary" {
         try std.testing.expect(selector.address_dependencies.eql(&saved_domain));
         try selector.eflags.validateSnapshot(saved_eflags);
         try std.testing.expectEqual(saved_semantics, selector.eflags_semantics.items.len);
+        try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
         try std.testing.expectError(error.ValueUseTransactionClosed, transaction.rollback());
     }
 
@@ -5016,6 +5020,155 @@ test "value-use scratch compare rollback is exact at every action boundary" {
     try std.testing.expectEqual(saved_lhs, selector.values.get("lhs").?);
     try std.testing.expect(selector.values.get("result") == null);
     try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+}
+
+test "value-use scratch compare owns its result across transaction teardown and following zext" {
+    var machine = MachineFunction.init("value-use-scratch-compare-then-zext", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("lhs", 1);
+    try plan.interval_ends.put("%7", 2);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi });
+
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const requests = try registerScratchCompare(
+            &transaction,
+            .{ .named = "lhs" },
+            .{ .immediate = -4294967296 },
+            "%7",
+            .{ .int = 64 },
+            .ult,
+            false,
+        );
+        try transaction.seal();
+        _ = try transaction.beginAccumulatorSession();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(requests.lhs));
+        try transaction.commit();
+    }
+
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.resolveValue(&selector, .{ .named = "%7" }).?);
+    selector.current_position = 2;
+    const diagnostic = try selector_scalar.lowerCast(&selector, "%spec.store.select", .{
+        .op = .zext,
+        .value = .{ .named = "%7" },
+        .from_ty = .{ .int = 1 },
+        .to_ty = .{ .int = 32 },
+    });
+    try std.testing.expect(diagnostic == null);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.resolveValue(&selector, .{ .named = "%spec.store.select" }).?);
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } },
+        .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = -4294967296 } },
+        .setb_eax,
+        .{ .and_eax_imm32 = 1 },
+    }, machine.instructions.items);
+}
+
+test "value-use scratch compare identity rollback frees one owned result at each durable boundary" {
+    const boundaries = [_]Transaction.ScratchCompareTestFailure{
+        .after_result_identity_ownership,
+        .after_result_definition,
+        .after_result_finalization,
+    };
+    for (boundaries) |boundary| {
+        var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+        const allocator = failing.allocator();
+        var machine = MachineFunction.init("value-use-scratch-compare-owned-rollback", .{ .int = 1 });
+        defer machine.deinit(allocator);
+        var plan = SelectorAllocationPlan.init(allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "lhs");
+        var selector = ComposedBlockSelector.init(allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const requests = try registerScratchCompare(
+            &transaction,
+            .{ .named = "lhs" },
+            .{ .immediate = 0 },
+            "result",
+            .{ .int = 32 },
+            .ne,
+            false,
+        );
+        try transaction.seal();
+        _ = try transaction.beginAccumulatorSession();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try machine.instructions.ensureUnusedCapacity(allocator, 4);
+        try machine.owned_labels.ensureUnusedCapacity(allocator, 1);
+        try selector.eflags_semantics.ensureUnusedCapacity(allocator, 4);
+        try selector.values.ensureUnusedCapacity(1);
+        const allocations_before = failing.allocations;
+        const deallocations_before = failing.deallocations;
+        try transaction.setScratchCompareTestFailure(boundary);
+        try std.testing.expectError(
+            error.ValueUseScratchCompareTestFailure,
+            transaction.executePreparedAction(try transaction.preparedView(requests.lhs)),
+        );
+        try std.testing.expectEqual(allocations_before + 1, failing.allocations);
+        try std.testing.expectEqual(deallocations_before + 1, failing.deallocations);
+        try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+        try std.testing.expect(selector.values.get("result") == null);
+    }
+}
+
+test "value-use scratch compare identity allocation failure leaves no binding or owned entry" {
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    const allocator = failing.allocator();
+    var machine = MachineFunction.init("value-use-scratch-compare-owned-oom", .{ .int = 1 });
+    defer machine.deinit(allocator);
+    var plan = SelectorAllocationPlan.init(allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "lhs");
+    var selector = ComposedBlockSelector.init(allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const requests = try registerScratchCompare(
+        &transaction,
+        .{ .named = "lhs" },
+        .{ .immediate = 0 },
+        "result",
+        .{ .int = 32 },
+        .ne,
+        false,
+    );
+    try transaction.seal();
+    _ = try transaction.beginAccumulatorSession();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try machine.instructions.ensureUnusedCapacity(allocator, 4);
+    try machine.owned_labels.ensureUnusedCapacity(allocator, 1);
+    try selector.eflags_semantics.ensureUnusedCapacity(allocator, 4);
+    try selector.values.ensureUnusedCapacity(1);
+    const allocations_before = failing.allocations;
+    const deallocations_before = failing.deallocations;
+    failing.fail_index = failing.alloc_index;
+    try std.testing.expectError(
+        error.OutOfMemory,
+        transaction.executePreparedAction(try transaction.preparedView(requests.lhs)),
+    );
+    try std.testing.expect(failing.has_induced_failure);
+    try std.testing.expectEqual(allocations_before, failing.allocations);
+    try std.testing.expectEqual(deallocations_before, failing.deallocations);
+    try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+    try std.testing.expect(selector.values.get("result") == null);
 }
 
 test "value-use scratch compare requires subordinate accumulator ownership and supports accepted wide homes" {

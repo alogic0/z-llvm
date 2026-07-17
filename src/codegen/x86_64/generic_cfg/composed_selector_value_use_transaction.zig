@@ -348,6 +348,8 @@ pub const ValueUseTransaction = struct {
         after_accumulator_preparation,
         after_flags_definition,
         after_setcc,
+        after_result_identity_ownership,
+        after_result_definition,
         after_result_finalization,
     };
 
@@ -2625,7 +2627,10 @@ fn executeScratchCompare(
     try selector_state.emitEflagsInstruction(transaction.selector, setcc, .use);
     try failScratchCompareForTest(transaction, .after_setcc);
     const stored_action = &transaction.requests[lhs_index].prepared_action.?.scratch_compare;
-    try session.define(stored_action.result.slice(), .zeroExtending(1));
+    const result_name = try ownActionIdentity(transaction, &stored_action.result);
+    try failScratchCompareForTest(transaction, .after_result_identity_ownership);
+    try session.define(result_name, .zeroExtending(1));
+    try failScratchCompareForTest(transaction, .after_result_definition);
     try session.finalize();
     try failScratchCompareForTest(transaction, .after_result_finalization);
 }
