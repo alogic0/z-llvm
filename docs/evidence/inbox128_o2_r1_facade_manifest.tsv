@@ -1,4 +1,5 @@
 symbol
+AccumulatorScalarCastAction
 AccumulatorSessionHandle
 ActionIdentity
 AddressOffset
@@ -21,6 +22,7 @@ LoadRequestError
 LoadTestFailure
 MemcpyAction
 MemcpyTestFailure
+PairLowScalarCastAction
 PreparedAction
 PreparedShape
 PreparedViewLease
@@ -30,6 +32,8 @@ ReadOnlyTableI16LoadAction
 Request
 RequestHandle
 RequestPhase
+ScalarCastRequestError
+ScalarCastTestFailure
 ScalarLoadAction
 ScalarLoadKind
 ScaledAddressAction
@@ -40,6 +44,7 @@ SetccEaxCompareAction
 SetccEaxCompareRequestError
 SetccEaxCompareStructure
 SetccEaxCompareTestFailure
+SignExtendScratchAction
 StackI128AliasLoadAction
 StoreI64Action
 StoreImmediateAction
@@ -64,9 +69,12 @@ executePreparedAction
 failedRequestIs
 finalizeAccumulatorResult
 finishAccumulatorCallPreparationAfterArguments
+isAccumulatorScalarCast
 isCurrentHomeSignBitIcmp
 isI128EqMinIcmp
 isI128SignBitIcmp
+isPairLowScalarCast
+isSignExtendScratchCast
 materializeAccumulator
 materializeAll
 max_identity_bytes
@@ -87,6 +95,7 @@ setI128EqMinTestFailure
 setI128SignBitTestFailure
 setLoadTestFailure
 setMemcpyTestFailure
+setScalarCastTestFailure
 setScratchCompareTestFailure
 setSetccEaxCompareTestFailure
 spillAccumulatorValue

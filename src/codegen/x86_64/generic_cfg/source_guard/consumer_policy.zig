@@ -86,6 +86,7 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     try validateSetccEaxCompareProductionSites(source_name, source);
     try validateCurrentHomeSignBitProductionSites(source_name, source);
     try validateI128PairProductionSites(source_name, source);
+    try validateDormantScalarCastProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -116,6 +117,25 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
             if (std.mem.indexOf(u8, function_source, pattern) != null)
                 return error.ValueUsePreparedLeafRawOperation;
         }
+    }
+}
+
+pub fn validateDormantScalarCastProductionSites(source_name: []const u8, source: [:0]const u8) !void {
+    _ = source_name;
+    const forbidden = [_][]const u8{
+        ".form = .pair_low_scalar_cast_operand",
+        ".form = .accumulator_scalar_cast_operand",
+        ".form = .sign_extend_scratch_operand",
+        ".prepared_action = .{ .pair_low_scalar_cast",
+        ".prepared_action = .{ .accumulator_scalar_cast",
+        ".prepared_action = .{ .sign_extend_scratch",
+        "isPairLowScalarCast(",
+        "isAccumulatorScalarCast(",
+        "isSignExtendScratchCast(",
+    };
+    for (forbidden) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseScalarCastProductionWiringForbidden;
     }
 }
 

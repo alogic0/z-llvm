@@ -128,12 +128,14 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateSetccEaxCompareIntentSurface(source);
     try validateCurrentHomeSignBitIntentSurface(source);
     try validateI128PairIntentSurface(source);
+    try validateScalarCastIntentSurface(source);
     try validateDurableActionIdentityOwnership(source);
     try validateScratchComparePreservationPreamble(source);
     try validateCurrentHomeEqZeroSequence(source);
     try validateSetccEaxCompareSequence(source);
     try validateCurrentHomeSignBitSequence(source);
     try validateI128PairSequence(source);
+    try validateScalarCastSequence(source);
 }
 
 pub fn validateScratchCompareIntentSurface(source: []const u8) !void {
@@ -320,6 +322,164 @@ pub fn validateI128PairIntentSurface(source: []const u8) !void {
         }
         if (countPattern(body, "result: ActionIdentity") != 1)
             return error.ValueUseI128PairIntentMismatch;
+    }
+}
+
+pub fn validateScalarCastIntentSurface(source: []const u8) !void {
+    const declarations = [_]struct {
+        declaration: []const u8,
+        required: []const []const u8,
+    }{
+        .{
+            .declaration = "pub const PairLowScalarCastAction = struct {",
+            .required = &.{ "result: ActionIdentity", "op: ir.CastOp", "from_bits: u16", "to_bits: u16" },
+        },
+        .{
+            .declaration = "pub const AccumulatorScalarCastAction = struct {",
+            .required = &.{
+                "result: ActionIdentity",
+                "op: ir.CastOp",
+                "from_bits: u16",
+                "to_bits: u16",
+                "immediate: ?i128",
+                "exact_ei: bool",
+            },
+        },
+        .{
+            .declaration = "pub const SignExtendScratchAction = struct {",
+            .required = &.{"result: ActionIdentity"},
+        },
+    };
+    var present: usize = 0;
+    for (declarations) |entry| {
+        const start = std.mem.indexOf(u8, source, entry.declaration) orelse continue;
+        present += 1;
+        const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+            return error.InvalidZigSource;
+        const body = source[start .. end + 2];
+        const forbidden = [_][]const u8{
+            "ArgReg",
+            "RegPair",
+            "ValueLoc",
+            "Destination",
+            "PreparedView",
+            "register",
+            "home",
+            "binding",
+            "scratch",
+            "spill",
+            "displacement",
+            "sequence",
+            "phase",
+        };
+        for (forbidden) |pattern| {
+            if (std.mem.indexOf(u8, body, pattern) != null)
+                return error.ValueUseScalarCastPhysicalIntentEscape;
+        }
+        for (entry.required) |pattern| {
+            if (countPattern(body, pattern) != 1)
+                return error.ValueUseScalarCastIntentMismatch;
+        }
+    }
+    if (present != 0 and present != declarations.len)
+        return error.ValueUseScalarCastIntentMissing;
+}
+
+pub fn validateScalarCastSequence(source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const pair_body = functionBodyNamed(bodies, "executePairLowScalarCast") orelse return;
+    const accumulator_body = functionBodyNamed(bodies, "executeAccumulatorScalarCast") orelse
+        return error.ValueUseScalarCastSequenceMismatch;
+    const sign_extend_body = functionBodyNamed(bodies, "executeSignExtendScratch") orelse
+        return error.ValueUseScalarCastSequenceMismatch;
+    const pair = source[pair_body.start..pair_body.end];
+    const accumulator = source[accumulator_body.start..accumulator_body.end];
+    const sign_extend = source[sign_extend_body.start..sign_extend_body.end];
+
+    const pair_order = [_][]const u8{
+        "validatePairLowScalarCastAction(action)",
+        "scalarCastNamedSource(",
+        "emitPairLowLaneIntoScratch(",
+        "ownActionIdentity(",
+        "bindScratch(",
+    };
+    var cursor: usize = 0;
+    for (pair_order) |pattern| {
+        const found = std.mem.indexOfPos(u8, pair, cursor, pattern) orelse
+            return error.ValueUseScalarCastSequenceMismatch;
+        cursor = found + pattern.len;
+    }
+    const accumulator_order = [_][]const u8{
+        "validateAccumulatorScalarCastAction(action)",
+        "scalarCastSourceValue(",
+        "session.prepare(",
+        "session.materialize(",
+        "emitEflagsInstruction(",
+        "ownActionIdentity(",
+        "session.define(",
+        "session.finalize()",
+    };
+    cursor = 0;
+    for (accumulator_order) |pattern| {
+        const found = std.mem.indexOfPos(u8, accumulator, cursor, pattern) orelse
+            return error.ValueUseScalarCastSequenceMismatch;
+        cursor = found + pattern.len;
+    }
+    const sign_extend_order = [_][]const u8{
+        "scalarCastNamedSource(",
+        ".arg32, .scratch32",
+        ".movsxd_arg32_arg64",
+        "ownActionIdentity(",
+        "bindScratch(",
+    };
+    cursor = 0;
+    for (sign_extend_order) |pattern| {
+        const found = std.mem.indexOfPos(u8, sign_extend, cursor, pattern) orelse
+            return error.ValueUseScalarCastSequenceMismatch;
+        cursor = found + pattern.len;
+    }
+    if (countPattern(pair, "emitPairLowLaneIntoScratch(") != 1 or
+        countPattern(pair, "bindPairScratch(") != 0 or
+        countPattern(pair, "materializePairValue(") != 0 or
+        countPattern(accumulator, "session.prepare(") != 1 or
+        countPattern(accumulator, "session.materialize(") != 1 or
+        countPattern(accumulator, "session.define(") != 1 or
+        countPattern(accumulator, "session.finalize()") != 1 or
+        countPattern(sign_extend, ".arg32, .scratch32") != 1 or
+        countPattern(sign_extend, ".spill64") != 0 or
+        countPattern(sign_extend, ".eax") != 0 or
+        countPattern(sign_extend, ".rax") != 0)
+    {
+        return error.ValueUseScalarCastSequenceMismatch;
+    }
+
+    const classifier_names = [_][]const u8{
+        "isPairLowScalarCast",
+        "isAccumulatorScalarCast",
+        "isSignExtendScratchCast",
+    };
+    for (classifier_names) |name| {
+        const classifier_body = functionBodyNamed(bodies, name) orelse
+            return error.ValueUseScalarCastClassifierMissing;
+        const classifier = source[classifier_body.start..classifier_body.end];
+        const forbidden = [_][]const u8{
+            "selector",
+            "resolveValue(",
+            "valueLoc(",
+            "ValueLoc",
+            "function",
+            "family",
+            ".arg",
+            ".scratch",
+            ".spill",
+            ".eax",
+            ".rax",
+        };
+        for (forbidden) |pattern| {
+            if (std.mem.indexOf(u8, classifier, pattern) != null)
+                return error.ValueUseScalarCastClassifierStatePredicate;
+        }
     }
 }
 

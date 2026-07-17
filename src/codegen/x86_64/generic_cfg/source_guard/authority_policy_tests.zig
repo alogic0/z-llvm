@@ -66,11 +66,13 @@ const validateCurrentHomeEqZeroIntentSurface = support.validateCurrentHomeEqZero
 const validateSetccEaxCompareIntentSurface = support.validateSetccEaxCompareIntentSurface;
 const validateCurrentHomeSignBitIntentSurface = support.validateCurrentHomeSignBitIntentSurface;
 const validateI128PairIntentSurface = support.validateI128PairIntentSurface;
+const validateScalarCastIntentSurface = support.validateScalarCastIntentSurface;
 const validateScratchComparePreservationPreamble = support.validateScratchComparePreservationPreamble;
 const validateCurrentHomeEqZeroSequence = support.validateCurrentHomeEqZeroSequence;
 const validateSetccEaxCompareSequence = support.validateSetccEaxCompareSequence;
 const validateCurrentHomeSignBitSequence = support.validateCurrentHomeSignBitSequence;
 const validateI128PairSequence = support.validateI128PairSequence;
+const validateScalarCastSequence = support.validateScalarCastSequence;
 const validateDurableActionIdentityOwnership = support.validateDurableActionIdentityOwnership;
 const validatePreparedViewLeafDiscipline = support.validatePreparedViewLeafDiscipline;
 const validateScratchCompareProductionSites = support.validateScratchCompareProductionSites;
@@ -307,6 +309,28 @@ test "composed selector source guard rejects callback escapes and raw operations
         validatePreparedViewLeafDiscipline(
             "composed_selector_fixture.zig",
             "fn lowerLoad() void { _ = transaction.setLoadTestFailure(.after_pointer_staging); }",
+        ),
+    );
+}
+
+test "composed selector source guard freezes semantic-only scalar cast intents" {
+    const accepted =
+        "pub const PairLowScalarCastAction = struct { result: ActionIdentity, op: ir.CastOp, from_bits: u16, to_bits: u16, };" ++
+        "pub const AccumulatorScalarCastAction = struct { result: ActionIdentity, op: ir.CastOp, from_bits: u16, to_bits: u16, immediate: ?i128 = null, exact_ei: bool = false, };" ++
+        "pub const SignExtendScratchAction = struct { result: ActionIdentity, };";
+    try validateScalarCastIntentSurface(accepted);
+    try std.testing.expectError(
+        error.ValueUseScalarCastPhysicalIntentEscape,
+        validateScalarCastIntentSurface(
+            "pub const PairLowScalarCastAction = struct { result: ActionIdentity, op: ir.CastOp, from_bits: u16, to_bits: u16, register: ArgReg, };" ++
+                "pub const AccumulatorScalarCastAction = struct { result: ActionIdentity, op: ir.CastOp, from_bits: u16, to_bits: u16, immediate: ?i128 = null, exact_ei: bool = false, };" ++
+                "pub const SignExtendScratchAction = struct { result: ActionIdentity, };",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseScalarCastIntentMissing,
+        validateScalarCastIntentSurface(
+            "pub const SignExtendScratchAction = struct { result: ActionIdentity, };",
         ),
     );
 }

@@ -98,6 +98,15 @@ pub const UseForm = enum {
     /// admit only existing arg128, scratch128, and stack128-value homes;
     /// notably, this is not the broader generic pair/spill capability.
     i128_icmp_pair_operand,
+    /// Action-only read-only i128 source for extracting the low scalar limb.
+    /// The action owns scratch selection and grants no pair-result capability.
+    pair_low_scalar_cast_operand,
+    /// Action-only scalar source for the closed accumulator-producing cast
+    /// family. Named and typed-immediate sources are validated internally.
+    accumulator_scalar_cast_operand,
+    /// Action-only i32 source for the exact sessionless sign-extension cast.
+    /// Only canonical G32/S32 homes are admitted by the action.
+    sign_extend_scratch_operand,
     stack_argument,
     new_pair_ownership,
 };
@@ -474,6 +483,47 @@ pub const I128SignBitTestFailure = enum {
     after_finalization,
 };
 
+pub const PairLowScalarCastAction = struct {
+    result: ActionIdentity,
+    op: ir.CastOp,
+    from_bits: u16,
+    to_bits: u16,
+};
+
+pub const AccumulatorScalarCastAction = struct {
+    result: ActionIdentity,
+    op: ir.CastOp,
+    from_bits: u16,
+    to_bits: u16,
+    immediate: ?i128 = null,
+    exact_ei: bool = false,
+};
+
+pub const SignExtendScratchAction = struct {
+    result: ActionIdentity,
+};
+
+pub const ScalarCastRequestError = error{
+    ValueUseScalarCastFormUnsupported,
+    ValueUseScalarCastWidthUnsupported,
+    ValueUseScalarCastLocationUnsupported,
+    ValueUseScalarCastImmediateMismatch,
+    ValueUseScalarCastScratchUnavailable,
+};
+
+pub const ScalarCastTestFailure = enum {
+    after_scratch_selection,
+    after_pair_staging,
+    after_accumulator_preparation,
+    after_accumulator_materialization,
+    after_mask_materialization,
+    after_mask,
+    after_sign_extend,
+    after_result_identity_ownership,
+    after_result_definition,
+    after_finalization,
+};
+
 /// Pure future-dispatch classifier for the exact pair equality form.
 pub const max_switch_cases = 8;
 
@@ -565,6 +615,9 @@ pub const PreparedAction = union(enum) {
     current_home_sign_bit: CurrentHomeSignBitAction,
     i128_eq_min: I128EqMinAction,
     i128_sign_bit: I128SignBitAction,
+    pair_low_scalar_cast: PairLowScalarCastAction,
+    accumulator_scalar_cast: AccumulatorScalarCastAction,
+    sign_extend_scratch: SignExtendScratchAction,
 
     pub fn eql(action: PreparedAction, other: PreparedAction) bool {
         return std.meta.eql(action, other);
@@ -687,6 +740,9 @@ pub const PreparedView = union(enum) {
     setcc_eax_compare: struct { bits: u16 },
     current_home_sign_bit: struct { bits: u16 },
     i128_icmp_pair: void,
+    pair_low_scalar_cast: void,
+    accumulator_scalar_cast: void,
+    sign_extend_scratch: void,
 };
 
 pub const PreparedRecord = struct {
@@ -923,6 +979,11 @@ pub fn Transaction(comptime Impl: type) type {
         pub const I128PairRequestError = Model.I128PairRequestError;
         pub const I128EqMinTestFailure = Model.I128EqMinTestFailure;
         pub const I128SignBitTestFailure = Model.I128SignBitTestFailure;
+        pub const PairLowScalarCastAction = Model.PairLowScalarCastAction;
+        pub const AccumulatorScalarCastAction = Model.AccumulatorScalarCastAction;
+        pub const SignExtendScratchAction = Model.SignExtendScratchAction;
+        pub const ScalarCastRequestError = Model.ScalarCastRequestError;
+        pub const ScalarCastTestFailure = Model.ScalarCastTestFailure;
         pub const max_switch_cases = Model.max_switch_cases;
         pub const SwitchCaseIntent = Model.SwitchCaseIntent;
         pub const SwitchCompareChainAction = Model.SwitchCompareChainAction;
@@ -987,6 +1048,7 @@ pub fn Transaction(comptime Impl: type) type {
         current_home_sign_bit_test_failure: if (builtin.is_test) ?Self.CurrentHomeSignBitTestFailure else void = if (builtin.is_test) null else {},
         i128_eq_min_test_failure: if (builtin.is_test) ?Self.I128EqMinTestFailure else void = if (builtin.is_test) null else {},
         i128_sign_bit_test_failure: if (builtin.is_test) ?Self.I128SignBitTestFailure else void = if (builtin.is_test) null else {},
+        scalar_cast_test_failure: if (builtin.is_test) ?Self.ScalarCastTestFailure else void = if (builtin.is_test) null else {},
 
         pub fn begin(selector: *ComposedBlockSelector) !Self {
             return Impl.begin(Self, selector);
@@ -1188,6 +1250,13 @@ pub fn Transaction(comptime Impl: type) type {
             return Impl.setI128SignBitTestFailure(Impl, transaction, failure);
         }
 
+        pub fn setScalarCastTestFailure(
+            transaction: *Self,
+            failure: ?Self.ScalarCastTestFailure,
+        ) !void {
+            return Impl.setScalarCastTestFailure(Impl, transaction, failure);
+        }
+
         fn requireActive(transaction: *const Self) !void {
             return Impl.requireActive(Impl, transaction);
         }
@@ -1341,6 +1410,18 @@ pub fn Transaction(comptime Impl: type) type {
 
         pub fn isI128SignBitIcmp(icmp: ir.IcmpInst) bool {
             return Impl.control_compare.isI128SignBitIcmp(icmp);
+        }
+
+        pub fn isPairLowScalarCast(cast: ir.CastInst) bool {
+            return Impl.control_compare.isPairLowScalarCast(cast);
+        }
+
+        pub fn isAccumulatorScalarCast(cast: ir.CastInst, exact_ei: bool) bool {
+            return Impl.control_compare.isAccumulatorScalarCast(cast, exact_ei);
+        }
+
+        pub fn isSignExtendScratchCast(cast: ir.CastInst) bool {
+            return Impl.control_compare.isSignExtendScratchCast(cast);
         }
     };
 }

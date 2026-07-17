@@ -68,11 +68,13 @@ const validateCurrentHomeEqZeroIntentSurface = authority.validateCurrentHomeEqZe
 const validateSetccEaxCompareIntentSurface = authority.validateSetccEaxCompareIntentSurface;
 const validateCurrentHomeSignBitIntentSurface = authority.validateCurrentHomeSignBitIntentSurface;
 const validateI128PairIntentSurface = authority.validateI128PairIntentSurface;
+const validateScalarCastIntentSurface = authority.validateScalarCastIntentSurface;
 const validateScratchComparePreservationPreamble = authority.validateScratchComparePreservationPreamble;
 const validateCurrentHomeEqZeroSequence = authority.validateCurrentHomeEqZeroSequence;
 const validateSetccEaxCompareSequence = authority.validateSetccEaxCompareSequence;
 const validateCurrentHomeSignBitSequence = authority.validateCurrentHomeSignBitSequence;
 const validateI128PairSequence = authority.validateI128PairSequence;
+const validateScalarCastSequence = authority.validateScalarCastSequence;
 const validateDurableActionIdentityOwnership = authority.validateDurableActionIdentityOwnership;
 pub fn validateValueUseFacadeSource(source: []const u8) !void {
     const expected =
@@ -307,7 +309,7 @@ pub fn validateValueUseFacadeSurfaceManifest(source: [:0]const u8) !void {
         previous = name;
         manifest_count += 1;
     }
-    if (declaration_count != manifest_count or manifest_count != 91)
+    if (declaration_count != manifest_count or manifest_count != 100)
         return error.ValueUseFacadeManifestMismatch;
 }
 
@@ -331,7 +333,7 @@ pub fn validateValueUseDirectForwardingWrappers(transaction_source: [:0]const u8
         wrapper_count += 1;
         cursor = close + 1;
     }
-    if (wrapper_count != 36) return error.ValueUseWrapperNotDirectForward;
+    if (wrapper_count != 40) return error.ValueUseWrapperNotDirectForward;
 }
 
 pub fn validateExactTopLevelPubNames(source: []const u8, expected: []const []const u8) !void {

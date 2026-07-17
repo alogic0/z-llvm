@@ -51,33 +51,35 @@ pub const value_use_leaf_paths = [_][]const u8{
 };
 
 pub const value_use_model_pub_names = [_][]const u8{
-    "AccumulatorSessionHandle",       "ActionIdentity",                    "AddressOffset",
-    "ByteAddressAction",              "CopyDestination",                   "CurrentHomeEqZeroAction",
-    "CurrentHomeEqZeroRequestError",  "CurrentHomeEqZeroTestFailure",      "CurrentHomeSignBitAction",
-    "CurrentHomeSignBitRequestError", "CurrentHomeSignBitTestFailure",     "Destination",
-    "EarlyPlan",                      "EarlyPreparedHome",                 "Expected",
-    "I128EqMinAction",                "I128EqMinTestFailure",              "I128PairRequestError",
-    "I128SignBitAction",              "I128SignBitTestFailure",            "Identity",
-    "Lifecycle",                      "LoadRequestError",                  "LoadTestFailure",
-    "MemcpyAction",                   "MemcpyTestFailure",                 "OperandPhase",
-    "OrderedOperand",                 "PhysicalNode",                      "PreparedAction",
-    "PreparedAddressComponent",       "PreparedAddressDescriptor",         "PreparedCondition",
-    "PreparedIdentity",               "PreparedPairLimb",                  "PreparedReadOnlyPair",
-    "PreparedRecord",                 "PreparedRegister",                  "PreparedScalarHome",
-    "PreparedShape",                  "PreparedStackF32PairAddress",       "PreparedStackObject",
-    "PreparedTablePointer",           "PreparedView",                      "PreparedViewLease",
-    "ReadOnlyPairLoadAction",         "ReadOnlyTableAddressAction",        "ReadOnlyTableI16LoadAction",
-    "Request",                        "RequestHandle",                     "RequestPhase",
-    "ScalarLoadAction",               "ScalarLoadKind",                    "ScaledAddressAction",
-    "ScratchCompareAction",           "ScratchCompareRhs",                 "ScratchCompareTestFailure",
-    "SemanticRole",                   "SetccEaxCompareAction",             "SetccEaxCompareRequestError",
-    "SetccEaxCompareStructure",       "SetccEaxCompareTestFailure",        "Source",
-    "StackI128AliasLoadAction",       "StoreI64Action",                    "StoreImmediateAction",
-    "StoreScalarAction",              "StoreStackPointerAction",           "StoredRequest",
-    "SwitchCaseIntent",               "SwitchCompareChainAction",          "Transaction",
-    "UseForm",                        "address_domain_copies_per_request", "address_domain_snapshot_bytes",
-    "address_domain_snapshot_copies", "max_identity_bytes",                "max_mappings",
-    "max_requests",                   "max_switch_cases",                  "physical_node_count",
+    "AccumulatorScalarCastAction",       "AccumulatorSessionHandle",       "ActionIdentity",
+    "AddressOffset",                     "ByteAddressAction",              "CopyDestination",
+    "CurrentHomeEqZeroAction",           "CurrentHomeEqZeroRequestError",  "CurrentHomeEqZeroTestFailure",
+    "CurrentHomeSignBitAction",          "CurrentHomeSignBitRequestError", "CurrentHomeSignBitTestFailure",
+    "Destination",                       "EarlyPlan",                      "EarlyPreparedHome",
+    "Expected",                          "I128EqMinAction",                "I128EqMinTestFailure",
+    "I128PairRequestError",              "I128SignBitAction",              "I128SignBitTestFailure",
+    "Identity",                          "Lifecycle",                      "LoadRequestError",
+    "LoadTestFailure",                   "MemcpyAction",                   "MemcpyTestFailure",
+    "OperandPhase",                      "OrderedOperand",                 "PhysicalNode",
+    "PreparedAction",                    "PairLowScalarCastAction",        "PreparedAddressComponent",
+    "PreparedAddressDescriptor",         "PreparedCondition",              "PreparedIdentity",
+    "PreparedPairLimb",                  "PreparedReadOnlyPair",           "PreparedRecord",
+    "PreparedRegister",                  "PreparedScalarHome",             "PreparedShape",
+    "PreparedStackF32PairAddress",       "PreparedStackObject",            "PreparedTablePointer",
+    "PreparedView",                      "PreparedViewLease",              "ReadOnlyPairLoadAction",
+    "ReadOnlyTableAddressAction",        "ReadOnlyTableI16LoadAction",     "Request",
+    "RequestHandle",                     "RequestPhase",                   "ScalarCastRequestError",
+    "ScalarCastTestFailure",             "ScalarLoadAction",               "ScalarLoadKind",
+    "ScaledAddressAction",               "ScratchCompareAction",           "ScratchCompareRhs",
+    "ScratchCompareTestFailure",         "SemanticRole",                   "SetccEaxCompareAction",
+    "SetccEaxCompareRequestError",       "SetccEaxCompareStructure",       "SetccEaxCompareTestFailure",
+    "SignExtendScratchAction",           "Source",                         "StackI128AliasLoadAction",
+    "StoreI64Action",                    "StoreImmediateAction",           "StoreScalarAction",
+    "StoreStackPointerAction",           "StoredRequest",                  "SwitchCaseIntent",
+    "SwitchCompareChainAction",          "Transaction",                    "UseForm",
+    "address_domain_copies_per_request", "address_domain_snapshot_bytes",  "address_domain_snapshot_copies",
+    "max_identity_bytes",                "max_mappings",                   "max_requests",
+    "max_switch_cases",                  "physical_node_count",
 };
 pub const value_use_core_pub_names = [_][]const u8{"ValueUseTransaction"};
 pub const value_use_planning_pub_names = [_][]const u8{
@@ -115,19 +117,23 @@ pub const value_use_address_pub_names = [_][]const u8{
     "executeStoreStackPointer",
 };
 pub const value_use_control_pub_names = [_][]const u8{
-    "classifyScratchCompare",    "executeBranchCondition",
-    "executeCurrentHomeEqZero",  "executeCurrentHomeSignBit",
-    "executeI128EqMin",          "executeI128SignBit",
-    "executeScratchCompare",     "executeSetccEaxCompare",
-    "executeSwitchCompareChain", "isCurrentHomeSignBitIcmp",
-    "isI128EqMinIcmp",           "isI128SignBitIcmp",
+    "classifyScratchCompare",              "executeAccumulatorScalarCast",
+    "executeBranchCondition",              "executeCurrentHomeEqZero",
+    "executeCurrentHomeSignBit",           "executeI128EqMin",
+    "executeI128SignBit",                  "executePairLowScalarCast",
+    "executeScratchCompare",               "executeSetccEaxCompare",
+    "executeSignExtendScratch",            "executeSwitchCompareChain",
+    "isAccumulatorScalarCast",             "isCurrentHomeSignBitIcmp",
+    "isI128EqMinIcmp",                     "isI128SignBitIcmp",
+    "isPairLowScalarCast",                 "isSignExtendScratchCast",
+    "validateAccumulatorScalarCastAction", "validatePairLowScalarCastAction",
 };
 pub const value_use_calls_pub_names = [_][]const u8{"executeInlineMemcpy"};
 
 pub const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
 pub const frozen_bypass_inventory_sha256 = "6e570be808d2aea9275809471f53846af7f54afdd908ab73e51218579ca8112d";
 pub const value_use_facade_manifest_path = "docs/evidence/inbox128_o2_r1_facade_manifest.tsv";
-pub const value_use_facade_manifest_sha256 = "c4584910259225efdb267821d63058a4cbe5b371f73ab4a9827988a1c530827e";
+pub const value_use_facade_manifest_sha256 = "51527db981eb4da7844856a21e6000fd35caa693b5176685bc40e6a278fe0b1b";
 pub const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",

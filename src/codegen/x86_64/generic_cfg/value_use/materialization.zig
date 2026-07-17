@@ -298,6 +298,9 @@ fn materializeRequestFromLoc(
         .setcc_eax_compare_operand,
         .current_home_sign_bit_operand,
         .i128_icmp_pair_operand,
+        .pair_low_scalar_cast_operand,
+        .accumulator_scalar_cast_operand,
+        .sign_extend_scratch_operand,
         => return error.ValueUsePreparedActionRequired,
         .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, destination),
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -321,11 +324,25 @@ fn buildPreparedRecordUnchecked(comptime Authority: type, transaction: anytype, 
     const name = switch (request.source) {
         .named => |*identity| identity.slice(),
         .int => |value| {
-            if (request.form != .switch_condition or request.prepared_action == null or
-                request.prepared_action.? != .switch_compare_chain)
-            {
+            const action = request.prepared_action orelse
                 return error.ValueUsePreparedViewUnsupported;
+            if (request.form == .accumulator_scalar_cast_operand and
+                action == .accumulator_scalar_cast and
+                action.accumulator_scalar_cast.immediate != null and
+                action.accumulator_scalar_cast.immediate.? == value)
+            {
+                return .{
+                    .view = .{ .accumulator_scalar_cast = {} },
+                    .source_vreg = .{
+                        .index = std.math.maxInt(usize),
+                        .class = if (request.expected.ty.int <= 32) .gpr32 else .gpr64,
+                        .bits = request.expected.ty.int,
+                    },
+                    .canonical_source_loc = if (request.expected.ty.int <= 32) .eax else .rax,
+                };
             }
+            if (request.form != .switch_condition or action != .switch_compare_chain)
+                return error.ValueUsePreparedViewUnsupported;
             try validateExpectedType(request.expected, request.form);
             const immediate = std.math.cast(i32, value) orelse
                 return error.ValueUseSwitchImmediateOutOfRange;
@@ -381,6 +398,9 @@ pub fn preparedViewFromLoc(
             .bits = request.expected.ty.int,
         } },
         .i128_icmp_pair_operand => .{ .i128_icmp_pair = {} },
+        .pair_low_scalar_cast_operand => .{ .pair_low_scalar_cast = {} },
+        .accumulator_scalar_cast_operand => .{ .accumulator_scalar_cast = {} },
+        .sign_extend_scratch_operand => .{ .sign_extend_scratch = {} },
         .stack_argument => error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
     };
@@ -626,6 +646,9 @@ pub fn preparedViewLoc(view: *const Types.PreparedView) !ValueLoc {
         .setcc_eax_compare,
         .current_home_sign_bit,
         .i128_icmp_pair,
+        .pair_low_scalar_cast,
+        .accumulator_scalar_cast,
+        .sign_extend_scratch,
         => error.ValueUsePreparedActionFormMismatch,
     };
 }
@@ -655,6 +678,9 @@ fn preparedViewEql(
         .setcc_eax_compare => |value| std.meta.eql(value, rhs.setcc_eax_compare),
         .current_home_sign_bit => |value| std.meta.eql(value, rhs.current_home_sign_bit),
         .i128_icmp_pair => true,
+        .pair_low_scalar_cast => true,
+        .accumulator_scalar_cast => true,
+        .sign_extend_scratch => true,
     };
 }
 fn preparedStackObjectEql(
@@ -868,6 +894,29 @@ fn validateBindingCompatibility(
         try validateExpectedType(request.expected, request.form);
         if (binding.vreg.class != .gpr128 or binding.vreg.bits < 128)
             return error.ValueUseI128PairWidthUnsupported;
+        return;
+    }
+    if (request.form == .pair_low_scalar_cast_operand) {
+        try validateExpectedType(request.expected, request.form);
+        if (binding.vreg.class != .gpr128 or binding.vreg.bits < 128)
+            return error.ValueUseScalarCastWidthUnsupported;
+        return;
+    }
+    if (request.form == .accumulator_scalar_cast_operand) {
+        try validateExpectedType(request.expected, request.form);
+        const bits = request.expected.ty.int;
+        const valid_class = if (bits <= 32)
+            binding.vreg.class == .gpr32 or binding.vreg.class == .gpr64
+        else
+            binding.vreg.class == .gpr64;
+        if (!valid_class or binding.vreg.bits < bits)
+            return error.ValueUseScalarCastWidthUnsupported;
+        return;
+    }
+    if (request.form == .sign_extend_scratch_operand) {
+        try validateExpectedType(request.expected, request.form);
+        if (binding.vreg.class != .gpr32 or binding.vreg.bits < 32)
+            return error.ValueUseScalarCastWidthUnsupported;
         return;
     }
     if (request.form == .load_address) {
@@ -1142,6 +1191,29 @@ fn validateExpectedType(expected: Types.Expected, form: Types.UseForm) !void {
         {
             return error.ValueUseTypeMismatch;
         },
+        .pair_low_scalar_cast_operand => if (!expected.ty.eql(.{ .int = 128 }) or
+            expected.register_class != .gpr128 or expected.pointer_address_space != null)
+        {
+            return error.ValueUseTypeMismatch;
+        },
+        .accumulator_scalar_cast_operand => switch (expected.ty) {
+            .int => |bits| {
+                if (bits == 0 or bits > 64 or
+                    expected.register_class != if (bits <= 32)
+                        VirtualRegClass.gpr32
+                    else
+                        VirtualRegClass.gpr64)
+                {
+                    return error.ValueUseTypeMismatch;
+                }
+            },
+            else => return error.ValueUseTypeMismatch,
+        },
+        .sign_extend_scratch_operand => if (!expected.ty.eql(.{ .int = 32 }) or
+            expected.register_class != .gpr32 or expected.pointer_address_space != null)
+        {
+            return error.ValueUseTypeMismatch;
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -1239,6 +1311,10 @@ fn validateSourceView(loc: ValueLoc, form: Types.UseForm) !void {
         // canonical refresh inside the two closed wrapper actions. Their
         // exact semantic classifiers fence the admitted spill128 view.
         .i128_icmp_pair_operand => {},
+        .pair_low_scalar_cast_operand,
+        .accumulator_scalar_cast_operand,
+        .sign_extend_scratch_operand,
+        => {},
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -1271,6 +1347,9 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: Types.UseForm) bool {
         .setcc_eax_compare_operand,
         .current_home_sign_bit_operand,
         .i128_icmp_pair_operand,
+        .pair_low_scalar_cast_operand,
+        .accumulator_scalar_cast_operand,
+        .sign_extend_scratch_operand,
         .stack_argument,
         .new_pair_ownership,
         => false,

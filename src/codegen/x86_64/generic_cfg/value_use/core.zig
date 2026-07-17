@@ -77,6 +77,7 @@ const I128SignBitAction = Types.I128SignBitAction;
 const I128PairRequestError = Types.I128PairRequestError;
 const I128EqMinTestFailure = Types.I128EqMinTestFailure;
 const I128SignBitTestFailure = Types.I128SignBitTestFailure;
+const ScalarCastTestFailure = Types.ScalarCastTestFailure;
 const max_switch_cases = Types.max_switch_cases;
 const SwitchCaseIntent = Types.SwitchCaseIntent;
 const SwitchCompareChainAction = Types.SwitchCompareChainAction;
@@ -474,6 +475,14 @@ fn core_setI128SignBitTestFailure(
     if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
     transaction.i128_sign_bit_test_failure = failure;
 }
+fn core_setScalarCastTestFailure(
+    comptime _: type,
+    transaction: anytype,
+    failure: ?ScalarCastTestFailure,
+) !void {
+    if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
+    transaction.scalar_cast_test_failure = failure;
+}
 fn core_requireActive(comptime _: type, transaction: anytype) !void {
     if (transaction.lifecycle != .active) return error.ValueUseTransactionClosed;
 }
@@ -637,6 +646,15 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
         .current_home_sign_bit => |*compare| try compare.result.validate(),
         .i128_eq_min => |*compare| try compare.result.validate(),
         .i128_sign_bit => |*compare| try compare.result.validate(),
+        .pair_low_scalar_cast => |*cast| {
+            try cast.result.validate();
+            try control_compare_module.validatePairLowScalarCastAction(cast);
+        },
+        .accumulator_scalar_cast => |*cast| {
+            try cast.result.validate();
+            try control_compare_module.validateAccumulatorScalarCastAction(cast);
+        },
+        .sign_extend_scratch => |*cast| try cast.result.validate(),
     }
 }
 fn core_validateRegisteredOperandHandle(comptime _: type, transaction: anytype, handle: RequestHandle) !u8 {
@@ -684,6 +702,9 @@ fn core_validateActionDependenciesCanonical(comptime Authority: type, transactio
         .current_home_sign_bit => {},
         .i128_eq_min => {},
         .i128_sign_bit => {},
+        .pair_low_scalar_cast => {},
+        .accumulator_scalar_cast => {},
+        .sign_extend_scratch => {},
         .validate_shape,
         .emit_copy_to,
         .form_readonly_table_address,
@@ -779,6 +800,9 @@ fn executePreparedActionInternal(
                 .setcc_eax_compare_operand,
                 .current_home_sign_bit_operand,
                 .i128_icmp_pair_operand,
+                .pair_low_scalar_cast_operand,
+                .accumulator_scalar_cast_operand,
+                .sign_extend_scratch_operand,
                 => return error.ValueUsePreparedActionFormMismatch,
                 .stack_argument => return error.ValueUseStackArgumentUnsupported,
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -834,6 +858,27 @@ fn executePreparedActionInternal(
             view,
             &compare,
         ),
+        .pair_low_scalar_cast => |cast| try control_compare_module.executePairLowScalarCast(
+            Authority,
+            transaction,
+            request_index,
+            view,
+            &cast,
+        ),
+        .accumulator_scalar_cast => |cast| try control_compare_module.executeAccumulatorScalarCast(
+            Authority,
+            transaction,
+            request_index,
+            view,
+            &cast,
+        ),
+        .sign_extend_scratch => |cast| try control_compare_module.executeSignExtendScratch(
+            Authority,
+            transaction,
+            request_index,
+            view,
+            &cast,
+        ),
     }
 }
 fn core_registeredOperandCurrent(comptime Authority: type, transaction: anytype, handle: RequestHandle) !ValueLoc {
@@ -870,6 +915,9 @@ fn actionSecondaryOperand(
         .current_home_sign_bit => null,
         .i128_eq_min => null,
         .i128_sign_bit => null,
+        .pair_low_scalar_cast => null,
+        .accumulator_scalar_cast => null,
+        .sign_extend_scratch => null,
         .load_scalar,
         .load_readonly_pair,
         .load_stack_i128_alias,
@@ -929,6 +977,9 @@ fn actionTertiaryOperand(
         .current_home_sign_bit,
         .i128_eq_min,
         .i128_sign_bit,
+        .pair_low_scalar_cast,
+        .accumulator_scalar_cast,
+        .sign_extend_scratch,
         => null,
     };
 }
@@ -1036,6 +1087,7 @@ const Implementation = struct {
     pub const setCurrentHomeSignBitTestFailure = core_setCurrentHomeSignBitTestFailure;
     pub const setI128EqMinTestFailure = core_setI128EqMinTestFailure;
     pub const setI128SignBitTestFailure = core_setI128SignBitTestFailure;
+    pub const setScalarCastTestFailure = core_setScalarCastTestFailure;
     pub const requireActive = core_requireActive;
     pub const rollbackInternal = core_rollbackInternal;
     pub const handleFor = core_handleFor;
