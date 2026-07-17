@@ -1,0 +1,215 @@
+const std = @import("std");
+const builtin = @import("builtin");
+const ir = @import("../../../../../ir.zig");
+const x86_64_machine = @import("../../../machine.zig");
+const x86_64_types = @import("../../../types.zig");
+const selector_types = @import("../../selector_types.zig");
+const state_data = @import("../../composed_selector_state_data.zig");
+const selector_state = @import("../../composed_selector_state.zig");
+const stage2_planning = @import("../../stage2_planning.zig");
+const address_dependencies = @import("../../composed_selector_address_dependencies.zig");
+const eflags = @import("../../composed_selector_eflags.zig");
+const constant_table = @import("../../../constant_table.zig");
+const aggregate_object = @import("../../aggregate_object.zig");
+const composed_helpers = @import("../../composed_helpers.zig");
+const Diagnostic = @import("../../inspection.zig").Diagnostic;
+
+const ArgReg = x86_64_types.ArgReg;
+const FrameIndex = x86_64_types.FrameIndex;
+const RegPair = selector_types.RegPair;
+const ValueBinding = selector_types.ValueBinding;
+const ValueLoc = selector_types.ValueLoc;
+const VirtualReg = selector_types.VirtualReg;
+const VirtualRegClass = selector_types.VirtualRegClass;
+const ComposedBlockSelector = state_data.ComposedBlockSelector;
+const AddressDependencyDomain = address_dependencies.AddressDependencyDomain;
+const AccumulatorDefinition = selector_state.AccumulatorDefinition;
+const AccumulatorDefinitionSession = selector_state.AccumulatorDefinitionSession;
+const AccumulatorDisplacementPolicy = selector_state.AccumulatorDisplacementPolicy;
+const AccumulatorPreparationEffect = selector_state.AccumulatorPreparationEffect;
+const model = @import("../model.zig");
+const Types = model;
+const max_requests = Types.max_requests;
+const max_identity_bytes = Types.max_identity_bytes;
+const address_domain_snapshot_copies = Types.address_domain_snapshot_copies;
+const address_domain_copies_per_request = Types.address_domain_copies_per_request;
+const address_domain_snapshot_bytes = Types.address_domain_snapshot_bytes;
+const Expected = Types.Expected;
+const UseForm = Types.UseForm;
+const Destination = Types.Destination;
+const RequestHandle = Types.RequestHandle;
+const AccumulatorSessionHandle = Types.AccumulatorSessionHandle;
+const PreparedViewLease = Types.PreparedViewLease;
+const ActionIdentity = Types.ActionIdentity;
+const AddressOffset = Types.AddressOffset;
+const PreparedShape = Types.PreparedShape;
+const ByteAddressAction = Types.ByteAddressAction;
+const ScaledAddressAction = Types.ScaledAddressAction;
+const ReadOnlyTableAddressAction = Types.ReadOnlyTableAddressAction;
+const StoreScalarAction = Types.StoreScalarAction;
+const StoreImmediateAction = Types.StoreImmediateAction;
+const StoreI64Action = Types.StoreI64Action;
+const StoreStackPointerAction = Types.StoreStackPointerAction;
+const MemcpyAction = Types.MemcpyAction;
+const MemcpyTestFailure = Types.MemcpyTestFailure;
+const ScalarLoadKind = Types.ScalarLoadKind;
+const ScalarLoadAction = Types.ScalarLoadAction;
+const ReadOnlyPairLoadAction = Types.ReadOnlyPairLoadAction;
+const StackI128AliasLoadAction = Types.StackI128AliasLoadAction;
+const ReadOnlyTableI16LoadAction = Types.ReadOnlyTableI16LoadAction;
+const LoadRequestError = Types.LoadRequestError;
+const LoadTestFailure = Types.LoadTestFailure;
+const ScratchCompareRhs = Types.ScratchCompareRhs;
+const ScratchCompareAction = Types.ScratchCompareAction;
+const ScratchCompareTestFailure = Types.ScratchCompareTestFailure;
+const CurrentHomeEqZeroAction = Types.CurrentHomeEqZeroAction;
+const CurrentHomeEqZeroRequestError = Types.CurrentHomeEqZeroRequestError;
+const CurrentHomeEqZeroTestFailure = Types.CurrentHomeEqZeroTestFailure;
+const SetccEaxCompareStructure = Types.SetccEaxCompareStructure;
+const SetccEaxCompareAction = Types.SetccEaxCompareAction;
+const SetccEaxCompareRequestError = Types.SetccEaxCompareRequestError;
+const SetccEaxCompareTestFailure = Types.SetccEaxCompareTestFailure;
+const CurrentHomeSignBitAction = Types.CurrentHomeSignBitAction;
+const CurrentHomeSignBitRequestError = Types.CurrentHomeSignBitRequestError;
+const CurrentHomeSignBitTestFailure = Types.CurrentHomeSignBitTestFailure;
+const I128EqMinAction = Types.I128EqMinAction;
+const I128SignBitAction = Types.I128SignBitAction;
+const I128PairRequestError = Types.I128PairRequestError;
+const I128EqMinTestFailure = Types.I128EqMinTestFailure;
+const I128SignBitTestFailure = Types.I128SignBitTestFailure;
+const max_switch_cases = Types.max_switch_cases;
+const SwitchCaseIntent = Types.SwitchCaseIntent;
+const SwitchCompareChainAction = Types.SwitchCompareChainAction;
+const PreparedAction = Types.PreparedAction;
+const CopyDestination = Types.CopyDestination;
+const PreparedIdentity = Types.PreparedIdentity;
+const PreparedRegister = Types.PreparedRegister;
+const PreparedScalarHome = Types.PreparedScalarHome;
+const PreparedStackObject = Types.PreparedStackObject;
+const PreparedAddressComponent = Types.PreparedAddressComponent;
+const PreparedAddressDescriptor = Types.PreparedAddressDescriptor;
+const PreparedStackF32PairAddress = Types.PreparedStackF32PairAddress;
+const PreparedTablePointer = Types.PreparedTablePointer;
+const PreparedPairLimb = Types.PreparedPairLimb;
+const PreparedReadOnlyPair = Types.PreparedReadOnlyPair;
+const PreparedCondition = Types.PreparedCondition;
+const PreparedView = Types.PreparedView;
+const PreparedRecord = Types.PreparedRecord;
+const EarlyPlan = Types.EarlyPlan;
+const OperandPhase = Types.OperandPhase;
+const OrderedOperand = Types.OrderedOperand;
+const SemanticRole = Types.SemanticRole;
+const EarlyPreparedHome = Types.EarlyPreparedHome;
+const Request = Types.Request;
+const RequestPhase = Types.RequestPhase;
+const Lifecycle = Types.Lifecycle;
+const Identity = Types.Identity;
+const Source = Types.Source;
+const StoredRequest = Types.StoredRequest;
+const PhysicalNode = Types.PhysicalNode;
+const physical_node_count = Types.physical_node_count;
+const max_mappings = Types.max_mappings;
+const materialization = @import("../materialization.zig");
+
+pub fn executeInlineMemcpy(
+    comptime Authority: type,
+    transaction: anytype,
+    destination_index: u8,
+    action: Types.MemcpyAction,
+) !void {
+    // Validate the final call clobber before caller preservation or argument
+    // staging mutates selector state. The emission authority repeats this
+    // check while applying the semantic record immediately before append.
+    var next_eflags = transaction.selector.eflags;
+    try next_eflags.apply(.clobber);
+
+    if (try selector_state.spillLiveCallerClobbersForCall(transaction.selector)) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+    // Caller preservation may durably relocate an operand that dies at this
+    // call (the legacy accumulator path is the notable case). Refresh the
+    // transaction-owned canonical records immediately after that sole
+    // authority, so later argument staging remains subject to strict
+    // no-rebind post-validation without inventing post-call liveness.
+    try refreshMemcpyPreparedOperand(Authority, transaction, destination_index);
+    try refreshMemcpyPreparedOperand(Authority, transaction, action.source.index);
+    try refreshMemcpyPreparedOperand(Authority, transaction, action.length.index);
+    try failMemcpyForTest(Authority, transaction, .after_preservation);
+
+    try materializeMemcpyRequest(Authority, transaction, destination_index, .rdi);
+    try failMemcpyForTest(Authority, transaction, .after_destination);
+    try materializeMemcpyHandle(Authority, transaction, action.source, .rsi);
+    try failMemcpyForTest(Authority, transaction, .after_source);
+    try materializeMemcpyHandle(Authority, transaction, action.length, .rdx);
+    try failMemcpyForTest(Authority, transaction, .after_length);
+
+    try selector_state.emitEflagsInstruction(
+        transaction.selector,
+        .memcpy_rdi_rsi_rdx_rax,
+        .clobber,
+    );
+    try failMemcpyForTest(Authority, transaction, .after_call_append);
+}
+fn refreshMemcpyPreparedOperand(comptime Authority: type, transaction: anytype, index: u8) !void {
+    if (!transaction.prepared_view_valid[index]) {
+        Authority.recordRequestFailure(Authority, transaction, index);
+        return error.ValueUsePreparedViewMissing;
+    }
+    transaction.prepared_views[index] = try Authority.materialization.buildPreparedRecord(Authority, transaction, index);
+}
+fn materializeMemcpyHandle(
+    comptime Authority: type,
+    transaction: anytype,
+    handle: Types.RequestHandle,
+    destination: ArgReg,
+) !void {
+    const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
+    try materializeMemcpyRequest(Authority, transaction, index, destination);
+}
+fn materializeMemcpyRequest(
+    comptime Authority: type,
+    transaction: anytype,
+    index: u8,
+    destination: ArgReg,
+) !void {
+    return materializeMemcpyRequestUnchecked(Authority, transaction, index, destination) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, index, err);
+        return err;
+    };
+}
+fn materializeMemcpyRequestUnchecked(
+    comptime Authority: type,
+    transaction: anytype,
+    index: u8,
+    destination: ArgReg,
+) !void {
+    const current = (try Authority.validateRequestAt(Authority, transaction, index)) orelse {
+        Authority.recordRequestFailure(Authority, transaction, index);
+        return error.ValueUseUnsupportedSource;
+    };
+    switch (current) {
+        .arg128, .scratch128 => |pair| {
+            if (pair.lo == destination) return;
+            try selector_state.clobberArgReg(transaction.selector, destination);
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+                .mov_arg64_arg = .{ .dst = destination, .src = pair.lo },
+            });
+        },
+        else => try materialization.materializeScalar64(
+            transaction.selector,
+            current,
+            .{ .gpr64 = destination },
+        ),
+    }
+}
+fn failMemcpyForTest(
+    comptime _: type,
+    transaction: anytype,
+    boundary: Types.MemcpyTestFailure,
+) !void {
+    if (builtin.is_test) {
+        if (transaction.memcpy_test_failure == boundary)
+            return error.ValueUseMemcpyTestFailure;
+    }
+}

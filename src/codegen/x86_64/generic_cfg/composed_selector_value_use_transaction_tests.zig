@@ -7769,3 +7769,58 @@ test "value-use i128 sign-bit wrapper rolls back exactly at every partial stage"
     inline for (std.meta.tags(Transaction.I128SignBitTestFailure)) |boundary|
         try expectI128PairRollbackExact(.{ .sign_bit = boundary });
 }
+
+test "value-use generic transaction layout matches frozen R0" {
+    try std.testing.expectEqual(@as(usize, 194688), @sizeOf(Transaction));
+    try std.testing.expectEqual(@as(usize, 16), @alignOf(Transaction));
+    const expected_layout = .{
+        .{ "selector", 185040 },
+        .{ "snapshot", 34816 },
+        .{ "requests", 0 },
+        .{ "request_count", 194662 },
+        .{ "request_phase", 194661 },
+        .{ "lifecycle", 194660 },
+        .{ "write_nodes", 194653 },
+        .{ "early_plans", 194605 },
+        .{ "semantic_order_edges", 194349 },
+        .{ "ordered_operands", 194285 },
+        .{ "ordered_operand_count", 194284 },
+        .{ "early_homes", 33280 },
+        .{ "early_home_valid", 194333 },
+        .{ "prepared_views", 185048 },
+        .{ "prepared_view_valid", 194268 },
+        .{ "switch_boundary_applied", 194637 },
+        .{ "view_generation", 194264 },
+        .{ "action_diagnostic", 185008 },
+        .{ "failed_request", 184984 },
+        .{ "accumulator_session", 184816 },
+        .{ "memcpy_test_failure", 194663 },
+        .{ "load_test_failure", 194665 },
+        .{ "scratch_compare_test_failure", 194667 },
+        .{ "current_home_eq_zero_test_failure", 194669 },
+        .{ "setcc_eax_compare_test_failure", 194671 },
+        .{ "current_home_sign_bit_test_failure", 194673 },
+        .{ "i128_eq_min_test_failure", 194675 },
+        .{ "i128_sign_bit_test_failure", 194677 },
+    };
+    inline for (expected_layout) |field|
+        try std.testing.expectEqual(@as(usize, field[1]), @offsetOf(Transaction, field[0]));
+}
+
+test "value-use facade methods retain finite reachable error sets" {
+    inline for (comptime std.meta.declarations(Transaction)) |declaration| {
+        const declaration_type = @TypeOf(@field(Transaction, declaration.name));
+        switch (@typeInfo(declaration_type)) {
+            .@"fn" => |function| {
+                const return_type = function.return_type orelse continue;
+                switch (@typeInfo(return_type)) {
+                    .error_union => |error_union| try std.testing.expect(
+                        @typeInfo(error_union.error_set).error_set != null,
+                    ),
+                    else => {},
+                }
+            },
+            else => {},
+        }
+    }
+}

@@ -39,8 +39,95 @@ const classified_sources = [_]ClassifiedSource{
     .{ .name = "composed_selector_vector.zig", .kind = .consumer },
 };
 
+const value_use_leaf_paths = [_][]const u8{
+    "src/codegen/x86_64/generic_cfg/value_use/model.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/core.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/planning.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/materialization.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/composition.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/control_compare.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/calls.zig",
+};
+
+const value_use_model_pub_names = [_][]const u8{
+    "AccumulatorSessionHandle",       "ActionIdentity",                    "AddressOffset",
+    "ByteAddressAction",              "CopyDestination",                   "CurrentHomeEqZeroAction",
+    "CurrentHomeEqZeroRequestError",  "CurrentHomeEqZeroTestFailure",      "CurrentHomeSignBitAction",
+    "CurrentHomeSignBitRequestError", "CurrentHomeSignBitTestFailure",     "Destination",
+    "EarlyPlan",                      "EarlyPreparedHome",                 "Expected",
+    "I128EqMinAction",                "I128EqMinTestFailure",              "I128PairRequestError",
+    "I128SignBitAction",              "I128SignBitTestFailure",            "Identity",
+    "Lifecycle",                      "LoadRequestError",                  "LoadTestFailure",
+    "MemcpyAction",                   "MemcpyTestFailure",                 "OperandPhase",
+    "OrderedOperand",                 "PhysicalNode",                      "PreparedAction",
+    "PreparedAddressComponent",       "PreparedAddressDescriptor",         "PreparedCondition",
+    "PreparedIdentity",               "PreparedPairLimb",                  "PreparedReadOnlyPair",
+    "PreparedRecord",                 "PreparedRegister",                  "PreparedScalarHome",
+    "PreparedShape",                  "PreparedStackF32PairAddress",       "PreparedStackObject",
+    "PreparedTablePointer",           "PreparedView",                      "PreparedViewLease",
+    "ReadOnlyPairLoadAction",         "ReadOnlyTableAddressAction",        "ReadOnlyTableI16LoadAction",
+    "Request",                        "RequestHandle",                     "RequestPhase",
+    "ScalarLoadAction",               "ScalarLoadKind",                    "ScaledAddressAction",
+    "ScratchCompareAction",           "ScratchCompareRhs",                 "ScratchCompareTestFailure",
+    "SemanticRole",                   "SetccEaxCompareAction",             "SetccEaxCompareRequestError",
+    "SetccEaxCompareStructure",       "SetccEaxCompareTestFailure",        "Source",
+    "StackI128AliasLoadAction",       "StoreI64Action",                    "StoreImmediateAction",
+    "StoreScalarAction",              "StoreStackPointerAction",           "StoredRequest",
+    "SwitchCaseIntent",               "SwitchCompareChainAction",          "Transaction",
+    "UseForm",                        "address_domain_copies_per_request", "address_domain_snapshot_bytes",
+    "address_domain_snapshot_copies", "max_identity_bytes",                "max_mappings",
+    "max_requests",                   "max_switch_cases",                  "physical_node_count",
+};
+const value_use_core_pub_names = [_][]const u8{"ValueUseTransaction"};
+const value_use_planning_pub_names = [_][]const u8{
+    "actionOwnsOrderedWrites",      "argRegForNode",             "nodeForArgReg",
+    "pairSourceNodes",              "planEarlyMaterializations", "requestDestinationNodes",
+    "requestMappings",              "scalarSourceNode",          "seal",
+    "validateBindingCompatibility", "validateEarlyHome",         "validateFormAndDestination",
+    "validateRequest",              "validateRequestAt",         "validateSemanticOrderTopology",
+};
+const value_use_materialization_pub_names = [_][]const u8{
+    "buildPreparedRecord",             "clobberPhysicalNode",     "materializeAll",
+    "materializeByteAddressPointer",   "materializeEarlyPlans",   "materializeNull",
+    "materializePair",                 "materializePairLimb",     "materializePointer",
+    "materializeRequest",              "materializeScalar32",     "materializeScalar64",
+    "materializeStackAddress",         "prepare",                 "preparedConditionView",
+    "preparedMemcpyScalarView",        "preparedPairView",        "preparedPointerView",
+    "preparedRecordEql",               "preparedScalarView",      "preparedScratchCompareView",
+    "preparedStackF32PairAddressView", "preparedStackObjectView", "preparedViewFromLoc",
+    "preparedViewLoc",                 "resolveNamedCurrent",     "validatePreparedShape",
+};
+const value_use_composition_pub_names = [_][]const u8{
+    "beginAccumulatorSession",                        "commitAccumulatorSession",
+    "defineAccumulatorResult",                        "finalizeAccumulatorResult",
+    "finishAccumulatorCallPreparationAfterArguments", "materializeAccumulator",
+    "ownActionIdentity",                              "ownRegisteredOperandName",
+    "prepareAccumulator",                             "prepareAccumulatorCallBeforeArguments",
+    "spillAccumulatorValue",
+};
+const value_use_address_pub_names = [_][]const u8{
+    "executeByteAddress",          "executeReadOnlyPairLoad",
+    "executeReadOnlyTableAddress", "executeReadOnlyTableI16Load",
+    "executeScalarLoad",           "executeScaledAddress",
+    "executeStackI128AliasLoad",   "executeStoreI64",
+    "executeStoreImmediate",       "executeStoreScalar",
+    "executeStoreStackPointer",
+};
+const value_use_control_pub_names = [_][]const u8{
+    "classifyScratchCompare",    "executeBranchCondition",
+    "executeCurrentHomeEqZero",  "executeCurrentHomeSignBit",
+    "executeI128EqMin",          "executeI128SignBit",
+    "executeScratchCompare",     "executeSetccEaxCompare",
+    "executeSwitchCompareChain", "isCurrentHomeSignBitIcmp",
+    "isI128EqMinIcmp",           "isI128SignBitIcmp",
+};
+const value_use_calls_pub_names = [_][]const u8{"executeInlineMemcpy"};
+
 const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
 const frozen_bypass_inventory_sha256 = "6e570be808d2aea9275809471f53846af7f54afdd908ab73e51218579ca8112d";
+const value_use_facade_manifest_path = "docs/evidence/inbox128_o2_r1_facade_manifest.tsv";
+const value_use_facade_manifest_sha256 = "c4584910259225efdb267821d63058a4cbe5b371f73ab4a9827988a1c530827e";
 const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -267,7 +354,7 @@ const FunctionBody = struct {
     end: usize,
 };
 
-const max_function_bodies = 256;
+const max_function_bodies = 384;
 
 fn validateCurrentTree(allocator: std.mem.Allocator) !void {
     const io = std.testing.io;
@@ -304,6 +391,7 @@ fn validateCurrentTree(allocator: std.mem.Allocator) !void {
     const inventory = try readFrozenBypassInventory(allocator);
     defer allocator.free(inventory);
     try validateFrozenBypassInventoryHash(inventory);
+    try validateSplitValueUseTree(allocator);
 }
 
 fn validateProductionSource(name: []const u8, source: [:0]const u8) !void {
@@ -311,9 +399,14 @@ fn validateProductionSource(name: []const u8, source: [:0]const u8) !void {
     switch (classified_sources[index].kind) {
         .authority => try validateAddressDependencyStateAuthority(source),
         .address_dependency_domain => try validateAddressDependencyDomainSource(source),
-        .value_use_authority => try validateValueUseAuthoritySource(source),
+        .value_use_authority => try validateValueUseFacadeSource(source),
         .lifecycle => try validateStateDataLifecycle(source),
         .consumer => {
+            if (std.mem.indexOf(u8, source, "@import(\"value_use/") != null or
+                std.mem.indexOf(u8, source, "@import(\"./value_use/") != null)
+            {
+                return error.ValueUseProductionInternalImport;
+            }
             if (std.mem.indexOf(u8, source, ".values") != null) return error.RawSelectorValuesAccess;
             const inventory = try readFrozenBypassInventory(std.testing.allocator);
             defer std.testing.allocator.free(inventory);
@@ -325,6 +418,301 @@ fn validateProductionSource(name: []const u8, source: [:0]const u8) !void {
             try validateEflagsEmissionAuthority(name, source);
             try validatePreparedViewLeafDiscipline(name, source);
         },
+    }
+}
+
+fn validateValueUseFacadeSource(source: []const u8) !void {
+    const expected =
+        "const core = @import(\"value_use/core.zig\");\n\n" ++
+        "pub const ValueUseTransaction = core.ValueUseTransaction;\n";
+    if (!std.mem.eql(u8, source, expected)) return error.ValueUseFacadeManifestMismatch;
+}
+
+fn validateSplitValueUseTree(allocator: std.mem.Allocator) !void {
+    const io = std.testing.io;
+    var combined: std.Io.Writer.Allocating = .init(allocator);
+    defer combined.deinit();
+
+    for (value_use_leaf_paths) |path| {
+        const source = try std.Io.Dir.cwd().readFileAllocOptions(
+            io,
+            path,
+            allocator,
+            .limited(2 * 1024 * 1024),
+            .of(u8),
+            0,
+        );
+        defer allocator.free(source);
+        try validateValueUseLeaf(path, source);
+        try appendNormalizedValueUseSource(&combined.writer, source);
+        try combined.writer.writeByte('\n');
+    }
+    const combined_source = try allocator.dupeZ(u8, combined.writer.buffered());
+    defer allocator.free(combined_source);
+    try validateValueUseAuthoritySourceWithVisibility(combined_source, true);
+}
+
+fn appendNormalizedValueUseSource(writer: *std.Io.Writer, source: []const u8) !void {
+    const rewritten = [_]struct { from: []const u8, to: []const u8 }{
+        .{
+            .from = "transaction.prepared_views[source_index] = try Authority.materialization.buildPreparedRecord(Authority, transaction, source_index);",
+            .to = "transaction.prepared_views[source_index] = try transaction.buildPreparedRecord(source_index);",
+        },
+        .{ .from = "buildPreparedRecord(Authority, transaction, ", .to = "buildPreparedRecord(" },
+    };
+    const removed = [_][]const u8{
+        "Authority, ",
+        "Authority.planning.",
+        "Authority.materialization.",
+        "Authority.composition.",
+        "Authority.control_compare.",
+        "planning_module.",
+        "materialization_module.",
+        "composition_module.",
+        "control_compare_module.",
+        "address_memory.",
+        "control_compare.",
+        "materialization.",
+        "composition.",
+        "planning.",
+        "calls.",
+        "model.",
+    };
+    var cursor: usize = 0;
+    while (cursor < source.len) {
+        var matched = false;
+        for (rewritten) |replacement| {
+            if (std.mem.startsWith(u8, source[cursor..], replacement.from)) {
+                try writer.writeAll(replacement.to);
+                cursor += replacement.from.len;
+                matched = true;
+                break;
+            }
+        }
+        if (matched) continue;
+        for (removed) |pattern| {
+            if (std.mem.startsWith(u8, source[cursor..], pattern)) {
+                cursor += pattern.len;
+                matched = true;
+                break;
+            }
+        }
+        if (matched) continue;
+        try writer.writeByte(source[cursor]);
+        cursor += 1;
+    }
+}
+
+fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
+    try validateNoFunctionFamilyPredicate(source, error.ValueUseFunctionPredicateForbidden);
+    if (std.mem.indexOf(u8, source, "@typeName(") != null)
+        return error.ValueUseTypeNameDependency;
+    if (std.mem.indexOf(u8, source, "*const fn") != null or
+        std.mem.indexOf(u8, source, "*fn") != null or
+        std.mem.indexOf(u8, source, "vtable") != null)
+    {
+        return error.ValueUseRuntimeDispatchForbidden;
+    }
+
+    const is_model = std.mem.endsWith(u8, path, "/model.zig");
+    const is_core = std.mem.endsWith(u8, path, "/core.zig");
+    const is_planning = std.mem.endsWith(u8, path, "/planning.zig");
+    const is_materialization = std.mem.endsWith(u8, path, "/materialization.zig");
+    const is_composition = std.mem.endsWith(u8, path, "/composition.zig");
+    const is_address = std.mem.endsWith(u8, path, "/actions/address_memory.zig");
+    const is_control = std.mem.endsWith(u8, path, "/actions/control_compare.zig");
+    const is_calls = std.mem.endsWith(u8, path, "/actions/calls.zig");
+
+    const public_names: []const []const u8 = if (is_model)
+        &value_use_model_pub_names
+    else if (is_core)
+        &value_use_core_pub_names
+    else if (is_planning)
+        &value_use_planning_pub_names
+    else if (is_materialization)
+        &value_use_materialization_pub_names
+    else if (is_composition)
+        &value_use_composition_pub_names
+    else if (is_address)
+        &value_use_address_pub_names
+    else if (is_control)
+        &value_use_control_pub_names
+    else if (is_calls)
+        &value_use_calls_pub_names
+    else
+        return error.ValueUseImportDagMismatch;
+    if (is_core) {
+        if (countPattern(source, "model.Transaction(Implementation)") != 1)
+            return error.ValueUseProductionInstantiationMismatch;
+        var body_storage: [max_function_bodies]FunctionBody = undefined;
+        const bodies = try collectFunctionBodies(source, &body_storage);
+        const dispatch = functionBodyNamed(bodies, "executePreparedActionInternal") orelse
+            return error.ValueUseExecutionDispatchMismatch;
+        if (countPattern(source[dispatch.start..dispatch.end], "switch (action)") != 1)
+            return error.ValueUseExecutionDispatchMismatch;
+    } else if (std.mem.indexOf(u8, source, "model.Transaction(") != null) {
+        return error.ValueUseProductionInstantiationMismatch;
+    }
+
+    if (is_model) {
+        try validateValueUseFacadeSurfaceManifest(source);
+        if (std.mem.indexOf(u8, source, "@import(\"core.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"planning.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"materialization.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"composition.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"actions/") != null)
+            return error.ValueUseImportDagMismatch;
+    } else if (is_planning) {
+        if (std.mem.indexOf(u8, source, "@import(\"core.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"materialization.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"composition.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"actions/address_memory.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"actions/calls.zig\")") != null)
+            return error.ValueUseImportDagMismatch;
+    } else if (is_materialization or is_composition) {
+        if (std.mem.indexOf(u8, source, "@import(\"core.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"planning.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"actions/") != null)
+            return error.ValueUseImportDagMismatch;
+    } else if (is_address or is_control or is_calls) {
+        if (std.mem.indexOf(u8, source, "@import(\"../core.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"../planning.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"../actions/") != null or
+            std.mem.indexOf(u8, source, "Authority.planning") != null)
+            return error.ValueUseImportDagMismatch;
+    }
+
+    if (is_control and countPattern(source, "\n") + 1 > 2000)
+        return error.ValueUseControlCompareLineBudgetExceeded;
+    try validateExactTopLevelPubNames(source, public_names);
+}
+
+fn validateValueUseFacadeSurfaceManifest(source: [:0]const u8) !void {
+    const manifest = try std.Io.Dir.cwd().readFileAllocOptions(
+        std.testing.io,
+        value_use_facade_manifest_path,
+        std.testing.allocator,
+        .limited(32 * 1024),
+        .of(u8),
+        0,
+    );
+    defer std.testing.allocator.free(manifest);
+    var digest: [std.crypto.hash.sha2.Sha256.digest_length]u8 = undefined;
+    std.crypto.hash.sha2.Sha256.hash(manifest, &digest, .{});
+    const actual = std.fmt.bytesToHex(digest, .lower);
+    if (!std.mem.eql(u8, &actual, value_use_facade_manifest_sha256))
+        return error.ValueUseFacadeManifestHashMismatch;
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const transaction_body = functionBodyNamed(bodies, "Transaction") orelse
+        return error.ValueUseFacadeManifestMismatch;
+    const transaction_source = try std.testing.allocator.dupeZ(
+        u8,
+        source[transaction_body.start..transaction_body.end],
+    );
+    defer std.testing.allocator.free(transaction_source);
+    try validateValueUseDirectForwardingWrappers(transaction_source);
+
+    var declaration_count: usize = 0;
+    var lines = std.mem.splitScalar(u8, transaction_source, '\n');
+    while (lines.next()) |line| {
+        const prefix = if (std.mem.startsWith(u8, line, "        pub fn "))
+            "        pub fn "
+        else if (std.mem.startsWith(u8, line, "        pub const "))
+            "        pub const "
+        else
+            continue;
+        const rest = line[prefix.len..];
+        var name_end: usize = 0;
+        while (name_end < rest.len and
+            (std.ascii.isAlphanumeric(rest[name_end]) or rest[name_end] == '_'))
+        {
+            name_end += 1;
+        }
+        if (name_end == 0) return error.ValueUseFacadeManifestMismatch;
+        const name = rest[0..name_end];
+        var needle_buffer: [128]u8 = undefined;
+        const needle = std.fmt.bufPrint(&needle_buffer, "\n{s}\n", .{name}) catch
+            return error.ValueUseFacadeManifestMismatch;
+        if (countPattern(manifest, needle) != 1)
+            return error.ValueUseFacadeManifestMismatch;
+        declaration_count += 1;
+    }
+
+    var manifest_count: usize = 0;
+    var previous: ?[]const u8 = null;
+    var manifest_lines = std.mem.splitScalar(u8, manifest, '\n');
+    if (!std.mem.eql(u8, manifest_lines.next() orelse "", "symbol"))
+        return error.ValueUseFacadeManifestMismatch;
+    while (manifest_lines.next()) |name| {
+        if (name.len == 0) continue;
+        if (previous) |prior| {
+            if (std.mem.order(u8, prior, name) != .lt)
+                return error.ValueUseFacadeManifestMismatch;
+        }
+        previous = name;
+        manifest_count += 1;
+    }
+    if (declaration_count != manifest_count or manifest_count != 91)
+        return error.ValueUseFacadeManifestMismatch;
+}
+
+fn validateValueUseDirectForwardingWrappers(transaction_source: [:0]const u8) !void {
+    var wrapper_count: usize = 0;
+    var cursor: usize = 0;
+    while (std.mem.indexOfPos(u8, transaction_source, cursor, "\n        pub fn ")) |start| {
+        const open = std.mem.indexOfPos(u8, transaction_source, start, "{") orelse
+            return error.ValueUseWrapperNotDirectForward;
+        const close = std.mem.indexOfPos(u8, transaction_source, open, "}") orelse
+            return error.ValueUseWrapperNotDirectForward;
+        const implementation = std.mem.trim(u8, transaction_source[open + 1 .. close], " \t\r\n");
+        if (!std.mem.startsWith(u8, implementation, "return Impl.") or
+            countPattern(implementation, ";") != 1 or
+            std.mem.indexOf(u8, implementation, " if ") != null or
+            std.mem.indexOf(u8, implementation, "defer") != null or
+            std.mem.indexOf(u8, implementation, "catch") != null)
+        {
+            return error.ValueUseWrapperNotDirectForward;
+        }
+        wrapper_count += 1;
+        cursor = close + 1;
+    }
+    if (wrapper_count != 36) return error.ValueUseWrapperNotDirectForward;
+}
+
+fn validateExactTopLevelPubNames(source: []const u8, expected: []const []const u8) !void {
+    var seen = [_]bool{false} ** 128;
+    if (expected.len > seen.len) return error.ValueUseTechnicalPubBudgetMismatch;
+    var lines = std.mem.splitScalar(u8, source, '\n');
+    while (lines.next()) |line| {
+        const prefix = if (std.mem.startsWith(u8, line, "pub fn "))
+            "pub fn "
+        else if (std.mem.startsWith(u8, line, "pub const "))
+            "pub const "
+        else
+            continue;
+        const rest = line[prefix.len..];
+        var name_end: usize = 0;
+        while (name_end < rest.len and
+            (std.ascii.isAlphanumeric(rest[name_end]) or rest[name_end] == '_'))
+        {
+            name_end += 1;
+        }
+        if (name_end == 0) return error.ValueUseTechnicalPubBudgetMismatch;
+        const name = rest[0..name_end];
+        var found = false;
+        for (expected, 0..) |expected_name, index| {
+            if (!std.mem.eql(u8, name, expected_name)) continue;
+            if (seen[index]) return error.ValueUseTechnicalPubBudgetMismatch;
+            seen[index] = true;
+            found = true;
+            break;
+        }
+        if (!found) return error.ValueUseTechnicalPubBudgetMismatch;
+    }
+    for (seen[0..expected.len]) |was_seen| {
+        if (!was_seen) return error.ValueUseTechnicalPubBudgetMismatch;
     }
 }
 
@@ -340,16 +728,25 @@ fn readFrozenBypassInventory(allocator: std.mem.Allocator) ![:0]u8 {
 }
 
 fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
+    return validateValueUseAuthoritySourceWithVisibility(source, false);
+}
+
+fn validateValueUseAuthoritySourceWithVisibility(
+    source: [:0]const u8,
+    allow_technical_visibility: bool,
+) !void {
     try validateNoFunctionFamilyPredicate(source, error.ValueUseFunctionPredicateForbidden);
-    if (std.mem.indexOf(u8, source, "pub const SemanticRole") != null or
-        std.mem.indexOf(u8, source, "pub const OperandPhase") != null or
-        std.mem.indexOf(u8, source, "pub const OrderedOperand") != null or
+    if ((!allow_technical_visibility and
+        (std.mem.indexOf(u8, source, "pub const SemanticRole") != null or
+            std.mem.indexOf(u8, source, "pub const OperandPhase") != null or
+            std.mem.indexOf(u8, source, "pub const OrderedOperand") != null)) or
         std.mem.indexOf(u8, source, "semantic_priority") != null or
         std.mem.indexOf(u8, source, "ordering_priority") != null)
     {
         return error.ValueUseConsumerOrderingForbidden;
     }
-    if (std.mem.indexOf(u8, source, "pub const PreparedView =") != null or
+    if ((!allow_technical_visibility and
+        std.mem.indexOf(u8, source, "pub const PreparedView =") != null) or
         std.mem.indexOf(u8, source, "pub fn readPreparedView") != null or
         std.mem.indexOf(u8, source, "pub fn invalidatePreparedViews") != null or
         std.mem.indexOf(u8, source, "pub fn consumePreparedView") != null or
@@ -374,7 +771,7 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     {
         return error.ValueUseLoadHomeClassificationEscape;
     }
-    try validateNoPublicPreparedPointer(source);
+    if (!allow_technical_visibility) try validateNoPublicPreparedPointer(source);
     const required = [_]struct { function: []const u8, pattern: []const u8, count: usize }{
         .{ .function = "resolveNamedCurrent", .pattern = "resolveValue(", .count = 1 },
     };
@@ -4294,4 +4691,85 @@ test "composed selector source guard keeps i128 pair wrappers semantic and produ
 
 test "composed selector source guard accepts the fully classified current tree" {
     try validateCurrentTree(std.testing.allocator);
+}
+
+test "value-use split guard rejects facade widening and internal production imports" {
+    try std.testing.expectError(
+        error.ValueUseFacadeManifestMismatch,
+        validateValueUseFacadeSource(
+            "const core = @import(\"value_use/core.zig\");\n" ++
+                "pub const ValueUseTransaction = core.ValueUseTransaction;\n" ++
+                "pub const Internal = core.Internal;\n",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseProductionInternalImport,
+        validateProductionSource(
+            "composed_selector_scalar.zig",
+            "@import(\"value_use/model.zig\");",
+        ),
+    );
+}
+
+test "value-use split guard rejects runtime dispatch type-name coupling and extra instantiations" {
+    try std.testing.expectError(
+        error.ValueUseRuntimeDispatchForbidden,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/model.zig",
+            "const callback: *const fn () void = undefined;",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseTypeNameDependency,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/model.zig",
+            "const name = @typeName(usize);",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseProductionInstantiationMismatch,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/core.zig",
+            "const A = model.Transaction(Implementation); const B = model.Transaction(Implementation);",
+        ),
+    );
+}
+
+test "value-use split guard rejects reverse imports and control-compare budget growth" {
+    try std.testing.expectError(
+        error.ValueUseImportDagMismatch,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/actions/control_compare.zig",
+            "const planning = @import(\"../planning.zig\");",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseImportDagMismatch,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/actions/control_compare.zig",
+            "fn reverse(comptime Authority: type) void { _ = Authority.planning; }",
+        ),
+    );
+    const oversized = "// line\n" ** 2001;
+    try std.testing.expectError(
+        error.ValueUseControlCompareLineBudgetExceeded,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/actions/control_compare.zig",
+            oversized,
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseTechnicalPubBudgetMismatch,
+        validateExactTopLevelPubNames(
+            "pub const ValueUseTransaction = model.Transaction(Implementation);\n" ++
+                "pub const Widened = usize;\n",
+            &value_use_core_pub_names,
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseWrapperNotDirectForward,
+        validateValueUseDirectForwardingWrappers(
+            "fn altered() void { if (true) return; }\n",
+        ),
+    );
 }

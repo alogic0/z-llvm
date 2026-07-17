@@ -1,0 +1,192 @@
+# INBOX-128 O2-R1 production split summary
+
+Status: source/evidence/guard tree frozen for the required post-commit
+counterbalanced measurement; final performance results are appended in the
+follow-up evidence commit.
+
+Date: 2026-07-17
+
+## Scope and baseline
+
+The accepted R0 working baseline is commit
+`4c0a69f730975fed988274c4f54e434676e94b1e`, tree
+`ee795cbbf158e36da149be840e10deaa36cd3d3a`, with the monolith frozen at:
+
+```text
+file=src/codegen/x86_64/generic_cfg/composed_selector_value_use_transaction.zig
+lines=6698
+bytes=290587
+sha256=825abb19d5a24bfa2fc1ccc1c611a4ffc6c620c1d771ad3a026fa5bc866f52e1
+```
+
+R1 mechanically partitions that source into the accepted R0 layout. The
+compatibility facade remains:
+
+```text
+const core = @import("value_use/core.zig");
+
+pub const ValueUseTransaction = core.ValueUseTransaction;
+```
+
+There is no consumer migration, capability change, diagnostic change, or
+frontier movement. The direct-materialization ratchet remains exactly 172.
+`stash@{0}` remains untouched.
+
+## Mechanical provenance and manifests
+
+Exact reconstruction/provenance command:
+
+```text
+git show 4c0a69f730975fed988274c4f54e434676e94b1e:src/codegen/x86_64/generic_cfg/composed_selector_value_use_transaction.zig > tmp/inbox128_r0_value_use_transaction.zig
+INBOX128_R0_SOURCE=tmp/inbox128_r0_value_use_transaction.zig python3 tools/o2_r1_split_from_r0.py
+zig fmt src/codegen/x86_64/generic_cfg/composed_selector_value_use_transaction.zig src/codegen/x86_64/generic_cfg/value_use
+```
+
+```text
+tool=tools/o2_r1_split_from_r0.py
+tool_sha256=769212111623ed63c041f053c344b45de97cb9f994146f483d6cacf5feb4d868
+provenance=docs/evidence/inbox128_o2_r1_symbol_provenance.tsv
+provenance_rows=287_plus_header
+provenance_sha256=cee0970e29141a9bb5974ab55c01995d0ed21122f39204bc0470e5aff3034df9
+facade_manifest=docs/evidence/inbox128_o2_r1_facade_manifest.tsv
+facade_manifest_entries=91
+facade_manifest_sha256=c4584910259225efdb267821d63058a4cbe5b371f73ab4a9827988a1c530827e
+tag_error_dispatch_manifest=docs/evidence/inbox128_o2_r1_tag_error_dispatch_manifest.tsv
+tag_error_dispatch_manifest_sha256=4432b0cad4193aed358f5887939470f6afef7f83fde3ac1c3681205f35491ce1
+```
+
+The facade manifest is identical to R0: zero additions, removals, or
+signature/error-surface changes. `PreparedAction` remains centralized in
+`model.zig`; `core.zig` contains the sole exhaustive action dispatch.
+
+## Leaf identities and budgets
+
+```text
+3      4f5887e9d2bce0943df26c1e08e8360053440da64eefd19ddfd9d53225dddd7a  composed_selector_value_use_transaction.zig
+1346   3dbfb5a0b85dd3901e74724d490b954f3fc26a43832a724254f2022d9e8e9534  value_use/model.zig
+1055   febb6d5c30bdd0b4c2e400d349020feec923ce6712038c49cee456e5ea6a10f8  value_use/core.zig
+1969   9a495f9a9c247ed1991c0f942566bfd85627b2d6cfeebbc2b94a40180ae2d0d5  value_use/planning.zig
+1278   78f808f22449264bb4fcdb3abf487a62cbb370ce07e3bdf43dd375cf7d92e703  value_use/materialization.zig
+258    12ef0e4d49c2f228f012dd9aa3f68ad2f03658a45cecf6be48e7b3412067c6dc  value_use/composition.zig
+929    e1760a3513ff8c1f5e4c3cb9808f38e6bffccab6b4a759e044150e2aea7f4b51  value_use/actions/address_memory.zig
+1408   5d5ed89c7fd49978eb03bdbb84045fb9a488a16c7c34662eb0f6149adb1f64c7  value_use/actions/control_compare.zig
+215    d6b6fd404f8eacc462bf2f9da575cacd6877268ff0407346f8a33aec8aa18fe3  value_use/actions/calls.zig
+```
+
+No leaf exceeds 2,000 lines. The watched `control_compare.zig` leaf is 1,408
+lines. Planning is 1,969 lines: above its R0 projection but below the explicit
+2,000-line reviewed-exception threshold. Its extra lines are the frozen pure
+compatibility classifiers moved out of model to satisfy the exact
+technically-public name budget; no capability was added.
+
+The source guard enforces every exact per-leaf technically-public name set.
+Action leaves cannot import planning or access `Authority.planning`; shared
+physical-node classification data lives in the model and planning exposes
+only its frozen forwarding names. Production consumers remain facade-only.
+
+## Transaction(comptime Impl) proofs
+
+- Exactly one production instantiation exists:
+  `model.Transaction(Implementation)` in `core.zig`.
+- The facade exposes no `Impl`.
+- No function pointers, vtables, or runtime callbacks are present.
+- No production or test source uses `@typeName` for this authority.
+- All 36 extracted transaction methods are guarded as direct forwarding
+  shells: one return, no branch, cleanup, error translation, mutation, or
+  retry.
+- The R0 and R1 transaction layouts are identical:
+  `@sizeOf=194688`, `@alignOf=16`, with all 28 field offsets frozen in the
+  full-unit test.
+- Reflection tests prove every public callable method retains a finite
+  reachable error set; none widened to `anyerror`.
+- The exact sorted facade and PreparedAction/UseForm/error/dispatch manifests
+  match R0.
+- The import graph is acyclic. Planning imports only the frozen pure compare
+  classifier set. Action leaves have no reverse planning dependency.
+
+## Optimized allocated-section inspection
+
+Both artifacts were built with the exact command `zig build
+-Doptimize=ReleaseFast` from R0 and the final pre-commit R1 source,
+respectively. The retained inspection is
+`tmp/inbox128_o2_r1/artifacts/optimized_allocated_sections.txt`, SHA-256
+`1f6dacf40adc7a17b53b64e53e57a3be1c1fc882756eea59aeae43e8563e0ed8`.
+
+```text
+artifact_A_sha256=a9bd992941e69d689798cf5d808d4de7829ba25adbdca7686d2f61acdce02cbf
+artifact_B_sha256=fa03e845610b58a901d6096c7947f3b41f5b43e3efbfc71c1b8e041412fee76e
+section                 A_bytes  B_bytes  status
+.rodata                  772004   772772  changed
+.eh_frame_hdr             25316    25300  changed
+.eh_frame                149968   149992  changed
+.text                   4907267  4910995  changed
+.got                           8        8  byte-identical
+.data                      19176    19176  changed
+```
+
+The allocated-section movement is recorded, not hidden: the approved generic
+type and moved function identities change optimized symbol ordering and
+unwind/string placement. The behavior-facing gates below remain exact, and
+the required counterbalanced runtime gate adjudicates the runtime effect.
+
+## Exact behavior identities
+
+Exact commands:
+
+```text
+LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --report-all-codegen-failures --target=x86_64-linux --input-limit=67108864 tmp/inbox92_second_resume2_perf/compiler_rt_frozen.ll > /dev/null 2> tmp/inbox128_o2_r1/validation/fresh_full_report_final.log
+LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll > tmp/inbox128_o2_r1/validation/accepted_final.o 2> tmp/inbox128_o2_r1/validation/accepted_final.stderr
+LC_ALL=C zig-out/bin/z_llvm --emit=selection-owner-manifest --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll > tmp/inbox128_o2_r1/validation/owner_manifest_final.tsv 2> tmp/inbox128_o2_r1/validation/owner_manifest_final.stderr
+```
+
+```text
+report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681
+selected/emitted/failed=443/285/158
+first_failure=compiler_rt.trunc.truncl/UnsupportedLongDoubleAbi
+accepted_object_sha256=061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be
+owner_manifest_sha256=5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d
+owner_ledger=167/17/101
+owner_breakdown=composed_block:40,composed_cfg:127,legacy_envelope:17,structural_fallback:101
+```
+
+## Non-performance validation
+
+Every log below records exactly the command shown. No Tier 3 command was run.
+
+```text
+command=zig test src/codegen/x86_64/generic_cfg/composed_selector_source_guard_tests.zig > tmp/inbox128_o2_r1/validation/source_guard_final.log 2>&1
+result=34/34
+log_sha256=0c0a058bb28dfb96fd2991abd3b5dfe299bb20b0436aa8cfca0cd9d0cdbf987e
+
+command=zig build test --summary all > tmp/inbox128_o2_r1/validation/full_unit_final2.log 2>&1
+result=1278/1278
+log_sha256=d0b4e771e65d87690697bdbc9a6de6896190f218fe2670e6d54fba9736370621
+
+command=zig build abi-differential --summary all > tmp/inbox128_o2_r1/validation/abi_differential_final.log 2>&1
+result=60/60+30/30
+log_sha256=9a8949619993bf17a50f6fef97053ae7952746b1735aceace205124d911a91c2
+
+command=zig build focused-codegen-canaries --summary all > tmp/inbox128_o2_r1/validation/focused_canaries_final.log 2>&1
+result=2_canaries/35_cases
+log_sha256=2bf6f68ae7cec068253218a52e4d89d17d0b193396c31e3bca2feb72744e40f8
+
+command=zig build distribution-zig-integrated-exe --summary all > tmp/inbox128_o2_r1/validation/integrated_exe_final.log 2>&1
+result=7/7
+log_sha256=3360567d9272f0aa4e70b292d825f19ff237472b609c074e8814addef8b0736e
+
+command=zig build test structural-smoke compare-codegen-asm compare-codegen-objdump compare-codegen-readelf distribution-object distribution-executable distribution-debug-object distribution-debug-executable distribution-releasesafe-object distribution-zig-integrated-exe abi-differential --summary all > tmp/inbox128_o2_r1/validation/strengthened_tier2_final.log 2>&1
+result=29/29_steps,1286/1286_tests
+log_sha256=1358935fa69b459d24269d99b566b9db2a858beef43f182ff9e2fb205abbdf8b
+```
+
+Tier 3 was not invoked.
+
+## Counterbalanced performance
+
+The final production/evidence/guard source commit is frozen before artifact
+construction, as required. Immutable A and B artifact hashes, the idle
+preflight, two discarded warmups per artifact, all six `AB/BA/AB/BA/AB/BA`
+pairs, ordinary medians, median paired ratio, maximum RSS, and the dual gate
+decision are appended after that one authorized measurement. No source,
+tool, build, facade, or guard mutation is permitted between the source freeze
+and timing.
