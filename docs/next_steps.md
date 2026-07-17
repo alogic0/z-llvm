@@ -196,7 +196,25 @@ removed only after proving no remaining owner; ratchet reconciling EXACTLY
 to 153 (any other count = hard stop); identities + six frontier rows
 byte-identical; full correctness + counterbalanced perf gates; uncommitted
 wiring preserved losslessly on any stop; no Tier 3; stop after the
-production + evidence commits. INBOX-135 dispatched.
+production + evidence commits. INBOX-135 dispatched. **INBOX-135 HARD-STOPPED CORRECTLY** (a live-after
+64-bit-shift RAX source must spill/reload per the legacy liveness-aware
+`accumulatorArithmeticDisplacement`, but the frozen
+`immediateSourceDisplacement` reuses EAX/RAX unconditionally — the
+`__multi3` frozen identity caught it; nothing committed; the wiring
+preserved at sha `39aa6d53`, apply-check clean). **The Reviewer authorized
+the two-step repair** (2026-07-17) with a correction to my proposal: do NOT
+change `scalarCastSourceDisplacement` — the cast reuse-without-liveness is
+INTENTIONAL (its accepted ancestors differ), and changing it would exceed
+the byte-identical scope; the guard must freeze the deliberate
+cast-vs-arithmetic distinction. Step A2 changes only
+`immediateSourceDisplacement` (EAX/RAX named source: reuse only when
+`!valueIsLiveAfterCurrent`, else the supplied fallback; exact boundary
+semantics; legacy authority error propagation; canonical re-resolution after
+spill) with the four required test classes plus the design note mapping
+every remaining scalar action to its exact legacy displacement authority
+(form-table / liveness-aware arithmetic / hardcoded — no generalization
+between categories). Step B2 resumes the wiring from patch `39aa6d53` under
+the unchanged contract. INBOX-135 amended in place; Step A2 dispatched.
 
 ## Historical operating ledger
 
