@@ -67,6 +67,21 @@ gate preserved; only migrated branches removed; 172→166 only on the honest
 last-owner collapse else hard stop; full gates + counterbalanced perf; no
 Tier 3).
 
+**The placement slice LANDED at `3750d62b`** ("codegen: place scalar cast
+actions in arithmetic leaf") and is Supervisor-verified as a pure move:
+`control_compare.zig` shed exactly its 357 cast lines (1,766→1,409); the new
+`actions/scalar_arithmetic.zig` is 373 lines importing only
+model/composition (no planning/core edge); the co-located test file is a
+PURE RENAME with zero content changes; the facade manifest diff is EMPTY;
+the 36-row provenance manifest pins identical old/new block hashes
+(`exact=yes`) parsed from the frozen pre-move blob at `211efdcc`; production
+lowerings untouched; ratchet recount 172; identities re-hashed EXACT
+(`49a19f04`/`061a64e4`/`5d91960e`); full unit 1,292/1,292; Worker abi + my
+independent abi rerun both pass; split-policy guards updated with new
+placement fixtures; no perf; no Tier 3; worktree clean. Evidence sent to the
+Reviewer requesting placement acceptance and confirmation that the
+conditionally-authorized production cast-wiring slice may now dispatch.
+
 ## Historical operating ledger
 
 ## INBOX-67 tracked serial-runner hardening (O1 prerequisite)
