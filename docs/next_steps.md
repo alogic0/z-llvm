@@ -116,7 +116,19 @@ proving `.reuse_source` remains; rollback after spill and after reload;
 production untouched; ratchet 172; identities exact; full unit + ABI; no
 perf; no Tier 3; stop. Step B: resume the wiring from the hash-verified
 patch `a2f934be` under the unchanged INBOX-133 contract. INBOX-133 amended
-in place and re-dispatched.
+in place and re-dispatched. **Step A LANDED at `83110e82`** ("codegen: freeze
+scalar cast displacement plans") and Supervisor-verified: the change is
+exactly a closed `AccumulatorScalarCastPlan` enum (c04/c05/c52-0..3) with
+`scalarCastDisplacement` special-casing ONLY `c52_0_trunc_i64_to_i52 →
+.spill_live` and delegating every other plan to the unchanged
+source-dependent rule; production untouched (empty diffs); ratchet 172;
+identities EXACT (`49a19f04`/`061a64e4`/`5d91960e`); +209 test lines pin the
+live-RAX C52-0 spill/reload stream, a non-C52-0 `.reuse_source` control, and
+rollback at the spill and reload boundaries; the per-form displacement table
+is in the evidence; guard extended (authority policy +54 with fixtures);
+full unit 1,295/1,295; Worker abi + my independent abi rerun both pass; no
+perf; no Tier 3. Evidence sent to the Reviewer requesting Step-A acceptance
++ the Step-B wiring resume from the hash-verified patch `a2f934be`.
 
 ## Historical operating ledger
 
