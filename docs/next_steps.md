@@ -172,7 +172,21 @@ evidence; scalar_arithmetic.zig below 2,000 lines (crossing = review stop);
 dormant acceptance at ratchet 166; the later wiring claims 166→153 only if
 all 12 gateways land, L00 remains, and
 `tryLowerLshr64SpillThroughRax/resolveValue` genuinely loses its last owner.
-INBOX-134 dispatched.
+INBOX-134 dispatched. **The dormant immediates LANDED at `b2189cdc`** and
+are Supervisor-verified: production lowering files untouched (empty diffs);
+ratchet recount 166; `scalar_arithmetic.zig` at 1,368 lines (+956, under the
+2,000 ceiling); the two direction-specific actions + pure classifiers with
+L00 and the i128 pair-result branches explicitly rejected; the facade
+manifest versioned +7 (exactly the two actions, the two classifiers,
+`ImmediateScalarRequestError`, and the test-failure hook pair); the
+R00–R06/L01–L03 closed plan table recorded in evidence with the
+source-derived choices preserved (R01 scratch-vs-spill-through-RAX with
+accumulator fallback only when no scratch plan exists; R02 scratch32
+transient-EAX write-back; R03 EAX-vs-durable-RCX; R06 sessionless); +636
+dormant test lines; identities EXACT (`49a19f04`/`061a64e4`/`5d91960e`);
+full unit 1,309/1,309; Worker abi + my independent abi rerun both pass; no
+perf; no Tier 3. Evidence sent to the Reviewer requesting dormant acceptance
++ the immediates wiring authorization (166→153).
 
 ## Historical operating ledger
 
