@@ -63,6 +63,7 @@ pub const ValueUseTransaction = struct {
     accumulator_session: ?AccumulatorDefinitionSession = null,
     memcpy_test_failure: if (builtin.is_test) ?MemcpyTestFailure else void = if (builtin.is_test) null else {},
     load_test_failure: if (builtin.is_test) ?LoadTestFailure else void = if (builtin.is_test) null else {},
+    scratch_compare_test_failure: if (builtin.is_test) ?ScratchCompareTestFailure else void = if (builtin.is_test) null else {},
 
     pub const Expected = struct {
         ty: ir.Type,
@@ -101,6 +102,10 @@ pub const ValueUseTransaction = struct {
         /// closed load action and canonical binding/home; consumers neither
         /// discover nor choose a physical source representation.
         load_address,
+        /// Action-only scalar/pointer compare operand. The closed compare
+        /// action derives the accepted low view and fixed scratch assignment;
+        /// this form grants no generic materialization capability.
+        scratch_compare_operand,
         stack_argument,
         new_pair_ownership,
     };
@@ -316,6 +321,36 @@ pub const ValueUseTransaction = struct {
         after_first_partial_load,
     };
 
+    pub const ScratchCompareRhs = union(enum) {
+        immediate: i128,
+        null_pointer,
+        named: RequestHandle,
+    };
+
+    /// Complete fixed-scratch scalar/pointer compare intent. No physical
+    /// register, source home, or staging order crosses this public boundary.
+    pub const ScratchCompareAction = struct {
+        result: ActionIdentity,
+        operand_ty: ir.Type,
+        predicate: ir.IcmpPredicate,
+        samesign: bool,
+        rhs: ScratchCompareRhs,
+    };
+
+    pub const ScratchCompareTestFailure = enum {
+        after_lhs_staging,
+        after_rhs_staging,
+        after_immediate_staging,
+        after_lhs_normalize_shl,
+        after_lhs_normalize_sar,
+        after_rhs_normalize_shl,
+        after_rhs_normalize_sar,
+        after_accumulator_preparation,
+        after_flags_definition,
+        after_setcc,
+        after_result_finalization,
+    };
+
     pub const max_switch_cases = 8;
 
     pub const SwitchCaseIntent = struct {
@@ -400,6 +435,7 @@ pub const ValueUseTransaction = struct {
         load_readonly_pair: ReadOnlyPairLoadAction,
         load_stack_i128_alias: StackI128AliasLoadAction,
         load_readonly_table_i16: ReadOnlyTableI16LoadAction,
+        scratch_compare: ScratchCompareAction,
 
         fn eql(action: PreparedAction, other: PreparedAction) bool {
             return std.meta.eql(action, other);
@@ -814,6 +850,40 @@ pub const ValueUseTransaction = struct {
         return transaction.handleFor(index);
     }
 
+    /// Attaches one closed fixed-scratch compare intent after every named
+    /// operand has been registered in legacy source order. This changes only
+    /// the transaction-local plan; selector state remains untouched.
+    pub fn attachScratchCompareAction(
+        transaction: *ValueUseTransaction,
+        lhs: RequestHandle,
+        action: ScratchCompareAction,
+    ) !void {
+        try transaction.requireActive();
+        if (transaction.request_phase != .registering) return error.ValueUseLateRegistration;
+        const lhs_index = try transaction.validateHandle(lhs);
+        const lhs_request = &transaction.requests[lhs_index];
+        if (lhs_request.destination != .prepared_view or
+            lhs_request.form != .scratch_compare_operand or
+            lhs_request.prepared_action != null)
+        {
+            return error.ValueUsePreparedActionFormMismatch;
+        }
+        try action.result.validate();
+        _ = try classifyScratchCompare(&action);
+        switch (action.rhs) {
+            .named => |rhs| {
+                const rhs_index = try transaction.validateRegisteredOperandHandle(rhs);
+                if (rhs_index <= lhs_index or
+                    transaction.requests[rhs_index].form != .scratch_compare_operand)
+                {
+                    return error.ValueUseScratchCompareSourceOrder;
+                }
+            },
+            .immediate, .null_pointer => {},
+        }
+        lhs_request.prepared_action = .{ .scratch_compare = action };
+    }
+
     /// Seals and validates the complete plan before selector mutation. Current
     /// locations are inspected only to validate types, conflicts, and cycles;
     /// they are never stored for later materialization.
@@ -1201,6 +1271,16 @@ pub const ValueUseTransaction = struct {
         transaction.load_test_failure = failure;
     }
 
+    /// White-box scratch-compare rollback boundary control. Unavailable in
+    /// every production build and guarded from production consumers.
+    pub fn setScratchCompareTestFailure(
+        transaction: *ValueUseTransaction,
+        failure: ?ScratchCompareTestFailure,
+    ) !void {
+        if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
+        transaction.scratch_compare_test_failure = failure;
+    }
+
     fn requireActive(transaction: *const ValueUseTransaction) !void {
         if (transaction.lifecycle != .active) return error.ValueUseTransactionClosed;
     }
@@ -1275,6 +1355,9 @@ pub const ValueUseTransaction = struct {
             error.ValueUseEarlyOrderingCycle,
             error.ValueUseActionDiagnostic,
             error.ValueUseMemcpyTestFailure,
+            error.ValueUseScratchCompareTestFailure,
+            error.ValueUseScratchCompareImmediateOutOfRange,
+            error.ValueUseScratchCompareFormUnsupported,
             error.ValueUseLateRegistration,
             error.ValueUsePlanAlreadySealed,
             error.ValueUsePrepareBeforeSeal,
@@ -1371,6 +1454,7 @@ pub const ValueUseTransaction = struct {
             },
             .load_stack_i128_alias => |*load| try load.result.validate(),
             .load_readonly_table_i16 => |*load| try load.result.validate(),
+            .scratch_compare => return error.ValueUseScratchCompareAttachRequired,
         }
     }
 
@@ -1430,6 +1514,10 @@ pub const ValueUseTransaction = struct {
             .inline_memcpy => |memcpy| {
                 try transaction.validateOperandCanonical(memcpy.source);
                 try transaction.validateOperandCanonical(memcpy.length);
+            },
+            .scratch_compare => |compare| switch (compare.rhs) {
+                .named => |handle| try transaction.validateOperandCanonical(handle),
+                .immediate, .null_pointer => {},
             },
             .validate_shape,
             .emit_copy_to,
@@ -1584,6 +1672,10 @@ pub const ValueUseTransaction = struct {
             .store_i64 => |store| try transaction.validateRegisteredOperandHandle(store.value),
             .store_stack_pointer => |store| try transaction.validateRegisteredOperandHandle(store.destination),
             .inline_memcpy => |memcpy| try transaction.validateRegisteredOperandHandle(memcpy.source),
+            .scratch_compare => |compare| switch (compare.rhs) {
+                .named => |handle| try transaction.validateRegisteredOperandHandle(handle),
+                .immediate, .null_pointer => null,
+            },
             .load_scalar,
             .load_readonly_pair,
             .load_stack_i128_alias,
@@ -1620,6 +1712,7 @@ pub const ValueUseTransaction = struct {
             .load_readonly_pair,
             .load_stack_i128_alias,
             .load_readonly_table_i16,
+            .scratch_compare,
             => null,
         };
     }
@@ -1964,6 +2057,7 @@ pub const ValueUseTransaction = struct {
             .memcpy_pointer,
             .memcpy_length,
             .load_address,
+            .scratch_compare_operand,
             => return error.ValueUsePreparedActionRequired,
             .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, destination),
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -2048,6 +2142,7 @@ fn preparedViewFromLoc(
         .pair_low_high, .pair_high_low => preparedPairView(loc, request.form),
         .branch_condition, .switch_condition => preparedConditionView(loc),
         .memcpy_pointer, .memcpy_length => preparedMemcpyScalarView(loc),
+        .scratch_compare_operand => preparedScratchCompareView(loc, request.expected.ty),
         .stack_argument => error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
     };
@@ -2060,6 +2155,27 @@ fn preparedMemcpyScalarView(loc: ValueLoc) !ValueUseTransaction.PreparedView {
             .register = .{ .register = .{ .gpr64 = pair.lo }, .bits = 64 },
         },
         else => error.ValueUseSourceViewMismatch,
+    };
+}
+
+fn preparedScratchCompareView(
+    loc: ValueLoc,
+    operand_ty: ir.Type,
+) !ValueUseTransaction.PreparedView {
+    const bits: u16 = switch (operand_ty) {
+        .int => |value| value,
+        .ptr => 64,
+        else => return error.ValueUseTypeMismatch,
+    };
+    return switch (loc) {
+        .arg128, .scratch128 => |pair| .{ .register = .{
+            .register = if (bits <= 32)
+                .{ .gpr32 = pair.lo }
+            else
+                .{ .gpr64 = pair.lo },
+            .bits = if (bits <= 32) 32 else 64,
+        } },
+        else => preparedScalarView(loc),
     };
 }
 
@@ -2207,6 +2323,128 @@ fn preparedPairView(
         .{ .first = high, .second = low } };
 }
 
+const ScratchCompareKind = enum {
+    ne_zero_i16,
+    ne_zero_i32,
+    ne_zero_i64,
+    ne_named,
+    eq_pointer_null,
+    eq_pointer_named,
+    eq_i52_zero,
+    eq_named,
+    eq_i64_immediate,
+    unsigned_i16_immediate,
+    ugt_named,
+    ugt_i64_immediate,
+    ugt_i32_immediate,
+    sgt_i64_immediate,
+    slt_i16_zero,
+    slt_i64_immediate,
+    signed_named,
+    ult_i32_named,
+    ult_i64_named,
+    ult_i64_immediate,
+};
+
+const ScratchComparePlan = struct {
+    kind: ScratchCompareKind,
+    bits: u16,
+    lhs_register: ArgReg = .rcx,
+    rhs_register: ?ArgReg = null,
+    immediate_register: ?ArgReg = null,
+};
+
+fn classifyScratchCompare(
+    action: *const ValueUseTransaction.ScratchCompareAction,
+) !ScratchComparePlan {
+    const rhs_tag = std.meta.activeTag(action.rhs);
+    if (action.operand_ty == .ptr) {
+        if (action.predicate != .eq) return error.ValueUseScratchCompareFormUnsupported;
+        return switch (rhs_tag) {
+            .null_pointer => .{ .kind = .eq_pointer_null, .bits = 64 },
+            .named => .{
+                .kind = .eq_pointer_named,
+                .bits = 64,
+                .rhs_register = .r8,
+            },
+            .immediate => error.ValueUseScratchCompareFormUnsupported,
+        };
+    }
+    if (action.operand_ty != .int) return error.ValueUseScratchCompareFormUnsupported;
+    const bits = action.operand_ty.int;
+    if (bits == 0 or bits > 64) return error.ValueUseScratchCompareFormUnsupported;
+    switch (action.rhs) {
+        .null_pointer => return error.ValueUseScratchCompareFormUnsupported,
+        .immediate => |immediate| {
+            if (action.predicate == .ne and immediate == 0) return switch (bits) {
+                16 => .{ .kind = .ne_zero_i16, .bits = bits },
+                32 => .{ .kind = .ne_zero_i32, .bits = bits },
+                64 => .{ .kind = .ne_zero_i64, .bits = bits },
+                else => error.ValueUseScratchCompareFormUnsupported,
+            };
+            if (!action.samesign and action.predicate == .eq and bits == 52 and immediate == 0)
+                return .{ .kind = .eq_i52_zero, .bits = bits };
+            if (action.predicate == .eq and bits == 64 and immediate != 0) {
+                _ = composed_helpers.i64Value(immediate) catch
+                    return error.ValueUseScratchCompareImmediateOutOfRange;
+                return .{ .kind = .eq_i64_immediate, .bits = bits };
+            }
+            if ((action.predicate == .ult or action.predicate == .ugt) and bits == 16) {
+                _ = composed_helpers.u16BitPattern(immediate) catch
+                    return error.ValueUseScratchCompareImmediateOutOfRange;
+                return .{ .kind = .unsigned_i16_immediate, .bits = bits };
+            }
+            if (action.predicate == .ugt and bits == 64) return .{
+                .kind = .ugt_i64_immediate,
+                .bits = bits,
+                .immediate_register = .r8,
+            };
+            if (action.predicate == .ugt and bits == 32) return .{
+                .kind = .ugt_i32_immediate,
+                .bits = bits,
+                .immediate_register = .r8,
+            };
+            if (!action.samesign and action.predicate == .sgt and bits == 64)
+                return .{ .kind = .sgt_i64_immediate, .bits = bits };
+            if (action.predicate == .slt and bits == 16 and immediate == 0)
+                return .{ .kind = .slt_i16_zero, .bits = bits };
+            if (!action.samesign and action.predicate == .slt and bits == 64 and immediate != 0)
+                return .{ .kind = .slt_i64_immediate, .bits = bits };
+            if (action.predicate == .ult and bits == 64)
+                return .{ .kind = .ult_i64_immediate, .bits = bits };
+        },
+        .named => {
+            if (!action.samesign and action.predicate == .ne and
+                (bits == 16 or bits == 32 or bits == 64))
+            {
+                return .{ .kind = .ne_named, .bits = bits, .rhs_register = .r8 };
+            }
+            if (action.predicate == .eq and (bits <= 32 or bits == 64))
+                return .{ .kind = .eq_named, .bits = bits, .rhs_register = .r8 };
+            if (action.predicate == .ugt and (bits == 32 or bits == 64))
+                return .{ .kind = .ugt_named, .bits = bits, .rhs_register = .r8 };
+            if (!action.samesign and (action.predicate == .slt or action.predicate == .sgt) and
+                (bits == 16 or bits == 32 or bits == 64))
+            {
+                return .{ .kind = .signed_named, .bits = bits, .rhs_register = .r8 };
+            }
+            if (action.predicate == .ult and bits == 32) return .{
+                .kind = .ult_i32_named,
+                .bits = bits,
+                .lhs_register = .r8,
+                .rhs_register = .rcx,
+            };
+            if (!action.samesign and action.predicate == .ult and bits == 64) return .{
+                .kind = .ult_i64_named,
+                .bits = bits,
+                .lhs_register = .r8,
+                .rhs_register = .rcx,
+            };
+        },
+    }
+    return error.ValueUseScratchCompareFormUnsupported;
+}
+
 fn executePreparedActionInternal(
     transaction: *ValueUseTransaction,
     request_index: u8,
@@ -2231,6 +2469,7 @@ fn executePreparedActionInternal(
                 .memcpy_pointer,
                 .memcpy_length,
                 .load_address,
+                .scratch_compare_operand,
                 => return error.ValueUsePreparedActionFormMismatch,
                 .stack_argument => return error.ValueUseStackArgumentUnsupported,
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -2250,7 +2489,186 @@ fn executePreparedActionInternal(
         .load_readonly_pair => |load| try executeReadOnlyPairLoad(transaction, request_index, view, &load),
         .load_stack_i128_alias => |load| try executeStackI128AliasLoad(transaction, view, &load),
         .load_readonly_table_i16 => |load| try executeReadOnlyTableI16Load(transaction, view, &load),
+        .scratch_compare => |compare| try executeScratchCompare(transaction, request_index, view, &compare),
     }
+}
+
+fn executeScratchCompare(
+    transaction: *ValueUseTransaction,
+    lhs_index: u8,
+    lhs_view: *const ValueUseTransaction.PreparedView,
+    action: *const ValueUseTransaction.ScratchCompareAction,
+) !void {
+    const plan = try classifyScratchCompare(action);
+    const session = if (transaction.accumulator_session) |*session|
+        session
+    else
+        return error.ValueUseScratchCompareAccumulatorSessionRequired;
+
+    try stageScratchCompareOperand(
+        transaction,
+        lhs_index,
+        lhs_view,
+        plan.lhs_register,
+        plan.bits,
+    );
+    try failScratchCompareForTest(transaction, .after_lhs_staging);
+
+    switch (action.rhs) {
+        .named => |handle| {
+            const rhs_index = try transaction.validateRegisteredOperandHandle(handle);
+            try stageScratchCompareOperand(
+                transaction,
+                rhs_index,
+                try transaction.registeredOperandView(handle),
+                plan.rhs_register orelse return error.ValueUseScratchCompareFormUnsupported,
+                plan.bits,
+            );
+            try failScratchCompareForTest(transaction, .after_rhs_staging);
+        },
+        .immediate => |immediate| if (plan.immediate_register) |reg| {
+            try clobberPhysicalNode(transaction.selector, nodeForArgReg(reg));
+            const value = composed_helpers.i64Value(immediate) catch
+                return error.ValueUseScratchCompareImmediateOutOfRange;
+            try transaction.selector.machine.instructions.append(
+                transaction.selector.allocator,
+                switch (reg) {
+                    .r8 => .{ .mov_imm_r8 = value },
+                    else => unreachable,
+                },
+            );
+            try failScratchCompareForTest(transaction, .after_immediate_staging);
+        },
+        .null_pointer => {},
+    }
+
+    if (try session.prepare(.preserve, .spill_live)) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+    try failScratchCompareForTest(transaction, .after_accumulator_preparation);
+
+    if ((plan.kind == .ne_named or plan.kind == .signed_named) and plan.bits == 16) {
+        try selector_state.emitEflagsInstruction(
+            transaction.selector,
+            .{ .shl_rcx_imm6 = 48 },
+            .write,
+        );
+        try failScratchCompareForTest(transaction, .after_lhs_normalize_shl);
+        try selector_state.emitEflagsInstruction(
+            transaction.selector,
+            .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 48 } },
+            .write,
+        );
+        try failScratchCompareForTest(transaction, .after_lhs_normalize_sar);
+        try selector_state.emitEflagsInstruction(
+            transaction.selector,
+            .{ .shl_r8_imm6 = 48 },
+            .write,
+        );
+        try failScratchCompareForTest(transaction, .after_rhs_normalize_shl);
+        try selector_state.emitEflagsInstruction(
+            transaction.selector,
+            .{ .sar_arg64_imm6 = .{ .reg = .r8, .amount = 48 } },
+            .write,
+        );
+        try failScratchCompareForTest(transaction, .after_rhs_normalize_sar);
+    }
+
+    const definition: x86_64_machine.Instruction = switch (plan.kind) {
+        .ne_zero_i16, .slt_i16_zero => .{
+            .cmp_arg16_imm16 = .{ .reg = .rcx, .imm = 0 },
+        },
+        .ne_zero_i32 => .{ .test_arg32 = .rcx },
+        .ne_zero_i64 => .{ .cmp_arg64_imm64 = .{ .reg = .rcx, .imm = 0 } },
+        .ne_named,
+        .eq_pointer_named,
+        .eq_named,
+        .ugt_named,
+        .signed_named,
+        => if (plan.bits <= 32)
+            .{ .cmp_ecx_arg32 = .r8 }
+        else
+            .{ .cmp_rcx_arg64 = .r8 },
+        .eq_pointer_null, .eq_i52_zero => .{ .test_arg64 = .rcx },
+        .eq_i64_immediate,
+        .sgt_i64_immediate,
+        .slt_i64_immediate,
+        .ult_i64_immediate,
+        => .{ .cmp_arg64_imm64 = .{
+            .reg = .rcx,
+            .imm = composed_helpers.i64Value(action.rhs.immediate) catch
+                return error.ValueUseScratchCompareImmediateOutOfRange,
+        } },
+        .unsigned_i16_immediate => .{ .cmp_arg16_imm16 = .{
+            .reg = .rcx,
+            .imm = composed_helpers.u16BitPattern(action.rhs.immediate) catch unreachable,
+        } },
+        .ugt_i64_immediate => .{ .cmp_rcx_arg64 = .r8 },
+        .ugt_i32_immediate => .{ .cmp_r8d_arg32 = .rcx },
+        .ult_i32_named => .{ .cmp_ecx_arg32 = .r8 },
+        .ult_i64_named => .{ .cmp_rcx_arg64 = .r8 },
+    };
+    try selector_state.emitEflagsInstruction(transaction.selector, definition, .definition);
+    try failScratchCompareForTest(transaction, .after_flags_definition);
+
+    const setcc: x86_64_machine.Instruction = switch (plan.kind) {
+        .ne_zero_i16, .ne_zero_i32, .ne_zero_i64, .ne_named => .setne_eax,
+        .eq_pointer_null, .eq_pointer_named, .eq_i52_zero, .eq_named, .eq_i64_immediate => .sete_eax,
+        .unsigned_i16_immediate => if (action.predicate == .ult) .setb_eax else .seta_eax,
+        .ugt_named, .ugt_i64_immediate, .ugt_i32_immediate => .setb_eax,
+        .sgt_i64_immediate => .setg_eax,
+        .slt_i16_zero, .slt_i64_immediate => .setl_eax,
+        .signed_named => if (action.predicate == .slt) .setg_eax else .setl_eax,
+        .ult_i32_named, .ult_i64_named, .ult_i64_immediate => .setb_eax,
+    };
+    try selector_state.emitEflagsInstruction(transaction.selector, setcc, .use);
+    try failScratchCompareForTest(transaction, .after_setcc);
+    const stored_action = &transaction.requests[lhs_index].prepared_action.?.scratch_compare;
+    try session.define(stored_action.result.slice(), .zeroExtending(1));
+    try session.finalize();
+    try failScratchCompareForTest(transaction, .after_result_finalization);
+}
+
+fn stageScratchCompareOperand(
+    transaction: *ValueUseTransaction,
+    request_index: u8,
+    view: *const ValueUseTransaction.PreparedView,
+    destination: ArgReg,
+    bits: u16,
+) !void {
+    return stageScratchCompareOperandUnchecked(transaction, view, destination, bits) catch |err| {
+        transaction.noteRequestBoundaryError(request_index, err);
+        return err;
+    };
+}
+
+fn stageScratchCompareOperandUnchecked(
+    transaction: *ValueUseTransaction,
+    view: *const ValueUseTransaction.PreparedView,
+    destination: ArgReg,
+    bits: u16,
+) !void {
+    const current = try preparedViewLoc(view);
+    const already_in_place = switch (current) {
+        .arg32, .scratch32, .arg64, .scratch64 => |reg| reg == destination,
+        else => false,
+    };
+    if (already_in_place) return;
+    try clobberPhysicalNode(transaction.selector, nodeForArgReg(destination));
+    if (bits <= 32) {
+        try materializeScalar32(transaction.selector, current, .{ .gpr32 = destination });
+    } else {
+        try materializeScalar64(transaction.selector, current, .{ .gpr64 = destination });
+    }
+}
+
+fn failScratchCompareForTest(
+    transaction: *ValueUseTransaction,
+    boundary: ValueUseTransaction.ScratchCompareTestFailure,
+) !void {
+    if (builtin.is_test and transaction.scratch_compare_test_failure == boundary)
+        return error.ValueUseScratchCompareTestFailure;
 }
 
 fn executeScalarLoad(
@@ -3526,6 +3944,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .pair_high_low,
             .memcpy_pointer,
             .memcpy_length,
+            .scratch_compare_operand,
             => {},
             .stack_f32_pair_byte_address,
             .branch_condition,
@@ -3551,6 +3970,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
             .memcpy_pointer,
             .memcpy_length,
             .load_address,
+            .scratch_compare_operand,
             => {},
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -3590,6 +4010,9 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
                 request.expected.register_class != .stack_pointer or
                 request.expected.pointer_address_space != 0)
                 error.ValueUsePreparedActionFormMismatch,
+            .scratch_compare => |compare| if (request.form != .scratch_compare_operand or
+                !request.expected.ty.eql(compare.operand_ty))
+                error.ValueUsePreparedActionFormMismatch,
         };
     }
     if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
@@ -3603,6 +4026,7 @@ fn validateFormAndDestination(request: *const ValueUseTransaction.StoredRequest)
         .memcpy_pointer,
         .memcpy_length,
         .load_address,
+        .scratch_compare_operand,
         => false,
         .pair_low_high, .pair_high_low => request.destination == .pair,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -3622,6 +4046,10 @@ fn validateBindingCompatibility(
     request: *const ValueUseTransaction.StoredRequest,
     current: ValueLoc,
 ) !void {
+    if (request.form == .scratch_compare_operand) {
+        try validateScratchCompareBinding(binding, request.expected, current);
+        return;
+    }
     if (request.form == .load_address) {
         try validateExpectedType(request.expected, request.form);
         const action = request.prepared_action orelse
@@ -3692,6 +4120,32 @@ fn validateBindingCompatibility(
         return error.ValueUseRegisterClassMismatch;
     }
     try validateExpectedType(request.expected, request.form);
+}
+
+fn validateScratchCompareBinding(
+    binding: ValueBinding,
+    expected: ValueUseTransaction.Expected,
+    current: ValueLoc,
+) !void {
+    try validateExpectedType(expected, .scratch_compare_operand);
+    const bits: u16 = switch (expected.ty) {
+        .int => |value| value,
+        .ptr => 64,
+        else => unreachable,
+    };
+    if (binding.vreg.bits < bits) return error.ValueUseScratchCompareWidthMismatch;
+    const accepted = if (bits <= 32) switch (current) {
+        .eax, .arg32, .scratch32 => binding.vreg.class == .gpr32,
+        .rax, .arg64, .scratch64, .spill64 => binding.vreg.class == .gpr32 or
+            binding.vreg.class == .gpr64,
+        .arg128, .scratch128 => binding.vreg.class == .gpr128,
+        else => false,
+    } else switch (current) {
+        .rax, .arg64, .scratch64, .spill64 => binding.vreg.class == .gpr64,
+        .arg128, .scratch128 => binding.vreg.class == .gpr128,
+        else => false,
+    };
+    if (!accepted) return error.ValueUseScratchCompareHomeUnsupported;
 }
 
 fn validateOrdinaryLoadHome(
@@ -3808,6 +4262,27 @@ fn validateExpectedType(expected: ValueUseTransaction.Expected, form: ValueUseTr
         {
             return error.ValueUseTypeMismatch;
         },
+        .scratch_compare_operand => switch (expected.ty) {
+            .int => |bits| {
+                if (bits == 0 or bits > 64 or
+                    expected.register_class != if (bits <= 32)
+                        VirtualRegClass.gpr32
+                    else
+                        VirtualRegClass.gpr64)
+                {
+                    return error.ValueUseTypeMismatch;
+                }
+            },
+            .ptr => {
+                if (expected.register_class != .gpr64 or
+                    expected.pointer_address_space == null or
+                    expected.pointer_address_space.? != 0)
+                {
+                    return error.ValueUseTypeMismatch;
+                }
+            },
+            else => return error.ValueUseTypeMismatch,
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -3879,6 +4354,19 @@ fn validateSourceView(loc: ValueLoc, form: ValueUseTransaction.UseForm) !void {
             .aggregate_sse => return error.ValueUseAggregateUnsupported,
             else => return error.ValueUseLoadAddressHomeUnsupported,
         },
+        .scratch_compare_operand => switch (loc) {
+            .eax,
+            .rax,
+            .arg32,
+            .scratch32,
+            .arg64,
+            .scratch64,
+            .arg128,
+            .scratch128,
+            .spill64,
+            => {},
+            else => return error.ValueUseScratchCompareHomeUnsupported,
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -3911,6 +4399,7 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: ValueUseTransaction.UseForm) 
         .memcpy_pointer,
         .memcpy_length,
         .load_address,
+        .scratch_compare_operand,
         .stack_argument,
         .new_pair_ownership,
         => false,
@@ -3931,6 +4420,7 @@ fn earlySequencingCandidate(loc: ValueLoc, form: ValueUseTransaction.UseForm) bo
         },
         .branch_condition, .switch_condition => false,
         .load_address => false,
+        .scratch_compare_operand => false,
         else => false,
     };
 }
@@ -4078,6 +4568,16 @@ fn requestDestinationNodes(
                 switch (current orelse return error.ValueUseUnresolvedSource) {
                     .readonly_table_ptr => |ptr| if (ptr.storage == .spill) try result.append(.rcx),
                     else => return error.ValueUseLoadReadonlyTableType,
+                }
+            },
+            .scratch_compare => |*compare| {
+                const plan = try classifyScratchCompare(compare);
+                try result.append(.accumulator);
+                try result.append(nodeForArgReg(plan.lhs_register));
+                if (plan.rhs_register) |reg| try result.append(nodeForArgReg(reg));
+                if (plan.immediate_register) |reg| {
+                    if (plan.rhs_register == null or plan.rhs_register.? != reg)
+                        try result.append(nodeForArgReg(reg));
                 }
             },
         },
@@ -4326,6 +4826,33 @@ fn requestMappings(
                     else => return error.ValueUseLoadReadonlyTableType,
                 }
             },
+            .scratch_compare => |*compare| {
+                const plan = try classifyScratchCompare(compare);
+                mappings.append(.{
+                    .source = scalarSourceNode(current orelse return error.ValueUseUnresolvedSource),
+                    .destination = nodeForArgReg(plan.lhs_register),
+                    .source_request_index = request_index,
+                });
+                switch (compare.rhs) {
+                    .named => |handle| mappings.append(.{
+                        .source = scalarSourceNode(try transaction.registeredOperandCurrent(handle)),
+                        .destination = nodeForArgReg(plan.rhs_register orelse
+                            return error.ValueUseScratchCompareFormUnsupported),
+                        .source_request_index = handle.index,
+                    }),
+                    .immediate => if (plan.immediate_register) |reg| mappings.append(.{
+                        .source = null,
+                        .destination = nodeForArgReg(reg),
+                        .source_request_index = null,
+                    }),
+                    .null_pointer => {},
+                }
+                mappings.append(.{
+                    .source = null,
+                    .destination = .accumulator,
+                    .source_request_index = null,
+                });
+            },
             .validate_shape, .emit_copy_to => {},
         }
         if (action != .emit_copy_to) return mappings;
@@ -4373,6 +4900,7 @@ fn actionOwnsOrderedWrites(action: ValueUseTransaction.PreparedAction) bool {
         .load_readonly_pair,
         .load_stack_i128_alias,
         .load_readonly_table_i16,
+        .scratch_compare,
         => true,
         .validate_shape,
         .emit_copy_to,
@@ -4531,6 +5059,7 @@ fn validateCopyActionForm(
         .memcpy_pointer,
         .memcpy_length,
         .load_address,
+        .scratch_compare_operand,
         => false,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,

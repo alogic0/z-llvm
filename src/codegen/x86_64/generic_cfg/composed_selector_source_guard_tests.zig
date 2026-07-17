@@ -393,6 +393,7 @@ fn validateValueUseAuthoritySource(source: [:0]const u8) !void {
     }
     if (std.mem.indexOf(u8, source, "AccumulatorDefinitionTransaction.begin(") != null)
         return error.ValueUseNestedAccumulatorSnapshot;
+    try validateScratchCompareIntentSurface(source);
 }
 
 fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const u8) !void {
@@ -416,6 +417,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     try validateDormantLoadActionProductionSites(source_name, source);
     try validateFailureProvenanceProductionSites(source_name, source);
     try validateAccumulatorCompositionProductionSites(source_name, source);
+    try validateDormantScratchCompareProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -447,6 +449,48 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
                 return error.ValueUsePreparedLeafRawOperation;
         }
     }
+}
+
+fn validateScratchCompareIntentSurface(source: []const u8) !void {
+    const declarations = [_][]const u8{
+        "pub const ScratchCompareRhs = union(enum) {",
+        "pub const ScratchCompareAction = struct {",
+    };
+    const has_rhs = std.mem.indexOf(u8, source, declarations[0]) != null;
+    const has_action = std.mem.indexOf(u8, source, declarations[1]) != null;
+    if (!has_rhs and !has_action) return;
+    if (!has_rhs or !has_action) return error.ValueUseScratchCompareIntentMissing;
+    const forbidden = [_][]const u8{
+        "ArgReg",
+        "ValueLoc",
+        "Destination",
+        "FrameIndex",
+        "PreparedView",
+        "PreparedScalarHome",
+    };
+    for (declarations) |declaration| {
+        const start = std.mem.indexOf(u8, source, declaration).?;
+        const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+            return error.InvalidZigSource;
+        const body = source[start .. end + 2];
+        for (forbidden) |pattern| {
+            if (std.mem.indexOf(u8, body, pattern) != null)
+                return error.ValueUseScratchComparePhysicalIntentEscape;
+        }
+    }
+}
+
+fn validateDormantScratchCompareProductionSites(source_name: []const u8, source: []const u8) !void {
+    const patterns = [_][]const u8{
+        ".scratch_compare_operand",
+        "attachScratchCompareAction(",
+        ".scratch_compare =",
+    };
+    for (patterns) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseScratchCompareProductionWiringForbidden;
+    }
+    _ = source_name;
 }
 
 fn validateLoadDiagnosticMappingProductionSites(source_name: []const u8, source: [:0]const u8) !void {
@@ -2275,6 +2319,37 @@ test "composed selector source guard admits only reviewed accumulator compositio
             "fn lowerAbsI32() void { _ = transaction.beginAccumulatorSession(); }",
         ),
     );
+}
+
+test "composed selector source guard keeps scratch compare intent semantic and dormant" {
+    const accepted_intent: [:0]const u8 =
+        "pub const ScratchCompareRhs = union(enum) { immediate: i128, null_pointer, named: RequestHandle, }; " ++
+        "pub const ScratchCompareAction = struct { result: ActionIdentity, operand_ty: ir.Type, " ++
+        "predicate: ir.IcmpPredicate, samesign: bool, rhs: ScratchCompareRhs, };";
+    try validateScratchCompareIntentSurface(accepted_intent);
+    try std.testing.expectError(
+        error.ValueUseScratchComparePhysicalIntentEscape,
+        validateScratchCompareIntentSurface(
+            "pub const ScratchCompareRhs = union(enum) { named: RequestHandle, }; " ++
+                "pub const ScratchCompareAction = struct { physical_lhs: ArgReg, };",
+        ),
+    );
+
+    try validateDormantScratchCompareProductionSites(
+        "composed_selector_icmp.zig",
+        "fn lowerIcmp() void { legacyLowering(); }",
+    );
+    const rejected = [_][]const u8{
+        "fn lowerIcmp() void { _ = .scratch_compare_operand; }",
+        "fn lowerIcmp() void { transaction.attachScratchCompareAction(lhs, action); }",
+        "fn lowerIcmp() void { _ = .{ .scratch_compare = intent }; }",
+    };
+    for (rejected) |fixture| {
+        try std.testing.expectError(
+            error.ValueUseScratchCompareProductionWiringForbidden,
+            validateDormantScratchCompareProductionSites("composed_selector_icmp.zig", fixture),
+        );
+    }
 }
 
 test "composed selector source guard accepts the fully classified current tree" {
