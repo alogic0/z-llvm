@@ -554,6 +554,7 @@ pub const ImmediateScalarRequestError = error{
 
 pub const ImmediateScalarTestFailure = enum {
     after_preservation,
+    after_canonical_refresh,
     after_scratch_selection,
     after_rcx_staging,
     after_accumulator_preparation,

@@ -70,6 +70,7 @@ const validateScalarCastIntentSurface = support.validateScalarCastIntentSurface;
 const validateImmediateScalarIntentSurface = support.validateImmediateScalarIntentSurface;
 const validateScalarCastDisplacementPlan = support.validateScalarCastDisplacementPlan;
 const validateScalarDisplacementAuthorityDistinction = support.validateScalarDisplacementAuthorityDistinction;
+const validateImmediateScalarAccumulatorPreamble = support.validateImmediateScalarAccumulatorPreamble;
 const validateScratchComparePreservationPreamble = support.validateScratchComparePreservationPreamble;
 const validateCurrentHomeEqZeroSequence = support.validateCurrentHomeEqZeroSequence;
 const validateSetccEaxCompareSequence = support.validateSetccEaxCompareSequence;
@@ -104,6 +105,24 @@ const validateAddressDependencyStateAuthority = support.validateAddressDependenc
 const validateAddressDependencyDomainSource = support.validateAddressDependencyDomainSource;
 const validateFrozenBypassInventoryHash = support.validateFrozenBypassInventoryHash;
 const validateFrozenBypassInventoryForSource = support.validateFrozenBypassInventoryForSource;
+
+fn replaceOnceSentinel(
+    allocator: std.mem.Allocator,
+    source: [:0]const u8,
+    needle: []const u8,
+    replacement: []const u8,
+) ![:0]u8 {
+    const start = std.mem.indexOf(u8, source, needle) orelse return error.TestNeedleMissing;
+    const result_len = source.len - needle.len + replacement.len;
+    const result = try allocator.allocSentinel(u8, result_len, 0);
+    @memcpy(result[0..start], source[0..start]);
+    @memcpy(result[start..][0..replacement.len], replacement);
+    @memcpy(
+        result[start + replacement.len ..],
+        source[start + needle.len ..],
+    );
+    return result;
+}
 
 test "composed selector source guard rejects the retired stack pointer liveness scan" {
     const accepted =
@@ -464,5 +483,35 @@ test "composed selector source guard freezes distinct cast and arithmetic displa
     try std.testing.expectError(
         error.ValueUseScalarDisplacementAuthorityMismatch,
         validateScalarDisplacementAuthorityDistinction(widened_cast),
+    );
+}
+
+test "composed selector source guard freezes immediate plan-derived alias preservation" {
+    const accepted: [:0]const u8 =
+        @embedFile("../value_use/actions/scalar_arithmetic.zig");
+    try validateImmediateScalarAccumulatorPreamble(accepted);
+
+    const widened_plan = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        ".r05_wide_accumulator_immediate => .spill_source,",
+        ".r05_wide_accumulator_immediate => .none,",
+    );
+    defer std.testing.allocator.free(widened_plan);
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarPreamblePlanMismatch,
+        validateImmediateScalarAccumulatorPreamble(widened_plan),
+    );
+
+    const source_excluded = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "if (std.mem.eql(u8, entry.key_ptr.*, source_name)) continue;",
+        "if (false) continue;",
+    );
+    defer std.testing.allocator.free(source_excluded);
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarPreambleLivenessMismatch,
+        validateImmediateScalarAccumulatorPreamble(source_excluded),
     );
 }

@@ -25,19 +25,21 @@ const PlanRow = struct {
     accumulator: bool,
     scratch: bool,
     writes: u8,
+    first_accumulator_write: []const u8 = "test-specific closed plan",
+    accumulator_preamble: []const u8 = "derived internally from the closed plan",
 };
 
 const immediate_plan = [_]PlanRow{
-    .{ .id = "R00", .direction = .rhs, .operation = .sdiv, .bits = 32, .literal = 2, .accumulator = true, .scratch = false, .writes = 3 },
-    .{ .id = "R01", .direction = .rhs, .operation = .lshr, .bits = 64, .literal = 7, .accumulator = false, .scratch = true, .writes = 1 },
-    .{ .id = "R02", .direction = .rhs, .operation = .shl, .bits = 32, .literal = 3, .accumulator = true, .scratch = true, .writes = 1 },
-    .{ .id = "R03", .direction = .rhs, .operation = .ashr, .bits = 64, .literal = 5, .accumulator = false, .scratch = true, .writes = 1 },
-    .{ .id = "R04", .direction = .rhs, .operation = .add, .bits = 32, .literal = 9, .accumulator = true, .scratch = false, .writes = 1 },
-    .{ .id = "R05", .direction = .rhs, .operation = .@"and", .bits = 64, .literal = 0x123456789, .accumulator = true, .scratch = false, .writes = 1 },
-    .{ .id = "R06", .direction = .rhs, .operation = .sub, .bits = 64, .literal = 11, .accumulator = false, .scratch = true, .writes = 1 },
-    .{ .id = "L01", .direction = .lhs, .operation = .sub, .bits = 32, .literal = 17, .accumulator = true, .scratch = false, .writes = 1 },
-    .{ .id = "L02", .direction = .lhs, .operation = .shl, .bits = 16, .literal = 3, .accumulator = true, .scratch = false, .writes = 2 },
-    .{ .id = "L03", .direction = .lhs, .operation = .lshr, .bits = 64, .literal = 0x1000, .accumulator = true, .scratch = false, .writes = 1 },
+    .{ .id = "R00", .direction = .rhs, .operation = .sdiv, .bits = 32, .literal = 2, .accumulator = true, .scratch = false, .writes = 3, .first_accumulator_write = "session materializes source into EAX", .accumulator_preamble = "none; session owns liveness-aware displacement" },
+    .{ .id = "R01", .direction = .rhs, .operation = .lshr, .bits = 64, .literal = 7, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "spill fallback reloads RAX; scratch form has none", .accumulator_preamble = "none" },
+    .{ .id = "R02", .direction = .rhs, .operation = .shl, .bits = 32, .literal = 3, .accumulator = true, .scratch = true, .writes = 1, .first_accumulator_write = "session materializes EAX/RAX; scratch32 form stages EAX", .accumulator_preamble = "scratch-preferred <=32; spill-source at 64" },
+    .{ .id = "R03", .direction = .rhs, .operation = .ashr, .bits = 64, .literal = 5, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "accumulator form materializes EAX; scratch64 form has none", .accumulator_preamble = "scratch-preferred accumulator; none scratch64" },
+    .{ .id = "R04", .direction = .rhs, .operation = .add, .bits = 32, .literal = 9, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "session materializes source into EAX", .accumulator_preamble = "scratch-preferred" },
+    .{ .id = "R05", .direction = .rhs, .operation = .@"and", .bits = 64, .literal = 0x123456789, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "session materializes source into RAX", .accumulator_preamble = "spill-source" },
+    .{ .id = "R06", .direction = .rhs, .operation = .sub, .bits = 64, .literal = 11, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "none; result remains in RCX", .accumulator_preamble = "none" },
+    .{ .id = "L01", .direction = .lhs, .operation = .sub, .bits = 32, .literal = 17, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "literal materialization into EAX/RAX", .accumulator_preamble = "none; session spill-live authority" },
+    .{ .id = "L02", .direction = .lhs, .operation = .shl, .bits = 16, .literal = 3, .accumulator = true, .scratch = false, .writes = 2, .first_accumulator_write = "literal materialization into EAX", .accumulator_preamble = "none; session spill-live authority" },
+    .{ .id = "L03", .direction = .lhs, .operation = .lshr, .bits = 64, .literal = 0x1000, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "literal materialization into EAX/RAX", .accumulator_preamble = "none; session spill-live authority" },
 };
 
 const DeclaredType = enum { non_integer, i1, i16, i32, i64, i128 };
@@ -180,6 +182,8 @@ test "value-use immediate scalar plan table is closed and direction specific" {
             Transaction.isImmediateLhsScalar(inst),
         );
         try std.testing.expect(row.accumulator or row.scratch);
+        try std.testing.expect(row.first_accumulator_write.len != 0);
+        try std.testing.expect(row.accumulator_preamble.len != 0);
     }
 
     const l00: ir.BinaryInst = .{
@@ -537,6 +541,227 @@ test "value-use immediate scalar displacement distinguishes live-after from dies
     }
 }
 
+test "value-use immediate scalar __multi3 unrelated RAX alias is spilled once before R05" {
+    const row = PlanRow{
+        .id = "__multi3-R05",
+        .direction = .rhs,
+        .operation = .@"and",
+        .bits = 64,
+        .literal = std.math.maxInt(u32),
+        .accumulator = true,
+        .scratch = false,
+        .writes = 1,
+    };
+    var machine = MachineFunction.init(row.id, .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "source");
+    try support.addLive(&plan, "prior-result");
+    try addAtCurrent(&plan, "result");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "source", .rax);
+    try selector_state.bindValueLoc(&selector, "prior-result", .rax);
+    try selector.eflags.apply(.definition);
+    try selector.eflags.apply(.use);
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const handle = try registerImmediate(&transaction, row);
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(handle));
+    try transaction.commit();
+
+    try std.testing.expectEqualSlices(
+        machine_module.Instruction,
+        &.{
+            .{ .spill_rax_rsp = .slot0 },
+            .{ .reload_rsp_rax = .slot0 },
+            .{ .and_eax_imm32 = -1 },
+        },
+        machine.instructions.items,
+    );
+    try std.testing.expectEqual(
+        ValueLoc{ .spill64 = .slot0 },
+        selector_state.resolveValue(&selector, .{ .named = "source" }).?,
+    );
+    try std.testing.expectEqual(
+        ValueLoc{ .spill64 = .slot0 },
+        selector_state.resolveValue(&selector, .{ .named = "prior-result" }).?,
+    );
+    try std.testing.expectEqual(ValueLoc.rax, selector_state.resolveValue(
+        &selector,
+        .{ .named = "result" },
+    ).?);
+    try std.testing.expectEqual(@as(usize, 1), selector.spill_slots.count());
+    try std.testing.expect(selector.spill_slots.get("source") != null);
+    try std.testing.expect(selector.spill_slots.get("prior-result") == null);
+    try std.testing.expectEqual(@as(usize, 1), selector.next_spill_slot);
+    try std.testing.expectEqual(@as(usize, 1), selector.eflags_semantics.items.len);
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        selector.eflags_semantics.items[0].instruction_index,
+    );
+    try std.testing.expectEqual(
+        selector_state.EflagsEffect.write,
+        selector.eflags_semantics.items[0].effect,
+    );
+}
+
+test "value-use immediate scalar R05 no-alias and multiple-alias preambles are exact" {
+    const row = PlanRow{
+        .id = "R05-alias-controls",
+        .direction = .rhs,
+        .operation = .@"and",
+        .bits = 64,
+        .literal = std.math.maxInt(u32),
+        .accumulator = true,
+        .scratch = false,
+        .writes = 1,
+    };
+    inline for (.{
+        .{
+            .id = "no-alias",
+            .alias_count = @as(u8, 0),
+            .expected_instructions = &[_]machine_module.Instruction{
+                .{ .and_eax_imm32 = -1 },
+            },
+            .expected_source = ValueLoc.rax,
+            .expected_spills = @as(usize, 0),
+        },
+        .{
+            .id = "multiple-aliases",
+            .alias_count = @as(u8, 2),
+            .expected_instructions = &[_]machine_module.Instruction{
+                .{ .spill_rax_rsp = .slot0 },
+                .{ .reload_rsp_rax = .slot0 },
+                .{ .and_eax_imm32 = -1 },
+            },
+            .expected_source = ValueLoc{ .spill64 = .slot0 },
+            .expected_spills = @as(usize, 1),
+        },
+    }) |case| {
+        var machine = MachineFunction.init(case.id, .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "source");
+        if (case.alias_count != 0) {
+            try support.addLive(&plan, "alias-a");
+            try support.addLive(&plan, "alias-b");
+        }
+        try addAtCurrent(&plan, "result");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "source", .rax);
+        if (case.alias_count != 0) {
+            try selector_state.bindValueLoc(&selector, "alias-a", .rax);
+            try selector_state.bindValueLoc(&selector, "alias-b", .rax);
+        }
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handle = try registerImmediate(&transaction, row);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(handle));
+        try transaction.commit();
+
+        try std.testing.expectEqualSlices(
+            machine_module.Instruction,
+            case.expected_instructions,
+            machine.instructions.items,
+        );
+        try std.testing.expectEqual(
+            case.expected_source,
+            selector_state.resolveValue(&selector, .{ .named = "source" }).?,
+        );
+        try std.testing.expectEqual(case.expected_spills, selector.spill_slots.count());
+        if (case.alias_count != 0) {
+            try std.testing.expectEqual(
+                ValueLoc{ .spill64 = .slot0 },
+                selector_state.resolveValue(&selector, .{ .named = "alias-a" }).?,
+            );
+            try std.testing.expectEqual(
+                ValueLoc{ .spill64 = .slot0 },
+                selector_state.resolveValue(&selector, .{ .named = "alias-b" }).?,
+            );
+        }
+    }
+}
+
+test "value-use immediate scalar unrelated-alias preamble rollback preserves flags and state" {
+    const row = PlanRow{
+        .id = "R05-preamble-rollback",
+        .direction = .rhs,
+        .operation = .@"and",
+        .bits = 64,
+        .literal = std.math.maxInt(u32),
+        .accumulator = true,
+        .scratch = false,
+        .writes = 1,
+    };
+    inline for ([_]Transaction.ImmediateScalarTestFailure{
+        .after_preservation,
+        .after_canonical_refresh,
+    }) |boundary| {
+        var machine = MachineFunction.init(@tagName(boundary), .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "source");
+        try support.addLive(&plan, "prior-result");
+        try addAtCurrent(&plan, "result");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "source", .rax);
+        try selector_state.bindValueLoc(&selector, "prior-result", .rax);
+        try selector.eflags.apply(.definition);
+        const saved_source = selector.values.get("source").?;
+        const saved_alias = selector.values.get("prior-result").?;
+        const saved_next_vreg = selector.next_virtual_reg;
+        const saved_next_spill = selector.next_spill_slot;
+        const saved_accumulator = selector.accumulator_domain;
+        const saved_dependencies = selector.address_dependencies;
+        const saved_eflags = selector.eflags.snapshot();
+        const saved_semantics = selector.eflags_semantics.items.len;
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handle = try registerImmediate(&transaction, row);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.setImmediateScalarTestFailure(boundary);
+        try std.testing.expectError(
+            error.ValueUseImmediateScalarTestFailure,
+            transaction.executePreparedAction(try transaction.preparedView(handle)),
+        );
+
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(saved_source, selector.values.get("source").?);
+        try std.testing.expectEqual(saved_alias, selector.values.get("prior-result").?);
+        try std.testing.expect(selector.values.get("result") == null);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+        try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+        try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+        try std.testing.expectEqual(saved_accumulator, selector.accumulator_domain);
+        try std.testing.expect(selector.address_dependencies.eql(&saved_dependencies));
+        try selector.eflags.validateSnapshot(saved_eflags);
+        try std.testing.expectEqual(saved_semantics, selector.eflags_semantics.items.len);
+    }
+}
+
 test "value-use immediate scalar non-accumulator and literal controls remain exact" {
     const cases = [_]struct {
         row: PlanRow,
@@ -661,6 +886,63 @@ test "value-use immediate scalar malformed dependency liveness fails closed and 
     try selector.eflags.validateSnapshot(saved_eflags);
     try std.testing.expectEqual(saved_semantics, selector.eflags_semantics.items.len);
     try std.testing.expectError(error.ValueUseTransactionClosed, transaction.rollback());
+}
+
+test "value-use immediate scalar unrelated-alias malformed liveness fails closed before preservation" {
+    const row = PlanRow{
+        .id = "R05-malformed-alias-domain",
+        .direction = .rhs,
+        .operation = .@"and",
+        .bits = 64,
+        .literal = std.math.maxInt(u32),
+        .accumulator = true,
+        .scratch = false,
+        .writes = 1,
+    };
+    var machine = MachineFunction.init(row.id, .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "source");
+    try addAtCurrent(&plan, "result");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "source", .rax);
+    const saved_source = selector.values.get("source").?;
+    const saved_next_vreg = selector.next_virtual_reg;
+    const saved_next_spill = selector.next_spill_slot;
+    const saved_accumulator = selector.accumulator_domain;
+    const saved_dependencies = selector.address_dependencies;
+    const saved_eflags = selector.eflags.snapshot();
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const handle = try registerImmediate(&transaction, row);
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    const lease = try transaction.preparedView(handle);
+    try selector_state.bindValueLoc(&selector, "malformed-alias", .rax);
+    try selector.address_dependencies.replaceAddress("malformed-alias", &.{
+        .{ .name = "source", .identity_type = .integer, .role = .index },
+    });
+    try std.testing.expectError(
+        error.AddressDependencyMissingOwnerPlanEntry,
+        transaction.executePreparedAction(lease),
+    );
+
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(saved_source, selector.values.get("source").?);
+    try std.testing.expect(selector.values.get("malformed-alias") == null);
+    try std.testing.expect(selector.values.get("result") == null);
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+    try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+    try std.testing.expectEqual(saved_accumulator, selector.accumulator_domain);
+    try std.testing.expect(selector.address_dependencies.eql(&saved_dependencies));
+    try selector.eflags.validateSnapshot(saved_eflags);
 }
 
 test "value-use immediate scalar diagnostics preserve request provenance" {

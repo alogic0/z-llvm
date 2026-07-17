@@ -33,6 +33,12 @@ const ImmediateScalarPlan = enum {
     l03_variable_logical_shift_right,
 };
 
+const ImmediateAccumulatorPreamble = enum {
+    none,
+    scratch_preferred,
+    spill_source,
+};
+
 const AccumulatorScalarCastPlan = enum {
     c04_exact_ei,
     c05_narrow_zext,
@@ -483,23 +489,13 @@ pub fn executeImmediateRhsScalar(
         );
     const source_name = try immediateScalarNamedSource(Authority, transaction, source_index);
     try validateImmediateScalarSource(Authority, transaction, source_index, bits);
-
-    if (bits <= 32 and switch (semantic_plan) {
-        .r02_shift_left_accumulator,
-        .r03_arithmetic_shift_right_accumulator,
-        .r04_narrow_accumulator_immediate,
-        => true,
-        else => false,
-    }) {
-        while (try selector_state.liveAccumulatorNameAfterCurrent(transaction.selector)) |live_name| {
-            if (try selector_state.preserveLiveAccumulatorValue(transaction.selector, live_name)) |diagnostic| {
-                transaction.action_diagnostic = diagnostic;
-                return error.ValueUseActionDiagnostic;
-            }
-        }
-        try failImmediateScalarForTest(transaction, .after_preservation);
-        try refreshImmediateScalarSource(Authority, transaction, source_index);
-    }
+    try preserveImmediateUnrelatedAccumulator(
+        Authority,
+        transaction,
+        source_index,
+        source_name,
+        immediateAccumulatorPreamble(semantic_plan, bits),
+    );
 
     switch (semantic_plan) {
         .r00_signed_divide_by_two => try executeImmediateR00(
@@ -703,6 +699,121 @@ fn classifyImmediateLhsSemantic(
             error.ValueUseImmediateScalarWidthUnsupported,
         else => error.ValueUseImmediateScalarFormUnsupported,
     };
+}
+
+fn immediateAccumulatorPreamble(
+    plan: ImmediateScalarPlan,
+    bits: u16,
+) ImmediateAccumulatorPreamble {
+    return switch (plan) {
+        .r02_shift_left_accumulator => if (bits <= 32) .scratch_preferred else .spill_source,
+        .r03_arithmetic_shift_right_accumulator,
+        .r04_narrow_accumulator_immediate,
+        => .scratch_preferred,
+        .r05_wide_accumulator_immediate => .spill_source,
+        .r00_signed_divide_by_two,
+        .r01_logical_shift_right_scratch,
+        .r01_logical_shift_right_accumulator,
+        .r02_shift_left_scratch32_writeback,
+        .r03_arithmetic_shift_right_scratch64,
+        .r06_wide_scratch_immediate,
+        .l01_reverse_subtract,
+        .l02_variable_shift_left,
+        .l03_variable_logical_shift_right,
+        => .none,
+    };
+}
+
+fn preserveImmediateUnrelatedAccumulator(
+    comptime Authority: type,
+    transaction: anytype,
+    source_index: u8,
+    source_name: []const u8,
+    preamble: ImmediateAccumulatorPreamble,
+) !void {
+    if (preamble == .none) return;
+    const flags_before = transaction.selector.eflags.snapshot();
+    const semantic_records_before = transaction.selector.eflags_semantics.items.len;
+    const live_name = try immediateUnrelatedLiveAccumulatorName(
+        transaction.selector,
+        source_name,
+    ) orelse return;
+    const preserve_name = switch (preamble) {
+        .scratch_preferred => live_name,
+        .spill_source => switch (transaction.selector.values.get(source_name).?.loc) {
+            .eax, .rax => source_name,
+            else => live_name,
+        },
+        .none => unreachable,
+    };
+    switch (preamble) {
+        .scratch_preferred => {
+            if (try selector_state.preserveLiveAccumulatorValue(
+                transaction.selector,
+                preserve_name,
+            )) |diagnostic| {
+                transaction.action_diagnostic = diagnostic;
+                return error.ValueUseActionDiagnostic;
+            }
+        },
+        .spill_source => {
+            if (try selector_state.spillValue(
+                transaction.selector,
+                preserve_name,
+            )) |diagnostic| {
+                transaction.action_diagnostic = diagnostic;
+                return error.ValueUseActionDiagnostic;
+            }
+        },
+        .none => unreachable,
+    }
+    const preserved_loc = transaction.selector.values.get(preserve_name).?.loc;
+
+    // EAX and RAX are one physical value. Move it once, then update every
+    // logical alias of that physical home—including the semantic source—so
+    // later materialization re-resolves the canonical preserved home.
+    while (true) {
+        var alias_name: ?[]const u8 = null;
+        var iterator = transaction.selector.values.iterator();
+        while (iterator.next()) |entry| {
+            if (std.mem.eql(u8, entry.key_ptr.*, preserve_name)) continue;
+            switch (entry.value_ptr.loc) {
+                .eax, .rax => {
+                    alias_name = entry.key_ptr.*;
+                    break;
+                },
+                else => {},
+            }
+        }
+        const name = alias_name orelse break;
+        try selector_state.bindValueLoc(transaction.selector, name, preserved_loc);
+    }
+    try failImmediateScalarForTest(transaction, .after_preservation);
+    try refreshImmediateScalarSource(Authority, transaction, source_index);
+    try validateImmediateScalarSource(Authority, transaction, source_index, switch (transaction.requests[source_index].expected.ty) {
+        .int => |bits| bits,
+        else => unreachable,
+    });
+    try failImmediateScalarForTest(transaction, .after_canonical_refresh);
+    try transaction.selector.eflags.validateSnapshot(flags_before);
+    if (transaction.selector.eflags_semantics.items.len != semantic_records_before)
+        return error.EflagsImmediateScalarPreambleChanged;
+}
+
+fn immediateUnrelatedLiveAccumulatorName(
+    selector: *const ComposedBlockSelector,
+    source_name: []const u8,
+) !?[]const u8 {
+    var iterator = selector.values.iterator();
+    while (iterator.next()) |entry| {
+        if (std.mem.eql(u8, entry.key_ptr.*, source_name)) continue;
+        if (!try selector_state.valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
+        switch (entry.value_ptr.loc) {
+            .eax, .rax => return entry.key_ptr.*,
+            else => {},
+        }
+    }
+    return null;
 }
 
 fn executeImmediateR00(

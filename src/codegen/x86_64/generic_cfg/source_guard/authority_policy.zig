@@ -130,6 +130,7 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateI128PairIntentSurface(source);
     try validateScalarCastIntentSurface(source);
     try validateImmediateScalarIntentSurface(source);
+    try validateImmediateScalarAccumulatorPreamble(source);
     try validateDurableActionIdentityOwnership(source);
     try validateScratchComparePreservationPreamble(source);
     try validateCurrentHomeEqZeroSequence(source);
@@ -612,6 +613,118 @@ pub fn validateScalarDisplacementAuthorityDistinction(source: [:0]const u8) !voi
     }
 }
 
+pub fn validateImmediateScalarAccumulatorPreamble(source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const execute_body = functionBodyNamed(bodies, "executeImmediateRhsScalar") orelse return;
+    const plan_body = functionBodyNamed(bodies, "immediateAccumulatorPreamble") orelse
+        return error.ValueUseImmediateScalarPreambleMissing;
+    const preserve_body = functionBodyNamed(bodies, "preserveImmediateUnrelatedAccumulator") orelse
+        return error.ValueUseImmediateScalarPreambleMissing;
+    const liveness_body = functionBodyNamed(bodies, "immediateUnrelatedLiveAccumulatorName") orelse
+        return error.ValueUseImmediateScalarPreambleMissing;
+    const execute = source[execute_body.start..execute_body.end];
+    const plan = source[plan_body.start..plan_body.end];
+    const preserve = source[preserve_body.start..preserve_body.end];
+    const liveness = source[liveness_body.start..liveness_body.end];
+
+    const validate_source = std.mem.indexOf(
+        u8,
+        execute,
+        "try validateImmediateScalarSource(",
+    ) orelse return error.ValueUseImmediateScalarPreambleOrder;
+    const preserve_call = std.mem.indexOf(
+        u8,
+        execute,
+        "try preserveImmediateUnrelatedAccumulator(",
+    ) orelse return error.ValueUseImmediateScalarPreambleMissing;
+    const dispatch = std.mem.indexOf(
+        u8,
+        execute,
+        "switch (semantic_plan) {",
+    ) orelse return error.ValueUseImmediateScalarPreambleOrder;
+    if (!(validate_source < preserve_call and preserve_call < dispatch) or
+        countPattern(execute, "preserveImmediateUnrelatedAccumulator(") != 1 or
+        countPattern(execute, "immediateAccumulatorPreamble(semantic_plan, bits)") != 1)
+    {
+        return error.ValueUseImmediateScalarPreambleOrder;
+    }
+
+    const plan_forbidden = [_][]const u8{
+        "transaction",
+        "selector",
+        "ValueLoc",
+        ".eax",
+        ".rax",
+        "function",
+        "family",
+    };
+    for (plan_forbidden) |pattern| {
+        if (std.mem.indexOf(u8, plan, pattern) != null)
+            return error.ValueUseImmediateScalarPreamblePhysicalPredicate;
+    }
+    if (countPattern(plan, ".r02_shift_left_accumulator => if (bits <= 32) .scratch_preferred else .spill_source") != 1 or
+        countPattern(plan, ".r03_arithmetic_shift_right_accumulator,") != 1 or
+        countPattern(plan, ".r04_narrow_accumulator_immediate,") != 1 or
+        countPattern(plan, "=> .scratch_preferred") != 1 or
+        countPattern(plan, ".r05_wide_accumulator_immediate => .spill_source") != 1 or
+        countPattern(plan, "=> .none") != 1)
+    {
+        return error.ValueUseImmediateScalarPreamblePlanMismatch;
+    }
+
+    const preserve_required = [_][]const u8{
+        "if (preamble == .none) return;",
+        "immediateUnrelatedLiveAccumulatorName(",
+        "preserveLiveAccumulatorValue(",
+        "selector_state.spillValue(",
+        ".eax, .rax",
+        "selector_state.bindValueLoc(",
+        "after_preservation",
+        "refreshImmediateScalarSource(",
+        "validateImmediateScalarSource(",
+        "after_canonical_refresh",
+        "eflags.validateSnapshot(flags_before)",
+    };
+    for (preserve_required) |pattern| {
+        if (std.mem.indexOf(u8, preserve, pattern) == null)
+            return error.ValueUseImmediateScalarPreambleMissing;
+    }
+    const preserve_once = [_][]const u8{
+        "preserveLiveAccumulatorValue(",
+        "selector_state.spillValue(",
+        "refreshImmediateScalarSource(",
+        "validateImmediateScalarSource(",
+        "eflags.validateSnapshot(flags_before)",
+    };
+    for (preserve_once) |pattern| {
+        if (countPattern(preserve, pattern) != 1)
+            return error.ValueUseImmediateScalarPreambleOrder;
+    }
+    const preserve_write = std.mem.indexOf(
+        u8,
+        preserve,
+        "selector_state.bindValueLoc(",
+    ) orelse return error.ValueUseImmediateScalarPreambleMissing;
+    const refresh = std.mem.indexOf(
+        u8,
+        preserve,
+        "try refreshImmediateScalarSource(",
+    ) orelse return error.ValueUseImmediateScalarPreambleMissing;
+    if (!(preserve_write < refresh))
+        return error.ValueUseImmediateScalarPreambleOrder;
+
+    if (countPattern(liveness, "std.mem.eql(u8, entry.key_ptr.*, source_name)") != 1 or
+        countPattern(liveness, "selector_state.valueIsLiveAfterCurrent(selector, entry.key_ptr.*)") != 1 or
+        countPattern(liveness, "valueIsLiveAtOrAfterCurrent(") != 0 or
+        countPattern(liveness, ".eax, .rax") != 1 or
+        countPattern(liveness, "function") != 0 or
+        countPattern(liveness, "family") != 0)
+    {
+        return error.ValueUseImmediateScalarPreambleLivenessMismatch;
+    }
+}
+
 pub fn validateScratchComparePreservationPreamble(source: [:0]const u8) !void {
     var body_storage: [max_function_bodies]FunctionBody = undefined;
     const bodies = try collectFunctionBodies(source, &body_storage);
@@ -623,10 +736,12 @@ pub fn validateScratchComparePreservationPreamble(source: [:0]const u8) !void {
     const execute_source = source[execute_body.start..execute_body.end];
     const preserve_source = source[preserve_body.start..preserve_body.end];
     const refresh_source = source[refresh_body.start..refresh_body.end];
-    const preservation_preamble_count: usize =
+    const direct_liveness_preamble_count: usize =
         1 +
-        @as(usize, @intFromBool(functionBodyNamed(bodies, "preserveCurrentHomeSignBitLiveAccumulator") != null)) +
-        @as(usize, @intFromBool(functionBodyNamed(bodies, "executeImmediateRhsScalar") != null));
+        @as(usize, @intFromBool(functionBodyNamed(bodies, "preserveCurrentHomeSignBitLiveAccumulator") != null));
+    const preservation_preamble_count =
+        direct_liveness_preamble_count +
+        @as(usize, @intFromBool(functionBodyNamed(bodies, "preserveImmediateUnrelatedAccumulator") != null));
 
     const preserve_call = std.mem.indexOf(
         u8,
@@ -662,7 +777,7 @@ pub fn validateScratchComparePreservationPreamble(source: [:0]const u8) !void {
         countPattern(refresh_source, "buildPreparedRecord(lhs_index)") != 1 or
         countPattern(refresh_source, "buildPreparedRecord(rhs_index)") != 1 or
         countPattern(source, "liveAccumulatorNameAfterCurrent(transaction.selector)") !=
-            preservation_preamble_count or
+            direct_liveness_preamble_count or
         countPattern(source, "preserveLiveAccumulatorValue(") != preservation_preamble_count)
     {
         return error.ValueUseScratchComparePreservationOrder;
