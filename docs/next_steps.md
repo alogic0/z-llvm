@@ -214,7 +214,49 @@ spill) with the four required test classes plus the design note mapping
 every remaining scalar action to its exact legacy displacement authority
 (form-table / liveness-aware arithmetic / hardcoded — no generalization
 between categories). Step B2 resumes the wiring from patch `39aa6d53` under
-the unchanged contract. INBOX-135 amended in place; Step A2 dispatched.
+the unchanged contract. INBOX-135 amended in place; Step A2 dispatched. **Step A2 LANDED at
+`49fcc04d`** ("O2: make immediate displacement liveness-aware") and is
+Supervisor-verified: the change is confined to `immediateSourceDisplacement`
+(+18/-6, the exact legacy rule: EAX/RAX named source reuses only when
+`!valueIsLiveAfterCurrent`, else the supplied fallback);
+`scalarCastSourceDisplacement` untouched (zero diff hits); +197 test lines
+pin the live-after spill/reload/shift stream, the dies-at-current reuse
+control, unchanged non-accumulator/immediate controls, and fails-closed
+rollback; the guard gained fixtures freezing the deliberate
+cast-vs-arithmetic distinction (+27/+76); the **displacement-authority
+design note** covers every remaining scalar action with its exact legacy
+authority (slice 3: liveness-aware ordinary binary vs form-table
+boolean/shift and preserve-current forms vs the i52 preserve-current+mask;
+slice 4: liveness-aware ≤32-bit multiply, form-table i64 multiply, hardcoded
+spill-lhs-through-RAX; slice 5: form-table quotient with the fixed RCX/RDX
+order — no generalization); production untouched; ratchet 166; identities
+EXACT; unit 1,313/1,313; Worker abi + my independent abi rerun both pass; no
+perf; no Tier 3. Evidence sent requesting A2 acceptance + the B2 wiring
+resume.
+
+**The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
+Finish and accept Step A2, land the immediate wiring at ratchet 153, then
+block scalar slice 3 until this checkpoint is complete."): an evidence-only
+R0-style plan first, then separately reviewed slices — (1) action split:
+scalar_arithmetic.zig becomes a thin stable facade over `scalar_cast.zig` +
+`scalar_immediate.zig`; NO empty named-arithmetic leaf (it arrives with
+slice 3); multiply/division separate later; (2) planning split: planning.zig
+stays a thin facade partitioned by ownership (likely
+compatibility/admission, physical mapping/conflict graph, semantic
+ordering/early-materialization) with API/error sets/import DAG preserved
+exactly — any cycle or reverse action→planning dependency is a hard stop;
+(3) scalar tests behind a stable aggregator with an exact 1:1 test-name
+manifest; (4) planning tests as a separate test-only slice with the same
+manifest discipline; composed_selector_state.zig DEFERRED (needs its own
+evidence-only dependency + snapshot-ownership plan). Constraints: ratchet
+exactly 153 throughout; production moves need provenance manifests,
+unchanged facade/tag/error manifests, exact identities, full gates, AND
+counterbalanced perf (output-byte identity alone does NOT waive perf for a
+production/import-layout refactor); test-only slices may omit perf only on
+hash-identity of production/tools/build-roots/facades; leaves preferably
+<1,500 lines with 2,000 a hard review stop; no semantic/capability/
+diagnostic/transaction-ordering changes; no Tier 3; stop after the plan and
+after each production slice.
 
 **USER DIRECTIVE (2026-07-17): a REFACTORING CHECKPOINT before scalar slice
 3.** Concrete size pressure: `value_use/planning.zig` 2,298 lines (already
