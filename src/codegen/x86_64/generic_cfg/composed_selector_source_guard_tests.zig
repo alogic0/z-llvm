@@ -40,7 +40,7 @@ const classified_sources = [_]ClassifiedSource{
 };
 
 const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-const frozen_bypass_inventory_sha256 = "c5cf3caa4f4edfc715d8e139d736b399a4fb0b70a82b82f17af182ec88aace3e";
+const frozen_bypass_inventory_sha256 = "0df5eb738ae883dd7703bb2303d9c2c3d39ff133d854aca7ab5fa894cbabe829";
 const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -419,7 +419,7 @@ fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const
     try validateDormantLoadActionProductionSites(source_name, source);
     try validateFailureProvenanceProductionSites(source_name, source);
     try validateAccumulatorCompositionProductionSites(source_name, source);
-    try validateDormantScratchCompareProductionSites(source_name, source);
+    try validateScratchCompareProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -574,17 +574,83 @@ fn validateDurableActionIdentityOwnership(source: [:0]const u8) !void {
         return error.ValueUseDurableActionIdentityOwnershipOrder;
 }
 
-fn validateDormantScratchCompareProductionSites(source_name: []const u8, source: []const u8) !void {
-    const patterns = [_][]const u8{
-        ".scratch_compare_operand",
-        "attachScratchCompareAction(",
-        ".scratch_compare =",
-    };
-    for (patterns) |pattern| {
-        if (std.mem.indexOf(u8, source, pattern) != null)
-            return error.ValueUseScratchCompareProductionWiringForbidden;
+fn validateScratchCompareProductionSites(source_name: []const u8, source: [:0]const u8) !void {
+    const form_pattern = ".form = .scratch_compare_operand";
+    const attach_pattern = "attachScratchCompareAction(";
+    const form_total = countPattern(source, form_pattern);
+    const attach_total = countPattern(source, attach_pattern);
+    if (!std.mem.eql(u8, source_name, "composed_selector_icmp.zig")) {
+        if (form_total != 0 or attach_total != 0)
+            return error.ValueUseScratchCompareActionOutsideAllowlist;
+        return;
     }
-    _ = source_name;
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const classifier_body = functionBodyNamed(bodies, "classifyScratchCompare") orelse
+        return error.ValueUseScratchCompareActionAllowlistMismatch;
+    const action_body = functionBodyNamed(bodies, "lowerScratchCompare") orelse
+        return error.ValueUseScratchCompareActionAllowlistMismatch;
+    const dispatch_body = functionBodyNamed(bodies, "lowerIcmp") orelse
+        return error.ValueUseScratchCompareActionAllowlistMismatch;
+    const classifier_source = source[classifier_body.start..classifier_body.end];
+    const action_source = source[action_body.start..action_body.end];
+    const dispatch_source = source[dispatch_body.start..dispatch_body.end];
+
+    // The partial-family split is semantic only: the classifier cannot observe
+    // selector state, current homes, functions, or family identity.
+    const classifier_forbidden = [_][]const u8{
+        "selector",
+        "resolveValue(",
+        "valueLoc(",
+        "allocation_plan",
+        "ValueLoc",
+        "function",
+        "Function",
+        "family",
+        "Family",
+        "callee",
+        "Callee",
+        "isExact",
+        ".spill64",
+        ".spill128",
+        ".eax",
+        ".rax",
+        ".arg32",
+        ".arg64",
+        ".scratch32",
+        ".scratch64",
+    };
+    for (classifier_forbidden) |pattern| {
+        if (std.mem.indexOf(u8, classifier_source, pattern) != null)
+            return error.ValueUseScratchCompareClassifierStatePredicate;
+    }
+
+    const dispatch_index = std.mem.indexOf(u8, dispatch_source, "classifyScratchCompare(icmp)") orelse
+        return error.ValueUseScratchCompareDispatchMismatch;
+    const legacy_begin_index = std.mem.indexOf(
+        u8,
+        dispatch_source,
+        "AccumulatorDefinitionTransaction.begin(selector)",
+    ) orelse return error.ValueUseScratchCompareDispatchMismatch;
+    if (dispatch_index >= legacy_begin_index or
+        countPattern(dispatch_source, "classifyScratchCompare(icmp)") != 1 or
+        countPattern(dispatch_source, "lowerScratchCompare(selector, result_name, icmp, action)") != 1 or
+        countPattern(dispatch_source, "ValueUseTransaction.begin(selector)") != 0 or
+        countPattern(dispatch_source, "AccumulatorDefinitionTransaction.begin(selector)") != 1 or
+        countPattern(action_source, form_pattern) != 2 or
+        countPattern(action_source, attach_pattern) != 1 or
+        countPattern(action_source, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(action_source, "beginAccumulatorSession()") != 1 or
+        countPattern(action_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
+        countPattern(action_source, ".preparedView(") != 1 or
+        countPattern(action_source, ".executePreparedAction(") != 1 or
+        countPattern(action_source, ".commit()") != 1 or
+        form_total != 2 or
+        attach_total != 1)
+    {
+        return error.ValueUseScratchCompareActionAllowlistMismatch;
+    }
 }
 
 fn validateLoadDiagnosticMappingProductionSites(source_name: []const u8, source: [:0]const u8) !void {
@@ -772,6 +838,23 @@ fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source
         if (std.mem.indexOf(u8, source, pattern) != null) has_composition_api = true;
     }
     if (!has_composition_api) return;
+    if (std.mem.eql(u8, source_name, "composed_selector_icmp.zig")) {
+        var body_storage: [max_function_bodies]FunctionBody = undefined;
+        const bodies = try collectFunctionBodies(source, &body_storage);
+        const action_body = functionBodyNamed(bodies, "lowerScratchCompare") orelse
+            return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+        const function_source = source[action_body.start..action_body.end];
+        if (countPattern(function_source, "beginAccumulatorSession(") != 1 or
+            countPattern(function_source, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(function_source, ".executePreparedAction(") != 1 or
+            countPattern(function_source, ".commit()") != 1 or
+            countPattern(function_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
+            countPattern(source, "beginAccumulatorSession(") != 1)
+        {
+            return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+        }
+        return;
+    }
     if (std.mem.eql(u8, source_name, "composed_selector_memory.zig")) {
         var body_storage: [max_function_bodies]FunctionBody = undefined;
         const bodies = try collectFunctionBodies(source, &body_storage);
@@ -870,6 +953,18 @@ fn validateAccumulatorCompositionProductionSites(source_name: []const u8, source
 fn validateFailureProvenanceProductionSites(source_name: []const u8, source: [:0]const u8) !void {
     const query_count = countPattern(source, ".failedRequestIs(");
     if (query_count == 0) return;
+    if (std.mem.eql(u8, source_name, "composed_selector_icmp.zig")) {
+        var body_storage: [max_function_bodies]FunctionBody = undefined;
+        const bodies = try collectFunctionBodies(source, &body_storage);
+        const mapper = functionBodyNamed(bodies, "scratchCompareDiagnostic") orelse
+            return error.ValueUseFailureProvenanceOutsideAllowlist;
+        if (countPattern(source[mapper.start..mapper.end], ".failedRequestIs(") != 2 or
+            query_count != 2)
+        {
+            return error.ValueUseFailureProvenanceAllowlistMismatch;
+        }
+        return;
+    }
     if (std.mem.eql(u8, source_name, "composed_selector_memory.zig")) {
         var body_storage: [max_function_bodies]FunctionBody = undefined;
         const bodies = try collectFunctionBodies(source, &body_storage);
@@ -2415,7 +2510,7 @@ test "composed selector source guard admits only reviewed accumulator compositio
     );
 }
 
-test "composed selector source guard keeps scratch compare intent semantic and dormant" {
+test "composed selector source guard keeps scratch compare intent semantic and production wiring narrow" {
     const accepted_intent: [:0]const u8 =
         "pub const ScratchCompareRhs = union(enum) { immediate: i128, null_pointer, named: RequestHandle, }; " ++
         "pub const ScratchCompareAction = struct { result: ActionIdentity, operand_ty: ir.Type, " ++
@@ -2429,21 +2524,61 @@ test "composed selector source guard keeps scratch compare intent semantic and d
         ),
     );
 
-    try validateDormantScratchCompareProductionSites(
-        "composed_selector_icmp.zig",
-        "fn lowerIcmp() void { legacyLowering(); }",
+    const accepted_wiring: [:0]const u8 =
+        "fn classifyScratchCompare() void { _ = semantic_form; } " ++
+        "fn lowerScratchCompare() void { " ++
+        "var transaction = try ValueUseTransaction.begin(selector); " ++
+        "_ = .{ .form = .scratch_compare_operand }; " ++
+        "_ = .{ .form = .scratch_compare_operand }; " ++
+        "try transaction.attachScratchCompareAction(lhs, action); " ++
+        "_ = try transaction.beginAccumulatorSession(); " ++
+        "const lease = try transaction.preparedView(lhs); " ++
+        "try transaction.executePreparedAction(lease); " ++
+        "try transaction.commit(); } " ++
+        "fn lowerIcmp() void { " ++
+        "_ = classifyScratchCompare(icmp); " ++
+        "_ = lowerScratchCompare(selector, result_name, icmp, action); " ++
+        "_ = AccumulatorDefinitionTransaction.begin(selector); }";
+    try validateScratchCompareProductionSites("composed_selector_icmp.zig", accepted_wiring);
+    try std.testing.expectError(
+        error.ValueUseScratchCompareActionOutsideAllowlist,
+        validateScratchCompareProductionSites("composed_selector_scalar.zig", accepted_wiring),
     );
-    const rejected = [_][]const u8{
-        "fn lowerIcmp() void { _ = .scratch_compare_operand; }",
-        "fn lowerIcmp() void { transaction.attachScratchCompareAction(lhs, action); }",
-        "fn lowerIcmp() void { _ = .{ .scratch_compare = intent }; }",
-    };
-    for (rejected) |fixture| {
-        try std.testing.expectError(
-            error.ValueUseScratchCompareProductionWiringForbidden,
-            validateDormantScratchCompareProductionSites("composed_selector_icmp.zig", fixture),
-        );
-    }
+
+    const classifier_state_fixture: [:0]const u8 =
+        "fn classifyScratchCompare() void { _ = selector.valueLoc(source); } " ++
+        accepted_wiring["fn classifyScratchCompare() void { _ = semantic_form; } ".len..];
+    try std.testing.expectError(
+        error.ValueUseScratchCompareClassifierStatePredicate,
+        validateScratchCompareProductionSites("composed_selector_icmp.zig", classifier_state_fixture),
+    );
+    const classifier_family_fixture: [:0]const u8 =
+        "fn classifyScratchCompare() void { _ = family_name; } " ++
+        accepted_wiring["fn classifyScratchCompare() void { _ = semantic_form; } ".len..];
+    try std.testing.expectError(
+        error.ValueUseScratchCompareClassifierStatePredicate,
+        validateScratchCompareProductionSites("composed_selector_icmp.zig", classifier_family_fixture),
+    );
+    const nested_fixture: [:0]const u8 =
+        "fn classifyScratchCompare() void { _ = semantic_form; } " ++
+        "fn lowerScratchCompare() void { " ++
+        "var transaction = try ValueUseTransaction.begin(selector); " ++
+        "_ = .{ .form = .scratch_compare_operand }; " ++
+        "_ = .{ .form = .scratch_compare_operand }; " ++
+        "try transaction.attachScratchCompareAction(lhs, action); " ++
+        "_ = try transaction.beginAccumulatorSession(); " ++
+        "_ = AccumulatorDefinitionTransaction.begin(selector); " ++
+        "const lease = try transaction.preparedView(lhs); " ++
+        "try transaction.executePreparedAction(lease); " ++
+        "try transaction.commit(); } " ++
+        "fn lowerIcmp() void { " ++
+        "_ = classifyScratchCompare(icmp); " ++
+        "_ = lowerScratchCompare(selector, result_name, icmp, action); " ++
+        "_ = AccumulatorDefinitionTransaction.begin(selector); }";
+    try std.testing.expectError(
+        error.ValueUseScratchCompareActionAllowlistMismatch,
+        validateScratchCompareProductionSites("composed_selector_icmp.zig", nested_fixture),
+    );
 
     const preamble_helpers =
         "fn preserveScratchCompareLiveAccumulator() void { " ++
