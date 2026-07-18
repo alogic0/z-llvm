@@ -702,7 +702,14 @@ duplicated test can be attributed to one aggregator change, and the
 performance omission must be proved independently for each tree."), with
 the note that checkpoint completion does NOT auto-authorize the campaign's
 scalar slice 3 — a stop follows for the R03/R04 design and sequencing
-decision. INBOX-147 (slice 3, the scalar test split) dispatched.
+decision. INBOX-147 (slice 3, the scalar test split) dispatched. **Slice 3 LANDED at
+`b7b176ed`** and is Supervisor-verified: two PURE RENAMES (zero content
+changes) + a 4-line stable aggregator keeping the build entrypoint; the
+33-test sorted 1:1 manifest (duplicate-free, verified); the 423-row
+perf-omission hash contract confirmed by my own spot-hashes (production,
+planning facade, action facade, build all identical to the accepted tree);
+ratchet 154; MY abi + canary runs pass; no Tier 3. Evidence sent requesting
+slice-3 acceptance + slice-4 (the planning test split) dispatch.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
