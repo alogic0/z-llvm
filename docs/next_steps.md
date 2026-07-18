@@ -6,6 +6,28 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
+## INBOX-149 Slice-3 evidence refresh — dispatched
+
+The refactoring checkpoint is complete and accepted at ratchet 154. The
+Reviewer and Reviewer 2 agreed on Option B: scalar Slice 3 precedes R03/R04
+design, while both residuals remain guard-enforced legacy owners until the
+post-calls residual audit.
+
+The sole authorized Worker action is **INBOX-149**, a docs-only refresh from
+the accepted ratchet-154 tree. It must independently recount every named/i52
+gateway and last-owner helper, freeze exact R03/R04 owners and guard anchors,
+partition each proposed family under one already-approved displacement
+authority, derive honest target arithmetic from 154, define the
+family-isolation plus aggregate-interaction procedure, and freeze the future
+`scalar_named.zig` import/facade/size budget.
+
+Any family requiring preservation-home or per-alias authority remains
+wholly legacy with zero ratchet credit. No implementation, refactoring,
+R03/R04 design, production/test/guard change, build or validation gate,
+performance run, or Tier 3 is authorized. Ratchet remains 154. The Worker
+must commit the single refresh document and stop for review; no dormant
+Slice-3 action is preauthorized.
+
 ## INBOX-131 dormant scalar-cast actions — dispatched
 
 INBOX-130 at `101ac07c` is **ACCEPTED**. Its honest scalar terminal is 129:
