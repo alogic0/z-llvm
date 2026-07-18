@@ -464,6 +464,15 @@ regression tests + the immediate-tests additions cover the six mandated
 scenarios; full unit 1,325/1,325; Worker gates + my independent abi
 (`status=pass`) and canary (`success`) runs all green; no perf; no Tier 3.
 Evidence sent requesting 139 acceptance + B5 (the carrier resume to 153).
+**INBOX-139 is ACCEPTED and B5 AUTHORIZED** (Reviewer, 2026-07-17: "Durable
+spill keys now have an explicit selector-owned lifecycle across insertion,
+rollback, commit, rehash, and teardown, with the broader identity-map audit
+and canary coverage closing the defect class."). B5 conditions: carrier
+without reconciliation; model + lifetime + durable-key ownership rules
+frozen at `de3cb6f9`; ratchet exactly 153; identities + six rows + the
+`__multi3` stream; full gates INCLUDING focused canaries; frozen-artifact
+perf; any NEW lifecycle/ownership failure returns for review; no Tier 3. B5
+dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
