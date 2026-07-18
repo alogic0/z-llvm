@@ -6,7 +6,25 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-154 — stream-movement stop RESOLVED (Option A ruled); resumed
+## INBOX-154 — LANDED at cbb532ac, Supervisor-verified
+
+The test-only slice landed and is verified: all five production/guard
+files byte-identical to the accepted 152 tree (spot-hashed); ratchet 152;
+no maxInt lifetimes in the new tests; the Option-A adoption applied to
+the qualifying B05/B06 cases with before/after records and the plan-blind
+artifact proof pinned (the no-plan artifact reproduces the old stream);
+current-binding + forward-metadata characterization tests added (the
+valid-forward test demonstrates legacy resolution succeeding while
+transaction admission returns ValueUseUnresolvedSource); the six B07
+cohort traces preserved; gates green with hashes re-verified (guard
+50/50, unit 1342/1342, abi 60/60+30/30, canaries 35, integrated-exe 7/7,
+strengthened Tier 2 1350/1350); identities exact (49a19f04 / 061a64e4 /
+5d91960e); the 423/423 production hash proof validates the perf
+omission; MY abi + canary reruns pass; no Tier 3. Sent to the Reviewer
+for acceptance + the forward-Q1-amendment vs multiply sequencing
+decision.
+
+## Former: stream-movement stop RESOLVED (Option A ruled); resumed
 
 The Worker stopped correctly on the no-movement condition: the shared
 exact-EI B06 fixture's old RAX-reuse stream is a plan-blind artifact —
