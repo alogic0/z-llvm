@@ -6,7 +6,28 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-150 dormant scalar_named.zig — dispatched
+## INBOX-150 dormant scalar_named.zig — LANDED at 0661c8cd, Supervisor-verified
+
+The dormant slice landed (22 files, +1,941/−50) and is verified:
+`composed_selector_scalar.zig` and `composed_selector_state.zig` are
+byte-identical to the accepted 5bc839ee tree (empty diff — production
+consumers untouched, R03/R04 byte-identical); zero `scalar_named`
+references in any production selector file; the leaf has EXACTLY six
+public declarations in 751 lines and the facade EXACTLY twenty names;
+model.zig owns exactly the section-8.1 types
+(NamedScalarBinaryAction/ExactI52BinaryAction/NamedScalarRequestError/
+NamedScalarTestFailure + the two action-union arms and Implementation
+aliases); ratchet recount 154; identities EXACT (fresh report 49a19f04,
+object 061a64e4, owner manifest 5d91960e); all four pinned gate-log
+sha256 hashes re-verified against the retained logs (guard 50/50, unit
+7/7 steps 1339/1339, abi 60/60 + 30/30, canaries 35/35); MY independent
+abi (three modes match) + canary (35 cases, local_fail=0) reruns pass; no
+perf, no Tier 3. Evidence: inbox150_o2_scalar_named_dormant.summary (196
+lines). Sent to the Reviewer for dormant acceptance + the wiring-phase
+agreement (family-isolation matrix first; target 140 minus retained
+credits).
+
+## Former INBOX-150 dispatch entry — superseded by the landing above
 
 INBOX-149 at `5bc839ee` is **ACCEPTED** (Reviewer, 2026-07-18: "The
 refreshed arithmetic is correct: ratchet 154, fourteen conditional direct
