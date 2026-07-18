@@ -262,7 +262,29 @@ stream, no-alias and multiple-alias exactness, the rollback preserving flags
 and state, and the fails-closed malformed-liveness case; identities EXACT;
 unit 1,318/1,318; Worker abi + my independent abi rerun both pass; no perf;
 no Tier 3. Evidence sent requesting A3 acceptance + the B3 resume (patch
-`8ab26a97` unchanged, 153 contract).
+`8ab26a97` unchanged, 153 contract). **A3 ACCEPTED, B3 dispatched — then B3
+HARD-STOPPED per the process rule on a THIRD distinct lifecycle gap**, with
+a second critical finding: (1) `ValueUseExpiredSource` at seal — a
+registered spill-backed operand with NO allocation plan fails
+`valueIsLiveAtOrAfterCurrent` on the accepted direct unit paths (empty
+dependency domain), so seven unit tests fail (1,311/1,318) before the
+action's supported spill materialization can run — a GENERAL
+sealed-request admission question independent of A2/A3; (2) **A3 did not
+restore the production `__multi3` stream** — the divergence is
+byte-identical to B2 despite A3's dormant tests passing. Shared root: the
+transaction's liveness/domain queries answer differently in the dormant
+test environment (no allocation plan) versus production (plan present) —
+the dormant environment is not production-faithful, which is why point
+amendments pass their pinned tests and fail at wiring. The complete B3
+stopped state is preserved at sha `3f3e46ff` (apply-check clean); ratchet
+stays 166; the wiring stays parked. My architectural-review proposal is
+with the Reviewer: an evidence-only per-plan-family liveness/domain
+diagnosis slice, a design ruling on sealed-request availability and the
+occupant-query authority (possibly one unified liveness authority with
+explicit no-plan semantics, mirrored into the dormant harness), then a
+single reviewed amendment + the wiring resume; plus a sequencing question
+(this review vs the refactoring checkpoint, which touches the same
+planning.zig).
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
