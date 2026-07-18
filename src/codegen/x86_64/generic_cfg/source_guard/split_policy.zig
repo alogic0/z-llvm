@@ -314,6 +314,10 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
             std.mem.indexOf(u8, source, "function_name") != null or
             std.mem.indexOf(u8, source, "functionName") != null))
         return error.ValueUseNamedScalarFunctionPredicateForbidden;
+    if (is_scalar_named and
+        (std.mem.indexOf(u8, source, "transaction.selector.values.get(") != null or
+            std.mem.indexOf(u8, source, "resolveForwardValueForUse(") != null))
+        return error.ValueUseNamedScalarLifetimeAuthorityBypass;
 
     if (is_control and countPattern(source, "\n") + 1 > 2000)
         return error.ValueUseControlCompareLineBudgetExceeded;

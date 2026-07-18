@@ -5,11 +5,13 @@ const std = support.std;
 const ir = support.ir;
 const machine_module = support.machine_module;
 const selector_state = support.selector_state;
+const stage2_planning = support.stage2_planning;
 const ComposedBlockSelector = support.ComposedBlockSelector;
 const MachineFunction = support.MachineFunction;
 const SelectorAllocationPlan = support.SelectorAllocationPlan;
 const Transaction = support.Transaction;
 const ValueLoc = support.ValueLoc;
+const PlannedValueAssignment = stage2_planning.PlannedValueAssignment;
 const expected = support.expected;
 const actionIdentity = support.actionIdentity;
 
@@ -99,6 +101,21 @@ fn registerNamedAction(
         .rhs = rhs,
     });
     return lhs;
+}
+
+fn installNamedForward(
+    plan: *SelectorAllocationPlan,
+    name: []const u8,
+    definition_position: usize,
+    interval_end: usize,
+    assignment: PlannedValueAssignment,
+) !void {
+    try plan.interval_ends.put(name, interval_end);
+    try plan.forward_values.put(name, .{
+        .definition_position = definition_position,
+        .metadata = .{ .class = .gpr64, .bits = 64 },
+    });
+    try plan.assignments.put(name, assignment);
 }
 
 fn binaryNamed(function: ir.Function, result_name: []const u8) ir.BinaryInst {
@@ -393,6 +410,217 @@ test "value-use named scalar B07 preserves accepted accumulator topology branche
             case.expected,
             machine.instructions.items,
         );
+    }
+}
+
+test "value-use named scalar B07 admits all six canonical forward rhs cohort shapes" {
+    const cases = [_]struct {
+        function: []const u8,
+        lhs: []const u8,
+        rhs: []const u8,
+        current_position: usize,
+        definition_position: usize,
+        interval_end: usize,
+        assignment: PlannedValueAssignment,
+        expected: []const machine_module.Instruction,
+    }{
+        .{
+            .function = "compiler_rt.floatuneidf.__floatuneidf",
+            .lhs = "12",
+            .rhs = "20",
+            .current_position = 25,
+            .definition_position = 37,
+            .interval_end = 42,
+            .assignment = .{ .gpr64 = .r9 },
+            .expected = &.{.{ .binary_arg_rax = .{ .op = .sub, .reg = .r9 } }},
+        },
+        .{
+            .function = "compiler_rt.floatuneisf.__floatuneisf",
+            .lhs = "12",
+            .rhs = "20",
+            .current_position = 25,
+            .definition_position = 37,
+            .interval_end = 42,
+            .assignment = .{ .gpr64 = .r9 },
+            .expected = &.{.{ .binary_arg_rax = .{ .op = .sub, .reg = .r9 } }},
+        },
+        .{
+            .function = "compiler_rt.floatuneihf.__floatuneihf",
+            .lhs = "12",
+            .rhs = "20",
+            .current_position = 25,
+            .definition_position = 37,
+            .interval_end = 42,
+            .assignment = .{ .gpr64 = .r9 },
+            .expected = &.{.{ .binary_arg_rax = .{ .op = .sub, .reg = .r9 } }},
+        },
+        .{
+            .function = "compiler_rt.floateidf.__floateidf",
+            .lhs = ".neg",
+            .rhs = "26",
+            .current_position = 29,
+            .definition_position = 42,
+            .interval_end = 47,
+            .assignment = .{ .spill = 0 },
+            .expected = &.{
+                .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot0 } },
+                .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } },
+            },
+        },
+        .{
+            .function = "compiler_rt.floateisf.__floateisf",
+            .lhs = ".neg",
+            .rhs = "26",
+            .current_position = 29,
+            .definition_position = 42,
+            .interval_end = 47,
+            .assignment = .{ .spill = 0 },
+            .expected = &.{
+                .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot0 } },
+                .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } },
+            },
+        },
+        .{
+            .function = "compiler_rt.floateihf.__floateihf",
+            .lhs = ".neg",
+            .rhs = "26",
+            .current_position = 29,
+            .definition_position = 42,
+            .interval_end = 47,
+            .assignment = .{ .spill = 0 },
+            .expected = &.{
+                .{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot0 } },
+                .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } },
+            },
+        },
+    };
+    for (cases) |case| {
+        var machine = MachineFunction.init(case.function, .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put(case.lhs, case.current_position);
+        try plan.interval_ends.put("result", case.current_position + 1);
+        try installNamedForward(
+            &plan,
+            case.rhs,
+            case.definition_position,
+            case.interval_end,
+            case.assignment,
+        );
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = case.current_position;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, case.lhs, .rax);
+
+        {
+            var transaction = try Transaction.begin(&selector);
+            defer transaction.deinit();
+            const lhs = try registerNamedAction(
+                &transaction,
+                case.lhs,
+                case.rhs,
+                .sub,
+                64,
+            );
+            const rhs =
+                transaction.requests[lhs.index].prepared_action.?.named_scalar_binary.rhs;
+            try transaction.seal();
+            try std.testing.expect(selector.values.get(case.rhs) == null);
+            try transaction.prepare();
+            try transaction.materializeAll();
+            try std.testing.expectEqual(
+                @as(usize, std.math.maxInt(usize)),
+                transaction.prepared_views[rhs.index].source_vreg.index,
+            );
+            try transaction.executePreparedAction(try transaction.preparedView(lhs));
+            try transaction.commit();
+        }
+
+        try std.testing.expectEqualSlices(
+            machine_module.Instruction,
+            case.expected,
+            machine.instructions.items,
+        );
+        try std.testing.expect(selector.values.get(case.rhs) == null);
+        try std.testing.expectEqual(
+            ValueLoc.rax,
+            selector_state.resolveValue(&selector, .{ .named = "result" }).?,
+        );
+    }
+}
+
+test "value-use named scalar B07 forward errors preserve rhs provenance and rollback" {
+    const Failure = enum {
+        malformed_at_seal,
+        stale_after_seal,
+        partial_action,
+    };
+    inline for (std.meta.tags(Failure)) |failure| {
+        var machine = MachineFunction.init(@tagName(failure), .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("lhs", 2);
+        try plan.interval_ends.put("result", 3);
+        try installNamedForward(
+            &plan,
+            "rhs",
+            if (failure == .malformed_at_seal) 2 else 8,
+            10,
+            .{ .gpr64 = .r9 },
+        );
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 2;
+        try selector_state.bindValueLoc(&selector, "lhs", .rax);
+        const value_count = selector.values.count();
+
+        {
+            var transaction = try Transaction.begin(&selector);
+            defer transaction.deinit();
+            const lhs = try registerNamedAction(&transaction, "lhs", "rhs", .sub, 64);
+            const rhs =
+                transaction.requests[lhs.index].prepared_action.?.named_scalar_binary.rhs;
+            if (failure == .malformed_at_seal) {
+                try std.testing.expectError(
+                    error.ValueUseForwardPlanMalformed,
+                    transaction.seal(),
+                );
+                try std.testing.expect(!transaction.failedRequestIs(lhs));
+                try std.testing.expect(transaction.failedRequestIs(rhs));
+            } else if (failure == .stale_after_seal) {
+                try transaction.seal();
+                plan.assignments.getPtr("rhs").?.* = .{ .gpr64 = .r8 };
+                try transaction.prepare();
+                try std.testing.expectError(
+                    error.ValueUseForwardPlanStale,
+                    transaction.materializeAll(),
+                );
+                try std.testing.expect(!transaction.failedRequestIs(lhs));
+                try std.testing.expect(transaction.failedRequestIs(rhs));
+            } else {
+                try transaction.seal();
+                transaction.named_scalar_test_failure = .after_first_arithmetic_write;
+                try transaction.prepare();
+                try transaction.materializeAll();
+                try std.testing.expectError(
+                    error.ValueUseNamedScalarTestFailure,
+                    transaction.executePreparedAction(try transaction.preparedView(lhs)),
+                );
+            }
+        }
+
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(value_count, selector.values.count());
+        try std.testing.expect(selector.values.get("rhs") == null);
+        try std.testing.expect(
+            selector_state.resolveValue(&selector, .{ .named = "result" }) == null,
+        );
+        try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
     }
 }
 

@@ -300,6 +300,47 @@ test "value-use scalar named classifier rejects function-name admission" {
     );
 }
 
+test "value-use scalar named action cannot bypass transaction lifetime admission" {
+    const accepted: [:0]const u8 =
+        @embedFile("../value_use/actions/scalar_named.zig");
+    try validateValueUseLeaf(
+        "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_named.zig",
+        accepted,
+    );
+
+    const current_binding_bypass = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "_ = try namedSource(Authority, transaction, index);",
+        "_ = try namedSource(Authority, transaction, index);\n" ++
+            "    _ = transaction.selector.values.get(\"rhs\");",
+    );
+    defer std.testing.allocator.free(current_binding_bypass);
+    try std.testing.expectError(
+        error.ValueUseNamedScalarLifetimeAuthorityBypass,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_named.zig",
+            current_binding_bypass,
+        ),
+    );
+
+    const forward_resolver_bypass = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "_ = try namedSource(Authority, transaction, index);",
+        "_ = try namedSource(Authority, transaction, index);\n" ++
+            "    _ = selector_state.resolveForwardValueForUse(transaction.selector, \"rhs\");",
+    );
+    defer std.testing.allocator.free(forward_resolver_bypass);
+    try std.testing.expectError(
+        error.ValueUseNamedScalarLifetimeAuthorityBypass,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_named.zig",
+            forward_resolver_bypass,
+        ),
+    );
+}
+
 test "value-use planning split guard freezes the revised facade DAG and internal ownership" {
     const facade: [:0]const u8 = @embedFile("../value_use/planning.zig");
     try validatePlanningFacadeSource(facade);

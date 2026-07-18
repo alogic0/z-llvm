@@ -560,16 +560,17 @@ fn validateNamedSource(
     index: u8,
     bits: u16,
 ) !void {
-    const name = try namedSource(Authority, transaction, index);
-    const binding = transaction.selector.values.get(name) orelse {
+    _ = try namedSource(Authority, transaction, index);
+    if (!transaction.prepared_view_valid[index]) {
         Authority.recordRequestFailure(Authority, transaction, index);
-        return error.ValueUseUnresolvedSource;
-    };
+        return error.ValueUsePreparedViewMissing;
+    }
+    const binding = transaction.prepared_views[index].source_vreg;
     const valid_class = if (bits <= 32)
-        binding.vreg.class == .gpr32 or binding.vreg.class == .gpr64
+        binding.class == .gpr32 or binding.class == .gpr64
     else
-        binding.vreg.class == .gpr64;
-    if (!valid_class or binding.vreg.bits < bits)
+        binding.class == .gpr64;
+    if (!valid_class or binding.bits < bits)
         return namedRequestError(Authority, transaction, index, error.ValueUseNamedScalarWidthUnsupported);
     const current = transaction.prepared_views[index].canonical_source_loc;
     const valid_home = if (bits <= 32) switch (current) {
