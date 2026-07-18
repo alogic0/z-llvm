@@ -6,7 +6,21 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-158 B07 action-layer dormant amendment — dispatched
+## INBOX-158 — LANDED at 17bfa6d7, Supervisor-verified
+
+The B07 action-layer amendment landed surgically (scalar_named.zig
++15/−7 — the named-RHS request construction; +228 test lines; +45 guard
+lines; NO model/core/planning/materialization changes) and is verified:
+composed_selector_scalar.zig byte-identical to the accepted 148 tree
+(B03–B06 wired sites, B07 legacy routing, R03/R04 untouched); the
+six-decl leaf / twenty-name facade budgets unchanged (no public
+request-surface widening); ratchet 148; identities EXACT (49a19f04 /
+061a64e4 / 5d91960e); gates green with all four log hashes re-verified
+(unit 1356/1356, guard 53/53, abi 60/60+30/30, canaries 35); MY abi +
+canary reruns pass; no perf, no Tier 3. Sent to the Reviewer for
+acceptance + the INBOX-159 fresh-isolation proposal.
+
+## Former INBOX-158 dispatch entry — superseded by the landing above
 
 INBOX-157 is **ACCEPTED — the ratchet is accepted at 148** (Reviewer,
 2026-07-18: "I accept INBOX-157. The ratchet is accepted at 148…
