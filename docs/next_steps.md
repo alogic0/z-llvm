@@ -6,7 +6,22 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-157 wiring (B03–B06 → 148) — dispatched
+## INBOX-157 wiring — LANDED at 6b478652 + perf cfe4573c, Supervisor-verified
+
+The four-family wiring landed and is fully verified: ratchet recount
+**148** (the TSV removed exactly the four accepted gateways); the
+value_use action/lifetime/forward-Q1 tree has ZERO diffs vs the frozen
+3534551d; B07 remains pre-transaction via scalar_named_b07_rhs_admission;
+identities EXACT (fresh report 49a19f04, object 061a64e4, owner
+5d91960e — the cohort did not move); all six gate log hashes re-verified
+(guard 52/52, unit 1353/1353, abi 60/60+30/30, canaries 35,
+integrated-exe 7/7, strengthened Tier 2 1361/1361); MY abi + canary
+reruns pass; counterbalanced perf PASSED (median Δ +0.060s vs the
+allowance, paired ratio 1.0000005, RSS +316 KiB, all thresholds true);
+no Tier 3. Sent to the Reviewer for acceptance; the B07 action-layer
+dormant amendment (INBOX-158, already ruled) dispatches on acceptance.
+
+## Former INBOX-157 dispatch entry — superseded by the landing above
 
 INBOX-156 is **ACCEPTED and INBOX-157 authorized exactly as proposed**
 (Reviewer, 2026-07-18): wire only B03–B06 (152 → exactly 148); B07 stays
