@@ -6,7 +6,22 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-155 — term-4 stop RESOLVED (structural snapshot ruled); resumed
+## INBOX-155 — LANDED at 3534551d, Supervisor-verified
+
+The dormant forward-Q1 amendment landed (26 files, +1,380/−131) and is
+verified: composed_selector_scalar.zig (incl the five legacy owners)
+byte-identical to the accepted 152 tree; the state.zig delta adds ONLY
+the ruled shared resolver `resolveForwardValueForUse` — the frozen
+durable spill-key region is untouched (zero diff lines touch
+insertOwnedSpillSlot/owned_spill_slot_keys/SpillSlotSnapshotEntry/
+restoreSpillSlots); zero production consumer wiring; ratchet 152;
+identities EXACT (49a19f04 / 061a64e4 / 5d91960e, 285/285 per-function);
+gates green with all six log hashes re-verified (guard 52/52, unit
+1353/1353, abi 60/60+30/30, canaries 35, integrated-exe 7/7, Tier 2
+1361/1361); MY abi + canary reruns pass; no perf, no Tier 3. Sent to the
+Reviewer for acceptance + the INBOX-156 re-isolation proposal.
+
+## Former: term-4 stop RESOLVED (structural snapshot ruled); resumed
 
 The Worker hard-stopped correctly: no canonical forward-plan generation
 exists (ForwardValuePlan carries only definition_position + metadata;
