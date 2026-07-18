@@ -435,7 +435,22 @@ established helper; an AUDIT of every durable selector-side map for
 borrowed-slice keys under the new lifetime context with a guard fixture;
 the cross-instruction post-teardown regression + the canary shape as
 tests; canaries added to the standing dormant gate set — the 137 gap), then
-B5 resumes the carrier under the unchanged 153 contract.
+B5 resumes the carrier under the unchanged 153 contract. **The Reviewer
+AUTHORIZED INBOX-139** (2026-07-17) with the fix at the DURABLE-CONTAINER
+BOUNDARY (incoming slice lookup-only; existing key retains its backing with
+zero allocation; new key gets selector-owned/interned storage before
+assignment; rollback frees exactly once; commit retains to selector
+teardown; never a transaction-owned slice in the map even temporarily); the
+audit CLASSIFIES every identity-keyed container (six recorded attributes)
+rather than blindly copying — immutable IR-owned keys may stay borrowed
+with explicit lifetime proof — and the guard enforces exact insertion
+boundaries, not textual bans; six mandatory regressions incl allocator
+churn + forced rehash, duplicate-key no-alloc/no-leak, exactly-once free,
+cross-transaction retention, and the fma/__multi3 shapes. **Standing gate
+change: focused codegen canaries now run for every dormant slice touching
+selector/transaction/planning/state/action production code** (docs-only,
+test-only, and proven pure-move refactors exempt). Dormant at ratchet 166;
+B5 not yet authorized. INBOX-139 dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
