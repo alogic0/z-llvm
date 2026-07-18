@@ -53,6 +53,7 @@ pub const ComposedBlockSelector = struct {
     enable_expired_plan_register_reuse: bool = false,
     preserve_current_position_values: bool = false,
     spill_slots: std.StringHashMap(SpillSlotAssignment),
+    owned_spill_slot_keys: std.StringHashMap([]u8),
     next_spill_slot: usize = 0,
     eflags: eflags.Liveness = .{},
     eflags_semantics: std.ArrayList(EflagsSemanticRecord) = .empty,
@@ -73,12 +74,16 @@ pub const ComposedBlockSelector = struct {
             .phi_destinations = std.StringHashMap(ValueLoc).init(allocator),
             .overflow_results = std.StringHashMap(OverflowResultLoc).init(allocator),
             .spill_slots = std.StringHashMap(SpillSlotAssignment).init(allocator),
+            .owned_spill_slot_keys = std.StringHashMap([]u8).init(allocator),
         };
     }
 
     pub fn deinit(selector: *ComposedBlockSelector) void {
         selector.eflags_semantics.deinit(selector.allocator);
         selector.overflow_results.deinit();
+        var owned_spill_key_it = selector.owned_spill_slot_keys.valueIterator();
+        while (owned_spill_key_it.next()) |owned_key| selector.allocator.free(owned_key.*);
+        selector.owned_spill_slot_keys.deinit();
         selector.spill_slots.deinit();
         selector.phi_destinations.deinit();
         selector.phi_results.deinit();

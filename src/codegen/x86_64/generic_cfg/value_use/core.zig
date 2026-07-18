@@ -124,10 +124,7 @@ const ValueEntry = struct {
     binding: ValueBinding,
 };
 
-const SpillEntry = struct {
-    name: []const u8,
-    assignment: stage2_planning.SpillSlotAssignment,
-};
+const SpillEntry = selector_state.SpillSlotSnapshotEntry;
 
 const PhiDestinationEntry = struct {
     name: []const u8,
@@ -211,8 +208,7 @@ const CoreSnapshot = struct {
         selector.machine.owned_labels.items.len = snapshot.owned_labels_len;
         selector.values.clearRetainingCapacity();
         for (snapshot.values) |entry| selector.values.putAssumeCapacity(entry.name, entry.binding);
-        selector.spill_slots.clearRetainingCapacity();
-        for (snapshot.spill_slots) |entry| selector.spill_slots.putAssumeCapacity(entry.name, entry.assignment);
+        selector_state.restoreSpillSlots(selector, snapshot.spill_slots);
         selector.phi_destinations.clearRetainingCapacity();
         for (snapshot.phi_destinations) |entry| selector.phi_destinations.putAssumeCapacity(entry.name, entry.loc);
         selector.next_virtual_reg = snapshot.next_virtual_reg;

@@ -43,6 +43,22 @@ const isBypassOperation = support.isBypassOperation;
 const countPattern = support.countPattern;
 const validateEflagsEmissionAuthority = support.validateEflagsEmissionAuthority;
 const validateStateDataLifecycle = support.validateStateDataLifecycle;
+const validateDurableSpillSlotOwnership = support.validateDurableSpillSlotOwnership;
+
+fn replaceOnceSentinel(
+    allocator: std.mem.Allocator,
+    source: [:0]const u8,
+    needle: []const u8,
+    replacement: []const u8,
+) ![:0]u8 {
+    const index = std.mem.indexOf(u8, source, needle) orelse return error.TestNeedleMissing;
+    return std.fmt.allocPrintSentinel(
+        allocator,
+        "{s}{s}{s}",
+        .{ source[0..index], replacement, source[index + needle.len ..] },
+        0,
+    );
+}
 const validateResidualAccumulatorAllowlist = support.validateResidualAccumulatorAllowlist;
 const collectFunctionBodies = support.collectFunctionBodies;
 const functionBodyContaining = support.functionBodyContaining;
@@ -132,6 +148,49 @@ test "composed selector source guard narrowly permits only state-data lifecycle 
             "composed_selector_state_data.zig",
             lifecycle ++ "    _ = selector.values.get(\"x\");\n",
         ),
+    );
+}
+
+test "composed selector source guard enforces the durable spill-key insertion boundary" {
+    const accepted_state: [:0]const u8 = @embedFile("../composed_selector_state.zig");
+    const accepted_data: [:0]const u8 = @embedFile("../composed_selector_state_data.zig");
+    const accepted_core: [:0]const u8 = @embedFile("../value_use/core.zig");
+    try validateDurableSpillSlotOwnership("composed_selector_state.zig", accepted_state);
+    try validateDurableSpillSlotOwnership("composed_selector_state_data.zig", accepted_data);
+    try validateDurableSpillSlotOwnership("value_use/core.zig", accepted_core);
+
+    const borrowed_insert = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted_state,
+        "selector.spill_slots.putAssumeCapacity(owned_name, assignment);",
+        "selector.spill_slots.putAssumeCapacity(lookup_name, assignment);",
+    );
+    defer std.testing.allocator.free(borrowed_insert);
+    try std.testing.expectError(
+        error.SpillSlotOwnershipBoundaryMismatch,
+        validateDurableSpillSlotOwnership("composed_selector_state.zig", borrowed_insert),
+    );
+
+    const bypassed_boundary =
+        \\fn bad(selector: anytype, name: []const u8) void {
+        \\    selector.spill_slots.put(name, undefined) catch unreachable;
+        \\}
+    ;
+    try std.testing.expectError(
+        error.SpillSlotInsertionOutsideOwnershipBoundary,
+        validateDurableSpillSlotOwnership("composed_selector_scalar.zig", bypassed_boundary),
+    );
+
+    const missing_free = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted_state,
+        "selector.allocator.free(removed.value);",
+        "_ = removed;",
+    );
+    defer std.testing.allocator.free(missing_free);
+    try std.testing.expectError(
+        error.SpillSlotRollbackOwnershipMissing,
+        validateDurableSpillSlotOwnership("composed_selector_state.zig", missing_free),
     );
 }
 test "composed selector source guard rejects residual accumulator additions" {

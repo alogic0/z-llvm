@@ -480,7 +480,7 @@ pub const AccumulatorDefinitionTransaction = struct {
     selector: *ComposedBlockSelector,
     instruction_len: usize,
     values: []ValueEntry,
-    spill_slots: []SpillEntry,
+    spill_slots: []SpillSlotSnapshotEntry,
     next_virtual_reg: usize,
     next_spill_slot: usize,
     accumulator_domain: AccumulatorDomain,
@@ -497,15 +497,10 @@ pub const AccumulatorDefinitionTransaction = struct {
         binding: ValueBinding,
     };
 
-    const SpillEntry = struct {
-        name: []const u8,
-        assignment: SpillSlotAssignment,
-    };
-
     pub fn begin(selector: *ComposedBlockSelector) !AccumulatorDefinitionTransaction {
         const values = try selector.allocator.alloc(ValueEntry, selector.values.count());
         errdefer selector.allocator.free(values);
-        const spill_slots = try selector.allocator.alloc(SpillEntry, selector.spill_slots.count());
+        const spill_slots = try selector.allocator.alloc(SpillSlotSnapshotEntry, selector.spill_slots.count());
         errdefer selector.allocator.free(spill_slots);
 
         var value_index: usize = 0;
@@ -631,9 +626,7 @@ pub const AccumulatorDefinitionTransaction = struct {
         transaction.selector.values.clearRetainingCapacity();
         for (transaction.values) |entry|
             transaction.selector.values.putAssumeCapacity(entry.name, entry.binding);
-        transaction.selector.spill_slots.clearRetainingCapacity();
-        for (transaction.spill_slots) |entry|
-            transaction.selector.spill_slots.putAssumeCapacity(entry.name, entry.assignment);
+        restoreSpillSlots(transaction.selector, transaction.spill_slots);
         transaction.selector.next_virtual_reg = transaction.next_virtual_reg;
         transaction.selector.next_spill_slot = transaction.next_spill_slot;
         transaction.selector.accumulator_domain = transaction.accumulator_domain;
@@ -1664,12 +1657,65 @@ pub fn emitSignedUpperCorrection(selector: *ComposedBlockSelector, sign_limb: Fr
     try selector.machine.instructions.append(selector.allocator, .{ .label = end_label });
 }
 
+pub const SpillSlotSnapshotEntry = struct {
+    name: []const u8,
+    assignment: SpillSlotAssignment,
+};
+
+fn insertOwnedSpillSlot(
+    selector: *ComposedBlockSelector,
+    lookup_name: []const u8,
+    assignment: SpillSlotAssignment,
+) !void {
+    std.debug.assert(selector.spill_slots.get(lookup_name) == null);
+    try selector.spill_slots.ensureUnusedCapacity(1);
+    try selector.owned_spill_slot_keys.ensureUnusedCapacity(1);
+    const owned_name = try selector.allocator.dupe(u8, lookup_name);
+    errdefer selector.allocator.free(owned_name);
+    selector.owned_spill_slot_keys.putAssumeCapacity(owned_name, owned_name);
+    selector.spill_slots.putAssumeCapacity(owned_name, assignment);
+}
+
+fn snapshotContainsSpillSlot(
+    snapshot: []const SpillSlotSnapshotEntry,
+    name: []const u8,
+) bool {
+    for (snapshot) |entry| {
+        if (std.mem.eql(u8, entry.name, name)) return true;
+    }
+    return false;
+}
+
+pub fn restoreSpillSlots(
+    selector: *ComposedBlockSelector,
+    snapshot: []const SpillSlotSnapshotEntry,
+) void {
+    while (true) {
+        var speculative_name: ?[]const u8 = null;
+        var owned_it = selector.owned_spill_slot_keys.keyIterator();
+        while (owned_it.next()) |owned_name| {
+            if (!snapshotContainsSpillSlot(snapshot, owned_name.*)) {
+                speculative_name = owned_name.*;
+                break;
+            }
+        }
+        const name = speculative_name orelse break;
+        std.debug.assert(selector.spill_slots.remove(name));
+        const removed = selector.owned_spill_slot_keys.fetchRemove(name).?;
+        selector.allocator.free(removed.value);
+    }
+
+    selector.spill_slots.clearRetainingCapacity();
+    for (snapshot) |entry|
+        selector.spill_slots.putAssumeCapacity(entry.name, entry.assignment);
+}
+
 pub fn allocateSpillSlot(selector: *ComposedBlockSelector, name: []const u8) ?FrameIndex {
     if (selector.spill_slots.get(name)) |assignment| return spillFrameIndexMaybe(assignment.base);
     const base = selector.next_spill_slot;
     const frame_index = spillFrameIndexMaybe(base) orelse return null;
     if (selector.stack_frame_bytes != 0 and !frameIndexFitsFrame(selector, frame_index)) return null;
-    selector.spill_slots.put(name, .{ .base = base, .slots = 1 }) catch return null;
+    insertOwnedSpillSlot(selector, name, .{ .base = base, .slots = 1 }) catch return null;
     selector.next_spill_slot = base + 1;
     return frame_index;
 }
@@ -1682,7 +1728,7 @@ pub fn allocatePairSpillSlots(selector: *ComposedBlockSelector, name: []const u8
     const base = selector.next_spill_slot;
     const spill = pairSpillFrameIndexMaybe(base) orelse return null;
     if (selector.stack_frame_bytes != 0 and (!frameIndexFitsFrame(selector, spill.lo) or !frameIndexFitsFrame(selector, spill.hi))) return null;
-    selector.spill_slots.put(name, .{ .base = base, .slots = 2 }) catch return null;
+    insertOwnedSpillSlot(selector, name, .{ .base = base, .slots = 2 }) catch return null;
     selector.next_spill_slot = base + 2;
     return spill;
 }

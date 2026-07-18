@@ -90,6 +90,94 @@ pub fn validateStateDataLifecycle(source: []const u8) !void {
     if (init_count != 1 or deinit_count != 1) return error.StateDataLifecycleInventoryMismatch;
 }
 
+pub fn validateDurableSpillSlotOwnership(
+    name: []const u8,
+    source: [:0]const u8,
+) !void {
+    const raw_put = ".spill_slots.put(";
+    const raw_assume = ".spill_slots.putAssumeCapacity(";
+    if (!std.mem.eql(u8, name, "composed_selector_state.zig")) {
+        if (std.mem.indexOf(u8, source, raw_put) != null or
+            std.mem.indexOf(u8, source, raw_assume) != null)
+        {
+            return error.SpillSlotInsertionOutsideOwnershipBoundary;
+        }
+        if (std.mem.eql(u8, name, "composed_selector_state_data.zig")) {
+            if (std.mem.indexOf(u8, source, "spill_slots:") == null) return;
+            const required = [_][]const u8{
+                "owned_spill_slot_keys: std.StringHashMap([]u8),",
+                ".owned_spill_slot_keys = std.StringHashMap([]u8).init(allocator),",
+                "selector.owned_spill_slot_keys.valueIterator()",
+                "selector.allocator.free(owned_key.*);",
+                "selector.owned_spill_slot_keys.deinit();",
+            };
+            for (required) |pattern| {
+                if (countPattern(source, pattern) != 1)
+                    return error.SpillSlotOwnedKeyLifecycleMissing;
+            }
+        }
+        return;
+    }
+    if (std.mem.indexOf(u8, source, "pub fn allocateSpillSlot") == null) return;
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const insert_body = functionBodyNamed(bodies, "insertOwnedSpillSlot") orelse
+        return error.SpillSlotOwnershipBoundaryMissing;
+    const insert = source[insert_body.start..insert_body.end];
+    const ordered_insert = [_][]const u8{
+        "selector.spill_slots.get(lookup_name) == null",
+        "selector.spill_slots.ensureUnusedCapacity(1)",
+        "selector.owned_spill_slot_keys.ensureUnusedCapacity(1)",
+        "selector.allocator.dupe(u8, lookup_name)",
+        "selector.owned_spill_slot_keys.putAssumeCapacity(owned_name, owned_name)",
+        "selector.spill_slots.putAssumeCapacity(owned_name, assignment)",
+    };
+    var cursor: usize = 0;
+    for (ordered_insert) |pattern| {
+        const found = std.mem.indexOfPos(u8, insert, cursor, pattern) orelse
+            return error.SpillSlotOwnershipBoundaryMismatch;
+        cursor = found + pattern.len;
+    }
+    if (countPattern(source, raw_put) != 0 or
+        countPattern(source, raw_assume) != 2 or
+        countPattern(insert, raw_assume) != 1)
+    {
+        return error.SpillSlotInsertionOutsideOwnershipBoundary;
+    }
+
+    const restore_body = functionBodyNamed(bodies, "restoreSpillSlots") orelse
+        return error.SpillSlotRollbackOwnershipMissing;
+    const restore = source[restore_body.start..restore_body.end];
+    const ordered_restore = [_][]const u8{
+        "snapshotContainsSpillSlot(snapshot, owned_name.*)",
+        "selector.spill_slots.remove(name)",
+        "selector.owned_spill_slot_keys.fetchRemove(name)",
+        "selector.allocator.free(removed.value)",
+        "selector.spill_slots.clearRetainingCapacity()",
+        "selector.spill_slots.putAssumeCapacity(entry.name, entry.assignment)",
+    };
+    cursor = 0;
+    for (ordered_restore) |pattern| {
+        const found = std.mem.indexOfPos(u8, restore, cursor, pattern) orelse
+            return error.SpillSlotRollbackOwnershipMissing;
+        cursor = found + pattern.len;
+    }
+
+    const allocators = [_][]const u8{ "allocateSpillSlot", "allocatePairSpillSlots" };
+    for (allocators) |function_name| {
+        const body = functionBodyNamed(bodies, function_name) orelse
+            return error.SpillSlotOwnershipBoundaryMissing;
+        const function_source = source[body.start..body.end];
+        if (countPattern(function_source, "insertOwnedSpillSlot(selector, name,") != 1 or
+            std.mem.indexOf(u8, function_source, raw_put) != null or
+            std.mem.indexOf(u8, function_source, raw_assume) != null)
+        {
+            return error.SpillSlotOwnershipBoundaryBypassed;
+        }
+    }
+}
+
 pub fn validateResidualAccumulatorAllowlist(
     allowlist: []const ResidualAllowlistEntry,
     fingerprints: []const FunctionFingerprint,

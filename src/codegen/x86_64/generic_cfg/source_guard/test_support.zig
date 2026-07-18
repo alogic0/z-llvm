@@ -49,6 +49,7 @@ pub const isBypassOperation = model.isBypassOperation;
 pub const countPattern = model.countPattern;
 pub const validateEflagsEmissionAuthority = residual.validateEflagsEmissionAuthority;
 pub const validateStateDataLifecycle = residual.validateStateDataLifecycle;
+pub const validateDurableSpillSlotOwnership = residual.validateDurableSpillSlotOwnership;
 pub const validateResidualAccumulatorAllowlist = residual.validateResidualAccumulatorAllowlist;
 pub const collectFunctionBodies = residual.collectFunctionBodies;
 pub const functionBodyContaining = residual.functionBodyContaining;

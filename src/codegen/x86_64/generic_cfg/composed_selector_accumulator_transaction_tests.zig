@@ -707,3 +707,75 @@ test "accumulator EFLAGS and displacement policies are independent and roll back
     try std.testing.expectEqual(saved_binding, selector.values.get("old").?);
     try selector.eflags.validateSnapshot(saved_eflags);
 }
+
+test "spill-slot insertion owns transient keys and duplicate lookup allocates nothing" {
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    const allocator = failing.allocator();
+    var machine = MachineFunction.init("durable-spill-slot-key", .{ .int = 64 });
+    defer machine.deinit(allocator);
+    var selector = ComposedBlockSelector.init(allocator, &machine);
+    defer selector.deinit();
+    try selector.spill_slots.ensureUnusedCapacity(80);
+    try selector.owned_spill_slot_keys.ensureUnusedCapacity(80);
+
+    var transient = [_]u8{ 't', 'r', 'a', 'n', 's', 'i', 'e', 'n', 't' };
+    const allocations_before_insert = failing.allocations;
+    const slot = state.allocateSpillSlot(&selector, &transient).?;
+    try std.testing.expectEqual(allocations_before_insert + 1, failing.allocations);
+    try std.testing.expectEqual(@as(usize, 1), selector.owned_spill_slot_keys.count());
+    @memset(&transient, 'x');
+    try std.testing.expectEqual(slot, state.allocateSpillSlot(&selector, "transient").?);
+    const allocations_before_duplicate = failing.allocations;
+    try std.testing.expectEqual(slot, state.allocateSpillSlot(&selector, "transient").?);
+    try std.testing.expectEqual(allocations_before_duplicate, failing.allocations);
+
+    for (0..64) |index| {
+        var name_storage: [32]u8 = undefined;
+        const name = try std.fmt.bufPrint(&name_storage, "rehash-{d}", .{index});
+        try std.testing.expect(state.allocateSpillSlot(&selector, name) != null);
+    }
+    try std.testing.expectEqual(slot, state.allocateSpillSlot(&selector, "transient").?);
+    try std.testing.expect(state.allocateSpillSlot(&selector, "later-instruction") != null);
+    try std.testing.expectEqual(@as(usize, 66), selector.owned_spill_slot_keys.count());
+}
+
+test "accumulator rollback frees only speculative owned spill keys" {
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    const allocator = failing.allocator();
+    var machine = MachineFunction.init("durable-spill-key-rollback", .{ .int = 64 });
+    defer machine.deinit(allocator);
+    var plan = SelectorAllocationPlan.init(allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("source", 5);
+    var selector = ComposedBlockSelector.init(allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    selector.stack_frame_bytes = 64;
+    try selector.spill_slots.ensureUnusedCapacity(1);
+    try selector.owned_spill_slot_keys.ensureUnusedCapacity(1);
+    try selector.values.ensureUnusedCapacity(1);
+    try machine.instructions.ensureUnusedCapacity(allocator, 1);
+    try state.bindValueLoc(&selector, "source", .rax);
+
+    var before_insert = try AccumulatorDefinitionTransaction.begin(&selector);
+    const allocations_before_empty_rollback = failing.allocations;
+    const deallocations_before_empty_rollback = failing.deallocations;
+    try before_insert.rollback();
+    try std.testing.expectEqual(allocations_before_empty_rollback, failing.allocations);
+    try std.testing.expectEqual(deallocations_before_empty_rollback, failing.deallocations);
+    before_insert.deinit();
+
+    var after_insert = try AccumulatorDefinitionTransaction.begin(&selector);
+    const allocations_before_spill = failing.allocations;
+    const deallocations_before_spill = failing.deallocations;
+    try std.testing.expect((try after_insert.prepare(.preserve, .spill_live)) == null);
+    try std.testing.expectEqual(allocations_before_spill + 1, failing.allocations);
+    try std.testing.expectEqual(@as(usize, 1), selector.owned_spill_slot_keys.count());
+    try after_insert.rollback();
+    try std.testing.expectEqual(deallocations_before_spill + 1, failing.deallocations);
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    try std.testing.expectEqual(@as(usize, 0), selector.owned_spill_slot_keys.count());
+    try std.testing.expectEqual(ValueLoc.rax, selector.values.get("source").?.loc);
+    after_insert.deinit();
+}

@@ -637,6 +637,115 @@ test "value-use immediate scalar real __multi3 percent-11 uses inclusive policy 
     );
 }
 
+test "value-use subordinate spill key survives teardown churn rehash and later transaction" {
+    const row = PlanRow{
+        .id = "durable-subordinate-spill",
+        .direction = .rhs,
+        .operation = .@"and",
+        .bits = 64,
+        .literal = std.math.maxInt(u32),
+        .accumulator = true,
+        .scratch = false,
+        .writes = 1,
+    };
+    var machine = MachineFunction.init(row.id, .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "source");
+    try support.addLive(&plan, "result");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 1024;
+    try selector_state.bindValueLoc(&selector, "source", .rax);
+
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handle = try registerImmediate(&transaction, row);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(handle));
+        try transaction.commit();
+    }
+
+    try std.testing.expectEqual(@as(usize, 1), selector.owned_spill_slot_keys.count());
+    const committed = selector.spill_slots.get("source").?;
+    for (0..128) |index| {
+        const churn = try std.testing.allocator.alloc(u8, 17 + index);
+        @memset(churn, @intCast(index));
+        std.testing.allocator.free(churn);
+    }
+    for (0..64) |index| {
+        var name_storage: [32]u8 = undefined;
+        const name = try std.fmt.bufPrint(&name_storage, "post-commit-{d}", .{index});
+        try std.testing.expect(selector_state.allocateSpillSlot(&selector, name) != null);
+    }
+    try std.testing.expectEqual(committed, selector.spill_slots.get("source").?);
+
+    var later = try Transaction.begin(&selector);
+    try later.seal();
+    try later.prepare();
+    try later.materializeAll();
+    try later.commit();
+    later.deinit();
+    try std.testing.expectEqual(committed, selector.spill_slots.get("source").?);
+    try std.testing.expect(selector_state.allocateSpillSlot(&selector, "later") != null);
+}
+
+test "value-use outer rollback frees a subordinate speculative spill key exactly once" {
+    const row = PlanRow{
+        .id = "durable-subordinate-spill-rollback",
+        .direction = .rhs,
+        .operation = .@"and",
+        .bits = 64,
+        .literal = std.math.maxInt(u32),
+        .accumulator = true,
+        .scratch = false,
+        .writes = 1,
+    };
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    const allocator = failing.allocator();
+    var machine = MachineFunction.init(row.id, .{ .int = 64 });
+    defer machine.deinit(allocator);
+    var plan = SelectorAllocationPlan.init(allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "source");
+    try support.addLive(&plan, "result");
+    var selector = ComposedBlockSelector.init(allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector.spill_slots.ensureUnusedCapacity(1);
+    try selector.owned_spill_slot_keys.ensureUnusedCapacity(1);
+    try selector.values.ensureUnusedCapacity(2);
+    try machine.instructions.ensureUnusedCapacity(allocator, 4);
+    try selector_state.bindValueLoc(&selector, "source", .rax);
+    const source_before = selector.values.get("source").?;
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const handle = try registerImmediate(&transaction, row);
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.setImmediateScalarTestFailure(.after_accumulator_preparation);
+    const allocations_before = failing.allocations;
+    const deallocations_before = failing.deallocations;
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarTestFailure,
+        transaction.executePreparedAction(try transaction.preparedView(handle)),
+    );
+    try std.testing.expectEqual(allocations_before + 1, failing.allocations);
+    try std.testing.expectEqual(deallocations_before + 1, failing.deallocations);
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    try std.testing.expectEqual(@as(usize, 0), selector.owned_spill_slot_keys.count());
+    try std.testing.expectEqual(source_before, selector.values.get("source").?);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
 test "value-use immediate scalar R05 inclusive policy and genuine Q3 aliases are exact" {
     const row = PlanRow{
         .id = "R05-alias-controls",

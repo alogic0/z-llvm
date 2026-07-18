@@ -47,6 +47,7 @@ const isBypassOperation = model.isBypassOperation;
 const countPattern = model.countPattern;
 const validateEflagsEmissionAuthority = residual.validateEflagsEmissionAuthority;
 const validateStateDataLifecycle = residual.validateStateDataLifecycle;
+const validateDurableSpillSlotOwnership = residual.validateDurableSpillSlotOwnership;
 const validateResidualAccumulatorAllowlist = residual.validateResidualAccumulatorAllowlist;
 const collectFunctionBodies = residual.collectFunctionBodies;
 const functionBodyContaining = residual.functionBodyContaining;
@@ -137,6 +138,7 @@ pub fn validateCurrentTree(allocator: std.mem.Allocator) !void {
 
 pub fn validateProductionSource(name: []const u8, source: [:0]const u8) !void {
     const index = classificationIndex(name) orelse return error.UnclassifiedComposedSelectorSource;
+    try validateDurableSpillSlotOwnership(name, source);
     switch (classified_sources[index].kind) {
         .authority => try validateAddressDependencyStateAuthority(source),
         .address_dependency_domain => try validateAddressDependencyDomainSource(source),
