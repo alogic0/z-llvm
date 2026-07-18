@@ -692,39 +692,55 @@ test "value-use named scalar production wiring freezes accepted and retained fam
         ),
     );
 
-    const missing_interval_owner = try std.mem.replaceOwned(
-        u8,
+    const reintroduced_interval_owner = try std.fmt.allocPrint(
         std.testing.allocator,
-        accepted,
-        "scalar_named_b03_interval_admission",
-        "scalar_named_b03_unclassified",
+        "{s}\nfn scalar_named_b03_interval_admission() void {{}}\n",
+        .{accepted},
     );
-    defer std.testing.allocator.free(missing_interval_owner);
-    const missing_interval_owner_z = try std.testing.allocator.dupeZ(u8, missing_interval_owner);
-    defer std.testing.allocator.free(missing_interval_owner_z);
+    defer std.testing.allocator.free(reintroduced_interval_owner);
+    const reintroduced_interval_owner_z = try std.testing.allocator.dupeZ(u8, reintroduced_interval_owner);
+    defer std.testing.allocator.free(reintroduced_interval_owner_z);
     try std.testing.expectError(
-        error.ValueUseNamedScalarIntervalResidualMissing,
+        error.ValueUseNamedScalarMigratedResidualReintroduced,
         validateNamedScalarProductionSites(
             "composed_selector_scalar.zig",
-            missing_interval_owner_z,
+            reintroduced_interval_owner_z,
         ),
     );
 
-    const transactional_interval_owner = try std.mem.replaceOwned(
+    const wrong_b03_dispatch = try std.mem.replaceOwned(
         u8,
         std.testing.allocator,
         accepted,
-        ".imul_eax_arg32",
-        "/* ValueUseTransaction.begin(selector) */ .imul_eax_arg32",
+        "binary, bits, exact_ei_narrow, .b03",
+        "binary, bits, exact_ei_narrow, .b07",
     );
-    defer std.testing.allocator.free(transactional_interval_owner);
-    const transactional_interval_owner_z = try std.testing.allocator.dupeZ(u8, transactional_interval_owner);
-    defer std.testing.allocator.free(transactional_interval_owner_z);
+    defer std.testing.allocator.free(wrong_b03_dispatch);
+    const wrong_b03_dispatch_z = try std.testing.allocator.dupeZ(u8, wrong_b03_dispatch);
+    defer std.testing.allocator.free(wrong_b03_dispatch_z);
     try std.testing.expectError(
-        error.ValueUseNamedScalarIntervalResidualOwnershipMismatch,
+        error.ValueUseNamedScalarDispatchMismatch,
         validateNamedScalarProductionSites(
             "composed_selector_scalar.zig",
-            transactional_interval_owner_z,
+            wrong_b03_dispatch_z,
+        ),
+    );
+
+    const attempted_fallback = try std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        accepted,
+        "try transaction.commit();\n    return null;\n}\n\nfn namedScalarValueUseDiagnostic",
+        "try transaction.commit();\n    return scalar_named_b07_rhs_admission();\n}\n\nfn namedScalarValueUseDiagnostic",
+    );
+    defer std.testing.allocator.free(attempted_fallback);
+    const attempted_fallback_z = try std.testing.allocator.dupeZ(u8, attempted_fallback);
+    defer std.testing.allocator.free(attempted_fallback_z);
+    try std.testing.expectError(
+        error.ValueUseNamedScalarAttemptThenFallback,
+        validateNamedScalarProductionSites(
+            "composed_selector_scalar.zig",
+            attempted_fallback_z,
         ),
     );
 
