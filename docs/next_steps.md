@@ -472,7 +472,21 @@ without reconciliation; model + lifetime + durable-key ownership rules
 frozen at `de3cb6f9`; ratchet exactly 153; identities + six rows + the
 `__multi3` stream; full gates INCLUDING focused canaries; frozen-artifact
 perf; any NEW lifecycle/ownership failure returns for review; no Tier 3. B5
-dispatched.
+dispatched. **B5 STOPPED on a sixth distinct divergence — caught by the new
+standing canary gate**: in `fma`, the R04 form (`trunc i52→i6` then `add`)
+requires the accepted PER-ALIAS home assignment (the live low view `%31` →
+EDI AND the wide value `%30` → RSI) but the wired preamble preserves only
+once (RAX→RDI), propagating through all three frexp expansions; full unit
+passed 1,325/1,325 before the canary caught it; the report is
+byte-identical (no diagnostic — a pure accepted-stream ownership
+divergence); the stopped state is preserved at sha `1fb434f2`; nothing
+committed. My two-disposition proposal is with the Reviewer: (a)
+SCOPE-NARROWING — land the byte-identical plan subset, retain the
+multi-live-alias forms as named residuals with the honest recount deciding
+the number, and design the per-alias family in a dedicated follow-up
+(unblocking the checkpoint and campaign); or (b) FULL-FIDELITY — another
+amendment porting the per-alias home-assignment authority, then B6. I lean
+(a) after five wiring attempts, each one layer deeper.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
