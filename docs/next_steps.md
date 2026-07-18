@@ -416,7 +416,26 @@ satisfy the plan-required lifetime contract, with the single unreachable
 expectation corrected explicitly") **and B4 confirmed** under the standing
 contract (carrier unchanged, model frozen at the B4-pre tree, ratchet
 exactly 153, identities + six rows + the `__multi3` stream, full gates +
-post-final-tree frozen-artifact perf, no Tier 3). B4 dispatched.
+post-final-tree frozen-artifact perf, no Tier 3). B4 dispatched. **B4 STOPPED again under the architectural-review rule — a
+REAL memory-lifetime bug**: the subordinate-session spill path
+(`executeImmediateR04R06 → session.prepare → spillValue →
+allocateSpillSlot`) keys the durable `spill_slots` map with a
+TRANSACTION-OWNED identity slice; after teardown/reuse a later rehash sees
+mutated/equal keys and asserts (deterministic core dump on the serial
+cohort reproduction; the fma canary reaches the same defect through the
+existing cast action ON THE WIRED TREE). **My clarifying diagnostic: the
+accepted unwired tree PASSES the fma canary** (I ran it myself at
+`78705eff`: canaries=2, cases=35, local_fail=0) — no latent defect at
+ratchet 166; the BASELINE PROJECTION is intact. This is the icmp I-B1
+durable-identity lesson recurring on the spill path. The exact wiring state
+is preserved (`inbox138_b4_durable_spill_key_hard_stop.patch`); tree
+restored clean. My proposal is with the Reviewer: a reviewed amendment
+(selector-owned durable identity before the spill_slots key via the
+established helper; an AUDIT of every durable selector-side map for
+borrowed-slice keys under the new lifetime context with a guard fixture;
+the cross-instruction post-teardown regression + the canary shape as
+tests; canaries added to the standing dormant gate set — the 137 gap), then
+B5 resumes the carrier under the unchanged 153 contract.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
