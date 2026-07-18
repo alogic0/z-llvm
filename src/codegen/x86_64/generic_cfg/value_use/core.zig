@@ -496,6 +496,87 @@ fn core_setImmediateScalarTestFailure(
 fn core_requireActive(comptime _: type, transaction: anytype) !void {
     if (transaction.lifecycle != .active) return error.ValueUseTransactionClosed;
 }
+fn core_availabilityForConsumption(
+    comptime _: type,
+    transaction: anytype,
+    index: u8,
+) !void {
+    const request = &transaction.requests[index];
+    const identity = switch (request.source) {
+        .named => |*name| name,
+        // Typed literals and typed null pointers have no binding lifetime.
+        .int, .null_value => return,
+        .unsupported => return,
+    };
+    const binding = transaction.selector.values.get(identity.slice()) orelse
+        return error.ValueUseUnresolvedSource;
+    const plan = transaction.selector.allocation_plan orelse
+        return error.ValueUseSourcePlanMissing;
+    _ = plan.intervalEnd(identity.slice()) orelse
+        return error.ValueUseSourceIntervalMissing;
+    try selector_state.validateAddressDependenciesForUse(
+        transaction.selector,
+        identity.slice(),
+    );
+    if (!try selector_state.valueIsLiveAtOrAfterCurrent(
+        transaction.selector,
+        identity.slice(),
+    )) return error.ValueUseExpiredSource;
+
+    if (transaction.lifetime_context.pins[index]) |*pin| {
+        if (!pin.identity.eql(identity) or pin.generation != binding.vreg.index)
+            return error.ValueUseSourceGenerationChanged;
+    } else {
+        transaction.lifetime_context.pins[index] = .{
+            .identity = identity.*,
+            .generation = binding.vreg.index,
+        };
+    }
+}
+fn core_mustSurviveInstruction(
+    comptime Authority: type,
+    transaction: anytype,
+    index: u8,
+) !bool {
+    try core_availabilityForConsumption(Authority, transaction, index);
+    const identity = switch (transaction.requests[index].source) {
+        .named => |*name| name.slice(),
+        .int, .null_value => return false,
+        .unsupported => return error.ValueUseUnsupportedSource,
+    };
+    return selector_state.valueIsLiveAfterCurrent(transaction.selector, identity);
+}
+fn core_occupantNeedsPreservation(
+    comptime _: type,
+    transaction: anytype,
+    destination: PhysicalNode,
+    source_index: u8,
+) !?[]const u8 {
+    const source_name = switch (transaction.requests[source_index].source) {
+        .named => |*name| name.slice(),
+        .int, .null_value, .unsupported => null,
+    };
+    const plan = transaction.selector.allocation_plan orelse
+        return error.ValueUseSourcePlanMissing;
+    var iterator = transaction.selector.values.iterator();
+    while (iterator.next()) |entry| {
+        if (source_name) |name| {
+            if (std.mem.eql(u8, entry.key_ptr.*, name)) continue;
+        }
+        if (PhysicalNode.scalarSource(entry.value_ptr.loc) != destination) continue;
+        _ = plan.intervalEnd(entry.key_ptr.*) orelse
+            return error.ValueUseSourceIntervalMissing;
+        try selector_state.validateAddressDependenciesForUse(
+            transaction.selector,
+            entry.key_ptr.*,
+        );
+        if (try selector_state.valueIsLiveAfterCurrent(
+            transaction.selector,
+            entry.key_ptr.*,
+        )) return entry.key_ptr.*;
+    }
+    return null;
+}
 fn core_rollbackInternal(comptime Authority: type, transaction: anytype) void {
     transaction.snapshot.restore(transaction.selector);
     transaction.accumulator_session = null;
@@ -507,6 +588,7 @@ fn core_rollbackInternal(comptime Authority: type, transaction: anytype) void {
     transaction.early_home_valid = [_]bool{false} ** max_requests;
     transaction.prepared_view_valid = [_]bool{false} ** max_requests;
     transaction.switch_boundary_applied = [_]bool{false} ** max_requests;
+    transaction.lifetime_context = .{};
     transaction.view_generation +%= 1;
     if (transaction.view_generation == 0) transaction.view_generation = 1;
     transaction.lifecycle = .rolled_back;
@@ -761,16 +843,13 @@ fn core_validateConsumedOperandAfterUnchecked(comptime Authority: type, transact
             return error.ValueUsePreparedViewStale;
         return;
     };
-    if (!std.meta.eql(binding.vreg, transaction.prepared_views[index].source_vreg))
+    if (binding.vreg.index != transaction.prepared_views[index].source_vreg.index)
         return error.ValueUsePreparedViewStale;
-    const refreshed = try Authority.materialization.buildPreparedRecord(Authority, transaction, index);
-    if (materialization_module.preparedRecordEql(&transaction.prepared_views[index], &refreshed)) return;
-    // A source genuinely live after the consuming instruction may be
-    // durably relocated by the ordinary clobber-preservation authority.
-    // The stable vreg, typed request validation, and canonical dependency
-    // re-derivation above distinguish that relocation from a rebind.
-    if (!try selector_state.valueIsLiveAfterCurrent(transaction.selector, name))
-        return error.ValueUsePreparedViewStale;
+    // Re-derive the canonical source after all action-managed mutations.
+    // The lifetime pin deliberately carries no ValueLoc: stable identity
+    // generation, typed request validation, and canonical dependency
+    // validation distinguish a durable relocation from a stale rebind.
+    _ = try Authority.materialization.buildPreparedRecord(Authority, transaction, index);
 }
 fn core_validateOperandCanonical(comptime Authority: type, transaction: anytype, handle: RequestHandle) !void {
     const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
@@ -824,8 +903,22 @@ fn executePreparedActionInternal(
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
             }
         },
-        .form_byte_address => |address| try address_memory.executeByteAddress(Authority, transaction, view, request, address),
-        .form_scaled_address => |address| try address_memory.executeScaledAddress(Authority, transaction, view, request, address),
+        .form_byte_address => |address| try address_memory.executeByteAddress(
+            Authority,
+            transaction,
+            request_index,
+            view,
+            request,
+            address,
+        ),
+        .form_scaled_address => |address| try address_memory.executeScaledAddress(
+            Authority,
+            transaction,
+            request_index,
+            view,
+            request,
+            address,
+        ),
         .form_readonly_table_address => |address| try address_memory.executeReadOnlyTableAddress(Authority, transaction, view, request, address),
         .store_scalar => |store| try address_memory.executeStoreScalar(Authority, transaction, view, store),
         .store_immediate => |store| try address_memory.executeStoreImmediate(Authority, transaction, view, store),
@@ -1130,6 +1223,9 @@ const Implementation = struct {
     pub const validateHandle = core_validateHandle;
     pub const recordRequestFailure = core_recordRequestFailure;
     pub const noteRequestBoundaryError = core_noteRequestBoundaryError;
+    pub const availabilityForConsumption = core_availabilityForConsumption;
+    pub const mustSurviveInstruction = core_mustSurviveInstruction;
+    pub const occupantNeedsPreservation = core_occupantNeedsPreservation;
     pub const validateActionRegistration = core_validateActionRegistration;
     pub const validateRegisteredOperandHandle = core_validateRegisteredOperandHandle;
     pub const noteRegisteredOperandBoundaryError = core_noteRegisteredOperandBoundaryError;

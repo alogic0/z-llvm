@@ -205,12 +205,17 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
     transaction.request_phase = .sealed;
 }
 pub fn validateRequestAt(comptime Authority: type, transaction: anytype, index: u8) !?ValueLoc {
-    return validateRequest(Authority, transaction, &transaction.requests[index]) catch |err| {
+    return validateRequest(Authority, transaction, index, &transaction.requests[index]) catch |err| {
         Authority.noteRequestBoundaryError(Authority, transaction, index, err);
         return err;
     };
 }
-pub fn validateRequest(comptime Authority: type, transaction: anytype, request: *const StoredRequest) !?ValueLoc {
+pub fn validateRequest(
+    comptime Authority: type,
+    transaction: anytype,
+    index: u8,
+    request: *const StoredRequest,
+) !?ValueLoc {
     try validateFormAndDestination(request);
     switch (request.source) {
         .unsupported => return error.ValueUseUnsupportedSource,
@@ -246,11 +251,9 @@ pub fn validateRequest(comptime Authority: type, transaction: anytype, request: 
             return null;
         },
         .named => |*name| {
+            try Authority.availabilityForConsumption(Authority, transaction, index);
             const binding = transaction.selector.values.get(name.slice()) orelse return error.ValueUseUnresolvedSource;
             const current = try Authority.materialization.resolveNamedCurrent(Authority, transaction, name.slice());
-            try selector_state.validateAddressDependenciesForUse(transaction.selector, name.slice());
-            if (!try selector_state.valueIsLiveAtOrAfterCurrent(transaction.selector, name.slice()))
-                return error.ValueUseExpiredSource;
             try validateBindingCompatibility(binding, request, current);
             try validateSourceView(current, request.form);
             return current;

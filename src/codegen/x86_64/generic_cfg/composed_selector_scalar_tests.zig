@@ -429,6 +429,7 @@ test "generic cfg selector pair lshr avoids live scalar scratch values" {
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
     defer plan.deinit();
     try plan.interval_ends.put("lo", 10);
+    try plan.interval_ends.put("shifted", 3);
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
@@ -500,6 +501,7 @@ test "generic cfg selector i128 trunc reuses source low lane without clobbering 
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
     defer plan.deinit();
     try plan.interval_ends.put("lo", 10);
+    try plan.interval_ends.put("shifted", 3);
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();

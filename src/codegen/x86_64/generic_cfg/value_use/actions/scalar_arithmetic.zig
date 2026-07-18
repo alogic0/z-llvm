@@ -39,6 +39,13 @@ const ImmediateAccumulatorPreamble = enum {
     spill_source,
 };
 
+const ImmediateDisplacementAuthority = enum {
+    none,
+    liveness_aware,
+    inclusive_preserve_current,
+    hardcoded,
+};
+
 const AccumulatorScalarCastPlan = enum {
     c04_exact_ei,
     c05_narrow_zext,
@@ -504,6 +511,7 @@ pub fn executeImmediateRhsScalar(
             source_index,
             source_name,
             action,
+            semantic_plan,
         ),
         .r01_logical_shift_right_scratch => try executeImmediateR01(
             Authority,
@@ -520,6 +528,7 @@ pub fn executeImmediateRhsScalar(
             source_name,
             action,
             bits,
+            semantic_plan,
         ),
         .r03_arithmetic_shift_right_accumulator,
         .r03_arithmetic_shift_right_scratch64,
@@ -530,6 +539,7 @@ pub fn executeImmediateRhsScalar(
             source_name,
             action,
             bits,
+            semantic_plan,
         ),
         .r04_narrow_accumulator_immediate,
         .r05_wide_accumulator_immediate,
@@ -541,6 +551,7 @@ pub fn executeImmediateRhsScalar(
             source_name,
             action,
             bits,
+            semantic_plan,
         ),
         .r01_logical_shift_right_accumulator,
         .r02_shift_left_scratch32_writeback,
@@ -734,9 +745,11 @@ fn preserveImmediateUnrelatedAccumulator(
     if (preamble == .none) return;
     const flags_before = transaction.selector.eflags.snapshot();
     const semantic_records_before = transaction.selector.eflags_semantics.items.len;
-    const live_name = try immediateUnrelatedLiveAccumulatorName(
-        transaction.selector,
-        source_name,
+    const live_name = try Authority.occupantNeedsPreservation(
+        Authority,
+        transaction,
+        .accumulator,
+        source_index,
     ) orelse return;
     const preserve_name = switch (preamble) {
         .scratch_preferred => live_name,
@@ -800,28 +813,13 @@ fn preserveImmediateUnrelatedAccumulator(
         return error.EflagsImmediateScalarPreambleChanged;
 }
 
-fn immediateUnrelatedLiveAccumulatorName(
-    selector: *const ComposedBlockSelector,
-    source_name: []const u8,
-) !?[]const u8 {
-    var iterator = selector.values.iterator();
-    while (iterator.next()) |entry| {
-        if (std.mem.eql(u8, entry.key_ptr.*, source_name)) continue;
-        if (!try selector_state.valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
-        switch (entry.value_ptr.loc) {
-            .eax, .rax => return entry.key_ptr.*,
-            else => {},
-        }
-    }
-    return null;
-}
-
 fn executeImmediateR00(
     comptime Authority: type,
     transaction: anytype,
     source_index: u8,
     source_name: []const u8,
     action: *const Types.ImmediateRhsScalarAction,
+    plan: ImmediateScalarPlan,
 ) !void {
     selector_state.clobberArgReg(transaction.selector, .rcx) catch |err| {
         Authority.noteRequestBoundaryError(Authority, transaction, source_index, err);
@@ -830,7 +828,14 @@ fn executeImmediateR00(
     const session = try beginImmediateAccumulatorSession(Authority, transaction);
     if (try session.prepare(
         .preserve,
-        try immediateSourceDisplacement(transaction, source_index, .scratch_preferred),
+        try immediateSourceDisplacement(
+            Authority,
+            transaction,
+            source_index,
+            plan,
+            32,
+            .scratch_preferred,
+        ),
     )) |diagnostic| {
         transaction.action_diagnostic = diagnostic;
         return error.ValueUseActionDiagnostic;
@@ -962,6 +967,7 @@ fn executeImmediateR02(
     source_name: []const u8,
     action: *const Types.ImmediateRhsScalarAction,
     bits: u16,
+    plan: ImmediateScalarPlan,
 ) !void {
     const amount = immediateShiftAmount(action.literal, bits) catch |err|
         return immediateScalarRequestError(Authority, transaction, source_index, err);
@@ -1004,8 +1010,11 @@ fn executeImmediateR02(
     if (try session.prepare(
         .preserve,
         try immediateSourceDisplacement(
+            Authority,
             transaction,
             source_index,
+            plan,
+            bits,
             if (bits <= 32) .scratch_preferred else .spill_live,
         ),
     )) |diagnostic| {
@@ -1041,6 +1050,7 @@ fn executeImmediateR03(
     source_name: []const u8,
     action: *const Types.ImmediateRhsScalarAction,
     bits: u16,
+    plan: ImmediateScalarPlan,
 ) !void {
     const amount = immediateShiftAmount(action.literal, bits) catch |err|
         return immediateScalarRequestError(Authority, transaction, source_index, err);
@@ -1076,7 +1086,14 @@ fn executeImmediateR03(
     const session = try beginImmediateAccumulatorSession(Authority, transaction);
     if (try session.prepare(
         .preserve,
-        try immediateSourceDisplacement(transaction, source_index, .spill_live),
+        try immediateSourceDisplacement(
+            Authority,
+            transaction,
+            source_index,
+            plan,
+            bits,
+            .spill_live,
+        ),
     )) |diagnostic| {
         transaction.action_diagnostic = diagnostic;
         return error.ValueUseActionDiagnostic;
@@ -1104,6 +1121,7 @@ fn executeImmediateR04R06(
     source_name: []const u8,
     action: *const Types.ImmediateRhsScalarAction,
     bits: u16,
+    plan: ImmediateScalarPlan,
 ) !void {
     if (bits == 64 and
         (action.operation == .add or action.operation == .sub) and
@@ -1139,8 +1157,11 @@ fn executeImmediateR04R06(
     if (try session.prepare(
         .preserve,
         try immediateSourceDisplacement(
+            Authority,
             transaction,
             source_index,
+            plan,
+            bits,
             if (bits <= 32) .scratch_preferred else .spill_live,
         ),
     )) |diagnostic| {
@@ -1219,6 +1240,14 @@ fn materializeImmediateAccumulator(
     session: *AccumulatorDefinitionSession,
     bits: u16,
 ) !void {
+    Authority.availabilityForConsumption(
+        Authority,
+        transaction,
+        source_index,
+    ) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, source_index, err);
+        return err;
+    };
     session.materialize(
         immediateScalarSourceValue(transaction, source_index),
         immediateAccumulatorDefinition(bits),
@@ -1357,6 +1386,14 @@ fn refreshImmediateScalarSource(
     transaction: anytype,
     source_index: u8,
 ) !void {
+    Authority.availabilityForConsumption(
+        Authority,
+        transaction,
+        source_index,
+    ) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, source_index, err);
+        return err;
+    };
     transaction.prepared_views[source_index] =
         Authority.materialization.buildPreparedRecord(
             Authority,
@@ -1369,24 +1406,63 @@ fn refreshImmediateScalarSource(
     transaction.prepared_view_valid[source_index] = true;
 }
 
+fn immediateDisplacementAuthority(
+    plan: ImmediateScalarPlan,
+    bits: u16,
+) ImmediateDisplacementAuthority {
+    return switch (plan) {
+        .r00_signed_divide_by_two,
+        .r03_arithmetic_shift_right_accumulator,
+        .r04_narrow_accumulator_immediate,
+        => .liveness_aware,
+        .r02_shift_left_accumulator => if (bits <= 32)
+            .liveness_aware
+        else
+            .inclusive_preserve_current,
+        .r05_wide_accumulator_immediate => .inclusive_preserve_current,
+        .r01_logical_shift_right_accumulator,
+        .l01_reverse_subtract,
+        .l02_variable_shift_left,
+        .l03_variable_logical_shift_right,
+        => .hardcoded,
+        .r01_logical_shift_right_scratch,
+        .r02_shift_left_scratch32_writeback,
+        .r03_arithmetic_shift_right_scratch64,
+        .r06_wide_scratch_immediate,
+        => .none,
+    };
+}
+
 fn immediateSourceDisplacement(
+    comptime Authority: type,
     transaction: anytype,
     source_index: u8,
+    plan: ImmediateScalarPlan,
+    bits: u16,
     fallback: AccumulatorDisplacementPolicy,
 ) !AccumulatorDisplacementPolicy {
     const identity = switch (transaction.requests[source_index].source) {
         .named => |*name| name.slice(),
         else => return fallback,
     };
-    return switch (transaction.prepared_views[source_index].canonical_source_loc) {
-        .eax, .rax => if (!try selector_state.valueIsLiveAfterCurrent(
-            transaction.selector,
-            identity,
-        ))
-            .{ .reuse_source = identity }
-        else
-            fallback,
-        else => fallback,
+    const current = transaction.prepared_views[source_index].canonical_source_loc;
+    return switch (immediateDisplacementAuthority(plan, bits)) {
+        .liveness_aware => switch (current) {
+            .eax, .rax => if (!try Authority.mustSurviveInstruction(
+                Authority,
+                transaction,
+                source_index,
+            ))
+                .{ .reuse_source = identity }
+            else
+                fallback,
+            else => fallback,
+        },
+        .inclusive_preserve_current => switch (current) {
+            .eax, .rax => .{ .spill_source = identity },
+            else => fallback,
+        },
+        .hardcoded, .none => fallback,
     };
 }
 

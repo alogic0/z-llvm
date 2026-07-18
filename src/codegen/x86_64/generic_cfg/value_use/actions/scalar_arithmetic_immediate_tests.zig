@@ -27,19 +27,20 @@ const PlanRow = struct {
     writes: u8,
     first_accumulator_write: []const u8 = "test-specific closed plan",
     accumulator_preamble: []const u8 = "derived internally from the closed plan",
+    displacement_authority: []const u8 = "closed-plan test-specific",
 };
 
 const immediate_plan = [_]PlanRow{
-    .{ .id = "R00", .direction = .rhs, .operation = .sdiv, .bits = 32, .literal = 2, .accumulator = true, .scratch = false, .writes = 3, .first_accumulator_write = "session materializes source into EAX", .accumulator_preamble = "none; session owns liveness-aware displacement" },
-    .{ .id = "R01", .direction = .rhs, .operation = .lshr, .bits = 64, .literal = 7, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "spill fallback reloads RAX; scratch form has none", .accumulator_preamble = "none" },
-    .{ .id = "R02", .direction = .rhs, .operation = .shl, .bits = 32, .literal = 3, .accumulator = true, .scratch = true, .writes = 1, .first_accumulator_write = "session materializes EAX/RAX; scratch32 form stages EAX", .accumulator_preamble = "scratch-preferred <=32; spill-source at 64" },
-    .{ .id = "R03", .direction = .rhs, .operation = .ashr, .bits = 64, .literal = 5, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "accumulator form materializes EAX; scratch64 form has none", .accumulator_preamble = "scratch-preferred accumulator; none scratch64" },
-    .{ .id = "R04", .direction = .rhs, .operation = .add, .bits = 32, .literal = 9, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "session materializes source into EAX", .accumulator_preamble = "scratch-preferred" },
-    .{ .id = "R05", .direction = .rhs, .operation = .@"and", .bits = 64, .literal = 0x123456789, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "session materializes source into RAX", .accumulator_preamble = "spill-source" },
-    .{ .id = "R06", .direction = .rhs, .operation = .sub, .bits = 64, .literal = 11, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "none; result remains in RCX", .accumulator_preamble = "none" },
-    .{ .id = "L01", .direction = .lhs, .operation = .sub, .bits = 32, .literal = 17, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "literal materialization into EAX/RAX", .accumulator_preamble = "none; session spill-live authority" },
-    .{ .id = "L02", .direction = .lhs, .operation = .shl, .bits = 16, .literal = 3, .accumulator = true, .scratch = false, .writes = 2, .first_accumulator_write = "literal materialization into EAX", .accumulator_preamble = "none; session spill-live authority" },
-    .{ .id = "L03", .direction = .lhs, .operation = .lshr, .bits = 64, .literal = 0x1000, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "literal materialization into EAX/RAX", .accumulator_preamble = "none; session spill-live authority" },
+    .{ .id = "R00", .direction = .rhs, .operation = .sdiv, .bits = 32, .literal = 2, .accumulator = true, .scratch = false, .writes = 3, .first_accumulator_write = "session materializes source into EAX", .accumulator_preamble = "none; session owns liveness-aware displacement", .displacement_authority = "Q2 strict-after; scratch-preferred fallback" },
+    .{ .id = "R01", .direction = .rhs, .operation = .lshr, .bits = 64, .literal = 7, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "spill fallback reloads RAX; scratch form has none", .accumulator_preamble = "none", .displacement_authority = "sessionless scratch; hard spill-live only on spill-through-RAX fallback" },
+    .{ .id = "R02", .direction = .rhs, .operation = .shl, .bits = 32, .literal = 3, .accumulator = true, .scratch = true, .writes = 1, .first_accumulator_write = "session materializes EAX/RAX; scratch32 form stages EAX", .accumulator_preamble = "scratch-preferred <=32; spill-source at 64", .displacement_authority = "<=32 Q2 strict-after; i64 inclusive preserve-current" },
+    .{ .id = "R03", .direction = .rhs, .operation = .ashr, .bits = 64, .literal = 5, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "accumulator form materializes EAX; scratch64 form has none", .accumulator_preamble = "scratch-preferred accumulator; none scratch64", .displacement_authority = "<=32 Q2 strict-after; i64 sessionless scratch" },
+    .{ .id = "R04", .direction = .rhs, .operation = .add, .bits = 32, .literal = 9, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "session materializes source into EAX", .accumulator_preamble = "scratch-preferred", .displacement_authority = "Q2 strict-after; scratch-preferred fallback" },
+    .{ .id = "R05", .direction = .rhs, .operation = .@"and", .bits = 64, .literal = 0x123456789, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "session materializes source into RAX", .accumulator_preamble = "spill-source", .displacement_authority = "inclusive preserve-current; spill-live fallback" },
+    .{ .id = "R06", .direction = .rhs, .operation = .sub, .bits = 64, .literal = 11, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "none; result remains in RCX", .accumulator_preamble = "none", .displacement_authority = "sessionless scratch" },
+    .{ .id = "L01", .direction = .lhs, .operation = .sub, .bits = 32, .literal = 17, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "literal materialization into EAX/RAX", .accumulator_preamble = "none; session spill-live authority", .displacement_authority = "hard spill-live" },
+    .{ .id = "L02", .direction = .lhs, .operation = .shl, .bits = 16, .literal = 3, .accumulator = true, .scratch = false, .writes = 2, .first_accumulator_write = "literal materialization into EAX", .accumulator_preamble = "none; session spill-live authority", .displacement_authority = "hard spill-live" },
+    .{ .id = "L03", .direction = .lhs, .operation = .lshr, .bits = 64, .literal = 0x1000, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "literal materialization into EAX/RAX", .accumulator_preamble = "none; session spill-live authority", .displacement_authority = "hard spill-live" },
 };
 
 const DeclaredType = enum { non_integer, i1, i16, i32, i64, i128 };
@@ -184,6 +185,7 @@ test "value-use immediate scalar plan table is closed and direction specific" {
         try std.testing.expect(row.accumulator or row.scratch);
         try std.testing.expect(row.first_accumulator_write.len != 0);
         try std.testing.expect(row.accumulator_preamble.len != 0);
+        try std.testing.expect(row.displacement_authority.len != 0);
     }
 
     const l00: ir.BinaryInst = .{
@@ -472,11 +474,11 @@ test "value-use immediate scalar R01 spill source falls back through RAX when sc
 
 test "value-use immediate scalar displacement distinguishes live-after from dies-at-current RAX" {
     const row = PlanRow{
-        .id = "R02-i64",
+        .id = "R04-i32",
         .direction = .rhs,
-        .operation = .shl,
-        .bits = 64,
-        .literal = 32,
+        .operation = .add,
+        .bits = 32,
+        .literal = 9,
         .accumulator = true,
         .scratch = false,
         .writes = 1,
@@ -485,11 +487,11 @@ test "value-use immediate scalar displacement distinguishes live-after from dies
         .{
             .id = "live-after",
             .live_after = true,
-            .expected_source = ValueLoc{ .spill64 = .slot0 },
+            .expected_source = ValueLoc{ .scratch64 = .rdi },
             .expected_instructions = &[_]machine_module.Instruction{
-                .{ .spill_rax_rsp = .slot0 },
-                .{ .reload_rsp_rax = .slot0 },
-                .{ .shl_rax_imm6 = 32 },
+                .{ .mov_rax_to_arg = .rdi },
+                .{ .mov_arg_eax = .rdi },
+                .{ .add_eax_imm32 = 9 },
             },
         },
         .{
@@ -497,7 +499,7 @@ test "value-use immediate scalar displacement distinguishes live-after from dies
             .live_after = false,
             .expected_source = ValueLoc.rax,
             .expected_instructions = &[_]machine_module.Instruction{
-                .{ .shl_rax_imm6 = 32 },
+                .{ .add_eax_imm32 = 9 },
             },
         },
     }) |case| {
@@ -535,15 +537,15 @@ test "value-use immediate scalar displacement distinguishes live-after from dies
             selector_state.resolveValue(&selector, .{ .named = "source" }).?,
         );
         try std.testing.expectEqual(
-            ValueLoc.rax,
+            ValueLoc.eax,
             selector_state.resolveValue(&selector, .{ .named = "result" }).?,
         );
     }
 }
 
-test "value-use immediate scalar __multi3 unrelated RAX alias is spilled once before R05" {
+test "value-use immediate scalar real __multi3 percent-11 uses inclusive policy without a Q3 alias" {
     const row = PlanRow{
-        .id = "__multi3-R05",
+        .id = "__multi3-%11",
         .direction = .rhs,
         .operation = .@"and",
         .bits = 64,
@@ -556,21 +558,43 @@ test "value-use immediate scalar __multi3 unrelated RAX alias is spilled once be
     defer machine.deinit(std.testing.allocator);
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
     defer plan.deinit();
-    try addAtCurrent(&plan, "source");
-    try support.addLive(&plan, "prior-result");
-    try addAtCurrent(&plan, "result");
+    try plan.interval_ends.put("9", 16);
+    try plan.interval_ends.put("10", 29);
+    try plan.interval_ends.put("11", 19);
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
     selector.allocation_plan = &plan;
-    selector.stack_frame_bytes = 128;
-    try selector_state.bindValueLoc(&selector, "source", .rax);
-    try selector_state.bindValueLoc(&selector, "prior-result", .rax);
+    selector.current_position = 16;
+    selector.stack_frame_bytes = 256;
+    var seed = try selector_state.AccumulatorDefinitionTransaction.begin(&selector);
+    defer seed.deinit();
+    _ = try seed.prepare(.preserve, .spill_live);
+    try seed.define("9", .fullRax());
+    try seed.commit();
+    try selector_state.bindValueLoc(
+        &selector,
+        "10",
+        .{ .spill64 = selector_state.spillFrameIndex(9) },
+    );
+    try selector.spill_slots.put("10", .{ .base = 9, .slots = 1 });
+    selector.next_spill_slot = 10;
     try selector.eflags.apply(.definition);
     try selector.eflags.apply(.use);
 
     var transaction = try Transaction.begin(&selector);
     defer transaction.deinit();
-    const handle = try registerImmediate(&transaction, row);
+    const handle = try transaction.register(.{
+        .source = .{ .named = "9" },
+        .expected = expected(.{ .int = 64 }, .gpr64),
+        .form = .immediate_rhs_scalar_operand,
+        .destination = .prepared_view,
+        .prepared_action = .{ .immediate_rhs_scalar = .{
+            .result = try actionIdentity("11"),
+            .operation = row.operation,
+            .integer_ty = .{ .int = 64 },
+            .literal = row.literal,
+        } },
+    });
     try transaction.seal();
     try transaction.prepare();
     try transaction.materializeAll();
@@ -580,28 +604,28 @@ test "value-use immediate scalar __multi3 unrelated RAX alias is spilled once be
     try std.testing.expectEqualSlices(
         machine_module.Instruction,
         &.{
-            .{ .spill_rax_rsp = .slot0 },
-            .{ .reload_rsp_rax = .slot0 },
+            .{ .spill_rax_rsp = .{ .slot = 20 } },
+            .{ .reload_rsp_rax = .{ .slot = 20 } },
             .{ .and_eax_imm32 = -1 },
         },
         machine.instructions.items,
     );
     try std.testing.expectEqual(
-        ValueLoc{ .spill64 = .slot0 },
-        selector_state.resolveValue(&selector, .{ .named = "source" }).?,
+        ValueLoc{ .spill64 = .{ .slot = 20 } },
+        selector_state.resolveValue(&selector, .{ .named = "9" }).?,
     );
     try std.testing.expectEqual(
-        ValueLoc{ .spill64 = .slot0 },
-        selector_state.resolveValue(&selector, .{ .named = "prior-result" }).?,
+        ValueLoc{ .spill64 = .{ .slot = 18 } },
+        selector_state.resolveValue(&selector, .{ .named = "10" }).?,
     );
     try std.testing.expectEqual(ValueLoc.rax, selector_state.resolveValue(
         &selector,
-        .{ .named = "result" },
+        .{ .named = "11" },
     ).?);
-    try std.testing.expectEqual(@as(usize, 1), selector.spill_slots.count());
-    try std.testing.expect(selector.spill_slots.get("source") != null);
-    try std.testing.expect(selector.spill_slots.get("prior-result") == null);
-    try std.testing.expectEqual(@as(usize, 1), selector.next_spill_slot);
+    try std.testing.expectEqual(@as(usize, 2), selector.spill_slots.count());
+    try std.testing.expect(selector.spill_slots.get("9") != null);
+    try std.testing.expect(selector.spill_slots.get("10") != null);
+    try std.testing.expectEqual(@as(usize, 11), selector.next_spill_slot);
     try std.testing.expectEqual(@as(usize, 1), selector.eflags_semantics.items.len);
     try std.testing.expectEqual(
         @as(usize, 2),
@@ -613,7 +637,7 @@ test "value-use immediate scalar __multi3 unrelated RAX alias is spilled once be
     );
 }
 
-test "value-use immediate scalar R05 no-alias and multiple-alias preambles are exact" {
+test "value-use immediate scalar R05 inclusive policy and genuine Q3 aliases are exact" {
     const row = PlanRow{
         .id = "R05-alias-controls",
         .direction = .rhs,
@@ -629,10 +653,12 @@ test "value-use immediate scalar R05 no-alias and multiple-alias preambles are e
             .id = "no-alias",
             .alias_count = @as(u8, 0),
             .expected_instructions = &[_]machine_module.Instruction{
+                .{ .spill_rax_rsp = .slot0 },
+                .{ .reload_rsp_rax = .slot0 },
                 .{ .and_eax_imm32 = -1 },
             },
-            .expected_source = ValueLoc.rax,
-            .expected_spills = @as(usize, 0),
+            .expected_source = ValueLoc{ .spill64 = .slot0 },
+            .expected_spills = @as(usize, 1),
         },
         .{
             .id = "multiple-aliases",

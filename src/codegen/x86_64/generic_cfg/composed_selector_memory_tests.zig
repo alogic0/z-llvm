@@ -309,6 +309,8 @@ test "migrated pointer load displaces one and multiple accumulator aliases instr
         defer migrated_plan.deinit();
         try baseline_plan.interval_ends.put("eax_alias", 10);
         try migrated_plan.interval_ends.put("eax_alias", 10);
+        try baseline_plan.interval_ends.put("ptr", 10);
+        try migrated_plan.interval_ends.put("ptr", 10);
         if (alias_count == 2) {
             try baseline_plan.interval_ends.put("rax_alias", 10);
             try migrated_plan.interval_ends.put("rax_alias", 10);
@@ -417,6 +419,7 @@ test "migrated load production rollback restores full state before and after par
     defer plan.deinit();
     try plan.interval_ends.put("old", 10);
     try plan.interval_ends.put("bad-index-ptr", 10);
+    try plan.interval_ends.put("ptr", 10);
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();

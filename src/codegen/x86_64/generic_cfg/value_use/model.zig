@@ -918,6 +918,18 @@ pub const StoredRequest = struct {
     }
 };
 
+/// Transaction-private lifetime pin. It retains only semantic identity and
+/// virtual-register generation; current physical locations are always
+/// re-resolved from canonical selector state.
+const LifetimePin = struct {
+    identity: Identity,
+    generation: usize,
+};
+
+const LifetimeContext = struct {
+    pins: [max_requests]?LifetimePin = [_]?LifetimePin{null} ** max_requests,
+};
+
 pub const PhysicalNode = enum(u8) {
     rdi,
     rsi,
@@ -1065,6 +1077,7 @@ pub fn Transaction(comptime Impl: type) type {
         const Identity = Model.Identity;
         const Source = Model.Source;
         const StoredRequest = Model.StoredRequest;
+        const LifetimeContext = Model.LifetimeContext;
         const PhysicalNode = Model.PhysicalNode;
         const physical_node_count = Model.physical_node_count;
         const max_mappings = Model.max_mappings;
@@ -1088,6 +1101,7 @@ pub fn Transaction(comptime Impl: type) type {
         switch_boundary_applied: [Self.max_requests]bool = [_]bool{false} ** Self.max_requests,
         view_generation: u32 = 1,
         action_diagnostic: ?Diagnostic = null,
+        lifetime_context: Self.LifetimeContext = .{},
         /// First request to which a transaction failure can be attributed. This
         /// diagnostic-only identity deliberately survives automatic rollback.
         failed_request: ?Self.RequestHandle = null,
@@ -1407,8 +1421,12 @@ pub fn Transaction(comptime Impl: type) type {
             return Impl.validateOperandCanonical(Impl, transaction, handle);
         }
 
-        fn validateRequest(transaction: *Self, request: *const Self.StoredRequest) !?ValueLoc {
-            return Impl.planning.validateRequest(Impl, transaction, request);
+        fn validateRequest(
+            transaction: *Self,
+            index: u8,
+            request: *const Self.StoredRequest,
+        ) !?ValueLoc {
+            return Impl.planning.validateRequest(Impl, transaction, index, request);
         }
 
         fn materializeEarlyPlans(transaction: *Self) !void {

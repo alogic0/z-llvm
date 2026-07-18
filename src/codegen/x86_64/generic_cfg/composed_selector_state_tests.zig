@@ -211,6 +211,7 @@ test "generic cfg selector routes i128 trunc through planned expired register" {
     try plan.interval_ends.put("old", 1);
     try plan.assignments.put("lo", .{ .gpr64 = .r8 });
     try plan.interval_ends.put("lo", 2);
+    try plan.interval_ends.put("wide", 2);
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();

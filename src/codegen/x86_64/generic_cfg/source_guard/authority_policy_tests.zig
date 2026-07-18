@@ -70,6 +70,7 @@ const validateScalarCastIntentSurface = support.validateScalarCastIntentSurface;
 const validateImmediateScalarIntentSurface = support.validateImmediateScalarIntentSurface;
 const validateScalarCastDisplacementPlan = support.validateScalarCastDisplacementPlan;
 const validateScalarDisplacementAuthorityDistinction = support.validateScalarDisplacementAuthorityDistinction;
+const validateLifetimeContextAuthority = support.validateLifetimeContextAuthority;
 const validateImmediateScalarAccumulatorPreamble = support.validateImmediateScalarAccumulatorPreamble;
 const validateScratchComparePreservationPreamble = support.validateScratchComparePreservationPreamble;
 const validateCurrentHomeEqZeroSequence = support.validateCurrentHomeEqZeroSequence;
@@ -187,6 +188,27 @@ test "composed selector source guard rejects frozen bypass inventory growth" {
 }
 test "composed selector source guard rejects function predicates in the value-use authority" {
     const accepted =
+        "const LifetimePin = struct { identity: u8, generation: usize };" ++
+        "const LifetimeContext = struct { pins: u8 };" ++
+        "fn core_availabilityForConsumption() void {" ++
+        "switch (source) { .int, .null_value => return, else => {} }" ++
+        "_ = error.ValueUseSourcePlanMissing;" ++
+        "_ = error.ValueUseSourceIntervalMissing;" ++
+        "_ = validateAddressDependenciesForUse(source);" ++
+        "_ = valueIsLiveAtOrAfterCurrent(source);" ++
+        "_ = error.ValueUseExpiredSource;" ++
+        "if (pin.generation != binding.vreg.index) _ = error.ValueUseSourceGenerationChanged;" ++
+        "}" ++
+        "fn core_mustSurviveInstruction() void {" ++
+        "_ = core_availabilityForConsumption(source);" ++
+        "_ = valueIsLiveAfterCurrent(source);" ++
+        "}" ++
+        "fn core_occupantNeedsPreservation() void {" ++
+        "_ = source_name; _ = source_name;" ++
+        "_ = plan.intervalEnd(name);" ++
+        "_ = validateAddressDependenciesForUse(name);" ++
+        "_ = valueIsLiveAfterCurrent(name);" ++
+        "}" ++
         "fn resolveNamedCurrent() void { _ = resolveValue(undefined, undefined); }" ++
         "fn begin() void { _ = Snapshot.init(selector); " ++
         "_ = AccumulatorDefinitionSession.init(transaction.selector); }";
@@ -412,6 +434,31 @@ test "composed selector source guard freezes the closed scalar cast displacement
 }
 
 test "composed selector source guard freezes distinct cast and arithmetic displacement authorities" {
+    const displacement_plan =
+        \\fn immediateDisplacementAuthority() void {
+        \\    return switch (plan) {
+        \\        .r00_signed_divide_by_two,
+        \\        .r03_arithmetic_shift_right_accumulator,
+        \\        .r04_narrow_accumulator_immediate,
+        \\        => .liveness_aware,
+        \\        .r02_shift_left_accumulator => if (bits <= 32)
+        \\            .liveness_aware
+        \\        else
+        \\            .inclusive_preserve_current,
+        \\        .r05_wide_accumulator_immediate => .inclusive_preserve_current,
+        \\        .r01_logical_shift_right_accumulator,
+        \\        .l01_reverse_subtract,
+        \\        .l02_variable_shift_left,
+        \\        .l03_variable_logical_shift_right,
+        \\        => .hardcoded,
+        \\        .r01_logical_shift_right_scratch,
+        \\        .r02_shift_left_scratch32_writeback,
+        \\        .r03_arithmetic_shift_right_scratch64,
+        \\        .r06_wide_scratch_immediate,
+        \\        => .none,
+        \\    };
+        \\}
+    ;
     const cast =
         \\fn scalarCastSourceDisplacement() void {
         \\    return switch (source) {
@@ -424,21 +471,28 @@ test "composed selector source guard freezes distinct cast and arithmetic displa
         \\}
     ;
     const immediate =
-        \\fn immediateSourceDisplacement() void {
+        \\fn immediateSourceDisplacement(comptime Authority: type) void {
         \\    const identity = switch (source) {
         \\        .named => name,
         \\        else => return fallback,
         \\    };
-        \\    return switch (home) {
-        \\        .eax, .rax => if (!try selector_state.valueIsLiveAfterCurrent(selector, identity))
-        \\            .{ .reuse_source = identity }
-        \\        else
-        \\            fallback,
+        \\    return switch (authority) {
+        \\        .liveness_aware => switch (home) {
+        \\            .eax, .rax => if (!try Authority.mustSurviveInstruction(Authority, transaction, source_index))
+        \\                .{ .reuse_source = identity }
+        \\            else
+        \\                fallback,
+        \\            else => fallback,
+        \\        },
+        \\        .inclusive_preserve_current => switch (home) {
+        \\            .eax, .rax => .{ .spill_source = identity },
+        \\            else => fallback,
+        \\        },
         \\        else => fallback,
         \\    };
         \\}
     ;
-    try validateScalarDisplacementAuthorityDistinction(cast ++ immediate);
+    try validateScalarDisplacementAuthorityDistinction(cast ++ displacement_plan ++ immediate);
 
     const at_or_after =
         \\fn scalarCastSourceDisplacement() void {
@@ -450,23 +504,30 @@ test "composed selector source guard freezes distinct cast and arithmetic displa
         \\        else => .spill_live,
         \\    };
         \\}
-        \\fn immediateSourceDisplacement() void {
+        \\fn immediateSourceDisplacement(comptime Authority: type) void {
         \\    const identity = switch (source) {
         \\        .named => name,
         \\        else => return fallback,
         \\    };
-        \\    return switch (home) {
-        \\        .eax, .rax => if (!try selector_state.valueIsLiveAtOrAfterCurrent(selector, identity))
-        \\            .{ .reuse_source = identity }
-        \\        else
-        \\            fallback,
+        \\    return switch (authority) {
+        \\        .liveness_aware => switch (home) {
+        \\            .eax, .rax => if (!try Authority.valueIsLiveAtOrAfterCurrent(Authority, transaction, source_index))
+        \\                .{ .reuse_source = identity }
+        \\            else
+        \\                fallback,
+        \\            else => fallback,
+        \\        },
+        \\        .inclusive_preserve_current => switch (home) {
+        \\            .eax, .rax => .{ .spill_source = identity },
+        \\            else => fallback,
+        \\        },
         \\        else => fallback,
         \\    };
         \\}
     ;
     try std.testing.expectError(
         error.ValueUseScalarDisplacementAuthorityMismatch,
-        validateScalarDisplacementAuthorityDistinction(at_or_after),
+        validateScalarDisplacementAuthorityDistinction(displacement_plan ++ at_or_after),
     );
     const widened_cast =
         \\fn scalarCastSourceDisplacement() void {
@@ -479,10 +540,65 @@ test "composed selector source guard freezes distinct cast and arithmetic displa
         \\        else => .spill_live,
         \\    };
         \\}
-    ++ immediate;
+    ++ displacement_plan ++ immediate;
     try std.testing.expectError(
         error.ValueUseScalarDisplacementAuthorityMismatch,
         validateScalarDisplacementAuthorityDistinction(widened_cast),
+    );
+}
+
+test "composed selector source guard freezes private three-question lifetime authority" {
+    const accepted: [:0]const u8 =
+        @embedFile("../value_use/model.zig") ++
+        @embedFile("../value_use/core.zig");
+    try validateLifetimeContextAuthority(accepted);
+
+    const escaped = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "const LifetimeContext = struct {",
+        "pub const LifetimeContext = struct {",
+    );
+    defer std.testing.allocator.free(escaped);
+    try std.testing.expectError(
+        error.ValueUseLifetimeContextEscaped,
+        validateLifetimeContextAuthority(escaped),
+    );
+
+    const retained_location = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "generation: usize,",
+        "generation: usize,\n    location: ValueLoc,",
+    );
+    defer std.testing.allocator.free(retained_location);
+    try std.testing.expectError(
+        error.ValueUseLifetimeContextEscaped,
+        validateLifetimeContextAuthority(retained_location),
+    );
+
+    const collapsed_error = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "return error.ValueUseSourcePlanMissing;",
+        "return error.ValueUseExpiredSource;",
+    );
+    defer std.testing.allocator.free(collapsed_error);
+    try std.testing.expectError(
+        error.ValueUseLifetimeContextMissing,
+        validateLifetimeContextAuthority(collapsed_error),
+    );
+
+    const collapsed_interval_error = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "return error.ValueUseSourceIntervalMissing;",
+        "return error.ValueUseExpiredSource;",
+    );
+    defer std.testing.allocator.free(collapsed_interval_error);
+    try std.testing.expectError(
+        error.ValueUseLifetimeContextMissing,
+        validateLifetimeContextAuthority(collapsed_interval_error),
     );
 }
 
@@ -506,12 +622,12 @@ test "composed selector source guard freezes immediate plan-derived alias preser
     const source_excluded = try replaceOnceSentinel(
         std.testing.allocator,
         accepted,
-        "if (std.mem.eql(u8, entry.key_ptr.*, source_name)) continue;",
-        "if (false) continue;",
+        "Authority.occupantNeedsPreservation(",
+        "Authority.consumerSelectedOccupant(",
     );
     defer std.testing.allocator.free(source_excluded);
     try std.testing.expectError(
-        error.ValueUseImmediateScalarPreambleLivenessMismatch,
+        error.ValueUseImmediateScalarPreambleMissing,
         validateImmediateScalarAccumulatorPreamble(source_excluded),
     );
 }

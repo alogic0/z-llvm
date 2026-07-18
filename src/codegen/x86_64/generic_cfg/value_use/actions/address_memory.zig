@@ -710,6 +710,7 @@ fn stackScalarFromPreparedView(
 pub fn executeByteAddress(
     comptime Authority: type,
     transaction: anytype,
+    base_index: u8,
     base_view: *const Types.PreparedView,
     base_request: *const Types.StoredRequest,
     action: Types.ByteAddressAction,
@@ -717,7 +718,12 @@ pub fn executeByteAddress(
     const result_name = try composition.ownActionIdentity(Authority, transaction, &action.result);
     switch (action.offset) {
         .constant => |offset| {
-            const current = (try Authority.validateRequest(Authority, transaction, base_request)) orelse
+            const current = (try Authority.validateRequest(
+                Authority,
+                transaction,
+                base_index,
+                base_request,
+            )) orelse
                 return error.ValueUseUnsupportedSource;
             switch (current) {
                 .stack_f32_pair_ptr => |ptr| {
@@ -782,12 +788,18 @@ pub fn executeByteAddress(
 pub fn executeScaledAddress(
     comptime Authority: type,
     transaction: anytype,
+    base_index: u8,
     base_view: *const Types.PreparedView,
     base_request: *const Types.StoredRequest,
     action: Types.ScaledAddressAction,
 ) !void {
     const result_name = try composition.ownActionIdentity(Authority, transaction, &action.result);
-    const current = (try Authority.validateRequest(Authority, transaction, base_request)) orelse
+    const current = (try Authority.validateRequest(
+        Authority,
+        transaction,
+        base_index,
+        base_request,
+    )) orelse
         return error.ValueUseUnsupportedSource;
     switch (current) {
         .stack_i32_array => |array| {

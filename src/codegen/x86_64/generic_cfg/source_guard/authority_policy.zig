@@ -130,6 +130,7 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateI128PairIntentSurface(source);
     try validateScalarCastIntentSurface(source);
     try validateImmediateScalarIntentSurface(source);
+    try validateLifetimeContextAuthority(source);
     try validateImmediateScalarAccumulatorPreamble(source);
     try validateDurableActionIdentityOwnership(source);
     try validateScratchComparePreservationPreamble(source);
@@ -138,6 +139,72 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateCurrentHomeSignBitSequence(source);
     try validateI128PairSequence(source);
     try validateScalarCastSequence(source);
+}
+
+pub fn validateLifetimeContextAuthority(source: [:0]const u8) !void {
+    const pin_start = std.mem.indexOf(u8, source, "const LifetimePin = struct {") orelse
+        return error.ValueUseLifetimeContextMissing;
+    const context_start = std.mem.indexOfPos(
+        u8,
+        source,
+        pin_start,
+        "const LifetimeContext = struct {",
+    ) orelse return error.ValueUseLifetimeContextMissing;
+    const pin = source[pin_start..context_start];
+    if (std.mem.indexOf(u8, pin, "ValueLoc") != null or
+        std.mem.indexOf(u8, pin, "generation: usize") == null or
+        std.mem.indexOf(u8, source, "pub const LifetimePin") != null or
+        std.mem.indexOf(u8, source, "pub const LifetimeContext") != null or
+        std.mem.indexOf(u8, source, "pub fn availabilityForConsumption") != null or
+        std.mem.indexOf(u8, source, "pub fn mustSurviveInstruction") != null or
+        std.mem.indexOf(u8, source, "pub fn occupantNeedsPreservation") != null)
+    {
+        return error.ValueUseLifetimeContextEscaped;
+    }
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const availability_body = functionBodyNamed(
+        bodies,
+        "core_availabilityForConsumption",
+    ) orelse return error.ValueUseLifetimeContextMissing;
+    const survival_body = functionBodyNamed(
+        bodies,
+        "core_mustSurviveInstruction",
+    ) orelse return error.ValueUseLifetimeContextMissing;
+    const occupant_body = functionBodyNamed(
+        bodies,
+        "core_occupantNeedsPreservation",
+    ) orelse return error.ValueUseLifetimeContextMissing;
+    const availability = source[availability_body.start..availability_body.end];
+    const survival = source[survival_body.start..survival_body.end];
+    const occupant = source[occupant_body.start..occupant_body.end];
+    const availability_required = [_][]const u8{
+        ".int, .null_value => return",
+        "error.ValueUseSourcePlanMissing",
+        "error.ValueUseSourceIntervalMissing",
+        "validateAddressDependenciesForUse(",
+        "valueIsLiveAtOrAfterCurrent(",
+        "error.ValueUseExpiredSource",
+        "pin.generation != binding.vreg.index",
+        "error.ValueUseSourceGenerationChanged",
+    };
+    for (availability_required) |pattern| {
+        if (std.mem.indexOf(u8, availability, pattern) == null)
+            return error.ValueUseLifetimeContextMissing;
+    }
+    if (std.mem.indexOf(u8, availability, "ValueLoc") != null or
+        countPattern(survival, "core_availabilityForConsumption(") != 1 or
+        countPattern(survival, "valueIsLiveAfterCurrent(") != 1 or
+        countPattern(survival, "valueIsLiveAtOrAfterCurrent(") != 0 or
+        countPattern(occupant, "source_name") < 2 or
+        countPattern(occupant, "intervalEnd(") != 1 or
+        countPattern(occupant, "validateAddressDependenciesForUse(") != 1 or
+        countPattern(occupant, "valueIsLiveAfterCurrent(") != 1 or
+        countPattern(occupant, "valueIsLiveAtOrAfterCurrent(") != 0)
+    {
+        return error.ValueUseLifetimeContextBoundaryMismatch;
+    }
 }
 
 pub fn validateScratchCompareIntentSurface(source: []const u8) !void {
@@ -593,21 +660,55 @@ pub fn validateScalarDisplacementAuthorityDistinction(source: [:0]const u8) !voi
     const cast_body = functionBodyNamed(bodies, "scalarCastSourceDisplacement") orelse return;
     const immediate_body = functionBodyNamed(bodies, "immediateSourceDisplacement") orelse
         return error.ValueUseScalarDisplacementAuthorityMismatch;
+    const plan_body = functionBodyNamed(bodies, "immediateDisplacementAuthority") orelse
+        return error.ValueUseScalarDisplacementAuthorityMismatch;
     const cast = source[cast_body.start..cast_body.end];
     const immediate = source[immediate_body.start..immediate_body.end];
+    const plan = source[plan_body.start..plan_body.end];
 
     // Cast reuse is deliberately location-derived and liveness-independent.
-    // Immediate arithmetic reuse is deliberately the legacy after-current
-    // arithmetic boundary. These authorities must never be generalized.
+    // Immediate arithmetic reuse is deliberately routed through the private
+    // Q2 authority, while exact closed plans retain an independent inclusive
+    // preserve-current branch. Cast reuse remains liveness-independent.
     if (countPattern(cast, ".eax, .rax") != 1 or
         countPattern(cast, ".reuse_source") != 1 or
         countPattern(cast, "valueIsLiveAfterCurrent(") != 0 or
         countPattern(cast, "valueIsLiveAtOrAfterCurrent(") != 0 or
-        countPattern(immediate, ".eax, .rax") != 1 or
+        countPattern(immediate, ".eax, .rax") != 2 or
         countPattern(immediate, ".reuse_source") != 1 or
-        countPattern(immediate, "selector_state.valueIsLiveAfterCurrent(") != 1 or
-        countPattern(immediate, "valueIsLiveAtOrAfterCurrent(") != 0 or
-        countPattern(immediate, "else\n            fallback") != 1)
+        countPattern(immediate, "Authority.mustSurviveInstruction(") != 1 or
+        countPattern(immediate, ".inclusive_preserve_current") != 1 or
+        countPattern(immediate, ".spill_source = identity") != 1 or
+        countPattern(immediate, "selector_state.valueIsLiveAfterCurrent(") != 0 or
+        countPattern(immediate, "valueIsLiveAtOrAfterCurrent(") != 0)
+    {
+        return error.ValueUseScalarDisplacementAuthorityMismatch;
+    }
+    const plan_required = [_][]const u8{
+        ".r00_signed_divide_by_two,",
+        ".r03_arithmetic_shift_right_accumulator,",
+        ".r04_narrow_accumulator_immediate,",
+        "=> .liveness_aware",
+        ".r02_shift_left_accumulator => if (bits <= 32)",
+        ".inclusive_preserve_current",
+        ".r05_wide_accumulator_immediate => .inclusive_preserve_current",
+        ".r01_logical_shift_right_accumulator,",
+        ".l01_reverse_subtract,",
+        ".l02_variable_shift_left,",
+        ".l03_variable_logical_shift_right,",
+        "=> .hardcoded",
+        ".r06_wide_scratch_immediate,",
+        "=> .none",
+    };
+    for (plan_required) |pattern| {
+        if (std.mem.indexOf(u8, plan, pattern) == null)
+            return error.ValueUseScalarDisplacementAuthorityMismatch;
+    }
+    if (std.mem.indexOf(u8, plan, "transaction") != null or
+        std.mem.indexOf(u8, plan, "selector") != null or
+        std.mem.indexOf(u8, plan, "ValueLoc") != null or
+        std.mem.indexOf(u8, plan, "function") != null or
+        std.mem.indexOf(u8, plan, "family") != null)
     {
         return error.ValueUseScalarDisplacementAuthorityMismatch;
     }
@@ -621,12 +722,15 @@ pub fn validateImmediateScalarAccumulatorPreamble(source: [:0]const u8) !void {
         return error.ValueUseImmediateScalarPreambleMissing;
     const preserve_body = functionBodyNamed(bodies, "preserveImmediateUnrelatedAccumulator") orelse
         return error.ValueUseImmediateScalarPreambleMissing;
-    const liveness_body = functionBodyNamed(bodies, "immediateUnrelatedLiveAccumulatorName") orelse
+    const refresh_body = functionBodyNamed(bodies, "refreshImmediateScalarSource") orelse
+        return error.ValueUseImmediateScalarPreambleMissing;
+    const materialize_body = functionBodyNamed(bodies, "materializeImmediateAccumulator") orelse
         return error.ValueUseImmediateScalarPreambleMissing;
     const execute = source[execute_body.start..execute_body.end];
     const plan = source[plan_body.start..plan_body.end];
     const preserve = source[preserve_body.start..preserve_body.end];
-    const liveness = source[liveness_body.start..liveness_body.end];
+    const refresh_source = source[refresh_body.start..refresh_body.end];
+    const materialize_source = source[materialize_body.start..materialize_body.end];
 
     const validate_source = std.mem.indexOf(
         u8,
@@ -675,7 +779,8 @@ pub fn validateImmediateScalarAccumulatorPreamble(source: [:0]const u8) !void {
 
     const preserve_required = [_][]const u8{
         "if (preamble == .none) return;",
-        "immediateUnrelatedLiveAccumulatorName(",
+        "Authority.occupantNeedsPreservation(",
+        ".accumulator,",
         "preserveLiveAccumulatorValue(",
         "selector_state.spillValue(",
         ".eax, .rax",
@@ -714,12 +819,11 @@ pub fn validateImmediateScalarAccumulatorPreamble(source: [:0]const u8) !void {
     if (!(preserve_write < refresh))
         return error.ValueUseImmediateScalarPreambleOrder;
 
-    if (countPattern(liveness, "std.mem.eql(u8, entry.key_ptr.*, source_name)") != 1 or
-        countPattern(liveness, "selector_state.valueIsLiveAfterCurrent(selector, entry.key_ptr.*)") != 1 or
-        countPattern(liveness, "valueIsLiveAtOrAfterCurrent(") != 0 or
-        countPattern(liveness, ".eax, .rax") != 1 or
-        countPattern(liveness, "function") != 0 or
-        countPattern(liveness, "family") != 0)
+    if (countPattern(preserve, "Authority.occupantNeedsPreservation(") != 1 or
+        countPattern(preserve, "source_index,") < 1 or
+        countPattern(refresh_source, "Authority.availabilityForConsumption(") != 1 or
+        countPattern(materialize_source, "Authority.availabilityForConsumption(") != 1 or
+        functionBodyNamed(bodies, "immediateUnrelatedLiveAccumulatorName") != null)
     {
         return error.ValueUseImmediateScalarPreambleLivenessMismatch;
     }

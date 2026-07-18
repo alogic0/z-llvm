@@ -127,6 +127,107 @@ test "value-use transaction phase capacity identity and coalescing rules fail be
     _ = try unexpected_action.register(fixed_with_action);
     try std.testing.expectError(error.ValueUsePreparedActionUnexpected, unexpected_action.seal());
 }
+
+test "value-use lifetime authority separates plan interval availability and provenance" {
+    var machine = MachineFunction.init("value-use-lifetime-authority", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.current_position = 2;
+    try selector_state.bindValueLoc(&selector, "first", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "second", .{ .arg64 = .rsi });
+
+    var missing_plan = try Transaction.begin(&selector);
+    defer missing_plan.deinit();
+    const first = try missing_plan.register(request(
+        "first",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .rax,
+    ));
+    const second = try missing_plan.register(request(
+        "second",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .{ .gpr64 = .rcx },
+    ));
+    try std.testing.expectError(error.ValueUseSourcePlanMissing, missing_plan.seal());
+    try std.testing.expect(missing_plan.failedRequestIs(first));
+    try std.testing.expect(!missing_plan.failedRequestIs(second));
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    selector.allocation_plan = &plan;
+
+    var missing_interval = try Transaction.begin(&selector);
+    defer missing_interval.deinit();
+    const missing_interval_handle = try missing_interval.register(request(
+        "first",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .rax,
+    ));
+    try std.testing.expectError(
+        error.ValueUseSourceIntervalMissing,
+        missing_interval.seal(),
+    );
+    try std.testing.expect(missing_interval.failedRequestIs(missing_interval_handle));
+
+    try plan.interval_ends.put("first", 1);
+    var expired = try Transaction.begin(&selector);
+    defer expired.deinit();
+    const expired_handle = try expired.register(request(
+        "first",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .rax,
+    ));
+    try std.testing.expectError(error.ValueUseExpiredSource, expired.seal());
+    try std.testing.expect(expired.failedRequestIs(expired_handle));
+
+    try plan.interval_ends.put("first", 2);
+    var end_at_current = try Transaction.begin(&selector);
+    defer end_at_current.deinit();
+    _ = try end_at_current.register(request(
+        "first",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .rax,
+    ));
+    try end_at_current.seal();
+    try end_at_current.rollback();
+
+    try plan.interval_ends.put("first", 3);
+    var survives = try Transaction.begin(&selector);
+    defer survives.deinit();
+    _ = try survives.register(request(
+        "first",
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .rax,
+    ));
+    try survives.seal();
+    try survives.rollback();
+
+    selector.allocation_plan = null;
+    var typed_null = try Transaction.begin(&selector);
+    defer typed_null.deinit();
+    _ = try typed_null.register(.{
+        .source = .null_value,
+        .expected = expected(.ptr, .gpr64),
+        .form = .pointer,
+        .destination = .rax,
+    });
+    try typed_null.seal();
+    try typed_null.rollback();
+}
+
 test "value-use transaction separates safe overlap from genuine copy cycles and conflicting destinations" {
     var machine = MachineFunction.init("value-use-overlap", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
@@ -292,8 +393,11 @@ test "value-use transaction dependency and unsupported-view failures leave selec
     _ = selector.values.remove("missing-index");
     var missing_dependency = try Transaction.begin(&selector);
     defer missing_dependency.deinit();
-    _ = try missing_dependency.register(request("pointer", .ptr, .stack_pointer, .pointer, .rax));
+    const missing_dependency_handle = try missing_dependency.register(
+        request("pointer", .ptr, .stack_pointer, .pointer, .rax),
+    );
     try std.testing.expectError(error.AddressDependencyMissingBinding, missing_dependency.seal());
+    try std.testing.expect(missing_dependency.failedRequestIs(missing_dependency_handle));
 
     var stack_arg = try Transaction.begin(&selector);
     defer stack_arg.deinit();
