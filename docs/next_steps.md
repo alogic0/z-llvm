@@ -6,7 +6,18 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-158 — LANDED at 17bfa6d7, Supervisor-verified
+## INBOX-159 fresh B07 isolation — dispatched
+
+INBOX-158 is **ACCEPTED at ratchet 148** (Reviewer, 2026-07-18: "The
+dormant amendment is accepted at ratchet 148. INBOX-159 is authorized
+exactly as proposed. The six B07 rows, complete cohort identities,
+285/0/0 per-function comparison, full unit suite, and canaries are
+mandatory. No fix-forward or action/model changes during isolation. The
+ratchet remains 148; 140 is only a conditional projection pending
+successful isolation and separate wiring review."). INBOX-159
+dispatched.
+
+## INBOX-158 — ACCEPTED at 17bfa6d7, Supervisor-verified
 
 The B07 action-layer amendment landed surgically (scalar_named.zig
 +15/−7 — the named-RHS request construction; +228 test lines; +45 guard
