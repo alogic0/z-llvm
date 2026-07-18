@@ -6,7 +6,20 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-159 fresh B07 isolation — dispatched
+## INBOX-159 — B07 PASSES isolation (c9f8d805), Supervisor-verified
+
+The fresh isolation SUCCEEDED: all six mandatory rows restored
+(floatuneidf/uneisf/uneihf/eidf/eisf/eihf present with baseline-equal
+addresses/sizes; the sorted six-symbol manifests byte-equal); the exact
+443/285/158 report with the frozen first-failure; object EXACT; owner
+EXACT (167/17/101); 285/0/0 per-function; full unit 1356/1356; canaries
+35. The frozen action/model/lifetime/forward-Q1 implementations were not
+edited; evidence-only diff; ratchet 148 (140 conditional only). The
+two-part B07 fix (forward-Q1 structural snapshot + action-layer
+named-RHS request construction) is proven end-to-end. Sent to the
+Reviewer requesting the B07 wiring authorization (INBOX-160, 148 → 140).
+
+## Former INBOX-159 dispatch entry — superseded by the landing above
 
 INBOX-158 is **ACCEPTED at ratchet 148** (Reviewer, 2026-07-18: "The
 dormant amendment is accepted at ratchet 148. INBOX-159 is authorized
