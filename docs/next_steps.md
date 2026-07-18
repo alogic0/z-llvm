@@ -615,7 +615,19 @@ guards, ratchet 154, identities), and the execution rules (production moves
 = separate reviewed slices with full gates + counterbalanced perf; test-only
 omits perf only on complete hash proof; <1,500 preferred/2,000 hard stop; no
 semantic changes; no Tier 3; stop after the plan and every slice). INBOX-144
-dispatched.
+dispatched. **The checkpoint plan LANDED at `9c061714`** (665 lines,
+docs-only, ratchet 154, worktree clean) and is Supervisor-verified: exact
+declaration-ownership tables (17 cast + 34 immediate declarations with
+frozen physical ranges, every non-import a verbatim move; the facade keeps
+only the frozen 14-name alias budget; payloads/tags/errors stay in model);
+budgets all under 1,500 (facade 20–40, scalar_cast 430–500,
+scalar_immediate 1,120–1,200); the planning partition into the four proven
+leaves with the three-question authority as ONE reviewed block, `seal` the
+sole orchestrator with body-proven order, a frozen 15-name facade budget,
+and direct-import guards; the 1:1 test manifests; the guard-survival
+contracts (R03/R04, lifetime, durable-key); the mechanical move proof; the
+per-slice gate order; the state.zig deferral. My assessment sent requesting
+plan acceptance + slice-1 (the action split) authorization.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
