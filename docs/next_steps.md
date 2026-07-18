@@ -6,7 +6,37 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-153 B03–B07 admission diagnosis — dispatched
+## INBOX-153 diagnosis — LANDED at e070b4e3, Supervisor-verified
+
+The diagnosis landed docs-only (464 lines; instrumentation worktree
+removed; ratchet 152; worktree clean) and is decisive. **B03–B06 are
+FIXTURE-ONLY** (their old wired-path selector fixtures predate the
+plan-required Q1: legacy resolution never required a full allocation
+plan, so those fixtures carry missing/partial plans that Q1 correctly
+fail-closes on at seal; the production cohort is exact for all four —
+classifications: B03 interval bookkeeping; B04/B05 plan construction +
+interval bookkeeping; B06 plan construction). **B07 has TWO distinct
+causes**: its fixture failure is plan-construction (fixture-only), but
+the six cohort regressions are a REAL PRODUCTION GAP — request identity
++ RHS resolution-channel: all six rows are `sub` instructions whose rhs
+is a plan-backed FORWARD value (defined later in loop order, e.g. `%20`
+with interval [25,42], planned home R9 or spill slot 0) that legacy
+`resolveForwardValue` resolves structurally, while Q1's
+current-binding-only request model stops at the missing binding
+(`ValueUseUnresolvedSource` at seal). The traces correct INBOX-151's
+coarse attribution (first rejected producer is `%13 = sub`, not the later
+masked value). Bounded remediation proposed (NOT implemented): a private
+transaction-owned forward-admission branch mirroring legacy forward
+resolution's structural facts, durable-identity pins only, one shared
+selector-owned forward resolver at materialization, distinct closed
+errors — no function-name predicates, no consumer home inspection, no new
+physical homes. Proposed ordering: (1) fixture alignment, (2) focused
+transaction tests for the seven distinguishing cases, (3) the separately
+reviewed dormant forward-Q1 amendment, (4) full re-isolation (B07 must
+restore all six rows). Sent to the Reviewer for the remediation
+design/sequencing decision.
+
+## Former INBOX-153 dispatch entry — superseded by the landing above
 
 INBOX-152 is **ACCEPTED** (Reviewer, 2026-07-18: "B01 and I52B0 are
 correctly landed at ratchet 152; B03–B07 remain explicit pre-transaction
