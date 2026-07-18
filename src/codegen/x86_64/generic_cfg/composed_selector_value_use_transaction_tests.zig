@@ -17,7 +17,6 @@ comptime {
     _ = @import("value_use/actions/control_compare_setcc_tests.zig");
     _ = @import("value_use/actions/control_compare_sign_bit_tests.zig");
     _ = @import("value_use/actions/control_compare_i128_tests.zig");
-    _ = @import("value_use/actions/scalar_arithmetic_cast_tests.zig");
-    _ = @import("value_use/actions/scalar_arithmetic_immediate_tests.zig");
+    _ = @import("value_use/actions/scalar_arithmetic_tests.zig");
     _ = @import("value_use/core_architecture_proof_tests.zig");
 }
