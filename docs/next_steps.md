@@ -742,6 +742,18 @@ formats with no embedded commit or fine timing, while every commit-bearing
 log pins `3beffdfb`); identities exact; ratchet 154; MY independent abi
 (three modes 20/20 matched) and canary (2/2, 35 cases) reruns pass; no
 Tier 3. Evidence sent requesting the FINAL CHECKPOINT acceptance.
+**Slice 4 is ACCEPTED and THE REFACTORING CHECKPOINT IS COMPLETE at
+ratchet 154** (Reviewer, 2026-07-18: "Checkpoint Slice 4 (3beffdfb +
+8b20b6f1) is accepted… The refactoring checkpoint is now complete at
+ratchet 154: Scalar actions split behind a stable facade. Planning split
+behind a stable facade and acyclic ownership graph. Scalar tests split
+behind a stable aggregator. Planning tests split behind a stable
+aggregator. composed_selector_state.zig remains explicitly deferred. No
+Tier 3 occurred. No campaign resumption is authorized yet. Bring the
+R03/R04 design and sequencing proposal for review next."). The R03/R04
+(scalar_immediate_live_shared_source_preservation /
+scalar_immediate_multi_alias_preservation) design + sequencing decision
+goes to the Reviewer, then to the user, before any campaign resumption.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
