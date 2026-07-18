@@ -522,7 +522,17 @@ the named R04 residual and pure pre-transaction routing;
 `accumulatorArithmeticDisplacement` is NOT a collapse (R04 + future named
 arithmetic retain ownership); L00 + i128 pair-result stay O4; exact-EI
 unchanged. Evidence sent requesting partition acceptance + the narrowed
-wiring slice (INBOX-141).
+wiring slice (INBOX-141). **The partition is ACCEPTED and INBOX-141
+AUTHORIZED** (Reviewer, 2026-07-17: "The arithmetic is independently
+grounded, and the key invariant is correctly separated from the count: R04
+remains wholly legacy-owned despite contributing no textual gateway
+reduction."), with one addition: structural guard coverage for the
+ZERO-COUNT semantic migrations of R00/R05 as well as the R04 exclusion. The
+Worker is building the new narrowed patch from the accepted tree (nine
+landing families; R04 routed to legacy pre-transaction under
+`scalar_immediate_multi_alias_preservation`; model frozen at `de3cb6f9`;
+ratchet exactly 153; identities + six rows + the fma/`__multi3` streams;
+full gates + frozen-artifact perf; no Tier 3). INBOX-141 dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
