@@ -6,7 +6,25 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-151 matrix — LANDED at e9132cc1, Supervisor-verified
+## INBOX-152 stage-2 wiring (B01 + I52B0 → 152) — dispatched
+
+INBOX-151 at `e9132cc1` is **ACCEPTED** (Reviewer, 2026-07-18: "It proves
+that only B01 and I52B0 are ready for production wiring; cohort identity
+alone would have incorrectly admitted B03–B06, and B07 fails even the
+cohort contract.") and **Option A is RULED with amendments**: wire only
+B01 + I52B0; route B03–B07 to legacy lowering BEFORE transaction creation
+with exact guard-enforced owners distinguishing B03–B06 interval
+admission from B07 RHS admission; the dormant action/model frozen at
+0661c8cd (no fix-forward, no admission amendment); no
+transaction-then-fallback; ratchet exactly 154 → 152 (helper credit
+zero); R03/R04 + prior exclusions + six frontier rows + the
+fma/__multi3/exp2 streams preserved; exact identities; full gates +
+post-final-tree frozen-artifact counterbalanced perf; no Tier 3; stop on
+any divergence. The B03–B07 admission diagnosis is a SEPARATE later
+evidence-only directive anchored to the accepted ratchet-152 tree (not
+concurrent with wiring), before the multiply slice. INBOX-152 dispatched.
+
+## INBOX-151 matrix — ACCEPTED at e9132cc1, Supervisor-verified
 
 The matrix is decisive and verified (evidence-only diff vs the dormant
 tree; ratchet 154; pinned log hashes re-verified): **the individually
