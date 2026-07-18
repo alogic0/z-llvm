@@ -6,7 +6,26 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-154 fixture alignment + characterization tests — dispatched
+## INBOX-154 — stream-movement stop RESOLVED (Option A ruled); resumed
+
+The Worker stopped correctly on the no-movement condition: the shared
+exact-EI B06 fixture's old RAX-reuse stream is a plan-blind artifact —
+with a truthful interval [0,1] at position 1, the accepted
+current-INCLUSIVE preserve-current authority selects .spill_source, and
+no production-faithful interval can preserve the old stream (a source
+consumed at current cannot truthfully end before current; Q1 would treat
+it as expired — which is why the restage alternative was REJECTED). The
+Reviewer ruled OPTION A: a fixture may adopt the plan-visible stream only
+under five proven criteria (old fixture plan-blind; truthful interval
+ends at current; the legacy authority is current-inclusive; the same
+fixture minus the plan reproduces the old stream; the movement exactly
+attributable to that authority), with before/after records + the
+artifact proof in the manifest; uniform for any fixture meeting all
+five; ANY OTHER stream movement remains a hard stop; no permanent
+plan-blind fixtures retained as correctness coverage. Resumption from
+the preserved patch (6aeea7eb, reapplies cleanly) dispatched.
+
+## Former INBOX-154 dispatch entry (pre-amendment)
 
 INBOX-153 is **ACCEPTED** (Reviewer, 2026-07-18: "The diagnosis cleanly
 separates fixture-only plan defects in B03–B06 from B07's real
