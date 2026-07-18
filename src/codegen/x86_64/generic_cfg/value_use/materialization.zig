@@ -135,10 +135,10 @@ pub fn prepare(comptime Authority: type, transaction: anytype) !void {
         if (request.form != .pointer and request.form != .stack_object_address) continue;
         const request_index: u8 = @intCast(request_index_usize);
         const current = switch (request.source) {
-            .named => |*name| resolveNamedCurrent(Authority, transaction, name.slice()) catch |err| {
+            .named => (Authority.validateRequestAt(Authority, transaction, request_index) catch |err| {
                 Authority.noteRequestBoundaryError(Authority, transaction, request_index, err);
                 return err;
-            },
+            }) orelse continue,
             .int, .null_value, .unsupported => continue,
         };
         if (current == .stack_i32_ptr or current == .stack_scalar or current == .stack128 or current == .stack_i32_array) {
@@ -213,12 +213,15 @@ fn materializeEarlyPlan(comptime Authority: type, transaction: anytype, index: u
     if (!selector_state.scratchRegIsProvenFree(transaction.selector, destination_reg))
         return error.ValueUseEarlyDestinationNoLongerFree;
     const request = &transaction.requests[index];
-    const name = switch (request.source) {
-        .named => |*identity| identity.slice(),
+    switch (request.source) {
+        .named => {},
         .int, .null_value, .unsupported => return error.ValueUseEarlySourceNotNamed,
-    };
-    const binding = transaction.selector.values.get(name) orelse
-        return error.ValueUseUnresolvedSource;
+    }
+    const binding = requestSourceBinding(transaction, index) orelse
+        return if (transaction.lifetime_context.forward_snapshots[index] != null)
+            error.ValueUseForwardPlanStale
+        else
+            error.ValueUseUnresolvedSource;
     const current = (try Authority.validateRequestAt(Authority, transaction, index)) orelse
         return error.ValueUseUnsupportedSource;
     if (!earlyCopyIsFlagsPreserving(current, request.form))
@@ -251,10 +254,27 @@ pub fn materializeRequest(
     index: u8,
     request: *const StoredRequest,
 ) !void {
-    return materializeRequestUnchecked(Authority, transaction, request) catch |err| {
+    return materializeRequestAtUnchecked(Authority, transaction, index, request) catch |err| {
         Authority.noteRequestBoundaryError(Authority, transaction, index, err);
         return err;
     };
+}
+fn materializeRequestAtUnchecked(
+    comptime Authority: type,
+    transaction: anytype,
+    index: u8,
+    request: *const StoredRequest,
+) !void {
+    const current = switch (request.source) {
+        .named => (try Authority.validateRequestAt(Authority, transaction, index)) orelse
+            return error.ValueUseUnsupportedSource,
+        .null_value => {
+            try materializeNull(transaction.selector, request.destination);
+            return;
+        },
+        .int, .unsupported => return error.ValueUseUnsupportedSource,
+    };
+    try materializeRequestFromLoc(Authority, transaction, request, current, request.destination);
 }
 fn materializeRequestUnchecked(comptime Authority: type, transaction: anytype, request: *const StoredRequest) !void {
     const current = switch (request.source) {
@@ -314,6 +334,26 @@ pub fn resolveNamedCurrent(comptime _: type, transaction: anytype, name: []const
     return selector_state.resolveValue(transaction.selector, .{ .named = name }) orelse
         error.ValueUseUnresolvedSource;
 }
+
+fn requestSourceBinding(transaction: anytype, index: u8) ?ValueBinding {
+    const request = &transaction.requests[index];
+    const name = switch (request.source) {
+        .named => |*identity| identity.slice(),
+        .int, .null_value, .unsupported => return null,
+    };
+    if (transaction.selector.values.get(name)) |binding| return binding;
+    const snapshot = transaction.lifetime_context.forward_snapshots[index] orelse return null;
+    return .{
+        .vreg = snapshot.virtualReg(),
+        .loc = switch (snapshot.assignment) {
+            .gpr32 => |reg| .{ .scratch32 = reg },
+            .gpr64 => |reg| .{ .scratch64 = reg },
+            .spill => |spill_index| .{
+                .spill64 = selector_state.spillFrameIndexMaybe(spill_index) orelse return null,
+            },
+        },
+    };
+}
 pub fn buildPreparedRecord(comptime Authority: type, transaction: anytype, index: u8) !PreparedRecord {
     return buildPreparedRecordUnchecked(Authority, transaction, index) catch |err| {
         Authority.noteRequestBoundaryError(Authority, transaction, index, err);
@@ -324,8 +364,8 @@ fn buildPreparedRecordUnchecked(comptime Authority: type, transaction: anytype, 
     const request = &transaction.requests[index];
     if (request.destination != .prepared_source and request.destination != .prepared_view)
         return error.ValueUsePreparedViewMissing;
-    const name = switch (request.source) {
-        .named => |*identity| identity.slice(),
+    switch (request.source) {
+        .named => {},
         .int => |value| {
             const action = request.prepared_action orelse
                 return error.ValueUsePreparedViewUnsupported;
@@ -360,8 +400,12 @@ fn buildPreparedRecordUnchecked(comptime Authority: type, transaction: anytype, 
             };
         },
         else => return error.ValueUsePreparedViewUnsupported,
-    };
-    const binding = transaction.selector.values.get(name) orelse return error.ValueUseUnresolvedSource;
+    }
+    const binding = requestSourceBinding(transaction, index) orelse
+        return if (transaction.lifetime_context.forward_snapshots[index] != null)
+            error.ValueUseForwardPlanStale
+        else
+            error.ValueUseUnresolvedSource;
     const current = (try Authority.validateRequestAt(Authority, transaction, index)) orelse
         return error.ValueUsePreparedViewUnsupported;
     const prepared_loc = if (transaction.early_home_valid[index]) blk: {

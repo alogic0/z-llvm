@@ -181,7 +181,7 @@ test "value-use failure provenance distinguishes every memcpy request and foreig
         var transaction = try Transaction.begin(&selector);
         defer transaction.deinit();
         const requests = try registerMemcpyRequests(&transaction, case.destination, case.source, case.length);
-        try std.testing.expectError(error.ValueUseUnresolvedSource, transaction.seal());
+        try std.testing.expectError(error.ValueUseForwardPlanMissing, transaction.seal());
         try std.testing.expectEqualStrings(case.detail, inlineMemcpyValueUseDiagnosticForTest(&transaction, requests).?);
         try std.testing.expectEqual(case.failing == .destination, transaction.failedRequestIs(requests.destination));
         try std.testing.expectEqual(case.failing == .source, transaction.failedRequestIs(requests.source));

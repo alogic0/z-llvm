@@ -2712,19 +2712,43 @@ pub fn resolveValue(selector: *const ComposedBlockSelector, value: ir.Value) ?Va
 }
 
 fn resolveForwardValue(selector: *const ComposedBlockSelector, name: []const u8) ?ValueLoc {
-    const plan = selector.allocation_plan orelse return null;
-    const forward = plan.forwardValue(name) orelse return null;
-    if (selector.current_position >= forward.definition_position) return null;
-    return switch (plan.assignment(name) orelse return null) {
-        .gpr32 => |reg| if (forward.metadata.class == .gpr32) .{ .scratch32 = reg } else null,
-        .gpr64 => |reg| if (forward.metadata.class == .gpr64) .{ .scratch64 = reg } else null,
+    return resolveForwardValueForUse(selector, name) catch null;
+}
+
+pub fn resolveForwardValueForUse(
+    selector: *const ComposedBlockSelector,
+    name: []const u8,
+) !ValueLoc {
+    const plan = selector.allocation_plan orelse return error.ForwardValuePlanMissing;
+    const forward = plan.forwardValue(name) orelse return error.ForwardValuePlanMissing;
+    if (selector.current_position >= forward.definition_position)
+        return error.ForwardValuePlanStale;
+    return switch (plan.assignment(name) orelse return error.ForwardValueAssignmentMissing) {
+        .gpr32 => |reg| if (forward.metadata.class == .gpr32)
+            .{ .scratch32 = reg }
+        else
+            error.ForwardValueMetadataMismatch,
+        .gpr64 => |reg| if (forward.metadata.class == .gpr64)
+            .{ .scratch64 = reg }
+        else
+            error.ForwardValueMetadataMismatch,
         .spill => |index| switch (forward.metadata.class) {
             .gpr32, .gpr64 => if (spillFrameIndexMaybe(index)) |frame_index|
-                if (frameIndexFitsFrame(selector, frame_index)) .{ .spill64 = frame_index } else null
+                if (frameIndexFitsFrame(selector, frame_index))
+                    .{ .spill64 = frame_index }
+                else
+                    error.ForwardValueAssignmentOutOfFrame
             else
-                null,
-            .gpr128, .fp16, .fp32, .fp64, .vector_xmm, .aggregate_sse, .stack_object, .stack_pointer => null,
+                error.ForwardValueMetadataMismatch,
+            .gpr128, .fp16, .fp32, .fp64, .vector_xmm, .aggregate_sse, .stack_object, .stack_pointer => error.ForwardValueMetadataMismatch,
         },
-        .gpr128, .fp16, .fp32, .fp64, .vector_xmm, .stack_object, .stack_pointer => null,
+        .gpr128,
+        .fp16,
+        .fp32,
+        .fp64,
+        .vector_xmm,
+        .stack_object,
+        .stack_pointer,
+        => error.ForwardValueMetadataMismatch,
     };
 }

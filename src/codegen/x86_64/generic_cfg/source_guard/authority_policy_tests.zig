@@ -33,6 +33,7 @@ const FunctionFingerprint = support.FunctionFingerprint;
 const residual_function_fingerprints = support.residual_function_fingerprints;
 const FunctionBody = support.FunctionBody;
 const max_function_bodies = support.max_function_bodies;
+const validateForwardAdmissionSnapshotAuthority = support.validateForwardAdmissionSnapshotAuthority;
 const readFrozenBypassInventory = support.readFrozenBypassInventory;
 const validateNoPublicPreparedPointer = support.validateNoPublicPreparedPointer;
 const validateNoFunctionFamilyPredicate = support.validateNoFunctionFamilyPredicate;
@@ -601,6 +602,73 @@ test "composed selector source guard freezes private three-question lifetime aut
     try std.testing.expectError(
         error.ValueUseLifetimeContextMissing,
         validateLifetimeContextAuthority(collapsed_interval_error),
+    );
+}
+
+test "composed selector source guard freezes exact structural forward admission snapshots" {
+    const accepted: [:0]const u8 =
+        @embedFile("../value_use/model.zig") ++
+        @embedFile("../value_use/planning/lifetime_admission.zig");
+    try validateForwardAdmissionSnapshotAuthority(accepted);
+
+    const borrowed_plan = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "plan_identity: usize,",
+        "plan: *const SelectorAllocationPlan,",
+    );
+    defer std.testing.allocator.free(borrowed_plan);
+    try std.testing.expectError(
+        error.ValueUseForwardSnapshotMissing,
+        validateForwardAdmissionSnapshotAuthority(borrowed_plan),
+    );
+
+    const borrowed_location = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "plan_identity: usize,\n    identity: Identity,",
+        "plan_identity: usize,\n    identity: Identity,\n    location: ValueLoc,",
+    );
+    defer std.testing.allocator.free(borrowed_location);
+    try std.testing.expectError(
+        error.ValueUseForwardSnapshotBorrowedState,
+        validateForwardAdmissionSnapshotAuthority(borrowed_location),
+    );
+
+    const hashed = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "defined_width: u16,",
+        "defined_width: u16,\n    hash: u64,",
+    );
+    defer std.testing.allocator.free(hashed);
+    try std.testing.expectError(
+        error.ValueUseForwardSnapshotBorrowedState,
+        validateForwardAdmissionSnapshotAuthority(hashed),
+    );
+
+    const missing_capture = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "captureForwardAdmissionSnapshot(transaction, index) catch |err|",
+        "reuseForwardAdmissionSnapshot(transaction, index) catch |err|",
+    );
+    defer std.testing.allocator.free(missing_capture);
+    try std.testing.expectError(
+        error.ValueUseForwardSnapshotCaptureMismatch,
+        validateForwardAdmissionSnapshotAuthority(missing_capture),
+    );
+
+    const raw_resolution = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "selector_state.resolveForwardValueForUse(transaction.selector, name)",
+        "selector_state.resolveValue(transaction.selector, name)",
+    );
+    defer std.testing.allocator.free(raw_resolution);
+    try std.testing.expectError(
+        error.ValueUseForwardSnapshotResolverMismatch,
+        validateForwardAdmissionSnapshotAuthority(raw_resolution),
     );
 }
 

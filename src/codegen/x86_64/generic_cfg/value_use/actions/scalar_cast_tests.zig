@@ -574,7 +574,7 @@ test "value-use scalar cast unresolved source fails before home classification" 
     var transaction = try Transaction.begin(&selector);
     defer transaction.deinit();
     const source = try registerSignExtend(&transaction, "result");
-    try std.testing.expectError(error.ValueUseUnresolvedSource, transaction.seal());
+    try std.testing.expectError(error.ValueUseForwardPlanMissing, transaction.seal());
     try std.testing.expect(transaction.failedRequestIs(source));
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }

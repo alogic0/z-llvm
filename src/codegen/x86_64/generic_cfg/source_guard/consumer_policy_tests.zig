@@ -104,6 +104,16 @@ const validateAddressDependencyDomainSource = support.validateAddressDependencyD
 const validateFrozenBypassInventoryHash = support.validateFrozenBypassInventoryHash;
 const validateFrozenBypassInventoryForSource = support.validateFrozenBypassInventoryForSource;
 
+test "composed selector source guard confines forward resolution to the transaction authority" {
+    try std.testing.expectError(
+        error.ValueUsePreparedLeafRawOperation,
+        validatePreparedViewLeafDiscipline(
+            "composed_selector_calls.zig",
+            "fn bad() void { _ = selector_state.resolveForwardValueForUse(undefined, \"x\"); }",
+        ),
+    );
+}
+
 test "composed selector source guard admits only the complete ordinary readonly-pointer and table-i16 load action sets" {
     const table_fixture =
         "fn lowerReadOnlyTableLoad() void { " ++

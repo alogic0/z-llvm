@@ -420,7 +420,7 @@ test "value-use setcc EAX compare preserves unresolved-source provenance" {
         1,
         .ordinary,
     );
-    try std.testing.expectError(error.ValueUseUnresolvedSource, transaction.seal());
+    try std.testing.expectError(error.ValueUseForwardPlanMissing, transaction.seal());
     try std.testing.expectEqualStrings(
         "composed-block-icmp-lhs",
         setccEaxCompareDiagnosticForTest(

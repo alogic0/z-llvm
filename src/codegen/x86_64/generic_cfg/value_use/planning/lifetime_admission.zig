@@ -5,6 +5,7 @@ const Types = @import("../model.zig");
 const planning_model = @import("model.zig");
 const compatibility = @import("compatibility.zig");
 
+const ValueBinding = selector_types.ValueBinding;
 const ValueLoc = selector_types.ValueLoc;
 const StoredRequest = Types.StoredRequest;
 const PhysicalNode = planning_model.PhysicalNode;
@@ -54,10 +55,11 @@ pub fn validateRequest(
                 return error.ValueUsePreparedViewUnsupported;
             return null;
         },
-        .named => |*name| {
+        .named => {
             try Authority.availabilityForConsumption(Authority, transaction, index);
-            const binding = transaction.selector.values.get(name.slice()) orelse return error.ValueUseUnresolvedSource;
-            const current = try Authority.materialization.resolveNamedCurrent(Authority, transaction, name.slice());
+            const binding = sourceBinding(transaction, index) orelse
+                return error.ValueUseForwardPlanStale;
+            const current = try resolveRequestCurrent(Authority, transaction, index);
             try compatibility.validateBindingCompatibility(binding, request, current);
             try compatibility.validateSourceView(current, request.form);
             return current;
@@ -260,8 +262,19 @@ pub fn core_availabilityForConsumption(
         .int, .null_value => return,
         .unsupported => return,
     };
-    const binding = transaction.selector.values.get(identity.slice()) orelse
-        return error.ValueUseUnresolvedSource;
+    const binding = transaction.selector.values.get(identity.slice()) orelse {
+        const current = captureForwardAdmissionSnapshot(transaction, index) catch |err| {
+            if (transaction.lifetime_context.forward_snapshots[index] != null)
+                return error.ValueUseForwardPlanStale;
+            return err;
+        };
+        if (transaction.lifetime_context.forward_snapshots[index]) |*snapshot| {
+            if (!snapshot.eql(&current)) return error.ValueUseForwardPlanStale;
+        } else {
+            transaction.lifetime_context.forward_snapshots[index] = current;
+        }
+        return;
+    };
     const plan = transaction.selector.allocation_plan orelse
         return error.ValueUseSourcePlanMissing;
     _ = plan.intervalEnd(identity.slice()) orelse
@@ -284,6 +297,188 @@ pub fn core_availabilityForConsumption(
             .generation = binding.vreg.index,
         };
     }
+}
+
+/// Returns a transient binding for validation only. Forward admission never
+/// inserts it into selector.values and never exposes its resolved home.
+fn sourceBinding(transaction: anytype, index: u8) ?ValueBinding {
+    const request = &transaction.requests[index];
+    const name = switch (request.source) {
+        .named => |*identity| identity.slice(),
+        .int, .null_value, .unsupported => return null,
+    };
+    if (transaction.selector.values.get(name)) |binding| return binding;
+    const snapshot = transaction.lifetime_context.forward_snapshots[index] orelse return null;
+    return .{
+        .vreg = snapshot.virtualReg(),
+        .loc = switch (snapshot.assignment) {
+            .gpr32 => |reg| .{ .scratch32 = reg },
+            .gpr64 => |reg| .{ .scratch64 = reg },
+            .spill => |spill_index| .{
+                .spill64 = selector_state.spillFrameIndexMaybe(spill_index) orelse return null,
+            },
+        },
+    };
+}
+
+/// Revalidates the exact structural admission proof, then asks the single
+/// selector-owned forward resolver for the current home.
+fn resolveRequestCurrent(comptime Authority: type, transaction: anytype, index: u8) !ValueLoc {
+    const request = &transaction.requests[index];
+    const name = switch (request.source) {
+        .named => |*identity| identity.slice(),
+        .int, .null_value, .unsupported => return error.ValueUseUnsupportedSource,
+    };
+    if (transaction.selector.values.get(name)) |_|
+        return Authority.materialization.resolveNamedCurrent(
+            Authority,
+            transaction,
+            name,
+        );
+
+    _ = transaction.lifetime_context.forward_snapshots[index] orelse
+        return error.ValueUseForwardPlanMissing;
+    return selector_state.resolveForwardValueForUse(transaction.selector, name) catch
+        return error.ValueUseForwardPlanStale;
+}
+
+fn captureForwardAdmissionSnapshot(
+    transaction: anytype,
+    index: u8,
+) !Types.ForwardAdmissionSnapshot {
+    const request = &transaction.requests[index];
+    const identity = switch (request.source) {
+        .named => |name| name,
+        .int, .null_value, .unsupported => return error.ValueUseUnsupportedSource,
+    };
+    const plan = transaction.selector.allocation_plan orelse
+        return error.ValueUseForwardPlanMissing;
+    const forward = plan.forwardValue(identity.slice()) orelse
+        return error.ValueUseForwardPlanMissing;
+    if (transaction.selector.current_position >= forward.definition_position)
+        return error.ValueUseForwardPlanMalformed;
+    const interval_end = plan.intervalEnd(identity.slice()) orelse
+        return error.ValueUseForwardPlanMissing;
+    if (interval_end < transaction.selector.current_position)
+        return error.ValueUseForwardIntervalExpired;
+
+    const required_bits = expectedDefinedBits(request) orelse
+        return error.ValueUseForwardTypeMismatch;
+    if (forward.metadata.class != request.expected.register_class or
+        forward.metadata.bits < required_bits)
+    {
+        return error.ValueUseForwardTypeMismatch;
+    }
+
+    const assignment = switch (plan.assignment(identity.slice()) orelse
+        return error.ValueUseForwardAssignmentMissing) {
+        .gpr32 => |reg| if (forward.metadata.class == .gpr32)
+            Types.ForwardAssignmentSnapshot{ .gpr32 = reg }
+        else
+            return error.ValueUseForwardTypeMismatch,
+        .gpr64 => |reg| if (forward.metadata.class == .gpr64)
+            Types.ForwardAssignmentSnapshot{ .gpr64 = reg }
+        else
+            return error.ValueUseForwardTypeMismatch,
+        .spill => |spill_index| switch (forward.metadata.class) {
+            .gpr32, .gpr64 => Types.ForwardAssignmentSnapshot{ .spill = spill_index },
+            else => return error.ValueUseForwardTypeMismatch,
+        },
+        .gpr128,
+        .fp16,
+        .fp32,
+        .fp64,
+        .vector_xmm,
+        .stack_object,
+        .stack_pointer,
+        => return error.ValueUseForwardTypeMismatch,
+    };
+    _ = selector_state.resolveForwardValueForUse(
+        transaction.selector,
+        identity.slice(),
+    ) catch return error.ValueUseForwardPlanMalformed;
+    selector_state.validateAddressDependenciesForUse(
+        transaction.selector,
+        identity.slice(),
+    ) catch return error.ValueUseForwardPlanMalformed;
+
+    return .{
+        .plan_identity = @intFromPtr(plan),
+        .identity = identity,
+        .admission_position = transaction.selector.current_position,
+        .definition_position = forward.definition_position,
+        .interval_end = interval_end,
+        .virtual_class = forward.metadata.class,
+        .defined_width = forward.metadata.bits,
+        .assignment = assignment,
+        .assignment_frame_bytes = switch (assignment) {
+            .spill => transaction.selector.stack_frame_bytes,
+            .gpr32, .gpr64 => null,
+        },
+        .dependencies = try captureForwardDependencySnapshot(transaction),
+    };
+}
+
+fn expectedDefinedBits(request: *const StoredRequest) ?u16 {
+    return switch (request.expected.ty) {
+        .int => |bits| bits,
+        .ptr => 64,
+        else => null,
+    };
+}
+
+fn captureForwardDependencySnapshot(transaction: anytype) !Types.ForwardDependencySnapshot {
+    const selector = transaction.selector;
+    const plan = selector.allocation_plan orelse return error.ValueUseForwardPlanMissing;
+    const count = selector.address_dependencies.count();
+    if (count > Types.max_forward_dependency_owners)
+        return error.ValueUseForwardSnapshotCapacityExceeded;
+
+    var snapshot: Types.ForwardDependencySnapshot = .{};
+    snapshot.owner_count = @intCast(count);
+    for (0..count) |owner_index| {
+        const owner = selector.address_dependencies.ownerAt(owner_index) orelse
+            return error.ValueUseForwardPlanMalformed;
+        var owner_snapshot = Types.ForwardDependencyOwnerSnapshot{
+            .identity = try Types.Identity.init(owner.name),
+            .identity_type = owner.identity_type,
+            .interval_end = plan.intervalEnd(owner.name) orelse
+                return error.ValueUseForwardPlanMalformed,
+            .binding = try captureForwardDependencyBinding(selector, owner.name),
+            .dependency_count = owner.dependency_count,
+        };
+        for (owner.dependencySlice(), 0..) |dependency, dependency_index| {
+            owner_snapshot.dependencies[dependency_index] = .{
+                .identity = try Types.Identity.init(dependency.name),
+                .identity_type = dependency.identity_type,
+                .role = dependency.role,
+                .interval_end = plan.intervalEnd(dependency.name),
+                .binding = try captureForwardDependencyBinding(selector, dependency.name),
+            };
+        }
+        snapshot.owners[owner_index] = owner_snapshot;
+    }
+    return snapshot;
+}
+
+fn captureForwardDependencyBinding(
+    selector: anytype,
+    name: []const u8,
+) !?Types.ForwardDependencyBindingSnapshot {
+    const binding = selector.values.get(name) orelse return null;
+    var snapshot = Types.ForwardDependencyBindingSnapshot{ .vreg = binding.vreg };
+    switch (binding.loc) {
+        .stack_i32_ptr => |stack_ptr| {
+            snapshot.is_stack_i32_ptr = true;
+            if (stack_ptr.index) |stack_index| {
+                snapshot.address_index = try Types.Identity.init(stack_index.name);
+                if (stack_index.addend_name) |addend|
+                    snapshot.address_addend = try Types.Identity.init(addend);
+            }
+        },
+        else => {},
+    }
+    return snapshot;
 }
 pub fn core_mustSurviveInstruction(
     comptime Authority: type,

@@ -799,6 +799,14 @@ fn core_validateConsumedOperandAfterUnchecked(comptime Authority: type, transact
         .named => |*identity| identity.slice(),
         .int, .null_value, .unsupported => return,
     };
+    if (transaction.lifetime_context.forward_snapshots[index] != null) {
+        _ = try Authority.materialization.buildPreparedRecord(
+            Authority,
+            transaction,
+            index,
+        );
+        return;
+    }
     const binding = transaction.selector.values.get(name) orelse {
         if (try selector_state.valueIsLiveAfterCurrent(transaction.selector, name))
             return error.ValueUsePreparedViewStale;

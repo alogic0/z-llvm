@@ -132,6 +132,8 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateImmediateScalarIntentSurface(source);
     try validateNamedScalarIntentSurface(source);
     try validateLifetimeContextAuthority(source);
+    if (allow_technical_visibility)
+        try validateForwardAdmissionSnapshotAuthority(source);
     try validateImmediateScalarAccumulatorPreamble(source);
     try validateDurableActionIdentityOwnership(source);
     try validateScratchComparePreservationPreamble(source);
@@ -140,6 +142,111 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateCurrentHomeSignBitSequence(source);
     try validateI128PairSequence(source);
     try validateScalarCastSequence(source);
+}
+
+pub fn validateForwardAdmissionSnapshotAuthority(source: [:0]const u8) !void {
+    const snapshot_start = std.mem.indexOf(
+        u8,
+        source,
+        "pub const ForwardAdmissionSnapshot = struct {",
+    ) orelse return error.ValueUseForwardSnapshotMissing;
+    const snapshot_fields_end = std.mem.indexOfPos(
+        u8,
+        source,
+        snapshot_start,
+        "    pub fn eql(",
+    ) orelse return error.ValueUseForwardSnapshotMissing;
+    const snapshot_fields = source[snapshot_start..snapshot_fields_end];
+    const required_fields = [_][]const u8{
+        "plan_identity: usize",
+        "identity: Identity",
+        "admission_position: usize",
+        "definition_position: usize",
+        "interval_end: usize",
+        "virtual_class: VirtualRegClass",
+        "defined_width: u16",
+        "assignment: ForwardAssignmentSnapshot",
+        "assignment_frame_bytes: ?usize",
+        "dependencies: ForwardDependencySnapshot",
+    };
+    for (required_fields) |field| {
+        if (std.mem.indexOf(u8, snapshot_fields, field) == null)
+            return error.ValueUseForwardSnapshotMissing;
+    }
+    if (std.mem.indexOf(u8, snapshot_fields, "ValueLoc") != null or
+        std.mem.indexOf(u8, snapshot_fields, "[]") != null or
+        std.mem.indexOf(u8, snapshot_fields, "*") != null or
+        std.mem.indexOf(u8, snapshot_fields, "generation") != null or
+        std.mem.indexOf(u8, snapshot_fields, "hash") != null)
+    {
+        return error.ValueUseForwardSnapshotBorrowedState;
+    }
+    if (std.mem.indexOf(u8, source, "forward_snapshots: [max_requests]?ForwardAdmissionSnapshot") == null or
+        std.mem.indexOf(u8, source, "pub const max_forward_dependency_owners = 4;") == null or
+        std.mem.indexOf(u8, source, "error.ValueUseForwardSnapshotCapacityExceeded") == null or
+        std.mem.indexOf(u8, source, "forward_generation") != null or
+        std.mem.indexOf(u8, source, "ForwardAdmissionHash") != null)
+    {
+        return error.ValueUseForwardSnapshotStorageMismatch;
+    }
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const capture_body = functionBodyNamed(bodies, "captureForwardAdmissionSnapshot") orelse
+        return error.ValueUseForwardSnapshotCaptureMismatch;
+    const capture = source[capture_body.start..capture_body.end];
+    const capture_required = [_][]const u8{
+        "@intFromPtr(plan)",
+        "forward.definition_position",
+        "interval_end",
+        "forward.metadata.class",
+        "forward.metadata.bits",
+        "plan.assignment(",
+        "transaction.selector.stack_frame_bytes",
+        "captureForwardDependencySnapshot(transaction)",
+    };
+    for (capture_required) |pattern| {
+        if (std.mem.indexOf(u8, capture, pattern) == null)
+            return error.ValueUseForwardSnapshotCaptureMismatch;
+    }
+    if (countPattern(source, "fn captureForwardAdmissionSnapshot(") != 1 or
+        countPattern(source, "captureForwardAdmissionSnapshot(transaction, index)") != 1)
+    {
+        return error.ValueUseForwardSnapshotCaptureMismatch;
+    }
+    const resolve_body = functionBodyNamed(bodies, "resolveRequestCurrent") orelse
+        return error.ValueUseForwardSnapshotResolverMismatch;
+    const resolve = source[resolve_body.start..resolve_body.end];
+    if (countPattern(resolve, "captureForwardAdmissionSnapshot(transaction, index)") != 0 or
+        countPattern(resolve, "selector_state.resolveForwardValueForUse(") != 1)
+    {
+        return error.ValueUseForwardSnapshotResolverMismatch;
+    }
+    const availability_body = functionBodyNamed(
+        bodies,
+        "core_availabilityForConsumption",
+    ) orelse return error.ValueUseForwardSnapshotCaptureMismatch;
+    const availability = source[availability_body.start..availability_body.end];
+    if (countPattern(availability, "captureForwardAdmissionSnapshot(transaction, index)") != 1 or
+        std.mem.indexOf(u8, availability, "snapshot.eql(&current)") == null or
+        std.mem.indexOf(u8, availability, "forward_snapshots[index] = current") == null or
+        std.mem.indexOf(u8, availability, "ValueUseUnresolvedSource") != null)
+    {
+        return error.ValueUseForwardSnapshotCaptureMismatch;
+    }
+    const closed_errors = [_][]const u8{
+        "error.ValueUseForwardPlanMissing",
+        "error.ValueUseForwardPlanMalformed",
+        "error.ValueUseForwardPlanStale",
+        "error.ValueUseForwardIntervalExpired",
+        "error.ValueUseForwardTypeMismatch",
+        "error.ValueUseForwardAssignmentMissing",
+        "error.ValueUseForwardSnapshotCapacityExceeded",
+    };
+    for (closed_errors) |closed_error| {
+        if (std.mem.indexOf(u8, source, closed_error) == null)
+            return error.ValueUseForwardSnapshotErrorTableMismatch;
+    }
 }
 
 pub fn validateLifetimeContextAuthority(source: [:0]const u8) !void {

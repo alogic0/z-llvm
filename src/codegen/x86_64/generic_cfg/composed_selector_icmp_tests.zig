@@ -175,13 +175,15 @@ test "I13 current-home eq-zero production path preserves dispatch precedence and
         selector.allocation_plan = &plan;
         selector.current_position = 1;
 
-        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
-            .predicate = .eq,
-            .operand_ty = .{ .int = 32 },
-            .lhs = .{ .named = "missing" },
-            .rhs = .{ .int = 0 },
-        })).?;
-        try std.testing.expectEqualStrings("composed-block-icmp-lhs", diagnostic.detail());
+        try std.testing.expectError(
+            error.ValueUseForwardPlanMissing,
+            selector_icmp.lowerIcmp(&selector, "cmp", .{
+                .predicate = .eq,
+                .operand_ty = .{ .int = 32 },
+                .lhs = .{ .named = "missing" },
+                .rhs = .{ .int = 0 },
+            }),
+        );
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
     }
 }
@@ -271,13 +273,15 @@ test "setcc EAX production path maps only matching request failures" {
         defer selector.deinit();
         selector.allocation_plan = &plan;
 
-        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
-            .predicate = .ult,
-            .operand_ty = .{ .int = 32 },
-            .lhs = .{ .named = "missing" },
-            .rhs = .{ .int = 7 },
-        })).?;
-        try std.testing.expectEqualStrings("composed-block-icmp-lhs", diagnostic.detail());
+        try std.testing.expectError(
+            error.ValueUseForwardPlanMissing,
+            selector_icmp.lowerIcmp(&selector, "cmp", .{
+                .predicate = .ult,
+                .operand_ty = .{ .int = 32 },
+                .lhs = .{ .named = "missing" },
+                .rhs = .{ .int = 7 },
+            }),
+        );
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
     }
 
@@ -700,13 +704,15 @@ test "current-home sign-bit production mapping preserves unresolved provenance" 
         selector.allocation_plan = &plan;
         selector.current_position = 1;
 
-        const diagnostic = (try selector_icmp.lowerIcmp(&selector, "cmp", .{
-            .predicate = .slt,
-            .operand_ty = .{ .int = 32 },
-            .lhs = .{ .named = "missing" },
-            .rhs = .{ .int = 0 },
-        })).?;
-        try std.testing.expectEqualStrings("composed-block-icmp-lhs", diagnostic.detail());
+        try std.testing.expectError(
+            error.ValueUseForwardPlanMissing,
+            selector_icmp.lowerIcmp(&selector, "cmp", .{
+                .predicate = .slt,
+                .operand_ty = .{ .int = 32 },
+                .lhs = .{ .named = "missing" },
+                .rhs = .{ .int = 0 },
+            }),
+        );
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
     }
 }

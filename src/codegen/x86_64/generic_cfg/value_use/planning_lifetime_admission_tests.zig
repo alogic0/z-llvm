@@ -65,6 +65,7 @@ const ForwardCharacterization = struct {
     forward: ForwardValuePlan,
     assignment: ?PlannedValueAssignment,
     legacy_resolution: ?ValueLoc,
+    admission_error: ?anyerror = null,
 };
 
 fn expectForwardCharacterization(fixture: ForwardCharacterization) !void {
@@ -97,9 +98,43 @@ fn expectForwardCharacterization(fixture: ForwardCharacterization) !void {
         .gpr64,
         .rax,
     ));
-    try std.testing.expectError(error.ValueUseUnresolvedSource, transaction.seal());
-    try std.testing.expect(transaction.failedRequestIs(source));
-    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    if (fixture.admission_error) |expected_error| {
+        try std.testing.expectError(expected_error, transaction.seal());
+        try std.testing.expect(transaction.failedRequestIs(source));
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    } else {
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.rollback();
+    }
+}
+
+fn installForward(
+    plan: *SelectorAllocationPlan,
+    name: []const u8,
+    definition_position: usize,
+    interval_end: usize,
+    class: selector_types.VirtualRegClass,
+    bits: u16,
+    assignment: PlannedValueAssignment,
+) !void {
+    try plan.interval_ends.put(name, interval_end);
+    try plan.forward_values.put(name, .{
+        .definition_position = definition_position,
+        .metadata = .{ .class = class, .bits = bits },
+    });
+    try plan.assignments.put(name, assignment);
+}
+
+fn registerForwardGpr64(transaction: *Transaction, name: []const u8, destination: Transaction.Destination) !Transaction.RequestHandle {
+    return transaction.register(request(
+        name,
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        destination,
+    ));
 }
 
 test "value-use current binding characterizes missing plan and missing interval" {
@@ -177,6 +212,7 @@ test "value-use forward metadata characterizes legacy resolution before Q1 admis
             },
             .assignment = .{ .gpr64 = .r9 },
             .legacy_resolution = null,
+            .admission_error = error.ValueUseForwardPlanMalformed,
         },
         .{
             .name = "expired-forward-interval",
@@ -190,6 +226,7 @@ test "value-use forward metadata characterizes legacy resolution before Q1 admis
             .assignment = .{ .gpr64 = .r9 },
             // Legacy forward resolution does not consult the interval.
             .legacy_resolution = .{ .scratch64 = .r9 },
+            .admission_error = error.ValueUseForwardIntervalExpired,
         },
         .{
             .name = "forward-class-mismatch",
@@ -202,6 +239,7 @@ test "value-use forward metadata characterizes legacy resolution before Q1 admis
             },
             .assignment = .{ .gpr64 = .r9 },
             .legacy_resolution = null,
+            .admission_error = error.ValueUseForwardTypeMismatch,
         },
         .{
             .name = "forward-defined-width-mismatch",
@@ -215,6 +253,7 @@ test "value-use forward metadata characterizes legacy resolution before Q1 admis
             .assignment = .{ .gpr64 = .r9 },
             // Legacy checks the class but does not validate defined width.
             .legacy_resolution = .{ .scratch64 = .r9 },
+            .admission_error = error.ValueUseForwardTypeMismatch,
         },
         .{
             .name = "forward-missing-assignment",
@@ -227,6 +266,7 @@ test "value-use forward metadata characterizes legacy resolution before Q1 admis
             },
             .assignment = null,
             .legacy_resolution = null,
+            .admission_error = error.ValueUseForwardAssignmentMissing,
         },
     };
     inline for (cases) |fixture| try expectForwardCharacterization(fixture);
@@ -308,6 +348,353 @@ test "value-use preserves the six B07 forward-RHS cohort traces as future inputs
         },
     };
     inline for (cases) |fixture| try expectForwardCharacterization(fixture);
+}
+
+test "value-use forward Q1 admits register and spill assignments without creating bindings" {
+    const cases = [_]struct {
+        name: []const u8,
+        assignment: PlannedValueAssignment,
+        destination: Transaction.Destination,
+    }{
+        .{ .name = "register-forward", .assignment = .{ .gpr64 = .r9 }, .destination = .rax },
+        .{ .name = "spill-forward", .assignment = .{ .spill = 0 }, .destination = .{ .gpr64 = .rcx } },
+    };
+    inline for (cases) |case| {
+        var machine = MachineFunction.init(case.name, .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try installForward(&plan, "forward", 5, 7, .gpr64, 64, case.assignment);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 2;
+        selector.stack_frame_bytes = 128;
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        _ = try registerForwardGpr64(&transaction, "forward", case.destination);
+        try transaction.seal();
+        try std.testing.expect(selector.values.get("forward") == null);
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try std.testing.expect(selector.values.get("forward") == null);
+        try transaction.rollback();
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expect(selector.values.get("forward") == null);
+    }
+}
+
+test "value-use forward Q1 has a closed request-attributable admission error table" {
+    const cases = [_]struct {
+        name: []const u8,
+        install_interval: bool = true,
+        interval_end: usize = 7,
+        definition_position: usize = 5,
+        class: selector_types.VirtualRegClass = .gpr64,
+        bits: u16 = 64,
+        assignment: ?PlannedValueAssignment = .{ .gpr64 = .r9 },
+        expected_error: anyerror,
+    }{
+        .{ .name = "no-valid-plan", .install_interval = false, .expected_error = error.ValueUseForwardPlanMissing },
+        .{ .name = "malformed-definition", .definition_position = 2, .expected_error = error.ValueUseForwardPlanMalformed },
+        .{ .name = "expired-interval", .interval_end = 1, .expected_error = error.ValueUseForwardIntervalExpired },
+        .{ .name = "class-mismatch", .class = .gpr32, .bits = 64, .assignment = .{ .gpr32 = .r9 }, .expected_error = error.ValueUseForwardTypeMismatch },
+        .{ .name = "width-mismatch", .bits = 32, .expected_error = error.ValueUseForwardTypeMismatch },
+        .{ .name = "missing-assignment", .assignment = null, .expected_error = error.ValueUseForwardAssignmentMissing },
+    };
+    inline for (cases) |case| {
+        var machine = MachineFunction.init(case.name, .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        if (case.install_interval) try plan.interval_ends.put("forward", case.interval_end);
+        try plan.forward_values.put("forward", .{
+            .definition_position = case.definition_position,
+            .metadata = .{ .class = case.class, .bits = case.bits },
+        });
+        if (case.assignment) |assignment| try plan.assignments.put("forward", assignment);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 2;
+        selector.stack_frame_bytes = 128;
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handle = try registerForwardGpr64(&transaction, "forward", .rax);
+        try std.testing.expectError(case.expected_error, transaction.seal());
+        try std.testing.expect(transaction.failedRequestIs(handle));
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
+test "value-use forward snapshot rejects every changed admission fact before emission" {
+    const Mutation = enum {
+        request_identity,
+        instruction_position,
+        definition_position,
+        interval_end,
+        virtual_class,
+        defined_width,
+        assignment_tag,
+        assignment_payload,
+        spill_frame_extent,
+        entry_removed,
+    };
+    inline for (std.meta.tags(Mutation)) |mutation| {
+        var machine = MachineFunction.init(@tagName(mutation), .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try installForward(
+            &plan,
+            "forward",
+            8,
+            10,
+            .gpr64,
+            64,
+            if (mutation == .spill_frame_extent) .{ .spill = 0 } else .{ .gpr64 = .r9 },
+        );
+        if (mutation == .request_identity)
+            try installForward(&plan, "replacement", 8, 10, .gpr64, 64, .{ .gpr64 = .r9 });
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 2;
+        selector.stack_frame_bytes = 128;
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handle = try transaction.register(preparedSourceRequest(
+            "forward",
+            .{ .int = 64 },
+            .gpr64,
+            .gpr64,
+        ));
+        if (mutation == .request_identity)
+            _ = try transaction.register(preparedSourceRequest(
+                "replacement",
+                .{ .int = 64 },
+                .gpr64,
+                .gpr64,
+            ));
+        try transaction.seal();
+        try transaction.prepare();
+        switch (mutation) {
+            .request_identity => transaction.requests[0].source = transaction.requests[1].source,
+            .instruction_position => selector.current_position = 3,
+            .definition_position => plan.forward_values.getPtr("forward").?.definition_position = 9,
+            .interval_end => plan.interval_ends.getPtr("forward").?.* = 11,
+            .virtual_class => {
+                plan.forward_values.getPtr("forward").?.metadata.class = .gpr32;
+                plan.assignments.getPtr("forward").?.* = .{ .gpr32 = .r9 };
+            },
+            .defined_width => plan.forward_values.getPtr("forward").?.metadata.bits = 63,
+            .assignment_tag => plan.assignments.getPtr("forward").?.* = .{ .spill = 0 },
+            .assignment_payload => plan.assignments.getPtr("forward").?.* = .{ .gpr64 = .r8 },
+            .spill_frame_extent => selector.stack_frame_bytes = 0,
+            .entry_removed => _ = plan.forward_values.remove("forward"),
+        }
+        try std.testing.expectError(error.ValueUseForwardPlanStale, transaction.materializeAll());
+        try std.testing.expect(transaction.failedRequestIs(handle));
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expect(selector.values.get("forward") == null);
+    }
+}
+
+test "value-use forward snapshot rejects allocation-plan replacement" {
+    var machine = MachineFunction.init("forward-plan-replacement", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var admitted_plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer admitted_plan.deinit();
+    try installForward(&admitted_plan, "forward", 8, 10, .gpr64, 64, .{ .gpr64 = .r9 });
+    var replacement_plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer replacement_plan.deinit();
+    try installForward(&replacement_plan, "forward", 8, 10, .gpr64, 64, .{ .gpr64 = .r9 });
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &admitted_plan;
+    selector.current_position = 2;
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const handle = try registerForwardGpr64(&transaction, "forward", .rax);
+    try transaction.seal();
+    try transaction.prepare();
+    selector.allocation_plan = &replacement_plan;
+    try std.testing.expectError(error.ValueUseForwardPlanStale, transaction.materializeAll());
+    try std.testing.expect(transaction.failedRequestIs(handle));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use forward snapshot captures canonical dependency facts and rejects mutation" {
+    var machine = MachineFunction.init("forward-dependency-snapshot", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try installForward(&plan, "forward", 8, 10, .gpr64, 64, .{ .gpr64 = .r9 });
+    inline for (&.{ "owner", "index", "replacement-index" }) |name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 2;
+    try selector_state.bindValueLoc(&selector, "index", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "replacement-index", .{ .arg64 = .rsi });
+    try selector_state.bindValueLoc(&selector, "owner", .{ .stack_i32_ptr = .{
+        .disp = 8,
+        .index = .{ .reg = .rdi, .name = "index" },
+    } });
+
+    {
+        var unchanged = try Transaction.begin(&selector);
+        defer unchanged.deinit();
+        _ = try registerForwardGpr64(&unchanged, "forward", .rax);
+        try unchanged.seal();
+        try unchanged.prepare();
+        try unchanged.materializeAll();
+        try unchanged.rollback();
+    }
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const handle = try registerForwardGpr64(&transaction, "forward", .rax);
+    try transaction.seal();
+    try transaction.prepare();
+    try selector_state.bindValueLoc(&selector, "owner", .{ .stack_i32_ptr = .{
+        .disp = 8,
+        .index = .{ .reg = .rsi, .name = "replacement-index" },
+    } });
+    try std.testing.expectError(error.ValueUseForwardPlanStale, transaction.materializeAll());
+    try std.testing.expect(transaction.failedRequestIs(handle));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use forward malformed dependency metadata is a closed request error" {
+    var machine = MachineFunction.init("forward-malformed-dependency", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try installForward(&plan, "forward", 8, 10, .gpr64, 64, .{ .gpr64 = .r9 });
+    try addLive(&plan, "owner");
+    try addLive(&plan, "index");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 2;
+    try selector_state.bindValueLoc(&selector, "index", .{ .arg64 = .rdi });
+    try selector.address_dependencies.replaceAddress("owner", &.{
+        .{ .name = "index", .identity_type = .integer, .role = .index },
+    });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const handle = try registerForwardGpr64(&transaction, "forward", .rax);
+    try std.testing.expectError(error.ValueUseForwardPlanMalformed, transaction.seal());
+    try std.testing.expect(transaction.failedRequestIs(handle));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use forward snapshot capacity fails closed" {
+    var machine = MachineFunction.init("forward-dependency-capacity", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try installForward(&plan, "forward", 8, 10, .gpr64, 64, .{ .gpr64 = .r9 });
+    try addLive(&plan, "index");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 2;
+    try selector_state.bindValueLoc(&selector, "index", .{ .arg64 = .rdi });
+    inline for (0..5) |owner_index| {
+        const owner = std.fmt.comptimePrint("owner-{d}", .{owner_index});
+        try addLive(&plan, owner);
+        try selector_state.bindValueLoc(&selector, owner, .{ .stack_i32_ptr = .{
+            .disp = @intCast(owner_index * 4),
+            .index = .{ .reg = .rdi, .name = "index" },
+        } });
+    }
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const handle = try registerForwardGpr64(&transaction, "forward", .rax);
+    try std.testing.expectError(
+        error.ValueUseForwardSnapshotCapacityExceeded,
+        transaction.seal(),
+    );
+    try std.testing.expect(transaction.failedRequestIs(handle));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use forward duplicate requests and first-failure provenance remain exact" {
+    var machine = MachineFunction.init("forward-duplicate-provenance", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try installForward(&plan, "forward", 8, 10, .gpr64, 64, .{ .gpr64 = .r9 });
+    try plan.forward_values.put("broken", .{
+        .definition_position = 8,
+        .metadata = .{ .class = .gpr64, .bits = 64 },
+    });
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 2;
+
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        _ = try registerForwardGpr64(&transaction, "forward", .rax);
+        _ = try registerForwardGpr64(&transaction, "forward", .{ .gpr64 = .rcx });
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.rollback();
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const first = try registerForwardGpr64(&transaction, "forward", .rax);
+        const second = try registerForwardGpr64(&transaction, "broken", .{ .gpr64 = .rcx });
+        try std.testing.expectError(error.ValueUseForwardPlanMissing, transaction.seal());
+        try std.testing.expect(!transaction.failedRequestIs(first));
+        try std.testing.expect(transaction.failedRequestIs(second));
+    }
+}
+
+test "value-use forward snapshot rollback and teardown retain no binding or snapshot state" {
+    var machine = MachineFunction.init("forward-rollback-teardown", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try installForward(&plan, "forward", 8, 10, .gpr64, 64, .{ .gpr64 = .r9 });
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 2;
+
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        _ = try registerForwardGpr64(&transaction, "forward", .rax);
+        try transaction.seal();
+        try std.testing.expect(transaction.lifetime_context.forward_snapshots[0] != null);
+        try transaction.rollback();
+        try std.testing.expect(transaction.lifetime_context.forward_snapshots[0] == null);
+    }
+    {
+        var transaction = try Transaction.begin(&selector);
+        _ = try registerForwardGpr64(&transaction, "forward", .rax);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.rollback();
+        transaction.deinit();
+    }
+    try std.testing.expect(selector.values.get("forward") == null);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
 test "value-use lifetime authority separates plan interval availability and provenance" {

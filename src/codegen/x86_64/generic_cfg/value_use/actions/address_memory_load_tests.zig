@@ -177,7 +177,7 @@ test "value-use load resolution precedes invalid-width classification" {
         "missing",
         .{ .load_scalar = .{ .kind = .ordinary, .bits = 24 } },
     ));
-    try std.testing.expectError(error.ValueUseUnresolvedSource, missing.seal());
+    try std.testing.expectError(error.ValueUseForwardPlanMissing, missing.seal());
     try std.testing.expect(missing.failedRequestIs(missing_action));
 
     try selector_state.bindValueLoc(&selector, "missing", .{ .arg64 = .rdi });

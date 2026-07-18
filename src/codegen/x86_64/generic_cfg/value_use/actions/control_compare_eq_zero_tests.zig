@@ -225,7 +225,7 @@ test "value-use current-home eq-zero keeps unresolved width and location diagnos
             .{ .int = 64 },
         );
         const err = transaction.seal();
-        try std.testing.expectError(error.ValueUseUnresolvedSource, err);
+        try std.testing.expectError(error.ValueUseForwardPlanMissing, err);
         try std.testing.expectEqualStrings(
             "composed-block-icmp-lhs",
             currentHomeEqZeroDiagnosticForTest(&transaction, source, error.ValueUseUnresolvedSource).?,

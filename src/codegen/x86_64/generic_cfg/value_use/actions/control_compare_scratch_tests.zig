@@ -439,7 +439,7 @@ test "value-use scratch compare enforces legacy source order validation timing a
             .eq,
             false,
         );
-        try std.testing.expectError(error.ValueUseUnresolvedSource, transaction.seal());
+        try std.testing.expectError(error.ValueUseForwardPlanMissing, transaction.seal());
         try std.testing.expect(!transaction.failedRequestIs(requests.lhs));
         try std.testing.expect(transaction.failedRequestIs(requests.rhs.?));
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
@@ -466,7 +466,7 @@ test "value-use scratch compare enforces legacy source order validation timing a
             .eq,
             false,
         );
-        try std.testing.expectError(error.ValueUseUnresolvedSource, transaction.seal());
+        try std.testing.expectError(error.ValueUseForwardPlanMissing, transaction.seal());
         try std.testing.expect(transaction.failedRequestIs(requests.lhs));
         try std.testing.expect(!transaction.failedRequestIs(requests.rhs.?));
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);

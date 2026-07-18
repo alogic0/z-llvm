@@ -256,7 +256,7 @@ test "value-use current-home sign-bit diagnostics are provenance scoped and pair
             "result",
             .{ .int = 32 },
         );
-        try std.testing.expectError(error.ValueUseUnresolvedSource, transaction.seal());
+        try std.testing.expectError(error.ValueUseForwardPlanMissing, transaction.seal());
         try std.testing.expectEqualStrings(
             "composed-block-icmp-lhs",
             currentHomeSignBitDiagnosticForTest(

@@ -908,6 +908,164 @@ pub const Identity = struct {
     }
 };
 
+pub const max_forward_dependency_owners = 4;
+
+pub const ForwardAssignmentSnapshot = union(enum) {
+    gpr32: ArgReg,
+    gpr64: ArgReg,
+    spill: usize,
+
+    pub fn eql(
+        assignment: ForwardAssignmentSnapshot,
+        other: ForwardAssignmentSnapshot,
+    ) bool {
+        if (std.meta.activeTag(assignment) != std.meta.activeTag(other))
+            return false;
+        return switch (assignment) {
+            .gpr32 => |reg| reg == other.gpr32,
+            .gpr64 => |reg| reg == other.gpr64,
+            .spill => |index| index == other.spill,
+        };
+    }
+};
+
+pub const ForwardDependencyBindingSnapshot = struct {
+    vreg: VirtualReg,
+    address_index: ?Identity = null,
+    address_addend: ?Identity = null,
+    is_stack_i32_ptr: bool = false,
+
+    pub fn eql(
+        binding: *const ForwardDependencyBindingSnapshot,
+        other: *const ForwardDependencyBindingSnapshot,
+    ) bool {
+        return std.meta.eql(binding.vreg, other.vreg) and
+            binding.is_stack_i32_ptr == other.is_stack_i32_ptr and
+            optionalIdentityEql(binding.address_index, other.address_index) and
+            optionalIdentityEql(binding.address_addend, other.address_addend);
+    }
+};
+
+pub const ForwardDependencyEdgeSnapshot = struct {
+    identity: Identity,
+    identity_type: AddressDependencyDomain.IdentityType,
+    role: AddressDependencyDomain.Role,
+    interval_end: ?usize,
+    binding: ?ForwardDependencyBindingSnapshot,
+
+    pub fn eql(
+        edge: *const ForwardDependencyEdgeSnapshot,
+        other: *const ForwardDependencyEdgeSnapshot,
+    ) bool {
+        return edge.identity.eql(&other.identity) and
+            edge.identity_type == other.identity_type and
+            edge.role == other.role and
+            edge.interval_end == other.interval_end and
+            optionalForwardDependencyBindingEql(edge.binding, other.binding);
+    }
+};
+
+pub const ForwardDependencyOwnerSnapshot = struct {
+    identity: Identity,
+    identity_type: AddressDependencyDomain.IdentityType,
+    interval_end: usize,
+    binding: ?ForwardDependencyBindingSnapshot,
+    dependencies: [AddressDependencyDomain.max_dependencies_per_owner]ForwardDependencyEdgeSnapshot = undefined,
+    dependency_count: u8 = 0,
+
+    pub fn eql(
+        owner: *const ForwardDependencyOwnerSnapshot,
+        other: *const ForwardDependencyOwnerSnapshot,
+    ) bool {
+        if (!owner.identity.eql(&other.identity) or
+            owner.identity_type != other.identity_type or
+            owner.interval_end != other.interval_end or
+            !optionalForwardDependencyBindingEql(owner.binding, other.binding) or
+            owner.dependency_count != other.dependency_count)
+        {
+            return false;
+        }
+        for (
+            owner.dependencies[0..owner.dependency_count],
+            other.dependencies[0..other.dependency_count],
+        ) |*edge, *other_edge| {
+            if (!edge.eql(other_edge)) return false;
+        }
+        return true;
+    }
+};
+
+pub const ForwardDependencySnapshot = struct {
+    owners: [max_forward_dependency_owners]ForwardDependencyOwnerSnapshot = undefined,
+    owner_count: u8 = 0,
+
+    pub fn eql(
+        dependencies: *const ForwardDependencySnapshot,
+        other: *const ForwardDependencySnapshot,
+    ) bool {
+        if (dependencies.owner_count != other.owner_count) return false;
+        for (
+            dependencies.owners[0..dependencies.owner_count],
+            other.owners[0..other.owner_count],
+        ) |*owner, *other_owner| {
+            if (!owner.eql(other_owner)) return false;
+        }
+        return true;
+    }
+};
+
+/// Exact transaction-owned structural proof for a plan-backed forward use.
+/// It stores no ValueLoc and no slice or pointer into mutable plan entries.
+pub const ForwardAdmissionSnapshot = struct {
+    plan_identity: usize,
+    identity: Identity,
+    admission_position: usize,
+    definition_position: usize,
+    interval_end: usize,
+    virtual_class: VirtualRegClass,
+    defined_width: u16,
+    assignment: ForwardAssignmentSnapshot,
+    assignment_frame_bytes: ?usize,
+    dependencies: ForwardDependencySnapshot,
+
+    pub fn eql(
+        snapshot: *const ForwardAdmissionSnapshot,
+        other: *const ForwardAdmissionSnapshot,
+    ) bool {
+        return snapshot.plan_identity == other.plan_identity and
+            snapshot.identity.eql(&other.identity) and
+            snapshot.admission_position == other.admission_position and
+            snapshot.definition_position == other.definition_position and
+            snapshot.interval_end == other.interval_end and
+            snapshot.virtual_class == other.virtual_class and
+            snapshot.defined_width == other.defined_width and
+            snapshot.assignment.eql(other.assignment) and
+            snapshot.assignment_frame_bytes == other.assignment_frame_bytes and
+            snapshot.dependencies.eql(&other.dependencies);
+    }
+
+    pub fn virtualReg(snapshot: ForwardAdmissionSnapshot) VirtualReg {
+        return .{
+            .index = std.math.maxInt(usize),
+            .class = snapshot.virtual_class,
+            .bits = snapshot.defined_width,
+        };
+    }
+};
+
+fn optionalIdentityEql(lhs: ?Identity, rhs: ?Identity) bool {
+    if ((lhs == null) != (rhs == null)) return false;
+    return if (lhs) |identity| identity.eql(&rhs.?) else true;
+}
+
+fn optionalForwardDependencyBindingEql(
+    lhs: ?ForwardDependencyBindingSnapshot,
+    rhs: ?ForwardDependencyBindingSnapshot,
+) bool {
+    if ((lhs == null) != (rhs == null)) return false;
+    return if (lhs) |binding| binding.eql(&rhs.?) else true;
+}
+
 pub const Source = union(enum) {
     named: Identity,
     int: i128,
@@ -968,6 +1126,8 @@ const LifetimePin = struct {
 
 const LifetimeContext = struct {
     pins: [max_requests]?LifetimePin = [_]?LifetimePin{null} ** max_requests,
+    forward_snapshots: [max_requests]?ForwardAdmissionSnapshot =
+        [_]?ForwardAdmissionSnapshot{null} ** max_requests,
 };
 
 pub const PhysicalNode = enum(u8) {
@@ -1122,6 +1282,7 @@ pub fn Transaction(comptime Impl: type) type {
         const Source = Model.Source;
         const StoredRequest = Model.StoredRequest;
         const LifetimeContext = Model.LifetimeContext;
+        const ForwardAdmissionSnapshot = Model.ForwardAdmissionSnapshot;
         const PhysicalNode = Model.PhysicalNode;
         const physical_node_count = Model.physical_node_count;
         const max_mappings = Model.max_mappings;

@@ -61,6 +61,8 @@ const validateAccumulatorDisplacementPolicies = residual.validateAccumulatorDisp
 const classificationIndex = residual.classificationIndex;
 const isTestSource = residual.isTestSource;
 pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]const u8) !void {
+    if (std.mem.indexOf(u8, source, "resolveForwardValueForUse(") != null)
+        return error.ValueUsePreparedLeafRawOperation;
     if (std.mem.indexOf(u8, source, "readPreparedView(") != null or
         std.mem.indexOf(u8, source, "consumePreparedView(") != null or
         std.mem.indexOf(u8, source, ".PreparedView") != null or

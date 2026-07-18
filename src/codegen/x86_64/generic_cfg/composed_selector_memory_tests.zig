@@ -405,11 +405,13 @@ test "migrated ordinary load maps only attributed closed variants to the four le
     defer unresolved_machine.deinit(std.testing.allocator);
     var unresolved = ComposedBlockSelector.init(std.testing.allocator, &unresolved_machine);
     defer unresolved.deinit();
-    const diagnostic = (try selector_memory.lowerLoad(&unresolved, "loaded", .{
-        .ty = .{ .int = 32 },
-        .ptr = .{ .named = "missing" },
-    })).?;
-    try std.testing.expectEqualStrings("composed-block-unknown-load-ptr", diagnostic.unsupported_value);
+    try std.testing.expectError(
+        error.ValueUseForwardPlanMissing,
+        selector_memory.lowerLoad(&unresolved, "loaded", .{
+            .ty = .{ .int = 32 },
+            .ptr = .{ .named = "missing" },
+        }),
+    );
 }
 
 test "migrated load production rollback restores full state before and after partial emission" {

@@ -456,7 +456,7 @@ test "value-use named scalar request provenance distinguishes lhs and rhs failur
     defer transaction.deinit();
     const lhs = try registerFixture(&transaction, fixtures[5]);
     const rhs = transaction.requests[lhs.index].prepared_action.?.named_scalar_binary.rhs;
-    try std.testing.expectError(error.ValueUseUnresolvedSource, transaction.seal());
+    try std.testing.expectError(error.ValueUseForwardPlanMissing, transaction.seal());
     try std.testing.expect(!transaction.failedRequestIs(lhs));
     try std.testing.expect(transaction.failedRequestIs(rhs));
 }

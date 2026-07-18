@@ -359,17 +359,39 @@ pub fn validateEarlyHome(comptime Authority: type, transaction: anytype, index: 
 fn validateEarlyHomeUnchecked(comptime Authority: type, transaction: anytype, index: u8) !void {
     if (!transaction.early_home_valid[index]) return error.ValueUseEarlyHomeMissing;
     const request = &transaction.requests[index];
-    const name = switch (request.source) {
-        .named => |*identity| identity.slice(),
+    switch (request.source) {
+        .named => {},
         .int, .null_value, .unsupported => return error.ValueUseEarlySourceNotNamed,
-    };
-    const binding = transaction.selector.values.get(name) orelse
-        return error.ValueUseUnresolvedSource;
+    }
+    const binding = requestSourceBinding(transaction, index) orelse
+        return if (transaction.lifetime_context.forward_snapshots[index] != null)
+            error.ValueUseForwardPlanStale
+        else
+            error.ValueUseUnresolvedSource;
     if (!std.meta.eql(binding.vreg, transaction.early_homes[index].source_vreg))
         return error.ValueUsePreparedViewStale;
     _ = try Authority.planning.validateRequestAt(Authority, transaction, index);
     try compatibility.validateExpectedType(request.expected, request.form);
     try compatibility.validateSourceView(transaction.early_homes[index].loc, request.form);
+}
+fn requestSourceBinding(transaction: anytype, index: u8) ?selector_types.ValueBinding {
+    const request = &transaction.requests[index];
+    const name = switch (request.source) {
+        .named => |*identity| identity.slice(),
+        .int, .null_value, .unsupported => return null,
+    };
+    if (transaction.selector.values.get(name)) |binding| return binding;
+    const snapshot = transaction.lifetime_context.forward_snapshots[index] orelse return null;
+    return .{
+        .vreg = snapshot.virtualReg(),
+        .loc = switch (snapshot.assignment) {
+            .gpr32 => |reg| .{ .scratch32 = reg },
+            .gpr64 => |reg| .{ .scratch64 = reg },
+            .spill => |spill_index| .{
+                .spill64 = selector_state.spillFrameIndexMaybe(spill_index) orelse return null,
+            },
+        },
+    };
 }
 fn earlySequencingCandidate(loc: ValueLoc, form: Types.UseForm) bool {
     return switch (form) {
