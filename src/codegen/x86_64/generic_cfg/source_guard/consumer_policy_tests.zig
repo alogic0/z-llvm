@@ -81,7 +81,7 @@ const validateI128PairProductionSites = support.validateI128PairProductionSites;
 const validateScalarCastProductionSites = support.validateScalarCastProductionSites;
 const validateImmediateScalarSemanticPartition = support.validateImmediateScalarSemanticPartition;
 const validateImmediateScalarProductionSites = support.validateImmediateScalarProductionSites;
-const validateDormantNamedScalarProductionSites = support.validateDormantNamedScalarProductionSites;
+const validateNamedScalarProductionSites = support.validateNamedScalarProductionSites;
 const validateLoadDiagnosticMappingProductionSites = support.validateLoadDiagnosticMappingProductionSites;
 const validateDormantLoadActionProductionSites = support.validateDormantLoadActionProductionSites;
 const validateAccumulatorCompositionProductionSites = support.validateAccumulatorCompositionProductionSites;
@@ -670,20 +670,87 @@ test "composed selector source guard rejects unclassified immediate scalar produ
     );
 }
 
-test "value-use dormant named scalar actions reject premature production wiring" {
-    try validateDormantNamedScalarProductionSites("composed_selector_scalar.zig", "fn lower() void {}");
+test "value-use named scalar production wiring freezes accepted and retained families" {
+    const accepted: [:0]const u8 = @embedFile("../composed_selector_scalar.zig");
+    try validateNamedScalarProductionSites("composed_selector_scalar.zig", accepted);
+
     try std.testing.expectError(
-        error.ValueUseNamedScalarPrematureProductionUse,
-        validateDormantNamedScalarProductionSites(
-            "composed_selector_scalar.zig",
+        error.ValueUseNamedScalarActionOutsideAllowlist,
+        validateNamedScalarProductionSites(
+            "composed_selector_calls.zig",
             "fn lower() void { _ = ValueUseTransaction.isNamedScalarBinary(binary, false); }",
         ),
     );
+
+    const missing_interval_owner = try std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        accepted,
+        "scalar_named_b03_interval_admission",
+        "scalar_named_b03_unclassified",
+    );
+    defer std.testing.allocator.free(missing_interval_owner);
+    const missing_interval_owner_z = try std.testing.allocator.dupeZ(u8, missing_interval_owner);
+    defer std.testing.allocator.free(missing_interval_owner_z);
     try std.testing.expectError(
-        error.ValueUseNamedScalarPrematureProductionUse,
-        validateDormantNamedScalarProductionSites(
+        error.ValueUseNamedScalarIntervalResidualMissing,
+        validateNamedScalarProductionSites(
             "composed_selector_scalar.zig",
-            "fn lower() void { try transaction.attachExactI52BinaryAction(lhs, action); }",
+            missing_interval_owner_z,
+        ),
+    );
+
+    const transactional_interval_owner = try std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        accepted,
+        ".imul_eax_arg32",
+        "/* ValueUseTransaction.begin(selector) */ .imul_eax_arg32",
+    );
+    defer std.testing.allocator.free(transactional_interval_owner);
+    const transactional_interval_owner_z = try std.testing.allocator.dupeZ(u8, transactional_interval_owner);
+    defer std.testing.allocator.free(transactional_interval_owner_z);
+    try std.testing.expectError(
+        error.ValueUseNamedScalarIntervalResidualOwnershipMismatch,
+        validateNamedScalarProductionSites(
+            "composed_selector_scalar.zig",
+            transactional_interval_owner_z,
+        ),
+    );
+
+    const missing_rhs_owner = try std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        accepted,
+        "scalar_named_b07_rhs_admission",
+        "scalar_named_b07_unclassified",
+    );
+    defer std.testing.allocator.free(missing_rhs_owner);
+    const missing_rhs_owner_z = try std.testing.allocator.dupeZ(u8, missing_rhs_owner);
+    defer std.testing.allocator.free(missing_rhs_owner_z);
+    try std.testing.expectError(
+        error.ValueUseNamedScalarRhsResidualMissing,
+        validateNamedScalarProductionSites(
+            "composed_selector_scalar.zig",
+            missing_rhs_owner_z,
+        ),
+    );
+
+    const transactional_rhs_owner = try std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        accepted,
+        "selector_state.emitValueIntoScratchAndRelocate(",
+        "/* ValueUseTransaction.begin(selector) */ selector_state.emitValueIntoScratchAndRelocate(",
+    );
+    defer std.testing.allocator.free(transactional_rhs_owner);
+    const transactional_rhs_owner_z = try std.testing.allocator.dupeZ(u8, transactional_rhs_owner);
+    defer std.testing.allocator.free(transactional_rhs_owner_z);
+    try std.testing.expectError(
+        error.ValueUseNamedScalarRhsResidualOwnershipMismatch,
+        validateNamedScalarProductionSites(
+            "composed_selector_scalar.zig",
+            transactional_rhs_owner_z,
         ),
     );
 }

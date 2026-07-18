@@ -78,14 +78,7 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
     if (bits == 52) return lowerI52Binary(selector, result_name, binary);
     if (bits == 1) {
         if ((binary.op != .@"and" and binary.op != .@"or") or valueIsInt(binary.lhs) or valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
-        selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits) catch return .{ .unsupported_value = "composed-block-unknown-rhs" };
-        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-        defer transaction.deinit();
-        if (try transaction.prepare(.preserve, accumulatorDirectMaterializationDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
-        transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-unknown-lhs" };
-        try emitArithmeticWrite(selector, .{ .binary_arg_eax = .{ .op = machineBinaryOp(binary.op) orelse unreachable, .reg = .rcx } });
-        try finishArithmeticResult(&transaction, result_name, bits);
-        return null;
+        return lowerB01NamedScalarBinary(selector, result_name, binary);
     }
     if (bits == 8) {
         if (binary.op != .@"and" or !valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
@@ -108,58 +101,150 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         return try lowerUnsignedDivRem(selector, result_name, binary, bits);
     }
     if (binary.op == .mul and bits <= 32) {
-        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-        defer transaction.deinit();
-        if (try transaction.prepare(.preserve, try accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
-        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
-        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
-        try emitArithmeticWrite(selector, .{ .imul_eax_arg32 = .rcx });
-        try finishArithmeticResult(&transaction, result_name, bits);
-        return null;
+        return scalar_named_b03_interval_admission(selector, result_name, binary, bits);
     }
     if ((binary.op == .shl or binary.op == .lshr or binary.op == .ashr) and (bits == 16 or bits == 32 or (exact_ei_narrow and bits < 32))) {
-        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
-        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-        defer transaction.deinit();
-        if (try transaction.prepare(.preserve, accumulatorDirectMaterializationDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
-        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
-        try emitArithmeticWrite(selector, switch (binary.op) {
-            .shl => .shl_eax_cl,
-            .lshr => .shr_eax_cl,
-            .ashr => .sar_eax_cl,
-            else => unreachable,
-        });
-        try finishArithmeticResult(&transaction, result_name, bits);
-        return null;
+        return scalar_named_b04_interval_admission(selector, result_name, binary, bits);
     }
     if ((binary.op == .shl or binary.op == .lshr or binary.op == .ashr) and (bits == 64 or (exact_ei_narrow and bits > 32))) {
-        selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-ei-shift-rhs" };
-        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-        defer transaction.deinit();
-        if (try transaction.prepare(.preserve, try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
-        transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-ei-shift-lhs" };
-        try emitArithmeticWrite(selector, switch (binary.op) {
-            .shl => .shl_rax_cl,
-            .lshr => .shr_rax_cl,
-            .ashr => .sar_rax_cl,
-            else => unreachable,
-        });
-        try finishArithmeticResult(&transaction, result_name, bits);
-        return null;
+        return scalar_named_b05_interval_admission(selector, result_name, binary, bits);
     }
     if (exact_ei_narrow and bits > 32) {
-        const op = machineBinaryOp(binary.op) orelse return .{ .no_emitter = "composed-block-binary-op" };
-        selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch return .{ .unsupported_value = "composed-block-ei-binary-rhs" };
-        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-        defer transaction.deinit();
-        if (try transaction.prepare(.preserve, try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
-        transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch return .{ .unsupported_value = "composed-block-ei-binary-lhs" };
-        try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = op, .reg = .rcx } });
-        try finishArithmeticResult(&transaction, result_name, bits);
-        return null;
+        return scalar_named_b06_interval_admission(selector, result_name, binary, bits);
     }
 
     const op = machineBinaryOp(binary.op) orelse return .{ .no_emitter = "composed-block-binary-op" };
+    return scalar_named_b07_rhs_admission(selector, result_name, binary, bits, exact_ei_narrow, op);
+}
+
+fn lowerB01NamedScalarBinary(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    binary: ir.BinaryInst,
+) !?Diagnostic {
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const lhs_request = try transaction.register(.{
+        .source = binary.lhs,
+        .expected = .{ .ty = binary.ty, .register_class = .gpr32 },
+        .form = .named_scalar_operand,
+        .destination = .prepared_view,
+    });
+    const rhs_request = try transaction.register(.{
+        .source = binary.rhs,
+        .expected = .{ .ty = binary.ty, .register_class = .gpr32 },
+        .form = .named_scalar_operand,
+        .destination = .prepared_source,
+    });
+    try transaction.attachNamedScalarBinaryAction(lhs_request, .{
+        .result = try ValueUseTransaction.ActionIdentity.init(result_name),
+        .operation = binary.op,
+        .integer_ty = binary.ty,
+        .exact_ei = false,
+        .rhs = rhs_request,
+    });
+    transaction.seal() catch |err|
+        return namedScalarValueUseDiagnostic(&transaction, lhs_request, rhs_request, .b01, err) orelse return err;
+    transaction.prepare() catch |err|
+        return namedScalarValueUseDiagnostic(&transaction, lhs_request, rhs_request, .b01, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return namedScalarValueUseDiagnostic(&transaction, lhs_request, rhs_request, .b01, err) orelse return err;
+    const lease = transaction.preparedView(lhs_request) catch |err|
+        return namedScalarValueUseDiagnostic(&transaction, lhs_request, rhs_request, .b01, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return namedScalarValueUseDiagnostic(&transaction, lhs_request, rhs_request, .b01, err) orelse return err;
+    try transaction.commit();
+    return null;
+}
+
+fn scalar_named_b03_interval_admission(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    binary: ir.BinaryInst,
+    bits: u16,
+) !?Diagnostic {
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, try accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
+    try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
+    try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+    try emitArithmeticWrite(selector, .{ .imul_eax_arg32 = .rcx });
+    try finishArithmeticResult(&transaction, result_name, bits);
+    return null;
+}
+
+fn scalar_named_b04_interval_admission(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    binary: ir.BinaryInst,
+    bits: u16,
+) !?Diagnostic {
+    try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, accumulatorDirectMaterializationDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+    try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+    try emitArithmeticWrite(selector, switch (binary.op) {
+        .shl => .shl_eax_cl,
+        .lshr => .shr_eax_cl,
+        .ashr => .sar_eax_cl,
+        else => unreachable,
+    });
+    try finishArithmeticResult(&transaction, result_name, bits);
+    return null;
+}
+
+fn scalar_named_b05_interval_admission(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    binary: ir.BinaryInst,
+    bits: u16,
+) !?Diagnostic {
+    selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch
+        return .{ .unsupported_value = "composed-block-ei-shift-rhs" };
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+    transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch
+        return .{ .unsupported_value = "composed-block-ei-shift-lhs" };
+    try emitArithmeticWrite(selector, switch (binary.op) {
+        .shl => .shl_rax_cl,
+        .lshr => .shr_rax_cl,
+        .ashr => .sar_rax_cl,
+        else => unreachable,
+    });
+    try finishArithmeticResult(&transaction, result_name, bits);
+    return null;
+}
+
+fn scalar_named_b06_interval_admission(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    binary: ir.BinaryInst,
+    bits: u16,
+) !?Diagnostic {
+    const op = machineBinaryOp(binary.op) orelse
+        return .{ .no_emitter = "composed-block-binary-op" };
+    selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch
+        return .{ .unsupported_value = "composed-block-ei-binary-rhs" };
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
+    transaction.materialize(binary.lhs, accumulatorDefinition(bits)) catch
+        return .{ .unsupported_value = "composed-block-ei-binary-lhs" };
+    try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{ .op = op, .reg = .rcx } });
+    try finishArithmeticResult(&transaction, result_name, bits);
+    return null;
+}
+
+fn scalar_named_b07_rhs_admission(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    binary: ir.BinaryInst,
+    bits: u16,
+    exact_ei_narrow: bool,
+    op: MachineBinaryOp,
+) !?Diagnostic {
     while (try selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
         if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
     }
@@ -232,6 +317,50 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         try selector_state.emitBinaryArgAccumulator(selector, op, rhs_reg, bits);
         try finishArithmeticResult(&transaction, result_name, bits);
     }
+    return null;
+}
+
+const NamedScalarDiagnosticKind = enum {
+    b01,
+    i52b0,
+};
+
+fn namedScalarValueUseDiagnostic(
+    transaction: *const ValueUseTransaction,
+    lhs_request: ValueUseTransaction.RequestHandle,
+    rhs_request: ValueUseTransaction.RequestHandle,
+    kind: NamedScalarDiagnosticKind,
+    err: anyerror,
+) ?Diagnostic {
+    if (err == error.ValueUseActionDiagnostic) return transaction.actionDiagnostic();
+    const request_error = switch (err) {
+        error.ValueUseSourcePlanMissing,
+        error.ValueUseSourceIntervalMissing,
+        error.ValueUseSourceGenerationChanged,
+        error.ValueUseUnresolvedSource,
+        error.ValueUseExpiredSource,
+        error.ValueUseUnsupportedSource,
+        error.ValueUseTypeMismatch,
+        error.ValueUseRegisterClassMismatch,
+        error.ValueUseSourceViewMismatch,
+        error.ValueUseNamedScalarFormUnsupported,
+        error.ValueUseNamedScalarWidthUnsupported,
+        error.ValueUseNamedScalarLocationUnsupported,
+        error.ValueUseNamedScalarScratchUnavailable,
+        error.ValueUseNamedScalarExactEiUnsupported,
+        error.ValueUseNamedScalarI52EnvelopeUnsupported,
+        => true,
+        else => false,
+    };
+    if (!request_error) return null;
+    if (transaction.failedRequestIs(lhs_request)) return switch (kind) {
+        .b01 => .{ .unsupported_value = "composed-block-unknown-lhs" },
+        .i52b0 => .{ .unsupported_value = "composed-block-i52-shift-lhs" },
+    };
+    if (transaction.failedRequestIs(rhs_request)) return switch (kind) {
+        .b01 => .{ .unsupported_value = "composed-block-unknown-rhs" },
+        .i52b0 => .{ .unsupported_value = "composed-block-i52-shift-rhs" },
+    };
     return null;
 }
 
@@ -997,22 +1126,43 @@ fn lowerI52Binary(selector: *ComposedBlockSelector, result_name: []const u8, bin
     {
         return .{ .no_emitter = "composed-block-i52-binary-form" };
     }
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    return lowerExactI52NamedScalarBinary(selector, result_name, binary);
+}
+
+fn lowerExactI52NamedScalarBinary(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    binary: ir.BinaryInst,
+) !?Diagnostic {
+    var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
-    if (try transaction.prepare(
-        .preserve,
-        try accumulatorPreserveCurrentDisplacement(selector, binary.lhs, .spill_live),
-    )) |diagnostic| return diagnostic;
-    selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, 64) catch
-        return .{ .unsupported_value = "composed-block-i52-shift-rhs" };
-    transaction.materialize(binary.lhs, accumulatorDefinition(52)) catch
-        return .{ .unsupported_value = "composed-block-i52-shift-lhs" };
-    // Count 52 is poison in LLVM's i52 domain. The captured family keeps that
-    // value on the unselected side of its guarding select; x86 may compute any
-    // physical value here, and the low-52 mask preserves every defined case.
-    try emitArithmeticWrite(selector, .shl_rax_cl);
-    try maskRaxToI52(selector);
-    try finishArithmeticResult(&transaction, result_name, 52);
+    const lhs_request = try transaction.register(.{
+        .source = binary.lhs,
+        .expected = .{ .ty = binary.ty, .register_class = .gpr64 },
+        .form = .named_scalar_operand,
+        .destination = .prepared_view,
+    });
+    const rhs_request = try transaction.register(.{
+        .source = binary.rhs,
+        .expected = .{ .ty = binary.ty, .register_class = .gpr64 },
+        .form = .named_scalar_operand,
+        .destination = .prepared_source,
+    });
+    try transaction.attachExactI52BinaryAction(lhs_request, .{
+        .result = try ValueUseTransaction.ActionIdentity.init(result_name),
+        .rhs = rhs_request,
+    });
+    transaction.seal() catch |err|
+        return namedScalarValueUseDiagnostic(&transaction, lhs_request, rhs_request, .i52b0, err) orelse return err;
+    transaction.prepare() catch |err|
+        return namedScalarValueUseDiagnostic(&transaction, lhs_request, rhs_request, .i52b0, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return namedScalarValueUseDiagnostic(&transaction, lhs_request, rhs_request, .i52b0, err) orelse return err;
+    const lease = transaction.preparedView(lhs_request) catch |err|
+        return namedScalarValueUseDiagnostic(&transaction, lhs_request, rhs_request, .i52b0, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return namedScalarValueUseDiagnostic(&transaction, lhs_request, rhs_request, .i52b0, err) orelse return err;
+    try transaction.commit();
     return null;
 }
 

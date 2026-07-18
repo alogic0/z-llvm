@@ -88,7 +88,7 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     try validateI128PairProductionSites(source_name, source);
     try validateScalarCastProductionSites(source_name, source);
     try validateImmediateScalarProductionSites(source_name, source);
-    try validateDormantNamedScalarProductionSites(source_name, source);
+    try validateNamedScalarProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -122,23 +122,214 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     }
 }
 
-pub fn validateDormantNamedScalarProductionSites(
+pub fn validateNamedScalarProductionSites(
     source_name: []const u8,
     source: [:0]const u8,
 ) !void {
-    _ = source_name;
-    const forbidden = [_][]const u8{
-        "attachNamedScalarBinaryAction(",
-        "attachExactI52BinaryAction(",
-        "isNamedScalarBinary(",
-        "isExactI52Binary(",
-        ".named_scalar_binary",
-        ".exact_i52_binary",
-        ".named_scalar_operand",
+    const named_form = ".form = .named_scalar_operand";
+    const named_attach = "attachNamedScalarBinaryAction(";
+    const i52_attach = "attachExactI52BinaryAction(";
+    const marker_total =
+        countPattern(source, named_form) +
+        countPattern(source, named_attach) +
+        countPattern(source, i52_attach) +
+        countPattern(source, "isNamedScalarBinary(") +
+        countPattern(source, "isExactI52Binary(") +
+        countPattern(source, ".named_scalar_binary") +
+        countPattern(source, ".exact_i52_binary");
+    if (!std.mem.eql(u8, source_name, "composed_selector_scalar.zig")) {
+        if (marker_total != 0)
+            return error.ValueUseNamedScalarActionOutsideAllowlist;
+        return;
+    }
+    if (countPattern(source, named_form) != 4 or
+        countPattern(source, named_attach) != 1 or
+        countPattern(source, i52_attach) != 1 or
+        countPattern(source, "isNamedScalarBinary(") != 0 or
+        countPattern(source, "isExactI52Binary(") != 0)
+    {
+        return error.ValueUseNamedScalarActionAllowlistMismatch;
+    }
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const lower_binary = functionBodyNamed(bodies, "lowerBinary") orelse
+        return error.ValueUseNamedScalarActionAllowlistMismatch;
+    const b01 = functionBodyNamed(bodies, "lowerB01NamedScalarBinary") orelse
+        return error.ValueUseNamedScalarActionAllowlistMismatch;
+    const i52_dispatch = functionBodyNamed(bodies, "lowerI52Binary") orelse
+        return error.ValueUseNamedScalarActionAllowlistMismatch;
+    const i52_action = functionBodyNamed(bodies, "lowerExactI52NamedScalarBinary") orelse
+        return error.ValueUseNamedScalarActionAllowlistMismatch;
+    const mapper = functionBodyNamed(bodies, "namedScalarValueUseDiagnostic") orelse
+        return error.ValueUseNamedScalarActionAllowlistMismatch;
+    const b03 = functionBodyNamed(bodies, "scalar_named_b03_interval_admission") orelse
+        return error.ValueUseNamedScalarIntervalResidualMissing;
+    const b04 = functionBodyNamed(bodies, "scalar_named_b04_interval_admission") orelse
+        return error.ValueUseNamedScalarIntervalResidualMissing;
+    const b05 = functionBodyNamed(bodies, "scalar_named_b05_interval_admission") orelse
+        return error.ValueUseNamedScalarIntervalResidualMissing;
+    const b06 = functionBodyNamed(bodies, "scalar_named_b06_interval_admission") orelse
+        return error.ValueUseNamedScalarIntervalResidualMissing;
+    const b07 = functionBodyNamed(bodies, "scalar_named_b07_rhs_admission") orelse
+        return error.ValueUseNamedScalarRhsResidualMissing;
+
+    const ActionContract = struct {
+        body: FunctionBody,
+        attachment: []const u8,
     };
-    for (forbidden) |pattern|
-        if (std.mem.indexOf(u8, source, pattern) != null)
-            return error.ValueUseNamedScalarPrematureProductionUse;
+    const actions = [_]ActionContract{
+        .{ .body = b01, .attachment = named_attach },
+        .{ .body = i52_action, .attachment = i52_attach },
+    };
+    for (actions) |action| {
+        const body_source = source[action.body.start..action.body.end];
+        if (countPattern(body_source, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(body_source, "transaction.register(") != 2 or
+            countPattern(body_source, named_form) != 2 or
+            countPattern(body_source, action.attachment) != 1 or
+            countPattern(body_source, "transaction.seal()") != 1 or
+            countPattern(body_source, "transaction.prepare()") != 1 or
+            countPattern(body_source, "transaction.materializeAll()") != 1 or
+            countPattern(body_source, "transaction.preparedView(") != 1 or
+            countPattern(body_source, "transaction.executePreparedAction(") != 1 or
+            countPattern(body_source, "transaction.commit()") != 1 or
+            countPattern(body_source, "namedScalarValueUseDiagnostic(") != 5 or
+            countPattern(body_source, "AccumulatorDefinitionTransaction.begin(") != 0)
+        {
+            return error.ValueUseNamedScalarActionAllowlistMismatch;
+        }
+        for (bypass_operations) |operation| {
+            if (std.mem.indexOf(u8, body_source, operation) != null)
+                return error.ValueUseNamedScalarConsumerHomeClassification;
+        }
+    }
+
+    const mapper_source = source[mapper.start..mapper.end];
+    if (countPattern(mapper_source, ".failedRequestIs(") != 2 or
+        countPattern(mapper_source, "error.ValueUseActionDiagnostic") != 1 or
+        countPattern(mapper_source, "transaction.actionDiagnostic()") != 1)
+    {
+        return error.ValueUseNamedScalarActionAllowlistMismatch;
+    }
+
+    const lower_binary_source = source[lower_binary.start..lower_binary.end];
+    const b01_dispatch = std.mem.indexOf(
+        u8,
+        lower_binary_source,
+        "return lowerB01NamedScalarBinary(selector, result_name, binary);",
+    ) orelse return error.ValueUseNamedScalarDispatchMismatch;
+    const b03_dispatch = std.mem.indexOf(
+        u8,
+        lower_binary_source,
+        "return scalar_named_b03_interval_admission(selector, result_name, binary, bits);",
+    ) orelse return error.ValueUseNamedScalarIntervalResidualMissing;
+    const b04_dispatch = std.mem.indexOf(
+        u8,
+        lower_binary_source,
+        "return scalar_named_b04_interval_admission(selector, result_name, binary, bits);",
+    ) orelse return error.ValueUseNamedScalarIntervalResidualMissing;
+    const b05_dispatch = std.mem.indexOf(
+        u8,
+        lower_binary_source,
+        "return scalar_named_b05_interval_admission(selector, result_name, binary, bits);",
+    ) orelse return error.ValueUseNamedScalarIntervalResidualMissing;
+    const b06_dispatch = std.mem.indexOf(
+        u8,
+        lower_binary_source,
+        "return scalar_named_b06_interval_admission(selector, result_name, binary, bits);",
+    ) orelse return error.ValueUseNamedScalarIntervalResidualMissing;
+    const b07_dispatch = std.mem.indexOf(
+        u8,
+        lower_binary_source,
+        "return scalar_named_b07_rhs_admission(selector, result_name, binary, bits, exact_ei_narrow, op);",
+    ) orelse return error.ValueUseNamedScalarRhsResidualMissing;
+    if (!(b01_dispatch < b03_dispatch and b03_dispatch < b04_dispatch and
+        b04_dispatch < b05_dispatch and b05_dispatch < b06_dispatch and
+        b06_dispatch < b07_dispatch) or
+        countPattern(lower_binary_source, "ValueUseTransaction.begin(") != 0 or
+        countPattern(lower_binary_source, "AccumulatorDefinitionTransaction.begin(") != 0)
+    {
+        return error.ValueUseNamedScalarDispatchMismatch;
+    }
+
+    const i52_dispatch_source = source[i52_dispatch.start..i52_dispatch.end];
+    if (countPattern(i52_dispatch_source, "lowerExactI52NamedScalarBinary(") != 1 or
+        countPattern(i52_dispatch_source, "ValueUseTransaction.begin(") != 0 or
+        countPattern(i52_dispatch_source, "AccumulatorDefinitionTransaction.begin(") != 0)
+    {
+        return error.ValueUseNamedScalarDispatchMismatch;
+    }
+
+    const IntervalOwner = struct {
+        body: FunctionBody,
+        required: []const []const u8,
+    };
+    const interval_owners = [_]IntervalOwner{
+        .{
+            .body = b03,
+            .required = &.{
+                "accumulatorArithmeticDisplacement(",
+                ".scratch_preferred",
+                "emitValueIntoScratch(",
+                ".imul_eax_arg32",
+            },
+        },
+        .{
+            .body = b04,
+            .required = &.{
+                "accumulatorDirectMaterializationDisplacement(",
+                ".spill_live",
+                "emitValueIntoScratch(",
+                ".shl_eax_cl",
+                ".shr_eax_cl",
+                ".sar_eax_cl",
+            },
+        },
+        .{
+            .body = b05,
+            .required = &.{
+                "accumulatorPreserveCurrentDisplacement(",
+                ".spill_live",
+                "emitValueIntoScratch(",
+                ".shl_rax_cl",
+                ".shr_rax_cl",
+                ".sar_rax_cl",
+            },
+        },
+        .{
+            .body = b06,
+            .required = &.{
+                "accumulatorPreserveCurrentDisplacement(",
+                ".spill_live",
+                "emitValueIntoScratch(",
+                ".binary_arg_rax",
+            },
+        },
+    };
+    for (interval_owners) |owner| {
+        const owner_source = source[owner.body.start..owner.body.end];
+        if (countPattern(owner_source, "ValueUseTransaction.begin(") != 0 or
+            countPattern(owner_source, "AccumulatorDefinitionTransaction.begin(selector)") != 1)
+        {
+            return error.ValueUseNamedScalarIntervalResidualOwnershipMismatch;
+        }
+        for (owner.required) |pattern| {
+            if (countPattern(owner_source, pattern) != 1)
+                return error.ValueUseNamedScalarIntervalResidualOwnershipMismatch;
+        }
+    }
+
+    const b07_source = source[b07.start..b07.end];
+    if (countPattern(b07_source, "ValueUseTransaction.begin(") != 0 or
+        countPattern(b07_source, "AccumulatorDefinitionTransaction.begin(selector)") != 4 or
+        countPattern(b07_source, "selector_state.resolveValue(") != 4 or
+        countPattern(b07_source, "selector_state.emitValueIntoScratch(") != 2 or
+        countPattern(b07_source, "selector_state.emitValueIntoScratchAndRelocate(") != 1 or
+        countPattern(b07_source, "selector_state.emitBinaryLocIntoAccumulator(") != 1)
+    {
+        return error.ValueUseNamedScalarRhsResidualOwnershipMismatch;
+    }
 }
 
 pub fn validateImmediateScalarSemanticPartition(source: [:0]const u8) !void {
@@ -1591,9 +1782,12 @@ pub fn validateFailureProvenanceProductionSites(source_name: []const u8, source:
             return error.ValueUseFailureProvenanceOutsideAllowlist;
         const immediate_mapper = functionBodyNamed(bodies, "immediateScalarValueUseDiagnostic") orelse
             return error.ValueUseFailureProvenanceOutsideAllowlist;
+        const named_mapper = functionBodyNamed(bodies, "namedScalarValueUseDiagnostic") orelse
+            return error.ValueUseFailureProvenanceOutsideAllowlist;
         if (countPattern(source[cast_mapper.start..cast_mapper.end], ".failedRequestIs(") != 1 or
             countPattern(source[immediate_mapper.start..immediate_mapper.end], ".failedRequestIs(") != 1 or
-            query_count != 2)
+            countPattern(source[named_mapper.start..named_mapper.end], ".failedRequestIs(") != 2 or
+            query_count != 4)
         {
             return error.ValueUseFailureProvenanceAllowlistMismatch;
         }

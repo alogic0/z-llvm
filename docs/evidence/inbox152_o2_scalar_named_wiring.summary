@@ -1,0 +1,163 @@
+# INBOX-152 O2 scalar Slice 3 Stage 2 — B01 + I52B0 wiring
+
+Status at the production commit: correctness gates complete; performance
+evidence is appended by the required follow-up immutable evidence commit.
+No Tier 3 was run.
+
+## Scope and ownership
+
+Only the two INBOX-151-approved complete families are wired through
+`ValueUseTransaction`:
+
+- B01: named i1 `and`/`or`;
+- I52B0: the exact guarded i52 shift envelope.
+
+The dormant action/model implementation is unchanged from accepted commit
+`0661c8cd`:
+
+```text
+value_use/actions/scalar_named.zig
+  6de4086bb1285db52ebac352acb743e49a6778b2407def137ab71d56b9464416
+value_use/model.zig
+  b81a0173dd7af97a346df71c030e6655d925891496f6bf7049e3e6cf8f13ab76
+```
+
+Every retained family is routed to a complete legacy owner before any O2
+transaction is created:
+
+| Family | Guard-enforced residual owner | Admission class |
+|---|---|---|
+| B03 | `scalar_named_b03_interval_admission` | interval admission |
+| B04 | `scalar_named_b04_interval_admission` | interval admission |
+| B05 | `scalar_named_b05_interval_admission` | interval admission |
+| B06 | `scalar_named_b06_interval_admission` | interval admission |
+| B07 | `scalar_named_b07_rhs_admission` | RHS admission |
+
+There is no transactional attempt followed by legacy fallback. The guard
+requires zero `ValueUseTransaction.begin` occurrences in `lowerBinary` and
+in all five retained owners; it freezes each owner's accepted legacy
+authority, bypass-operation inventory, and dispatch order. Negative fixtures
+reject a missing/renamed owner and a transaction introduced into either an
+interval owner or the distinct RHS owner.
+
+R03 `scalar_immediate_live_shared_source_preservation`, R04
+`scalar_immediate_multi_alias_preservation`, pair/i128 ownership, exact-EI
+positioning, and all prior exclusions remain unchanged.
+
+## Ratchet
+
+`docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv` removes
+exactly the two accepted gateways:
+
+- B01 removes one `lowerBinary/emitValueIntoScratch`;
+- I52B0 removes one `lowerI52Binary/emitValueIntoScratch`.
+
+The retained operations are re-attributed, without count loss, to their
+five exact residual owners. Inventory SHA-256 is
+`135b0da652ff4de3df720555f77f022be6da657bd2b33beb0e1876f23181dc89`.
+The exact operation total is 152:
+
+```text
+154 - B01(1) - I52B0(1) - helper_collapses(0) = 152
+```
+
+## Decisive identities
+
+Commands:
+
+```text
+command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --report-all-codegen-failures --target=x86_64-linux --input-limit=67108864 tmp/inbox92_second_resume2_perf/compiler_rt_frozen.ll > /dev/null 2> tmp/inbox152_o2_scalar_named_wiring/validation/fresh_full_report.log
+
+command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll > tmp/inbox152_o2_scalar_named_wiring/validation/accepted.o 2> tmp/inbox152_o2_scalar_named_wiring/validation/accepted.stderr
+
+command=LC_ALL=C zig-out/bin/z_llvm --emit=selection-owner-manifest --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll > tmp/inbox152_o2_scalar_named_wiring/validation/owner_manifest.tsv 2> tmp/inbox152_o2_scalar_named_wiring/validation/owner_manifest.stderr
+
+command=/home/oleg/bin/zig run tmp/inbox142_family_isolation/compare_elf_functions.zig -- tmp/inbox151_o2_family_isolation/results/baseline/accepted.o tmp/inbox152_o2_scalar_named_wiring/validation/accepted.o > tmp/inbox152_o2_scalar_named_wiring/validation/function_diff.tsv
+```
+
+Results:
+
+```text
+report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681
+report=443 selected / 285 emitted / 158 failed
+first_failure=compiler_rt.trunc.truncl/UnsupportedLongDoubleAbi
+object_sha256=061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be
+owner_sha256=5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d
+owner_ledger=167 composed / 17 legacy / 101 structural
+accepted_stderr_bytes=0
+owner_stderr_bytes=0
+per_function=285 compared / 0 divergent / 0 missing
+per_function_log_sha256=aa378a2733f9b5bbd9160016942ab69a57da10672b1a0b94eabb13b9ff359240
+```
+
+The six `composed-block-icmp-lhs-loc` rows remain exact; their extracted
+record has SHA-256
+`87c35d64c6f8b8742b3f8449ad3b5bb1701d84cddbbc0624d6b7315a1047855f`.
+Whole-object and 285/0/0 per-function identity prove the `exp2` stream is
+unchanged. The focused validator independently proves the fma and
+`__multi3` streams, symbols, helpers, and executable cases.
+
+## Correctness gates
+
+Every command below ran against the final production source state. Logs are
+retained under `tmp/inbox152_o2_scalar_named_wiring/validation/`.
+
+### Source guard
+
+```text
+command=/home/oleg/bin/zig test src/codegen/x86_64/generic_cfg/composed_selector_source_guard_tests.zig 2>&1 | tee tmp/inbox152_o2_scalar_named_wiring/validation/source_guard.log
+result=50/50 passed
+log_sha256=973bd4f8ee08f195dff21cc112d9191b5d5e57a17de52c87f96aaf093ed208c3
+```
+
+### Full unit
+
+```text
+command=/home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox152_o2_scalar_named_wiring/validation/full_unit.log
+result=7/7 steps; 1339/1339 tests
+log_sha256=4e7329608e466c557aacbb7be75df7808edb2ba55738de9a922e944b3ad8e48c
+```
+
+### ABI differential
+
+```text
+command=/home/oleg/bin/zig build abi-differential --summary all 2>&1 | tee tmp/inbox152_o2_scalar_named_wiring/validation/abi_differential.log
+result=5/5 steps; 60/60 cases; 30/30 real functions
+log_sha256=11ded6f807f226f585e223ceb2242054102f34236331404001d29f2d992ab999
+```
+
+### Focused codegen canaries
+
+```text
+command=/home/oleg/bin/zig build focused-codegen-canaries --summary all 2>&1 | tee tmp/inbox152_o2_scalar_named_wiring/validation/focused_canaries.log
+result=2/2 canaries; 35 executable cases; fma and __multi3 object/stream/symbol/helper checks exact
+log_sha256=d704046eacfa8c3c2cf852ed97c86ab42b5a6a07dcfe4dd7de48cb870f2292c6
+```
+
+### Integrated executable
+
+```text
+command=/home/oleg/bin/zig build distribution-zig-integrated-exe --summary all 2>&1 | tee tmp/inbox152_o2_scalar_named_wiring/validation/integrated_exe.log
+result=2/2 steps; 7/7 build/run/stdout/exit
+log_sha256=0b9a00b84979e9e442c87470f353de361e92b336d3e447cbed35dc7ea1d89a92
+```
+
+### Strengthened Tier 2
+
+```text
+command=/home/oleg/bin/zig build test structural-smoke compare-codegen-asm compare-codegen-objdump compare-codegen-readelf distribution-object distribution-executable distribution-debug-object distribution-debug-executable distribution-releasesafe-object distribution-zig-integrated-exe abi-differential --summary all 2>&1 | tee tmp/inbox152_o2_scalar_named_wiring/validation/strengthened_tier2.log
+result=29/29 steps; 1347/1347 tests
+log_sha256=099d7ab3f695bf4f64ad9d415f2581edfc88cd1364ca4e283d1e08153709588c
+```
+
+No `distribution-all` command and no Tier 3 command was run.
+
+## Counterbalanced performance
+
+Pending the required follow-up evidence commit. Immutable A/B artifacts
+will be built and set mode 0555 only after this complete production tree is
+committed. The single accepted protocol is: idle-machine check, two
+discarded warmups per artifact, six counterbalanced pairs
+AB/BA/AB/BA/AB/BA, retain every sample, and decide on aggregate medians,
+median paired B/A ratio at most 1.05, and maximum-RSS increase at most
+16 MiB. No discretionary rerun is permitted.
