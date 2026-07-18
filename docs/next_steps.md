@@ -284,7 +284,25 @@ occupant-query authority (possibly one unified liveness authority with
 explicit no-plan semantics, mirrored into the dormant harness), then a
 single reviewed amendment + the wiring resume; plus a sequencing question
 (this review vs the refactoring checkpoint, which touches the same
-planning.zig).
+planning.zig). **The Reviewer RULED** (2026-07-17): the hard stop is
+accepted; no further immediate-action amendment; the DIAGNOSIS is
+authorized but must NOT presume a single unified predicate — it must
+separate three questions (current canonical availability; must-survive;
+destructive-destination occupant preservation), with "using
+valueIsLiveAtOrAfterCurrent for all three is likely the architectural
+mistake" stated as a hypothesis to prove. Eight evidence requirements folded
+verbatim into INBOX-136 (call-site inventory classified by question; the
+five-dimensional truth table; exact production AND dormant traces for
+`__multi3` %9/%10/%11; enumeration across cohort+unit+canary occurrences;
+the ValueUseExpiredSource intent audit with no-resurrection proof; a
+production-faithful test model with and without allocation plans; explicit
+error behavior, no silent Boolean fallback, no function-name predicates).
+SEQUENCING: the diagnosis + reviewed semantic amendment come BEFORE the
+refactoring checkpoint — splitting planning.zig with unresolved admission
+semantics would obscure provenance and risk fossilizing the wrong boundary;
+the wiring stays parked at ratchet 166; after the authority model is
+accepted and the wiring reaches 153, the checkpoint proceeds. INBOX-136
+dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
