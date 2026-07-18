@@ -6,7 +6,18 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-159 — B07 PASSES isolation (c9f8d805), Supervisor-verified
+## INBOX-160 B07 wiring (148 → 140) — dispatched
+
+INBOX-159 is **ACCEPTED and INBOX-160 authorized exactly as proposed**
+(Reviewer, 2026-07-18: "The ratchet must move exactly 148 → 140 through
+the eight B07 gateways, with no helper-collapse credit. Freeze the
+complete action/Q1 surface at 17bfa6d7; retain R03/R04 and all
+exclusions pre-transaction; no fallback or reconciliation. Exact
+identities, full gates, and post-final-tree counterbalanced performance
+remain blocking. No Tier 3."). On acceptance SLICE 3 IS COMPLETE AT 140.
+INBOX-160 dispatched.
+
+## INBOX-159 — B07 PASSES isolation (c9f8d805), ACCEPTED
 
 The fresh isolation SUCCEEDED: all six mandatory rows restored
 (floatuneidf/uneisf/uneihf/eidf/eisf/eihf present with baseline-equal
