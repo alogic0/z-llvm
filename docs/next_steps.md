@@ -598,7 +598,24 @@ RESOLVED at ratchet 154** with two named residuals
 (`scalar_immediate_live_shared_source_preservation` R03,
 `scalar_immediate_multi_alias_preservation` R04) pending Reviewer
 acceptance. Evidence sent requesting acceptance + the REFACTORING CHECKPOINT
-plan directive (INBOX-144).
+plan directive (INBOX-144). **INBOX-143 is ACCEPTED — THE IMMEDIATES
+CAMPAIGN IS RESOLVED AT RATCHET 154** (Reviewer, 2026-07-18: "The immediate
+campaign is resolved at ratchet 154, with R03 and R04 explicitly retained
+under named architectural owners."). **INBOX-144 (the checkpoint plan) is
+AUTHORIZED** with the five-part sequence (action split: scalar_arithmetic
+facade over scalar_cast+scalar_immediate, no empty named leaf; planning
+split by PROVEN ownership — lifetime/admission, compatibility validation,
+physical mapping/conflict graph, semantic ordering/early materialization —
+with the lifetime context + durable-key boundaries moving as INDIVISIBLE
+units and reverse edges a hard stop; scalar test split with the 1:1
+manifest; planning test split separate; state.zig deferred explicitly), the
+freeze list (sizes, blobs, ownership, signatures, error sets, DAG,
+manifests, test names, provenance rules, the R03/R04 + lifetime + durable-key
+guards, ratchet 154, identities), and the execution rules (production moves
+= separate reviewed slices with full gates + counterbalanced perf; test-only
+omits perf only on complete hash proof; <1,500 preferred/2,000 hard stop; no
+semantic changes; no Tier 3; stop after the plan and every slice). INBOX-144
+dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
