@@ -16,6 +16,8 @@ const value_use_composition_pub_names = support.value_use_composition_pub_names;
 const value_use_address_pub_names = support.value_use_address_pub_names;
 const value_use_control_pub_names = support.value_use_control_pub_names;
 const value_use_scalar_arithmetic_pub_names = support.value_use_scalar_arithmetic_pub_names;
+const value_use_scalar_cast_pub_names = support.value_use_scalar_cast_pub_names;
+const value_use_scalar_immediate_pub_names = support.value_use_scalar_immediate_pub_names;
 const value_use_calls_pub_names = support.value_use_calls_pub_names;
 const frozen_bypass_inventory_path = support.frozen_bypass_inventory_path;
 const frozen_bypass_inventory_sha256 = support.frozen_bypass_inventory_sha256;
@@ -91,6 +93,7 @@ const validateValueUseFacadeSource = support.validateValueUseFacadeSource;
 const validateSplitValueUseTree = support.validateSplitValueUseTree;
 const appendNormalizedValueUseSource = support.appendNormalizedValueUseSource;
 const validateValueUseLeaf = support.validateValueUseLeaf;
+const validateScalarArithmeticFacadeSource = support.validateScalarArithmeticFacadeSource;
 const validateValueUseFacadeSurfaceManifest = support.validateValueUseFacadeSurfaceManifest;
 const validateValueUseDirectForwardingWrappers = support.validateValueUseDirectForwardingWrappers;
 const validateExactTopLevelPubNames = support.validateExactTopLevelPubNames;
@@ -170,21 +173,21 @@ test "value-use split guard rejects reverse imports and control-compare budget g
     try std.testing.expectError(
         error.ValueUseImportDagMismatch,
         validateValueUseLeaf(
-            "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_arithmetic.zig",
+            "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_cast.zig",
             "const planning = @import(\"../planning.zig\");",
         ),
     );
     try std.testing.expectError(
         error.ValueUseImportDagMismatch,
         validateValueUseLeaf(
-            "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_arithmetic.zig",
+            "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate.zig",
             "fn reverse(comptime Authority: type) void { _ = Authority.planning; }",
         ),
     );
     try std.testing.expectError(
         error.ValueUseScalarArithmeticLineBudgetExceeded,
         validateValueUseLeaf(
-            "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_arithmetic.zig",
+            "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate.zig",
             oversized,
         ),
     );
@@ -193,6 +196,20 @@ test "value-use split guard rejects reverse imports and control-compare budget g
         validateExactTopLevelPubNames(
             "pub fn executeAccumulatorScalarCast() void {}\n",
             &value_use_scalar_arithmetic_pub_names,
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseTechnicalPubBudgetMismatch,
+        validateExactTopLevelPubNames(
+            "pub fn executePairLowScalarCast() void {}\n",
+            &value_use_scalar_cast_pub_names,
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseTechnicalPubBudgetMismatch,
+        validateExactTopLevelPubNames(
+            "pub fn executeImmediateRhsScalar() void {}\n",
+            &value_use_scalar_immediate_pub_names,
         ),
     );
     try std.testing.expectError(
@@ -207,6 +224,32 @@ test "value-use split guard rejects reverse imports and control-compare budget g
         error.ValueUseWrapperNotDirectForward,
         validateValueUseDirectForwardingWrappers(
             "fn altered() void { if (true) return; }\n",
+        ),
+    );
+}
+
+test "value-use scalar arithmetic facade is aliases only and core imports only it" {
+    const accepted: [:0]const u8 =
+        @embedFile("../value_use/actions/scalar_arithmetic.zig");
+    try validateScalarArithmeticFacadeSource(accepted);
+
+    const branched =
+        "const scalar_cast = @import(\"scalar_cast.zig\");\n" ++
+        "const scalar_immediate = @import(\"scalar_immediate.zig\");\n" ++
+        "pub fn executeAccumulatorScalarCast() void { if (true) return; }\n";
+    try std.testing.expectError(
+        error.ValueUseScalarArithmeticFacadeMismatch,
+        validateScalarArithmeticFacadeSource(branched),
+    );
+    try std.testing.expectError(
+        error.ValueUseImportDagMismatch,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/core.zig",
+            "const model = @import(\"model.zig\");\n" ++
+                "const a = @import(\"actions/scalar_arithmetic.zig\");\n" ++
+                "const b = @import(\"actions/scalar_cast.zig\");\n" ++
+                "const T = model.Transaction(Implementation);\n" ++
+                "fn executePreparedActionInternal() void { switch (action) {} }\n",
         ),
     );
 }

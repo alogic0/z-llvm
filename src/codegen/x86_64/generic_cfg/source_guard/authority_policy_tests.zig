@@ -604,7 +604,7 @@ test "composed selector source guard freezes private three-question lifetime aut
 
 test "composed selector source guard freezes immediate plan-derived alias preservation" {
     const accepted: [:0]const u8 =
-        @embedFile("../value_use/actions/scalar_arithmetic.zig");
+        @embedFile("../value_use/actions/scalar_immediate.zig");
     try validateImmediateScalarAccumulatorPreamble(accepted);
 
     const widened_plan = try replaceOnceSentinel(

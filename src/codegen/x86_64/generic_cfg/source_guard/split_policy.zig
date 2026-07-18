@@ -18,6 +18,8 @@ const value_use_composition_pub_names = model.value_use_composition_pub_names;
 const value_use_address_pub_names = model.value_use_address_pub_names;
 const value_use_control_pub_names = model.value_use_control_pub_names;
 const value_use_scalar_arithmetic_pub_names = model.value_use_scalar_arithmetic_pub_names;
+const value_use_scalar_cast_pub_names = model.value_use_scalar_cast_pub_names;
+const value_use_scalar_immediate_pub_names = model.value_use_scalar_immediate_pub_names;
 const value_use_calls_pub_names = model.value_use_calls_pub_names;
 const frozen_bypass_inventory_path = model.frozen_bypass_inventory_path;
 const frozen_bypass_inventory_sha256 = model.frozen_bypass_inventory_sha256;
@@ -130,6 +132,8 @@ pub fn appendNormalizedValueUseSource(writer: *std.Io.Writer, source: []const u8
         "address_memory.",
         "control_compare.",
         "scalar_arithmetic.",
+        "scalar_cast.",
+        "scalar_immediate.",
         "materialization.",
         "composition.",
         "planning.",
@@ -180,6 +184,8 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
     const is_address = std.mem.endsWith(u8, path, "/actions/address_memory.zig");
     const is_control = std.mem.endsWith(u8, path, "/actions/control_compare.zig");
     const is_scalar_arithmetic = std.mem.endsWith(u8, path, "/actions/scalar_arithmetic.zig");
+    const is_scalar_cast = std.mem.endsWith(u8, path, "/actions/scalar_cast.zig");
+    const is_scalar_immediate = std.mem.endsWith(u8, path, "/actions/scalar_immediate.zig");
     const is_calls = std.mem.endsWith(u8, path, "/actions/calls.zig");
 
     const public_names: []const []const u8 = if (is_model)
@@ -198,6 +204,10 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
         &value_use_control_pub_names
     else if (is_scalar_arithmetic)
         &value_use_scalar_arithmetic_pub_names
+    else if (is_scalar_cast)
+        &value_use_scalar_cast_pub_names
+    else if (is_scalar_immediate)
+        &value_use_scalar_immediate_pub_names
     else if (is_calls)
         &value_use_calls_pub_names
     else
@@ -211,6 +221,12 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
             return error.ValueUseExecutionDispatchMismatch;
         if (countPattern(source[dispatch.start..dispatch.end], "switch (action)") != 1)
             return error.ValueUseExecutionDispatchMismatch;
+        if (countPattern(source, "@import(\"actions/scalar_arithmetic.zig\")") != 1 or
+            std.mem.indexOf(u8, source, "@import(\"actions/scalar_cast.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"actions/scalar_immediate.zig\")") != null)
+        {
+            return error.ValueUseImportDagMismatch;
+        }
     } else if (std.mem.indexOf(u8, source, "model.Transaction(") != null) {
         return error.ValueUseProductionInstantiationMismatch;
     }
@@ -235,19 +251,48 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
             std.mem.indexOf(u8, source, "@import(\"planning.zig\")") != null or
             std.mem.indexOf(u8, source, "@import(\"actions/") != null)
             return error.ValueUseImportDagMismatch;
-    } else if (is_address or is_control or is_scalar_arithmetic or is_calls) {
+    } else if (is_address or is_control or is_scalar_cast or is_scalar_immediate or is_calls) {
         if (std.mem.indexOf(u8, source, "@import(\"../core.zig\")") != null or
             std.mem.indexOf(u8, source, "@import(\"../planning.zig\")") != null or
             std.mem.indexOf(u8, source, "@import(\"../actions/") != null or
+            std.mem.indexOf(u8, source, "@import(\"scalar_arithmetic.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"scalar_cast.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"scalar_immediate.zig\")") != null or
             std.mem.indexOf(u8, source, "Authority.planning") != null)
             return error.ValueUseImportDagMismatch;
+    } else if (is_scalar_arithmetic) {
+        try validateScalarArithmeticFacadeSource(source);
     }
 
     if (is_control and countPattern(source, "\n") + 1 > 2000)
         return error.ValueUseControlCompareLineBudgetExceeded;
     if (is_scalar_arithmetic and countPattern(source, "\n") + 1 > 2000)
         return error.ValueUseScalarArithmeticLineBudgetExceeded;
+    if ((is_scalar_cast or is_scalar_immediate) and countPattern(source, "\n") + 1 > 2000)
+        return error.ValueUseScalarArithmeticLineBudgetExceeded;
     try validateExactTopLevelPubNames(source, public_names);
+}
+
+pub fn validateScalarArithmeticFacadeSource(source: []const u8) !void {
+    const expected =
+        "const scalar_cast = @import(\"scalar_cast.zig\");\n" ++
+        "const scalar_immediate = @import(\"scalar_immediate.zig\");\n\n" ++
+        "pub const executeAccumulatorScalarCast = scalar_cast.executeAccumulatorScalarCast;\n" ++
+        "pub const executeImmediateLhsScalar = scalar_immediate.executeImmediateLhsScalar;\n" ++
+        "pub const executeImmediateRhsScalar = scalar_immediate.executeImmediateRhsScalar;\n" ++
+        "pub const executePairLowScalarCast = scalar_cast.executePairLowScalarCast;\n" ++
+        "pub const executeSignExtendScratch = scalar_cast.executeSignExtendScratch;\n" ++
+        "pub const isAccumulatorScalarCast = scalar_cast.isAccumulatorScalarCast;\n" ++
+        "pub const isImmediateLhsScalar = scalar_immediate.isImmediateLhsScalar;\n" ++
+        "pub const isImmediateRhsScalar = scalar_immediate.isImmediateRhsScalar;\n" ++
+        "pub const isPairLowScalarCast = scalar_cast.isPairLowScalarCast;\n" ++
+        "pub const isSignExtendScratchCast = scalar_cast.isSignExtendScratchCast;\n" ++
+        "pub const validateAccumulatorScalarCastAction = scalar_cast.validateAccumulatorScalarCastAction;\n" ++
+        "pub const validateImmediateLhsScalarAction = scalar_immediate.validateImmediateLhsScalarAction;\n" ++
+        "pub const validateImmediateRhsScalarAction = scalar_immediate.validateImmediateRhsScalarAction;\n" ++
+        "pub const validatePairLowScalarCastAction = scalar_cast.validatePairLowScalarCastAction;\n";
+    if (!std.mem.eql(u8, source, expected))
+        return error.ValueUseScalarArithmeticFacadeMismatch;
 }
 
 pub fn validateValueUseFacadeSurfaceManifest(source: [:0]const u8) !void {

@@ -48,6 +48,8 @@ pub const value_use_leaf_paths = [_][]const u8{
     "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory.zig",
     "src/codegen/x86_64/generic_cfg/value_use/actions/control_compare.zig",
     "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_arithmetic.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_cast.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate.zig",
     "src/codegen/x86_64/generic_cfg/value_use/actions/calls.zig",
 };
 
@@ -134,6 +136,24 @@ pub const value_use_scalar_arithmetic_pub_names = [_][]const u8{
     "isPairLowScalarCast",                 "isSignExtendScratchCast",
     "validateAccumulatorScalarCastAction", "validateImmediateLhsScalarAction",
     "validateImmediateRhsScalarAction",    "validatePairLowScalarCastAction",
+};
+pub const value_use_scalar_cast_pub_names = [_][]const u8{
+    "executeAccumulatorScalarCast",
+    "executePairLowScalarCast",
+    "executeSignExtendScratch",
+    "isAccumulatorScalarCast",
+    "isPairLowScalarCast",
+    "isSignExtendScratchCast",
+    "validateAccumulatorScalarCastAction",
+    "validatePairLowScalarCastAction",
+};
+pub const value_use_scalar_immediate_pub_names = [_][]const u8{
+    "executeImmediateLhsScalar",
+    "executeImmediateRhsScalar",
+    "isImmediateLhsScalar",
+    "isImmediateRhsScalar",
+    "validateImmediateLhsScalarAction",
+    "validateImmediateRhsScalarAction",
 };
 pub const value_use_calls_pub_names = [_][]const u8{"executeInlineMemcpy"};
 
