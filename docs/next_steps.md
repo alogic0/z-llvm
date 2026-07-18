@@ -325,7 +325,28 @@ distinct result types, no consumer hints. Three design decisions teed up for
 the Reviewer: plan-required vs canonical-generation Q1; the closed error for
 plan-present-missing-interval; the instruction-local pin/displacement rule
 reproducing the accepted `%11` stream. My assessment + recommendations sent
-for the design ruling.
+for the design ruling. **All three recommendations ACCEPTED with
+refinements** (Reviewer, 2026-07-17): (1) Q1 plan-required for every
+named/bound source, typed immediates + null-pointers exempt, missing plan =
+a distinct request-attributable closed error; (2) plan-present-no-interval =
+a second distinct error; `ValueUseExpiredSource` reserved exclusively for a
+valid interval not covering the current instruction; end-at-current stays
+consumable, survival-after stays a strict separate boundary; (3) the `%11`
+stream governed directly by the closed immediate-plan displacement policy
+(inclusive preserve-current even when Q2 is false; Q3 must not manufacture
+it; the Q1 pin retains only identity/generation metadata, never a
+pre-mutation ValueLoc, with canonical re-resolution after mutation).
+INBOX-137 implements ONE private transaction-owned lifetime context (three
+narrow decisions, Q1 revalidation after relocation, first-request
+provenance, explicit errors) plus six mandatory corrections (rebuild dormant
+fixtures with production-faithful plan intervals; recast the A3 alias test
+as a genuine Q3 test; add the REAL `__multi3` shape whose spill/reload
+arises from the inclusive plan policy; the seven-case error/attribution
+coverage; freeze the displacement table without generalizing "wide";
+preserve A2 and valid-A3 behaviors as separate decisions). Dormant contract:
+ratchet 166, exact identities, full unit + ABI, no perf, no Tier 3, stop; B3
+not yet reauthorized; the checkpoint stays behind wiring at 153. INBOX-137
+dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
