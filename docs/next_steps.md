@@ -670,7 +670,21 @@ CopyVisitState + validateCopyActionForm, bottom of the DAG, exact pub
 budget + guard) dissolving conflicts 1–2, plus ONE explicitly ruled
 core→lifetime_admission edge for exactly the three Implementation aliases
 (guard-listed sole exception) keeping the facade at 15 names — or
-alternatively an 18-name facade expansion.
+alternatively an 18-name facade expansion. **The Reviewer RULED the revised
+graph** (2026-07-18): shared passive data and pure validation as SEPARATE
+lower layers — `planning/model.zig` (Mapping + CopyVisitState + only their
+directly required passive types) → `planning/compatibility.zig` (owns
+validateCopyActionForm, imports model) → lifetime_admission +
+semantic_ordering (import model/compatibility; lifetime NEVER imports
+physical_mapping) → physical_mapping (imports the lower leaves, sole seal
+orchestrator) → the facade; core stays facade-only with the budget expanded
+to EXACTLY 18 for the Q1/Q2/Q3 functions, guarded to the three
+Implementation aliases; Mapping/CopyVisitState visibility pinned; NO
+open-ended shared allowance — the complete revised declaration/import
+manifest freezes BEFORE code moves (any addition = another structural
+stop); seal order + error sets exact; the spill-key stays in state.zig.
+INBOX-146 amended and re-dispatched under the revised graph + original
+contract.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
