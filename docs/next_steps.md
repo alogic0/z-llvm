@@ -6,7 +6,26 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-151 family-isolation matrix (stage 1) — dispatched
+## INBOX-151 matrix — LANDED at e9132cc1, Supervisor-verified
+
+The matrix is decisive and verified (evidence-only diff vs the dormant
+tree; ratchet 154; pinned log hashes re-verified): **the individually
+accepted set is exactly B01 + I52B0** (each 1339/1339 unit, cohort/object/
+owner exact, 285/0/0 per-function; their aggregate also exact, so no
+interacting-subset minimization was needed). **B03–B07 are retained
+wholesale**: B03/B04/B05/B06 keep full cohort identity but FAIL their own
+production-path fixtures at seal-time admission (e.g. B03
+`ValueUseSourceIntervalMissing` on the accumulator-before-rhs multiply
+fixture — first divergence during transaction sealing, before instruction
+mutation); B07 additionally MOVES THE COHORT (443/279/164, six formerly
+accepted functions failing `unsupported_value/composed-block-unknown-rhs`
+at named/named transaction admission — the 279 surviving functions remain
+byte-identical, no masked offset drift). Reviewer-corrected arithmetic:
+accepted credits = 2, helper = 0, conditional later ratchet **152** (for
+review, not a wiring claim; this slice leaves 154). Sent to the Reviewer
+for the stage-2 decision.
+
+## Former INBOX-151 dispatch entry — superseded by the landing above
 
 INBOX-150 at `0661c8cd` is **ACCEPTED** (Reviewer, 2026-07-18: "The action
 surface, budgets, production-faithful fixtures, durability tests, rollback
