@@ -6,7 +6,26 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-156 re-isolation matrix — dispatched
+## INBOX-156 matrix — LANDED at f837fede, Supervisor-verified
+
+The re-isolation is decisive and verified (evidence-only diff; ratchet
+152): **B03, B04, B05, and B06 are ALL individually accepted** — each
+1353/1353 unit + 35 canary cases + exact cohort/object/owner + 285/0/0
+per-function, and their aggregate is exact (the fixture alignment was
+the whole story for those four). **B07 remains retained wholesale**: the
+six rows STILL fail `unsupported_value/composed-block-unknown-rhs` at
+named/named RHS admission even with the dormant forward-Q1 snapshot
+amendment present and all its unit coverage passing — indicating the
+remaining gap sits in the ACTION-LAYER RHS resolution channel (request
+construction for a forward rhs), the second component of INBOX-153's
+dual classification, not in Q1 (whose branch is proven by tests but is
+never reached when the composed-block layer cannot construct the rhs
+request identity). Stub-proof again confirms all 279 surviving functions
+byte-exact. Arithmetic: 152 − 4 = **148** conditional (B07's 8 credits
+retained). Sent to the Reviewer proposing the B03–B06 wiring (INBOX-157)
+and the B07 follow-up decision.
+
+## Former INBOX-156 dispatch entry — superseded by the landing above
 
 INBOX-155 is **ACCEPTED** (Reviewer, 2026-07-18: "The exact structural
 forward snapshot, canonical recapture, closed errors, shared resolver,
