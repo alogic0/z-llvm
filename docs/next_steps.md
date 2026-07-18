@@ -754,6 +754,32 @@ R03/R04 design and sequencing proposal for review next."). The R03/R04
 (scalar_immediate_live_shared_source_preservation /
 scalar_immediate_multi_alias_preservation) design + sequencing decision
 goes to the Reviewer, then to the user, before any campaign resumption.
+**The Reviewer ruled OPTION B with amendments** (2026-07-18): "Rule
+Option B: proceed with scalar Slice 3 first, while R03/R04 remain
+guard-enforced legacy residuals until the post-calls residual audit."
+Corrections/constraints (Reviewer-exact): the proposed 154→138 target is
+STALE (it inherited the old 153 baseline; nominal 139 if all 15 original
+removals hold, but R03/R04 may retain helper ownership) — an EVIDENCE-ONLY
+REFRESH must precede dispatch: recount every named/i52 gateway and
+last-owner helper from ratchet 154; prove R03/R04 retain all their current
+owners; partition by closed displacement authority; freeze the honest
+target without assuming prior cumulative arithmetic; establish the
+family-isolation matrix + aggregate interaction plan. Slice-3 scope: new
+`actions/scalar_named.zig` under the checkpoint import/size rules; ONLY
+already-approved authorities (liveness-aware arithmetic displacement,
+direct-materialization form tables, preserve-current tables, explicitly
+hardcoded plans); NO preservation-home selection or per-alias assignment;
+any family requiring R03/R04 semantics is retained WHOLESALE; production-
+faithful fixtures with real allocation plans and alias topology; dormant
+slices run unit+ABI+canaries, wiring runs full gates + family-isolated
+cohort identity + aggregate identity + counterbalanced perf; no Tier 3.
+Residual audit (post-calls): R03 = planner-owned scratch-vs-stack
+preservation-home authority with explicit occupancy/fallback rules; R04 =
+per-logical-alias requests and home assignments (aliases never collapsed
+for sharing a physical source); both as separate dormant designs + wiring
+reviews; no function-name or runtime fallback predicates. AWAITING USER
+CONFIRMATION before the refresh directive dispatches (the user-gated
+campaign-resumption stop).
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
