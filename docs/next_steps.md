@@ -574,7 +574,15 @@ R02×2, R06×2, L01×2, L02×1, L03×2; R00/R05 are zero-count ownership
 transitions proven byte-identical; R03's one gateway stays; the prior 153
 projection is superseded). Evidence sent requesting matrix acceptance + the
 FINAL narrowed patch (INBOX-143: eight eligible families; R03+R04 named
-residuals; target 154).
+residuals; target 154). **The matrix is ACCEPTED and INBOX-143 AUTHORIZED**
+(Reviewer, 2026-07-17: "It proves the eight eligible families both
+individually and compositionally byte-identical, while R03 and R04 are
+correctly retained wholesale."), with the two residual owners named:
+`scalar_immediate_live_shared_source_preservation` (R03) and
+`scalar_immediate_multi_alias_preservation` (R04), both plus the R00/R05
+zero-count transitions enforced structurally; model frozen at `de3cb6f9`;
+ratchet exactly 166→154; the fma/`__multi3`/`exp2` streams all required;
+full gates + frozen-artifact perf; no Tier 3. INBOX-143 dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
