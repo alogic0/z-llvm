@@ -381,9 +381,16 @@ test "generic cfg selector reloads spilled mul64 lhs through rax when scratch re
 test "generic cfg selector reloads 32-bit spill rhs for binary accumulator op" {
     var machine = MachineFunction.init("reload-spill32-rhs", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);
+    var plan = try allocateSelectorIntervals(std.testing.allocator, &.{
+        .{ .name = "lhs", .class = .gpr32, .bits = 32, .start = 0, .end = 1 },
+        .{ .name = "rhs", .class = .gpr32, .bits = 32, .start = 0, .end = 1 },
+    });
+    defer plan.deinit();
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
 
     try selector_state.bindValueLoc(&selector, "lhs", .{ .scratch32 = .rdi });
     try selector_state.bindValueLoc(&selector, "rhs", .{ .spill64 = .slot4 });
@@ -626,7 +633,7 @@ test "generic cfg selector immediate i64 siblings preserve a current accumulator
     }
 }
 
-test "generic cfg selector exact ei binary and shift reuse a dead accumulator lhs" {
+test "generic cfg selector exact ei binary and shift preserve a current accumulator lhs" {
     const input =
         \\define double @exact(ptr readonly %input, i64 %bits) {
         \\entry:
@@ -663,9 +670,16 @@ test "generic cfg selector exact ei binary and shift reuse a dead accumulator lh
     }) |case| {
         var machine = MachineFunction.init("dead-rax-exact-ei", .{ .int = case[1] });
         defer machine.deinit(std.testing.allocator);
+        var plan = try allocateSelectorIntervals(std.testing.allocator, &.{
+            .{ .name = "source", .class = .gpr64, .bits = case[1], .start = 0, .end = 1 },
+            .{ .name = "amount", .class = .gpr64, .bits = case[1], .start = 0, .end = 1 },
+        });
+        defer plan.deinit();
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
         selector.function = &module.functions.items[0];
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
         selector.stack_frame_bytes = stage2SpillReservedBytes();
         try selector_state.bindValueLoc(&selector, "source", .rax);
         try selector_state.bindValueLoc(&selector, "amount", .{ .arg64 = .rsi });
@@ -676,10 +690,17 @@ test "generic cfg selector exact ei binary and shift reuse a dead accumulator lh
             .lhs = .{ .named = "source" },
             .rhs = .{ .named = "amount" },
         })) == null);
-        try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "source").?);
+        try std.testing.expectEqual(
+            ValueLoc{ .spill64 = .slot0 },
+            selector_state.valueLoc(&selector, "source").?,
+        );
         try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "result").?);
-        try std.testing.expectEqual(x86_64_machine.Instruction{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rsi } }, machine.instructions.items[0]);
-        try std.testing.expectEqual(case[2], machine.instructions.items[1]);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rsi } },
+            .{ .spill_rax_rsp = .slot0 },
+            .{ .reload_rsp_rax = .slot0 },
+            case[2],
+        }, machine.instructions.items);
     }
 }
 
@@ -716,9 +737,11 @@ test "exact ei shift preserves the accepted current-use accumulator rhs spill" {
 
     var machine = MachineFunction.init("current-rhs-exact-ei", .{ .int = 56 });
     defer machine.deinit(std.testing.allocator);
-    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    var plan = try allocateSelectorIntervals(std.testing.allocator, &.{
+        .{ .name = "lhs", .class = .gpr64, .bits = 56, .start = 0, .end = 4 },
+        .{ .name = "amount", .class = .gpr64, .bits = 56, .start = 1, .end = 4 },
+    });
     defer plan.deinit();
-    try plan.interval_ends.put("amount", 4);
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
     selector.function = &module.functions.items[0];
@@ -1198,9 +1221,11 @@ test "generic cfg selector lowers named i32 unsigned division and remainder" {
 test "accumulator-resident named i32 shift keeps accepted direct materialization stream" {
     var machine = MachineFunction.init("shift-i32-accumulator-lhs", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);
-    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    var plan = try allocateSelectorIntervals(std.testing.allocator, &.{
+        .{ .name = "lhs", .class = .gpr32, .bits = 32, .start = 0, .end = 9 },
+        .{ .name = "amount", .class = .gpr32, .bits = 32, .start = 1, .end = 4 },
+    });
     defer plan.deinit();
-    try plan.interval_ends.put("lhs", 9);
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
@@ -1257,9 +1282,12 @@ test "accumulator-resident udiv lhs keeps accepted fixed-register stream" {
 test "named i32 multiply preserves the accepted accumulator-before-rhs order" {
     var machine = MachineFunction.init("mul-i32-preserve-order", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);
-    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    var plan = try allocateSelectorIntervals(std.testing.allocator, &.{
+        .{ .name = "live", .class = .gpr32, .bits = 32, .start = 0, .end = 9 },
+        .{ .name = "lhs", .class = .gpr32, .bits = 32, .start = 1, .end = 4 },
+        .{ .name = "rhs", .class = .gpr32, .bits = 32, .start = 2, .end = 4 },
+    });
     defer plan.deinit();
-    try plan.interval_ends.put("live", 9);
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
@@ -1880,9 +1908,16 @@ test "generic cfg selector lowers variable i16 shifts" {
     inline for (.{ .shl, .lshr }) |op| {
         var machine = MachineFunction.init("variable-i16-shift", .{ .int = 16 });
         defer machine.deinit(std.testing.allocator);
+        var plan = try allocateSelectorIntervals(std.testing.allocator, &.{
+            .{ .name = "value", .class = .gpr32, .bits = 16, .start = 0, .end = 1 },
+            .{ .name = "amount", .class = .gpr32, .bits = 16, .start = 0, .end = 1 },
+        });
+        defer plan.deinit();
 
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
         try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
         try selector_state.bindValueLoc(&selector, "amount", .{ .arg32 = .rsi });
 
@@ -2102,9 +2137,11 @@ test "generic cfg selector lowers i32 arithmetic-right shifts" {
     inline for (.{ ir.Value{ .int = 7 }, ir.Value{ .named = "amount" } }) |rhs| {
         var machine = MachineFunction.init("i32-ashr", .{ .int = 32 });
         defer machine.deinit(std.testing.allocator);
-        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        var plan = try allocateSelectorIntervals(std.testing.allocator, &.{
+            .{ .name = "value", .class = .gpr32, .bits = 32, .start = 0, .end = 0 },
+            .{ .name = "amount", .class = .gpr32, .bits = 32, .start = 0, .end = 0 },
+        });
         defer plan.deinit();
-        try plan.interval_ends.put("value", 0);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
         selector.allocation_plan = &plan;

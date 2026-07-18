@@ -15,6 +15,8 @@ const MachineFunction = support.MachineFunction;
 const SelectorAllocationPlan = support.SelectorAllocationPlan;
 const Transaction = support.Transaction;
 const ValueLoc = support.ValueLoc;
+const PlannedValueAssignment = stage2_planning.PlannedValueAssignment;
+const ForwardValuePlan = stage2_planning.ForwardValuePlan;
 const addLive = support.addLive;
 const addAtCurrent = support.addAtCurrent;
 const expected = support.expected;
@@ -54,6 +56,259 @@ const expectReadOnlyScalarLoadFailure = support.expectReadOnlyScalarLoadFailure;
 const expectTableLoadFailure = support.expectTableLoadFailure;
 const I128PairRollbackBoundary = support.I128PairRollbackBoundary;
 const expectI128PairRollbackExact = support.expectI128PairRollbackExact;
+
+const ForwardCharacterization = struct {
+    name: []const u8,
+    source: []const u8,
+    current_position: usize,
+    interval_end: usize,
+    forward: ForwardValuePlan,
+    assignment: ?PlannedValueAssignment,
+    legacy_resolution: ?ValueLoc,
+};
+
+fn expectForwardCharacterization(fixture: ForwardCharacterization) !void {
+    var machine = MachineFunction.init(fixture.name, .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put(fixture.source, fixture.interval_end);
+    try plan.forward_values.put(fixture.source, fixture.forward);
+    if (fixture.assignment) |assignment|
+        try plan.assignments.put(fixture.source, assignment);
+
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = fixture.current_position;
+    selector.stack_frame_bytes = 128;
+    try std.testing.expectEqual(@as(usize, 0), selector.address_dependencies.count());
+    try std.testing.expectEqual(
+        fixture.legacy_resolution,
+        selector_state.resolveValue(&selector, .{ .named = fixture.source }),
+    );
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const source = try transaction.register(request(
+        fixture.source,
+        .{ .int = 64 },
+        .gpr64,
+        .gpr64,
+        .rax,
+    ));
+    try std.testing.expectError(error.ValueUseUnresolvedSource, transaction.seal());
+    try std.testing.expect(transaction.failedRequestIs(source));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use current binding characterizes missing plan and missing interval" {
+    var machine = MachineFunction.init("current-binding-plan-errors", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.current_position = 2;
+    try selector_state.bindValueLoc(&selector, "source", .{ .arg64 = .rdi });
+    const binding = selector.values.get("source").?;
+    try std.testing.expectEqual(
+        ValueLoc{ .arg64 = .rdi },
+        selector_state.resolveValue(&selector, .{ .named = "source" }).?,
+    );
+
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const source = try transaction.register(request(
+            "source",
+            .{ .int = 64 },
+            .gpr64,
+            .gpr64,
+            .rax,
+        ));
+        try std.testing.expectError(error.ValueUseSourcePlanMissing, transaction.seal());
+        try std.testing.expect(transaction.failedRequestIs(source));
+    }
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.assignments.put("source", .{ .gpr64 = .rdi });
+    selector.allocation_plan = &plan;
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const source = try transaction.register(request(
+            "source",
+            .{ .int = 64 },
+            .gpr64,
+            .gpr64,
+            .rax,
+        ));
+        try std.testing.expectError(error.ValueUseSourceIntervalMissing, transaction.seal());
+        try std.testing.expect(transaction.failedRequestIs(source));
+    }
+
+    try std.testing.expectEqual(binding, selector.values.get("source").?);
+    try std.testing.expectEqual(@as(usize, 0), selector.address_dependencies.count());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+}
+
+test "value-use forward metadata characterizes legacy resolution before Q1 admission" {
+    const cases = [_]ForwardCharacterization{
+        .{
+            .name = "valid-forward",
+            .source = "forward",
+            .current_position = 2,
+            .interval_end = 7,
+            .forward = .{
+                .definition_position = 5,
+                .metadata = .{ .class = .gpr64, .bits = 64 },
+            },
+            .assignment = .{ .gpr64 = .r9 },
+            .legacy_resolution = .{ .scratch64 = .r9 },
+        },
+        .{
+            .name = "stale-forward-definition",
+            .source = "forward",
+            .current_position = 5,
+            .interval_end = 7,
+            .forward = .{
+                .definition_position = 5,
+                .metadata = .{ .class = .gpr64, .bits = 64 },
+            },
+            .assignment = .{ .gpr64 = .r9 },
+            .legacy_resolution = null,
+        },
+        .{
+            .name = "expired-forward-interval",
+            .source = "forward",
+            .current_position = 3,
+            .interval_end = 2,
+            .forward = .{
+                .definition_position = 5,
+                .metadata = .{ .class = .gpr64, .bits = 64 },
+            },
+            .assignment = .{ .gpr64 = .r9 },
+            // Legacy forward resolution does not consult the interval.
+            .legacy_resolution = .{ .scratch64 = .r9 },
+        },
+        .{
+            .name = "forward-class-mismatch",
+            .source = "forward",
+            .current_position = 2,
+            .interval_end = 7,
+            .forward = .{
+                .definition_position = 5,
+                .metadata = .{ .class = .gpr32, .bits = 32 },
+            },
+            .assignment = .{ .gpr64 = .r9 },
+            .legacy_resolution = null,
+        },
+        .{
+            .name = "forward-defined-width-mismatch",
+            .source = "forward",
+            .current_position = 2,
+            .interval_end = 7,
+            .forward = .{
+                .definition_position = 5,
+                .metadata = .{ .class = .gpr64, .bits = 32 },
+            },
+            .assignment = .{ .gpr64 = .r9 },
+            // Legacy checks the class but does not validate defined width.
+            .legacy_resolution = .{ .scratch64 = .r9 },
+        },
+        .{
+            .name = "forward-missing-assignment",
+            .source = "forward",
+            .current_position = 2,
+            .interval_end = 7,
+            .forward = .{
+                .definition_position = 5,
+                .metadata = .{ .class = .gpr64, .bits = 64 },
+            },
+            .assignment = null,
+            .legacy_resolution = null,
+        },
+    };
+    inline for (cases) |fixture| try expectForwardCharacterization(fixture);
+}
+
+test "value-use preserves the six B07 forward-RHS cohort traces as future inputs" {
+    const cases = [_]ForwardCharacterization{
+        .{
+            .name = "compiler_rt.floatuneidf.__floatuneidf position 25 sub 12 20",
+            .source = "20",
+            .current_position = 25,
+            .interval_end = 42,
+            .forward = .{
+                .definition_position = 37,
+                .metadata = .{ .class = .gpr64, .bits = 64 },
+            },
+            .assignment = .{ .gpr64 = .r9 },
+            .legacy_resolution = .{ .scratch64 = .r9 },
+        },
+        .{
+            .name = "compiler_rt.floatuneisf.__floatuneisf position 25 sub 12 20",
+            .source = "20",
+            .current_position = 25,
+            .interval_end = 42,
+            .forward = .{
+                .definition_position = 37,
+                .metadata = .{ .class = .gpr64, .bits = 64 },
+            },
+            .assignment = .{ .gpr64 = .r9 },
+            .legacy_resolution = .{ .scratch64 = .r9 },
+        },
+        .{
+            .name = "compiler_rt.floatuneihf.__floatuneihf position 25 sub 12 20",
+            .source = "20",
+            .current_position = 25,
+            .interval_end = 42,
+            .forward = .{
+                .definition_position = 37,
+                .metadata = .{ .class = .gpr64, .bits = 64 },
+            },
+            .assignment = .{ .gpr64 = .r9 },
+            .legacy_resolution = .{ .scratch64 = .r9 },
+        },
+        .{
+            .name = "compiler_rt.floateidf.__floateidf position 29 sub .neg 26",
+            .source = "26",
+            .current_position = 29,
+            .interval_end = 47,
+            .forward = .{
+                .definition_position = 42,
+                .metadata = .{ .class = .gpr64, .bits = 64 },
+            },
+            .assignment = .{ .spill = 0 },
+            .legacy_resolution = .{ .spill64 = .slot0 },
+        },
+        .{
+            .name = "compiler_rt.floateisf.__floateisf position 29 sub .neg 26",
+            .source = "26",
+            .current_position = 29,
+            .interval_end = 47,
+            .forward = .{
+                .definition_position = 42,
+                .metadata = .{ .class = .gpr64, .bits = 64 },
+            },
+            .assignment = .{ .spill = 0 },
+            .legacy_resolution = .{ .spill64 = .slot0 },
+        },
+        .{
+            .name = "compiler_rt.floateihf.__floateihf position 29 sub .neg 26",
+            .source = "26",
+            .current_position = 29,
+            .interval_end = 47,
+            .forward = .{
+                .definition_position = 42,
+                .metadata = .{ .class = .gpr64, .bits = 64 },
+            },
+            .assignment = .{ .spill = 0 },
+            .legacy_resolution = .{ .spill64 = .slot0 },
+        },
+    };
+    inline for (cases) |fixture| try expectForwardCharacterization(fixture);
+}
 
 test "value-use lifetime authority separates plan interval availability and provenance" {
     var machine = MachineFunction.init("value-use-lifetime-authority", .{ .int = 64 });
