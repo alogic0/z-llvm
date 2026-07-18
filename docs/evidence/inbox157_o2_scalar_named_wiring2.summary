@@ -163,4 +163,105 @@ No `distribution-all` command and no Tier 3 command was run.
 
 ## Counterbalanced performance
 
-Pending the required post-production-commit immutable A/B artifact batch.
+The production source commit was frozen before either timed artifact was
+built:
+
+```text
+production_commit=6b478652108ee431acb2ffdc216c7d383c0c0794
+production_tree=3b582b7f313f86d9a8b665f9830069362696f3ef
+```
+
+The immutable comparison artifacts were built once in detached worktrees
+and were not rebuilt between samples:
+
+```text
+A_commit=16222bf2c67a7918655b23e27e26fc691e3ca8c2
+A_tree=0253350e3f9faa0e99ce8bc94d4305f5df713f65
+A_build_command=cd tmp/inbox157_o2_scalar_named_wiring2/perf/worktree_A && /home/oleg/bin/zig build
+A_build_log_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+A_artifact_sha256=51bc1759b814546760a200c16173ea4e1ada2f2c6ee22ab197d8dd4c01df9e58
+A_artifact_mode=0555
+A_artifact_bytes=106218082
+
+B_commit=6b478652108ee431acb2ffdc216c7d383c0c0794
+B_tree=3b582b7f313f86d9a8b665f9830069362696f3ef
+B_build_command=cd tmp/inbox157_o2_scalar_named_wiring2/perf/worktree_B && /home/oleg/bin/zig build
+B_build_log_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+B_artifact_sha256=0e33d931c45a98d7dcdce0281d0d9dbcfba4aaf729c96ba926cee0819c52052e
+B_artifact_mode=0555
+B_artifact_bytes=106246072
+```
+
+The idle preflight recorded load averages `1.12/1.20/1.14`; pinned CPU 0
+was 92.00%, 98.00%, and 98.02% idle, averaging 96.01% idle. No selector or
+Zig build was running. The complete process and CPU record is retained at
+`tmp/inbox157_o2_scalar_named_wiring2/perf/idle_preflight.txt`,
+SHA-256
+`6ea675f50f4b67eb684c1f167d2c4456e1f8991c600434b8311f4a263f538864`.
+
+The runner pinned every sample to CPU 0, used `LC_ALL=C`, the same frozen
+compiler-rt input and selector arguments, and invoked the immutable
+artifact through `/usr/bin/time -f "%e %M"`. Exactly two warmups per
+artifact were discarded, followed by the sole retained sequence
+`AB, BA, AB, BA, AB, BA`. No sample was removed and no discretionary
+rerun occurred.
+
+```text
+command=/home/oleg/bin/zig run tmp/inbox157_o2_scalar_named_wiring2/run_counterbalanced.zig 2>&1 | tee tmp/inbox157_o2_scalar_named_wiring2/perf/run_counterbalanced.log
+runner_sha256=1a43a53cd88cafe2d7be37da66c7b151e03a3f65b96c7262275f2f8a8ea6656a
+runner_log_sha256=d142895d36a766f2de28ff939881c1ca0671ca8a7635c0f9224c7c14f74ff6ec
+
+command=/home/oleg/bin/zig run tmp/inbox157_o2_scalar_named_wiring2/analyze_counterbalanced.zig 2>&1 | tee tmp/inbox157_o2_scalar_named_wiring2/perf/paired_metrics.tsv
+analyzer_sha256=47020ace269c4728f288ea354baeb548fd60285a628442c86b4c0d2d45e962af
+metrics_sha256=2e709631ee9c42ab0f238c8463ed32fcba1c46355e8e2dee457a25d924b5f5df
+```
+
+All samples are retained below as `seconds / maximum RSS KiB`:
+
+```text
+warmup1_A  48.06 / 88820
+warmup1_B  48.20 / 89120
+warmup2_A  47.90 / 88816
+warmup2_B  48.09 / 89128
+
+pair  order  A seconds/RSS  B seconds/RSS  B/A
+1     AB     47.94/88760    48.08/89136    1.002920317
+2     BA     48.16/88060    48.11/89128    0.998961794
+3     AB     48.07/88808    47.97/89128    0.997919700
+4     BA     48.00/88820    47.96/89124    0.999166667
+5     AB     47.94/88820    48.19/89124    1.005214852
+6     BA     47.94/88816    47.98/89124    1.000834376
+```
+
+Gate result:
+
+```text
+median_A_seconds=47.970
+median_B_seconds=48.030
+median_delta_seconds=+0.060
+allowed_delta_seconds=2.399
+aggregate_median_pass=true
+median_paired_ratio_B_over_A=1.000000521
+paired_ratio_limit=1.05
+paired_ratio_pass=true
+A_max_rss_kib=88820
+B_max_rss_kib=89136
+rss_delta_kib=+316
+rss_limit_kib=16384
+rss_pass=true
+reports_exact=16/16
+overall=PASS
+```
+
+Every warmup and retained report independently hashes to
+`49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681`.
+The complete raw and report manifests are retained:
+
+```text
+raw_manifest_sha256=101be89c20e19734c42511866db998bc520ba738dad3ab5631c91ae6afa871c1
+report_manifest_sha256=5a844ad7198e95ffe79b08453cd7ae78c4743b6cf9006ddd1b445096d30e34f4
+```
+
+INBOX-157 therefore closes with ratchet 148, exact frozen correctness
+identities, all mandatory non-Tier-3 gates green, and the blocking
+counterbalanced performance gate green. No Tier 3 was run.
