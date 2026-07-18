@@ -6,7 +6,33 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-154 — LANDED at cbb532ac, Supervisor-verified
+## INBOX-155 forward-Q1 dormant amendment — dispatched
+
+INBOX-154 is **ACCEPTED** (Reviewer, 2026-07-18: "The fixture alignment,
+narrowly reviewed plan-visible stream corrections, forward
+characterization, complete gates, and production hash identity satisfy
+the test-only contract.") and the **forward-Q1 dormant amendment is
+sequenced BEFORE multiply and authorized** (INBOX-155): the private
+admission branch runs only for a named request with no current binding
+and a canonical valid ForwardValuePlan; validates identity/position/
+interval/class/width/assignment/dependencies/plan generation; STOPS if
+canonical generation metadata doesn't exist (no invented metadata
+authority); pins only durable identity + forward-plan metadata (never
+ValueLoc/register/spill home); no binding or physical assignment at
+seal; materialization revalidates through ONE shared selector-owned
+forward resolver failing closed before emission; exact first-request
+provenance; an explicit closed error table (no silent fallback to
+ValueUseUnresolvedSource); no consumer hints / name predicates / home
+inspection / new homes / cycle resolution / attempt-then-fallback;
+snapshot-rollback covers every new pin field with no borrowed storage.
+Nine mandatory test groups (incl the six B07 regression shapes, plan
+mutation between seal and materialization failing closed, duplicate
+forward requests, rollback both sides of materialization, teardown with
+no borrowed identity). B03–B07 stay legacy-routed; no consumer wiring;
+ratchet 152; exact identities; full gates, no perf, no Tier 3; stop;
+full B03–B07 re-isolation follows before any wiring or multiply.
+
+## INBOX-154 — ACCEPTED at cbb532ac, Supervisor-verified
 
 The test-only slice landed and is verified: all five production/guard
 files byte-identical to the accepted 152 tree (spot-hashed); ratchet 152;
