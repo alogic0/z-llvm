@@ -13,6 +13,11 @@ const value_use_leaf_paths = model.value_use_leaf_paths;
 const value_use_model_pub_names = model.value_use_model_pub_names;
 const value_use_core_pub_names = model.value_use_core_pub_names;
 const value_use_planning_pub_names = model.value_use_planning_pub_names;
+const value_use_planning_model_pub_names = model.value_use_planning_model_pub_names;
+const value_use_planning_compatibility_pub_names = model.value_use_planning_compatibility_pub_names;
+const value_use_planning_lifetime_pub_names = model.value_use_planning_lifetime_pub_names;
+const value_use_planning_semantic_pub_names = model.value_use_planning_semantic_pub_names;
+const value_use_planning_physical_pub_names = model.value_use_planning_physical_pub_names;
 const value_use_materialization_pub_names = model.value_use_materialization_pub_names;
 const value_use_composition_pub_names = model.value_use_composition_pub_names;
 const value_use_address_pub_names = model.value_use_address_pub_names;
@@ -176,17 +181,23 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
         return error.ValueUseRuntimeDispatchForbidden;
     }
 
-    const is_model = std.mem.endsWith(u8, path, "/model.zig");
-    const is_core = std.mem.endsWith(u8, path, "/core.zig");
-    const is_planning = std.mem.endsWith(u8, path, "/planning.zig");
-    const is_materialization = std.mem.endsWith(u8, path, "/materialization.zig");
-    const is_composition = std.mem.endsWith(u8, path, "/composition.zig");
-    const is_address = std.mem.endsWith(u8, path, "/actions/address_memory.zig");
-    const is_control = std.mem.endsWith(u8, path, "/actions/control_compare.zig");
-    const is_scalar_arithmetic = std.mem.endsWith(u8, path, "/actions/scalar_arithmetic.zig");
-    const is_scalar_cast = std.mem.endsWith(u8, path, "/actions/scalar_cast.zig");
-    const is_scalar_immediate = std.mem.endsWith(u8, path, "/actions/scalar_immediate.zig");
-    const is_calls = std.mem.endsWith(u8, path, "/actions/calls.zig");
+    const root = "src/codegen/x86_64/generic_cfg/value_use/";
+    const is_model = std.mem.eql(u8, path, root ++ "model.zig");
+    const is_core = std.mem.eql(u8, path, root ++ "core.zig");
+    const is_planning = std.mem.eql(u8, path, root ++ "planning.zig");
+    const is_planning_model = std.mem.eql(u8, path, root ++ "planning/model.zig");
+    const is_planning_compatibility = std.mem.eql(u8, path, root ++ "planning/compatibility.zig");
+    const is_planning_lifetime = std.mem.eql(u8, path, root ++ "planning/lifetime_admission.zig");
+    const is_planning_semantic = std.mem.eql(u8, path, root ++ "planning/semantic_ordering.zig");
+    const is_planning_physical = std.mem.eql(u8, path, root ++ "planning/physical_mapping.zig");
+    const is_materialization = std.mem.eql(u8, path, root ++ "materialization.zig");
+    const is_composition = std.mem.eql(u8, path, root ++ "composition.zig");
+    const is_address = std.mem.eql(u8, path, root ++ "actions/address_memory.zig");
+    const is_control = std.mem.eql(u8, path, root ++ "actions/control_compare.zig");
+    const is_scalar_arithmetic = std.mem.eql(u8, path, root ++ "actions/scalar_arithmetic.zig");
+    const is_scalar_cast = std.mem.eql(u8, path, root ++ "actions/scalar_cast.zig");
+    const is_scalar_immediate = std.mem.eql(u8, path, root ++ "actions/scalar_immediate.zig");
+    const is_calls = std.mem.eql(u8, path, root ++ "actions/calls.zig");
 
     const public_names: []const []const u8 = if (is_model)
         &value_use_model_pub_names
@@ -194,6 +205,16 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
         &value_use_core_pub_names
     else if (is_planning)
         &value_use_planning_pub_names
+    else if (is_planning_model)
+        &value_use_planning_model_pub_names
+    else if (is_planning_compatibility)
+        &value_use_planning_compatibility_pub_names
+    else if (is_planning_lifetime)
+        &value_use_planning_lifetime_pub_names
+    else if (is_planning_semantic)
+        &value_use_planning_semantic_pub_names
+    else if (is_planning_physical)
+        &value_use_planning_physical_pub_names
     else if (is_materialization)
         &value_use_materialization_pub_names
     else if (is_composition)
@@ -222,10 +243,27 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
         if (countPattern(source[dispatch.start..dispatch.end], "switch (action)") != 1)
             return error.ValueUseExecutionDispatchMismatch;
         if (countPattern(source, "@import(\"actions/scalar_arithmetic.zig\")") != 1 or
+            countPattern(source, "@import(\"planning.zig\")") != 1 or
+            std.mem.indexOf(u8, source, "@import(\"planning/") != null or
             std.mem.indexOf(u8, source, "@import(\"actions/scalar_cast.zig\")") != null or
             std.mem.indexOf(u8, source, "@import(\"actions/scalar_immediate.zig\")") != null)
         {
             return error.ValueUseImportDagMismatch;
+        }
+        const lifetime_aliases = [_][]const u8{
+            "pub const availabilityForConsumption = planning_module.availabilityForConsumption;",
+            "pub const mustSurviveInstruction = planning_module.mustSurviveInstruction;",
+            "pub const occupantNeedsPreservation = planning_module.occupantNeedsPreservation;",
+        };
+        for (lifetime_aliases) |alias| {
+            if (countPattern(source, alias) != 1)
+                return error.ValueUsePlanningLifetimeAliasMismatch;
+        }
+        if (std.mem.indexOf(u8, source, "core_availabilityForConsumption") != null or
+            std.mem.indexOf(u8, source, "core_mustSurviveInstruction") != null or
+            std.mem.indexOf(u8, source, "core_occupantNeedsPreservation") != null)
+        {
+            return error.ValueUsePlanningLifetimeAliasMismatch;
         }
     } else if (std.mem.indexOf(u8, source, "model.Transaction(") != null) {
         return error.ValueUseProductionInstantiationMismatch;
@@ -240,20 +278,22 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
             std.mem.indexOf(u8, source, "@import(\"actions/") != null)
             return error.ValueUseImportDagMismatch;
     } else if (is_planning) {
-        if (std.mem.indexOf(u8, source, "@import(\"core.zig\")") != null or
-            std.mem.indexOf(u8, source, "@import(\"materialization.zig\")") != null or
-            std.mem.indexOf(u8, source, "@import(\"composition.zig\")") != null or
-            std.mem.indexOf(u8, source, "@import(\"actions/address_memory.zig\")") != null or
-            std.mem.indexOf(u8, source, "@import(\"actions/calls.zig\")") != null)
-            return error.ValueUseImportDagMismatch;
+        try validatePlanningFacadeSource(source);
+    } else if (is_planning_model or is_planning_compatibility or
+        is_planning_lifetime or is_planning_semantic or is_planning_physical)
+    {
+        try validatePlanningLeafImportDag(path, source);
+        try validatePlanningInternalOwnership(path, source);
     } else if (is_materialization or is_composition) {
         if (std.mem.indexOf(u8, source, "@import(\"core.zig\")") != null or
             std.mem.indexOf(u8, source, "@import(\"planning.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"planning/") != null or
             std.mem.indexOf(u8, source, "@import(\"actions/") != null)
             return error.ValueUseImportDagMismatch;
     } else if (is_address or is_control or is_scalar_cast or is_scalar_immediate or is_calls) {
         if (std.mem.indexOf(u8, source, "@import(\"../core.zig\")") != null or
             std.mem.indexOf(u8, source, "@import(\"../planning.zig\")") != null or
+            std.mem.indexOf(u8, source, "@import(\"../planning/") != null or
             std.mem.indexOf(u8, source, "@import(\"../actions/") != null or
             std.mem.indexOf(u8, source, "@import(\"scalar_arithmetic.zig\")") != null or
             std.mem.indexOf(u8, source, "@import(\"scalar_cast.zig\")") != null or
@@ -270,7 +310,159 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
         return error.ValueUseScalarArithmeticLineBudgetExceeded;
     if ((is_scalar_cast or is_scalar_immediate) and countPattern(source, "\n") + 1 > 2000)
         return error.ValueUseScalarArithmeticLineBudgetExceeded;
+    if ((is_planning_model or is_planning_compatibility or is_planning_lifetime or
+        is_planning_semantic or is_planning_physical) and
+        countPattern(source, "\n") + 1 > 2000)
+    {
+        return error.ValueUsePlanningLeafLineBudgetExceeded;
+    }
     try validateExactTopLevelPubNames(source, public_names);
+}
+
+pub fn validatePlanningFacadeSource(source: []const u8) !void {
+    const expected =
+        "const planning_model = @import(\"planning/model.zig\");\n" ++
+        "const compatibility = @import(\"planning/compatibility.zig\");\n" ++
+        "const lifetime_admission = @import(\"planning/lifetime_admission.zig\");\n" ++
+        "const semantic_ordering = @import(\"planning/semantic_ordering.zig\");\n" ++
+        "const physical_mapping = @import(\"planning/physical_mapping.zig\");\n\n" ++
+        "pub const actionOwnsOrderedWrites = semantic_ordering.actionOwnsOrderedWrites;\n" ++
+        "pub const argRegForNode = physical_mapping.argRegForNode;\n" ++
+        "pub const availabilityForConsumption = lifetime_admission.core_availabilityForConsumption;\n" ++
+        "pub const mustSurviveInstruction = lifetime_admission.core_mustSurviveInstruction;\n" ++
+        "pub const nodeForArgReg = physical_mapping.nodeForArgReg;\n" ++
+        "pub const occupantNeedsPreservation = lifetime_admission.core_occupantNeedsPreservation;\n" ++
+        "pub const pairSourceNodes = physical_mapping.pairSourceNodes;\n" ++
+        "pub const planEarlyMaterializations = semantic_ordering.planEarlyMaterializations;\n" ++
+        "pub const requestDestinationNodes = physical_mapping.requestDestinationNodes;\n" ++
+        "pub const requestMappings = physical_mapping.requestMappings;\n" ++
+        "pub const scalarSourceNode = physical_mapping.scalarSourceNode;\n" ++
+        "pub const seal = physical_mapping.seal;\n" ++
+        "pub const validateBindingCompatibility = compatibility.validateBindingCompatibility;\n" ++
+        "pub const validateEarlyHome = semantic_ordering.validateEarlyHome;\n" ++
+        "pub const validateFormAndDestination = lifetime_admission.validateFormAndDestination;\n" ++
+        "pub const validateRequest = lifetime_admission.validateRequest;\n" ++
+        "pub const validateRequestAt = lifetime_admission.validateRequestAt;\n" ++
+        "pub const validateSemanticOrderTopology = semantic_ordering.validateSemanticOrderTopology;\n";
+    if (!std.mem.eql(u8, source, expected))
+        return error.ValueUsePlanningFacadeMismatch;
+}
+
+pub fn validatePlanningLeafImportDag(path: []const u8, source: []const u8) !void {
+    const ExpectedImport = struct { name: []const u8, path: []const u8 };
+    const model_imports = [_]ExpectedImport{
+        .{ .name = "value_use_model", .path = "../model.zig" },
+    };
+    const compatibility_imports = [_]ExpectedImport{
+        .{ .name = "selector_types", .path = "../../selector_types.zig" },
+        .{ .name = "Types", .path = "../model.zig" },
+        .{ .name = "planning_model", .path = "model.zig" },
+    };
+    const lifetime_imports = [_]ExpectedImport{
+        .{ .name = "std", .path = "std" },
+        .{ .name = "selector_types", .path = "../../selector_types.zig" },
+        .{ .name = "selector_state", .path = "../../composed_selector_state.zig" },
+        .{ .name = "Types", .path = "../model.zig" },
+        .{ .name = "planning_model", .path = "model.zig" },
+        .{ .name = "compatibility", .path = "compatibility.zig" },
+    };
+    const semantic_imports = [_]ExpectedImport{
+        .{ .name = "std", .path = "std" },
+        .{ .name = "x86_64_types", .path = "../../../types.zig" },
+        .{ .name = "selector_types", .path = "../../selector_types.zig" },
+        .{ .name = "selector_state", .path = "../../composed_selector_state.zig" },
+        .{ .name = "Types", .path = "../model.zig" },
+        .{ .name = "planning_model", .path = "model.zig" },
+        .{ .name = "compatibility", .path = "compatibility.zig" },
+    };
+    const physical_imports = [_]ExpectedImport{
+        .{ .name = "std", .path = "std" },
+        .{ .name = "ir", .path = "../../../../../ir.zig" },
+        .{ .name = "x86_64_types", .path = "../../../types.zig" },
+        .{ .name = "selector_types", .path = "../../selector_types.zig" },
+        .{ .name = "state_data", .path = "../../composed_selector_state_data.zig" },
+        .{ .name = "selector_state", .path = "../../composed_selector_state.zig" },
+        .{ .name = "Types", .path = "../model.zig" },
+        .{ .name = "control_compare", .path = "../actions/control_compare.zig" },
+        .{ .name = "planning_model", .path = "model.zig" },
+        .{ .name = "compatibility", .path = "compatibility.zig" },
+        .{ .name = "lifetime_admission", .path = "lifetime_admission.zig" },
+        .{ .name = "semantic_ordering", .path = "semantic_ordering.zig" },
+    };
+    const expected: []const ExpectedImport =
+        if (std.mem.endsWith(u8, path, "/planning/model.zig"))
+            &model_imports
+        else if (std.mem.endsWith(u8, path, "/planning/compatibility.zig"))
+            &compatibility_imports
+        else if (std.mem.endsWith(u8, path, "/planning/lifetime_admission.zig"))
+            &lifetime_imports
+        else if (std.mem.endsWith(u8, path, "/planning/semantic_ordering.zig"))
+            &semantic_imports
+        else if (std.mem.endsWith(u8, path, "/planning/physical_mapping.zig"))
+            &physical_imports
+        else
+            return error.ValueUseImportDagMismatch;
+    if (countPattern(source, "@import(") != expected.len)
+        return error.ValueUseImportDagMismatch;
+    for (expected) |entry| {
+        var buffer: [192]u8 = undefined;
+        const declaration = std.fmt.bufPrint(
+            &buffer,
+            "const {s} = @import(\"{s}\");",
+            .{ entry.name, entry.path },
+        ) catch return error.ValueUseImportDagMismatch;
+        if (countPattern(source, declaration) != 1)
+            return error.ValueUseImportDagMismatch;
+    }
+}
+
+pub fn validatePlanningInternalOwnership(path: []const u8, source: [:0]const u8) !void {
+    const is_model = std.mem.endsWith(u8, path, "/planning/model.zig");
+    const is_semantic = std.mem.endsWith(u8, path, "/planning/semantic_ordering.zig");
+    const is_physical = std.mem.endsWith(u8, path, "/planning/physical_mapping.zig");
+    if (!is_model and !is_semantic and !is_physical and
+        (std.mem.indexOf(u8, source, "planning_model.Mapping") != null or
+            std.mem.indexOf(u8, source, "planning_model.CopyVisitState") != null))
+    {
+        return error.ValueUsePlanningInternalOwnershipMismatch;
+    }
+    if (is_semantic or is_physical) {
+        if (countPattern(source, "const Mapping = planning_model.Mapping;") != 1 or
+            countPattern(source, "const CopyVisitState = planning_model.CopyVisitState;") != 1)
+        {
+            return error.ValueUsePlanningInternalOwnershipMismatch;
+        }
+        const reject_name = if (is_semantic) "rejectSemanticOrderCycles" else "rejectCopyCycles";
+        const visit_name = if (is_semantic) "visitSemanticOrderNode" else "visitCopyNode";
+        var reject_buffer: [96]u8 = undefined;
+        var visit_buffer: [96]u8 = undefined;
+        const reject_declaration = std.fmt.bufPrint(
+            &reject_buffer,
+            "fn {s}(",
+            .{reject_name},
+        ) catch return error.ValueUsePlanningInternalOwnershipMismatch;
+        const visit_declaration = std.fmt.bufPrint(
+            &visit_buffer,
+            "fn {s}(",
+            .{visit_name},
+        ) catch return error.ValueUsePlanningInternalOwnershipMismatch;
+        const state_storage = if (is_semantic)
+            "var states = [_]CopyVisitState{.unseen} ** Types.max_requests;"
+        else
+            "var states = [_]CopyVisitState{.unseen} ** Types.physical_node_count;";
+        const state_parameter = if (is_semantic)
+            "states: *[Types.max_requests]CopyVisitState,"
+        else
+            "states: *[Types.physical_node_count]CopyVisitState,";
+        if (countPattern(source, reject_declaration) != 1 or
+            countPattern(source, visit_declaration) != 1 or
+            countPattern(source, state_storage) != 1 or
+            countPattern(source, state_parameter) != 1 or
+            countPattern(source, "CopyVisitState") != 4)
+        {
+            return error.ValueUsePlanningInternalOwnershipMismatch;
+        }
+    }
 }
 
 pub fn validateScalarArithmeticFacadeSource(source: []const u8) !void {

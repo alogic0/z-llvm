@@ -550,7 +550,8 @@ test "composed selector source guard freezes distinct cast and arithmetic displa
 test "composed selector source guard freezes private three-question lifetime authority" {
     const accepted: [:0]const u8 =
         @embedFile("../value_use/model.zig") ++
-        @embedFile("../value_use/core.zig");
+        @embedFile("../value_use/core.zig") ++
+        @embedFile("../value_use/planning/lifetime_admission.zig");
     try validateLifetimeContextAuthority(accepted);
 
     const escaped = try replaceOnceSentinel(

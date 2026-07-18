@@ -94,6 +94,9 @@ const validateSplitValueUseTree = support.validateSplitValueUseTree;
 const appendNormalizedValueUseSource = support.appendNormalizedValueUseSource;
 const validateValueUseLeaf = support.validateValueUseLeaf;
 const validateScalarArithmeticFacadeSource = support.validateScalarArithmeticFacadeSource;
+const validatePlanningFacadeSource = support.validatePlanningFacadeSource;
+const validatePlanningLeafImportDag = support.validatePlanningLeafImportDag;
+const validatePlanningInternalOwnership = support.validatePlanningInternalOwnership;
 const validateValueUseFacadeSurfaceManifest = support.validateValueUseFacadeSurfaceManifest;
 const validateValueUseDirectForwardingWrappers = support.validateValueUseDirectForwardingWrappers;
 const validateExactTopLevelPubNames = support.validateExactTopLevelPubNames;
@@ -103,6 +106,21 @@ const validateAddressDependencyStateAuthority = support.validateAddressDependenc
 const validateAddressDependencyDomainSource = support.validateAddressDependencyDomainSource;
 const validateFrozenBypassInventoryHash = support.validateFrozenBypassInventoryHash;
 const validateFrozenBypassInventoryForSource = support.validateFrozenBypassInventoryForSource;
+
+fn replaceOnceSentinel(
+    allocator: std.mem.Allocator,
+    source: [:0]const u8,
+    needle: []const u8,
+    replacement: []const u8,
+) ![:0]u8 {
+    const start = std.mem.indexOf(u8, source, needle) orelse return error.TestNeedleMissing;
+    const result_len = source.len - needle.len + replacement.len;
+    const result = try allocator.allocSentinel(u8, result_len, 0);
+    @memcpy(result[0..start], source[0..start]);
+    @memcpy(result[start..][0..replacement.len], replacement);
+    @memcpy(result[start + replacement.len ..], source[start + needle.len ..]);
+    return result;
+}
 
 test "composed selector source guard accepts the fully classified current tree" {
     try validateCurrentTree(std.testing.allocator);
@@ -250,6 +268,67 @@ test "value-use scalar arithmetic facade is aliases only and core imports only i
                 "const b = @import(\"actions/scalar_cast.zig\");\n" ++
                 "const T = model.Transaction(Implementation);\n" ++
                 "fn executePreparedActionInternal() void { switch (action) {} }\n",
+        ),
+    );
+}
+
+test "value-use planning split guard freezes the revised facade DAG and internal ownership" {
+    const facade: [:0]const u8 = @embedFile("../value_use/planning.zig");
+    try validatePlanningFacadeSource(facade);
+    const widened_facade = try replaceOnceSentinel(
+        std.testing.allocator,
+        facade,
+        "pub const seal = physical_mapping.seal;",
+        "pub const seal = physical_mapping.seal;\npub const widened = physical_mapping.seal;",
+    );
+    defer std.testing.allocator.free(widened_facade);
+    try std.testing.expectError(
+        error.ValueUsePlanningFacadeMismatch,
+        validatePlanningFacadeSource(widened_facade),
+    );
+
+    const lifetime: [:0]const u8 =
+        @embedFile("../value_use/planning/lifetime_admission.zig");
+    try validatePlanningLeafImportDag(
+        "src/codegen/x86_64/generic_cfg/value_use/planning/lifetime_admission.zig",
+        lifetime,
+    );
+    const reverse_import = try replaceOnceSentinel(
+        std.testing.allocator,
+        lifetime,
+        "const compatibility = @import(\"compatibility.zig\");",
+        "const compatibility = @import(\"physical_mapping.zig\");",
+    );
+    defer std.testing.allocator.free(reverse_import);
+    try std.testing.expectError(
+        error.ValueUseImportDagMismatch,
+        validatePlanningLeafImportDag(
+            "src/codegen/x86_64/generic_cfg/value_use/planning/lifetime_admission.zig",
+            reverse_import,
+        ),
+    );
+
+    try std.testing.expectError(
+        error.ValueUsePlanningInternalOwnershipMismatch,
+        validatePlanningInternalOwnership(
+            "src/codegen/x86_64/generic_cfg/value_use/planning/compatibility.zig",
+            "const leaked = planning_model.Mapping;\n",
+        ),
+    );
+
+    const core: [:0]const u8 = @embedFile("../value_use/core.zig");
+    const bypassed_alias = try replaceOnceSentinel(
+        std.testing.allocator,
+        core,
+        "pub const mustSurviveInstruction = planning_module.mustSurviveInstruction;",
+        "pub const mustSurviveInstruction = core_mustSurviveInstruction;",
+    );
+    defer std.testing.allocator.free(bypassed_alias);
+    try std.testing.expectError(
+        error.ValueUsePlanningLifetimeAliasMismatch,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/core.zig",
+            bypassed_alias,
         ),
     );
 }

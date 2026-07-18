@@ -43,6 +43,11 @@ pub const value_use_leaf_paths = [_][]const u8{
     "src/codegen/x86_64/generic_cfg/value_use/model.zig",
     "src/codegen/x86_64/generic_cfg/value_use/core.zig",
     "src/codegen/x86_64/generic_cfg/value_use/planning.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/model.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/compatibility.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/lifetime_admission.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/semantic_ordering.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/physical_mapping.zig",
     "src/codegen/x86_64/generic_cfg/value_use/materialization.zig",
     "src/codegen/x86_64/generic_cfg/value_use/composition.zig",
     "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory.zig",
@@ -87,11 +92,55 @@ pub const value_use_model_pub_names = [_][]const u8{
 };
 pub const value_use_core_pub_names = [_][]const u8{"ValueUseTransaction"};
 pub const value_use_planning_pub_names = [_][]const u8{
-    "actionOwnsOrderedWrites",      "argRegForNode",             "nodeForArgReg",
+    "actionOwnsOrderedWrites",      "argRegForNode",             "availabilityForConsumption",
+    "mustSurviveInstruction",       "nodeForArgReg",             "occupantNeedsPreservation",
     "pairSourceNodes",              "planEarlyMaterializations", "requestDestinationNodes",
     "requestMappings",              "scalarSourceNode",          "seal",
     "validateBindingCompatibility", "validateEarlyHome",         "validateFormAndDestination",
     "validateRequest",              "validateRequestAt",         "validateSemanticOrderTopology",
+};
+pub const value_use_planning_model_pub_names = [_][]const u8{
+    "CopyVisitState",
+    "Mapping",
+    "PhysicalNode",
+};
+pub const value_use_planning_compatibility_pub_names = [_][]const u8{
+    "validateBindingCompatibility",
+    "validateCopyActionForm",
+    "validateExpectedType",
+    "validateI64StorePointer",
+    "validateMemcpyLengthOperand",
+    "validateMemcpyPointerOperand",
+    "validateSourceView",
+    "validateStackPointerStoreViews",
+    "validateStoreI64ValueOperand",
+    "validateStorePointerOperand",
+    "validateStoreStackObjectOperand",
+};
+pub const value_use_planning_lifetime_pub_names = [_][]const u8{
+    "core_availabilityForConsumption",
+    "core_mustSurviveInstruction",
+    "core_occupantNeedsPreservation",
+    "validateDeferredSwitchRequest",
+    "validateFormAndDestination",
+    "validateRequest",
+    "validateRequestAt",
+};
+pub const value_use_planning_semantic_pub_names = [_][]const u8{
+    "actionOwnsOrderedWrites",
+    "planEarlyMaterializations",
+    "resetSemanticOrderPlan",
+    "validateEarlyHome",
+    "validateSemanticOrderTopology",
+};
+pub const value_use_planning_physical_pub_names = [_][]const u8{
+    "argRegForNode",
+    "nodeForArgReg",
+    "pairSourceNodes",
+    "requestDestinationNodes",
+    "requestMappings",
+    "scalarSourceNode",
+    "seal",
 };
 pub const value_use_materialization_pub_names = [_][]const u8{
     "buildPreparedRecord",             "clobberPhysicalNode",     "materializeAll",

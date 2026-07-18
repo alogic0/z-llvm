@@ -1,0 +1,111 @@
+record_kind	owner	name_or_import	visibility_or_rule	approved_consumers_or_reason
+passive_type	planning/model.zig	PhysicalNode	pub_internal	planning/model.zig;planning/lifetime_admission.zig;planning/semantic_ordering.zig;planning/physical_mapping.zig
+declaration	planning/model.zig	Mapping	pub_internal	planning/physical_mapping.zig;planning/semantic_ordering.zig
+declaration	planning/model.zig	CopyVisitState	pub_internal	planning/physical_mapping.zig:rejectCopyCycles+visitCopyNode;planning/semantic_ordering.zig:rejectSemanticOrderCycles+visitSemanticOrderNode
+declaration	planning/lifetime_admission.zig	validateRequestAt	pub_facade	planning.zig
+declaration	planning/lifetime_admission.zig	validateRequest	pub_facade	planning.zig
+declaration	planning/lifetime_admission.zig	validateDeferredSwitchRequest	pub_internal	planning/physical_mapping.zig:seal
+declaration	planning/lifetime_admission.zig	validateFormAndDestination	pub_facade	planning.zig
+declaration	planning/lifetime_admission.zig	core_availabilityForConsumption	pub_internal	planning.zig:availabilityForConsumption
+declaration	planning/lifetime_admission.zig	core_mustSurviveInstruction	pub_internal	planning.zig:mustSurviveInstruction
+declaration	planning/lifetime_admission.zig	core_occupantNeedsPreservation	pub_internal	planning.zig:occupantNeedsPreservation
+declaration	planning/compatibility.zig	validateStorePointerOperand	pub_internal	planning/physical_mapping.zig
+declaration	planning/compatibility.zig	validateStoreI64ValueOperand	pub_internal	planning/physical_mapping.zig
+declaration	planning/compatibility.zig	validateStoreStackObjectOperand	pub_internal	planning/physical_mapping.zig
+declaration	planning/compatibility.zig	validateMemcpyPointerOperand	pub_internal	planning/physical_mapping.zig
+declaration	planning/compatibility.zig	validateMemcpyLengthOperand	pub_internal	planning/physical_mapping.zig
+declaration	planning/compatibility.zig	validateI64StorePointer	pub_internal	planning/physical_mapping.zig
+declaration	planning/compatibility.zig	validateStackPointerStoreViews	pub_internal	planning/physical_mapping.zig
+declaration	planning/compatibility.zig	validateCopyActionForm	pub_internal	planning/lifetime_admission.zig
+declaration	planning/compatibility.zig	validateBindingCompatibility	pub_facade	planning.zig
+declaration	planning/compatibility.zig	validateScratchCompareBinding	private	planning/compatibility.zig
+declaration	planning/compatibility.zig	validateOrdinaryLoadHome	private	planning/compatibility.zig
+declaration	planning/compatibility.zig	validateReadOnlyPointerLoadHome	private	planning/compatibility.zig
+declaration	planning/compatibility.zig	validateReadOnlyTableLoadHome	private	planning/compatibility.zig
+declaration	planning/compatibility.zig	hasLow32View	private	planning/compatibility.zig
+declaration	planning/compatibility.zig	validateExpectedType	pub_internal	planning/lifetime_admission.zig;planning/semantic_ordering.zig;planning/compatibility.zig
+declaration	planning/compatibility.zig	validateSourceView	pub_internal	planning/lifetime_admission.zig;planning/semantic_ordering.zig;planning/compatibility.zig
+declaration	planning/semantic_ordering.zig	validateSemanticOrderTopology	pub_facade	planning.zig
+declaration	planning/semantic_ordering.zig	actionSecondaryOperand	private	planning/semantic_ordering.zig
+declaration	planning/semantic_ordering.zig	actionTertiaryOperand	private	planning/semantic_ordering.zig
+declaration	planning/semantic_ordering.zig	resetSemanticOrderPlan	pub_internal	planning/physical_mapping.zig:seal
+declaration	planning/semantic_ordering.zig	planEarlyMaterializations	pub_facade	planning.zig
+declaration	planning/semantic_ordering.zig	appendOrderedOperand	private	planning/semantic_ordering.zig
+declaration	planning/semantic_ordering.zig	sortSemanticRoots	private	planning/semantic_ordering.zig
+declaration	planning/semantic_ordering.zig	semanticRootLessThan	private	planning/semantic_ordering.zig
+declaration	planning/semantic_ordering.zig	firstStructuralDestination	private	planning/semantic_ordering.zig
+declaration	planning/semantic_ordering.zig	validateEarlyHome	pub_facade	planning.zig
+declaration	planning/semantic_ordering.zig	validateEarlyHomeUnchecked	private	planning/semantic_ordering.zig
+declaration	planning/semantic_ordering.zig	earlySequencingCandidate	private	planning/semantic_ordering.zig
+declaration	planning/semantic_ordering.zig	actionOwnsOrderedWrites	pub_facade	planning.zig
+declaration	planning/semantic_ordering.zig	rejectSemanticOrderCycles	private	planning/semantic_ordering.zig
+declaration	planning/semantic_ordering.zig	visitSemanticOrderNode	private	planning/semantic_ordering.zig
+declaration	planning/semantic_ordering.zig	firstMappingDestination	private	planning/semantic_ordering.zig
+declaration	planning/semantic_ordering.zig	sourceStructuralOrder	private	planning/semantic_ordering.zig
+declaration	planning/semantic_ordering.zig	earlyCopyIsFlagsPreserving	private	planning/semantic_ordering.zig
+declaration	planning/physical_mapping.zig	NodeList	private	planning/physical_mapping.zig
+declaration	planning/physical_mapping.zig	MappingList	private	planning/physical_mapping.zig
+declaration	planning/physical_mapping.zig	seal	pub_facade	planning.zig
+declaration	planning/physical_mapping.zig	requestDestinationNodes	pub_facade	planning.zig
+declaration	planning/physical_mapping.zig	appendImmediateRhsDestinationNodes	private	planning/physical_mapping.zig
+declaration	planning/physical_mapping.zig	immediateScratch64PlanningDestination	private	planning/physical_mapping.zig
+declaration	planning/physical_mapping.zig	immediateFitsI32	private	planning/physical_mapping.zig
+declaration	planning/physical_mapping.zig	pairLowScalarCastDestination	private	planning/physical_mapping.zig
+declaration	planning/physical_mapping.zig	signExtendScratchDestination	private	planning/physical_mapping.zig
+declaration	planning/physical_mapping.zig	scalarCastScratchAvailable	private	planning/physical_mapping.zig
+declaration	planning/physical_mapping.zig	requestMappings	pub_facade	planning.zig
+declaration	planning/physical_mapping.zig	appendStorePointerDestinationNodes	private	planning/physical_mapping.zig
+declaration	planning/physical_mapping.zig	appendStorePointerMappings	private	planning/physical_mapping.zig
+declaration	planning/physical_mapping.zig	rejectCopyCycles	private	planning/physical_mapping.zig
+declaration	planning/physical_mapping.zig	visitCopyNode	private	planning/physical_mapping.zig
+declaration	planning/physical_mapping.zig	scalarSourceNode	pub_facade	planning.zig
+declaration	planning/physical_mapping.zig	pairSourceNodes	pub_facade	planning.zig
+declaration	planning/physical_mapping.zig	nodeForArgReg	pub_facade	planning.zig
+declaration	planning/physical_mapping.zig	argRegForNode	pub_facade	planning.zig
+facade_alias	planning.zig	actionOwnsOrderedWrites	pub_exact	semantic_ordering.actionOwnsOrderedWrites
+facade_alias	planning.zig	argRegForNode	pub_exact	physical_mapping.argRegForNode
+facade_alias	planning.zig	availabilityForConsumption	pub_exact	lifetime_admission.core_availabilityForConsumption
+facade_alias	planning.zig	mustSurviveInstruction	pub_exact	lifetime_admission.core_mustSurviveInstruction
+facade_alias	planning.zig	nodeForArgReg	pub_exact	physical_mapping.nodeForArgReg
+facade_alias	planning.zig	occupantNeedsPreservation	pub_exact	lifetime_admission.core_occupantNeedsPreservation
+facade_alias	planning.zig	pairSourceNodes	pub_exact	physical_mapping.pairSourceNodes
+facade_alias	planning.zig	planEarlyMaterializations	pub_exact	semantic_ordering.planEarlyMaterializations
+facade_alias	planning.zig	requestDestinationNodes	pub_exact	physical_mapping.requestDestinationNodes
+facade_alias	planning.zig	requestMappings	pub_exact	physical_mapping.requestMappings
+facade_alias	planning.zig	scalarSourceNode	pub_exact	physical_mapping.scalarSourceNode
+facade_alias	planning.zig	seal	pub_exact	physical_mapping.seal
+facade_alias	planning.zig	validateBindingCompatibility	pub_exact	compatibility.validateBindingCompatibility
+facade_alias	planning.zig	validateEarlyHome	pub_exact	semantic_ordering.validateEarlyHome
+facade_alias	planning.zig	validateFormAndDestination	pub_exact	lifetime_admission.validateFormAndDestination
+facade_alias	planning.zig	validateRequest	pub_exact	lifetime_admission.validateRequest
+facade_alias	planning.zig	validateRequestAt	pub_exact	lifetime_admission.validateRequestAt
+facade_alias	planning.zig	validateSemanticOrderTopology	pub_exact	semantic_ordering.validateSemanticOrderTopology
+core_use	core.zig	availabilityForConsumption	exact_alias	Implementation.availabilityForConsumption=planning_module.availabilityForConsumption
+core_use	core.zig	mustSurviveInstruction	exact_alias	Implementation.mustSurviveInstruction=planning_module.mustSurviveInstruction
+core_use	core.zig	occupantNeedsPreservation	exact_alias	Implementation.occupantNeedsPreservation=planning_module.occupantNeedsPreservation
+import	planning/model.zig	../model.zig	exact	passive PhysicalNode backing only
+import	planning/compatibility.zig	model.zig	exact	revised lower-layer dependency
+import	planning/compatibility.zig	../model.zig	exact	value-use semantic types
+import	planning/compatibility.zig	../../selector_types.zig	exact	binding and location types
+import	planning/lifetime_admission.zig	model.zig	exact	passive PhysicalNode
+import	planning/lifetime_admission.zig	compatibility.zig	exact	pure validation
+import	planning/lifetime_admission.zig	../model.zig	exact	request types
+import	planning/lifetime_admission.zig	../../selector_types.zig	exact	binding/location types
+import	planning/lifetime_admission.zig	../../composed_selector_state.zig	exact	dependency-aware liveness authority
+import	planning/semantic_ordering.zig	model.zig	exact	Mapping+CopyVisitState+PhysicalNode
+import	planning/semantic_ordering.zig	compatibility.zig	exact	pure type/view validation
+import	planning/semantic_ordering.zig	../model.zig	exact	ordering state types
+import	planning/semantic_ordering.zig	../../../types.zig	exact	ArgReg
+import	planning/semantic_ordering.zig	../../selector_types.zig	exact	ValueLoc
+import	planning/semantic_ordering.zig	../../composed_selector_state.zig	exact	scratch-free proof
+import	planning/physical_mapping.zig	model.zig	exact	Mapping+CopyVisitState+PhysicalNode
+import	planning/physical_mapping.zig	compatibility.zig	exact	pure validation
+import	planning/physical_mapping.zig	lifetime_admission.zig	exact	request admission
+import	planning/physical_mapping.zig	semantic_ordering.zig	exact	ordering/early planning
+import	planning/physical_mapping.zig	../model.zig	exact	value-use semantic types
+import	planning/physical_mapping.zig	../actions/control_compare.zig	exact	frozen pure classifier edge
+import	planning.zig	planning/model.zig	exact	reviewed passive lower layer
+import	planning.zig	planning/compatibility.zig	exact	reviewed validation lower layer
+import	planning.zig	planning/lifetime_admission.zig	exact	reviewed admission lower layer
+import	planning.zig	planning/semantic_ordering.zig	exact	reviewed ordering lower layer
+import	planning.zig	planning/physical_mapping.zig	exact	reviewed orchestration owner

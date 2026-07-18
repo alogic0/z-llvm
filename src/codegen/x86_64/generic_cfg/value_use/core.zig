@@ -492,87 +492,6 @@ fn core_setImmediateScalarTestFailure(
 fn core_requireActive(comptime _: type, transaction: anytype) !void {
     if (transaction.lifecycle != .active) return error.ValueUseTransactionClosed;
 }
-fn core_availabilityForConsumption(
-    comptime _: type,
-    transaction: anytype,
-    index: u8,
-) !void {
-    const request = &transaction.requests[index];
-    const identity = switch (request.source) {
-        .named => |*name| name,
-        // Typed literals and typed null pointers have no binding lifetime.
-        .int, .null_value => return,
-        .unsupported => return,
-    };
-    const binding = transaction.selector.values.get(identity.slice()) orelse
-        return error.ValueUseUnresolvedSource;
-    const plan = transaction.selector.allocation_plan orelse
-        return error.ValueUseSourcePlanMissing;
-    _ = plan.intervalEnd(identity.slice()) orelse
-        return error.ValueUseSourceIntervalMissing;
-    try selector_state.validateAddressDependenciesForUse(
-        transaction.selector,
-        identity.slice(),
-    );
-    if (!try selector_state.valueIsLiveAtOrAfterCurrent(
-        transaction.selector,
-        identity.slice(),
-    )) return error.ValueUseExpiredSource;
-
-    if (transaction.lifetime_context.pins[index]) |*pin| {
-        if (!pin.identity.eql(identity) or pin.generation != binding.vreg.index)
-            return error.ValueUseSourceGenerationChanged;
-    } else {
-        transaction.lifetime_context.pins[index] = .{
-            .identity = identity.*,
-            .generation = binding.vreg.index,
-        };
-    }
-}
-fn core_mustSurviveInstruction(
-    comptime Authority: type,
-    transaction: anytype,
-    index: u8,
-) !bool {
-    try core_availabilityForConsumption(Authority, transaction, index);
-    const identity = switch (transaction.requests[index].source) {
-        .named => |*name| name.slice(),
-        .int, .null_value => return false,
-        .unsupported => return error.ValueUseUnsupportedSource,
-    };
-    return selector_state.valueIsLiveAfterCurrent(transaction.selector, identity);
-}
-fn core_occupantNeedsPreservation(
-    comptime _: type,
-    transaction: anytype,
-    destination: PhysicalNode,
-    source_index: u8,
-) !?[]const u8 {
-    const source_name = switch (transaction.requests[source_index].source) {
-        .named => |*name| name.slice(),
-        .int, .null_value, .unsupported => null,
-    };
-    const plan = transaction.selector.allocation_plan orelse
-        return error.ValueUseSourcePlanMissing;
-    var iterator = transaction.selector.values.iterator();
-    while (iterator.next()) |entry| {
-        if (source_name) |name| {
-            if (std.mem.eql(u8, entry.key_ptr.*, name)) continue;
-        }
-        if (PhysicalNode.scalarSource(entry.value_ptr.loc) != destination) continue;
-        _ = plan.intervalEnd(entry.key_ptr.*) orelse
-            return error.ValueUseSourceIntervalMissing;
-        try selector_state.validateAddressDependenciesForUse(
-            transaction.selector,
-            entry.key_ptr.*,
-        );
-        if (try selector_state.valueIsLiveAfterCurrent(
-            transaction.selector,
-            entry.key_ptr.*,
-        )) return entry.key_ptr.*;
-    }
-    return null;
-}
 fn core_rollbackInternal(comptime Authority: type, transaction: anytype) void {
     transaction.snapshot.restore(transaction.selector);
     transaction.accumulator_session = null;
@@ -1219,9 +1138,9 @@ const Implementation = struct {
     pub const validateHandle = core_validateHandle;
     pub const recordRequestFailure = core_recordRequestFailure;
     pub const noteRequestBoundaryError = core_noteRequestBoundaryError;
-    pub const availabilityForConsumption = core_availabilityForConsumption;
-    pub const mustSurviveInstruction = core_mustSurviveInstruction;
-    pub const occupantNeedsPreservation = core_occupantNeedsPreservation;
+    pub const availabilityForConsumption = planning_module.availabilityForConsumption;
+    pub const mustSurviveInstruction = planning_module.mustSurviveInstruction;
+    pub const occupantNeedsPreservation = planning_module.occupantNeedsPreservation;
     pub const validateActionRegistration = core_validateActionRegistration;
     pub const validateRegisteredOperandHandle = core_validateRegisteredOperandHandle;
     pub const noteRegisteredOperandBoundaryError = core_noteRegisteredOperandBoundaryError;
