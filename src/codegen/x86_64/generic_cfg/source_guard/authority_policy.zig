@@ -130,6 +130,7 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateI128PairIntentSurface(source);
     try validateScalarCastIntentSurface(source);
     try validateImmediateScalarIntentSurface(source);
+    try validateNamedScalarIntentSurface(source);
     try validateLifetimeContextAuthority(source);
     try validateImmediateScalarAccumulatorPreamble(source);
     try validateDurableActionIdentityOwnership(source);
@@ -501,6 +502,125 @@ pub fn validateImmediateScalarIntentSurface(source: []const u8) !void {
         return error.ValueUseImmediateScalarIntentMissing;
 }
 
+pub fn validateNamedScalarIntentSurface(source: []const u8) !void {
+    const declarations = [_]struct {
+        declaration: []const u8,
+        required: []const []const u8,
+    }{
+        .{
+            .declaration = "pub const NamedScalarBinaryAction = struct {",
+            .required = &.{
+                "result: ActionIdentity",
+                "operation: ir.BinaryOp",
+                "integer_ty: ir.Type",
+                "exact_ei: bool",
+                "rhs: RequestHandle",
+            },
+        },
+        .{
+            .declaration = "pub const ExactI52BinaryAction = struct {",
+            .required = &.{ "result: ActionIdentity", "rhs: RequestHandle" },
+        },
+    };
+    var present: usize = 0;
+    for (declarations) |entry| {
+        const start = std.mem.indexOf(u8, source, entry.declaration) orelse continue;
+        present += 1;
+        const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+            return error.InvalidZigSource;
+        const body = source[start .. end + 2];
+        for (entry.required) |pattern|
+            if (countPattern(body, pattern) != 1)
+                return error.ValueUseNamedScalarIntentMismatch;
+        const forbidden = [_][]const u8{
+            "ArgReg",   "RegPair", "ValueLoc", "Destination", "PreparedView",
+            "home",     "binding", "scratch",  "spill",       "displacement",
+            "sequence", "phase",
+        };
+        for (forbidden) |pattern|
+            if (std.mem.indexOf(u8, body, pattern) != null)
+                return error.ValueUseNamedScalarPhysicalIntentEscape;
+        if (countPattern(body, ",") != entry.required.len)
+            return error.ValueUseNamedScalarIntentMismatch;
+    }
+    if (present != 0 and present != declarations.len)
+        return error.ValueUseNamedScalarIntentMissing;
+    if (present == 0) return;
+
+    const exact_sets = [_]struct {
+        declaration: []const u8,
+        required: []const []const u8,
+    }{
+        .{
+            .declaration = "pub const NamedScalarRequestError = error{",
+            .required = &.{
+                "ValueUseNamedScalarFormUnsupported",
+                "ValueUseNamedScalarWidthUnsupported",
+                "ValueUseNamedScalarLocationUnsupported",
+                "ValueUseNamedScalarScratchUnavailable",
+                "ValueUseNamedScalarExactEiUnsupported",
+                "ValueUseNamedScalarI52EnvelopeUnsupported",
+            },
+        },
+        .{
+            .declaration = "pub const NamedScalarTestFailure = enum {",
+            .required = &.{
+                "after_preamble",
+                "after_canonical_refresh",
+                "after_first_operand_staging",
+                "after_accumulator_preparation",
+                "after_second_operand_staging",
+                "after_first_arithmetic_write",
+                "after_second_arithmetic_write",
+                "after_result_identity_ownership",
+                "after_result_definition",
+                "after_finalization",
+            },
+        },
+    };
+    for (exact_sets) |entry| {
+        const start = std.mem.indexOf(u8, source, entry.declaration) orelse
+            return error.ValueUseNamedScalarIntentMissing;
+        const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+            return error.InvalidZigSource;
+        const body = source[start .. end + 2];
+        for (entry.required) |pattern|
+            if (countPattern(body, pattern) != 1)
+                return error.ValueUseNamedScalarIntentMismatch;
+        if (countPattern(body, ",") != entry.required.len)
+            return error.ValueUseNamedScalarIntentMismatch;
+    }
+
+    const exact_members = [_]struct {
+        declaration: []const u8,
+        member: []const u8,
+    }{
+        .{ .declaration = "pub const UseForm = enum {", .member = "named_scalar_operand," },
+        .{
+            .declaration = "pub const PreparedAction = union(enum) {",
+            .member = "named_scalar_binary: NamedScalarBinaryAction,",
+        },
+        .{
+            .declaration = "pub const PreparedAction = union(enum) {",
+            .member = "exact_i52_binary: ExactI52BinaryAction,",
+        },
+    };
+    for (exact_members) |entry| {
+        const start = std.mem.indexOf(u8, source, entry.declaration) orelse
+            return error.ValueUseNamedScalarIntentMissing;
+        const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+            return error.InvalidZigSource;
+        if (countPattern(source[start .. end + 2], entry.member) != 1)
+            return error.ValueUseNamedScalarIntentMismatch;
+    }
+    for ([_][]const u8{
+        "pub fn attachNamedScalarBinaryAction(",
+        "pub fn attachExactI52BinaryAction(",
+    }) |pattern|
+        if (countPattern(source, pattern) != 1)
+            return error.ValueUseNamedScalarIntentMismatch;
+}
+
 pub fn validateScalarCastSequence(source: [:0]const u8) !void {
     var body_storage: [max_function_bodies]FunctionBody = undefined;
     const bodies = try collectFunctionBodies(source, &body_storage);
@@ -840,12 +960,16 @@ pub fn validateScratchComparePreservationPreamble(source: [:0]const u8) !void {
     const execute_source = source[execute_body.start..execute_body.end];
     const preserve_source = source[preserve_body.start..preserve_body.end];
     const refresh_source = source[refresh_body.start..refresh_body.end];
+    const named_scalar_preamble_count: usize =
+        @intFromBool(functionBodyNamed(bodies, "executeNamedScalarBinary") != null);
     const direct_liveness_preamble_count: usize =
         1 +
-        @as(usize, @intFromBool(functionBodyNamed(bodies, "preserveCurrentHomeSignBitLiveAccumulator") != null));
+        @as(usize, @intFromBool(functionBodyNamed(bodies, "preserveCurrentHomeSignBitLiveAccumulator") != null)) +
+        named_scalar_preamble_count;
     const preservation_preamble_count =
         direct_liveness_preamble_count +
-        @as(usize, @intFromBool(functionBodyNamed(bodies, "preserveImmediateUnrelatedAccumulator") != null));
+        @as(usize, @intFromBool(functionBodyNamed(bodies, "preserveImmediateUnrelatedAccumulator") != null)) +
+        named_scalar_preamble_count;
 
     const preserve_call = std.mem.indexOf(
         u8,

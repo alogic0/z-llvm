@@ -68,6 +68,7 @@ const validateCurrentHomeSignBitIntentSurface = support.validateCurrentHomeSignB
 const validateI128PairIntentSurface = support.validateI128PairIntentSurface;
 const validateScalarCastIntentSurface = support.validateScalarCastIntentSurface;
 const validateImmediateScalarIntentSurface = support.validateImmediateScalarIntentSurface;
+const validateNamedScalarIntentSurface = support.validateNamedScalarIntentSurface;
 const validateScalarCastDisplacementPlan = support.validateScalarCastDisplacementPlan;
 const validateScalarDisplacementAuthorityDistinction = support.validateScalarDisplacementAuthorityDistinction;
 const validateLifetimeContextAuthority = support.validateLifetimeContextAuthority;
@@ -630,5 +631,42 @@ test "composed selector source guard freezes immediate plan-derived alias preser
     try std.testing.expectError(
         error.ValueUseImmediateScalarPreambleMissing,
         validateImmediateScalarAccumulatorPreamble(source_excluded),
+    );
+}
+
+test "value-use named scalar semantic intent is exact and rejects physical choices" {
+    const exact_tail =
+        "pub const NamedScalarRequestError = error{ ValueUseNamedScalarFormUnsupported, ValueUseNamedScalarWidthUnsupported, ValueUseNamedScalarLocationUnsupported, ValueUseNamedScalarScratchUnavailable, ValueUseNamedScalarExactEiUnsupported, ValueUseNamedScalarI52EnvelopeUnsupported, };" ++
+        "pub const NamedScalarTestFailure = enum { after_preamble, after_canonical_refresh, after_first_operand_staging, after_accumulator_preparation, after_second_operand_staging, after_first_arithmetic_write, after_second_arithmetic_write, after_result_identity_ownership, after_result_definition, after_finalization, };" ++
+        "pub const UseForm = enum { named_scalar_operand, };" ++
+        "pub const PreparedAction = union(enum) { named_scalar_binary: NamedScalarBinaryAction, exact_i52_binary: ExactI52BinaryAction, };" ++
+        "pub fn attachNamedScalarBinaryAction() void {}" ++
+        "pub fn attachExactI52BinaryAction() void {}";
+    const accepted =
+        "pub const NamedScalarBinaryAction = struct { result: ActionIdentity, operation: ir.BinaryOp, integer_ty: ir.Type, exact_ei: bool, rhs: RequestHandle, };" ++
+        "pub const ExactI52BinaryAction = struct { result: ActionIdentity, rhs: RequestHandle, };" ++
+        exact_tail;
+    try validateNamedScalarIntentSurface(accepted);
+    try std.testing.expectError(
+        error.ValueUseNamedScalarPhysicalIntentEscape,
+        validateNamedScalarIntentSurface(
+            "pub const NamedScalarBinaryAction = struct { result: ActionIdentity, operation: ir.BinaryOp, integer_ty: ir.Type, exact_ei: bool, rhs: RequestHandle, home: ValueLoc, };" ++
+                "pub const ExactI52BinaryAction = struct { result: ActionIdentity, rhs: RequestHandle, };" ++
+                exact_tail,
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseNamedScalarIntentMismatch,
+        validateNamedScalarIntentSurface(
+            "pub const NamedScalarBinaryAction = struct { result: ActionIdentity, operation: ir.BinaryOp, integer_ty: ir.Type, exact_ei: bool, rhs: RequestHandle, semantic_mode: bool, };" ++
+                "pub const ExactI52BinaryAction = struct { result: ActionIdentity, rhs: RequestHandle, };" ++
+                exact_tail,
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseNamedScalarIntentMissing,
+        validateNamedScalarIntentSurface(
+            "pub const NamedScalarBinaryAction = struct { result: ActionIdentity, operation: ir.BinaryOp, integer_ty: ir.Type, exact_ei: bool, rhs: RequestHandle, };",
+        ),
     );
 }

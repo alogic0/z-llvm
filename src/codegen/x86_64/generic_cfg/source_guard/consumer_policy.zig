@@ -88,6 +88,7 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     try validateI128PairProductionSites(source_name, source);
     try validateScalarCastProductionSites(source_name, source);
     try validateImmediateScalarProductionSites(source_name, source);
+    try validateDormantNamedScalarProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -119,6 +120,25 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
                 return error.ValueUsePreparedLeafRawOperation;
         }
     }
+}
+
+pub fn validateDormantNamedScalarProductionSites(
+    source_name: []const u8,
+    source: [:0]const u8,
+) !void {
+    _ = source_name;
+    const forbidden = [_][]const u8{
+        "attachNamedScalarBinaryAction(",
+        "attachExactI52BinaryAction(",
+        "isNamedScalarBinary(",
+        "isExactI52Binary(",
+        ".named_scalar_binary",
+        ".exact_i52_binary",
+        ".named_scalar_operand",
+    };
+    for (forbidden) |pattern|
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseNamedScalarPrematureProductionUse;
 }
 
 pub fn validateImmediateScalarSemanticPartition(source: [:0]const u8) !void {

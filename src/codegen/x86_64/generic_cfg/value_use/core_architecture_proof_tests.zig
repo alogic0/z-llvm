@@ -67,13 +67,13 @@ test "value-use generic transaction layout matches frozen R0" {
         .{ "lifecycle", 198116 },
         .{ "write_nodes", 198109 },
         .{ "early_plans", 198077 },
-        .{ "semantic_order_edges", 197805 },
-        .{ "ordered_operands", 197757 },
-        .{ "ordered_operand_count", 197740 },
+        .{ "semantic_order_edges", 197724 },
+        .{ "ordered_operands", 197997 },
+        .{ "ordered_operand_count", 197980 },
         .{ "early_homes", 33280 },
-        .{ "early_home_valid", 197741 },
+        .{ "early_home_valid", 197981 },
         .{ "prepared_views", 188504 },
-        .{ "prepared_view_valid", 197724 },
+        .{ "prepared_view_valid", 198045 },
         .{ "switch_boundary_applied", 198061 },
         .{ "view_generation", 197720 },
         .{ "action_diagnostic", 188464 },
@@ -88,6 +88,9 @@ test "value-use generic transaction layout matches frozen R0" {
         .{ "current_home_sign_bit_test_failure", 198129 },
         .{ "i128_eq_min_test_failure", 198131 },
         .{ "i128_sign_bit_test_failure", 198133 },
+        .{ "scalar_cast_test_failure", 198135 },
+        .{ "immediate_scalar_test_failure", 198137 },
+        .{ "named_scalar_test_failure", 198139 },
     };
     inline for (expected_layout) |field|
         try std.testing.expectEqual(@as(usize, field[1]), @offsetOf(Transaction, field[0]));

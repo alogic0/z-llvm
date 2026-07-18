@@ -12,6 +12,7 @@ CurrentHomeSignBitAction
 CurrentHomeSignBitRequestError
 CurrentHomeSignBitTestFailure
 Destination
+ExactI52BinaryAction
 Expected
 I128EqMinAction
 I128EqMinTestFailure
@@ -26,6 +27,9 @@ LoadRequestError
 LoadTestFailure
 MemcpyAction
 MemcpyTestFailure
+NamedScalarBinaryAction
+NamedScalarRequestError
+NamedScalarTestFailure
 PairLowScalarCastAction
 PreparedAction
 PreparedShape
@@ -62,6 +66,8 @@ address_domain_copies_per_request
 address_domain_snapshot_bytes
 address_domain_snapshot_copies
 applySwitchBoundary
+attachExactI52BinaryAction
+attachNamedScalarBinaryAction
 attachScratchCompareAction
 begin
 beginAccumulatorSession

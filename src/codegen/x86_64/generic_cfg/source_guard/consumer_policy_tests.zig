@@ -81,6 +81,7 @@ const validateI128PairProductionSites = support.validateI128PairProductionSites;
 const validateScalarCastProductionSites = support.validateScalarCastProductionSites;
 const validateImmediateScalarSemanticPartition = support.validateImmediateScalarSemanticPartition;
 const validateImmediateScalarProductionSites = support.validateImmediateScalarProductionSites;
+const validateDormantNamedScalarProductionSites = support.validateDormantNamedScalarProductionSites;
 const validateLoadDiagnosticMappingProductionSites = support.validateLoadDiagnosticMappingProductionSites;
 const validateDormantLoadActionProductionSites = support.validateDormantLoadActionProductionSites;
 const validateAccumulatorCompositionProductionSites = support.validateAccumulatorCompositionProductionSites;
@@ -665,6 +666,24 @@ test "composed selector source guard rejects unclassified immediate scalar produ
         validateImmediateScalarProductionSites(
             "composed_selector_scalar.zig",
             "fn lowerBinaryImmediateRhs() void { _ = isImmediateRhsScalar(binary); }",
+        ),
+    );
+}
+
+test "value-use dormant named scalar actions reject premature production wiring" {
+    try validateDormantNamedScalarProductionSites("composed_selector_scalar.zig", "fn lower() void {}");
+    try std.testing.expectError(
+        error.ValueUseNamedScalarPrematureProductionUse,
+        validateDormantNamedScalarProductionSites(
+            "composed_selector_scalar.zig",
+            "fn lower() void { _ = ValueUseTransaction.isNamedScalarBinary(binary, false); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseNamedScalarPrematureProductionUse,
+        validateDormantNamedScalarProductionSites(
+            "composed_selector_scalar.zig",
+            "fn lower() void { try transaction.attachExactI52BinaryAction(lhs, action); }",
         ),
     );
 }

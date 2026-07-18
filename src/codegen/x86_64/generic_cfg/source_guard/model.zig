@@ -55,40 +55,43 @@ pub const value_use_leaf_paths = [_][]const u8{
     "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_arithmetic.zig",
     "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_cast.zig",
     "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_named.zig",
     "src/codegen/x86_64/generic_cfg/value_use/actions/calls.zig",
 };
 
 pub const value_use_model_pub_names = [_][]const u8{
-    "AccumulatorScalarCastAction",    "AccumulatorSessionHandle",          "ActionIdentity",
-    "AddressOffset",                  "ByteAddressAction",                 "CopyDestination",
-    "CurrentHomeEqZeroAction",        "CurrentHomeEqZeroRequestError",     "CurrentHomeEqZeroTestFailure",
-    "CurrentHomeSignBitAction",       "CurrentHomeSignBitRequestError",    "CurrentHomeSignBitTestFailure",
-    "Destination",                    "EarlyPlan",                         "EarlyPreparedHome",
-    "Expected",                       "I128EqMinAction",                   "I128EqMinTestFailure",
-    "I128PairRequestError",           "I128SignBitAction",                 "I128SignBitTestFailure",
-    "Identity",                       "ImmediateLhsScalarAction",          "ImmediateRhsScalarAction",
-    "ImmediateScalarRequestError",    "ImmediateScalarTestFailure",        "Lifecycle",
-    "LoadRequestError",               "LoadTestFailure",                   "MemcpyAction",
-    "MemcpyTestFailure",              "OperandPhase",                      "OrderedOperand",
-    "PhysicalNode",                   "PreparedAction",                    "PairLowScalarCastAction",
-    "PreparedAddressComponent",       "PreparedAddressDescriptor",         "PreparedCondition",
-    "PreparedIdentity",               "PreparedPairLimb",                  "PreparedReadOnlyPair",
-    "PreparedRecord",                 "PreparedRegister",                  "PreparedScalarHome",
-    "PreparedShape",                  "PreparedStackF32PairAddress",       "PreparedStackObject",
-    "PreparedTablePointer",           "PreparedView",                      "PreparedViewLease",
-    "ReadOnlyPairLoadAction",         "ReadOnlyTableAddressAction",        "ReadOnlyTableI16LoadAction",
-    "Request",                        "RequestHandle",                     "RequestPhase",
-    "ScalarCastRequestError",         "ScalarCastTestFailure",             "ScalarLoadAction",
-    "ScalarLoadKind",                 "ScaledAddressAction",               "ScratchCompareAction",
-    "ScratchCompareRhs",              "ScratchCompareTestFailure",         "SemanticRole",
-    "SetccEaxCompareAction",          "SetccEaxCompareRequestError",       "SetccEaxCompareStructure",
-    "SetccEaxCompareTestFailure",     "SignExtendScratchAction",           "Source",
-    "StackI128AliasLoadAction",       "StoreI64Action",                    "StoreImmediateAction",
-    "StoreScalarAction",              "StoreStackPointerAction",           "StoredRequest",
-    "SwitchCaseIntent",               "SwitchCompareChainAction",          "Transaction",
-    "UseForm",                        "address_domain_copies_per_request", "address_domain_snapshot_bytes",
-    "address_domain_snapshot_copies", "max_identity_bytes",                "max_mappings",
-    "max_requests",                   "max_switch_cases",                  "physical_node_count",
+    "AccumulatorScalarCastAction",   "AccumulatorSessionHandle",       "ActionIdentity",
+    "AddressOffset",                 "ByteAddressAction",              "CopyDestination",
+    "CurrentHomeEqZeroAction",       "CurrentHomeEqZeroRequestError",  "CurrentHomeEqZeroTestFailure",
+    "CurrentHomeSignBitAction",      "CurrentHomeSignBitRequestError", "CurrentHomeSignBitTestFailure",
+    "Destination",                   "EarlyPlan",                      "EarlyPreparedHome",
+    "Expected",                      "I128EqMinAction",                "I128EqMinTestFailure",
+    "I128PairRequestError",          "I128SignBitAction",              "I128SignBitTestFailure",
+    "Identity",                      "ImmediateLhsScalarAction",       "ImmediateRhsScalarAction",
+    "ImmediateScalarRequestError",   "ImmediateScalarTestFailure",     "Lifecycle",
+    "ExactI52BinaryAction",          "LoadRequestError",               "LoadTestFailure",
+    "MemcpyAction",                  "MemcpyTestFailure",              "NamedScalarBinaryAction",
+    "NamedScalarRequestError",       "NamedScalarTestFailure",         "OperandPhase",
+    "OrderedOperand",                "PhysicalNode",                   "PreparedAction",
+    "PairLowScalarCastAction",       "PreparedAddressComponent",       "PreparedAddressDescriptor",
+    "PreparedCondition",             "PreparedIdentity",               "PreparedPairLimb",
+    "PreparedReadOnlyPair",          "PreparedRecord",                 "PreparedRegister",
+    "PreparedScalarHome",            "PreparedShape",                  "PreparedStackF32PairAddress",
+    "PreparedStackObject",           "PreparedTablePointer",           "PreparedView",
+    "PreparedViewLease",             "ReadOnlyPairLoadAction",         "ReadOnlyTableAddressAction",
+    "ReadOnlyTableI16LoadAction",    "Request",                        "RequestHandle",
+    "RequestPhase",                  "ScalarCastRequestError",         "ScalarCastTestFailure",
+    "ScalarLoadAction",              "ScalarLoadKind",                 "ScaledAddressAction",
+    "ScratchCompareAction",          "ScratchCompareRhs",              "ScratchCompareTestFailure",
+    "SemanticRole",                  "SetccEaxCompareAction",          "SetccEaxCompareRequestError",
+    "SetccEaxCompareStructure",      "SetccEaxCompareTestFailure",     "SignExtendScratchAction",
+    "Source",                        "StackI128AliasLoadAction",       "StoreI64Action",
+    "StoreImmediateAction",          "StoreScalarAction",              "StoreStackPointerAction",
+    "StoredRequest",                 "SwitchCaseIntent",               "SwitchCompareChainAction",
+    "Transaction",                   "UseForm",                        "address_domain_copies_per_request",
+    "address_domain_snapshot_bytes", "address_domain_snapshot_copies", "max_identity_bytes",
+    "max_mappings",                  "max_requests",                   "max_switch_cases",
+    "physical_node_count",
 };
 pub const value_use_core_pub_names = [_][]const u8{"ValueUseTransaction"};
 pub const value_use_planning_pub_names = [_][]const u8{
@@ -179,12 +182,15 @@ pub const value_use_control_pub_names = [_][]const u8{
 };
 pub const value_use_scalar_arithmetic_pub_names = [_][]const u8{
     "executeAccumulatorScalarCast",        "executeImmediateLhsScalar",
-    "executeImmediateRhsScalar",           "executePairLowScalarCast",
+    "executeImmediateRhsScalar",           "executeExactI52Binary",
+    "executeNamedScalarBinary",            "executePairLowScalarCast",
     "executeSignExtendScratch",            "isAccumulatorScalarCast",
     "isImmediateLhsScalar",                "isImmediateRhsScalar",
+    "isExactI52Binary",                    "isNamedScalarBinary",
     "isPairLowScalarCast",                 "isSignExtendScratchCast",
     "validateAccumulatorScalarCastAction", "validateImmediateLhsScalarAction",
-    "validateImmediateRhsScalarAction",    "validatePairLowScalarCastAction",
+    "validateImmediateRhsScalarAction",    "validateExactI52BinaryAction",
+    "validateNamedScalarBinaryAction",     "validatePairLowScalarCastAction",
 };
 pub const value_use_scalar_cast_pub_names = [_][]const u8{
     "executeAccumulatorScalarCast",
@@ -204,12 +210,20 @@ pub const value_use_scalar_immediate_pub_names = [_][]const u8{
     "validateImmediateLhsScalarAction",
     "validateImmediateRhsScalarAction",
 };
+pub const value_use_scalar_named_pub_names = [_][]const u8{
+    "executeExactI52Binary",
+    "executeNamedScalarBinary",
+    "isExactI52Binary",
+    "isNamedScalarBinary",
+    "validateExactI52BinaryAction",
+    "validateNamedScalarBinaryAction",
+};
 pub const value_use_calls_pub_names = [_][]const u8{"executeInlineMemcpy"};
 
 pub const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
 pub const frozen_bypass_inventory_sha256 = "155f7be0d933df9516731265d4442c3ebbc1fb9ca4d5d6f3bacc2776aa936eb6";
 pub const value_use_facade_manifest_path = "docs/evidence/inbox128_o2_r1_facade_manifest.tsv";
-pub const value_use_facade_manifest_sha256 = "68db09931f2916753f2fd257da06ee78ab7aac851efe855ab9b32e280b9e9966";
+pub const value_use_facade_manifest_sha256 = "9c38e682ff462204ba63a0ab30a9e7f56927ed51ba577dffd710c4222e01a0f8";
 pub const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -475,6 +489,19 @@ pub fn validateNoFunctionFamilyPredicate(source: [:0]const u8, forbidden_error: 
             .invalid, .invalid_periodasterisks => return error.InvalidZigSource,
             .identifier => {
                 const identifier = source[token.loc.start..token.loc.end];
+                const reviewed_exact_i52_identifier =
+                    std.mem.eql(u8, identifier, "Function") or
+                    std.mem.eql(u8, identifier, "isExactI52Binary") or
+                    std.mem.eql(u8, identifier, "isExactI52ShiftCount") or
+                    std.mem.eql(u8, identifier, "isExactCtlzI52Envelope") or
+                    std.mem.eql(u8, identifier, "ExactI52BinaryAction") or
+                    std.mem.eql(u8, identifier, "ExactI52Plan") or
+                    std.mem.eql(u8, identifier, "executeExactI52Binary") or
+                    std.mem.eql(u8, identifier, "validateExactI52BinaryAction") or
+                    std.mem.eql(u8, identifier, "callee") or
+                    std.mem.eql(u8, identifier, "callee_value") or
+                    std.mem.eql(u8, identifier, "callee_function_ty");
+                if (reviewed_exact_i52_identifier) continue;
                 if (std.mem.indexOf(u8, identifier, "function") != null or
                     std.mem.indexOf(u8, identifier, "Function") != null or
                     std.mem.indexOf(u8, identifier, "family") != null or

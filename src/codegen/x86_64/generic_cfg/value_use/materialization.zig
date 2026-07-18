@@ -303,6 +303,7 @@ fn materializeRequestFromLoc(
         .sign_extend_scratch_operand,
         .immediate_rhs_scalar_operand,
         .immediate_lhs_scalar_operand,
+        .named_scalar_operand,
         => return error.ValueUsePreparedActionRequired,
         .pair_low_high, .pair_high_low => try materializePair(transaction.selector, current, request.form, destination),
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
@@ -405,6 +406,7 @@ pub fn preparedViewFromLoc(
         .sign_extend_scratch_operand => .{ .sign_extend_scratch = {} },
         .immediate_rhs_scalar_operand => .{ .immediate_rhs_scalar = {} },
         .immediate_lhs_scalar_operand => .{ .immediate_lhs_scalar = {} },
+        .named_scalar_operand => preparedScalarView(loc),
         .stack_argument => error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => error.ValueUseNewPairOwnershipUnsupported,
     };
@@ -928,7 +930,8 @@ fn validateBindingCompatibility(
         return;
     }
     if (request.form == .immediate_rhs_scalar_operand or
-        request.form == .immediate_lhs_scalar_operand)
+        request.form == .immediate_lhs_scalar_operand or
+        request.form == .named_scalar_operand)
     {
         try validateExpectedType(request.expected, request.form);
         const bits = request.expected.ty.int;
@@ -937,7 +940,10 @@ fn validateBindingCompatibility(
         else
             binding.vreg.class == .gpr64;
         if (!valid_class or binding.vreg.bits < bits)
-            return error.ValueUseImmediateScalarWidthUnsupported;
+            return if (request.form == .named_scalar_operand)
+                error.ValueUseNamedScalarWidthUnsupported
+            else
+                error.ValueUseImmediateScalarWidthUnsupported;
         return;
     }
     if (request.form == .load_address) {
@@ -1248,6 +1254,17 @@ fn validateExpectedType(expected: Types.Expected, form: Types.UseForm) !void {
             },
             else => return error.ValueUseTypeMismatch,
         },
+        .named_scalar_operand => switch (expected.ty) {
+            .int => |bits| {
+                if (bits == 0 or bits > 64 or
+                    expected.register_class != if (bits <= 32)
+                        VirtualRegClass.gpr32
+                    else
+                        VirtualRegClass.gpr64)
+                    return error.ValueUseTypeMismatch;
+            },
+            else => return error.ValueUseTypeMismatch,
+        },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
     }
@@ -1350,6 +1367,7 @@ fn validateSourceView(loc: ValueLoc, form: Types.UseForm) !void {
         .sign_extend_scratch_operand,
         .immediate_rhs_scalar_operand,
         .immediate_lhs_scalar_operand,
+        .named_scalar_operand,
         => {},
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -1388,6 +1406,7 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: Types.UseForm) bool {
         .sign_extend_scratch_operand,
         .immediate_rhs_scalar_operand,
         .immediate_lhs_scalar_operand,
+        .named_scalar_operand,
         .stack_argument,
         .new_pair_ownership,
         => false,

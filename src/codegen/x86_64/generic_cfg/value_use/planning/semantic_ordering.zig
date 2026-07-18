@@ -76,6 +76,8 @@ fn actionSecondaryOperand(
         .sign_extend_scratch => null,
         .immediate_rhs_scalar => null,
         .immediate_lhs_scalar => null,
+        .named_scalar_binary => |named| try Authority.validateRegisteredOperandHandle(Authority, transaction, named.rhs),
+        .exact_i52_binary => |named| try Authority.validateRegisteredOperandHandle(Authority, transaction, named.rhs),
         .load_scalar,
         .load_readonly_pair,
         .load_stack_i128_alias,
@@ -123,6 +125,8 @@ fn actionTertiaryOperand(
         .sign_extend_scratch,
         .immediate_rhs_scalar,
         .immediate_lhs_scalar,
+        .named_scalar_binary,
+        .exact_i52_binary,
         => null,
     };
 }
@@ -387,6 +391,7 @@ fn earlySequencingCandidate(loc: ValueLoc, form: Types.UseForm) bool {
         .sign_extend_scratch_operand => false,
         .immediate_rhs_scalar_operand => false,
         .immediate_lhs_scalar_operand => false,
+        .named_scalar_operand => false,
         else => false,
     };
 }
@@ -414,6 +419,8 @@ pub fn actionOwnsOrderedWrites(action: Types.PreparedAction) bool {
         .sign_extend_scratch,
         .immediate_rhs_scalar,
         .immediate_lhs_scalar,
+        .named_scalar_binary,
+        .exact_i52_binary,
         => true,
         .validate_shape,
         .emit_copy_to,
@@ -502,6 +509,7 @@ fn earlyCopyIsFlagsPreserving(loc: ValueLoc, form: Types.UseForm) bool {
         .sign_extend_scratch_operand,
         .immediate_rhs_scalar_operand,
         .immediate_lhs_scalar_operand,
+        .named_scalar_operand,
         .stack_argument,
         .new_pair_ownership,
         => false,

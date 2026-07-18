@@ -18,6 +18,7 @@ const value_use_control_pub_names = support.value_use_control_pub_names;
 const value_use_scalar_arithmetic_pub_names = support.value_use_scalar_arithmetic_pub_names;
 const value_use_scalar_cast_pub_names = support.value_use_scalar_cast_pub_names;
 const value_use_scalar_immediate_pub_names = support.value_use_scalar_immediate_pub_names;
+const value_use_scalar_named_pub_names = support.value_use_scalar_named_pub_names;
 const value_use_calls_pub_names = support.value_use_calls_pub_names;
 const frozen_bypass_inventory_path = support.frozen_bypass_inventory_path;
 const frozen_bypass_inventory_sha256 = support.frozen_bypass_inventory_sha256;
@@ -226,6 +227,13 @@ test "value-use split guard rejects reverse imports and control-compare budget g
     try std.testing.expectError(
         error.ValueUseTechnicalPubBudgetMismatch,
         validateExactTopLevelPubNames(
+            "pub fn executeNamedScalarBinary() void {}\n",
+            &value_use_scalar_named_pub_names,
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseTechnicalPubBudgetMismatch,
+        validateExactTopLevelPubNames(
             "pub fn executeImmediateRhsScalar() void {}\n",
             &value_use_scalar_immediate_pub_names,
         ),
@@ -268,6 +276,26 @@ test "value-use scalar arithmetic facade is aliases only and core imports only i
                 "const b = @import(\"actions/scalar_cast.zig\");\n" ++
                 "const T = model.Transaction(Implementation);\n" ++
                 "fn executePreparedActionInternal() void { switch (action) {} }\n",
+        ),
+    );
+}
+
+test "value-use scalar named classifier rejects function-name admission" {
+    const accepted: [:0]const u8 =
+        @embedFile("../value_use/actions/scalar_named.zig");
+    const altered = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "const body = ir_body orelse return false;",
+        "const body = ir_body orelse return false;\n" ++
+            "    if (function.name.len != 0) return false;",
+    );
+    defer std.testing.allocator.free(altered);
+    try std.testing.expectError(
+        error.ValueUseNamedScalarFunctionPredicateForbidden,
+        validateValueUseLeaf(
+            "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_named.zig",
+            altered,
         ),
     );
 }

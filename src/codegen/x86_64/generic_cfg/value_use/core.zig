@@ -79,6 +79,8 @@ const I128EqMinTestFailure = Types.I128EqMinTestFailure;
 const I128SignBitTestFailure = Types.I128SignBitTestFailure;
 const ScalarCastTestFailure = Types.ScalarCastTestFailure;
 const ImmediateScalarTestFailure = Types.ImmediateScalarTestFailure;
+const NamedScalarBinaryAction = Types.NamedScalarBinaryAction;
+const ExactI52BinaryAction = Types.ExactI52BinaryAction;
 const max_switch_cases = Types.max_switch_cases;
 const SwitchCaseIntent = Types.SwitchCaseIntent;
 const SwitchCompareChainAction = Types.SwitchCompareChainAction;
@@ -297,6 +299,46 @@ fn core_attachScratchCompareAction(
         .immediate, .null_pointer => {},
     }
     lhs_request.prepared_action = .{ .scratch_compare = action };
+}
+fn core_attachNamedScalarBinaryAction(
+    comptime Authority: type,
+    transaction: anytype,
+    lhs: RequestHandle,
+    action: NamedScalarBinaryAction,
+) !void {
+    try Authority.requireActive(Authority, transaction);
+    if (transaction.request_phase != .registering) return error.ValueUseLateRegistration;
+    const lhs_index = try Authority.validateHandle(Authority, transaction, lhs);
+    const lhs_request = &transaction.requests[lhs_index];
+    if (lhs_request.destination != .prepared_view or
+        lhs_request.form != .named_scalar_operand or
+        lhs_request.prepared_action != null)
+        return error.ValueUsePreparedActionFormMismatch;
+    const rhs_index = try Authority.validateRegisteredOperandHandle(Authority, transaction, action.rhs);
+    if (rhs_index <= lhs_index or transaction.requests[rhs_index].form != .named_scalar_operand)
+        return error.ValueUsePreparedActionFormMismatch;
+    try scalar_arithmetic_module.validateNamedScalarBinaryAction(&action);
+    lhs_request.prepared_action = .{ .named_scalar_binary = action };
+}
+fn core_attachExactI52BinaryAction(
+    comptime Authority: type,
+    transaction: anytype,
+    lhs: RequestHandle,
+    action: ExactI52BinaryAction,
+) !void {
+    try Authority.requireActive(Authority, transaction);
+    if (transaction.request_phase != .registering) return error.ValueUseLateRegistration;
+    const lhs_index = try Authority.validateHandle(Authority, transaction, lhs);
+    const lhs_request = &transaction.requests[lhs_index];
+    if (lhs_request.destination != .prepared_view or
+        lhs_request.form != .named_scalar_operand or
+        lhs_request.prepared_action != null)
+        return error.ValueUsePreparedActionFormMismatch;
+    const rhs_index = try Authority.validateRegisteredOperandHandle(Authority, transaction, action.rhs);
+    if (rhs_index <= lhs_index or transaction.requests[rhs_index].form != .named_scalar_operand)
+        return error.ValueUsePreparedActionFormMismatch;
+    try scalar_arithmetic_module.validateExactI52BinaryAction(&action);
+    lhs_request.prepared_action = .{ .exact_i52_binary = action };
 }
 fn core_applySwitchBoundary(
     comptime Authority: type,
@@ -664,6 +706,8 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
         .sign_extend_scratch => |*cast| try cast.result.validate(),
         .immediate_rhs_scalar => |*immediate| try scalar_arithmetic_module.validateImmediateRhsScalarAction(immediate),
         .immediate_lhs_scalar => |*immediate| try scalar_arithmetic_module.validateImmediateLhsScalarAction(immediate),
+        .named_scalar_binary => return error.ValueUsePreparedActionFormMismatch,
+        .exact_i52_binary => return error.ValueUsePreparedActionFormMismatch,
     }
 }
 fn core_validateRegisteredOperandHandle(comptime _: type, transaction: anytype, handle: RequestHandle) !u8 {
@@ -716,6 +760,8 @@ fn core_validateActionDependenciesCanonical(comptime Authority: type, transactio
         .sign_extend_scratch => {},
         .immediate_rhs_scalar => {},
         .immediate_lhs_scalar => {},
+        .named_scalar_binary => |named| try Authority.validateOperandCanonical(Authority, transaction, named.rhs),
+        .exact_i52_binary => |named| try Authority.validateOperandCanonical(Authority, transaction, named.rhs),
         .validate_shape,
         .emit_copy_to,
         .form_readonly_table_address,
@@ -813,6 +859,7 @@ fn executePreparedActionInternal(
                 .sign_extend_scratch_operand,
                 .immediate_rhs_scalar_operand,
                 .immediate_lhs_scalar_operand,
+                .named_scalar_operand,
                 => return error.ValueUsePreparedActionFormMismatch,
                 .stack_argument => return error.ValueUseStackArgumentUnsupported,
                 .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -917,6 +964,20 @@ fn executePreparedActionInternal(
             view,
             &immediate,
         ),
+        .named_scalar_binary => |named| try scalar_arithmetic_module.executeNamedScalarBinary(
+            Authority,
+            transaction,
+            request_index,
+            view,
+            &named,
+        ),
+        .exact_i52_binary => |named| try scalar_arithmetic_module.executeExactI52Binary(
+            Authority,
+            transaction,
+            request_index,
+            view,
+            &named,
+        ),
     }
 }
 fn core_registeredOperandCurrent(comptime Authority: type, transaction: anytype, handle: RequestHandle) !ValueLoc {
@@ -958,6 +1019,8 @@ fn actionSecondaryOperand(
         .sign_extend_scratch => null,
         .immediate_rhs_scalar => null,
         .immediate_lhs_scalar => null,
+        .named_scalar_binary => |named| try Authority.validateRegisteredOperandHandle(Authority, transaction, named.rhs),
+        .exact_i52_binary => |named| try Authority.validateRegisteredOperandHandle(Authority, transaction, named.rhs),
         .load_scalar,
         .load_readonly_pair,
         .load_stack_i128_alias,
@@ -1022,6 +1085,8 @@ fn actionTertiaryOperand(
         .sign_extend_scratch,
         .immediate_rhs_scalar,
         .immediate_lhs_scalar,
+        .named_scalar_binary,
+        .exact_i52_binary,
         => null,
     };
 }
@@ -1113,6 +1178,8 @@ const Implementation = struct {
     pub const deinit = core_deinit;
     pub const register = core_register;
     pub const attachScratchCompareAction = core_attachScratchCompareAction;
+    pub const attachNamedScalarBinaryAction = core_attachNamedScalarBinaryAction;
+    pub const attachExactI52BinaryAction = core_attachExactI52BinaryAction;
     pub const applySwitchBoundary = core_applySwitchBoundary;
     pub const preparedView = core_preparedView;
     pub const executePreparedAction = core_executePreparedAction;

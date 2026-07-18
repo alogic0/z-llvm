@@ -113,6 +113,9 @@ pub const UseForm = enum {
     /// Action-only named rhs for a closed scalar operation with an inline
     /// typed lhs literal. The action owns all physical staging decisions.
     immediate_lhs_scalar_operand,
+    /// Action-only named operand for the closed named-scalar and exact-i52
+    /// families. The action owns canonical resolution and all staging.
+    named_scalar_operand,
     stack_argument,
     new_pair_ownership,
 };
@@ -568,6 +571,41 @@ pub const ImmediateScalarTestFailure = enum {
     after_finalization,
 };
 
+pub const NamedScalarBinaryAction = struct {
+    result: ActionIdentity,
+    operation: ir.BinaryOp,
+    integer_ty: ir.Type,
+    exact_ei: bool,
+    rhs: RequestHandle,
+};
+
+pub const ExactI52BinaryAction = struct {
+    result: ActionIdentity,
+    rhs: RequestHandle,
+};
+
+pub const NamedScalarRequestError = error{
+    ValueUseNamedScalarFormUnsupported,
+    ValueUseNamedScalarWidthUnsupported,
+    ValueUseNamedScalarLocationUnsupported,
+    ValueUseNamedScalarScratchUnavailable,
+    ValueUseNamedScalarExactEiUnsupported,
+    ValueUseNamedScalarI52EnvelopeUnsupported,
+};
+
+pub const NamedScalarTestFailure = enum {
+    after_preamble,
+    after_canonical_refresh,
+    after_first_operand_staging,
+    after_accumulator_preparation,
+    after_second_operand_staging,
+    after_first_arithmetic_write,
+    after_second_arithmetic_write,
+    after_result_identity_ownership,
+    after_result_definition,
+    after_finalization,
+};
+
 /// Pure future-dispatch classifier for the exact pair equality form.
 pub const max_switch_cases = 8;
 
@@ -664,6 +702,8 @@ pub const PreparedAction = union(enum) {
     sign_extend_scratch: SignExtendScratchAction,
     immediate_rhs_scalar: ImmediateRhsScalarAction,
     immediate_lhs_scalar: ImmediateLhsScalarAction,
+    named_scalar_binary: NamedScalarBinaryAction,
+    exact_i52_binary: ExactI52BinaryAction,
 
     pub fn eql(action: PreparedAction, other: PreparedAction) bool {
         return std.meta.eql(action, other);
@@ -1048,6 +1088,10 @@ pub fn Transaction(comptime Impl: type) type {
         pub const ImmediateLhsScalarAction = Model.ImmediateLhsScalarAction;
         pub const ImmediateScalarRequestError = Model.ImmediateScalarRequestError;
         pub const ImmediateScalarTestFailure = Model.ImmediateScalarTestFailure;
+        pub const NamedScalarBinaryAction = Model.NamedScalarBinaryAction;
+        pub const ExactI52BinaryAction = Model.ExactI52BinaryAction;
+        pub const NamedScalarRequestError = Model.NamedScalarRequestError;
+        pub const NamedScalarTestFailure = Model.NamedScalarTestFailure;
         pub const max_switch_cases = Model.max_switch_cases;
         pub const SwitchCaseIntent = Model.SwitchCaseIntent;
         pub const SwitchCompareChainAction = Model.SwitchCompareChainAction;
@@ -1116,6 +1160,7 @@ pub fn Transaction(comptime Impl: type) type {
         i128_sign_bit_test_failure: if (builtin.is_test) ?Self.I128SignBitTestFailure else void = if (builtin.is_test) null else {},
         scalar_cast_test_failure: if (builtin.is_test) ?Self.ScalarCastTestFailure else void = if (builtin.is_test) null else {},
         immediate_scalar_test_failure: if (builtin.is_test) ?Self.ImmediateScalarTestFailure else void = if (builtin.is_test) null else {},
+        named_scalar_test_failure: if (builtin.is_test) ?Self.NamedScalarTestFailure else void = if (builtin.is_test) null else {},
 
         pub fn begin(selector: *ComposedBlockSelector) !Self {
             return Impl.begin(Self, selector);
@@ -1135,6 +1180,22 @@ pub fn Transaction(comptime Impl: type) type {
             action: Self.ScratchCompareAction,
         ) !void {
             return Impl.attachScratchCompareAction(Impl, transaction, lhs, action);
+        }
+
+        pub fn attachNamedScalarBinaryAction(
+            transaction: *Self,
+            lhs: Self.RequestHandle,
+            action: Self.NamedScalarBinaryAction,
+        ) !void {
+            return Impl.attachNamedScalarBinaryAction(Impl, transaction, lhs, action);
+        }
+
+        pub fn attachExactI52BinaryAction(
+            transaction: *Self,
+            lhs: Self.RequestHandle,
+            action: Self.ExactI52BinaryAction,
+        ) !void {
+            return Impl.attachExactI52BinaryAction(Impl, transaction, lhs, action);
         }
 
         pub fn seal(transaction: *Self) !void {

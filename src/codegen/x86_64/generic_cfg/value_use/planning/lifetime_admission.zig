@@ -93,6 +93,7 @@ pub fn validateFormAndDestination(request: *const Types.StoredRequest) !void {
             .memcpy_pointer,
             .memcpy_length,
             .scratch_compare_operand,
+            .named_scalar_operand,
             => {},
             .stack_f32_pair_byte_address,
             .branch_condition,
@@ -137,6 +138,7 @@ pub fn validateFormAndDestination(request: *const Types.StoredRequest) !void {
             .sign_extend_scratch_operand,
             .immediate_rhs_scalar_operand,
             .immediate_lhs_scalar_operand,
+            .named_scalar_operand,
             => {},
             .stack_argument => return error.ValueUseStackArgumentUnsupported,
             .new_pair_ownership => return error.ValueUseNewPairOwnershipUnsupported,
@@ -209,6 +211,12 @@ pub fn validateFormAndDestination(request: *const Types.StoredRequest) !void {
             .immediate_lhs_scalar => |immediate| if (request.form != .immediate_lhs_scalar_operand or
                 !request.expected.ty.eql(immediate.integer_ty))
                 error.ValueUsePreparedActionFormMismatch,
+            .named_scalar_binary => |named| if (request.form != .named_scalar_operand or
+                !request.expected.ty.eql(named.integer_ty))
+                error.ValueUsePreparedActionFormMismatch,
+            .exact_i52_binary => if (request.form != .named_scalar_operand or
+                !request.expected.ty.eql(.{ .int = 52 }))
+                error.ValueUsePreparedActionFormMismatch,
         };
     }
     if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;
@@ -232,6 +240,7 @@ pub fn validateFormAndDestination(request: *const Types.StoredRequest) !void {
         .sign_extend_scratch_operand,
         .immediate_rhs_scalar_operand,
         .immediate_lhs_scalar_operand,
+        .named_scalar_operand,
         => false,
         .pair_low_high, .pair_high_low => request.destination == .pair,
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
