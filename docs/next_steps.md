@@ -6,7 +6,29 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-155 forward-Q1 dormant amendment — dispatched
+## INBOX-155 — term-4 stop RESOLVED (structural snapshot ruled); resumed
+
+The Worker hard-stopped correctly: no canonical forward-plan generation
+exists (ForwardValuePlan carries only definition_position + metadata;
+SelectorAllocationPlan has no generation field; forward maps mutate
+without version change), so seal-to-materialization revalidation could
+not be built without inventing a metadata authority. The Reviewer ruled
+my fingerprint option REFINED to an EXACT STRUCTURAL SNAPSHOT: a private
+transaction-owned ForwardAdmissionSnapshot capturing every validated
+fact (plan identity/pointer, entry identity, definition position,
+interval bounds, class, width, assignment tag+payload, consulted forward
+metadata, consulted dependency facts) in owned inline/fixed-capacity
+storage (overflow fails closed); ONE canonical capture function at both
+admission and materialization; exact structural equality required before
+resolving the current home; removal/replacement/any-field-change returns
+the distinct stale-plan error before emission. Seven additional
+mandatory tests (per-field mutation, entry removal, plan-pointer
+replacement, dependency mutation, unchanged-succeeds, no storage
+survives teardown, rollback restores snapshot state). No maintained
+planner generation in INBOX-155; a digest fallback or implicit authority
+widening is itself a stop. Resumption dispatched.
+
+## Former INBOX-155 dispatch entry (pre-amendment)
 
 INBOX-154 is **ACCEPTED** (Reviewer, 2026-07-18: "The fixture alignment,
 narrowly reviewed plan-visible stream corrections, forward
