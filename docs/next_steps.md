@@ -656,7 +656,21 @@ facade; `seal` sole orchestrator with proven-identical statement order;
 NodeList/MappingList private; Mapping limited to the two leaves; no direct
 planning-leaf imports from production; hard stops on reverse edges/semantic
 edits/init-order/error-drift/manifest movement; ratchet 154; full gates +
-perf; no Tier 3). INBOX-146 dispatched.
+perf; no Tier 3). INBOX-146 dispatched. **INBOX-146 STOPPED STRUCTURALLY before any move** —
+the Worker checked the declaration graph first: (1) the shared
+`CopyVisitState` (used by both cycle walkers) would force the forbidden
+physical↔semantic cycle given `Mapping`'s assignment; (2)
+`validateFormAndDestination` ↔ `seal` creates a two-way
+lifetime/physical_mapping dependency via `validateCopyActionForm`; (3) the
+Q1/Q2/Q3 implementations live in core.zig and moving them under the
+facade-only rule breaks the 15-name budget. Nothing changed; the analysis
+preserved with exact anchors. My proposal is with the Reviewer: a shared
+planning-internal foundation leaf (`planning/model.zig` owning Mapping +
+CopyVisitState + validateCopyActionForm, bottom of the DAG, exact pub
+budget + guard) dissolving conflicts 1–2, plus ONE explicitly ruled
+core→lifetime_admission edge for exactly the three Implementation aliases
+(guard-listed sole exception) keeping the facade at 15 names — or
+alternatively an 18-name facade expansion.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
