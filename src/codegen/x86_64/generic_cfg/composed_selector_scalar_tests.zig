@@ -529,8 +529,14 @@ test "generic cfg selector masks reloaded i64 spill low half" {
     var machine = MachineFunction.init("spill-mask", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
 
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("wide_lo", 0);
+
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 0;
 
     try selector_state.bindValueLoc(&selector, "wide_lo", .{ .spill64 = .slot6 });
     const diagnostic = try selector_scalar.lowerBinaryImmediateRhs(&selector, "masked", .{
@@ -554,6 +560,7 @@ test "generic cfg selector preserves live rax before another i64 low-half mask" 
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
     defer plan.deinit();
     try plan.interval_ends.put("left_masked", 10);
+    try plan.interval_ends.put("right", 4);
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
@@ -580,17 +587,22 @@ test "generic cfg selector preserves live rax before another i64 low-half mask" 
     try std.testing.expectEqual(x86_64_machine.Instruction{ .and_eax_imm32 = -1 }, machine.instructions.items[2]);
 }
 
-test "generic cfg selector immediate i64 siblings reuse a dead accumulator lhs" {
+test "generic cfg selector immediate i64 siblings preserve a current accumulator source at final use" {
     inline for (.{
         .{ ir.BinaryOp.@"and", @as(i128, 0x1_0000_0000), x86_64_machine.Instruction{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } } },
         .{ ir.BinaryOp.@"or", @as(i128, 0x2_0000_0000), x86_64_machine.Instruction{ .binary_arg_rax = .{ .op = .@"or", .reg = .rcx } } },
         .{ ir.BinaryOp.add, @as(i128, 0x3_0000_0000), x86_64_machine.Instruction{ .binary_arg_rax = .{ .op = .add, .reg = .rcx } } },
         .{ ir.BinaryOp.xor, @as(i128, 0x4_0000_0000), x86_64_machine.Instruction{ .binary_arg_rax = .{ .op = .xor, .reg = .rcx } } },
     }) |case| {
-        var machine = MachineFunction.init("dead-rax-immediate", .{ .int = 64 });
+        var machine = MachineFunction.init("current-rax-immediate-final-use", .{ .int = 64 });
         defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("source", 0);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 0;
         selector.stack_frame_bytes = stage2SpillReservedBytes();
         try selector_state.bindValueLoc(&selector, "source", .rax);
 
@@ -600,9 +612,14 @@ test "generic cfg selector immediate i64 siblings reuse a dead accumulator lhs" 
             .lhs = .{ .named = "source" },
             .rhs = .{ .int = case[1] },
         })) == null);
-        try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "source").?);
+        try std.testing.expectEqual(
+            ValueLoc{ .spill64 = .slot0 },
+            selector_state.valueLoc(&selector, "source").?,
+        );
         try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "result").?);
         try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .spill_rax_rsp = .slot0 },
+            .{ .reload_rsp_rax = .slot0 },
             .{ .mov_imm_rcx = @intCast(case[1]) },
             case[2],
         }, machine.instructions.items);
@@ -732,6 +749,7 @@ test "generic cfg selector lshr64 avoids live scalar scratch values" {
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
     defer plan.deinit();
     try plan.interval_ends.put("live", 10);
+    try plan.interval_ends.put("source", 4);
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
@@ -885,6 +903,7 @@ test "generic cfg selector lshr64 reloads spilled source through rax when scratc
     try plan.interval_ends.put("live_rcx", 10);
     try plan.interval_ends.put("live_r8", 10);
     try plan.interval_ends.put("live_r9", 10);
+    try plan.interval_ends.put("source", 4);
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
@@ -1888,8 +1907,14 @@ test "generic cfg selector lowers i64 immediate-left variable lshr" {
     var machine = MachineFunction.init("variable-i64-lshr", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
 
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("amount", 0);
+
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 0;
     try selector_state.bindValueLoc(&selector, "amount", .{ .arg64 = .rdi });
 
     try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
@@ -1910,8 +1935,13 @@ test "generic cfg selector lowers exact i16 and i32 immediate-left variable shl"
     inline for (.{ 16, 32 }) |bits| {
         var machine = MachineFunction.init("variable-immediate-left-shl", .{ .int = bits });
         defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("amount", 0);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 0;
         try selector_state.bindValueLoc(&selector, "amount", .{ .arg32 = .rdi });
 
         try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
@@ -2016,8 +2046,14 @@ test "generic cfg selector lowers i64 immediate xor" {
     var machine = MachineFunction.init("i64-immediate-xor", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
 
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("value", 0);
+
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 0;
     try selector_state.bindValueLoc(&selector, "value", .{ .arg64 = .rdi });
 
     try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
@@ -2066,8 +2102,13 @@ test "generic cfg selector lowers i32 arithmetic-right shifts" {
     inline for (.{ ir.Value{ .int = 7 }, ir.Value{ .named = "amount" } }) |rhs| {
         var machine = MachineFunction.init("i32-ashr", .{ .int = 32 });
         defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("value", 0);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 0;
         try selector_state.bindValueLoc(&selector, "value", .{ .arg32 = .rdi });
         try selector_state.bindValueLoc(&selector, "amount", .{ .arg32 = .rsi });
 
