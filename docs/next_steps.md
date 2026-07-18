@@ -560,7 +560,21 @@ proof; docs-only at 166; the five-part evidence deliverable; the final
 narrowed patch NOT preauthorized. STANDING DISCIPLINE: the family-isolated
 full-cohort matrix + aggregate interaction check for future multi-family
 partitions — canaries supplemental, never cohort substitutes. INBOX-142
-dispatched.
+dispatched. **The matrix LANDED at `f37845a1`** (332 lines, docs-only,
+ratchet 166, worktree clean) and is Supervisor-verified — a definitive
+result: R00/R01/R02/R05/R06/L01/L02/L03 are byte-identical in ISOLATION
+(each isolated build's whole object exactly `061a64e4`, 285 functions
+compared 0 different, report + owner exact per build) AND in AGGREGATE (the
+eight-family composite is byte-identical across all 285 emitted functions —
+no hidden interaction); R03 retained (exactly one divergent function,
+`exp2`: EDI preservation vs the wired stack spill/reload of the live shared
+source) and R04 retained (the fma evidence). The honest recomputed target is
+**166→154** (the eligible reduction is 12: R01×3 incl the helper collapse,
+R02×2, R06×2, L01×2, L02×1, L03×2; R00/R05 are zero-count ownership
+transitions proven byte-identical; R03's one gateway stays; the prior 153
+projection is superseded). Evidence sent requesting matrix acceptance + the
+FINAL narrowed patch (INBOX-143: eight eligible families; R03+R04 named
+residuals; target 154).
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
