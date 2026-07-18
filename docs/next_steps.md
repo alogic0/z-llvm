@@ -546,6 +546,21 @@ preserved stopped state (enumerate EVERY divergent symbol, attribute each to
 its family), then ONE final narrowed patch retaining all proven-divergent
 families wholesale (at minimum R04+R03; floor 154 if only R03 joins), and
 the cohort-scoped field-5 discipline made standing for future partitions.
+**The Reviewer AUTHORIZED the attribution WITH a strengthening**
+(2026-07-17: "An earlier length-changing family can mask later divergences
+in the same function") — INBOX-142 is a FAMILY-ISOLATION MATRIX: one
+temporary build per candidate family (each wiring exactly one family, all
+others legacy) with full cohort report/owner/object/per-function-disassembly
+comparison and root-cause attribution separating semantic changes from
+branch-offset drift; wholesale retention on any divergent occurrence
+(R03+R04 already retained); an AGGREGATE build of all individually-identical
+families with minimal-interaction isolation if it diverges (individual
+identity ≠ compositional identity); R00/R05 included for dispatch-ownership
+proof; docs-only at 166; the five-part evidence deliverable; the final
+narrowed patch NOT preauthorized. STANDING DISCIPLINE: the family-isolated
+full-cohort matrix + aggregate interaction check for future multi-family
+partitions — canaries supplemental, never cohort substitutes. INBOX-142
+dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
