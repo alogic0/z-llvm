@@ -410,7 +410,13 @@ and guard diffs all EMPTY; ratchet 166; identities EXACT
 independent abi rerun both pass; and — critically — the carrier `3f3e46ff`
 STILL APPLIES CLEAN at the B4-pre tree (I verified `git apply --check`
 myself), so no fresh-carrier ruling is needed. Evidence sent requesting
-B4-pre acceptance + the B4 carrier continuation to ratchet 153.
+B4-pre acceptance + the B4 carrier continuation to ratchet 153. **B4-pre is
+ACCEPTED** (Reviewer, 2026-07-17: "It proves the nine fixtures independently
+satisfy the plan-required lifetime contract, with the single unreachable
+expectation corrected explicitly") **and B4 confirmed** under the standing
+contract (carrier unchanged, model frozen at the B4-pre tree, ratchet
+exactly 153, identities + six rows + the `__multi3` stream, full gates +
+post-final-tree frozen-artifact perf, no Tier 3). B4 dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
