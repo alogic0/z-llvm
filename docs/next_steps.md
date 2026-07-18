@@ -6,7 +6,28 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-150 dormant scalar_named.zig — LANDED at 0661c8cd, Supervisor-verified
+## INBOX-151 family-isolation matrix (stage 1) — dispatched
+
+INBOX-150 at `0661c8cd` is **ACCEPTED** (Reviewer, 2026-07-18: "The action
+surface, budgets, production-faithful fixtures, durability tests, rollback
+coverage, identities, and dormant gate set satisfy the contract.") and
+**ONLY STAGE 1 of the wiring phase is authorized**: the family-isolation
+matrix. Requirements: baseline artifacts frozen from the dormant tree;
+each of B01/B03/B04/B05/B06/B07/I52B0 built ALONE (others + R03/R04
+legacy); no action/model amendment during isolation; per isolated build
+the complete cohort report/object/owner/per-function comparison PLUS full
+unit and focused canaries (canaries supplement, never replace, the
+cohort); first semantic divergence attributed separately from downstream
+offsets; failing/divergent families retained WHOLESALE, no automatic
+fix-forward; then the aggregate of individually accepted families, with
+minimal interacting subsets isolated on divergence; exact source/artifact
+hashes + temporary-build provenance preserved; matrix evidence commits
+only; stop for review; no perf, no Tier 3. **Arithmetic corrected by the
+Reviewer**: the final target is 154 − sum(direct credits of ACCEPTED
+families) — equivalently 140 + credits of retained families; helper
+credit stays zero. Final wiring remains pending matrix review.
+
+## INBOX-150 dormant scalar_named.zig — ACCEPTED at 0661c8cd, Supervisor-verified
 
 The dormant slice landed (22 files, +1,941/−50) and is verified:
 `composed_selector_scalar.zig` and `composed_selector_state.zig` are
