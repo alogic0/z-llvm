@@ -684,7 +684,17 @@ open-ended shared allowance — the complete revised declaration/import
 manifest freezes BEFORE code moves (any addition = another structural
 stop); seal order + error sets exact; the spill-key stays in state.zig.
 INBOX-146 amended and re-dispatched under the revised graph + original
-contract.
+contract. **Slice 2 LANDED (move `dacc2566` + evidence `7120c1b4`)** and is
+Supervisor-verified: `planning.zig` is a 24-line facade over the five
+revised leaves (model 10, compatibility 589, lifetime_admission 322,
+physical_mapping 899, semantic_ordering 509 — all far under budget); the
+111-row frozen manifest + 63-row provenance committed; `lifetime_admission`
+verified free of the forbidden physical_mapping import; state.zig +
+value_use/model.zig untouched; ratchet 154; identities EXACT with six
+frontier rows; unit 1,329/1,329; MY abi + canary runs pass; perf PASSED
+(+0.380s vs 2.438s allowance, ratio 1.0041, RSS +524 KiB, 16/16 reports);
+no Tier 3. Evidence sent requesting slice-2 acceptance + slices 3/4 (the
+test splits) authorization.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
