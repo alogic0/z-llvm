@@ -644,7 +644,19 @@ ratchet 154; identities EXACT with six frontier rows; unit 1,328/1,328; MY
 abi + canary runs pass at the split tree; perf PASSED (+0.135s vs the 2.541s
 allowance, ratio 1.0039, RSS delta 0, 16/16 reports exact, no rerun); no
 Tier 3. Evidence sent requesting slice-1 acceptance + slice-2 (the planning
-split) authorization.
+split) authorization. **Slice 1 is ACCEPTED and slice 2 AUTHORIZED**
+(Reviewer, 2026-07-18: "The facade, leaf sizes, provenance, identities,
+gates, and performance satisfy the move-only contract."), with one ownership
+clarification: the three-question lifetime/admission authority moves as ONE
+indivisible block into `planning/lifetime_admission.zig`, while the durable
+spill-key implementation (insertOwnedSpillSlot, restoration, registry,
+teardown) stays FROZEN in the deferred `composed_selector_state.zig` with
+its guard boundary preserved. All other section-6 terms stand (the 15-name
+facade; `seal` sole orchestrator with proven-identical statement order;
+NodeList/MappingList private; Mapping limited to the two leaves; no direct
+planning-leaf imports from production; hard stops on reverse edges/semantic
+edits/init-order/error-drift/manifest movement; ratchet 154; full gates +
+perf; no Tier 3). INBOX-146 dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
