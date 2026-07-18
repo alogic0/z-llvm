@@ -727,6 +727,21 @@ exported; independent perf-omission hash proof for its tree; ratchet 154;
 exact identities; full unit + guard + ABI + canaries + integrated-exe +
 strengthened Tier 2 with every gate's command + log hash pinned; no
 Tier 3; STOP for the final checkpoint review. INBOX-148 dispatched.
+**Slice 4 LANDED at `3beffdfb`** (evidence `8b20b6f1`) and is
+Supervisor-verified: the planning test monolith split into four leaves
+(compatibility/lifetime_admission/physical_mapping/semantic_ordering)
+behind a 6-line `planning_tests.zig` aggregator with the transaction-tests
+entrypoint repointed exactly as in slice 3; the 14-test sorted 1:1
+name/body manifest is duplicate-free (verified); the split commit touches
+ONLY test and evidence files, so no internals could be exported; the
+422/422 perf-omission hash contract is confirmed by my own spot-hashes of
+five production/facade/build files against the accepted slice-3 tree; all
+ten pinned gate-log sha256 hashes re-verified against the retained logs
+(the four hashes byte-identical to slice-3 logs are fully deterministic
+formats with no embedded commit or fine timing, while every commit-bearing
+log pins `3beffdfb`); identities exact; ratchet 154; MY independent abi
+(three modes 20/20 matched) and canary (2/2, 35 cases) reruns pass; no
+Tier 3. Evidence sent requesting the FINAL CHECKPOINT acceptance.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
