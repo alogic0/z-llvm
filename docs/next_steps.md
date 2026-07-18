@@ -6,7 +6,33 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-156 matrix — LANDED at f837fede, Supervisor-verified
+## INBOX-157 wiring (B03–B06 → 148) — dispatched
+
+INBOX-156 is **ACCEPTED and INBOX-157 authorized exactly as proposed**
+(Reviewer, 2026-07-18): wire only B03–B06 (152 → exactly 148); B07 stays
+pre-transaction through scalar_named_b07_rhs_admission; the action,
+lifetime, and forward-Q1 model frozen at 3534551d; no helper-collapse
+credit; identities + frontier rows + pinned streams preserved (cohort
+must not move); complete gates + post-final-tree counterbalanced perf;
+no attempt-then-fallback; no Tier 3. **B07: option (a) ruled** — the
+action-layer dormant amendment is designed immediately after INBOX-157
+acceptance, BEFORE multiply ("Its eight credits and direct relationship
+to the freshly proven forward-Q1 mechanism justify closing it while the
+evidence is current"), narrowly action-layer: construct the named RHS
+request from semantic identity and expected type/class/width without
+requiring a current binding; Q1 remains the sole admission authority; no
+consumer-side forward resolver / home inspection / name predicates /
+retry / fallback; source-order validation + provenance + legacy
+diagnostics preserved; no physical-home/pair/cycle/fixed-register
+authority; prove all six cohort rows + current-binding +
+register/spill-assigned forward + malformed/stale + rollback +
+multi-request cases; re-prove B03–B06 byte-identical (shared action
+surface); dormant at ratchet 148 with unit/guard/ABI/canaries, no
+perf/Tier 3; then a FRESH isolation run before B07 wiring; "if semantic
+request construction cannot be achieved without widening the public
+request surface, stop for review." INBOX-157 dispatched.
+
+## INBOX-156 matrix — ACCEPTED at f837fede, Supervisor-verified
 
 The re-isolation is decisive and verified (evidence-only diff; ratchet
 152): **B03, B04, B05, and B06 are ALL individually accepted** — each
