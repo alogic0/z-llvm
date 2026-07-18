@@ -402,7 +402,15 @@ spill/reload/RCX-immediate/binary sequence per sibling; source binding stays
 at the spill, result at RAX; the strict-after dies-at-current control
 remains the separate proof of legitimate reuse). B4-pre continues with the
 other eight alignments plus this correction; production/model untouched;
-stop before the carrier. Re-dispatched.
+stop before the carrier. Re-dispatched. **B4-pre LANDED at `068f586b`** and
+is Supervisor-verified: exactly two files (the scalar test file +47/-3 and
+the evidence summary with the nine-row manifest); production, `value_use/`,
+and guard diffs all EMPTY; ratchet 166; identities EXACT
+(`49a19f04`/`061a64e4`/`5d91960e`); full unit 1,320/1,320; Worker abi + my
+independent abi rerun both pass; and — critically — the carrier `3f3e46ff`
+STILL APPLIES CLEAN at the B4-pre tree (I verified `git apply --check`
+myself), so no fresh-carrier ruling is needed. Evidence sent requesting
+B4-pre acceptance + the B4 carrier continuation to ratchet 153.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
