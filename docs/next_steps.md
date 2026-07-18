@@ -6,7 +6,29 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-152 wiring — LANDED at e048ff5c + perf cf07e35b, Supervisor-verified
+## INBOX-153 B03–B07 admission diagnosis — dispatched
+
+INBOX-152 is **ACCEPTED** (Reviewer, 2026-07-18: "B01 and I52B0 are
+correctly landed at ratchet 152; B03–B07 remain explicit pre-transaction
+residuals with frozen action/model behavior, exact identities, complete
+gates, and passing performance."). The evidence-only admission diagnosis
+is authorized with ten Reviewer-required fields per family (failing
+fixture/cohort rows + first failing request; registration order,
+handle/role, failure provenance; instruction position; canonical
+binding/home/type/width; allocation-plan presence + exact source
+interval; dependency owners/edges; legacy route vs transaction Q1/seal
+route; classification among plan construction / interval bookkeeping /
+Q1 availability / request identity / RHS resolution channel; proof of
+fixture-only vs production-only vs shared; a bounded remediation proposal
+with no function-name predicate and no consumer-side home inspection),
+plus: B07's six cohort regressions traced individually (unresolved
+identity vs valid-binding-rejected), and B03–B06 explaining why dormant
+fixtures passed while wired production-path fixtures lack the interval.
+Temporary instrumentation allowed for evidence only and removed before
+commit; docs-only; ratchet 152; no perf; no Tier 3; stop for design
+review. No action/model amendment or multiply work authorized yet.
+
+## INBOX-152 wiring — ACCEPTED at e048ff5c + cf07e35b, Supervisor-verified
 
 The wiring landed and is fully verified: ratchet recount **152** (the TSV
 removed exactly the two accepted gateways, retained operations
