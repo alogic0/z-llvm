@@ -6,7 +6,25 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-155 — LANDED at 3534551d, Supervisor-verified
+## INBOX-156 re-isolation matrix — dispatched
+
+INBOX-155 is **ACCEPTED** (Reviewer, 2026-07-18: "The exact structural
+forward snapshot, canonical recapture, closed errors, shared resolver,
+rollback coverage, and unchanged production routing satisfy the dormant
+amendment contract.") and **INBOX-156 authorized**: the B03–B07
+re-isolation matrix from baseline 3534551d (B01/I52B0 already wired at
+152); the five families isolated one at a time (others + R03/R04
+legacy); the forward-Q1 implementation frozen during isolation; per
+build the full cohort report/object/owner/per-function comparison +
+full unit + focused canaries; B07 must restore all six rows and exact
+443/285/158 + object/owner/per-function identities; B03–B06 must pass
+their aligned production-path fixtures; failing/divergent families
+retained wholesale; the aggregate of survivors with minimal-subset
+isolation if needed; exact hashes/provenance; the result stated as 152 −
+accepted credits (140 the all-five floor); evidence-only; no perf; no
+Tier 3; stop. No production wiring or multiply preauthorized. Dispatched.
+
+## INBOX-155 — ACCEPTED at 3534551d, Supervisor-verified
 
 The dormant forward-Q1 amendment landed (26 files, +1,380/−131) and is
 verified: composed_selector_scalar.zig (incl the five legacy owners)
