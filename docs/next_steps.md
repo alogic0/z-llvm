@@ -6,7 +6,29 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-153 diagnosis — LANDED at e070b4e3, Supervisor-verified
+## INBOX-154 fixture alignment + characterization tests — dispatched
+
+INBOX-153 is **ACCEPTED** (Reviewer, 2026-07-18: "The diagnosis cleanly
+separates fixture-only plan defects in B03–B06 from B07's real
+forward-value admission gap.") and **INBOX-154 authorized** as test-only
+steps 1–2 with refinements: every B03–B07 legacy production-path fixture
+aligned with real plans/positions/intervals/assignments/bindings/
+dependencies; per-fixture manifest, no blanket maxInt lifetimes;
+instruction streams, bindings, and diagnostics UNCHANGED (movement =
+stop); current-binding tests (missing plan, missing interval) +
+forward-metadata characterization fixtures (valid identity,
+malformed/stale, expired interval, class/width mismatch, missing
+assignment); the valid-forward test must explicitly demonstrate legacy
+forward resolution succeeding while transaction admission returns
+ValueUseUnresolvedSource (no claiming future-Q1 errors exist yet); the
+six B07 cohort traces preserved as immutable regression inputs; no
+production/action/model/admission/guard-policy relaxation; ratchet 152;
+exact identities; full gates with per-gate log-hash pins; perf omitted
+only with production hash identity; no Tier 3; stop. Forward-Q1 dormant
+amendment vs multiply sequencing decided after review — neither
+preauthorized. INBOX-154 dispatched.
+
+## INBOX-153 diagnosis — ACCEPTED at e070b4e3, Supervisor-verified
 
 The diagnosis landed docs-only (464 lines; instrumentation worktree
 removed; ratchet 152; worktree clean) and is decisive. **B03–B06 are
