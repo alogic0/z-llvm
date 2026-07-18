@@ -6,7 +6,24 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-149 Slice-3 evidence refresh — dispatched
+## INBOX-149 Slice-3 evidence refresh — LANDED at 5bc839ee, Supervisor-verified
+
+The refresh landed docs-only (624 lines, one file) and is verified: ratchet
+recount 154; seven candidate families (B01/B03/B04/B05/B06/B07/I52B0)
+accounting for 14 direct sites; the shared helper
+`accumulatorArithmeticDisplacement` has 11 live call-site owners — verified
+by grep at exactly the frozen lines (113 B03; 183/191/205/213 B07; 407 R03;
+449/457/465/474/483 R04; definition 1098) — so its last-owner collapse
+credit is ZERO while R03/R04 remain legacy owners. **The honest conditional
+all-family target is 140** (154 − 14 − 0), superseding the stale 138 twice
+(wrong 153 baseline; invalid helper-collapse claim). Retained families lose
+their whole direct credit; the target recomputes per family-isolation
+outcome. R03/R04 owner freeze, closed displacement authorities, the
+isolation + aggregate procedure, and the scalar_named.zig
+facade/import/size budget are in the document. Sent to the Reviewer for the
+dormant-slice (design) agreement.
+
+## Former INBOX-149 dispatch entry — superseded by the landing above
 
 The refactoring checkpoint is complete and accepted at ratchet 154. The
 Reviewer and Reviewer 2 agreed on Option B: scalar Slice 3 precedes R03/R04
