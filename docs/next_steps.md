@@ -709,7 +709,24 @@ changes) + a 4-line stable aggregator keeping the build entrypoint; the
 perf-omission hash contract confirmed by my own spot-hashes (production,
 planning facade, action facade, build all identical to the accepted tree);
 ratchet 154; MY abi + canary runs pass; no Tier 3. Evidence sent requesting
-slice-3 acceptance + slice-4 (the planning test split) dispatch.
+slice-3 acceptance + slice-4 (the planning test split) dispatch. The
+Reviewer first WITHHELD acceptance pending the four remaining gate results
+from the slice-3 tree (full unit / source guard / integrated-exe /
+strengthened Tier 2); all four were already pinned in the Worker's evidence
+commit `be334bcc` with exact commands, counts, and retained-log sha256
+hashes — I re-verified each log hash myself (all MATCH; unit 1329/1329,
+guard 47/47, integrated-exe 7/7 ok cases hand-counted, Tier 2 29 steps
+1337/1337) and forwarded them. **Slice 3 is ACCEPTED and INBOX-148 (slice
+4, the planning test split — the FINAL checkpoint slice) is AUTHORIZED**
+(Reviewer, 2026-07-18: "Checkpoint Slice 3 (b7b176ed with evidence
+be334bcc) is accepted. The full required gate set is pinned to the Slice-3
+source tree… INBOX-148 is authorized under the identical test-only
+discipline"), with the standing terms: stable aggregator + unchanged
+entrypoint; exact sorted 1:1 test-name/body manifest; no internals
+exported; independent perf-omission hash proof for its tree; ratchet 154;
+exact identities; full unit + guard + ABI + canaries + integrated-exe +
+strengthened Tier 2 with every gate's command + log hash pinned; no
+Tier 3; STOP for the final checkpoint review. INBOX-148 dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
