@@ -582,7 +582,23 @@ correctly retained wholesale."), with the two residual owners named:
 `scalar_immediate_multi_alias_preservation` (R04), both plus the R00/R05
 zero-count transitions enforced structurally; model frozen at `de3cb6f9`;
 ratchet exactly 166→154; the fma/`__multi3`/`exp2` streams all required;
-full gates + frozen-artifact perf; no Tier 3. INBOX-143 dispatched.
+full gates + frozen-artifact perf; no Tier 3. INBOX-143 dispatched. **INBOX-143 LANDED (wiring `41bdecf9` + evidence
+`01722543`)** and is Supervisor-verified (all checklist items green): scope
+exactly the eight matrix-proven families + the R03/R04 pre-transaction
+routings + guard fixtures; the frozen `value_use/`+state model untouched
+(empty diffs); honest recount EXACTLY 154; `tryLowerLshr64SpillThroughRax`
+has no production owner; identities EXACT
+(`49a19f04`/`061a64e4`/`5d91960e`, six lhs-loc rows); full unit
+1,327/1,327; MY abi rerun (60/60+30/30) AND canary run both pass at the
+wired tree — the first wired-immediates canary pass across six attempts;
+counterbalanced perf PASSED decisively (median B 49.415s vs A 49.875s — B
+faster by 0.460s; paired ratio 0.98265; RSS −3,924 KiB; 16/16 reports at
+`49a19f04`; no sample removed, no rerun); no Tier 3. **The IMMEDIATES are
+RESOLVED at ratchet 154** with two named residuals
+(`scalar_immediate_live_shared_source_preservation` R03,
+`scalar_immediate_multi_alias_preservation` R04) pending Reviewer
+acceptance. Evidence sent requesting acceptance + the REFACTORING CHECKPOINT
+plan directive (INBOX-144).
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
