@@ -506,7 +506,23 @@ full gates incl canaries + Tier 2 + counterbalanced perf; no Tier 3); after
 its acceptance the REFACTORING CHECKPOINT begins even if the ratchet is
 above 153; the retained R04 family gets a dedicated per-alias design after
 the checkpoint and cannot be silently absorbed into slice 3. INBOX-140 (the
-partition) dispatched.
+partition) dispatched. **The partition LANDED at `1216fe29`** (334 lines,
+docs-only, ratchet 166, worktree clean) and is Supervisor-verified: per-family
+classifier boundaries, occurrence counts, preservation authorities/alias
+topologies, and byte-identity results from the preserved B5 evidence; ONLY
+R04 has divergent hunks — every other family shows no divergence in the fma
+streams and passed its unit/rollback coverage. **The recomputed narrowed
+target is 153** — R04 contributes ZERO counted textual gateways (its
+inventory rows belong to other families), so retaining it wholesale costs
+nothing on the ratchet: 166 − 12 direct gateways (R01×2+R02×2+R03+R06×2+
+L01×2+L02+L03×2) − 1 R01 helper collapse
+(`tryLowerLshr64SpillThroughRax/resolveValue`) = 153, independently derived
+from the closed-family ownership, with the guard still required to enforce
+the named R04 residual and pure pre-transaction routing;
+`accumulatorArithmeticDisplacement` is NOT a collapse (R04 + future named
+arithmetic retain ownership); L00 + i128 pair-result stay O4; exact-EI
+unchanged. Evidence sent requesting partition acceptance + the narrowed
+wiring slice (INBOX-141).
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
