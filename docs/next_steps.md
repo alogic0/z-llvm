@@ -450,7 +450,20 @@ cross-transaction retention, and the fma/__multi3 shapes. **Standing gate
 change: focused codegen canaries now run for every dormant slice touching
 selector/transaction/planning/state/action production code** (docs-only,
 test-only, and proven pure-move refactors exempt). Dormant at ratchet 166;
-B5 not yet authorized. INBOX-139 dispatched.
+B5 not yet authorized. INBOX-139 dispatched. **INBOX-139 LANDED at
+`de3cb6f9`** ("INBOX-139 own durable spill-slot keys") and is
+Supervisor-verified: the fix sits exactly at the ruled container boundary in
+`composed_selector_state.zig` — `insertOwnedSpillSlot` uses the incoming
+slice for lookup only, asserts no existing key, ensures capacity before
+duping into selector-owned storage tracked in `owned_spill_slot_keys` (for
+exactly-once free), and rollback restores via the snapshot helper;
+production lowering untouched; ratchet 166; identities EXACT
+(`49a19f04`/`061a64e4`/`5d91960e`); the classification audit table covers
+every identity-keyed container as ruled; 17 new accumulator-transaction
+regression tests + the immediate-tests additions cover the six mandated
+scenarios; full unit 1,325/1,325; Worker gates + my independent abi
+(`status=pass`) and canary (`success`) runs all green; no perf; no Tier 3.
+Evidence sent requesting 139 acceptance + B5 (the carrier resume to 153).
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
