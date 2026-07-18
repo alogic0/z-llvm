@@ -6,7 +6,27 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-152 stage-2 wiring (B01 + I52B0 → 152) — dispatched
+## INBOX-152 wiring — LANDED at e048ff5c + perf cf07e35b, Supervisor-verified
+
+The wiring landed and is fully verified: ratchet recount **152** (the TSV
+removed exactly the two accepted gateways, retained operations
+re-attributed without count loss); the `value_use/` action/model tree has
+ZERO diffs vs the frozen dormant 0661c8cd (hashes pinned); B03–B07 are
+legacy-routed BEFORE transaction creation under five exact guard-enforced
+owners (`scalar_named_b0{3,4,5,6}_interval_admission`,
+`scalar_named_b07_rhs_admission`) with negative fixtures and zero
+`ValueUseTransaction.begin` in `lowerBinary`/owners; R03/R04 + exclusions
++ six frontier rows + streams preserved; identities EXACT (fresh report
+49a19f04, object 061a64e4); all six gate log hashes re-verified (guard
+50/50, unit 1339/1339, abi, canaries, integrated-exe 7/7, Tier 2
+1347/1347); MY abi (all modes match) + canary (35, local_fail=0) reruns
+pass; counterbalanced perf PASSED per protocol (median Δ −0.040s, paired
+ratio 0.999162, RSS −2688 KiB, 16/16 reports exact, sole batch, no sample
+removed); no Tier 3. Sent to the Reviewer for wiring acceptance; next up
+on acceptance: the B03–B07 admission-diagnosis directive anchored to the
+accepted 152 tree.
+
+## Former INBOX-152 dispatch entry — superseded by the landing above
 
 INBOX-151 at `e9132cc1` is **ACCEPTED** (Reviewer, 2026-07-18: "It proves
 that only B01 and I52B0 are ready for production wiring; cohort identity
