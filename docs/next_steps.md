@@ -388,7 +388,21 @@ ONLY if it still applies without reconciliation, else a fresh-carrier
 ruling (no hand-merging of test hunks). "This proves the fixtures satisfy
 the plan-required contract independently of the new dispatch, keeping the
 eventual wiring result attributable to production behavior rather than
-simultaneous fixture repair." INBOX-138 amended; B4-pre dispatched.
+simultaneous fixture repair." INBOX-138 amended; B4-pre dispatched. **B4-pre stopped correctly on a real
+fixture conflict**: "immediate i64 siblings reuse a dead accumulator lhs"
+cannot both keep its exact unwired reuse stream (a real end-at-current
+interval makes the legacy INCLUSIVE preserve-current authority spill) and
+satisfy the plan-required Q1. **The Reviewer ruled disposition (b)** — the
+inspected forms (large i64 and/or/add/xor) all dispatch through
+`accumulatorPreserveCurrentDisplacement`, so end-at-current is INTENTIONALLY
+spilled and the reuse expectation documents an unreachable no-plan state: a
+single explicitly-reviewed stream/binding correction is authorized (rename
+the fixture to preserving-at-final-use; real interval; the exact
+spill/reload/RCX-immediate/binary sequence per sibling; source binding stays
+at the spill, result at RAX; the strict-after dies-at-current control
+remains the separate proof of legitimate reuse). B4-pre continues with the
+other eight alignments plus this correction; production/model untouched;
+stop before the carrier. Re-dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
