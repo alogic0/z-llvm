@@ -346,7 +346,21 @@ coverage; freeze the displacement table without generalizing "wide";
 preserve A2 and valid-A3 behaviors as separate decisions). Dormant contract:
 ratchet 166, exact identities, full unit + ABI, no perf, no Tier 3, stop; B3
 not yet reauthorized; the checkpoint stays behind wiring at 153. INBOX-137
-dispatched.
+dispatched. **INBOX-137 LANDED at `e7ddb36c`** ("INBOX-137: separate
+value-use lifetime authorities", 15 files +868/-151) and is
+Supervisor-verified: production lowering untouched (empty diffs); ratchet
+166; the facade manifest unchanged (the lifetime context is private);
+identities EXACT (`49a19f04`/`061a64e4`/`5d91960e`); full unit 1,320/1,320;
+Worker abi + my independent abi rerun both pass; the crown-jewel test is
+present — "real __multi3 percent-11 uses inclusive policy without a Q3
+alias" — with the displacement table refined PER PLAN (R02 widths ≤32 use
+strict-after Q2, i64 uses inclusive preserve-current; R05 wide inclusive
+with spill-live fallback); dormant fixtures across memory/scalar/state
+gained production-faithful plan intervals; the seven-case error coverage
+(missing plan / missing interval / expired / end-at-current /
+survives-after / malformed dependency / first-failure attribution) is in the
+core planning tests; no perf; no Tier 3. Evidence sent requesting INBOX-137
+acceptance + the B4 wiring resume (carrier `3f3e46ff`, 153 contract).
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
