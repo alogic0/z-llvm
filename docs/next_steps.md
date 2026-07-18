@@ -532,7 +532,20 @@ Worker is building the new narrowed patch from the accepted tree (nine
 landing families; R04 routed to legacy pre-transaction under
 `scalar_immediate_multi_alias_preservation`; model frozen at `de3cb6f9`;
 ratchet exactly 153; identities + six rows + the fma/`__multi3` streams;
-full gates + frozen-artifact perf; no Tier 3). INBOX-141 dispatched.
+full gates + frozen-artifact perf; no Tier 3). INBOX-141 dispatched. **INBOX-141 STOPPED on the accepted-object identity —
+a seventh divergence, in R03**: at `exp2`, the accepted stream preserves the
+live-after `%10` via a REGISTER copy (the scratch-preferred authority) while
+the narrowed plan spilled to stack — both preserve, different homes; all
+prior gates passed (guard 45/45 incl the new fixtures, unit 1,327/1,327,
+both canaries, report + owner exact) so the divergence is canary-invisible.
+This exposed the partition's methodological gap: field 5 was evidenced from
+the preserved B5 (fma-scoped) streams, not the full cohort object. The
+narrowed patch is preserved at sha `7e2fc523`. My proposal is with the
+Reviewer: an evidence-only COHORT-WIDE divergence attribution from the
+preserved stopped state (enumerate EVERY divergent symbol, attribute each to
+its family), then ONE final narrowed patch retaining all proven-divergent
+families wholesale (at minimum R04+R03; floor 154 if only R03 joins), and
+the cohort-scoped field-5 discipline made standing for future partitions.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
