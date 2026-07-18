@@ -154,10 +154,92 @@ No `distribution-all` command and no Tier 3 command was run.
 
 ## Counterbalanced performance
 
-Pending the required follow-up evidence commit. Immutable A/B artifacts
-will be built and set mode 0555 only after this complete production tree is
-committed. The single accepted protocol is: idle-machine check, two
-discarded warmups per artifact, six counterbalanced pairs
-AB/BA/AB/BA/AB/BA, retain every sample, and decide on aggregate medians,
-median paired B/A ratio at most 1.05, and maximum-RSS increase at most
-16 MiB. No discretionary rerun is permitted.
+The production tree was committed before either timed artifact was frozen.
+Both artifacts were built in separate clean detached worktrees, copied to
+the evidence directory, and set mode 0555 before the first warmup. Neither
+artifact was rebuilt or modified during the batch.
+
+```text
+A_commit=eb1ad794fe243613b6dce4f4fff4d297e08088a7
+A_tree=b8e5f979e93c809a1c3b564fbaa01b899944ba0a
+A_artifact_sha256=15463ed61efbf480a79e0bc532c3f28cda842b2ea2001729761fb0d698da03dd
+A_artifact_mode=0555
+A_artifact_bytes=92805947
+
+B_commit=e048ff5cb7818f0b1e99d6971b9542562ffcf086
+B_tree=5c5bfa8cc202ec6403799b56df2e613275bdeb22
+B_artifact_sha256=043d25e21480ebf56ff211b17d6a324a404111ecdd8993420d1a8018dca76335
+B_artifact_mode=0555
+B_artifact_bytes=107646818
+
+build_command=/home/oleg/bin/zig build
+A_build_log_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+B_build_log_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+input_sha256=7c91f5f602ec45c57a96ad82d1e097c47a47df7b00809800ebcefc3fccf6760b
+```
+
+The idle preflight captured the process list, load average, and three
+one-second CPU-0 samples immediately before the batch. CPU 0 averaged
+96.98% idle. Its retained record has SHA-256
+`84bf994cffea69079d7cd5610cec40942c5d50295bdf15d4e330c50ac18ca25b`.
+
+The measurement was orchestrated by a Zig script. Every invocation used:
+
+```text
+command=/usr/bin/time -f "%e %M" -o <raw> taskset -c 0 env LC_ALL=C <A-or-B>/z_llvm --emit=obj --generic-cfg-selector --report-all-codegen-failures --target=x86_64-linux --input-limit=67108864 tmp/inbox92_second_resume2_perf/compiler_rt_frozen.ll
+runner_command=/home/oleg/bin/zig run tmp/inbox152_o2_scalar_named_wiring/run_counterbalanced.zig 2>&1 | tee tmp/inbox152_o2_scalar_named_wiring/perf/run_counterbalanced.log
+analyzer_command=/home/oleg/bin/zig run tmp/inbox152_o2_scalar_named_wiring/analyze_counterbalanced.zig 2>&1 | tee tmp/inbox152_o2_scalar_named_wiring/perf/paired_metrics.tsv
+runner_sha256=f93f036f4e8585827dbeaa047badbd2a9bb61ea0c3e7ae1c94a827c6c1c6a034
+analyzer_sha256=728d1ac34e2d5988d1ce3a9475b8bff76fab69a326953744bfd157103c2381c5
+runner_log_sha256=d142895d36a766f2de28ff939881c1ca0671ca8a7635c0f9224c7c14f74ff6ec
+metrics_log_sha256=47e2055e64bb232b7e62522f99ee448ed9d894aeecd6590eb75de03331616411
+```
+
+Exactly two warmups per artifact were discarded:
+
+| Warmup | Seconds | Peak RSS KiB |
+|---|---:|---:|
+| A1 | 47.65 | 91036 |
+| B1 | 47.76 | 88092 |
+| A2 | 47.66 | 91032 |
+| B2 | 47.69 | 88260 |
+
+All six timed pairs were retained in the prescribed
+AB/BA/AB/BA/AB/BA order:
+
+| Pair | Order | A seconds | A RSS KiB | B seconds | B RSS KiB | B/A |
+|---:|---|---:|---:|---:|---:|---:|
+| 1 | AB | 47.76 | 91024 | 47.70 | 88348 | 0.998743719 |
+| 2 | BA | 47.73 | 91036 | 47.71 | 88348 | 0.999580976 |
+| 3 | AB | 47.83 | 91036 | 47.67 | 88336 | 0.996654819 |
+| 4 | BA | 47.81 | 91032 | 47.62 | 88344 | 0.996025936 |
+| 5 | AB | 47.68 | 91024 | 47.78 | 88332 | 1.002097315 |
+| 6 | BA | 47.70 | 91024 | 47.73 | 88348 | 1.000628931 |
+
+Acceptance calculation:
+
+```text
+median_A_seconds=47.745
+median_B_seconds=47.705
+median_delta_seconds=-0.040
+allowed_delta_seconds=max(2.387, 0.100)=2.387
+median_paired_ratio_B_over_A=0.999162347
+A_max_rss_KiB=91036
+B_max_rss_KiB=88348
+rss_delta_KiB=-2688
+wall_pass=true
+paired_ratio_pass=true
+rss_pass=true
+report_hashes_exact=16/16
+```
+
+The gate passes both wall-time criteria and the RSS criterion. All four
+warmup reports and all twelve timed reports are exactly
+`49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681`.
+The retained raw-sample manifest contains 16 entries and has SHA-256
+`af8a79fa5521269f3ad627b5f7610824924b0f2167876e30cbbdb15ee2ef1dec`;
+the retained report manifest contains 16 entries and has SHA-256
+`665d5d04635b21d606d6a9b7a9cf7bd667420c348b5f504ec0f35265a11d72c1`.
+
+This was the sole measurement batch. No sample was removed, no artifact was
+rebuilt between samples, and no discretionary rerun was performed.
