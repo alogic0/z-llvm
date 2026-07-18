@@ -371,7 +371,24 @@ ratchet exactly 166→153 with the last-owner removal; L00/i128-pair/exact-EI
 unchanged; identities + six frontier rows + the production `__multi3` stream
 must hold; full gates + post-final-tree frozen-artifact counterbalanced
 perf; no Tier 3; any further lifecycle or carrier conflict returns for
-architectural review. INBOX-138 (B4) dispatched.
+architectural review. INBOX-138 (B4) dispatched. **B4 STOPPED on a bounded residue**: the carrier
+applied cleanly and the guard + ratchet inventory reconciled, but nine
+production-path tests route through the plan-required Q1 once the wiring
+exists, and their fixtures predate the contract (six lack a plan; three
+lack the source interval) — the expected residue of the accepted design
+meeting fixtures previously unreachable by Q1; the Worker preserved the
+applied state (`f2b29a60`) and stopped without touching the frozen model.
+**The Reviewer chose the STRICTER disposition** (2026-07-17): B4-pre on the
+UNWIRED tree first — only the nine fixtures modified, with a nine-row
+manifest (test, source identity, position, installed interval, and why it
+represents the intended lifetime), real plan representations (no test-only
+bypass or blanket maxInt), no expected-stream changes, focused + full unit
+1,320/1,320, identities exact, stop for review; then the carrier reapplies
+ONLY if it still applies without reconciliation, else a fresh-carrier
+ruling (no hand-merging of test hunks). "This proves the fixtures satisfy
+the plan-required contract independently of the new dispatch, keeping the
+eventual wiring result attributable to production behavior rather than
+simultaneous fixture repair." INBOX-138 amended; B4-pre dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
