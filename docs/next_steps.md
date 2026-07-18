@@ -6,7 +6,30 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-149 Slice-3 evidence refresh — LANDED at 5bc839ee, Supervisor-verified
+## INBOX-150 dormant scalar_named.zig — dispatched
+
+INBOX-149 at `5bc839ee` is **ACCEPTED** (Reviewer, 2026-07-18: "The
+refreshed arithmetic is correct: ratchet 154, fourteen conditional direct
+removals, no helper collapse, and an all-family ceiling of 140.") and the
+**dormant INBOX-150 is AUTHORIZED** with refinements: exact six-name
+leaf / twenty-name facade / import / size budgets per section 8; central
+model additions match section 8 exactly (no extra tags/errors/fields/
+attachments/exports); distinct closed internal plans per family (no
+generalizing shared displacement policies); B03 narrow multiply only (i64
+multiply excluded for the later multiply slice); isExactI52Binary inspects
+IR structure never function identity/name; accepted validation + staging
+order preserved (incl prepare-before-RHS); real allocation plans +
+canonical dependencies + production alias topology in every fixture;
+durable-result post-teardown lookup/use coverage + exact rollback at every
+declared failure boundary; R03/R04 owners/guards byte-identical and
+unreachable from the new action; production consumers untouched with
+guards rejecting premature use; ratchet 154; exact identities; full unit +
+source guard + ABI + focused canaries with per-gate command/counts/log-hash
+pins; no perf, no Tier 3; stop for review. "No wiring or target-140 claim
+is authorized until the dormant slice is accepted and the family-isolation
+matrix is reviewed."
+
+## INBOX-149 Slice-3 evidence refresh — ACCEPTED at 5bc839ee, Supervisor-verified
 
 The refresh landed docs-only (624 lines, one file) and is verified: ratchet
 recount 154; seven candidate families (B01/B03/B04/B05/B06/B07/I52B0)
