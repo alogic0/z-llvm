@@ -302,7 +302,30 @@ refactoring checkpoint — splitting planning.zig with unresolved admission
 semantics would obscure provenance and risk fossilizing the wrong boundary;
 the wiring stays parked at ratchet 166; after the authority model is
 accepted and the wiring reaches 153, the checkpoint proceeds. INBOX-136
-dispatched.
+dispatched. **The diagnosis LANDED at `e7d740c4`** (750 lines, docs-only,
+ratchet 166, worktree clean, carriers intact) and is Supervisor-verified
+against all eight requirements. Central findings: (1) the accepted `__multi3`
+`%11` spill/reload comes from the legacy
+`accumulatorPreserveCurrentDisplacement`'s INCLUSIVE boundary
+(`liveAccumulatorName`: `16 >= 16` → `.spill_source(%9)` at the source's own
+final use) — production has Q1=true/Q2=false/Q3=none, so no single Boolean
+can encode the triple, and **the A3 dormant test passed for the wrong
+reason** (it invented a second RAX alias; in production `%10` is already
+spilled and `%9` is the sole occupant) — the accepted stream is a
+source-lifecycle displacement policy to represent directly, not a
+manufactured Q3 alias; (2) `ValueUseExpiredSource`'s intended meaning
+(lifetime does not cover this instruction) is overloaded by the no-plan path,
+and the missing-interval path can wrongly admit; `expireExpiredBindings`
+leaves stale map entries, so "binding present" cannot prove availability
+(the non-resurrection obligation); (3) the separate-authority hypothesis is
+SUPPORTED with containment: one internal error-bearing lifetime context
+exposing three narrow decisions (availabilityForConsumption /
+mustSurviveInstruction / occupantNeedsPreservation), shared traversal,
+distinct result types, no consumer hints. Three design decisions teed up for
+the Reviewer: plan-required vs canonical-generation Q1; the closed error for
+plan-present-missing-interval; the instruction-local pin/displacement rule
+reproducing the accepted `%11` stream. My assessment + recommendations sent
+for the design ruling.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
