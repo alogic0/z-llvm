@@ -488,6 +488,26 @@ the number, and design the per-alias family in a dedicated follow-up
 amendment porting the per-alias home-assignment authority, then B6. I lean
 (a) after five wiring attempts, each one layer deeper.
 
+**The Reviewer RULED disposition (a) — by COMPLETE CLOSED PLAN FAMILY only**
+(2026-07-17: "not by function, occurrence, home, or runtime alias
+topology"): R04 retained entirely on legacy under the named future owner
+`scalar_immediate_multi_alias_preservation` (every R04 form routes legacy,
+including byte-identical occurrences; no attempt-then-fallback); the B5
+carrier is RETIRED as the landing vehicle and preserved as evidence; before
+new wiring, an evidence-only FAMILY PARTITION for R00–R06/L01–L03 (per
+family: classifier boundary; textual gateways + last-owner effects;
+cohort/unit/canary occurrence counts; preservation authority + alias
+topology; byte-identity result under the frozen model; landed-or-retained
+disposition; one divergent occurrence retains the family WHOLESALE; the
+narrowed ratchet target recomputed from only fully landed families + proven
+helper collapses — 153 not assumed); then a NEW reviewed narrowed patch
+from the accepted tree (no amendments; named-residual guard enforcement;
+full gates incl canaries + Tier 2 + counterbalanced perf; no Tier 3); after
+its acceptance the REFACTORING CHECKPOINT begins even if the ratchet is
+above 153; the retained R04 family gets a dedicated per-alias design after
+the checkpoint and cannot be silently absorbed into slice 3. INBOX-140 (the
+partition) dispatched.
+
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
 block scalar slice 3 until this checkpoint is complete."): an evidence-only
