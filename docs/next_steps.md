@@ -361,6 +361,17 @@ gained production-faithful plan intervals; the seven-case error coverage
 survives-after / malformed dependency / first-failure attribution) is in the
 core planning tests; no perf; no Tier 3. Evidence sent requesting INBOX-137
 acceptance + the B4 wiring resume (carrier `3f3e46ff`, 153 contract).
+**INBOX-137 is ACCEPTED and B4 AUTHORIZED** (Reviewer, 2026-07-17: "INBOX-137
+at e7ddb36c is accepted. It cleanly separates availability, survival, and
+occupant preservation; reserves expiry for real interval failure; and
+retains only identity/generation pins rather than stale locations."). B4
+conditions: carrier reverified and applied without reconciliation at
+`e7ddb36c` else stop; the lifetime/planning/immediate-action model frozen;
+ratchet exactly 166→153 with the last-owner removal; L00/i128-pair/exact-EI
+unchanged; identities + six frontier rows + the production `__multi3` stream
+must hold; full gates + post-final-tree frozen-artifact counterbalanced
+perf; no Tier 3; any further lifecycle or carrier conflict returns for
+architectural review. INBOX-138 (B4) dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
