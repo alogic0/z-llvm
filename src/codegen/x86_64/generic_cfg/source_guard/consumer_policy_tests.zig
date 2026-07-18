@@ -79,7 +79,8 @@ const validateSetccEaxCompareProductionSites = support.validateSetccEaxComparePr
 const validateCurrentHomeSignBitProductionSites = support.validateCurrentHomeSignBitProductionSites;
 const validateI128PairProductionSites = support.validateI128PairProductionSites;
 const validateScalarCastProductionSites = support.validateScalarCastProductionSites;
-const validateDormantImmediateScalarProductionSites = support.validateDormantImmediateScalarProductionSites;
+const validateImmediateScalarSemanticPartition = support.validateImmediateScalarSemanticPartition;
+const validateImmediateScalarProductionSites = support.validateImmediateScalarProductionSites;
 const validateLoadDiagnosticMappingProductionSites = support.validateLoadDiagnosticMappingProductionSites;
 const validateDormantLoadActionProductionSites = support.validateDormantLoadActionProductionSites;
 const validateAccumulatorCompositionProductionSites = support.validateAccumulatorCompositionProductionSites;
@@ -456,24 +457,214 @@ test "composed selector source guard confines active scalar cast actions" {
     );
 }
 
-test "composed selector source guard keeps immediate scalar actions dormant" {
+test "composed selector source guard confines narrowed immediate scalar actions" {
     const fixtures = [_][:0]const u8{
-        "fn lowerBinaryImmediateRhs() void { _ = .immediate_rhs_scalar_operand; }",
-        "fn lowerBinaryImmediateLhs() void { _ = .{ .immediate_lhs_scalar = action }; }",
+        "fn lowerBinaryImmediateRhs() void { _ = .{ .form = .immediate_rhs_scalar_operand }; }",
+        "fn lowerBinaryImmediateLhs() void { _ = .{ .prepared_action = .{ .immediate_lhs_scalar = action } }; }",
         "fn lowerBinary() void { _ = isImmediateRhsScalar(binary); }",
         "fn lowerBinary() void { _ = isImmediateLhsScalar(binary); }",
+        "fn lowerBinaryImmediateRhs() void { _ = isScalarImmediateLiveSharedSourcePreservation(binary); }",
+        "fn scalar_immediate_live_shared_source_preservation() void {}",
+        "fn lowerBinaryImmediateRhs() void { _ = isScalarImmediateMultiAliasPreservation(binary); }",
+        "fn scalar_immediate_multi_alias_preservation() void {}",
     };
     for (fixtures) |fixture| {
         try std.testing.expectError(
-            error.ValueUseImmediateScalarActionNotWired,
-            validateDormantImmediateScalarProductionSites(
-                "composed_selector_scalar.zig",
+            error.ValueUseImmediateScalarActionOutsideAllowlist,
+            validateImmediateScalarProductionSites(
+                "composed_selector_calls.zig",
                 fixture,
             ),
         );
     }
-    try validateDormantImmediateScalarProductionSites(
-        "composed_selector_scalar.zig",
-        "fn lowerBinary() void { _ = legacy; }",
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarActionAllowlistMismatch,
+        validateImmediateScalarProductionSites(
+            "composed_selector_scalar.zig",
+            "fn lowerBinary() void { _ = .{ .form = .immediate_rhs_scalar_operand }; }",
+        ),
+    );
+}
+
+const immediate_partition_fixture: [:0]const u8 =
+    \\fn isScalarImmediateLiveSharedSourcePreservation(binary: anytype) bool {
+    \\    if (binary.lhs != .named or binary.rhs != .int) return false;
+    \\    const bits = intBits(binary.ty) orelse return false;
+    \\    if (bits == 0) return false;
+    \\    return binary.op == .ashr and (bits <= 32 or bits == 64);
+    \\}
+    \\fn scalar_immediate_live_shared_source_preservation() void {
+    \\    while (liveAccumulatorNameAfterCurrent()) |_| { preserveLiveAccumulatorValue(); }
+    \\    AccumulatorDefinitionTransaction.begin(selector);
+    \\    accumulatorArithmeticDisplacement(.spill_live);
+    \\    emitValueIntoScratch();
+    \\    bindScratch();
+    \\    spillValue();
+    \\    _ = .sar_eax_imm5;
+    \\    _ = .sar_arg64_imm6;
+    \\}
+    \\fn isScalarImmediateMultiAliasPreservation(binary: anytype) bool {
+    \\    if (binary.lhs != .named or binary.rhs != .int) return false;
+    \\    const bits = intBits(binary.ty) orelse return false;
+    \\    if (bits == 0 or bits > 32) return false;
+    \\    return switch (binary.op) { .@"and", .@"or", .add, .sub, .xor => true, else => false };
+    \\}
+    \\fn scalar_immediate_multi_alias_preservation() void {
+    \\    while (liveAccumulatorNameAfterCurrent()) |_| { preserveLiveAccumulatorValue(); }
+    \\    switch (binary.op) {
+    \\        .@"and" => { AccumulatorDefinitionTransaction.begin(selector); accumulatorArithmeticDisplacement(.scratch_preferred); },
+    \\        .@"or" => { AccumulatorDefinitionTransaction.begin(selector); accumulatorArithmeticDisplacement(.scratch_preferred); },
+    \\        .add => { AccumulatorDefinitionTransaction.begin(selector); accumulatorArithmeticDisplacement(.scratch_preferred); },
+    \\        .sub => { AccumulatorDefinitionTransaction.begin(selector); accumulatorArithmeticDisplacement(.scratch_preferred); },
+    \\        .xor => { AccumulatorDefinitionTransaction.begin(selector); accumulatorArithmeticDisplacement(.scratch_preferred); },
+    \\    }
+    \\}
+    \\fn lowerBinaryImmediateRhs() void {
+    \\    if (isScalarImmediateLiveSharedSourcePreservation(binary))
+    \\        return scalar_immediate_live_shared_source_preservation(selector, result_name, binary, bits, literal);
+    \\    if (isScalarImmediateMultiAliasPreservation(binary))
+    \\        return scalar_immediate_multi_alias_preservation(selector, result_name, binary, bits, literal);
+    \\    if (ValueUseTransaction.isImmediateRhsScalar(binary)) return lowerImmediateRhsScalar();
+    \\    return switch (binary.op) {
+    \\        .lshr => if (bits == 128) { selector_state.emitPairLshrImmediate(); },
+    \\        .shl => if (bits == 128) { selector_state.emitPairShlImmediate(); },
+    \\        .ashr => if (bits == 128) { selector_state.emitPairSignMask(); },
+    \\    };
+    \\}
+    \\fn lowerBinaryImmediateLhs() void {
+    \\    if (binary.op == .sub and bits == 128 and literal == 0) {
+    \\        selector_state.materializePairValue();
+    \\        selector_state.bindPairScratch();
+    \\    }
+    \\    if (ValueUseTransaction.isImmediateLhsScalar(binary)) return lowerImmediateLhsScalar();
+    \\}
+;
+
+test "composed selector source guard freezes immediate semantic partition anchors" {
+    try validateImmediateScalarSemanticPartition(immediate_partition_fixture);
+
+    const r03_after_action = std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        immediate_partition_fixture,
+        "if (isScalarImmediateLiveSharedSourcePreservation(binary))",
+        "if (ValueUseTransaction.isImmediateRhsScalar(binary))",
+    ) catch unreachable;
+    defer std.testing.allocator.free(r03_after_action);
+    const r03_after_action_z = try std.testing.allocator.dupeZ(u8, r03_after_action);
+    defer std.testing.allocator.free(r03_after_action_z);
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarDispatchOrderMismatch,
+        validateImmediateScalarSemanticPartition(r03_after_action_z),
+    );
+
+    const r03_transactional = std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        immediate_partition_fixture,
+        "while (liveAccumulatorNameAfterCurrent())",
+        "ValueUseTransaction.begin(selector); while (liveAccumulatorNameAfterCurrent())",
+    ) catch unreachable;
+    defer std.testing.allocator.free(r03_transactional);
+    const r03_transactional_z = try std.testing.allocator.dupeZ(u8, r03_transactional);
+    defer std.testing.allocator.free(r03_transactional_z);
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarResidualOwnershipMismatch,
+        validateImmediateScalarSemanticPartition(r03_transactional_z),
+    );
+
+    const r04_after_action = std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        immediate_partition_fixture,
+        "if (isScalarImmediateMultiAliasPreservation(binary))",
+        "if (ValueUseTransaction.isImmediateRhsScalar(binary))",
+    ) catch unreachable;
+    defer std.testing.allocator.free(r04_after_action);
+    const r04_after_action_z = try std.testing.allocator.dupeZ(u8, r04_after_action);
+    defer std.testing.allocator.free(r04_after_action_z);
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarDispatchOrderMismatch,
+        validateImmediateScalarSemanticPartition(r04_after_action_z),
+    );
+
+    const second_preamble = std.mem.lastIndexOf(
+        u8,
+        immediate_partition_fixture,
+        "while (liveAccumulatorNameAfterCurrent())",
+    ) orelse unreachable;
+    const r04_transactional = try std.mem.concat(std.testing.allocator, u8, &.{
+        immediate_partition_fixture[0..second_preamble],
+        "ValueUseTransaction.begin(selector); ",
+        immediate_partition_fixture[second_preamble..],
+    });
+    defer std.testing.allocator.free(r04_transactional);
+    const r04_transactional_z = try std.testing.allocator.dupeZ(u8, r04_transactional);
+    defer std.testing.allocator.free(r04_transactional_z);
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarResidualOwnershipMismatch,
+        validateImmediateScalarSemanticPartition(r04_transactional_z),
+    );
+
+    const r00_legacy = std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        immediate_partition_fixture,
+        "return switch (binary.op)",
+        "mov_eax_to_arg; return switch (binary.op)",
+    ) catch unreachable;
+    defer std.testing.allocator.free(r00_legacy);
+    const r00_legacy_z = try std.testing.allocator.dupeZ(u8, r00_legacy);
+    defer std.testing.allocator.free(r00_legacy_z);
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarResidualOwnershipMismatch,
+        validateImmediateScalarSemanticPartition(r00_legacy_z),
+    );
+
+    const r05_legacy = std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        immediate_partition_fixture,
+        "return switch (binary.op)",
+        "accumulatorPreserveCurrentDisplacement(); return switch (binary.op)",
+    ) catch unreachable;
+    defer std.testing.allocator.free(r05_legacy);
+    const r05_legacy_z = try std.testing.allocator.dupeZ(u8, r05_legacy);
+    defer std.testing.allocator.free(r05_legacy_z);
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarResidualOwnershipMismatch,
+        validateImmediateScalarSemanticPartition(r05_legacy_z),
+    );
+
+    const stateful_classifier = std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        immediate_partition_fixture,
+        "const bits = intBits(binary.ty)",
+        "_ = selector; const bits = intBits(binary.ty)",
+    ) catch unreachable;
+    defer std.testing.allocator.free(stateful_classifier);
+    const stateful_classifier_z = try std.testing.allocator.dupeZ(u8, stateful_classifier);
+    defer std.testing.allocator.free(stateful_classifier_z);
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarResidualClassifierStateful,
+        validateImmediateScalarSemanticPartition(stateful_classifier_z),
+    );
+}
+
+test "composed selector source guard rejects unclassified immediate scalar production" {
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarActionOutsideAllowlist,
+        validateImmediateScalarProductionSites(
+            "composed_selector_calls.zig",
+            "fn lowerBinaryImmediateRhs() void { _ = .{ .form = .immediate_rhs_scalar_operand }; }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseImmediateScalarActionAllowlistMismatch,
+        validateImmediateScalarProductionSites(
+            "composed_selector_scalar.zig",
+            "fn lowerBinaryImmediateRhs() void { _ = isImmediateRhsScalar(binary); }",
+        ),
     );
 }

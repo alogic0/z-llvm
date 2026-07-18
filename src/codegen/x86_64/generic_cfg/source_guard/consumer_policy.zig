@@ -87,7 +87,7 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     try validateCurrentHomeSignBitProductionSites(source_name, source);
     try validateI128PairProductionSites(source_name, source);
     try validateScalarCastProductionSites(source_name, source);
-    try validateDormantImmediateScalarProductionSites(source_name, source);
+    try validateImmediateScalarProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -121,24 +121,280 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     }
 }
 
-pub fn validateDormantImmediateScalarProductionSites(
-    source_name: []const u8,
-    source: [:0]const u8,
-) !void {
-    _ = source_name;
-    const forbidden = [_][]const u8{
-        ".immediate_rhs_scalar_operand",
-        ".immediate_lhs_scalar_operand",
-        ".immediate_rhs_scalar",
-        ".immediate_lhs_scalar",
-        "isImmediateRhsScalar(",
-        "isImmediateLhsScalar(",
-        "setImmediateScalarTestFailure(",
-    };
-    for (forbidden) |pattern| {
-        if (std.mem.indexOf(u8, source, pattern) != null)
-            return error.ValueUseImmediateScalarActionNotWired;
+pub fn validateImmediateScalarSemanticPartition(source: [:0]const u8) !void {
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const rhs_dispatch = functionBodyNamed(bodies, "lowerBinaryImmediateRhs") orelse
+        return error.ValueUseImmediateScalarActionAllowlistMismatch;
+    const lhs_dispatch = functionBodyNamed(bodies, "lowerBinaryImmediateLhs") orelse
+        return error.ValueUseImmediateScalarActionAllowlistMismatch;
+    const r03_classifier = functionBodyNamed(bodies, "isScalarImmediateLiveSharedSourcePreservation") orelse
+        return error.ValueUseImmediateScalarResidualOwnershipMismatch;
+    const r03_owner = functionBodyNamed(bodies, "scalar_immediate_live_shared_source_preservation") orelse
+        return error.ValueUseImmediateScalarResidualOwnershipMismatch;
+    const r04_classifier = functionBodyNamed(bodies, "isScalarImmediateMultiAliasPreservation") orelse
+        return error.ValueUseImmediateScalarResidualOwnershipMismatch;
+    const r04_owner = functionBodyNamed(bodies, "scalar_immediate_multi_alias_preservation") orelse
+        return error.ValueUseImmediateScalarResidualOwnershipMismatch;
+
+    const rhs_source = source[rhs_dispatch.start..rhs_dispatch.end];
+    const r03_dispatch = std.mem.indexOf(
+        u8,
+        rhs_source,
+        "isScalarImmediateLiveSharedSourcePreservation(binary)",
+    ) orelse return error.ValueUseImmediateScalarDispatchOrderMismatch;
+    const r03_call = std.mem.indexOf(
+        u8,
+        rhs_source,
+        "scalar_immediate_live_shared_source_preservation(selector, result_name, binary, bits, literal)",
+    ) orelse return error.ValueUseImmediateScalarDispatchOrderMismatch;
+    const r04_dispatch = std.mem.indexOf(
+        u8,
+        rhs_source,
+        "isScalarImmediateMultiAliasPreservation(binary)",
+    ) orelse return error.ValueUseImmediateScalarDispatchOrderMismatch;
+    const r04_call = std.mem.indexOf(
+        u8,
+        rhs_source,
+        "scalar_immediate_multi_alias_preservation(selector, result_name, binary, bits, literal)",
+    ) orelse return error.ValueUseImmediateScalarDispatchOrderMismatch;
+    const rhs_action_dispatch = std.mem.indexOf(
+        u8,
+        rhs_source,
+        "ValueUseTransaction.isImmediateRhsScalar(binary)",
+    ) orelse return error.ValueUseImmediateScalarDispatchOrderMismatch;
+    const rhs_pair_tail = std.mem.indexOf(u8, rhs_source, ".lshr => if (bits == 128)") orelse
+        return error.ValueUseImmediateScalarDispatchOrderMismatch;
+    if (!(r03_dispatch <= r03_call and r03_call < r04_dispatch and
+        r04_dispatch <= r04_call and r04_call < rhs_action_dispatch and
+        rhs_action_dispatch < rhs_pair_tail) or
+        countPattern(rhs_source, "selector_state.emitPairLshrImmediate(") != 1 or
+        countPattern(rhs_source, "selector_state.emitPairShlImmediate(") != 1 or
+        countPattern(rhs_source, "selector_state.emitPairSignMask(") != 1 or
+        countPattern(rhs_source, "AccumulatorDefinitionTransaction.begin") != 0 or
+        countPattern(rhs_source, "accumulatorPreserveCurrentDisplacement(") != 0 or
+        countPattern(rhs_source, "mov_eax_to_arg") != 0 or
+        countPattern(rhs_source, "mov_imm_rcx") != 0)
+    {
+        return error.ValueUseImmediateScalarResidualOwnershipMismatch;
     }
+
+    const classifier_contracts = [_]struct {
+        body: FunctionBody,
+        required: []const []const u8,
+    }{
+        .{
+            .body = r03_classifier,
+            .required = &.{
+                "binary.lhs != .named",
+                "binary.rhs != .int",
+                "bits == 0",
+                "binary.op == .ashr",
+                "bits <= 32",
+                "bits == 64",
+            },
+        },
+        .{
+            .body = r04_classifier,
+            .required = &.{
+                "binary.lhs != .named",
+                "binary.rhs != .int",
+                "bits == 0 or bits > 32",
+                ".@\"and\", .@\"or\", .add, .sub, .xor",
+            },
+        },
+    };
+    const classifier_forbidden = [_][]const u8{
+        "selector",
+        "resolveValue",
+        "ValueLoc",
+        "function",
+        "compiler_rt",
+        ".eax",
+        ".rax",
+        ".spill",
+    };
+    for (classifier_contracts) |contract| {
+        const classifier_source = source[contract.body.start..contract.body.end];
+        for (classifier_forbidden) |pattern| {
+            if (std.mem.indexOf(u8, classifier_source, pattern) != null)
+                return error.ValueUseImmediateScalarResidualClassifierStateful;
+        }
+        for (contract.required) |pattern| {
+            if (countPattern(classifier_source, pattern) != 1)
+                return error.ValueUseImmediateScalarResidualClassifierMismatch;
+        }
+    }
+
+    const r03_owner_source = source[r03_owner.start..r03_owner.end];
+    if (countPattern(r03_owner_source, "ValueUseTransaction.begin(") != 0 or
+        countPattern(r03_owner_source, "liveAccumulatorNameAfterCurrent(") != 1 or
+        countPattern(r03_owner_source, "preserveLiveAccumulatorValue(") != 1 or
+        countPattern(r03_owner_source, "AccumulatorDefinitionTransaction.begin(selector)") != 1 or
+        countPattern(r03_owner_source, "accumulatorArithmeticDisplacement(") != 1 or
+        countPattern(r03_owner_source, ".spill_live") != 1 or
+        countPattern(r03_owner_source, "emitValueIntoScratch(") != 1 or
+        countPattern(r03_owner_source, "bindScratch(") != 1 or
+        countPattern(r03_owner_source, "spillValue(") != 1 or
+        countPattern(r03_owner_source, ".sar_eax_imm5") != 1 or
+        countPattern(r03_owner_source, ".sar_arg64_imm6") != 1)
+    {
+        return error.ValueUseImmediateScalarResidualOwnershipMismatch;
+    }
+
+    const r04_owner_source = source[r04_owner.start..r04_owner.end];
+    if (countPattern(r04_owner_source, "ValueUseTransaction.begin(") != 0 or
+        countPattern(r04_owner_source, "liveAccumulatorNameAfterCurrent(") != 1 or
+        countPattern(r04_owner_source, "preserveLiveAccumulatorValue(") != 1 or
+        countPattern(r04_owner_source, "AccumulatorDefinitionTransaction.begin(selector)") != 5 or
+        countPattern(r04_owner_source, "accumulatorArithmeticDisplacement(") != 5 or
+        countPattern(r04_owner_source, ".scratch_preferred") != 5 or
+        countPattern(r04_owner_source, ".@\"and\" =>") != 1 or
+        countPattern(r04_owner_source, ".@\"or\" =>") != 1 or
+        countPattern(r04_owner_source, ".add =>") != 1 or
+        countPattern(r04_owner_source, ".sub =>") != 1 or
+        countPattern(r04_owner_source, ".xor =>") != 1)
+    {
+        return error.ValueUseImmediateScalarResidualOwnershipMismatch;
+    }
+
+    const lhs_source = source[lhs_dispatch.start..lhs_dispatch.end];
+    const l00 = std.mem.indexOf(
+        u8,
+        lhs_source,
+        "binary.op == .sub and bits == 128 and literal == 0",
+    ) orelse return error.ValueUseImmediateScalarDispatchOrderMismatch;
+    const lhs_action_dispatch = std.mem.indexOf(
+        u8,
+        lhs_source,
+        "ValueUseTransaction.isImmediateLhsScalar(binary)",
+    ) orelse return error.ValueUseImmediateScalarDispatchOrderMismatch;
+    if (l00 >= lhs_action_dispatch or
+        countPattern(lhs_source, "selector_state.materializePairValue(") != 1 or
+        countPattern(lhs_source, "selector_state.bindPairScratch(") != 1 or
+        countPattern(lhs_source, "AccumulatorDefinitionTransaction.begin") != 0 or
+        countPattern(lhs_source, "selector_state.emitValueIntoScratch(") != 0)
+    {
+        return error.ValueUseImmediateScalarResidualOwnershipMismatch;
+    }
+}
+
+pub fn validateImmediateScalarProductionSites(source_name: []const u8, source: [:0]const u8) !void {
+    const rhs_form = ".form = .immediate_rhs_scalar_operand";
+    const lhs_form = ".form = .immediate_lhs_scalar_operand";
+    const rhs_action = ".prepared_action = .{ .immediate_rhs_scalar";
+    const lhs_action = ".prepared_action = .{ .immediate_lhs_scalar";
+    const rhs_classifier = "isImmediateRhsScalar(";
+    const lhs_classifier = "isImmediateLhsScalar(";
+    const r03_classifier = "isScalarImmediateLiveSharedSourcePreservation(";
+    const r03_owner = "scalar_immediate_live_shared_source_preservation(";
+    const r04_classifier = "isScalarImmediateMultiAliasPreservation(";
+    const r04_owner = "scalar_immediate_multi_alias_preservation(";
+    const marker_total =
+        countPattern(source, rhs_form) +
+        countPattern(source, lhs_form) +
+        countPattern(source, rhs_action) +
+        countPattern(source, lhs_action) +
+        countPattern(source, rhs_classifier) +
+        countPattern(source, lhs_classifier) +
+        countPattern(source, r03_classifier) +
+        countPattern(source, r03_owner) +
+        countPattern(source, r04_classifier) +
+        countPattern(source, r04_owner);
+    if (!std.mem.eql(u8, source_name, "composed_selector_scalar.zig")) {
+        if (marker_total != 0)
+            return error.ValueUseImmediateScalarActionOutsideAllowlist;
+        return;
+    }
+    if (countPattern(source, rhs_form) != 1 or
+        countPattern(source, lhs_form) != 1 or
+        countPattern(source, rhs_action) != 1 or
+        countPattern(source, lhs_action) != 1 or
+        countPattern(source, rhs_classifier) != 1 or
+        countPattern(source, lhs_classifier) != 1 or
+        countPattern(source, r03_classifier) != 2 or
+        countPattern(source, r03_owner) != 2 or
+        countPattern(source, r04_classifier) != 2 or
+        countPattern(source, r04_owner) != 2 or
+        countPattern(source, "tryLowerLshr64SpillThroughRax") != 0 or
+        countPattern(source, "setImmediateScalarTestFailure(") != 0)
+    {
+        return error.ValueUseImmediateScalarActionAllowlistMismatch;
+    }
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const lower_binary = functionBodyNamed(bodies, "lowerBinary") orelse
+        return error.ValueUseImmediateScalarActionAllowlistMismatch;
+    const rhs_lowerer = functionBodyNamed(bodies, "lowerImmediateRhsScalar") orelse
+        return error.ValueUseImmediateScalarActionAllowlistMismatch;
+    const lhs_lowerer = functionBodyNamed(bodies, "lowerImmediateLhsScalar") orelse
+        return error.ValueUseImmediateScalarActionAllowlistMismatch;
+    const mapper = functionBodyNamed(bodies, "immediateScalarValueUseDiagnostic") orelse
+        return error.ValueUseImmediateScalarActionAllowlistMismatch;
+
+    const LowererContract = struct {
+        body: FunctionBody,
+        form: []const u8,
+        action: []const u8,
+    };
+    const lowerers = [_]LowererContract{
+        .{ .body = rhs_lowerer, .form = rhs_form, .action = rhs_action },
+        .{ .body = lhs_lowerer, .form = lhs_form, .action = lhs_action },
+    };
+    for (lowerers) |lowerer| {
+        const body_source = source[lowerer.body.start..lowerer.body.end];
+        if (countPattern(body_source, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(body_source, "transaction.register(") != 1 or
+            countPattern(body_source, lowerer.form) != 1 or
+            countPattern(body_source, lowerer.action) != 1 or
+            countPattern(body_source, "transaction.seal()") != 1 or
+            countPattern(body_source, "transaction.prepare()") != 1 or
+            countPattern(body_source, "transaction.materializeAll()") != 1 or
+            countPattern(body_source, "transaction.preparedView(") != 1 or
+            countPattern(body_source, "transaction.executePreparedAction(") != 1 or
+            countPattern(body_source, "transaction.commit()") != 1 or
+            countPattern(body_source, "immediateScalarValueUseDiagnostic(") != 5 or
+            countPattern(body_source, "orelse return err") != 5)
+        {
+            return error.ValueUseImmediateScalarActionAllowlistMismatch;
+        }
+        const forbidden = [_][]const u8{
+            "resolveValue(",
+            "ValueLoc",
+            "bindValueLoc(",
+            "bindAccumulator(",
+            "emitValueInto",
+            ".spill64",
+            ".spill128",
+            ".eax",
+            ".rax",
+        };
+        for (forbidden) |pattern| {
+            if (std.mem.indexOf(u8, body_source, pattern) != null)
+                return error.ValueUseImmediateScalarConsumerHomeClassification;
+        }
+    }
+
+    const mapper_source = source[mapper.start..mapper.end];
+    if (countPattern(mapper_source, ".failedRequestIs(") != 1 or
+        countPattern(mapper_source, "error.ValueUseActionDiagnostic") != 1 or
+        countPattern(mapper_source, "transaction.actionDiagnostic()") != 1)
+    {
+        return error.ValueUseImmediateScalarActionAllowlistMismatch;
+    }
+
+    const lower_binary_source = source[lower_binary.start..lower_binary.end];
+    const exact_ei = std.mem.indexOf(u8, lower_binary_source, "const exact_ei_narrow =") orelse
+        return error.ValueUseImmediateScalarDispatchOrderMismatch;
+    const rhs_value_dispatch = std.mem.indexOf(u8, lower_binary_source, "if (valueIsInt(binary.rhs))") orelse
+        return error.ValueUseImmediateScalarDispatchOrderMismatch;
+    const lhs_value_dispatch = std.mem.indexOf(u8, lower_binary_source, "if (valueIsInt(binary.lhs))") orelse
+        return error.ValueUseImmediateScalarDispatchOrderMismatch;
+    if (!(exact_ei < rhs_value_dispatch and rhs_value_dispatch < lhs_value_dispatch))
+        return error.ValueUseImmediateScalarDispatchOrderMismatch;
+
+    try validateImmediateScalarSemanticPartition(source);
 }
 
 pub fn validateScalarCastProductionSites(source_name: []const u8, source: [:0]const u8) !void {
@@ -1311,10 +1567,13 @@ pub fn validateFailureProvenanceProductionSites(source_name: []const u8, source:
     if (std.mem.eql(u8, source_name, "composed_selector_scalar.zig")) {
         var body_storage: [max_function_bodies]FunctionBody = undefined;
         const bodies = try collectFunctionBodies(source, &body_storage);
-        const mapper = functionBodyNamed(bodies, "scalarCastValueUseDiagnostic") orelse
+        const cast_mapper = functionBodyNamed(bodies, "scalarCastValueUseDiagnostic") orelse
             return error.ValueUseFailureProvenanceOutsideAllowlist;
-        if (countPattern(source[mapper.start..mapper.end], ".failedRequestIs(") != 1 or
-            query_count != 1)
+        const immediate_mapper = functionBodyNamed(bodies, "immediateScalarValueUseDiagnostic") orelse
+            return error.ValueUseFailureProvenanceOutsideAllowlist;
+        if (countPattern(source[cast_mapper.start..cast_mapper.end], ".failedRequestIs(") != 1 or
+            countPattern(source[immediate_mapper.start..immediate_mapper.end], ".failedRequestIs(") != 1 or
+            query_count != 2)
         {
             return error.ValueUseFailureProvenanceAllowlistMismatch;
         }
