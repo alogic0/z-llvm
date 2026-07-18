@@ -694,7 +694,15 @@ value_use/model.zig untouched; ratchet 154; identities EXACT with six
 frontier rows; unit 1,329/1,329; MY abi + canary runs pass; perf PASSED
 (+0.380s vs 2.438s allowance, ratio 1.0041, RSS +524 KiB, 16/16 reports);
 no Tier 3. Evidence sent requesting slice-2 acceptance + slices 3/4 (the
-test splits) authorization.
+test splits) authorization. **Slice 2 is ACCEPTED and slices 3/4 authorized
+SEQUENTIALLY** (Reviewer, 2026-07-18: "The revised DAG, facade expansion,
+lifetime boundary, seal ordering, identities, gates, and performance
+satisfy the contract… These should remain separate slices so a missing or
+duplicated test can be attributed to one aggregator change, and the
+performance omission must be proved independently for each tree."), with
+the note that checkpoint completion does NOT auto-authorize the campaign's
+scalar slice 3 — a stop follows for the R03/R04 design and sequencing
+decision. INBOX-147 (slice 3, the scalar test split) dispatched.
 
 **The REFACTORING CHECKPOINT is PRE-AGREED** (Reviewer, 2026-07-17: "Agreed.
 Finish and accept Step A2, land the immediate wiring at ratchet 153, then
