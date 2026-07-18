@@ -122,11 +122,11 @@ composed_selector_scalar.zig	lowerBinary	emitBinaryLocIntoAccumulator	1	1	3	O2-3
 composed_selector_scalar.zig	lowerBinary	emitValueIntoScratch	1-7	7	3	O2-3B-O1	compose_binary_uses_with_accumulator_result_transaction	o1_binary
 composed_selector_scalar.zig	lowerBinary	emitValueIntoScratchAndRelocate	1	1	3	O2-3B-O1	compose_binary_uses_with_accumulator_result_transaction	o1_binary
 composed_selector_scalar.zig	lowerBinary	resolveValue	1-4	4	3	O2-3B-O1	compose_binary_uses_with_accumulator_result_transaction	o1_binary
-composed_selector_scalar.zig	lowerBinaryImmediateLhs	emitValueIntoScratch	1-5	5	3	O2-3B-O1	compose_named_rhs_with_accumulator_result_transaction	o1_binary_immediate_lhs
-composed_selector_scalar.zig	lowerBinaryImmediateLhs	materializePairValue	1	1	3	O2-3B-O1	compose_readonly_pair_rhs_with_result_transaction	o1_binary_immediate_lhs
-composed_selector_scalar.zig	lowerBinaryImmediateRhs	emitValueIntoEax	1	1	3	O2-3B-O1	compose_named_lhs_with_accumulator_result_transaction	o1_binary_immediate_rhs
-composed_selector_scalar.zig	lowerBinaryImmediateRhs	emitValueIntoScratch	1-5	5	3	O2-3B-O1	compose_named_lhs_with_accumulator_result_transaction	o1_binary_immediate_rhs
-composed_selector_scalar.zig	lowerBinaryImmediateRhs	resolveValue	1	1	3	O2-3B-O1	compose_named_lhs_with_accumulator_result_transaction	o1_binary_immediate_rhs
+composed_selector_scalar.zig	lowerBinaryImmediateLhs	emitValueIntoScratch	1-5	5	3	O2-3S-immediate-INBOX-143	migrated_immediate_lhs_action	o1_binary_immediate_lhs
+composed_selector_scalar.zig	lowerBinaryImmediateLhs	materializePairValue	1	1	5	O4-pair-result	retain_L00_i128_pair_result	o1_binary_immediate_lhs
+composed_selector_scalar.zig	lowerBinaryImmediateRhs	emitValueIntoEax	1	1	3	O2-3S-immediate-INBOX-143	migrated_R02_immediate_rhs_action	o1_binary_immediate_rhs
+composed_selector_scalar.zig	lowerBinaryImmediateRhs	emitValueIntoScratch	1-2,4-5	4	3	O2-3S-immediate-INBOX-143	migrated_R01_R06_immediate_rhs_actions	o1_binary_immediate_rhs
+composed_selector_scalar.zig	lowerBinaryImmediateRhs	resolveValue	1	1	3	O2-3S-immediate-INBOX-143	migrated_R02_immediate_rhs_action	o1_binary_immediate_rhs
 composed_selector_scalar.zig	lowerCast	emitValueIntoScratch	1	1	5	O4-pair-result	retain_for_pair_result_migration	-
 composed_selector_scalar.zig	lowerCast	resolveValue	1	1	6	O4-alias-copy	retain_as_approved_alias_only_binding	-
 composed_selector_scalar.zig	lowerFreeze	resolveValue	1	1	5	O4-alias-copy	retain_as_approved_alias_only_binding	use_freeze
@@ -141,7 +141,8 @@ composed_selector_scalar.zig	lowerUnsignedDivRem	resolveValue	1	1	3	O2-3B-O1	com
 composed_selector_scalar.zig	lowerUnsignedRem	emitValueIntoAccumulator	1-2	2	5	O4-RDX-result	retain_for_approved_rdx_result_slice	-
 composed_selector_scalar.zig	lowerUnsignedRem	emitValueIntoScratch	1-2	2	5	O4-RDX-result	retain_for_approved_rdx_result_slice	-
 composed_selector_scalar.zig	lowerUnsignedRem	resolveValue	1	1	5	O4-RDX-result	retain_for_approved_rdx_result_slice	-
-composed_selector_scalar.zig	tryLowerLshr64SpillThroughRax	resolveValue	1	1	6	parent-consumer	collapse_with_binary_immediate_rhs_owner	-
+composed_selector_scalar.zig	scalar_immediate_live_shared_source_preservation	emitValueIntoScratch	1	1	3	scalar_immediate_live_shared_source_preservation	retain_complete_R03_legacy_family	o1_binary_immediate_rhs
+composed_selector_scalar.zig	tryLowerLshr64SpillThroughRax	resolveValue	1	1	6	O2-3S-immediate-INBOX-143	migrated_last_owner_collapsed_into_R01_action	-
 composed_selector_vector.zig	bindMaskScalarResult	materializeLocIntoLoc	1	1	4	O3-vector-XMM	retain_for_vector_migration	-
 composed_selector_vector.zig	describeVectorValue	resolveValue	1	1	6	parent-consumer	collapse_with_vector_owner	-
 composed_selector_vector.zig	materializeVectorValueAvoidingTwo	materializeLocIntoLoc	1	1	6	parent-consumer	collapse_with_vector_owner	-
