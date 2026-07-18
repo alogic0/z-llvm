@@ -6,7 +6,24 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-157 wiring — LANDED at 6b478652 + perf cfe4573c, Supervisor-verified
+## INBOX-158 B07 action-layer dormant amendment — dispatched
+
+INBOX-157 is **ACCEPTED — the ratchet is accepted at 148** (Reviewer,
+2026-07-18: "I accept INBOX-157. The ratchet is accepted at 148…
+INBOX-158 is authorized exactly under the stated dormant contract. The
+B07 legacy owner remains intact until fresh isolation proves the
+amendment restores all six cohort rows with exact identities. Any
+public-surface widening or consumer-side resolution requirement is a
+hard stop."). INBOX-158 dispatched under the option-a ruling: named-RHS
+request construction from semantic identity + expected type/class/width
+without a current binding; Q1 the sole admission authority; no
+consumer-side resolution/predicates/retry/fallback; provenance + legacy
+diagnostics preserved; no new physical authorities; six cohort rows +
+the seven case groups proven; B03–B06 re-proven byte-identical; dormant
+at 148 with unit/guard/abi/canaries; no perf/Tier 3; hard stop on
+public-surface widening; then fresh B07 isolation before wiring.
+
+## INBOX-157 wiring — ACCEPTED (ratchet 148), Supervisor-verified
 
 The four-family wiring landed and is fully verified: ratchet recount
 **148** (the TSV removed exactly the four accepted gateways); the
