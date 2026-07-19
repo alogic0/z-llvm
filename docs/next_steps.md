@@ -6,33 +6,41 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-186 exact compiler-rt v1 adoption and retention pin — AUTHORIZED
+## INBOX-187 compiler-rt v1 baseline-validation contract and patch freeze — AUTHORIZED
 
-INBOX-185 at `b1567ace` is accepted as successful three-generation
-reproducibility proof for the full artifact ID ending in SHA-256
-`9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1`.
-This proves deterministic bytes only.
+INBOX-186 at `43de59b0` is accepted as exact v1 input adoption plus explicit
+retention protection only. Produce a closed, non-executing validation
+contract and read-only future coverage patch bundle.
 
-Perform only exact adoption and explicit retention protection. After the
-complete clean/identity/absence/capacity preflight, run the contract's exact
-`install -D -m 0444` command once, using only gen-1. Require the adopted
-1,897,410-byte file to match all three generations exactly. Create the
-complete adoption manifest; make both input and manifest read-only; hash
-both after final modes.
+Canonical baseline identities must come from exactly three independent
+non-timing repetitions using one immutable artifact from the exact clean,
+dormant ratchet-131 tree. No aggregate or observer patch may define those
+identities. Freeze all report/object/owner/objdump/per-function/frontier
+commands, environments, outputs, comparisons, and new
+`o2_calls_crt_v1_r131_*` names before execution.
 
-Append exactly two live-pin rows, without changing or reordering existing
-rows, for top-level `tmp/inbox184_o2_compiler_rt_v1` and
-`tmp/o2_calls_perf`, keyed to INBOX-186 and the full artifact ID. Run the
-retention reporter exactly once in report-only/no-delete mode and require
-both paths protected by `explicit-live-pin`. Any failure or postflight
-identity movement retains all artifacts and stops without retry, repair,
-replacement, deletion, or cleanup.
+The separately frozen aggregate-consumer/observer/guard bundle is for
+dynamic coverage only. It must use fixed non-allocating observation state,
+count only ordinary `DirectCallAction` and `IntByteSizeCallAction` lifecycle
+boundaries, emit through a separate channel, admit no third family, and
+change no semantic behavior. Observation-off and observation-on outputs
+must equal the canonical identities exactly. This temporary artifact is
+excluded from performance.
 
-Run no workload validation, protocol adoption, z_llvm, gates, coverage,
-performance, production change, wiring, or credit. Commit only the pin TSV
-and INBOX-186 evidence summary, preserve ratchet 131, watcher blob
-`b64131cf`, stash, ignored roots, and frozen surfaces, and stop before
-baseline validation.
+Retain the patch bundle read-only beneath the pinned adopted root, prove it
+apply-checks, and restore exact source. Run no project code, build,
+validation, coverage, gate, performance, wiring, pin edit, cleanup, or
+credit. Commit only the INBOX-187 contract document, preserve ratchet 131
+and every frozen surface, and stop before validation execution.
+
+## INBOX-186 exact compiler-rt v1 adoption and retention pin — ACCEPTED at 43de59b0
+
+The adopted mode-0444 1,897,410-byte input has SHA-256 `9b8d6993…` and is
+raw-equal to all three accepted generations. Its mode-0444 manifest is
+`500e73c8…`. Exactly two ordered live pins were appended; the one-shot
+report-only/no-delete reporter protected both top-level roots with
+`explicit-live-pin` and deleted nothing. No validation, wiring, performance,
+cleanup, or credit occurred; ratchet remains 131.
 
 ## INBOX-185 compiler-rt v1 three-generation reproduction — ACCEPTED at b1567ace
 
