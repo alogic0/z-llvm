@@ -6,7 +6,19 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-167 quotient refresh — LANDED at f5b6c516, Supervisor-verified
+## INBOX-168 quotient dormant — dispatched
+
+INBOX-167 is **ACCEPTED and INBOX-168 authorized** (Reviewer,
+2026-07-18) with two explicit constraints: width and RHS-staging branch
+selection derived internally from semantic type and canonical
+transaction state (no consumer home/sequencing hints); the
+helper-collapse credit stays conditional until the final wired tree
+proves zero remaining production owners (131/132 unresolved until
+wiring review). UQ32/UQ64 dormant, quotient-only authority, remainder
+paths untouched, exact streams + rollback, ratchet 135, dormant gates
+incl canaries, no perf/Tier 3, stop. Dispatched.
+
+## INBOX-167 quotient refresh — ACCEPTED at f5b6c516, Supervisor-verified
 
 The refresh landed docs-only (532 lines) and is verified: exactly three
 quotient-owned ratchet rows (lowerUnsignedDivRem resolveValue ×1 +
