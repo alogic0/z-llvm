@@ -6,7 +6,17 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-168 — LANDED at d1e6fcbd, Supervisor-verified
+## INBOX-169 quotient isolation — dispatched
+
+INBOX-168 is **ACCEPTED and INBOX-169 authorized exactly as proposed**
+(Reviewer, 2026-07-18: "UQ32 and UQ64 must each satisfy the three-bar
+discipline independently, followed by an exact aggregate result. Any
+failing or divergent width is retained wholesale without amendment or
+partial credit. Remainder paths and R03/R04 remain legacy. Ratchet stays
+135; both the direct-credit target and helper collapse remain
+conditional on isolation and final owner recount."). Dispatched.
+
+## INBOX-168 — ACCEPTED at d1e6fcbd, Supervisor-verified
 
 The dormant quotient build landed (18 files, +1,072/−9: the leaf at 696
 lines under the 2,000 ceiling; tests +319; model +43, core +33, small
