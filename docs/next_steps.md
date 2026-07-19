@@ -6,7 +6,20 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-160 B07 wiring (148 → 140) — dispatched
+## INBOX-160 B07 wiring — LANDED at 19c4c3b8 + perf fee82b59, Supervisor-verified
+
+The B07 wiring landed and is fully verified: ratchet recount **140**
+(the TSV removed the B07 gateway row); the value_use action/Q1 tree has
+ZERO diffs vs the frozen 17bfa6d7; the scalar selector shed 95 lines of
+B07 legacy path while R03/R04 remain pre-transaction; identities EXACT
+(fresh report 49a19f04, object 061a64e4, owner 5d91960e — the cohort did
+not move, the six restored rows byte-identical); all six gate log hashes
+re-verified; MY abi + canary reruns pass; counterbalanced perf PASSED
+(median Δ +0.390s vs the ~2.4s allowance, paired ratio 1.00794, RSS
++100 KiB, all gates PASS); no Tier 3. Sent to the Reviewer for the
+acceptance that completes SCALAR SLICE 3 AT 140.
+
+## Former INBOX-160 dispatch entry — superseded by the landing above
 
 INBOX-159 is **ACCEPTED and INBOX-160 authorized exactly as proposed**
 (Reviewer, 2026-07-18: "The ratchet must move exactly 148 → 140 through
