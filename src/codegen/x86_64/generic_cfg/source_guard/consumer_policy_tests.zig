@@ -846,7 +846,7 @@ test "scalar multiply production wiring is complete and exclusive" {
     );
 }
 
-test "unsigned quotient action stays dormant in every production consumer" {
+test "unsigned quotient production wiring is complete and exclusive" {
     const accepted: [:0]const u8 = @embedFile("../composed_selector_scalar.zig");
     try validateUnsignedQuotientProductionSites("composed_selector_scalar.zig", accepted);
 
@@ -864,4 +864,48 @@ test "unsigned quotient action stays dormant in every production consumer" {
             ),
         );
     }
+
+    try std.testing.expectError(
+        error.ValueUseUnsignedQuotientPrematureProductionUse,
+        validateUnsignedQuotientProductionSites(
+            "composed_selector_calls.zig",
+            "fn lowerCall() void { _ = isUnsignedQuotient(binary); }",
+        ),
+    );
+
+    const raw_resolution = try std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        accepted,
+        "var transaction = try ValueUseTransaction.begin(selector);",
+        "_ = selector_state.resolveValue(selector, binary.rhs);\n    var transaction = try ValueUseTransaction.begin(selector);",
+    );
+    defer std.testing.allocator.free(raw_resolution);
+    const raw_resolution_z = try std.testing.allocator.dupeZ(u8, raw_resolution);
+    defer std.testing.allocator.free(raw_resolution_z);
+    try std.testing.expectError(
+        error.ValueUseUnsignedQuotientPrematureProductionUse,
+        validateUnsignedQuotientProductionSites(
+            "composed_selector_scalar.zig",
+            raw_resolution_z,
+        ),
+    );
+
+    const reordered_remainder = try std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        accepted,
+        "if (binary.op == .urem) return lowerUnsignedRem(selector, result_name, binary, bits);",
+        "if (false) return lowerUnsignedRem(selector, result_name, binary, bits);",
+    );
+    defer std.testing.allocator.free(reordered_remainder);
+    const reordered_remainder_z = try std.testing.allocator.dupeZ(u8, reordered_remainder);
+    defer std.testing.allocator.free(reordered_remainder_z);
+    try std.testing.expectError(
+        error.ValueUseUnsignedQuotientPrematureProductionUse,
+        validateUnsignedQuotientProductionSites(
+            "composed_selector_scalar.zig",
+            reordered_remainder_z,
+        ),
+    );
 }

@@ -198,15 +198,60 @@ pub fn validateUnsignedQuotientProductionSites(
     source_name: []const u8,
     source: [:0]const u8,
 ) !void {
-    _ = source_name;
-    for ([_][]const u8{
+    const forbidden = [_][]const u8{
         "attachUnsignedQuotientAction(",
         "isUnsignedQuotient(",
         ".unsigned_quotient",
         "executeUnsignedQuotient(",
-    }) |pattern|
-        if (std.mem.indexOf(u8, source, pattern) != null)
-            return error.ValueUseUnsignedQuotientPrematureProductionUse;
+    };
+    if (!std.mem.eql(u8, source_name, "composed_selector_scalar.zig")) {
+        for (forbidden) |pattern|
+            if (std.mem.indexOf(u8, source, pattern) != null)
+                return error.ValueUseUnsignedQuotientPrematureProductionUse;
+        return;
+    }
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const dispatch = functionBodyNamed(bodies, "lowerUnsignedDivRem") orelse
+        return error.ValueUseUnsignedQuotientPrematureProductionUse;
+    const action = functionBodyNamed(bodies, "lowerUnsignedQuotientValueUse") orelse
+        return error.ValueUseUnsignedQuotientPrematureProductionUse;
+    const mapper = functionBodyNamed(bodies, "unsignedQuotientValueUseDiagnostic") orelse
+        return error.ValueUseUnsignedQuotientPrematureProductionUse;
+    if (functionBodyNamed(bodies, "accumulatorDirectMaterializationDisplacement") != null)
+        return error.ValueUseUnsignedQuotientPrematureProductionUse;
+
+    const dispatch_source = source[dispatch.start..dispatch.end];
+    const action_source = source[action.start..action.end];
+    const mapper_source = source[mapper.start..mapper.end];
+    if (countPattern(dispatch_source, "if (binary.op == .urem) return lowerUnsignedRem(") != 1 or
+        countPattern(dispatch_source, "isUnsignedQuotient(") != 1 or
+        countPattern(dispatch_source, "lowerUnsignedQuotientValueUse(") != 1 or
+        countPattern(dispatch_source, "ValueUseTransaction.begin(selector)") != 0 or
+        countPattern(dispatch_source, "selector_state.resolveValue(") != 0 or
+        countPattern(dispatch_source, "selector_state.emitValueIntoScratch(") != 0 or
+        countPattern(dispatch_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
+        countPattern(action_source, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(action_source, "transaction.register(") != 2 or
+        countPattern(action_source, ".form = .named_scalar_operand") != 2 or
+        countPattern(action_source, "attachUnsignedQuotientAction(") != 1 or
+        countPattern(action_source, "transaction.seal()") != 1 or
+        countPattern(action_source, "transaction.prepare()") != 1 or
+        countPattern(action_source, "transaction.materializeAll()") != 1 or
+        countPattern(action_source, "transaction.preparedView(") != 1 or
+        countPattern(action_source, "transaction.executePreparedAction(") != 1 or
+        countPattern(action_source, "transaction.commit()") != 1 or
+        countPattern(action_source, "selector_state.resolveValue(") != 0 or
+        countPattern(action_source, "selector_state.emitValueIntoScratch(") != 0 or
+        countPattern(action_source, "selector_state.emitValueIntoAccumulator(") != 0 or
+        countPattern(action_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
+        countPattern(mapper_source, ".failedRequestIs(") != 2 or
+        countPattern(mapper_source, "composed-block-unknown-rhs") != 1 or
+        countPattern(mapper_source, "composed-block-unknown-lhs") != 1)
+    {
+        return error.ValueUseUnsignedQuotientPrematureProductionUse;
+    }
 }
 
 pub fn validateNamedScalarProductionSites(
@@ -229,7 +274,7 @@ pub fn validateNamedScalarProductionSites(
             return error.ValueUseNamedScalarActionOutsideAllowlist;
         return;
     }
-    if (countPattern(source, named_form) != 8 or
+    if (countPattern(source, named_form) != 10 or
         countPattern(source, named_attach) != 2 or
         countPattern(source, i52_attach) != 1 or
         countPattern(source, "isNamedScalarBinary(") != 0 or
@@ -1814,11 +1859,14 @@ pub fn validateFailureProvenanceProductionSites(source_name: []const u8, source:
             return error.ValueUseFailureProvenanceOutsideAllowlist;
         const multiply_mapper = functionBodyNamed(bodies, "scalarMultiplyValueUseDiagnostic") orelse
             return error.ValueUseFailureProvenanceOutsideAllowlist;
+        const quotient_mapper = functionBodyNamed(bodies, "unsignedQuotientValueUseDiagnostic") orelse
+            return error.ValueUseFailureProvenanceOutsideAllowlist;
         if (countPattern(source[cast_mapper.start..cast_mapper.end], ".failedRequestIs(") != 1 or
             countPattern(source[immediate_mapper.start..immediate_mapper.end], ".failedRequestIs(") != 1 or
             countPattern(source[named_mapper.start..named_mapper.end], ".failedRequestIs(") != 2 or
             countPattern(source[multiply_mapper.start..multiply_mapper.end], ".failedRequestIs(") != 2 or
-            query_count != 6)
+            countPattern(source[quotient_mapper.start..quotient_mapper.end], ".failedRequestIs(") != 2 or
+            query_count != 8)
         {
             return error.ValueUseFailureProvenanceAllowlistMismatch;
         }

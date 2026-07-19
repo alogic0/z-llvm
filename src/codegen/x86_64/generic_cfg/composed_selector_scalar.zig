@@ -696,27 +696,93 @@ fn scalarMultiplyValueUseDiagnostic(
 
 pub fn lowerUnsignedDivRem(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {
     if (binary.op == .urem) return lowerUnsignedRem(selector, result_name, binary, bits);
-    const rhs = selector_state.resolveValue(selector, binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
-    const rhs_is_accumulator = switch (rhs) {
-        .eax => bits == 32,
-        .rax => bits == 64,
+    if (!ValueUseTransaction.isUnsignedQuotient(binary)) unreachable;
+    return lowerUnsignedQuotientValueUse(selector, result_name, binary, bits);
+}
+
+fn lowerUnsignedQuotientValueUse(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    binary: ir.BinaryInst,
+    bits: u16,
+) !?Diagnostic {
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const rhs_request = try transaction.register(.{
+        .source = binary.rhs,
+        .expected = .{
+            .ty = binary.ty,
+            .register_class = if (bits == 32) .gpr32 else .gpr64,
+        },
+        .form = .named_scalar_operand,
+        .destination = .prepared_source,
+    });
+    const lhs_request = try transaction.register(.{
+        .source = binary.lhs,
+        .expected = .{
+            .ty = binary.ty,
+            .register_class = if (bits == 32) .gpr32 else .gpr64,
+        },
+        .form = .named_scalar_operand,
+        .destination = .prepared_view,
+    });
+    try transaction.attachUnsignedQuotientAction(lhs_request, .{
+        .result = try ValueUseTransaction.ActionIdentity.init(result_name),
+        .integer_ty = binary.ty,
+        .rhs = rhs_request,
+    });
+    transaction.seal() catch |err|
+        return unsignedQuotientValueUseDiagnostic(&transaction, lhs_request, rhs_request, err) orelse return err;
+    transaction.prepare() catch |err|
+        return unsignedQuotientValueUseDiagnostic(&transaction, lhs_request, rhs_request, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return unsignedQuotientValueUseDiagnostic(&transaction, lhs_request, rhs_request, err) orelse return err;
+    const lease = transaction.preparedView(lhs_request) catch |err|
+        return unsignedQuotientValueUseDiagnostic(&transaction, lhs_request, rhs_request, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return unsignedQuotientValueUseDiagnostic(&transaction, lhs_request, rhs_request, err) orelse return err;
+    try transaction.commit();
+    return null;
+}
+
+fn unsignedQuotientValueUseDiagnostic(
+    transaction: *const ValueUseTransaction,
+    lhs_request: ValueUseTransaction.RequestHandle,
+    rhs_request: ValueUseTransaction.RequestHandle,
+    err: anyerror,
+) ?Diagnostic {
+    if (err == error.ValueUseActionDiagnostic) return transaction.actionDiagnostic();
+    const request_error = switch (err) {
+        error.ValueUseSourcePlanMissing,
+        error.ValueUseSourceIntervalMissing,
+        error.ValueUseSourceGenerationChanged,
+        error.ValueUseUnresolvedSource,
+        error.ValueUseExpiredSource,
+        error.ValueUseUnsupportedSource,
+        error.ValueUseTypeMismatch,
+        error.ValueUseRegisterClassMismatch,
+        error.ValueUseSourceViewMismatch,
+        error.ValueUseForwardPlanMissing,
+        error.ValueUseForwardPlanMalformed,
+        error.ValueUseForwardPlanStale,
+        error.ValueUseForwardIntervalExpired,
+        error.ValueUseForwardTypeMismatch,
+        error.ValueUseForwardAssignmentMissing,
+        error.ValueUseForwardSnapshotCapacityExceeded,
+        error.ValueUseNamedScalarFormUnsupported,
+        error.ValueUseNamedScalarWidthUnsupported,
+        error.ValueUseNamedScalarLocationUnsupported,
+        error.ValueUseUnsignedQuotientFormUnsupported,
+        error.ValueUseUnsignedQuotientWidthUnsupported,
+        error.ValueUseUnsignedQuotientLocationUnsupported,
+        => true,
         else => false,
     };
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-    defer transaction.deinit();
-    if (rhs_is_accumulator) {
-        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
-        if (try transaction.prepare(.preserve, accumulatorDirectMaterializationDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
-        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
-    } else {
-        if (try transaction.prepare(.preserve, accumulatorDirectMaterializationDisplacement(selector, binary.lhs, .spill_live))) |diagnostic| return diagnostic;
-        try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
-        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
-    }
-    try selector_state.clobberArgReg(selector, .rdx);
-    try emitArithmeticWrite(selector, .xor_edx_edx);
-    try selector_state.emitEflagsInstruction(selector, if (bits == 32) .{ .div_arg32 = .rcx } else .{ .div_arg64 = .rcx }, .clobber);
-    try finishArithmeticResult(&transaction, result_name, bits);
+    if (!request_error) return null;
+    if (transaction.failedRequestIs(rhs_request))
+        return .{ .unsupported_value = "composed-block-unknown-rhs" };
+    if (transaction.failedRequestIs(lhs_request))
+        return .{ .unsupported_value = "composed-block-unknown-lhs" };
     return null;
 }
 
@@ -1143,18 +1209,6 @@ fn accumulatorArithmeticDisplacement(
             .{ .reuse_source = name }
         else
             fallback,
-        else => fallback,
-    };
-}
-
-fn accumulatorDirectMaterializationDisplacement(
-    selector: *const ComposedBlockSelector,
-    value: ir.Value,
-    fallback: selector_state.AccumulatorDisplacementPolicy,
-) selector_state.AccumulatorDisplacementPolicy {
-    const source = selector_state.resolveValue(selector, value) orelse return fallback;
-    return switch (source) {
-        .eax, .rax => accumulatorLocDisplacement(value, source),
         else => fallback,
     };
 }
