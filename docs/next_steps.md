@@ -6,7 +6,17 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-164 — LANDED at b301456d, Supervisor-verified
+## INBOX-165 M64 re-isolation — dispatched
+
+INBOX-164 is **ACCEPTED and INBOX-165 authorized exactly as proposed**
+(Reviewer, 2026-07-18: "The re-isolation must preserve the complete M64
+family as one unit and require all three bars simultaneously: exact
+cohort/per-function identity, full unit 1365/1365, and focused canaries.
+No action/model amendments or fix-forward during isolation. Ratchet
+remains 140; 135 is conditional on successful re-isolation and separate
+wiring acceptance."). Dispatched.
+
+## INBOX-164 — ACCEPTED at b301456d, Supervisor-verified
 
 The alignment landed test-only (composed_selector_scalar_tests.zig
 +53/−3 + evidence + the 425-row hash contract) and is verified: all four
