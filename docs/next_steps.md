@@ -25,10 +25,11 @@ ratchet-131 baseline validation with new identities and guard-confined
 nonzero dynamic coverage of both accepted call routes, immutable retention,
 and the unchanged counterbalanced A/B contract. Execute none of it now.
 
-Preserve the clean user-authorized infrastructure boundary `9f84022c` plus
-`5555afb6` and watcher HEAD/index/worktree blob `75c9a932`. The superseded
-pre-commit working identity `accca76b` is not valid. Do not modify or stage
-the watcher; every tracked path must start and finish clean.
+Preserve the clean user-authorized infrastructure boundary `9f84022c`,
+`5555afb6`, and formatting-only `7bcb7fab`, with watcher HEAD/index/worktree
+blob `b64131cf`. The previous `75c9a932` and pre-commit `accca76b` identities
+are superseded. Do not modify, stage, or revert the watcher; every tracked
+path must start and finish clean.
 
 Run no project code, Zig, generation, materialization, pinning, selector,
 gate, performance, cleanup, network, source/tool/build/test/guard/inventory/
