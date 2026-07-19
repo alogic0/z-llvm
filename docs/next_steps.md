@@ -6,7 +6,18 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-171 — ALL THREE BUILDS PASS (c532fe82), Supervisor-verified
+## INBOX-172 quotient wiring (135 → 132/131) — dispatched
+
+INBOX-171 is **ACCEPTED and INBOX-172 authorized** (Reviewer,
+2026-07-19: "Wire UQ32 and UQ64 together, with the remainder
+dispatch/path unchanged. The ratchet must reach 132 from the three
+direct gateways; 131 is allowed only if the final production-owner
+recount proves accumulatorDirectMaterializationDisplacement has no
+remaining production owner. Guard/test references do not create credit
+or block a genuine production last-owner collapse."). On acceptance the
+quotient step is complete. Dispatched.
+
+## INBOX-171 — ALL THREE BUILDS PASS (c532fe82), ACCEPTED
 
 The re-isolation from the aligned tree succeeds completely: UQ32 alone,
 UQ64 alone, and the aggregate each pass all three bars (cohort/object/
