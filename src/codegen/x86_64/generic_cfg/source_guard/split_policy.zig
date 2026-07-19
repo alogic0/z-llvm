@@ -114,7 +114,77 @@ pub fn validateSplitValueUseTree(allocator: std.mem.Allocator) !void {
     }
     const combined_source = try allocator.dupeZ(u8, combined.writer.buffered());
     defer allocator.free(combined_source);
+    const calls_source = try std.Io.Dir.cwd().readFileAllocOptions(
+        io,
+        "src/codegen/x86_64/generic_cfg/value_use/actions/calls.zig",
+        allocator,
+        .limited(2 * 1024 * 1024),
+        .of(u8),
+        0,
+    );
+    defer allocator.free(calls_source);
+    const materialization_source = try std.Io.Dir.cwd().readFileAllocOptions(
+        io,
+        "src/codegen/x86_64/generic_cfg/value_use/materialization.zig",
+        allocator,
+        .limited(2 * 1024 * 1024),
+        .of(u8),
+        0,
+    );
+    defer allocator.free(materialization_source);
+    try validateAttachedCallRollbackAuthority(
+        calls_source,
+        materialization_source,
+        combined_source,
+    );
     try validateValueUseAuthoritySourceWithVisibility(combined_source, true);
+}
+
+pub fn validateAttachedCallRollbackAuthority(
+    calls_source: [:0]const u8,
+    materialization_source: [:0]const u8,
+    combined_source: [:0]const u8,
+) !void {
+    var calls_body_storage: [max_function_bodies]FunctionBody = undefined;
+    const calls_bodies = try collectFunctionBodies(calls_source, &calls_body_storage);
+    const execute = functionBodyNamed(calls_bodies, "executeAttachedCallAction") orelse
+        return error.ValueUseCallRollbackAuthorityMismatch;
+    const execute_source = calls_source[execute.start..execute.end];
+    if (countPattern(execute_source, "rollbackInternal") != 0)
+        return error.ValueUseCallRollbackAuthorityMismatch;
+
+    var materialization_body_storage: [max_function_bodies]FunctionBody = undefined;
+    const materialization_bodies = try collectFunctionBodies(
+        materialization_source,
+        &materialization_body_storage,
+    );
+    const materialize = functionBodyNamed(materialization_bodies, "materializeAll") orelse
+        return error.ValueUseCallRollbackAuthorityMismatch;
+    const materialize_source = materialization_source[materialize.start..materialize.end];
+    var combined_body_storage: [max_function_bodies]FunctionBody = undefined;
+    const combined_bodies = try collectFunctionBodies(combined_source, &combined_body_storage);
+    var structural_call_count: usize = 0;
+    for (combined_bodies) |body| {
+        const body_call_count = countPattern(
+            combined_source[body.start..body.end],
+            "executeAttachedCallAction(",
+        );
+        if (body_call_count == 0) continue;
+        if (!std.mem.eql(u8, body.name, "materializeAll") or body_call_count != 1)
+            return error.ValueUseCallRollbackAuthorityMismatch;
+        structural_call_count += body_call_count;
+    }
+    if (countPattern(
+        materialize_source,
+        "errdefer Authority.rollbackInternal(Authority, transaction);",
+    ) != 1 or
+        countPattern(materialize_source, "executeAttachedCallAction(") != 1 or
+        countPattern(materialization_source, "executeAttachedCallAction(") != 1 or
+        countPattern(combined_source, "executeAttachedCallAction(") != 2 or
+        structural_call_count != 1)
+    {
+        return error.ValueUseCallRollbackAuthorityMismatch;
+    }
 }
 
 pub fn appendNormalizedValueUseSource(writer: *std.Io.Writer, source: []const u8) !void {

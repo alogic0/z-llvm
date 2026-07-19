@@ -101,6 +101,13 @@ fn expectCallInstructions(
     }
 }
 
+fn expectCallRollbackStorageCleared(transaction: *const Transaction) !void {
+    try std.testing.expectEqual(Transaction.RequestPhase.registering, transaction.phase());
+    try std.testing.expectEqual(@as(usize, 0), transaction.requestCount());
+    try std.testing.expect(transaction.call_action == null);
+    try std.testing.expect(!transaction.call_action_executed);
+}
+
 test "value-use inline memcpy action owns exact preservation staging and call clobber" {
     var machine = MachineFunction.init("value-use-inline-memcpy", .void);
     defer machine.deinit(std.testing.allocator);
@@ -877,6 +884,7 @@ test "value-use dormant call rollback restores every declared mutation boundary"
         try std.testing.expectEqual(next_spill, selector.next_spill_slot);
         try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
         try selector.eflags.validateSnapshot(saved_flags);
+        try expectCallRollbackStorageCleared(&transaction);
     }
 
     var mask_machine = MachineFunction.init("value-use-int-byte-size-mask-rollback", .{ .int = 16 });
@@ -903,4 +911,65 @@ test "value-use dormant call rollback restores every declared mutation boundary"
     try std.testing.expectError(error.ValueUseCallTestFailure, mask_transaction.materializeAll());
     try std.testing.expectEqual(@as(usize, 0), mask_machine.instructions.items.len);
     try std.testing.expect(mask_selector.values.get("result") == null);
+    try expectCallRollbackStorageCleared(&mask_transaction);
+}
+
+test "value-use dormant call later argument failure rolls back earlier stages exactly once" {
+    var machine = MachineFunction.init("value-use-call-later-argument-rollback", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .push_rax);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "first", "second", "third" }) |name| try addAtCurrent(&plan, name);
+    try addLive(&plan, "live-rcx");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "first", .{ .spill64 = .slot3 });
+    try selector_state.bindValueLoc(&selector, "second", .{ .arg32 = .r8 });
+    try selector_state.bindValueLoc(&selector, "third", .{ .spill64 = .slot4 });
+    try selector_state.bindValueLoc(&selector, "live-rcx", .{ .arg64 = .rcx });
+    const first_binding = selector.values.get("first").?;
+    const second_binding = selector.values.get("second").?;
+    const third_binding = selector.values.get("third").?;
+    const live_binding = selector.values.get("live-rcx").?;
+    const saved_next_vreg = selector.next_virtual_reg;
+    const saved_next_spill = selector.next_spill_slot;
+    const saved_accumulator_domain = selector.accumulator_domain;
+    const saved_dependencies = selector.address_dependencies;
+    const saved_eflags = selector.eflags.snapshot();
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const first = try transaction.register(callRequest("first", .{ .int = 64 }));
+    const second = try transaction.register(callRequest("second", .{ .int = 32 }));
+    const third = try transaction.register(callRequest("third", .{ .int = 64 }));
+    try transaction.seal();
+    try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
+        "callee_later_failure",
+        null,
+        .void,
+        &.{ first, second, third },
+        &.{ .{ .int = 64 }, .{ .int = 32 }, .{ .int = 64 } },
+    ) });
+    try call_actions.setCallTestFailureForTest(&transaction, .after_argument, 2);
+    try transaction.prepare();
+    try std.testing.expectError(error.ValueUseCallTestFailure, transaction.materializeAll());
+
+    try std.testing.expectEqual(@as(usize, 1), machine.instructions.items.len);
+    try std.testing.expectEqual(machine_module.Instruction.push_rax, machine.instructions.items[0]);
+    try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+    try std.testing.expectEqual(first_binding, selector.values.get("first").?);
+    try std.testing.expectEqual(second_binding, selector.values.get("second").?);
+    try std.testing.expectEqual(third_binding, selector.values.get("third").?);
+    try std.testing.expectEqual(live_binding, selector.values.get("live-rcx").?);
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+    try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+    try std.testing.expectEqual(saved_accumulator_domain, selector.accumulator_domain);
+    try std.testing.expect(selector.address_dependencies.eql(&saved_dependencies));
+    try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+    try selector.eflags.validateSnapshot(saved_eflags);
+    try expectCallRollbackStorageCleared(&transaction);
 }

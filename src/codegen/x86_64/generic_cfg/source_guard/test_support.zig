@@ -117,6 +117,7 @@ pub const validateStoreActionProductionSites = consumers.validateStoreActionProd
 pub const validateDormantCallActionProductionSites = consumers.validateDormantCallActionProductionSites;
 pub const validateValueUseFacadeSource = split.validateValueUseFacadeSource;
 pub const validateSplitValueUseTree = split.validateSplitValueUseTree;
+pub const validateAttachedCallRollbackAuthority = split.validateAttachedCallRollbackAuthority;
 pub const appendNormalizedValueUseSource = split.appendNormalizedValueUseSource;
 pub const validateValueUseLeaf = split.validateValueUseLeaf;
 pub const validateScalarArithmeticFacadeSource = split.validateScalarArithmeticFacadeSource;

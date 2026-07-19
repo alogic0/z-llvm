@@ -1,21 +1,61 @@
-# INBOX-174 — dormant ordinary and intByteSize call actions
+# INBOX-174/174a — dormant ordinary and intByteSize call actions
 
-Status: implementation and the authorized dormant validation are complete;
-stopped before isolation. Production call routing is untouched, the O2 bypass
-ratchet remains 131, and no performance, strengthened Tier 2, or Tier 3
-command was run.
+Status: the dormant implementation and the bounded INBOX-174a exactly-once
+rollback correction are complete; stopped for review before isolation.
+Production call routing is untouched, the O2 bypass ratchet remains 131, and
+no performance, integrated-executable, strengthened Tier 2, distribution-all,
+or Tier 3 command was run.
+
+## INBOX-174a exactly-once rollback correction
+
+The accepted dormant source commit was `fb3ae403`; INBOX-174a was authorized
+by operating-doc commit `6d6fa37a`. The correction removes only the inner
+`rollbackInternal` `errdefer` from `executeAttachedCallAction`.
+`materializeAll` retains its single outer automatic rollback and is therefore
+the sole rollback invocation for failures from the attached call action.
+
+The structural guard now proves all of the following over the complete
+value-use production tree:
+
+```text
+executeAttachedCallAction.rollbackInternal_references=0
+materializeAll.outer_rollback_errdefers=1
+materializeAll.executeAttachedCallAction_calls=1
+complete_tree.executeAttachedCallAction_declaration_plus_calls=2
+alternate_executeAttachedCallAction_callers=0
+facade_manifest_change=none
+```
+
+Negative fixtures reject an inner rollback, a missing outer rollback,
+duplicate outer rollbacks, and an alternate caller. A new three-argument
+direct-call test injects failure after argument index 2, after caller-clobber
+preservation and all prior argument stages have mutated state. It proves the
+single outer rollback restores the pre-existing instruction prefix, every
+operand and live-clobber binding, spill registry and counters, accumulator
+domain, address dependencies, EFLAGS state and semantic-record length, owned
+labels, and all speculative instructions. Every call rollback boundary now
+also explicitly proves:
+
+```text
+phase=registering
+request_count=0
+call_action=null
+call_action_executed=false
+```
 
 ## Frozen basis and scope
 
 ```text
-authorization_commit=ed26c326ac140f6983d3ed079bfe162441a2600a
+INBOX_174_authorization_commit=ed26c326ac140f6983d3ed079bfe162441a2600a
+INBOX_174a_authorization_commit=6d6fa37ac79aef2a414f1722716638444fca1ceb
+INBOX_174_dormant_source_commit=fb3ae403
 accepted_INBOX_173=efcac24b
-validation_head_before_worker_commit=eb34b1d80419ebdfbc4b42eaf018898608715f81
-validation_head_delta_from_authorization=watcher-script/.gitignore infrastructure only
 accepted_semantic_ratchet=131 (unchanged)
 stash_at_0=INBOX-93 preserve B2B wiring plus five diagnosis tests (untouched)
 performance_run=none
+integrated_executable=not_run
 strengthened_tier2=not_run
+distribution_all=not_run
 tier3=not_run
 ```
 
@@ -141,7 +181,7 @@ forms gain no new capability.
 
 ## Focused dormant coverage
 
-Ten new call-action tests, plus the pre-existing memcpy tests in the same
+Eleven call-action tests, plus the pre-existing memcpy tests in the same
 leaf, cover:
 
 - zero-argument aligned void calls and unaligned framed calls;
@@ -153,7 +193,8 @@ leaf, cover:
 - sealed-only, exactly-one, two-tag-only attachment;
 - first-request provenance and post-lhs RHS validation timing;
 - retained i128/pair rejection and global copy-schedule rejection;
-- rollback after preservation, each argument stage, alignment, symbol
+- rollback after preservation, each argument stage including a three-argument
+  index-2 failure, alignment, symbol
   ownership, call append, unalignment, mask, result ownership, definition,
   and finalization.
 
@@ -169,16 +210,19 @@ or `attachCallAction`.
 ## Size and source budgets
 
 ```text
-actions/calls.zig=608 lines (hard ceiling 1200)
-actions/calls_tests.zig=906 lines (hard ceiling 1500)
+actions/calls.zig=607 lines (hard ceiling 1200)
+actions/calls_tests.zig=975 lines (hard ceiling 1500)
 model.zig=1889 lines (hard ceiling 1999)
 core.zig=1328 lines (hard ceiling 1499)
 composition.zig=277 lines (hard ceiling 399)
-calls_sha256=a6c892256711989542a2e57b74473ded555bd0c616c33d75a30088e4656d81a4
-calls_tests_sha256=f85e5258ce60e55c9332a839c715563530ed275177fc1d227852bb5f503456fa
+calls_sha256=90990dd80a6f31c085a7b09e286e8b52674fcf03f29be492c661239a8483cb4c
+calls_tests_sha256=a000850e9ce55011d1e6100d3cc77eaadc53320eb7fe50b51dbd5e3f44b45c17
 model_sha256=50f0596186c4deec9fbcd89e52beb45b32567f1c175467bbd42759f43e9dbd7c
 core_sha256=22026db467c9fc03c70a86f37ba6cb4323e744b63e2707fa38e34a85d92249c4
 composition_sha256=bcecd26f7faef31621695b940db55bcc4060bf12476c1803404d13f3ec95e82c
+source_guard/split_policy.zig_sha256=7453e5a7ec1ba7a62ba6c32fafc8d125abb6e23cb47f193fd8265c22548516e1
+source_guard/split_policy_tests.zig_sha256=77957c9421fe1b4bbb6e93a5a33342dc4a75c0563dd1390aa9c588101f1ebea6
+source_guard/test_support.zig_sha256=0c5ff6c31a2783b6b2e77c96079360f68b82bd10bb20db6a12068dd7a420777f
 ```
 
 The transaction layout proof is updated for the fixed inline action storage:
@@ -192,20 +236,20 @@ copies.
 The full report's intentional exit status is 1:
 
 ```text
-command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --report-all-codegen-failures --target=x86_64-linux --input-limit=67108864 tmp/inbox92_second_resume2_perf/compiler_rt_frozen.ll >/dev/null 2>tmp/inbox174_o2_calls_dormant/validation/fresh_full_report.log
+command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --report-all-codegen-failures --target=x86_64-linux --input-limit=67108864 tmp/inbox92_second_resume2_perf/compiler_rt_frozen.ll >/dev/null 2>tmp/inbox174a_o2_call_rollback/validation/fresh_full_report.log
 report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681
 selected/emitted/failed=443/285/158
 first_failure=compiler_rt.trunc.truncl/UnsupportedLongDoubleAbi
 ```
 
 ```text
-command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll >tmp/inbox174_o2_calls_dormant/validation/accepted.o 2>tmp/inbox174_o2_calls_dormant/validation/accepted.stderr
+command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll >tmp/inbox174a_o2_call_rollback/validation/accepted.o 2>tmp/inbox174a_o2_call_rollback/validation/accepted.stderr
 accepted_object_sha256=061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be
 stderr_bytes=0
 ```
 
 ```text
-command=LC_ALL=C zig-out/bin/z_llvm --emit=selection-owner-manifest --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll >tmp/inbox174_o2_calls_dormant/validation/owner_manifest.tsv 2>tmp/inbox174_o2_calls_dormant/validation/owner_manifest.stderr
+command=LC_ALL=C zig-out/bin/z_llvm --emit=selection-owner-manifest --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll >tmp/inbox174a_o2_call_rollback/validation/owner_manifest.tsv 2>tmp/inbox174a_o2_call_rollback/validation/owner_manifest.stderr
 owner_manifest_sha256=5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d
 owner_breakdown=composed_block:40,composed_cfg:127,legacy_envelope:17,structural_fallback:101
 owner_ledger=167/17/101
@@ -222,35 +266,35 @@ Every retained log is paired with its exact command.
 ### Source guard
 
 ```text
-command=set -o pipefail; /home/oleg/bin/zig test src/codegen/x86_64/generic_cfg/composed_selector_source_guard_tests.zig 2>&1 | tee tmp/inbox174_o2_calls_dormant/validation/source_guard.log
-result=59/59_tests
-log_sha256=432bcb2bad4031448561d715d2a415a1ec237dccc1343c536a2df26ca22e1938
+command=set -o pipefail; /home/oleg/bin/zig test src/codegen/x86_64/generic_cfg/composed_selector_source_guard_tests.zig 2>&1 | tee tmp/inbox174a_o2_call_rollback/validation/source_guard.log
+result=60/60_tests
+log_sha256=bd11d5154f06d30ad22bd06428ee62cf54320aa4b30d3f7b7516062ab1b2c0b6
 ```
 
 ### Full unit
 
 ```text
-command=set -o pipefail; /home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox174_o2_calls_dormant/validation/full_unit.log >/dev/null
-result=7/7_steps,1387/1387_tests
-log_sha256=a46440eed0c929abb45a2aefc8f9aba78faf62b49f065f9a919fbe1c655d42cb
+command=set -o pipefail; /home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox174a_o2_call_rollback/validation/full_unit.log
+result=7/7_steps,1389/1389_tests
+log_sha256=2f68b688f3e55a88dee54784e7b1a022d74b667bb976a8d66f450cfc29e7911c
 ```
 
 ### ABI differential
 
 ```text
-command=set -o pipefail; /home/oleg/bin/zig build abi-differential --summary all 2>&1 | tee tmp/inbox174_o2_calls_dormant/validation/abi_differential.log >/dev/null
+command=set -o pipefail; /home/oleg/bin/zig build abi-differential --summary all 2>&1 | tee tmp/inbox174a_o2_call_rollback/validation/abi_differential.log
 result=5/5_steps,60/60_cases,30/30_real_functions
-log_sha256=dd2d12377a87097eed5dc9fd4e59dbc0514e1deda3227c2e71abadd08c82d8a9
+log_sha256=e86e582ec2e9f319dd5306f591cedc737c1d1ca5053e7f5dcf8f495fda7a939c
 ```
 
 ### Focused codegen canaries
 
 ```text
-command=set -o pipefail; /home/oleg/bin/zig build focused-codegen-canaries --summary all 2>&1 | tee tmp/inbox174_o2_calls_dormant/validation/focused_canaries.log >/dev/null
+command=set -o pipefail; /home/oleg/bin/zig build focused-codegen-canaries --summary all 2>&1 | tee tmp/inbox174a_o2_call_rollback/validation/focused_canaries.log
 result=2/2_steps,2/2_canaries,35/35_execution_cases,__multi3_green,fma_green,no_host_libc_substitution
 log_sha256=d704046eacfa8c3c2cf852ed97c86ab42b5a6a07dcfe4dd7de48cb870f2292c6
 ```
 
-No integrated-executable, performance, strengthened Tier 2, distribution-all,
-or Tier 3 command was run. INBOX-174 stops here before ordinary-call,
+No isolation, integrated-executable, performance, strengthened Tier 2,
+distribution-all, or Tier 3 command was run. INBOX-174a stops here before ordinary-call,
 `intByteSize`, or aggregate isolation.

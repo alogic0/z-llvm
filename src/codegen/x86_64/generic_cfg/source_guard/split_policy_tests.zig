@@ -92,6 +92,7 @@ const validateBranchActionProductionSites = support.validateBranchActionProducti
 const validateStoreActionProductionSites = support.validateStoreActionProductionSites;
 const validateValueUseFacadeSource = support.validateValueUseFacadeSource;
 const validateSplitValueUseTree = support.validateSplitValueUseTree;
+const validateAttachedCallRollbackAuthority = support.validateAttachedCallRollbackAuthority;
 const appendNormalizedValueUseSource = support.appendNormalizedValueUseSource;
 const validateValueUseLeaf = support.validateValueUseLeaf;
 const validateScalarArithmeticFacadeSource = support.validateScalarArithmeticFacadeSource;
@@ -140,6 +141,79 @@ test "value-use split guard rejects facade widening and internal production impo
         validateProductionSource(
             "composed_selector_scalar.zig",
             "@import(\"value_use/model.zig\");",
+        ),
+    );
+}
+
+test "value-use call rollback guard enforces exactly one outer automatic rollback" {
+    const calls_source =
+        "pub fn executeAttachedCallAction(comptime Authority: type, transaction: anytype, action: anytype) !void {\n" ++
+        "    try executeDirectCall(Authority, transaction, action);\n" ++
+        "}\n";
+    const materialization_source =
+        "pub fn materializeAll(comptime Authority: type, transaction: anytype) !void {\n" ++
+        "    errdefer Authority.rollbackInternal(Authority, transaction);\n" ++
+        "    try Authority.executeAttachedCallAction(Authority, transaction, action);\n" ++
+        "}\n";
+    const combined_source = calls_source ++ materialization_source;
+    try validateAttachedCallRollbackAuthority(
+        calls_source,
+        materialization_source,
+        combined_source,
+    );
+
+    const inner_rollback =
+        "pub fn executeAttachedCallAction(comptime Authority: type, transaction: anytype, action: anytype) !void {\n" ++
+        "    errdefer Authority.rollbackInternal(Authority, transaction);\n" ++
+        "    try executeDirectCall(Authority, transaction, action);\n" ++
+        "}\n";
+    try std.testing.expectError(
+        error.ValueUseCallRollbackAuthorityMismatch,
+        validateAttachedCallRollbackAuthority(
+            inner_rollback,
+            materialization_source,
+            inner_rollback ++ materialization_source,
+        ),
+    );
+
+    const missing_outer =
+        "pub fn materializeAll(comptime Authority: type, transaction: anytype) !void {\n" ++
+        "    try Authority.executeAttachedCallAction(Authority, transaction, action);\n" ++
+        "}\n";
+    try std.testing.expectError(
+        error.ValueUseCallRollbackAuthorityMismatch,
+        validateAttachedCallRollbackAuthority(
+            calls_source,
+            missing_outer,
+            calls_source ++ missing_outer,
+        ),
+    );
+
+    const duplicate_outer =
+        "pub fn materializeAll(comptime Authority: type, transaction: anytype) !void {\n" ++
+        "    errdefer Authority.rollbackInternal(Authority, transaction);\n" ++
+        "    errdefer Authority.rollbackInternal(Authority, transaction);\n" ++
+        "    try Authority.executeAttachedCallAction(Authority, transaction, action);\n" ++
+        "}\n";
+    try std.testing.expectError(
+        error.ValueUseCallRollbackAuthorityMismatch,
+        validateAttachedCallRollbackAuthority(
+            calls_source,
+            duplicate_outer,
+            calls_source ++ duplicate_outer,
+        ),
+    );
+
+    const extra_caller =
+        "fn hiddenCall(comptime Authority: type, transaction: anytype, action: anytype) !void {\n" ++
+        "    try Authority.executeAttachedCallAction(Authority, transaction, action);\n" ++
+        "}\n";
+    try std.testing.expectError(
+        error.ValueUseCallRollbackAuthorityMismatch,
+        validateAttachedCallRollbackAuthority(
+            calls_source,
+            materialization_source,
+            combined_source ++ extra_caller,
         ),
     );
 }

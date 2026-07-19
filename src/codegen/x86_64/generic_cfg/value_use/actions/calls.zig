@@ -152,7 +152,6 @@ pub fn executeAttachedCallAction(
     transaction: anytype,
     action: *const Types.PreparedAction,
 ) !void {
-    errdefer Authority.rollbackInternal(Authority, transaction);
     switch (action.*) {
         .direct_call => |*direct| try executeDirectCall(Authority, transaction, direct),
         .int_byte_size_call => |*specialized| try executeIntByteSizeCall(Authority, transaction, specialized),
