@@ -10,9 +10,12 @@ after that, this entry controls until another explicit directive replaces it.
 
 INBOX-178a at `3a7ab346` is accepted as a compliant hard-stop and evidence
 record. Overall INBOX-178 remains unaccepted; isolation and wiring remain
-unauthorized. Begin from clean `3a7ab346`, with `462154a1` as the exact
-pre-fix semantic baseline and the retained INBOX-178a proof/logs as
-provenance.
+unauthorized. Proceed from user-amended composite HEAD `5e1cb6f1`, with
+`462154a1` as the exact pre-fix semantic baseline, `3a7ab346` as the
+accepted stop/evidence commit, `28e46b9f` as the tracked authorization, and
+the retained INBOX-178a proof/logs as provenance. User-authorized
+infrastructure commit `5e1cb6f1` removes only the watcher pause clause and
+grants no additional INBOX-178b code authority.
 
 Amend only the call-local shared authority used by
 `spillLiveCallerClobbersForCall`. Snapshot every live logical alias of the
@@ -37,8 +40,10 @@ No public/facade helper, import/test leaf, action tag/form/destination,
 callback, planning edge, consumer query, generic-Q1 change, scheduler,
 routing/classifier change, bypass/ratchet credit, or budget exception.
 Freeze production call routing, `intByteSize`, facade/126-symbol manifest,
-imports, bypass inventory, ratchet 131, retention surfaces, watcher loop,
-and stash.
+imports, bypass inventory, ratchet 131, retention surfaces, and stash.
+Freeze the watcher loop at user-authorized `5e1cb6f1` blob
+`8f3be1dd08dadc6f42ede169ca05e84daae773ab`; do not restore or commit prior
+blob `c4cf987d`.
 
 Run only full unit, standalone guard, ABI, canaries, and fresh exact
 object/owner. Preserve the absent-443-row exception and retained historical
