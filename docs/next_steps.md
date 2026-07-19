@@ -6,17 +6,17 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-176 ordinary-call failure diagnosis — AUTHORIZED, PAUSED; NOT DISPATCHED
+## INBOX-176 ordinary-call failure diagnosis — AUTHORIZED for dispatch
 
 The Reviewer accepts `fd48a962` as compliant INBOX-175 stop evidence, but
 does **not** accept the ordinary family or the incomplete matrix. Ordinary
 remains retained wholesale; `zig.target.intByteSize` and aggregate isolation
 remain unauthorized.
 
-Dispatch is paused for the user-authorized clean-boundary integration of the
-separately tested clean-tmp tooling commit `6804846c`. That infrastructure
-coordination does not alter the INBOX-175 technical judgment and does not
-authorize the Worker to start INBOX-176.
+Dispatch is authorized from composite HEAD `dc8609a4`. The separately tested
+clean-tmp tooling patch `6804846c` was integrated byte-for-byte at the clean
+boundary. Use `c1ffd1cc` as the exact codegen-source baseline and `dc8609a4`
+as the composite provenance HEAD.
 
 When separately dispatched, INBOX-176 is diagnostic/evidence-only. Reapply
 the exact retained ordinary patch from the clean `c1ffd1cc` dormant source
@@ -46,6 +46,10 @@ commit evidence only; ratchet 131; stash untouched; STOP for review.
 No full unit or isolation rerun, `intByteSize`/aggregate build, canaries, ABI,
 standalone source guard, performance, integrated-exe, strengthened Tier 2,
 distribution-all, Tier 3, production wiring, or ratchet credit.
+
+The retention tooling and policy files are out of scope and must remain
+byte-identical to `dc8609a4`. Do not execute `clean-tmp`, delete retained
+artifacts, or infer cleanup authority from the infrastructure commit.
 
 ## INBOX-175 isolation — COMPLIANT STOP evidence ACCEPTED at fd48a962; families NOT accepted
 
