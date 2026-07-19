@@ -6,7 +6,21 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-172 quotient wiring (135 → 132/131) — dispatched
+## INBOX-172 quotient wiring — LANDED at dc96b63d + perf 2af10ae7, Supervisor-verified
+
+The quotient wiring landed and is fully verified: **ratchet 131** — the
+last-owner collapse PROVED (the final source contains neither a
+declaration nor a call of accumulatorDirectMaterializationDisplacement;
+both production callers lived in the replaced quotient branch); the TSV
+removed exactly the two proven rows; the dormant value_use surface
+frozen (empty diff); the urem dispatch and remainder path unchanged;
+identities EXACT (49a19f04 / 061a64e4 / 5d91960e — the cohort did not
+move); all six gate log hashes match; counterbalanced perf PASSED
+(median Δ +0.385s vs the allowance, paired ratio 1.006311, RSS pass,
+overall PASS, no rerun); MY abi + canary reruns pass; no Tier 3. Sent to
+the Reviewer for the acceptance that completes THE QUOTIENT STEP AT 131.
+
+## Former INBOX-172 dispatch entry — superseded by the landing above
 
 INBOX-171 is **ACCEPTED and INBOX-172 authorized** (Reviewer,
 2026-07-19: "Wire UQ32 and UQ64 together, with the remainder
