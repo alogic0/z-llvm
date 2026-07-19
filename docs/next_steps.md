@@ -6,26 +6,25 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-180a `intByteSize` bypass-transition re-isolation — AUTHORIZED
+## INBOX-181 ordinary + `intByteSize` aggregate re-isolation — AUTHORIZED
 
-INBOX-180 at `81644889` is accepted as a compliant stop/evidence record.
-`intByteSize` remains retained and unaccepted; ordinary remains individually
-accepted; production remains dormant and ratchet remains 131. The confirmed
-failure is incomplete temporary guard accounting: specialized wiring removes
-the sole `lowerIntByteSizeCall/emitValueIntoScratch` occurrence while the
-canonical inventory still expects one.
+INBOX-180a at `a34815ba` and the `intByteSize` family are accepted as
+individually isolated and byte-identical. Ordinary remains individually
+accepted from INBOX-179. Production remains dormant, ratchet remains 131,
+and no wiring or credit is accepted.
 
-Preserve the first attempt. Reuse its exact consumer semantics unchanged.
-Extend only the temporary guard patch with a fail-closed overlay for the exact
-calls-file/function/operation tuple: expected one may be actual zero only
-when the complete reviewed `IntByteSizeCallAction` lifecycle is present and
-the function has zero legacy occurrences.
+Generate a fresh minimal combined temporary patch against the accepted
+dormant tree; do not concatenate the individual retained patches blindly.
+Activate only the accepted ordinary GPR/pointer `DirectCallAction` route and
+the accepted `zig.target.intByteSize` `IntByteSizeCallAction` route together.
+Keep every other call family legacy.
 
-Keep the canonical TSV/hash and permanent guard policy unchanged. Reject
-coexistence with the legacy gateway, partial specialized wiring,
-ordinary/aggregate activation, and every unrelated inventory mismatch.
-Add narrow negative fixtures in existing guard-test leaves. No dead/comment
-token, general exemption, action/model/facade widening, public API, or credit.
+Use a separate, exact combined temporary guard mode. Require both complete
+reviewed lifecycles simultaneously, permit only the exact `intByteSize`
+one-to-zero bypass transition, and reject partial activation, legacy
+coexistence, cross-family markers, unrelated inventory changes, and use
+outside the two approved functions. Do not weaken either individual policy
+or change the canonical TSV/hash or permanent guard policy.
 
 Run blocking bars in strict stop-on-failure order:
 
@@ -35,11 +34,21 @@ Run blocking bars in strict stop-on-failure order:
 3. All 35 focused canaries.
 4. Standalone ABI `60/60` plus `30/30` real functions.
 
-Stop immediately on failure without diagnosis/fix-forward. No fresh/substitute
-report, aggregate isolation, wiring, credit, performance, higher-tier gates,
-or cleanup. Restore all temporary consumer/guard/test changes exactly, retain
-both attempts, commit only the INBOX-180a evidence summary, preserve
-stash/watcher/retention/bypass surfaces, and STOP before aggregate or wiring.
+Stop immediately on failure without diagnosis/fix-forward. The historical
+report remains reference-only; no fresh/substitute report is permitted. No
+production wiring, ratchet credit, performance, higher-tier gates, or
+cleanup. Restore all temporary source/guard/test changes exactly, retain the
+complete aggregate attempt and provenance, commit only the INBOX-181 evidence
+summary, preserve stash/watcher/retention/bypass surfaces, and STOP before
+wiring or credit.
+
+## INBOX-180a `intByteSize` bypass-transition re-isolation — ACCEPTED at a34815ba
+
+All four blocking bars pass with exact object/owner, `285/0/0` per-function
+identity, unit `1399/1399`, guard `63/63`, canaries `35/35`, and ABI
+`60/60 + 30/30`. The exact temporary bypass-transition overlay passed its
+negative fixtures, both attempts were retained, temporary changes were
+removed, production remains dormant, and ratchet remains 131.
 
 ## INBOX-180 `intByteSize` re-isolation — COMPLIANT STOP at 81644889
 
