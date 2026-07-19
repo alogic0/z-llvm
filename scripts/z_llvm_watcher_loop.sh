@@ -69,19 +69,34 @@ It's from Watcher:
 7. After agreement, add the new directive to docs/worker_inbox.md, update docs/next_steps.md to the sole current authorized action, commit only tracked operating-document changes, and dispatch the agreed task to worker:0.0 using tmux bracketed paste.
 8. Confirm the Worker acknowledged the directive and its stop conditions.
 
-Proceed autonomously on Watcher/Reviewer agreement. A failed acceptance blocks
-wider advancement, but it does not block a bounded diagnosis or remediation
-that the Reviewer explicitly authorizes. Dispatch that agreed corrective slice.
+DECISION AUTHORITY:
+- Watcher and Reviewer mutual agreement is sufficient authority for every
+  non-destructive next-step decision, including acceptance judgments,
+  benchmark/workload selection, protocol and identity amendments,
+  materialization and pinning, validation, remediation, and bounded scope
+  changes. Do not ask the user to choose among options or wait for user
+  approval after mutual agreement.
+- A failed acceptance blocks wider advancement, but it does not block an
+  agreed diagnosis or remediation. Dispatch that corrective slice.
+- If no currently proposed option is acceptable, jointly define the smallest
+  reversible evidence, design, validation, or implementation task that reduces
+  the blocker, record its limits, and dispatch it. Do not leave the Worker idle
+  merely because a decision is material or changes an acceptance protocol.
+- Avoid destructive or irreversible actions. When one appears necessary,
+  choose and dispatch a reversible preparatory alternative instead.
+- Communicate decisions and relevant dialogue to the user as status updates,
+  not approval requests. Communicate every agreed directive to the Worker and
+  confirm acknowledgment.
 EOF
 )
 
 WORKER_STOPPED_MESSAGE=$(cat <<'EOF'
-The monitoring script detected that the Worker has stopped. Inspect worker:0.0 now and determine what it completed. Verify the source diff and retained logs without running project code. Then discuss acceptance and the next bounded task with the Reviewer on worker:1.0; begin every Reviewer message exactly with "It's from Watcher:". Obtain explicit agreement before updating the operating documents or assigning another task to the Worker. If acceptance failed but the Reviewer authorizes a bounded diagnosis or remediation, dispatch that corrective slice; failed acceptance alone is not a reason to leave the Worker idle.
+The monitoring script detected that the Worker has stopped. Inspect worker:0.0 now and determine what it completed. Verify the source diff and retained logs without running project code. Then discuss acceptance and the next bounded task with the Reviewer on worker:1.0; begin every Reviewer message exactly with "It's from Watcher:". Watcher/Reviewer mutual agreement is sufficient for all non-destructive decisions, including benchmark/workload selection, protocol or identity amendment, materialization, pinning, validation, remediation, and bounded scope changes. Do not ask the user to choose or wait for user approval. After agreement, update the operating documents, dispatch the agreed task to the Worker, and confirm acknowledgment. If acceptance failed, dispatch the agreed corrective slice. If no proposed option is acceptable, jointly define and dispatch the smallest reversible task that reduces the blocker.
 EOF
 )
 
 WORKER_STILL_STOPPED_MESSAGE=$(cat <<'EOF'
-Reminder: the Worker remains stopped after the previous notification. Check whether the Worker/Reviewer review produced an agreed next action. If the Reviewer authorized a bounded diagnosis or remediation after withheld acceptance, update the operating documents and dispatch it now. Leave the Worker stopped only for Reviewer disagreement, no mutually agreed safe bounded task, a destructive/irreversible/materially scope-expanding action requiring the user, or a genuine structural blocker; report that blocker explicitly.
+Reminder: the Worker remains stopped after the previous notification. Reach Watcher/Reviewer agreement and dispatch the agreed next task now; do not wait for user selection or approval. Mutual agreement is sufficient for non-destructive benchmark/workload, protocol, identity, materialization, pinning, validation, remediation, and bounded-scope decisions. If the current options remain unacceptable, agree on and dispatch the smallest reversible evidence, design, validation, or implementation task that reduces the blocker. Communicate the decision to the user as a status update and confirm the Worker's acknowledgment.
 EOF
 )
 
