@@ -6,35 +6,44 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-182 frozen performance-input recovery audit — AUTHORIZED
+## INBOX-183 calls performance-protocol amendment design — AUTHORIZED
 
-INBOX-181 at `5f076e52`, the aggregate ordinary+`intByteSize` matrix, and
-both families are accepted as ready for a future combined production-wiring
-slice. Production remains dormant and ratchet remains 131.
+INBOX-182 at `5e84e795` is accepted as a compliant, exhaustive
+repository-local no-candidate stop. It does not prove the historical input
+cannot exist externally. Under the frozen procedure, production wiring
+remains blocked; no substitute or protocol amendment is accepted.
 
-Production wiring is blocked under the accepted procedure because the exact
-standing performance input
-`tmp/inbox92_second_resume2_perf/compiler_rt_frozen.ll`, SHA-256
-`7c91f5f602ec45c57a96ad82d1e097c47a47df7b00809800ebcefc3fccf6760b`,
-is absent and was not retention-pinned. The 285-row cohort and different-hash
-regenerations are not substitutes.
+Produce a non-binding evidence-only design. Using retained evidence and
+existing files only, separate the performance gate's measurement invariants
+from the lost historical input identity, compare repository-local candidate
+foundations, and keep every candidate unauthorized under the current
+protocol. Record hashes, sizes, provenance gaps, proven population/coverage,
+representativeness risks, retention status, and required future authority.
 
-Perform an evidence-only, repository-local recovery audit. Inventory retained
-files, detached worktrees, archives, caches, Git objects/reflogs, manifests,
-and historical evidence for an already-existing byte-exact blob or lossless
-archived member. Hash Git objects and archive members by streaming only; do
-not check out, extract, copy, rename, synthesize, normalize, or pin anything.
-For any archived match, record container hash and exact member
-identity/metadata plus the decompressed-content target hash.
+Every candidate option must include a future ratchet-131 baseline-validation
+stage that establishes exact pinned bytes and a complete generation/source/
+tool manifest, deterministic repeated outputs, verified dynamic coverage of
+both accepted call routes, newly named report/object/owner identities, and
+immutable retention and reproducibility before any A/B wiring comparison.
+Do not run that validation now.
 
-Trace the INBOX-92 provenance and generation chain from retained evidence,
-but do not execute reconstruction even if it appears deterministic. Run no
-project code, build, test, report, gate, performance, network, cleanup, Git
-maintenance, reflog expiration, garbage collection, or deletion.
+Freeze the standing counterbalanced sampling and pass criteria in the design,
+separate all future decision stages, and identify each material acceptance-
+gate change requiring user authorization. Do not select a replacement, amend
+the protocol, materialize/generate/pin an input, execute project code, or
+authorize wiring.
 
-Commit only the INBOX-182 audit document. Preserve all source, artifacts,
-retention surfaces, the watcher, bypass inventory, stash, and ratchet 131,
-then STOP before recovery, protocol amendment, or production wiring.
+Commit only the INBOX-183 design document. Preserve source, retained
+artifacts, retention surfaces, watcher, bypass inventory, stash, and ratchet
+131, then STOP before protocol adoption, baseline validation, or wiring.
+
+## INBOX-182 frozen performance-input recovery audit — ACCEPTED at 5e84e795
+
+The repository-local audit covered 731,797 regular files, 17,194 streamed
+Git blobs, registered worktrees, caches, reflogs, and all detected archive
+members without finding the exact target. Retained evidence lacks the full
+deterministic creation chain. No recovery, reconstruction, gate, performance,
+cleanup, protocol change, or wiring occurred; ratchet remains 131.
 
 ## INBOX-181 ordinary + `intByteSize` aggregate re-isolation — ACCEPTED at 5f076e52
 
