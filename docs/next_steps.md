@@ -6,34 +6,52 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-187B compiler-rt v1 execution-order and canonical-status closure — AUTHORIZED
+## INBOX-187C compiler-rt v1 canonical-driver argument-binding closure — AUTHORIZED
 
-INBOX-187A at `527340b6` is not accepted as a closed execution contract.
-It fixed raw-input/subset ambiguity, but both coverage phases read object,
-owner, objdump, and per-function identities before producing them. Canonical
-status files consumed later also lack exact producing commands. Validation
-remains unauthorized.
+INBOX-187B at `22da533a` is not accepted as a closed execution contract.
+Its owner-ledger command passes the report summary as Bash `$3`, but never
+binds that argument to the `awk` variable used by
+`getline line < summary`. The exact driver therefore fails during canonical
+repetition 1. Validation remains unauthorized.
 
-Amend only the existing contract. Move successful-subset identity checks
-after their producers. Freeze one exact canonical Bash driver with unique
-stdout, stderr, status, command, environment, and timing records for every
-build/report/parser/extract/object/owner/inspection/per-function/frontier/
-ledger/comparison command. Expected-nonzero commands must explicitly disable
-immediate exit only around one producer, capture `$?`, atomically record it,
-restore strict mode, and validate the expected status. No `|| true`,
-status-obscuring pipeline, or implicit shell state is allowed.
+Amend only the existing contract. Bind the exact report-summary argument,
+then add and audit a complete ledger for every canonical and coverage
+`/bin/bash -c` invocation: explicit `$0` sentinel, every positional-argument
+mapping, shell-variable binding, `awk -v` binding and consumed path,
+producer-before-consumer order, and unique status producer. Fix only
+additional same-class documentation defects found by that audit and record
+each correction. Preserve the corrected producer ordering, one canonical
+`accepted.ll` producer, all paths/statuses, validation semantics, protocol
+identities, thresholds, and calls sequence.
 
-Add a complete file-and-directory producer-before-consumer ledger: exactly
-one producer per generated path, every producer before its consumers,
-pairwise-disjoint canonical/off/on roots, and exact hash/mode checks for all
-preflight-immutable inputs. Canonical `accepted.ll` is produced once and
-coverage only consumes it.
-
-Do not modify the accepted patch bundle. Run no project code, build,
-validation, coverage, gate, performance, wiring, pin edit, cleanup, or
-credit. Commit only the amended contract, remove stale closed disposition,
+Do not modify the accepted patch bundle or any source. Run only static
+syntax/source checks and read-only bundle/apply/restoration/frozen-identity
+checks. Run no project code, build, validation, coverage, gate, performance,
+wiring, pin edit, cleanup, or credit. Commit only the amended contract,
 preserve ratchet 131 and every frozen surface, and stop again before
 execution.
+
+## Mandatory post-calls evidence/design checkpoint — FUTURE BLOCKING BOUNDARY
+
+The current calls sequence is unchanged: accepted baseline validation,
+combined ordinary + `intByteSize` production wiring, correctness gates,
+`131 -> 130` recount, then post-final-tree performance acceptance.
+
+After that sequence, no O2-4/O2-5/O2-6 dormant or wiring implementation is
+authorized until a mandatory evidence/design checkpoint is reviewed and
+accepted. The checkpoint must pair the textual bypass ratchet, semantic
+authority/ownership inventory, and executed-route coverage; include residual
+R03/R04 and pair/PHI/fixed-register/cycle owners; and map value-location,
+liveness, spill, alias, and register-allocation responsibilities. Upstream
+LLVM separation is comparative evidence only, not an implementation to copy.
+Existing no-Tier-3 sequencing remains in force.
+
+## INBOX-187B execution-order and canonical-status closure — WITHHELD at 22da533a
+
+Producer ordering, canonical status production, the single canonical
+`accepted.ll` producer, and generated-path ledger are corrected. Closed
+acceptance is withheld because the canonical owner-ledger leaves its third
+report-summary argument unbound.
 
 ## INBOX-187A coverage-command closure — WITHHELD at 527340b6
 
