@@ -1224,8 +1224,24 @@ test "generic cfg selector lowers named i32 unsigned less-than" {
 test "generic cfg selector lowers named i32 unsigned division and remainder" {
     var quotient_machine = MachineFunction.init("udiv-i32-named", .{ .int = 32 });
     defer quotient_machine.deinit(std.testing.allocator);
+    var quotient_plan = try allocateSelectorIntervals(std.testing.allocator, &.{
+        .{ .name = "lhs", .class = .gpr32, .bits = 32, .start = 0, .end = 1 },
+        .{ .name = "rhs", .class = .gpr32, .bits = 32, .start = 0, .end = 1 },
+    });
+    defer quotient_plan.deinit();
+    try std.testing.expectEqual(
+        PlannedValueAssignment{ .gpr32 = .rdi },
+        quotient_plan.assignment("lhs").?,
+    );
+    try std.testing.expectEqual(
+        PlannedValueAssignment{ .gpr32 = .rsi },
+        quotient_plan.assignment("rhs").?,
+    );
     var quotient_selector = ComposedBlockSelector.init(std.testing.allocator, &quotient_machine);
     defer quotient_selector.deinit();
+    quotient_selector.allocation_plan = &quotient_plan;
+    quotient_selector.current_position = 1;
+    try std.testing.expectEqual(@as(usize, 0), quotient_selector.address_dependencies.count());
     try selector_state.bindValueLoc(&quotient_selector, "lhs", .{ .arg32 = .rdi });
     try selector_state.bindValueLoc(&quotient_selector, "rhs", .{ .arg32 = .rsi });
 
@@ -1245,8 +1261,24 @@ test "generic cfg selector lowers named i32 unsigned division and remainder" {
 
     var remainder_machine = MachineFunction.init("urem-i32-named", .{ .int = 32 });
     defer remainder_machine.deinit(std.testing.allocator);
+    var remainder_plan = try allocateSelectorIntervals(std.testing.allocator, &.{
+        .{ .name = "lhs", .class = .gpr32, .bits = 32, .start = 0, .end = 1 },
+        .{ .name = "rhs", .class = .gpr32, .bits = 32, .start = 0, .end = 1 },
+    });
+    defer remainder_plan.deinit();
+    try std.testing.expectEqual(
+        PlannedValueAssignment{ .gpr32 = .rdi },
+        remainder_plan.assignment("lhs").?,
+    );
+    try std.testing.expectEqual(
+        PlannedValueAssignment{ .gpr32 = .rsi },
+        remainder_plan.assignment("rhs").?,
+    );
     var remainder_selector = ComposedBlockSelector.init(std.testing.allocator, &remainder_machine);
     defer remainder_selector.deinit();
+    remainder_selector.allocation_plan = &remainder_plan;
+    remainder_selector.current_position = 1;
+    try std.testing.expectEqual(@as(usize, 0), remainder_selector.address_dependencies.count());
     try selector_state.bindValueLoc(&remainder_selector, "lhs", .{ .arg32 = .rdi });
     try selector_state.bindValueLoc(&remainder_selector, "rhs", .{ .arg32 = .rsi });
 
@@ -1299,15 +1331,26 @@ test "accumulator-resident named i32 shift keeps accepted direct materialization
 test "accumulator-resident udiv lhs keeps accepted fixed-register stream" {
     var machine = MachineFunction.init("udiv-i32-accumulator-lhs", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);
-    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    var plan = try allocateSelectorIntervals(std.testing.allocator, &.{
+        .{ .name = "lhs", .class = .gpr32, .bits = 32, .start = 0, .end = 9 },
+        .{ .name = "rhs", .class = .gpr32, .bits = 32, .start = 1, .end = 4 },
+    });
     defer plan.deinit();
-    try plan.interval_ends.put("lhs", 9);
+    try std.testing.expectEqual(
+        PlannedValueAssignment{ .gpr32 = .rdi },
+        plan.assignment("lhs").?,
+    );
+    try std.testing.expectEqual(
+        PlannedValueAssignment{ .gpr32 = .rsi },
+        plan.assignment("rhs").?,
+    );
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
     selector.allocation_plan = &plan;
     selector.current_position = 4;
     selector.stack_frame_bytes = stage2SpillReservedBytes();
+    try std.testing.expectEqual(@as(usize, 0), selector.address_dependencies.count());
     try selector_state.bindValueLoc(&selector, "lhs", .eax);
     try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
 
