@@ -6,7 +6,23 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-166 M64 wiring — LANDED at 50acec11 + perf 15082e2d, Supervisor-verified
+## MULTIPLY COMPLETE AT RATCHET 135 — INBOX-167 quotient refresh dispatched
+
+INBOX-166 is **ACCEPTED** (Reviewer, 2026-07-18: "I accept INBOX-166.
+The multiply step is complete at ratchet 135."). Session trail: 154 →
+152 → 148 → 140 (slice 3) → 135 (multiply), every landing
+byte-identical with the perf gate green. **INBOX-167 (the quotient
+evidence refresh) is authorized** with two refinements: quotient-result
+ownership separated from remainder/combined-result paths (retained
+remainder owners block credit for shared fixed-register setup/helpers
+they still use); the exact RAX/RDX/RCX preservation, dividend
+preparation, divide instruction, result-binding order, EFLAGS behavior,
+and diagnostic precedence frozen per admitted signed/unsigned form. All
+credits/collapses derived from the accepted 135 tree; facade-budget
+changes explicit; scalar_multiply_divide.zig under its 2,000-line
+ceiling; docs-only; stop before dormant implementation. Dispatched.
+
+## INBOX-166 M64 wiring — ACCEPTED (multiply complete at 135), Supervisor-verified
 
 The M64 wiring landed and is fully verified: ratchet recount **135**
 (the TSV shed the five M64 gateway rows); the frozen value_use
