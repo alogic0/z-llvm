@@ -6,7 +6,19 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-161 multiply refresh — LANDED at 2006570f, Supervisor-verified
+## INBOX-162 dormant multiply — dispatched
+
+INBOX-161 is **ACCEPTED and INBOX-162 authorized** (Reviewer,
+2026-07-18) with two refinements: M64-D vs M64-R selection derived
+internally from canonical transaction state (no consumer plan selection
+by operand homes); tests pin source-order failure provenance and exact
+diagnostic precedence across both plan branches, alongside durable
+identity and rollback coverage. Production untouched; ratchet 140;
+identities exact; dormant gates incl canaries; no perf/Tier 3; stop.
+"The 135 target remains conditional on successful whole-family
+isolation and separate wiring review." Dispatched.
+
+## INBOX-161 multiply refresh — ACCEPTED at 2006570f, Supervisor-verified
 
 The refresh landed docs-only (482 lines) and is verified: my grep
 confirms the enumeration (lowerMul64 ×2 sites, lowerMul64SpillLhsThroughRax
