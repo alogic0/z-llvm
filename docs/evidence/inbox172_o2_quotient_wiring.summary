@@ -1,9 +1,10 @@
 # INBOX-172 — unsigned quotient production wiring
 
-Status: production wiring and correctness gates complete. The required
-counterbalanced performance run is pending the follow-up immutable evidence
-commit. UQ32 and UQ64 are wired together through `ValueUseTransaction`; the
-`urem` dispatch and `lowerUnsignedRem` remainder path are unchanged.
+Status: complete. Production commit
+`dc96b63d7ef25e651f0dc16d9df3309c9371871f` wires UQ32 and UQ64 together
+through `ValueUseTransaction`; the `urem` dispatch and `lowerUnsignedRem`
+remainder path are unchanged. The post-final-tree counterbalanced performance
+gate passed on its single prescribed batch.
 
 No Tier 3 command was run.
 
@@ -244,6 +245,114 @@ No `distribution-all` command and no Tier 3 command was run.
 
 ## Counterbalanced performance
 
-Pending the required follow-up immutable evidence commit. The A and B
-artifacts will be built and frozen only after this complete production
-source, guard, inventory, and evidence tree is committed.
+PASS. The artifacts were built only after the complete production source,
+guard, inventory, and initial evidence tree had been committed. A and B were
+built in detached worktrees and frozen `0555` before timing; neither was
+rebuilt between samples.
+
+Frozen sources and artifacts:
+
+```text
+A_commit=7af7f0700d0abf976f1e63ead29217b095f11934
+A_tree=d2bbc1592ad825fb2626ec149641491c95711f07
+A_artifact_sha256=a46eaf36ef26f1889e2ffe560d63a5e90834f6d2c6d3aed522936fe3d21c6fb2
+A_artifact_mode=0555
+A_artifact_bytes=104352248
+
+B_commit=dc96b63d7ef25e651f0dc16d9df3309c9371871f
+B_tree=81e3e46a3c5fbbbe0b2c3d33e08dbed90bce338f
+B_artifact_sha256=f8a0742e901ee1be38039105f04fe10c6323db2f5447b8685e1139b3ca1c9697
+B_artifact_mode=0555
+B_artifact_bytes=103888546
+```
+
+Build commands:
+
+```text
+workdir=tmp/inbox172_o2_quotient_wiring/perf/worktree_A
+command=/home/oleg/bin/zig build 2>&1 | tee /home/oleg/prog/z_llvm/tmp/inbox172_o2_quotient_wiring/perf/build_A.log
+result=PASS
+log_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+workdir=tmp/inbox172_o2_quotient_wiring/perf/worktree_B
+command=/home/oleg/bin/zig build 2>&1 | tee /home/oleg/prog/z_llvm/tmp/inbox172_o2_quotient_wiring/perf/build_B.log
+result=PASS
+log_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+```
+
+The preflight was captured at `2026-07-19T01:27:59-05:00`. CPU 0 averaged
+98.34% idle over three one-second samples, with zero iowait and zero steal.
+
+```text
+command={ date --iso-8601=seconds; uptime; ps -eo pid,psr,stat,comm,args --sort=-%cpu | sed -n '1,30p'; mpstat -P 0 1 3; } > tmp/inbox172_o2_quotient_wiring/perf/idle_preflight.txt
+idle_preflight_sha256=34c3b9d61b426a51fb82196a01ec20567738e23628b02d56bba297110cf0f985
+```
+
+The Zig runner pinned every selector invocation to CPU 0, set `LC_ALL=C`,
+used the same frozen compiler-rt input and selector arguments, discarded
+exactly two warmups per artifact, and retained six counterbalanced pairs in
+the required order `AB, BA, AB, BA, AB, BA`.
+
+```text
+command=/home/oleg/bin/zig run tmp/inbox172_o2_quotient_wiring/run_counterbalanced.zig 2>&1 | tee tmp/inbox172_o2_quotient_wiring/perf/run_counterbalanced.log
+runner_sha256=d6f94cc620317ab434578fed94df704bdf0d9018bbf3b07b1a5ad7fbb87b8715
+run_log_sha256=d142895d36a766f2de28ff939881c1ca0671ca8a7635c0f9224c7c14f74ff6ec
+result=16/16 samples completed
+```
+
+Every retained sample:
+
+```text
+pair  order  A_seconds  A_RSS_KiB  B_seconds  B_RSS_KiB  B/A
+1     AB     48.88      89372      49.12      89316      1.004909984
+2     BA     48.97      89384      49.48      89304      1.010414540
+3     AB     49.07      89376      49.48      89308      1.008355411
+4     BA     48.97      89372      49.29      89316      1.006534613
+5     AB     49.03      89364      49.23      89324      1.004079135
+6     BA     49.28      89368      49.58      89316      1.006087662
+```
+
+Discarded warmups, retained without entering the decision:
+
+```text
+warmup1_A=49.17s/89376KiB
+warmup1_B=49.36s/89312KiB
+warmup2_A=49.91s/89376KiB
+warmup2_B=49.89s/89312KiB
+```
+
+The Zig analyzer verified all sixteen generated selector reports before
+computing the gates:
+
+```text
+command=/home/oleg/bin/zig run tmp/inbox172_o2_quotient_wiring/analyze_counterbalanced.zig 2>&1 | tee tmp/inbox172_o2_quotient_wiring/perf/paired_metrics.tsv
+analyzer_sha256=2709a36bfd843028d45eb615671981eadf0ca7dbe38c9c9d8ae3eb302ed3054d
+metrics_sha256=4dc11268a797db8d426568a3631ad85d8433b5b414fa5304e776f6621d3d72c8
+reports_exact=16/16
+median_A_seconds=49.000
+median_B_seconds=49.385
+median_delta_seconds=0.385
+allowed_delta_seconds=max(2.450,0.100)=2.450
+aggregate_median_pass=true
+median_paired_ratio=1.006311138
+paired_ratio_limit=1.05
+paired_ratio_pass=true
+A_max_RSS_KiB=89384
+B_max_RSS_KiB=89324
+RSS_delta_KiB=-60
+RSS_limit_KiB=16384
+RSS_pass=true
+overall=PASS
+```
+
+All raw samples and reports are retained:
+
+```text
+raw_files=16
+raw_manifest_sha256=a5cd0d1d77f36a3b6c94aef19311ba1835f3c79f3a7fc0fe89a6ef1627da3e1b
+report_files=16
+report_manifest_sha256=a16a44b8fe06793a7524f241dd4da47f2865cdef7973cbb6b23e91ad77519145
+every_report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681
+```
+
+There was no discretionary rerun. No Tier 3 command was run.
