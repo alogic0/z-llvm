@@ -6,7 +6,18 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-169 — UQ64 passes, UQ32 retained on plan-blind fixtures (119de279)
+## INBOX-170 UQ32 fixture alignment — dispatched
+
+INBOX-169's split verdict is **ACCEPTED and INBOX-170 authorized**
+(Reviewer, 2026-07-19): the two plan-blind fixtures aligned under the
+exact Option-A criteria, everything else frozen; no production/admission
+change; **the re-isolation must repeat ALL THREE builds** — "The fixture
+tree has changed, so the previous UQ64 full-unit result is supporting
+evidence but not acceptance-grade for the new tree"; ratchet 135;
+131/132 conditional on re-isolation + wiring + the owner recount; stop
+after alignment and again after re-isolation. Dispatched.
+
+## INBOX-169 — split verdict ACCEPTED (119de279), Supervisor-verified
 
 The isolation verdict (verified, evidence-only, ratchet 135): UQ64 alone
 passes all three bars; UQ32 alone and the aggregate fail full unit
