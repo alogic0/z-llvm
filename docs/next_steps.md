@@ -6,7 +6,24 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## MULTIPLY COMPLETE AT RATCHET 135 — INBOX-167 quotient refresh dispatched
+## INBOX-167 quotient refresh — LANDED at f5b6c516, Supervisor-verified
+
+The refresh landed docs-only (532 lines) and is verified: exactly three
+quotient-owned ratchet rows (lowerUnsignedDivRem resolveValue ×1 +
+emitValueIntoScratch ×2, quotient-only by the early urem dispatch) plus
+the quotient-only helper accumulatorDirectMaterializationDisplacement
+(resolveValue ×1, both call sites in the quotient branch). **Honest
+conditional target 131** = 135 − 3 direct − 1 quotient-only last-owner
+collapse (132 if the helper retains any owner at the future tree);
+remainder/combined credit ZERO — the five lowerUnsignedRem gateways and
+all shared RAX/RDX/RCX setup, EFLAGS, and machine-instruction helpers
+are retained by remainder/other owners per refinement 1; the inherited
+129 projection explicitly obsolete. Section 4 freezes the admitted
+UQ32/UQ64 streams and state order per refinement 2 (S32-I2 already
+landed as R00's signed control; UR32/UR64 retained). Ratchet 135. Sent
+to the Reviewer for the quotient dormant authorization (INBOX-168).
+
+## MULTIPLY COMPLETE AT RATCHET 135 — recorded
 
 INBOX-166 is **ACCEPTED** (Reviewer, 2026-07-18: "I accept INBOX-166.
 The multiply step is complete at ratchet 135."). Session trail: 154 →
