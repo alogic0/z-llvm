@@ -6,7 +6,18 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-163 — M64 retained on plan-blind fixtures (ea6eb87d), Supervisor-verified
+## INBOX-164 M64 fixture alignment — dispatched
+
+INBOX-163's retention verdict is **ACCEPTED and INBOX-164 authorized**
+(Reviewer, 2026-07-18: "The alignment must remain test/evidence-only and
+production-faithful. Apply Option A only where all five criteria prove
+the old expectation was plan-blind; each such exception requires
+before/after streams and the fixture-minus-plan artifact proof. All
+other streams, bindings, and diagnostics remain frozen. No Q1, action,
+model, admission, or guard-policy relaxation… Stop before M64
+re-isolation."). Dispatched.
+
+## INBOX-163 — retention verdict ACCEPTED (ea6eb87d), Supervisor-verified
 
 The isolation is the B03–B06 pattern repeated: the cohort, object,
 owner, and all 285 per-function comparisons are BYTE-EXACT and canaries
