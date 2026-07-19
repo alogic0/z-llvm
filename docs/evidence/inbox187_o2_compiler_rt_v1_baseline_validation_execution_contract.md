@@ -1,17 +1,19 @@
 # INBOX-187 — compiler-rt v1 baseline-validation execution contract
 
-Status: **contract and patch freeze complete; execution not performed**.
+Status: **contract correction pending Watcher/Reviewer acceptance; execution
+not authorized or performed**.
 
-This document closes the future ratchet-131 baseline-validation procedure.
+This document defines the proposed future ratchet-131 baseline-validation
+procedure.
 It deliberately separates canonical identity creation from temporary call
 coverage. No command in the future procedure was executed in INBOX-187.
 Production remains dormant and the bypass ratchet remains **131**.
 
-INBOX-187A closed the previously withheld section-9 command contract from
-operating-document commit
-`e4a8952633c101949093130b935db8503e921b68`. The accepted INBOX-187 document
-commit is `a041487eee50f86b594beeeedb2071479842c093`. The correction changes only
-this document: it does not change or execute the accepted patch bundle,
+INBOX-187A corrected section 9, but closed-contract acceptance was withheld
+because successful-subset checks preceded their producers and canonical
+status production remained implicit. INBOX-187B, authorized from operating
+commit `1d996a1abddfc584bcad2b747705fca7f6a3642d`, corrects only this
+document. It does not change or execute the accepted patch bundle,
 validation protocol, compiler, or any retained artifact.
 
 ## 1. Accepted basis and current preflight
@@ -19,8 +21,11 @@ validation protocol, compiler, or any retained artifact.
 The tracked authorization and source basis are:
 
 ```text
-operating_head=d7b11c97f43ccb5566f56a396501169f1334a15d
-operating_tree=b065779d17e5726dd81bc6b3c19bedf61a74b942
+original_INBOX_187_operating_head=d7b11c97f43ccb5566f56a396501169f1334a15d
+original_INBOX_187_operating_tree=b065779d17e5726dd81bc6b3c19bedf61a74b942
+INBOX_187_document_commit=a041487eee50f86b594beeeedb2071479842c093
+INBOX_187A_document_commit=527340b6
+INBOX_187B_operating_commit=1d996a1abddfc584bcad2b747705fca7f6a3642d
 exact_dormant_ratchet_131_source_commit=43de59b0
 INBOX_184_contract_commit=1c343ec8
 INBOX_185_reproduction_commit=b1567ace
@@ -266,376 +271,1232 @@ No inherited environment variable is allowed. Build commands additionally
 use explicit, initially empty local/global cache directories. A command,
 environment, tool, or output path not named here is prohibited.
 
-## 5. Canonical artifact build
+## 5. One exact canonical Bash driver
 
-After all preflights, create the root once and execute exactly:
+Sections 5–7 are one ordered `/bin/bash --noprofile --norc` driver. The
+code block below is the complete driver; no line may be omitted, reordered,
+or run interactively. Its working directory is `/home/oleg/prog/z_llvm`.
+The invoking shell has no inherited environment beyond the seven entries
+shown here:
 
 ```bash
-/usr/bin/mkdir -p \
-  "$ROOT/canonical/build/home" \
-  "$ROOT/canonical/build/tmp" \
-  "$ROOT/canonical/build/cache/local" \
-  "$ROOT/canonical/build/cache/global" \
-  "$ROOT/canonical/build/prefix" \
-  "$ROOT/canonical/artifact"
-
-/usr/bin/git -C "$REPO" worktree add --detach "$ROOT/canonical/source" \
-  43de59b0
-
 (
-  cd "$ROOT/canonical/source"
-  /usr/bin/env -i \
-    HOME="$ROOT/canonical/build/home" \
-    TMPDIR="$ROOT/canonical/build/tmp" \
+  cd /home/oleg/prog/z_llvm
+  exec /usr/bin/env -i \
+    HOME=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1 \
+    TMPDIR=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1 \
     PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
     LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
-    /home/oleg/bin/zig build \
-    --prefix "$ROOT/canonical/build/prefix" \
-    --cache-dir "$ROOT/canonical/build/cache/local" \
-    --global-cache-dir "$ROOT/canonical/build/cache/global" \
-    --summary all \
-    >"$ROOT/canonical/build/stdout.raw" \
-    2>"$ROOT/canonical/build/stderr.raw"
+    /bin/bash --noprofile --norc
 )
-
-/usr/bin/install -D -m 0555 \
-  "$ROOT/canonical/build/prefix/bin/z_llvm" \
-  "$ROOT/canonical/artifact/z_llvm"
 ```
 
-The build runs exactly once. Its status must be zero. Record command bytes,
-start/end UTC, stdout, stderr, status, byte counts, modes, SHA-256 values,
-the detached HEAD/tree/status, and a sorted SHA-256 manifest of all tracked
-production/build/tool files. Make every retained build log and manifest
-`0444`. The artifact stays `0555`. Any dirty source, changed hash, existing
-path, build failure, or post-mode movement stops without retry.
+The driver block is supplied exactly once on that shell's standard input.
+The already pinned parent is used only for the driver shell's `HOME` and
+`TMPDIR`; every build and workload command still receives its separately
+empty phase directories. The driver begins in strict mode and never uses
+`|| true`.
 
-The canonical artifact is now immutable and is the only artifact used in
-section 6.
-
-## 6. Exactly three canonical non-timing repetitions
-
-Create exactly:
-
-```text
-$ROOT/canonical/repetition-1
-$ROOT/canonical/repetition-2
-$ROOT/canonical/repetition-3
-```
-
-Each repetition receives independently empty `home` and `tmp` directories.
-There is no warmup, timing, CPU pin, cache sharing, retry, or fourth
-repetition.
-
-### 6.1 Report and accepted-subset derivation
-
-For each `N` in the fixed order `1 2 3`, define `REP` as the corresponding
-directory and execute the same block:
+The driver uses one status writer. `write_status_once` requires the status
+path to be absent, enables `noclobber`, and issues one Bash-builtin `printf`
+write. Thus no command can overwrite, append to, or partially reuse a
+status. `run_step` disables immediate exit only around its one producer,
+captures `$?` in the immediately following statement, restores strict mode,
+atomically creates the sole status, and validates the exact expected value
+before returning. Every pipeline executes with `pipefail` already active;
+no expected-nonzero producer is placed in a pipeline.
 
 ```bash
-/usr/bin/env -i \
-  HOME="$REP/home" TMPDIR="$REP/tmp" \
-  PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
-  LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
-  "$ROOT/canonical/artifact/z_llvm" \
-  --emit=obj \
-  --generic-cfg-selector \
-  --report-all-codegen-failures \
-  --target=x86_64-linux \
-  --input-limit=67108864 \
-  "$INPUT" \
-  >"$REP/report.stdout.raw" \
-  2>"$REP/report.stderr.raw"
-```
+set -euo pipefail
+umask 022
 
-Capture the status without transforming either channel. The required status
-is exactly `1`, `report.stdout.raw` is exactly empty, and
-`report.stderr.raw` contains exactly one final
-`summary zllvm-codegen-report-all` row. The summary must report:
+readonly REPO=/home/oleg/prog/z_llvm
+readonly PARENT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1
+readonly INPUT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/compiler_rt_v1.ll
+readonly BUNDLE=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/inbox187_baseline_validation_contract_bundle
+readonly ROOT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1
+readonly CANONICAL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical
+readonly ARTIFACT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical/artifact/z_llvm
+readonly ACCEPTED=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical/repetition-1/accepted.ll
+readonly DRIVER_RECORD=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.driver
+readonly PATH_VALUE=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin
 
-- `selected_functions > 0`;
-- `emitted_functions > 0`;
-- `failed_functions > 0`;
-- `selected_functions = emitted_functions + failed_functions`;
-- `local_fail=1`;
-- a non-`-` first failure and diagnostic.
-
-Extract the complete ordered failures with this exact command:
-
-```bash
-LC_ALL=C /usr/bin/awk \
-  '$1 == "zllvm-codegen-failure" {
-     if ($2 !~ /^function=/) exit 91;
-     sub(/^function=/, "", $2);
-     print $2
-   }' \
-  "$REP/report.stderr.raw" \
-  >"$REP/failed-functions.in-report-order.txt"
-
-LC_ALL=C /usr/bin/sort -u \
-  "$REP/failed-functions.in-report-order.txt" \
-  >"$REP/failed-functions.sorted.txt"
-```
-
-The ordered and unique counts must both equal `failed_functions`; duplicate,
-empty, or non-`[A-Za-z0-9_.$]+` identities are a stop.
-
-Create the candidate-specific accepted input only with:
-
-```bash
-extract_args=(--delete -S -o "$REP/accepted.ll")
-while IFS= read -r function_name; do
-  extract_args+=(--func "$function_name")
-done <"$REP/failed-functions.sorted.txt"
-extract_args+=("$INPUT")
-
-/usr/bin/env -i \
-  HOME="$REP/home" TMPDIR="$REP/tmp" \
-  PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
-  LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
-  /usr/lib/llvm-22/bin/llvm-extract \
-  "${extract_args[@]}" \
-  >"$REP/extract.stdout.raw" \
-  2>"$REP/extract.stderr.raw"
-```
-
-This command must return zero with empty stdout/stderr. `accepted.ll` is a
-derived output, not a substitute input. It is retained and hashed in every
-repetition.
-
-### 6.2 Object and owner outputs
-
-Run in this fixed order:
-
-```bash
-/usr/bin/env -i \
-  HOME="$REP/home" TMPDIR="$REP/tmp" \
-  PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
-  LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
-  "$ROOT/canonical/artifact/z_llvm" \
-  --emit=obj \
-  --generic-cfg-selector \
-  --target=x86_64-linux \
-  --input-limit=67108864 \
-  "$REP/accepted.ll" \
-  >"$REP/accepted.o" \
-  2>"$REP/object.stderr.raw"
-
-/usr/bin/env -i \
-  HOME="$REP/home" TMPDIR="$REP/tmp" \
-  PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
-  LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
-  "$ROOT/canonical/artifact/z_llvm" \
-  --emit=selection-owner-manifest \
-  --generic-cfg-selector \
-  --target=x86_64-linux \
-  --input-limit=67108864 \
-  "$REP/accepted.ll" \
-  >"$REP/owner.tsv" \
-  2>"$REP/owner.stderr.raw"
-
-(cd "$REP" && LC_ALL=C /usr/bin/objdump -d accepted.o \
-  >accepted.objdump 2>objdump.stderr.raw)
-```
-
-All three statuses must be zero; both `z_llvm` stderr files and objdump
-stderr must be empty. The owner header must be exactly
-`row_identity<TAB>selection_owner`. Owner row count must equal
-`emitted_functions`.
-
-Create `owner-ledger.txt` with exactly:
-
-```bash
-LC_ALL=C /usr/bin/awk -F '\t' '
-  NR == 1 {
-    if ($1 != "row_identity" || $2 != "selection_owner") exit 92;
-    next
-  }
-  { count[$2] += 1; total += 1 }
-  END {
-    printf("composed_block=%d\n", count["composed_block"]);
-    printf("composed_cfg=%d\n", count["composed_cfg"]);
-    printf("legacy_envelope=%d\n", count["legacy_envelope"]);
-    printf("structural_fallback=%d\n", count["structural_fallback"]);
-    printf("ledger=%d/%d/%d\n",
-      count["composed_block"] + count["composed_cfg"],
-      count["legacy_envelope"],
-      count["structural_fallback"]);
-    printf("total=%d\n", total);
-  }' "$REP/owner.tsv" >"$REP/owner-ledger.txt"
-```
-
-Any other owner tag, missing row, duplicate row identity, or count mismatch
-is a stop.
-
-### 6.3 Per-function bytes and disassembly
-
-Run:
-
-```bash
-(cd "$REP" && LC_ALL=C /usr/bin/readelf -SW accepted.o \
-  >sections.readelf 2>sections.stderr.raw)
-(cd "$REP" && LC_ALL=C /usr/bin/readelf -sW accepted.o \
-  >symbols.readelf 2>symbols.stderr.raw)
-(cd "$REP" && LC_ALL=C /usr/bin/objcopy \
-  --dump-section .text=text.bin accepted.o \
-  >objcopy.stdout.raw 2>objcopy.stderr.raw)
-
-LC_ALL=C /usr/bin/awk '
-  $4 == "FUNC" && $7 == "1" && ($3 + 0) > 0 {
-    print $8 "\t" $2 "\t" $3
-  }' "$REP/symbols.readelf" |
-  LC_ALL=C /usr/bin/sort -t "$(printf '\t')" -k1,1 \
-  >"$REP/functions.sorted.tsv"
-```
-
-The three tool statuses must be zero and all tool stderr/stdout channels
-that are expected empty must be empty. The function count and unique-name
-count must equal `emitted_functions`.
-
-Then execute this exact fixed loop:
-
-```bash
-/usr/bin/mkdir -p "$REP/functions"
-row=0
-while IFS=$'\t' read -r function_name value_hex size_dec; do
-  row=$((row + 1))
-  id=$(printf '%06d' "$row")
-  offset=$((16#$value_hex))
-  /usr/bin/dd \
-    if="$REP/text.bin" \
-    of="$REP/functions/$id.code.bin" \
-    bs=1 skip="$offset" count="$size_dec" status=none
+write_status_once() {
+  local status_path="$1"
+  local status_value="$2"
+  local status_text
+  test ! -e "$status_path"
+  printf -v status_text '%s\n' "$status_value"
   (
-    cd "$REP"
-    LC_ALL=C /usr/bin/objdump -dr \
-      --disassemble="$function_name" accepted.o \
-      >"functions/$id.objdump" \
-      2>"functions/$id.objdump.stderr"
+    set -o noclobber
+    printf '%s' "$status_text" >"$status_path"
   )
-  test ! -s "$REP/functions/$id.objdump.stderr"
-  code_sha=$(/usr/bin/sha256sum "$REP/functions/$id.code.bin" |
-    /usr/bin/awk '{print $1}')
-  dis_sha=$(/usr/bin/sha256sum "$REP/functions/$id.objdump" |
-    /usr/bin/awk '{print $1}')
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$id" "$function_name" "$size_dec" "$value_hex" "$code_sha" "$dis_sha"
-done <"$REP/functions.sorted.tsv" >"$REP/per-function-identities.tsv"
+}
+
+run_step() {
+  local record_prefix="$1"
+  local status_path="$2"
+  local expected_status="$3"
+  local stdout_path="$4"
+  local stderr_path="$5"
+  local command_status
+  shift 5
+
+  test ! -e "${record_prefix}.command.txt"
+  test ! -e "${record_prefix}.environment.txt"
+  test ! -e "${record_prefix}.cwd.txt"
+  test ! -e "${record_prefix}.start.utc"
+  test ! -e "${record_prefix}.end.utc"
+  test ! -e "${record_prefix}.records.tsv"
+  test ! -e "$status_path"
+  test ! -e "$stdout_path"
+  test ! -e "$stderr_path"
+
+  printf '%q ' "$@" >"${record_prefix}.command.txt"
+  printf '\n' >>"${record_prefix}.command.txt"
+  /usr/bin/env | LC_ALL=C /usr/bin/sort \
+    >"${record_prefix}.environment.txt"
+  pwd -P >"${record_prefix}.cwd.txt"
+  printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 >"${record_prefix}.start.utc"
+
+  set +e
+  "$@" >"$stdout_path" 2>"$stderr_path"
+  command_status=$?
+  set -e
+
+  write_status_once "$status_path" "$command_status"
+  printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 >"${record_prefix}.end.utc"
+  test "$command_status" -eq "$expected_status"
+
+  /usr/bin/chmod 0444 \
+    "${record_prefix}.command.txt" \
+    "${record_prefix}.environment.txt" \
+    "${record_prefix}.cwd.txt" \
+    "${record_prefix}.start.utc" \
+    "${record_prefix}.end.utc" \
+    "$status_path" "$stdout_path" "$stderr_path"
+  {
+    printf 'path\tbytes\tmode\tsha256\n'
+    for record_path in \
+      "${record_prefix}.command.txt" \
+      "${record_prefix}.environment.txt" \
+      "${record_prefix}.cwd.txt" \
+      "${record_prefix}.start.utc" \
+      "${record_prefix}.end.utc" \
+      "$status_path" "$stdout_path" "$stderr_path"
+    do
+      printf '%s\t%s\t%s\t%s\n' \
+        "$record_path" \
+        "$(/usr/bin/stat -c '%s' "$record_path")" \
+        "$(/usr/bin/stat -c '%a' "$record_path")" \
+        "$(/usr/bin/sha256sum "$record_path" |
+          /usr/bin/awk '{print $1}')"
+    done
+  } >"${record_prefix}.records.tsv"
+  /usr/bin/chmod 0444 "${record_prefix}.records.tsv"
+}
+
+test "$PWD" = "$REPO"
+test ! -e "$ROOT"
+readonly PREFLIGHT_RECORD="$PARENT/baseline_validation_v1.preflight"
+for suffix in \
+  command.txt environment.txt cwd.txt start.utc end.utc \
+  stdout.raw stderr.raw status records.tsv
+do
+  test ! -e "$PREFLIGHT_RECORD.$suffix"
+done
+
+/usr/bin/env | LC_ALL=C /usr/bin/sort \
+  >"$PREFLIGHT_RECORD.environment.txt"
+pwd -P >"$PREFLIGHT_RECORD.cwd.txt"
+printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 \
+  >"$PREFLIGHT_RECORD.start.utc"
+preflight_program='
+  set -euo pipefail
+  repo="$1"
+  input="$2"
+  bundle="$3"
+
+  test -z "$(/usr/bin/git -C "$repo" status --porcelain)"
+  test -f "$input"
+  test ! -L "$input"
+  test "$(/usr/bin/stat -c "%a" "$input")" = 444
+  test "$(/usr/bin/stat -c "%s" "$input")" = 1897410
+  test "$(/usr/bin/sha256sum "$input" |
+    /usr/bin/awk "{print \\$1}")" = \
+    9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1
+  test "$(/usr/bin/stat -c "%a" \
+    "$repo/tmp/o2_calls_perf/compiler_rt_v1/adoption_manifest.tsv")" = 444
+  test "$(/usr/bin/stat -c "%s" \
+    "$repo/tmp/o2_calls_perf/compiler_rt_v1/adoption_manifest.tsv")" = 4394
+  test "$(/usr/bin/sha256sum \
+    "$repo/tmp/o2_calls_perf/compiler_rt_v1/adoption_manifest.tsv" |
+    /usr/bin/awk "{print \\$1}")" = \
+    500e73c8433aa73159adfba5de8a6708ae4030140b97b823ef895caa1528f2bf
+  test -d "$bundle"
+  test ! -L "$bundle"
+  test "$(/usr/bin/stat -c "%a" "$bundle")" = 555
+  test "$(/usr/bin/stat -c "%a" \
+    "$bundle/manifests/bundle-files.sha256")" = 444
+  test "$(/usr/bin/stat -c "%s" \
+    "$bundle/manifests/bundle-files.sha256")" = 2519
+  test "$(/usr/bin/sha256sum \
+    "$bundle/manifests/bundle-files.sha256" |
+    /usr/bin/awk "{print \\$1}")" = \
+    0576d5803400ea9575d65fc501b87d514c97e806540be29018fb5192bd68e7f0
+  test "$(/usr/bin/stat -c "%a" \
+    "$bundle/patches/aggregate-consumer-observer-guard.patch")" = 444
+  test "$(/usr/bin/stat -c "%s" \
+    "$bundle/patches/aggregate-consumer-observer-guard.patch")" = 41140
+  test "$(/usr/bin/sha256sum \
+    "$bundle/patches/aggregate-consumer-observer-guard.patch" |
+    /usr/bin/awk "{print \\$1}")" = \
+    7508d1d8f74b7e9b97ae5722a0822a86c8d2079779a25cd37559ce5bc651036f
+  (
+    cd "$repo"
+    /usr/bin/sha256sum -c \
+      "$bundle/manifests/bundle-files.sha256"
+  )
+  while IFS="$(printf "\t")" read -r payload_path \
+    payload_bytes payload_mode
+  do
+    test "$(/usr/bin/stat -c "%s" "$repo/$payload_path")" = \
+      "$payload_bytes"
+    test "$(/usr/bin/stat -c "%a" "$repo/$payload_path")" = \
+      "${payload_mode#0}"
+  done <"$bundle/manifests/payload-final-modes.tsv"
+  test "$(/usr/bin/stat -c "%a" \
+    "$repo/tmp/inbox184_o2_compiler_rt_v1/materialize/comparison/retained-files-final.tsv")" = 664
+  test "$(/usr/bin/stat -c "%s" \
+    "$repo/tmp/inbox184_o2_compiler_rt_v1/materialize/comparison/retained-files-final.tsv")" = 458294
+  test "$(/usr/bin/sha256sum \
+    "$repo/tmp/inbox184_o2_compiler_rt_v1/materialize/comparison/retained-files-final.tsv" |
+    /usr/bin/awk "{print \\$1}")" = \
+    885008980c8a272e82d06cf89b81652ab5a9669e89364b01d7b9e2761135ff1e
+  test "$(/usr/bin/stat -c "%a" \
+    "$repo/docs/evidence/tmp_retention_pins.tsv")" = 664
+  test "$(/usr/bin/stat -c "%s" \
+    "$repo/docs/evidence/tmp_retention_pins.tsv")" = 3051
+  test "$(/usr/bin/sha256sum \
+    "$repo/docs/evidence/tmp_retention_pins.tsv" |
+    /usr/bin/awk "{print \\$1}")" = \
+    1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3
+  test "$(/usr/bin/stat -c "%a" \
+    "$repo/docs/retention_headroom_policy.md")" = 664
+  test "$(/usr/bin/stat -c "%s" \
+    "$repo/docs/retention_headroom_policy.md")" = 10622
+  test "$(/usr/bin/sha256sum \
+    "$repo/docs/retention_headroom_policy.md" |
+    /usr/bin/awk "{print \\$1}")" = \
+    a31e3fbf7aa03c8544fc5f9921e350c25e4e470cc3c779dfb356136634e052dd
+  test "$(/usr/bin/stat -c "%a" "$repo/tools/clean_tmp.zig")" = 664
+  test "$(/usr/bin/stat -c "%s" "$repo/tools/clean_tmp.zig")" = 50100
+  test "$(/usr/bin/sha256sum "$repo/tools/clean_tmp.zig" |
+    /usr/bin/awk "{print \\$1}")" = \
+    8e0c54ad6fed9e46326049dbe64bff743daddcc2527c1dc4d5e02be15fba2d5e
+  test "$(/usr/bin/stat -c "%a" \
+    "$repo/scripts/z_llvm_watcher_loop.sh")" = 775
+  test "$(/usr/bin/stat -c "%s" \
+    "$repo/scripts/z_llvm_watcher_loop.sh")" = 10850
+  test "$(/usr/bin/git -C "$repo" hash-object \
+    scripts/z_llvm_watcher_loop.sh)" = \
+    b64131cf60dd0ef638e815cd33db9ae8595a72cf
+  test "$(/usr/bin/git -C "$repo" rev-parse \
+    :scripts/z_llvm_watcher_loop.sh)" = \
+    b64131cf60dd0ef638e815cd33db9ae8595a72cf
+  test "$(/usr/bin/git -C "$repo" rev-parse \
+    HEAD:scripts/z_llvm_watcher_loop.sh)" = \
+    b64131cf60dd0ef638e815cd33db9ae8595a72cf
+  test "$(/usr/bin/git -C "$repo" stash list \
+    --format="%H" | /usr/bin/awk "NR == 1 { print; exit }")" = \
+    7985c6d01040a6e47e4ce5b918866d0e89517ac7
+  test "$(/usr/bin/stat -c "%a" \
+    "$repo/docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv")" = 664
+  test "$(/usr/bin/stat -c "%s" \
+    "$repo/docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv")" = 5188
+  test "$(/usr/bin/sha256sum \
+    "$repo/docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv" |
+    /usr/bin/awk "{print \\$1}")" = \
+    2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11
+  test "$(/usr/bin/stat -c "%a" \
+    "$repo/docs/evidence/inbox128_o2_r1_facade_manifest.tsv")" = 664
+  test "$(/usr/bin/stat -c "%s" \
+    "$repo/docs/evidence/inbox128_o2_r1_facade_manifest.tsv")" = 2686
+  test "$(/usr/bin/sha256sum \
+    "$repo/docs/evidence/inbox128_o2_r1_facade_manifest.tsv" |
+    /usr/bin/awk "{print \\$1}")" = \
+    2adcd99ee3bfbe0e9f09673f1df02ab305b5ddb2c1b461023152d5d03a079c26
+  test "$(/usr/bin/stat -c "%a" \
+    "$repo/src/codegen/x86_64/generic_cfg/composed_selector_value_use_transaction.zig")" = 664
+  test "$(/usr/bin/stat -c "%s" \
+    "$repo/src/codegen/x86_64/generic_cfg/composed_selector_value_use_transaction.zig")" = 103
+  test "$(/usr/bin/sha256sum \
+    "$repo/src/codegen/x86_64/generic_cfg/composed_selector_value_use_transaction.zig" |
+    /usr/bin/awk "{print \\$1}")" = \
+    4f5887e9d2bce0943df26c1e08e8360053440da64eefd19ddfd9d53225dddd7a
+  test "$(/usr/bin/git -C /home/oleg/prog/ziglang rev-parse HEAD)" = \
+    bdee02bc0c7f227c0f11bc9a449df673fe803540
+  test "$(/usr/bin/git -C /home/oleg/prog/ziglang rev-parse HEAD^{tree})" = \
+    aa032b2b82a48a4684657f909e6e270a6c925e33
+  test "$(/usr/bin/stat -c "%a" \
+    /home/oleg/prog/ziglang/build/stage4/bin/zig)" = 775
+  test "$(/usr/bin/stat -c "%s" \
+    /home/oleg/prog/ziglang/build/stage4/bin/zig)" = 530327885
+  test "$(/usr/bin/sha256sum \
+    /home/oleg/prog/ziglang/build/stage4/bin/zig |
+    /usr/bin/awk "{print \\$1}")" = \
+    dcea3478273d7ffe3895709c8eed4ccc0724548869cdb86183fc7356164410b7
+  while IFS="  " read -r expected tool_path; do
+    test -n "$expected"
+    test -n "$tool_path"
+    test "$(/usr/bin/sha256sum "$tool_path" |
+      /usr/bin/awk "{print \\$1}")" = "$expected"
+  done <"$bundle/manifests/future-tool-identities.sha256"
+  /usr/bin/git -C "$repo" diff --quiet 43de59b0 -- \
+    src build.zig build.zig.zon tools scripts \
+    docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv \
+    docs/evidence/inbox128_o2_r1_facade_manifest.tsv
+  /usr/bin/git -C "$repo" apply --check \
+    "$bundle/patches/aggregate-consumer-observer-guard.patch"
+  available_blocks=$(/usr/bin/stat -f -c "%a" "$repo")
+  block_size=$(/usr/bin/stat -f -c "%S" "$repo")
+  test "$((available_blocks * block_size))" -ge 17179869184
+  printf "preflight=pass\nroot_absent=1\n"
+'
+preflight_command=(
+  /bin/bash -c "$preflight_program" _ "$REPO" "$INPUT" "$BUNDLE"
+)
+printf '%q ' "${preflight_command[@]}" \
+  >"$PREFLIGHT_RECORD.command.txt"
+printf '\n' >>"$PREFLIGHT_RECORD.command.txt"
+set +e
+"${preflight_command[@]}" \
+  >"$PREFLIGHT_RECORD.stdout.raw" \
+  2>"$PREFLIGHT_RECORD.stderr.raw"
+preflight_status=$?
+set -e
+write_status_once "$PREFLIGHT_RECORD.status" "$preflight_status"
+printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 \
+  >"$PREFLIGHT_RECORD.end.utc"
+test "$preflight_status" -eq 0
+/usr/bin/chmod 0444 \
+  "$PREFLIGHT_RECORD.command.txt" \
+  "$PREFLIGHT_RECORD.environment.txt" \
+  "$PREFLIGHT_RECORD.cwd.txt" \
+  "$PREFLIGHT_RECORD.start.utc" \
+  "$PREFLIGHT_RECORD.end.utc" \
+  "$PREFLIGHT_RECORD.status" \
+  "$PREFLIGHT_RECORD.stdout.raw" \
+  "$PREFLIGHT_RECORD.stderr.raw"
+{
+  printf 'path\tbytes\tmode\tsha256\n'
+  for record_path in \
+    "$PREFLIGHT_RECORD.command.txt" \
+    "$PREFLIGHT_RECORD.environment.txt" \
+    "$PREFLIGHT_RECORD.cwd.txt" \
+    "$PREFLIGHT_RECORD.start.utc" \
+    "$PREFLIGHT_RECORD.end.utc" \
+    "$PREFLIGHT_RECORD.status" \
+    "$PREFLIGHT_RECORD.stdout.raw" \
+    "$PREFLIGHT_RECORD.stderr.raw"
+  do
+    printf '%s\t%s\t%s\t%s\n' \
+      "$record_path" \
+      "$(/usr/bin/stat -c '%s' "$record_path")" \
+      "$(/usr/bin/stat -c '%a' "$record_path")" \
+      "$(/usr/bin/sha256sum "$record_path" |
+        /usr/bin/awk '{print $1}')"
+  done
+} >"$PREFLIGHT_RECORD.records.tsv"
+/usr/bin/chmod 0444 "$PREFLIGHT_RECORD.records.tsv"
+
+for suffix in \
+  command.txt environment.txt cwd.txt start.utc end.utc \
+  stdout.raw stderr.raw status records.tsv
+do
+  test ! -e "$DRIVER_RECORD.$suffix"
+done
+
+/usr/bin/env | LC_ALL=C /usr/bin/sort \
+  >"$DRIVER_RECORD.environment.txt"
+pwd -P >"$DRIVER_RECORD.cwd.txt"
+printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 >"$DRIVER_RECORD.start.utc"
+mkdir_command=(/usr/bin/mkdir -p \
+  "$CANONICAL/records" \
+  "$CANONICAL/manifests" \
+  "$CANONICAL/comparisons" \
+  "$CANONICAL/build/home" \
+  "$CANONICAL/build/tmp" \
+  "$CANONICAL/build/cache/local" \
+  "$CANONICAL/build/cache/global" \
+  "$CANONICAL/build/prefix" \
+  "$CANONICAL/artifact" \
+  "$CANONICAL/repetition-1/home" \
+  "$CANONICAL/repetition-1/tmp" \
+  "$CANONICAL/repetition-1/records" \
+  "$CANONICAL/repetition-1/functions" \
+  "$CANONICAL/repetition-2/home" \
+  "$CANONICAL/repetition-2/tmp" \
+  "$CANONICAL/repetition-2/records" \
+  "$CANONICAL/repetition-2/functions" \
+  "$CANONICAL/repetition-3/home" \
+  "$CANONICAL/repetition-3/tmp" \
+  "$CANONICAL/repetition-3/records" \
+  "$CANONICAL/repetition-3/functions")
+printf '%q ' "${mkdir_command[@]}" >"$DRIVER_RECORD.command.txt"
+printf '\n' >>"$DRIVER_RECORD.command.txt"
+set +e
+"${mkdir_command[@]}" \
+  >"$DRIVER_RECORD.stdout.raw" \
+  2>"$DRIVER_RECORD.stderr.raw"
+driver_mkdir_status=$?
+set -e
+write_status_once "$DRIVER_RECORD.status" "$driver_mkdir_status"
+printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 >"$DRIVER_RECORD.end.utc"
+test "$driver_mkdir_status" -eq 0
+/usr/bin/chmod 0444 \
+  "$DRIVER_RECORD.command.txt" \
+  "$DRIVER_RECORD.environment.txt" \
+  "$DRIVER_RECORD.cwd.txt" \
+  "$DRIVER_RECORD.start.utc" \
+  "$DRIVER_RECORD.end.utc" \
+  "$DRIVER_RECORD.status" \
+  "$DRIVER_RECORD.stdout.raw" \
+  "$DRIVER_RECORD.stderr.raw"
+{
+  printf 'path\tbytes\tmode\tsha256\n'
+  for record_path in \
+    "$DRIVER_RECORD.command.txt" \
+    "$DRIVER_RECORD.environment.txt" \
+    "$DRIVER_RECORD.cwd.txt" \
+    "$DRIVER_RECORD.start.utc" \
+    "$DRIVER_RECORD.end.utc" \
+    "$DRIVER_RECORD.status" \
+    "$DRIVER_RECORD.stdout.raw" \
+    "$DRIVER_RECORD.stderr.raw"
+  do
+    printf '%s\t%s\t%s\t%s\n' \
+      "$record_path" \
+      "$(/usr/bin/stat -c '%s' "$record_path")" \
+      "$(/usr/bin/stat -c '%a' "$record_path")" \
+      "$(/usr/bin/sha256sum "$record_path" |
+        /usr/bin/awk '{print $1}')"
+  done
+} >"$DRIVER_RECORD.records.tsv"
+/usr/bin/chmod 0444 "$DRIVER_RECORD.records.tsv"
+
+run_step \
+  "$CANONICAL/records/worktree-add" \
+  "$CANONICAL/worktree-add.status" 0 \
+  "$CANONICAL/records/worktree-add.stdout" \
+  "$CANONICAL/records/worktree-add.stderr" \
+  /usr/bin/git -C "$REPO" worktree add --detach \
+  "$CANONICAL/source" 43de59b0
+
+run_step \
+  "$CANONICAL/records/source-preflight" \
+  "$CANONICAL/source-preflight.status" 0 \
+  "$CANONICAL/records/source-preflight.stdout" \
+  "$CANONICAL/records/source-preflight.stderr" \
+  /bin/bash -c '
+    set -euo pipefail
+    source_root="$1"
+    test "$(/usr/bin/git -C "$source_root" rev-parse HEAD)" = \
+      43de59b0
+    test -z "$(/usr/bin/git -C "$source_root" status --porcelain)"
+    /usr/bin/git -C "$source_root" rev-parse HEAD
+    /usr/bin/git -C "$source_root" rev-parse HEAD^{tree}
+  ' _ "$CANONICAL/source"
+
+run_step \
+  "$CANONICAL/records/build" \
+  "$CANONICAL/build/build.status" 0 \
+  "$CANONICAL/build/stdout.raw" \
+  "$CANONICAL/build/stderr.raw" \
+  /usr/bin/env -i \
+  HOME="$CANONICAL/build/home" \
+  TMPDIR="$CANONICAL/build/tmp" \
+  PATH="$PATH_VALUE" \
+  LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
+  /bin/bash -c '
+    set -euo pipefail
+    cd "$1"
+    exec /home/oleg/bin/zig build \
+      --prefix "$2" \
+      --cache-dir "$3" \
+      --global-cache-dir "$4" \
+      --summary all
+  ' _ \
+  "$CANONICAL/source" \
+  "$CANONICAL/build/prefix" \
+  "$CANONICAL/build/cache/local" \
+  "$CANONICAL/build/cache/global"
+
+run_step \
+  "$CANONICAL/records/artifact-install" \
+  "$CANONICAL/artifact-install.status" 0 \
+  "$CANONICAL/records/artifact-install.stdout" \
+  "$CANONICAL/records/artifact-install.stderr" \
+  /usr/bin/install -D -m 0555 \
+  "$CANONICAL/build/prefix/bin/z_llvm" "$ARTIFACT"
+
+run_step \
+  "$CANONICAL/records/artifact-identity" \
+  "$CANONICAL/artifact-identity.status" 0 \
+  "$CANONICAL/records/artifact-identity.stdout" \
+  "$CANONICAL/records/artifact-identity.stderr" \
+  /bin/bash -c '
+    set -euo pipefail
+    artifact="$1"
+    output="$2"
+    test -f "$artifact"
+    test ! -L "$artifact"
+    test "$(/usr/bin/stat -c "%a" "$artifact")" = 555
+    printf "path\tbytes\tmode\tsha256\n%s\t%s\t0555\t%s\n" \
+      "$artifact" \
+      "$(/usr/bin/stat -c "%s" "$artifact")" \
+      "$(/usr/bin/sha256sum "$artifact" |
+        /usr/bin/awk "{print \\$1}")" >"$output"
+  ' _ "$ARTIFACT" "$CANONICAL/artifact.identity.tsv"
+
+for repetition in 1 2 3; do
+  REP="$CANONICAL/repetition-$repetition"
+  REC="$REP/records"
+
+  run_step \
+    "$REC/report" "$REP/report.status" 1 \
+    "$REC/report.stdout" "$REC/report.stderr" \
+    /usr/bin/env -i \
+    HOME="$REP/home" TMPDIR="$REP/tmp" PATH="$PATH_VALUE" \
+    LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
+    /bin/bash -c '
+      set -euo pipefail
+      artifact="$1"
+      input="$2"
+      semantic_stdout="$3"
+      semantic_stderr="$4"
+      exec "$artifact" \
+        --emit=obj \
+        --generic-cfg-selector \
+        --report-all-codegen-failures \
+        --target=x86_64-linux \
+        --input-limit=67108864 \
+        "$input" \
+        >"$semantic_stdout" 2>"$semantic_stderr"
+    ' _ "$ARTIFACT" "$INPUT" \
+    "$REP/report.stdout.raw" "$REP/report.stderr.raw"
+
+  run_step \
+    "$REC/report-summary" "$REP/report-summary.status" 0 \
+    "$REC/report-summary.stdout" "$REC/report-summary.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      /usr/bin/awk '\''
+        $1 == "summary" && $2 == "zllvm-codegen-report-all" {
+          print; found += 1
+        }
+        END { if (found != 1) exit 95 }
+      '\'' "$1" >"$2"
+    ' _ "$REP/report.stderr.raw" "$REP/report.summary.txt"
+
+  run_step \
+    "$REC/report-validate" "$REP/report-validate.status" 0 \
+    "$REC/report-validate.stdout" "$REC/report-validate.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      test ! -s "$1"
+      /usr/bin/awk '\''
+        {
+          for (i = 1; i <= NF; i++) {
+            split($i, part, "=")
+            value[part[1]] = part[2]
+          }
+        }
+        END {
+          selected = value["selected_functions"] + 0
+          emitted = value["emitted_functions"] + 0
+          failed = value["failed_functions"] + 0
+          if (selected <= 0 || emitted <= 0 || failed <= 0) exit 97
+          if (selected != emitted + failed) exit 98
+          if (value["local_fail"] != "1") exit 99
+          if (value["first_failure"] == "" ||
+              value["first_failure"] == "-") exit 100
+          if (value["first_diagnostic"] == "" ||
+              value["first_diagnostic"] == "-") exit 101
+        }
+      '\'' "$2"
+    ' _ "$REP/report.stdout.raw" "$REP/report.summary.txt"
+
+  run_step \
+    "$REC/failures-in-order" "$REP/failures-in-order.status" 0 \
+    "$REC/failures-in-order.stdout" "$REC/failures-in-order.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      LC_ALL=C /usr/bin/awk '\''
+        $1 == "zllvm-codegen-failure" {
+          if ($2 !~ /^function=/) exit 91
+          sub(/^function=/, "", $2)
+          print $2
+        }
+      '\'' "$1" >"$2"
+    ' _ "$REP/report.stderr.raw" \
+    "$REP/failed-functions.in-report-order.txt"
+
+  run_step \
+    "$REC/failures-sorted" "$REP/failures-sorted.status" 0 \
+    "$REC/failures-sorted.stdout" "$REC/failures-sorted.stderr" \
+    /usr/bin/sort -u \
+    -o "$REP/failed-functions.sorted.txt" \
+    "$REP/failed-functions.in-report-order.txt"
+
+  run_step \
+    "$REC/frontier" "$REP/frontier.status" 0 \
+    "$REC/frontier.stdout" "$REC/frontier.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      temporary="$3"
+      LC_ALL=C /usr/bin/awk '\''
+        $1 == "zllvm-codegen-failure" {
+          function = diagnostic = selector_tag = selector_detail = ""
+          for (i = 2; i <= NF; i++) {
+            if ($i ~ /^function=/) {
+              function = $i
+              sub(/^function=/, "", function)
+            } else if ($i ~ /^diagnostic=/) {
+              diagnostic = $i
+              sub(/^diagnostic=/, "", diagnostic)
+            } else if ($i ~ /^selector_tag=/) {
+              selector_tag = $i
+              sub(/^selector_tag=/, "", selector_tag)
+            } else if ($i ~ /^selector_detail=/) {
+              selector_detail = $i
+              sub(/^selector_detail=/, "", selector_detail)
+            }
+          }
+          if (function == "" || diagnostic == "" ||
+              selector_tag == "" || selector_detail == "") exit 93
+          print function "\t" diagnostic "\t" selector_tag "\t" \
+            selector_detail
+        }
+      '\'' "$1" >"$temporary"
+      LC_ALL=C /usr/bin/sort -t "$(printf "\t")" -k1,1 \
+        -o "$2" "$temporary"
+      /usr/bin/chmod 0444 "$temporary"
+    ' _ "$REP/report.stderr.raw" "$REP/frontier.tsv" \
+    "$REP/frontier.unsorted.tsv"
+
+  run_step \
+    "$REC/frontier-grouped" "$REP/frontier-grouped.status" 0 \
+    "$REC/frontier-grouped.stdout" "$REC/frontier-grouped.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      temporary="$3"
+      LC_ALL=C /usr/bin/awk -F "\t" -v summary="$3" '\''
+        { key = $3 "\t" $4 "\t" $2; count[key] += 1 }
+        END { for (key in count) print key "\t" count[key] }
+      '\'' "$1" >"$temporary"
+      LC_ALL=C /usr/bin/sort -o "$2" "$temporary"
+      /usr/bin/chmod 0444 "$temporary"
+    ' _ "$REP/frontier.tsv" "$REP/frontier-grouped.tsv" \
+    "$REP/frontier-grouped.unsorted.tsv"
+
+  run_step \
+    "$REC/report-counts-validate" \
+    "$REP/report-counts-validate.status" 0 \
+    "$REC/report-counts-validate.stdout" \
+    "$REC/report-counts-validate.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      expected=$(/usr/bin/awk '\''
+        {
+          for (i = 1; i <= NF; i++) {
+            split($i, part, "=")
+            if (part[1] == "failed_functions") print part[2]
+          }
+        }
+      '\'' "$1")
+      ordered=$(/usr/bin/awk '\''END { print NR }'\'' "$2")
+      unique=$(/usr/bin/awk '\''END { print NR }'\'' "$3")
+      frontier=$(/usr/bin/awk '\''END { print NR }'\'' "$4")
+      test "$ordered" -eq "$expected"
+      test "$unique" -eq "$expected"
+      test "$frontier" -eq "$expected"
+      /usr/bin/awk '\''
+        $0 == "" || $0 !~ /^[A-Za-z0-9_.$]+$/ { exit 102 }
+      '\'' "$3"
+    ' _ "$REP/report.summary.txt" \
+    "$REP/failed-functions.in-report-order.txt" \
+    "$REP/failed-functions.sorted.txt" "$REP/frontier.tsv"
+
+  if test "$repetition" -eq 1; then
+    run_step \
+      "$REC/extract" "$REP/extract.status" 0 \
+      "$REC/extract.stdout" "$REC/extract.stderr" \
+      /usr/bin/env -i \
+      HOME="$REP/home" TMPDIR="$REP/tmp" PATH="$PATH_VALUE" \
+      LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
+      /bin/bash -c '
+        set -euo pipefail
+        failure_file="$1"
+        input="$2"
+        accepted="$3"
+        semantic_stdout="$4"
+        semantic_stderr="$5"
+        extract_args=(--delete -S -o "$accepted")
+        while IFS= read -r function_name; do
+          extract_args+=(--func "$function_name")
+        done <"$failure_file"
+        extract_args+=("$input")
+        exec /usr/lib/llvm-22/bin/llvm-extract \
+          "${extract_args[@]}" \
+          >"$semantic_stdout" 2>"$semantic_stderr"
+      ' _ "$REP/failed-functions.sorted.txt" "$INPUT" "$ACCEPTED" \
+      "$REP/extract.stdout.raw" "$REP/extract.stderr.raw"
+
+    run_step \
+      "$REC/accepted-freeze" "$REP/accepted-freeze.status" 0 \
+      "$REC/accepted-freeze.stdout" "$REC/accepted-freeze.stderr" \
+      /bin/bash -c '
+        set -euo pipefail
+        accepted="$1"
+        identity="$2"
+        test -f "$accepted"
+        test ! -L "$accepted"
+        test ! -s "$3"
+        test ! -s "$4"
+        /usr/bin/chmod 0444 "$accepted"
+        printf "path\tbytes\tmode\tsha256\n%s\t%s\t0444\t%s\n" \
+          "$accepted" \
+          "$(/usr/bin/stat -c "%s" "$accepted")" \
+          "$(/usr/bin/sha256sum "$accepted" |
+            /usr/bin/awk "{print \\$1}")" >"$identity"
+      ' _ "$ACCEPTED" "$REP/accepted.identity.tsv" \
+      "$REP/extract.stdout.raw" "$REP/extract.stderr.raw"
+  fi
+
+  test -f "$ACCEPTED"
+  test "$(/usr/bin/stat -c '%a' "$ACCEPTED")" = 444
+
+  run_step \
+    "$REC/object" "$REP/object.status" 0 \
+    "$REC/object.stdout" "$REC/object.stderr" \
+    /usr/bin/env -i \
+    HOME="$REP/home" TMPDIR="$REP/tmp" PATH="$PATH_VALUE" \
+    LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
+    /bin/bash -c '
+      set -euo pipefail
+      exec "$1" \
+        --emit=obj \
+        --generic-cfg-selector \
+        --target=x86_64-linux \
+        --input-limit=67108864 \
+        "$2" >"$3" 2>"$4"
+    ' _ "$ARTIFACT" "$ACCEPTED" "$REP/accepted.o" \
+    "$REP/object.stderr.raw"
+
+  run_step \
+    "$REC/owner" "$REP/owner.status" 0 \
+    "$REC/owner.stdout" "$REC/owner.stderr" \
+    /usr/bin/env -i \
+    HOME="$REP/home" TMPDIR="$REP/tmp" PATH="$PATH_VALUE" \
+    LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
+    /bin/bash -c '
+      set -euo pipefail
+      exec "$1" \
+        --emit=selection-owner-manifest \
+        --generic-cfg-selector \
+        --target=x86_64-linux \
+        --input-limit=67108864 \
+        "$2" >"$3" 2>"$4"
+    ' _ "$ARTIFACT" "$ACCEPTED" "$REP/owner.tsv" \
+    "$REP/owner.stderr.raw"
+
+  run_step \
+    "$REC/objdump" "$REP/objdump.status" 0 \
+    "$REC/objdump.stdout" "$REC/objdump.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      cd "$1"
+      exec /usr/bin/objdump -d accepted.o >accepted.objdump \
+        2>objdump.stderr.raw
+    ' _ "$REP"
+
+  run_step \
+    "$REC/readelf-sections" "$REP/readelf-sections.status" 0 \
+    "$REC/readelf-sections.stdout" "$REC/readelf-sections.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      exec /usr/bin/readelf -SW "$1" >"$2" 2>"$3"
+    ' _ "$REP/accepted.o" "$REP/sections.readelf" \
+    "$REP/sections.stderr.raw"
+
+  run_step \
+    "$REC/readelf-symbols" "$REP/readelf-symbols.status" 0 \
+    "$REC/readelf-symbols.stdout" "$REC/readelf-symbols.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      exec /usr/bin/readelf -sW "$1" >"$2" 2>"$3"
+    ' _ "$REP/accepted.o" "$REP/symbols.readelf" \
+    "$REP/symbols.stderr.raw"
+
+  run_step \
+    "$REC/objcopy-text" "$REP/objcopy-text.status" 0 \
+    "$REC/objcopy-text.stdout" "$REC/objcopy-text.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      exec /usr/bin/objcopy --dump-section ".text=$2" "$1" \
+        >"$3" 2>"$4"
+    ' _ "$REP/accepted.o" "$REP/text.bin" \
+    "$REP/objcopy.stdout.raw" "$REP/objcopy.stderr.raw"
+
+  run_step \
+    "$REC/functions-sorted" "$REP/functions-sorted.status" 0 \
+    "$REC/functions-sorted.stdout" "$REC/functions-sorted.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      temporary="$3"
+      LC_ALL=C /usr/bin/awk '\''
+        $4 == "FUNC" && $7 == "1" && ($3 + 0) > 0 {
+          print $8 "\t" $2 "\t" $3
+        }
+      '\'' "$1" >"$temporary"
+      LC_ALL=C /usr/bin/sort -t "$(printf "\t")" -k1,1 \
+        -o "$2" "$temporary"
+      /usr/bin/chmod 0444 "$temporary"
+    ' _ "$REP/symbols.readelf" "$REP/functions.sorted.tsv" \
+    "$REP/functions.unsorted.tsv"
+
+  row=0
+  while IFS=$'\t' read -r function_name value_hex size_dec; do
+    row=$((row + 1))
+    id=$(printf '%06d' "$row")
+    offset=$((16#$value_hex))
+
+    run_step \
+      "$REC/function-$id-dd" "$REP/functions/$id.dd.status" 0 \
+      "$REC/function-$id-dd.stdout" "$REC/function-$id-dd.stderr" \
+      /usr/bin/dd if="$REP/text.bin" \
+      of="$REP/functions/$id.code.bin" \
+      bs=1 skip="$offset" count="$size_dec" status=none
+
+    run_step \
+      "$REC/function-$id-objdump" \
+      "$REP/functions/$id.objdump.status" 0 \
+      "$REC/function-$id-objdump.stdout" \
+      "$REC/function-$id-objdump.stderr" \
+      /bin/bash -c '
+        set -euo pipefail
+        cd "$1"
+        exec /usr/bin/objdump -dr \
+          --disassemble="$2" accepted.o \
+          >"functions/$3.objdump" \
+          2>"functions/$3.objdump.stderr"
+      ' _ "$REP" "$function_name" "$id"
+
+    run_step \
+      "$REC/function-$id-identity" \
+      "$REP/functions/$id.identity.status" 0 \
+      "$REC/function-$id-identity.stdout" \
+      "$REC/function-$id-identity.stderr" \
+      /bin/bash -c '
+        set -euo pipefail
+        test ! -s "$2"
+        test "$(/usr/bin/stat -c "%s" "$1")" -eq "$3"
+        printf "%s\t%s\t%s\t%s\t%s\t%s\n" \
+          "$4" "$5" "$3" "$6" \
+          "$(/usr/bin/sha256sum "$1" |
+            /usr/bin/awk "{print \\$1}")" \
+          "$(/usr/bin/sha256sum "$7" |
+            /usr/bin/awk "{print \\$1}")" >"$8"
+      ' _ "$REP/functions/$id.code.bin" \
+      "$REP/functions/$id.objdump.stderr" "$size_dec" "$id" \
+      "$function_name" "$value_hex" "$REP/functions/$id.objdump" \
+      "$REP/functions/$id.identity.tsv"
+  done <"$REP/functions.sorted.tsv"
+
+  run_step \
+    "$REC/per-function" "$REP/per-function.status" 0 \
+    "$REC/per-function.stdout" "$REC/per-function.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      functions="$1"
+      output="$2"
+      source_manifest="$3"
+      : >"$output"
+      shopt -s nullglob
+      rows=("$functions"/*.identity.tsv)
+      expected_rows=$(/usr/bin/awk '\''END { print NR }'\'' \
+        "$source_manifest")
+      test "${#rows[@]}" -eq "$expected_rows"
+      for row_path in "${rows[@]}"; do
+        while IFS= read -r row_text; do
+          printf "%s\n" "$row_text" >>"$output"
+        done <"$row_path"
+      done
+    ' _ "$REP/functions" "$REP/per-function-identities.tsv" \
+    "$REP/functions.sorted.tsv"
+
+  run_step \
+    "$REC/owner-ledger" "$REP/owner-ledger.status" 0 \
+    "$REC/owner-ledger.stdout" "$REC/owner-ledger.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      LC_ALL=C /usr/bin/awk -F "\t" '\''
+        NR == 1 {
+          if ($1 != "row_identity" ||
+              $2 != "selection_owner") exit 92
+          next
+        }
+        {
+          if ($2 != "composed_block" &&
+              $2 != "composed_cfg" &&
+              $2 != "legacy_envelope" &&
+              $2 != "structural_fallback") exit 93
+          if (seen[$1] != 0) exit 94
+          seen[$1] = 1
+          count[$2] += 1
+          total += 1
+        }
+        END {
+          expected = 0
+          while ((getline line < summary) > 0) {
+            fields = split(line, values, " ")
+            for (i = 1; i <= fields; i++) {
+              split(values[i], part, "=")
+              if (part[1] == "emitted_functions") expected = part[2] + 0
+            }
+          }
+          if (total != expected) exit 95
+          printf("composed_block=%d\n", count["composed_block"])
+          printf("composed_cfg=%d\n", count["composed_cfg"])
+          printf("legacy_envelope=%d\n", count["legacy_envelope"])
+          printf("structural_fallback=%d\n",
+            count["structural_fallback"])
+          printf("ledger=%d/%d/%d\n",
+            count["composed_block"] + count["composed_cfg"],
+            count["legacy_envelope"],
+            count["structural_fallback"])
+          printf("total=%d\n", total)
+        }
+      '\'' "$1" >"$2"
+    ' _ "$REP/owner.tsv" "$REP/owner-ledger.txt" \
+    "$REP/report.summary.txt"
+done
 ```
 
-Every extracted code file must contain exactly `size_dec` bytes. The loop
-row count must equal `emitted_functions`. Empty, duplicate, overlapping, or
-out-of-range symbols are a stop. The sorted TSV is the canonical
-per-function manifest.
+There is exactly one extraction invocation: repetition 1 produces
+`$ACCEPTED`, freezes it mode `0444`, and records its identity before any
+object consumer. Repetitions 2 and 3 never create an `accepted.ll`; all
+three object and owner commands consume the same absolute `$ACCEPTED`.
 
-### 6.4 Complete candidate-specific frontier
+## 6. Exact equality, statuses, and canonical identities
 
-The frontier is the complete failure set, not a selected historical subset:
+Continue the same driver, without resetting shell state:
 
 ```bash
-LC_ALL=C /usr/bin/awk '
-  $1 == "zllvm-codegen-failure" {
-    function = diagnostic = selector_tag = selector_detail = "";
-    for (i = 2; i <= NF; i++) {
-      if ($i ~ /^function=/) {
-        function = $i; sub(/^function=/, "", function)
-      } else if ($i ~ /^diagnostic=/) {
-        diagnostic = $i; sub(/^diagnostic=/, "", diagnostic)
-      } else if ($i ~ /^selector_tag=/) {
-        selector_tag = $i; sub(/^selector_tag=/, "", selector_tag)
-      } else if ($i ~ /^selector_detail=/) {
-        selector_detail = $i; sub(/^selector_detail=/, "", selector_detail)
+readonly BASE="$CANONICAL/repetition-1"
+
+for repetition in 2 3; do
+  REP="$CANONICAL/repetition-$repetition"
+  for relative in \
+    report.stdout.raw report.stderr.raw report.status \
+    report.summary.txt report-summary.status report-validate.status \
+    report-counts-validate.status \
+    failed-functions.in-report-order.txt failures-in-order.status \
+    failed-functions.sorted.txt failures-sorted.status \
+    frontier.unsorted.tsv frontier.tsv frontier.status \
+    frontier-grouped.unsorted.tsv frontier-grouped.tsv \
+    frontier-grouped.status \
+    accepted.o object.stderr.raw object.status \
+    owner.tsv owner.stderr.raw owner.status \
+    accepted.objdump objdump.stderr.raw objdump.status \
+    sections.readelf sections.stderr.raw readelf-sections.status \
+    symbols.readelf symbols.stderr.raw readelf-symbols.status \
+    text.bin objcopy.stdout.raw objcopy.stderr.raw objcopy-text.status \
+    functions.unsorted.tsv functions.sorted.tsv functions-sorted.status \
+    per-function-identities.tsv per-function.status \
+    owner-ledger.txt owner-ledger.status
+  do
+    label=${relative//[^A-Za-z0-9]/-}
+    run_step \
+      "$CANONICAL/comparisons/repetition-$repetition-$label" \
+      "$CANONICAL/comparisons/repetition-$repetition-$label.status" 0 \
+      "$CANONICAL/comparisons/repetition-$repetition-$label.stdout" \
+      "$CANONICAL/comparisons/repetition-$repetition-$label.stderr" \
+      /usr/bin/cmp "$BASE/$relative" "$REP/$relative"
+  done
+
+  while IFS=$'\t' read -r id function_name size_dec value_hex \
+    code_sha dis_sha
+  do
+    for suffix in \
+      code.bin objdump objdump.stderr \
+      dd.status objdump.status identity.status identity.tsv
+    do
+      label=${suffix//[^A-Za-z0-9]/-}
+      run_step \
+        "$CANONICAL/comparisons/repetition-$repetition-$id-$label" \
+        "$CANONICAL/comparisons/repetition-$repetition-$id-$label.status" \
+        0 \
+        "$CANONICAL/comparisons/repetition-$repetition-$id-$label.stdout" \
+        "$CANONICAL/comparisons/repetition-$repetition-$id-$label.stderr" \
+        /usr/bin/cmp "$BASE/functions/$id.$suffix" \
+        "$REP/functions/$id.$suffix"
+    done
+  done <"$BASE/per-function-identities.tsv"
+done
+
+run_step \
+  "$CANONICAL/records/identity-manifest" \
+  "$CANONICAL/identity-manifest.status" 0 \
+  "$CANONICAL/records/identity-manifest.stdout" \
+  "$CANONICAL/records/identity-manifest.stderr" \
+  /bin/bash -c '
+    set -euo pipefail
+    input="$1"
+    artifact="$2"
+    base="$3"
+    output="$4"
+    accepted="$5"
+    summary="$base/report.summary.txt"
+    population=$(/usr/bin/awk '\''
+      {
+        for (i = 1; i <= NF; i++) {
+          split($i, part, "=")
+          if (part[1] == "selected_functions") print part[2]
+        }
       }
-    }
-    if (function == "" || diagnostic == "" ||
-        selector_tag == "" || selector_detail == "") exit 93;
-    print function "\t" diagnostic "\t" selector_tag "\t" selector_detail
-  }' "$REP/report.stderr.raw" |
-  LC_ALL=C /usr/bin/sort -t "$(printf '\t')" -k1,1 \
-  >"$REP/frontier.tsv"
+    '\'' "$summary")
+    first_failure=$(/usr/bin/awk '\''
+      {
+        for (i = 1; i <= NF; i++) {
+          split($i, part, "=")
+          if (part[1] == "first_failure") print part[2]
+        }
+      }
+    '\'' "$summary")
+    frontier_population=$(/usr/bin/awk '\''END { print NR }'\'' \
+      "$base/frontier.tsv")
+    function_count=$(/usr/bin/awk '\''END { print NR }'\'' \
+      "$base/per-function-identities.tsv")
+    printf "%s\t%s\n" \
+      o2_calls_crt_v1_r131_input_sha256 \
+      "$(/usr/bin/sha256sum "$input" | /usr/bin/awk "{print \\$1}")" \
+      o2_calls_crt_v1_r131_artifact_sha256 \
+      "$(/usr/bin/sha256sum "$artifact" |
+        /usr/bin/awk "{print \\$1}")" \
+      o2_calls_crt_v1_r131_report_sha256 \
+      "$(/usr/bin/sha256sum "$base/report.stderr.raw" |
+        /usr/bin/awk "{print \\$1}")" \
+      o2_calls_crt_v1_r131_report_population "$population" \
+      o2_calls_crt_v1_r131_report_first_failure "$first_failure" \
+      o2_calls_crt_v1_r131_report_status \
+      "$(/usr/bin/awk "{print \\$1}" "$base/report.status")" \
+      o2_calls_crt_v1_r131_accepted_input_sha256 \
+      "$(/usr/bin/sha256sum "$accepted" |
+        /usr/bin/awk "{print \\$1}")" \
+      o2_calls_crt_v1_r131_object_sha256 \
+      "$(/usr/bin/sha256sum "$base/accepted.o" |
+        /usr/bin/awk "{print \\$1}")" \
+      o2_calls_crt_v1_r131_object_status \
+      "$(/usr/bin/awk "{print \\$1}" "$base/object.status")" \
+      o2_calls_crt_v1_r131_owner_sha256 \
+      "$(/usr/bin/sha256sum "$base/owner.tsv" |
+        /usr/bin/awk "{print \\$1}")" \
+      o2_calls_crt_v1_r131_owner_ledger \
+      "$(/usr/bin/awk -F= '\''$1 == "ledger" { print $2 }'\'' \
+        "$base/owner-ledger.txt")" \
+      o2_calls_crt_v1_r131_owner_status \
+      "$(/usr/bin/awk "{print \\$1}" "$base/owner.status")" \
+      o2_calls_crt_v1_r131_objdump_sha256 \
+      "$(/usr/bin/sha256sum "$base/accepted.objdump" |
+        /usr/bin/awk "{print \\$1}")" \
+      o2_calls_crt_v1_r131_per_function_manifest_sha256 \
+      "$(/usr/bin/sha256sum "$base/per-function-identities.tsv" |
+        /usr/bin/awk "{print \\$1}")" \
+      o2_calls_crt_v1_r131_per_function_count "$function_count" \
+      o2_calls_crt_v1_r131_frontier_manifest_sha256 \
+      "$(/usr/bin/sha256sum "$base/frontier.tsv" |
+        /usr/bin/awk "{print \\$1}")" \
+      o2_calls_crt_v1_r131_frontier_population "$frontier_population" \
+      >"$output"
+  ' _ "$INPUT" "$ARTIFACT" "$BASE" \
+  "$CANONICAL/o2_calls_crt_v1_r131.identities.tsv" "$ACCEPTED"
+
+for repetition in 1 2 3; do
+  REP="$CANONICAL/repetition-$repetition"
+  run_step \
+    "$CANONICAL/records/repetition-$repetition-finalize" \
+    "$CANONICAL/repetition-$repetition-finalize.status" 0 \
+    "$CANONICAL/records/repetition-$repetition-finalize.stdout" \
+    "$CANONICAL/records/repetition-$repetition-finalize.stderr" \
+    /bin/bash -c '
+      set -euo pipefail
+      rep="$1"
+      manifest="$2"
+      shopt -s globstar nullglob
+      paths=("$rep"/**)
+      for path in "${paths[@]}"; do
+        test -f "$path" && test ! -L "$path" || continue
+        /usr/bin/chmod 0444 "$path"
+      done
+      {
+        printf "path\tbytes\tmode\tsha256\n"
+        {
+          for path in "${paths[@]}"; do
+            test -f "$path" && test ! -L "$path" || continue
+            printf "%s\t%s\t%s\t%s\n" \
+              "$path" \
+              "$(/usr/bin/stat -c "%s" "$path")" \
+              "$(/usr/bin/stat -c "%a" "$path")" \
+              "$(/usr/bin/sha256sum "$path" |
+                /usr/bin/awk "{print \\$1}")"
+          done
+        } | LC_ALL=C /usr/bin/sort -t "$(printf "\t")" -k1,1
+      } >"$manifest"
+      /usr/bin/chmod 0444 "$manifest"
+    ' _ "$REP" \
+    "$CANONICAL/manifests/repetition-$repetition.final.tsv"
+done
+
+run_step \
+  "$CANONICAL/records/canonical-finalize" \
+  "$CANONICAL/canonical-finalize.status" 0 \
+  "$CANONICAL/records/canonical-finalize.stdout" \
+  "$CANONICAL/records/canonical-finalize.stderr" \
+  /bin/bash -c '
+    set -euo pipefail
+    canonical="$1"
+    identities="$2"
+    artifact="$3"
+    /usr/bin/chmod 0444 "$identities"
+    test "$(/usr/bin/stat -c "%a" "$artifact")" = 555
+    test "$(/usr/bin/stat -c "%a" "$4")" = 444
+    printf "path\tbytes\tmode\tsha256\n%s\t%s\t0444\t%s\n" \
+      "$identities" \
+      "$(/usr/bin/stat -c "%s" "$identities")" \
+      "$(/usr/bin/sha256sum "$identities" |
+        /usr/bin/awk "{print \\$1}")" \
+      >"$canonical/manifests/identities.final.tsv"
+    /usr/bin/chmod 0444 \
+      "$canonical/manifests/identities.final.tsv"
+  ' _ "$CANONICAL" \
+  "$CANONICAL/o2_calls_crt_v1_r131.identities.tsv" \
+  "$ARTIFACT" "$ACCEPTED"
 ```
 
-Its row count must equal `failed_functions`; every row must map one-to-one
-to an original report failure. Record a second sorted proof grouped by exact
-`selector_tag`, `selector_detail`, and `diagnostic`, with counts. These two
-files define the candidate-specific frontier identity. Historical six-row
-pointer evidence is reference-only and cannot fill a missing v1 row.
+All three reports consume the adopted raw input. Only repetition 1 produces
+the successful subset. Every later canonical and coverage object/owner
+consumer uses that one read-only file. No comparison normalizes semantic
+output. Any mismatch stops the driver before section 8.
 
-### 6.5 Per-command and repetition manifests
+## 7. Complete producer-before-consumer ledger
 
-For every command retain, before mode changes:
+This ledger is part of the executable contract. A pattern denotes the
+finite set driven by the already-produced manifest named in its consumer
+column; it is not an open-ended path choice.
+
+### 7.1 Immutable inputs
+
+| Input | Absolute path | Required type/mode/bytes | Required identity check | Consumers |
+|---|---|---|---|---|
+| adopted raw input | `/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/compiler_rt_v1.ll` | regular, `0444`, 1,897,410 | SHA-256 `9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1` | all canonical/off/on report commands |
+| adoption manifest | `/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/adoption_manifest.tsv` | regular, `0444`, 4,394 | SHA-256 `500e73c8433aa73159adfba5de8a6708ae4030140b97b823ef895caa1528f2bf` | preflight only |
+| bundle manifest | `/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/inbox187_baseline_validation_contract_bundle/manifests/bundle-files.sha256` | regular, `0444`, 2,519 | SHA-256 `0576d5803400ea9575d65fc501b87d514c97e806540be29018fb5192bd68e7f0` | bundle preflight |
+| combined patch | `/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/inbox187_baseline_validation_contract_bundle/patches/aggregate-consumer-observer-guard.patch` | regular, `0444`, 41,140 | SHA-256 `7508d1d8f74b7e9b97ae5722a0822a86c8d2079779a25cd37559ce5bc651036f` | apply-check only |
+| reproduction manifest | `/home/oleg/prog/z_llvm/tmp/inbox184_o2_compiler_rt_v1/materialize/comparison/retained-files-final.tsv` | regular, `0664`, 458,294 | SHA-256 `885008980c8a272e82d06cf89b81652ab5a9669e89364b01d7b9e2761135ff1e` | preflight only |
+| live pins | `/home/oleg/prog/z_llvm/docs/evidence/tmp_retention_pins.tsv` | regular, `0664`, 3,051 | SHA-256 `1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3` | preflight only |
+| retention policy | `/home/oleg/prog/z_llvm/docs/retention_headroom_policy.md` | regular, `0664`, 10,622 | SHA-256 `a31e3fbf7aa03c8544fc5f9921e350c25e4e470cc3c779dfb356136634e052dd` | preflight only |
+| cleanup source | `/home/oleg/prog/z_llvm/tools/clean_tmp.zig` | regular, `0664`, 50,100 | SHA-256 `8e0c54ad6fed9e46326049dbe64bff743daddcc2527c1dc4d5e02be15fba2d5e` | preflight only; never executed |
+| watcher | `/home/oleg/prog/z_llvm/scripts/z_llvm_watcher_loop.sh` | regular, `0775`, 10,850 | Git blob `b64131cf60dd0ef638e815cd33db9ae8595a72cf` for HEAD/index/worktree | preflight only; never executed |
+| bypass inventory | `/home/oleg/prog/z_llvm/docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv` | regular, `0664`, 5,188 | SHA-256 `2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11`; recount 131 | preflight/restoration |
+| facade manifest | `/home/oleg/prog/z_llvm/docs/evidence/inbox128_o2_r1_facade_manifest.tsv` | regular, `0664`, 2,686 | SHA-256 `2adcd99ee3bfbe0e9f09673f1df02ab305b5ddb2c1b461023152d5d03a079c26` | preflight/restoration |
+| facade source | `/home/oleg/prog/z_llvm/src/codegen/x86_64/generic_cfg/composed_selector_value_use_transaction.zig` | regular, `0664`, 103 | SHA-256 `4f5887e9d2bce0943df26c1e08e8360053440da64eefd19ddfd9d53225dddd7a` | preflight/restoration |
+| pinned Zig source | `/home/oleg/prog/ziglang` | Git worktree | commit `bdee02bc0c7f227c0f11bc9a449df673fe803540`, tree `aa032b2b82a48a4684657f909e6e270a6c925e33` | provenance preflight only |
+| pinned stage4 | `/home/oleg/prog/ziglang/build/stage4/bin/zig` | regular, `0775`, 530,327,885 | SHA-256 `dcea3478273d7ffe3895709c8eed4ccc0724548869cdb86183fc7356164410b7` | provenance preflight only; never executed here |
+| frozen tool set | paths in `$BUNDLE/manifests/future-tool-identities.sha256` | modes unchanged | every path SHA-256 equals its manifest row | all future commands |
+
+Every row is checked before `$ROOT` is created and again after restoration.
+Mode, size, and identity movement is a stop.
+
+### 7.2 Canonical directories and files
+
+| Generated path or finite pattern | Sole producer | First consumer |
+|---|---|---|
+| `$PARENT/baseline_validation_v1.preflight.{command.txt,environment.txt,cwd.txt,start.utc,end.utc,stdout.raw,stderr.raw,status,records.tsv}` | immutable-input preflight record/write | review |
+| `$PARENT/baseline_validation_v1.driver.{command.txt,environment.txt,cwd.txt,start.utc,end.utc,stdout.raw,stderr.raw,status,records.tsv}` | driver bootstrap record/write | review |
+| `$ROOT/canonical/{records,manifests,comparisons,build/*,artifact,repetition-{1,2,3}/{home,tmp,records,functions}}` | driver bootstrap `mkdir` | subsequent named step |
+| `$ROOT/canonical/source` | `worktree-add` | `source-preflight`, then build |
+| `$ROOT/canonical/{worktree-add,source-preflight,artifact-install,artifact-identity,identity-manifest,repetition-{1,2,3}-finalize,canonical-finalize}.status` | corresponding named `run_step` | final evidence |
+| `$ROOT/canonical/records/*.{command.txt,environment.txt,cwd.txt,start.utc,end.utc,stdout,stderr}` | corresponding named canonical step | final evidence |
+| `$ROOT/canonical/build/{cache/**,prefix/**,stdout.raw,stderr.raw,build.status}` | `build` | artifact install/final evidence |
+| `$ROOT/canonical/artifact/z_llvm` | `artifact-install` | all three report/object/owner producers |
+| `$ROOT/canonical/artifact.identity.tsv` | `artifact-identity` | identity manifest/final evidence |
+| `repetition-N/report.{stdout.raw,stderr.raw,status}` | `repetition-N/report` | report parsers/comparisons |
+| `repetition-N/report.summary.txt` and parser status | `report-summary` | report validation/identity/comparison |
+| `repetition-N/failed-functions.in-report-order.txt` and status | `failures-in-order` | unique sort/comparison |
+| `repetition-N/failed-functions.sorted.txt` and status | `failures-sorted` | repetition-1 extraction/comparison |
+| `repetition-N/frontier{,-grouped}{,.unsorted}.tsv` and statuses | `frontier`, then `frontier-grouped` | identity/comparison |
+| `repetition-1/accepted.ll` | repetition-1 `extract` only | freeze, all canonical object/owner, section 9 |
+| `repetition-1/{extract.stdout.raw,extract.stderr.raw,extract.status,accepted.identity.tsv,accepted-freeze.status}` | `extract`, then `accepted-freeze` | immutable-input checks |
+| `repetition-N/accepted.o` and object records/status | `object` | objdump/readelf/objcopy/comparisons |
+| `repetition-N/owner.tsv` and owner records/status | `owner` | ledger/comparisons |
+| `repetition-N/accepted.objdump`, stderr, status | `objdump` | comparison/identity |
+| `repetition-N/{sections,symbols}.readelf`, stderr, statuses | two readelf steps | function sorting/comparison |
+| `repetition-N/text.bin`, objcopy channels/status | `objcopy-text` | per-function `dd` |
+| `repetition-N/functions.{unsorted,sorted}.tsv` and status | `functions-sorted` | finite per-function loop |
+| `repetition-N/functions/NNNNNN.{code.bin,dd.status,objdump,objdump.stderr,objdump.status,identity.tsv,identity.status}` | manifest-driven `dd`, objdump, identity steps | per-function aggregate/comparison |
+| `repetition-N/per-function-identities.tsv` and status | `per-function` | comparison/identity |
+| `repetition-N/owner-ledger.txt` and status | `owner-ledger` | comparison/identity |
+| `$CANONICAL/comparisons/*.{stdout,stderr,status,command.txt,environment.txt,cwd.txt,start.utc,end.utc}` | one named `run_step` comparison | final evidence only |
+| `$CANONICAL/o2_calls_crt_v1_r131.identities.tsv` | `identity-manifest` | section 9 identity checks |
+| `$CANONICAL/manifests/repetition-N.final.tsv` | repetition-N finalize | review |
+| `$CANONICAL/manifests/identities.final.tsv` | canonical finalize | review |
+
+Each `run_step` additionally and solely produces its unique
+`command.txt`, `environment.txt`, `cwd.txt`, `start.utc`, `end.utc`,
+stdout, stderr, status, and `records.tsv` paths. Its `records.tsv` freezes
+the path, bytes, final mode, and SHA-256 of the other eight records after
+they become `0444`. The table's `N` is exactly `1`, `2`, or `3`;
+`NNNNNN` is exactly one row ID from that repetition's
+`functions.sorted.tsv`.
+
+### 7.3 Coverage roots
+
+Canonical, observation-off, and observation-on generated roots are
+pairwise disjoint:
 
 ```text
-exact command text
-exact environment text
-start UTC
-end UTC
-exit status
-stdout path/bytes/SHA-256/mode
-stderr path/bytes/SHA-256/mode
-all declared output paths/bytes/SHA-256/mode
-input SHA-256
-artifact SHA-256
-source commit/tree/status
+$ROOT/canonical
+$ROOT/coverage/observation-off
+$ROOT/coverage/observation-on
 ```
 
-Create a sorted repetition manifest covering every file in `REP` except the
-manifest itself, then make every output and manifest `0444` and re-hash after
-the final modes. No output is normalized or rewritten after its producing
-command.
+The coverage producers are closed as follows:
 
-## 7. Three-repetition equality and canonical names
+| Generated path or finite pattern | Sole producer | First consumer |
+|---|---|---|
+| `$ROOT/coverage/reference` and `$ROOT/coverage/directory-creation.{command.txt,environment.txt,cwd.txt,start.utc,end.utc,stdout.raw,stderr.raw,status,records.tsv}` | section 9 directory-creation command/record | reference records |
+| `$OFF/{home,tmp,records,functions}` and `$ON/{home,tmp,records,functions}` | section 9 directory-creation command | phase commands |
+| `$OFF/report.{stdout,stderr}.raw`, report status/records | off report | off raw parsers/comparisons |
+| `$OFF/{report.summary.txt,failed-functions.*,frontier.tsv,frontier-grouped.tsv}` and parser records/statuses | corresponding off parser | off raw comparisons |
+| `$OFF/{accepted.o,object.stderr.raw,owner.tsv,owner.stderr.raw}` and records/statuses | off object/owner | off inspection/ledger |
+| `$OFF/{accepted.objdump,sections.readelf,symbols.readelf,text.bin,functions.sorted.tsv,per-function-identities.tsv,owner-ledger.txt}` plus finite function files and records | corresponding off inspection/manifest step | off comparisons/identity checks |
+| `$ROOT/coverage/reference/{channels.before-observation-off.txt,channels.after-observation-off.txt,canonical-accepted.before.tsv,canonical-accepted.after-off.tsv,canonical-accepted.after-off.cmp.status,canonical-accepted.after-on.tsv,canonical-accepted.after-on.cmp.status}` | corresponding exact absence/identity check | next named comparison/review |
+| `$ON/report.coverage.tsv` | on report only | report counter validator |
+| `$ON/object.coverage.tsv` | on object only | object counter validator |
+| `$ON/owner.coverage.tsv` | on owner only | owner counter validator |
+| `$ON/report.{stdout,stderr}.raw`, parsed raw-report outputs and records | on report/parsers | on raw comparisons |
+| `$ON/{accepted.o,owner.tsv,accepted.objdump,sections.readelf,symbols.readelf,text.bin,functions.sorted.tsv,per-function-identities.tsv,owner-ledger.txt}` plus finite function files and records | corresponding on successful-subset producer | on comparisons/identity checks |
+| `$ON/records/{report,object,owner}-channel.presence.txt` | corresponding sole channel producer postcheck | review |
+| `$ON/{validate-report-counters,validate-object-counters,validate-owner-counters,cmp-object-owner-counters}.{stdout,stderr}` and record/status sets | corresponding counter validator/comparison | review |
+| `$ROOT/coverage/{observation-off,observation-on}.{files.sha256,final.tsv}` and `final-manifests.sha256` | section 9 finalizers | review |
 
-After all three repetitions finish, compare repetition 1 to repetitions 2
-and 3 with raw `cmp` for every corresponding semantic and provenance output,
-including:
-
-```text
-report stdout/stderr/status and parsed summary
-failed-function lists
-accepted.ll
-accepted.o and object stderr/status
-owner.tsv, owner stderr/status, owner ledger
-accepted.objdump and stderr/status
-sections.readelf and symbols.readelf
-text.bin
-functions.sorted.tsv
-every per-function code file and disassembly
-per-function-identities.tsv
-frontier.tsv and grouped frontier proof
-all command/environment records
-```
-
-Path fields in command/provenance records are compared after replacing only
-the exact repetition directory token with literal `<REP>` at record creation
-time; semantic output files are never normalized. Any byte movement, even
-with stable counts, is failure.
-
-Only after every comparison passes, write the following names to the
-validation result manifest using the exact observed values:
-
-```text
-o2_calls_crt_v1_r131_input_sha256
-o2_calls_crt_v1_r131_artifact_sha256
-o2_calls_crt_v1_r131_report_sha256
-o2_calls_crt_v1_r131_report_population
-o2_calls_crt_v1_r131_report_first_failure
-o2_calls_crt_v1_r131_report_status
-o2_calls_crt_v1_r131_accepted_input_sha256
-o2_calls_crt_v1_r131_object_sha256
-o2_calls_crt_v1_r131_object_status
-o2_calls_crt_v1_r131_owner_sha256
-o2_calls_crt_v1_r131_owner_ledger
-o2_calls_crt_v1_r131_owner_status
-o2_calls_crt_v1_r131_objdump_sha256
-o2_calls_crt_v1_r131_per_function_manifest_sha256
-o2_calls_crt_v1_r131_per_function_count
-o2_calls_crt_v1_r131_frontier_manifest_sha256
-o2_calls_crt_v1_r131_frontier_population
-```
-
-The result manifest is new evidence requiring separate Reviewer/user
-acceptance. It does not modify historical identity files.
+Neither coverage root has a producer for `accepted.ll`. Every coverage
+object/owner command references the immutable absolute `$ACCEPTED`.
+Every report command references the immutable absolute `$INPUT`. Any
+duplicate producer, read-before-produce, unlisted output, root overlap, or
+implicit path is a contract failure.
 
 ## 8. Coverage-only artifact and guard
 
@@ -749,14 +1610,11 @@ The following blocks are one ordered command stream supplied to one
 coverage source root with an otherwise empty environment:
 
 ```bash
-/usr/bin/mkdir -p \
-  /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/driver/home \
-  /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/driver/tmp
 (
   cd /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/source
   exec /usr/bin/env -i \
-    HOME=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/driver/home \
-    TMPDIR=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/driver/tmp \
+    HOME=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage \
+    TMPDIR=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage \
     PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
     LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
     /bin/bash --noprofile --norc
@@ -783,9 +1641,9 @@ readonly OBJECT_CHANNEL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/
 readonly OWNER_CHANNEL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/observation-on/owner.coverage.tsv
 ```
 
-Section 7 must have written `CANONICAL_IDENTITIES` as two-column TSV
+Section 6 must have written `CANONICAL_IDENTITIES` as two-column TSV
 `name<TAB>value`, with exactly one row for each frozen
-`o2_calls_crt_v1_r131_*` name. Section 6.5 command retention must place the
+`o2_calls_crt_v1_r131_*` name. The section-6 driver places the
 canonical repetition-1 statuses at these exact paths:
 
 ```text
@@ -810,12 +1668,34 @@ Every coverage command below is recorded through this one exact,
 non-transforming Bash function:
 
 ```bash
+write_coverage_status_once() {
+  local status_path="$1"
+  local status_value="$2"
+  local status_text
+  test ! -e "$status_path"
+  printf -v status_text '%s\n' "$status_value"
+  (
+    set -o noclobber
+    printf '%s' "$status_text" >"$status_path"
+  )
+}
+
 run_recorded() {
   local record_prefix="$1"
   local expected_status="$2"
   local stdout_path="$3"
   local stderr_path="$4"
+  local status
   shift 4
+
+  test ! -e "${record_prefix}.command.txt"
+  test ! -e "${record_prefix}.cwd.txt"
+  test ! -e "${record_prefix}.environment.txt"
+  test ! -e "${record_prefix}.start.utc"
+  test ! -e "${record_prefix}.end.utc"
+  test ! -e "${record_prefix}.status"
+  test ! -e "$stdout_path"
+  test ! -e "$stderr_path"
 
   printf '%q ' "$@" >"${record_prefix}.command.txt"
   printf '\n' >>"${record_prefix}.command.txt"
@@ -825,9 +1705,9 @@ run_recorded() {
   printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 >"${record_prefix}.start.utc"
   set +e
   "$@" >"$stdout_path" 2>"$stderr_path"
-  local status="$?"
+  status=$?
   set -e
-  printf '%s\n' "$status" >"${record_prefix}.status"
+  write_coverage_status_once "${record_prefix}.status" "$status"
   printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 >"${record_prefix}.end.utc"
   test "$status" -eq "$expected_status"
 }
@@ -860,11 +1740,64 @@ Create only the declared phase directories:
 ```bash
 test ! -e "$OFF"
 test ! -e "$ON"
-/usr/bin/mkdir -p \
+readonly COVERAGE_BOOT="$ROOT/coverage/directory-creation"
+for suffix in \
+  command.txt environment.txt cwd.txt start.utc end.utc \
+  stdout.raw stderr.raw status records.tsv
+do
+  test ! -e "$COVERAGE_BOOT.$suffix"
+done
+/usr/bin/env | LC_ALL=C /usr/bin/sort \
+  >"$COVERAGE_BOOT.environment.txt"
+pwd -P >"$COVERAGE_BOOT.cwd.txt"
+printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 >"$COVERAGE_BOOT.start.utc"
+coverage_mkdir_command=(/usr/bin/mkdir -p \
   "$OFF/home" "$OFF/tmp" "$OFF/records" "$OFF/functions" \
   "$ON/home" "$ON/tmp" "$ON/records" "$ON/functions" \
-  "$ROOT/coverage/reference"
-printf '0\n' >"$ROOT/coverage/records-directory-creation.status"
+  "$ROOT/coverage/reference")
+printf '%q ' "${coverage_mkdir_command[@]}" \
+  >"$COVERAGE_BOOT.command.txt"
+printf '\n' >>"$COVERAGE_BOOT.command.txt"
+set +e
+"${coverage_mkdir_command[@]}" \
+  >"$COVERAGE_BOOT.stdout.raw" \
+  2>"$COVERAGE_BOOT.stderr.raw"
+coverage_mkdir_status=$?
+set -e
+write_coverage_status_once "$COVERAGE_BOOT.status" \
+  "$coverage_mkdir_status"
+printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 >"$COVERAGE_BOOT.end.utc"
+test "$coverage_mkdir_status" -eq 0
+/usr/bin/chmod 0444 \
+  "$COVERAGE_BOOT.command.txt" \
+  "$COVERAGE_BOOT.environment.txt" \
+  "$COVERAGE_BOOT.cwd.txt" \
+  "$COVERAGE_BOOT.start.utc" \
+  "$COVERAGE_BOOT.end.utc" \
+  "$COVERAGE_BOOT.status" \
+  "$COVERAGE_BOOT.stdout.raw" \
+  "$COVERAGE_BOOT.stderr.raw"
+{
+  printf 'path\tbytes\tmode\tsha256\n'
+  for record_path in \
+    "$COVERAGE_BOOT.command.txt" \
+    "$COVERAGE_BOOT.environment.txt" \
+    "$COVERAGE_BOOT.cwd.txt" \
+    "$COVERAGE_BOOT.start.utc" \
+    "$COVERAGE_BOOT.end.utc" \
+    "$COVERAGE_BOOT.status" \
+    "$COVERAGE_BOOT.stdout.raw" \
+    "$COVERAGE_BOOT.stderr.raw"
+  do
+    printf '%s\t%s\t%s\t%s\n' \
+      "$record_path" \
+      "$(/usr/bin/stat -c '%s' "$record_path")" \
+      "$(/usr/bin/stat -c '%a' "$record_path")" \
+      "$(/usr/bin/sha256sum "$record_path" |
+        /usr/bin/awk '{print $1}')"
+  done
+} >"$COVERAGE_BOOT.records.tsv"
+/usr/bin/chmod 0444 "$COVERAGE_BOOT.records.tsv"
 ```
 
 The three prospective channel paths must all be absent before observation
@@ -1046,15 +1979,6 @@ do
     "$OFF/records/$status_name.status"
 done
 
-require_identity_sha o2_calls_crt_v1_r131_object_sha256 \
-  "$OFF/accepted.o" "$OFF/records/object-identity"
-require_identity_sha o2_calls_crt_v1_r131_owner_sha256 \
-  "$OFF/owner.tsv" "$OFF/records/owner-identity"
-require_identity_sha o2_calls_crt_v1_r131_objdump_sha256 \
-  "$OFF/accepted.objdump" "$OFF/records/objdump-identity"
-require_identity_sha o2_calls_crt_v1_r131_per_function_manifest_sha256 \
-  "$OFF/per-function-identities.tsv" \
-  "$OFF/records/per-function-identity"
 require_identity_sha o2_calls_crt_v1_r131_frontier_manifest_sha256 \
   "$OFF/frontier.tsv" "$OFF/records/frontier-identity"
 ```
@@ -1238,6 +2162,16 @@ do
     /usr/bin/cmp "$CANONICAL/$status_name.status" \
     "$OFF/records/$status_name.status"
 done
+
+require_identity_sha o2_calls_crt_v1_r131_object_sha256 \
+  "$OFF/accepted.o" "$OFF/records/object-identity"
+require_identity_sha o2_calls_crt_v1_r131_owner_sha256 \
+  "$OFF/owner.tsv" "$OFF/records/owner-identity"
+require_identity_sha o2_calls_crt_v1_r131_objdump_sha256 \
+  "$OFF/accepted.objdump" "$OFF/records/objdump-identity"
+require_identity_sha o2_calls_crt_v1_r131_per_function_manifest_sha256 \
+  "$OFF/per-function-identities.tsv" \
+  "$OFF/records/per-function-identity"
 ```
 
 The comparison loop is driven only by the immutable canonical manifest. It
@@ -1430,15 +2364,6 @@ do
     "$ON/records/$status_name.status"
 done
 
-require_identity_sha o2_calls_crt_v1_r131_object_sha256 \
-  "$ON/accepted.o" "$ON/records/object-identity"
-require_identity_sha o2_calls_crt_v1_r131_owner_sha256 \
-  "$ON/owner.tsv" "$ON/records/owner-identity"
-require_identity_sha o2_calls_crt_v1_r131_objdump_sha256 \
-  "$ON/accepted.objdump" "$ON/records/objdump-identity"
-require_identity_sha o2_calls_crt_v1_r131_per_function_manifest_sha256 \
-  "$ON/per-function-identities.tsv" \
-  "$ON/records/per-function-identity"
 require_identity_sha o2_calls_crt_v1_r131_frontier_manifest_sha256 \
   "$ON/frontier.tsv" "$ON/records/frontier-identity"
 ```
@@ -1657,6 +2582,16 @@ do
     /usr/bin/cmp "$OFF/records/$status_name.status" \
     "$ON/records/$status_name.status"
 done
+
+require_identity_sha o2_calls_crt_v1_r131_object_sha256 \
+  "$ON/accepted.o" "$ON/records/object-identity"
+require_identity_sha o2_calls_crt_v1_r131_owner_sha256 \
+  "$ON/owner.tsv" "$ON/records/owner-identity"
+require_identity_sha o2_calls_crt_v1_r131_objdump_sha256 \
+  "$ON/accepted.objdump" "$ON/records/objdump-identity"
+require_identity_sha o2_calls_crt_v1_r131_per_function_manifest_sha256 \
+  "$ON/per-function-identities.tsv" \
+  "$ON/records/per-function-identity"
 ```
 
 The loop must consume every canonical manifest row exactly once. The only
@@ -1954,7 +2889,7 @@ a later directive explicitly authorizes it; INBOX-187 does not.
 Validation execution stops after producing the complete bundle. It does not
 adopt the protocol. The ordered later boundaries are:
 
-1. execute this closed validation contract;
+1. separately authorize and execute this corrected validation contract;
 2. Watcher/Reviewer/user accept or reject the new identities and coverage;
 3. separately authorize combined production wiring;
 4. run full wiring correctness gates and final owner recount;
@@ -2019,7 +2954,7 @@ performance, production wiring, pin edit, cleanup, or ratchet credit.
 Disposition:
 
 ```text
-contract=CLOSED_NON_EXECUTING
+contract=CORRECTED_PENDING_REVIEW
 patch_bundle=FROZEN_READ_ONLY
 canonical_identity=NOT_YET_DEFINED
 coverage=NOT_RUN
@@ -2066,4 +3001,58 @@ coverage=NOT_RUN
 production=UNCHANGED_DORMANT
 ratchet=131
 next=STOP_FOR_WATCHER_REVIEWER_BEFORE_VALIDATION_EXECUTION
+```
+
+## 15. INBOX-187B execution-order correction record
+
+INBOX-187B started from clean operating-document commit
+`1d996a1abddfc584bcad2b747705fca7f6a3642d` above the withheld
+INBOX-187A document commit `527340b6`. The only tracked change is this
+document.
+
+The correction:
+
+- moves raw report/frontier identity checks and successful-subset identity
+  checks into their respective producer phases;
+- defines one exact strict-mode canonical driver, including every status
+  later consumed by coverage;
+- produces the canonical `accepted.ll` exactly once in repetition 1;
+- gives every command unique command, environment, working-directory,
+  timing, stdout, stderr, status, and record-manifest paths; and
+- freezes the complete immutable-input and producer-before-consumer ledger.
+
+The final read-only recheck observed:
+
+```text
+bundle_manifest_sha256=0576d5803400ea9575d65fc501b87d514c97e806540be29018fb5192bd68e7f0
+combined_patch_sha256=7508d1d8f74b7e9b97ae5722a0822a86c8d2079779a25cd37559ce5bc651036f
+combined_patch_apply_check_status=0
+canonical_driver_bash_syntax_status=0
+coverage_referenced_canonical_status_producers=15_paths_each_exactly_once
+bundle_root_mode=0555
+bundle_payload_modes=0444
+adopted_input_mode_bytes_sha256=0444/1897410/9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1
+adoption_manifest_mode_bytes_sha256=0444/4394/500e73c8433aa73159adfba5de8a6708ae4030140b97b823ef895caa1528f2bf
+reproduction_manifest_sha256=885008980c8a272e82d06cf89b81652ab5a9669e89364b01d7b9e2761135ff1e
+retention_pins_sha256=1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3
+source_surface_diff_from_43de59b0=empty
+watcher_head_index_worktree_blob=b64131cf60dd0ef638e815cd33db9ae8595a72cf
+stash_at_0=7985c6d01040a6e47e4ce5b918866d0e89517ac7
+ratchet=131
+```
+
+INBOX-187B ran no project code, build, Zig command, `z_llvm`,
+selector/report, object generation, guard/test/gate, validation, coverage,
+performance, protocol adoption, production wiring, pin edit, cleanup, or
+credit.
+
+```text
+contract=CORRECTED_PENDING_WATCHER_REVIEWER_ACCEPTANCE
+patch_bundle=UNCHANGED_ACCEPTED
+canonical_identity=NOT_YET_DEFINED
+coverage=NOT_RUN
+validation=NOT_RUN
+production=UNCHANGED_DORMANT
+ratchet=131
+next=STOP_BEFORE_VALIDATION_EXECUTION
 ```
