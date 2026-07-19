@@ -6,48 +6,47 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-180 `intByteSize`-only re-isolation — AUTHORIZED for dispatch
+## INBOX-180a `intByteSize` bypass-transition re-isolation — AUTHORIZED
 
-INBOX-179 at `262f4880` and the ordinary GPR/pointer direct-call family are
-accepted as individually isolated and byte-identical. The evidence-only
-owner-count status 1 is accepted as a nontechnical post-processing failure:
-the exact immutable selector outputs already existed and only the obsolete
-parser was corrected. Production remains dormant and ratchet remains 131.
+INBOX-180 at `81644889` is accepted as a compliant stop/evidence record.
+`intByteSize` remains retained and unaccepted; ordinary remains individually
+accepted; production remains dormant and ratchet remains 131. The confirmed
+failure is incomplete temporary guard accounting: specialized wiring removes
+the sole `lowerIntByteSizeCall/emitValueIntoScratch` occurrence while the
+canonical inventory still expects one.
 
-Start from clean `262f4880`. Regenerate the smallest temporary consumer and
-function-scoped guard-accounting patch against the accepted tree. Route only
-`zig.target.intByteSize` through the dormant `IntByteSizeCallAction`. Keep
-ordinary and every other call family on exact legacy paths; do not build the
-aggregate.
+Preserve the first attempt. Reuse its exact consumer semantics unchanged.
+Extend only the temporary guard patch with a fail-closed overlay for the exact
+calls-file/function/operation tuple: expected one may be actual zero only
+when the complete reviewed `IntByteSizeCallAction` lifecycle is present and
+the function has zero legacy occurrences.
 
-Preserve the legacy validation/diagnostic order before admission: required
-result, call form, tail kind, i16 return/one-argument signature, and i16
-argument type. Use only the accepted
-register/attach/seal/prepare/materialize/commit lifecycle and existing
-request-specific diagnostic mapping. No action/model/Q1/materialization/
-facade/import/capability change, fallback, function predicate, consumer query,
-or diagnostic normalization.
+Keep the canonical TSV/hash and permanent guard policy unchanged. Reject
+coexistence with the legacy gateway, partial specialized wiring,
+ordinary/aggregate activation, and every unrelated inventory mismatch.
+Add narrow negative fixtures in existing guard-test leaves. No dead/comment
+token, general exemption, action/model/facade widening, public API, or credit.
 
 Run blocking bars in strict stop-on-failure order:
 
 1. Fresh exact object `061a64e4`, owner `5d91960e` with ledger `167/17/101`,
-   all `285/0/0` per-function bytes/disassembly, and six frontier rows/proofs.
+   all `285/0/0` per-function bytes/disassembly, and six frontier proofs.
 2. Full unit plus standalone source guard.
 3. All 35 focused canaries.
 4. Standalone ABI `60/60` plus `30/30` real functions.
 
-The canonical 443-row input remains preexisting absent. Do not generate a
-substitute or claim/attempt a fresh report; retained `49a19f04` is historical
-reference only. Fresh object/owner/per-function/frontier proof decides
-identity. Any failed bar retains `intByteSize` wholesale, stops later bars,
-and permits no fix-forward.
+Stop immediately on failure without diagnosis/fix-forward. No fresh/substitute
+report, aggregate isolation, wiring, credit, performance, higher-tier gates,
+or cleanup. Restore all temporary consumer/guard/test changes exactly, retain
+both attempts, commit only the INBOX-180a evidence summary, preserve
+stash/watcher/retention/bypass surfaces, and STOP before aggregate or wiring.
 
-Do not run ordinary/aggregate isolation, production wiring, ratchet credit,
-performance, integrated executable, strengthened Tier 2, distribution-all,
-Tier 3, cleanup/deletion, or `clean_tmp`. Restore temporary source/guard files
-exactly, retain all evidence, commit only the INBOX-180 evidence summary,
-clean the tree, preserve stash/watcher/retention surfaces, and STOP before
-aggregate isolation or wiring.
+## INBOX-180 `intByteSize` re-isolation — COMPLIANT STOP at 81644889
+
+Identity passed, then full unit stopped at `1397/1398` solely on
+`FrozenBypassOccurrenceMismatch`. All later bars were skipped, temporary
+source was restored, `intByteSize` was retained wholesale, and ratchet
+remained 131.
 
 ## INBOX-179 ordinary direct-call re-isolation — ACCEPTED at 262f4880
 
