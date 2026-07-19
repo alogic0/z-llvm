@@ -91,6 +91,8 @@ fn actionSecondaryOperand(
         .store_immediate,
         .branch_condition,
         .switch_compare_chain,
+        .direct_call,
+        .int_byte_size_call,
         => null,
     };
 }
@@ -131,6 +133,8 @@ fn actionTertiaryOperand(
         .exact_i52_binary,
         .scalar_multiply,
         .unsigned_quotient,
+        .direct_call,
+        .int_byte_size_call,
         => null,
     };
 }
@@ -449,6 +453,8 @@ pub fn actionOwnsOrderedWrites(action: Types.PreparedAction) bool {
         .exact_i52_binary,
         .scalar_multiply,
         .unsigned_quotient,
+        .direct_call,
+        .int_byte_size_call,
         => true,
         .validate_shape,
         .emit_copy_to,

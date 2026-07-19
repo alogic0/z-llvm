@@ -225,6 +225,7 @@ pub fn validateFormAndDestination(request: *const Types.StoredRequest) !void {
             .unsigned_quotient => |quotient| if (request.form != .named_scalar_operand or
                 !request.expected.ty.eql(quotient.integer_ty))
                 error.ValueUsePreparedActionFormMismatch,
+            .direct_call, .int_byte_size_call => error.ValueUsePreparedActionFormMismatch,
         };
     }
     if (request.prepared_action != null) return error.ValueUsePreparedActionUnexpected;

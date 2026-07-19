@@ -333,6 +333,8 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
     if ((is_scalar_cast or is_scalar_immediate or is_scalar_multiply_divide or is_scalar_named) and
         countPattern(source, "\n") + 1 > 2000)
         return error.ValueUseScalarArithmeticLineBudgetExceeded;
+    if (is_calls and countPattern(source, "\n") + 1 > 1200)
+        return error.ValueUseCallsLineBudgetExceeded;
     if ((is_planning_model or is_planning_compatibility or is_planning_lifetime or
         is_planning_semantic or is_planning_physical) and
         countPattern(source, "\n") + 1 > 2000)
@@ -591,7 +593,7 @@ pub fn validateValueUseFacadeSurfaceManifest(source: [:0]const u8) !void {
         previous = name;
         manifest_count += 1;
     }
-    if (declaration_count != manifest_count or manifest_count != 122)
+    if (declaration_count != manifest_count or manifest_count != 126)
         return error.ValueUseFacadeManifestMismatch;
 }
 
@@ -615,7 +617,7 @@ pub fn validateValueUseDirectForwardingWrappers(transaction_source: [:0]const u8
         wrapper_count += 1;
         cursor = close + 1;
     }
-    if (wrapper_count != 48) return error.ValueUseWrapperNotDirectForward;
+    if (wrapper_count != 49) return error.ValueUseWrapperNotDirectForward;
 }
 
 pub fn validateExactTopLevelPubNames(source: []const u8, expected: []const []const u8) !void {

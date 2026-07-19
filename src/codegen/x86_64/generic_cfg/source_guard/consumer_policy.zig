@@ -93,6 +93,7 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     try validateNamedScalarProductionSites(source_name, source);
     try validateScalarMultiplyProductionSites(source_name, source);
     try validateUnsignedQuotientProductionSites(source_name, source);
+    try validateDormantCallActionProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -123,6 +124,21 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
             if (std.mem.indexOf(u8, function_source, pattern) != null)
                 return error.ValueUsePreparedLeafRawOperation;
         }
+    }
+}
+
+pub fn validateDormantCallActionProductionSites(
+    _: []const u8,
+    source: [:0]const u8,
+) !void {
+    for ([_][]const u8{
+        "attachCallAction(",
+        "DirectCallAction",
+        "IntByteSizeCallAction",
+        ".int_byte_size_call",
+    }) |pattern| {
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseCallActionPrematureProductionUse;
     }
 }
 

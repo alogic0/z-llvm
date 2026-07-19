@@ -276,6 +276,63 @@ pub const MemcpyTestFailure = enum {
     after_call_append,
 };
 
+/// Complete semantic intent for the admitted ordinary direct-call envelope.
+/// Handles and declared types are copied into fixed transaction-owned storage;
+/// no discovered home, ABI destination, or staging order crosses this boundary.
+pub const DirectCallAction = struct {
+    symbol: ActionIdentity,
+    result: ?ActionIdentity,
+    return_type: ir.Type,
+    arguments: [max_requests]RequestHandle = undefined,
+    argument_types: [max_requests]ir.Type = undefined,
+    argument_count: u8 = 0,
+
+    pub fn init(
+        symbol: []const u8,
+        result: ?[]const u8,
+        return_type: ir.Type,
+        arguments: []const RequestHandle,
+        argument_types: []const ir.Type,
+    ) !DirectCallAction {
+        if (arguments.len != argument_types.len or arguments.len > max_requests)
+            return error.ValueUseCallArgumentCountUnsupported;
+        var action: DirectCallAction = .{
+            .symbol = try ActionIdentity.init(symbol),
+            .result = if (result) |name| try ActionIdentity.init(name) else null,
+            .return_type = return_type,
+        };
+        @memcpy(action.arguments[0..arguments.len], arguments);
+        @memcpy(action.argument_types[0..argument_types.len], argument_types);
+        action.argument_count = @intCast(arguments.len);
+        return action;
+    }
+};
+
+/// Closed semantic intent for `zig.target.intByteSize`.
+pub const IntByteSizeCallAction = struct {
+    symbol: ActionIdentity,
+    result: ActionIdentity,
+    argument: RequestHandle,
+
+    pub fn init(symbol: []const u8, result: []const u8, argument: RequestHandle) !IntByteSizeCallAction {
+        return .{
+            .symbol = try ActionIdentity.init(symbol),
+            .result = try ActionIdentity.init(result),
+            .argument = argument,
+        };
+    }
+};
+
+/// Request-attributable call failures expose only the frozen semantic class.
+pub const CallRequestError = error{
+    ValueUseCallArgumentNotNamed,
+    ValueUseCallArgumentTypeUnsupported,
+    ValueUseCallArgumentWidthUnsupported,
+    ValueUseCallArgumentLocationUnsupported,
+    ValueUseCallPointerLocationUnsupported,
+    ValueUseCallStackDisplacementUnsupported,
+};
+
 pub const ScalarLoadKind = enum {
     ordinary,
     readonly_pointer,
@@ -760,6 +817,8 @@ pub const PreparedAction = union(enum) {
     exact_i52_binary: ExactI52BinaryAction,
     scalar_multiply: ScalarMultiplyAction,
     unsigned_quotient: UnsignedQuotientAction,
+    direct_call: DirectCallAction,
+    int_byte_size_call: IntByteSizeCallAction,
 
     pub fn eql(action: PreparedAction, other: PreparedAction) bool {
         return std.meta.eql(action, other);
@@ -1270,6 +1329,9 @@ pub fn Transaction(comptime Impl: type) type {
         pub const StoreStackPointerAction = Model.StoreStackPointerAction;
         pub const MemcpyAction = Model.MemcpyAction;
         pub const MemcpyTestFailure = Model.MemcpyTestFailure;
+        pub const DirectCallAction = Model.DirectCallAction;
+        pub const IntByteSizeCallAction = Model.IntByteSizeCallAction;
+        pub const CallRequestError = Model.CallRequestError;
         pub const ScalarLoadKind = Model.ScalarLoadKind;
         pub const ScalarLoadAction = Model.ScalarLoadAction;
         pub const ReadOnlyPairLoadAction = Model.ReadOnlyPairLoadAction;
@@ -1373,6 +1435,10 @@ pub fn Transaction(comptime Impl: type) type {
         /// diagnostic-only identity deliberately survives automatic rollback.
         failed_request: ?Self.RequestHandle = null,
         accumulator_session: ?AccumulatorDefinitionSession = null,
+        call_action: ?Self.PreparedAction = null,
+        call_action_executed: bool = false,
+        call_test_failure: if (builtin.is_test) ?u8 else void = if (builtin.is_test) null else {},
+        call_test_argument_index: if (builtin.is_test) u8 else void = if (builtin.is_test) 0 else {},
         memcpy_test_failure: if (builtin.is_test) ?Self.MemcpyTestFailure else void = if (builtin.is_test) null else {},
         load_test_failure: if (builtin.is_test) ?Self.LoadTestFailure else void = if (builtin.is_test) null else {},
         scratch_compare_test_failure: if (builtin.is_test) ?Self.ScratchCompareTestFailure else void = if (builtin.is_test) null else {},
@@ -1437,6 +1503,10 @@ pub fn Transaction(comptime Impl: type) type {
             action: Self.UnsignedQuotientAction,
         ) !void {
             return Impl.attachUnsignedQuotientAction(Impl, transaction, lhs, action);
+        }
+
+        pub fn attachCallAction(transaction: *Self, action: Self.PreparedAction) !void {
+            return Impl.attachCallAction(Impl, transaction, action);
         }
 
         pub fn seal(transaction: *Self) !void {

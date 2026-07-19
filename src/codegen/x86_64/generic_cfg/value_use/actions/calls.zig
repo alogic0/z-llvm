@@ -110,6 +110,399 @@ const PhysicalNode = Types.PhysicalNode;
 const physical_node_count = Types.physical_node_count;
 const max_mappings = Types.max_mappings;
 const materialization = @import("../materialization.zig");
+const composition = @import("../composition.zig");
+
+pub const CallTestFailure = enum(u8) {
+    after_preservation,
+    after_argument,
+    after_alignment,
+    after_symbol_ownership,
+    after_call_append,
+    after_unalignment,
+    after_mask,
+    after_result_identity_ownership,
+    after_result_definition,
+    after_finalization,
+};
+
+pub fn setCallTestFailureForTest(
+    transaction: anytype,
+    failure: ?CallTestFailure,
+    argument_index: u8,
+) !void {
+    if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
+    transaction.call_test_failure = if (failure) |value| @intFromEnum(value) else null;
+    transaction.call_test_argument_index = argument_index;
+}
+
+pub fn validateCallActionAttachment(
+    comptime Authority: type,
+    transaction: anytype,
+    action: *const Types.PreparedAction,
+) !void {
+    switch (action.*) {
+        .direct_call => |*direct| try validateDirectCallAttachment(Authority, transaction, direct),
+        .int_byte_size_call => |*specialized| try validateIntByteSizeAttachment(Authority, transaction, specialized),
+        else => return error.ValueUseCallActionUnsupported,
+    }
+}
+
+pub fn executeAttachedCallAction(
+    comptime Authority: type,
+    transaction: anytype,
+    action: *const Types.PreparedAction,
+) !void {
+    errdefer Authority.rollbackInternal(Authority, transaction);
+    switch (action.*) {
+        .direct_call => |*direct| try executeDirectCall(Authority, transaction, direct),
+        .int_byte_size_call => |*specialized| try executeIntByteSizeCall(Authority, transaction, specialized),
+        else => return error.ValueUseCallActionUnsupported,
+    }
+}
+
+fn validateDirectCallAttachment(
+    comptime Authority: type,
+    transaction: anytype,
+    action: *const Types.DirectCallAction,
+) !void {
+    try action.symbol.validate();
+    if (action.argument_count > 6)
+        return error.ValueUseCallArgumentCountUnsupported;
+    const result_definition = try callResultDefinition(action.return_type);
+    if (action.result) |*result| {
+        try result.validate();
+        if (result_definition == null) return error.ValueUseCallResultUnsupported;
+    } else if (action.return_type == .void) {
+        // A request-free transaction is admitted only by this closed,
+        // validated zero-argument direct-call action.
+    }
+    var seen = [_]bool{false} ** Types.max_requests;
+    var previous_index: ?u8 = null;
+    for (
+        action.arguments[0..action.argument_count],
+        action.argument_types[0..action.argument_count],
+    ) |handle, declared_type| {
+        const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
+        if (previous_index) |previous| {
+            if (index < previous) return error.ValueUseCallArgumentSourceOrder;
+        }
+        previous_index = index;
+        _ = declared_type;
+        seen[index] = true;
+    }
+    for (seen[0..transaction.request_count]) |present| {
+        if (!present) return error.ValueUseCallRequestUnclaimed;
+    }
+}
+
+fn validateIntByteSizeAttachment(
+    comptime Authority: type,
+    transaction: anytype,
+    action: *const Types.IntByteSizeCallAction,
+) !void {
+    try action.symbol.validate();
+    try action.result.validate();
+    if (transaction.request_count != 1)
+        return error.ValueUseCallArgumentCountUnsupported;
+    const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, action.argument);
+    if (index != 0) return error.ValueUseCallArgumentSourceOrder;
+}
+
+fn validateCallRequest(request: *const Types.StoredRequest, declared_type: ir.Type) !void {
+    if (!request.expected.ty.eql(declared_type) or request.destination != .prepared_source)
+        return error.ValueUseCallArgumentTypeUnsupported;
+    if (declared_type == .ptr) {
+        if (request.form != .stack_object_address or request.expected.register_class != .stack_object or
+            request.expected.pointer_address_space != 0)
+            return error.ValueUseCallArgumentTypeUnsupported;
+        return;
+    }
+    const bits = switch (declared_type) {
+        .int => |value| value,
+        else => return error.ValueUseCallArgumentTypeUnsupported,
+    };
+    if (bits != 32 and bits != 64) return error.ValueUseCallArgumentWidthUnsupported;
+    if (request.form != (if (bits == 32) Types.UseForm.gpr32 else Types.UseForm.gpr64) or
+        request.expected.register_class != if (bits == 32)
+            VirtualRegClass.gpr32
+        else
+            VirtualRegClass.gpr64)
+    {
+        return error.ValueUseCallArgumentTypeUnsupported;
+    }
+}
+
+fn executeDirectCall(
+    comptime Authority: type,
+    transaction: anytype,
+    action: *const Types.DirectCallAction,
+) !void {
+    var next_eflags = transaction.selector.eflags;
+    try next_eflags.apply(.clobber);
+    try validateDirectCallCopySchedule(Authority, transaction, action);
+    const result_definition = try callResultDefinition(action.return_type);
+    if (action.result != null) {
+        try composition.beginAccumulatorSessionForPreparedAction(Authority, transaction);
+        if (try transaction.accumulator_session.?.prepareCallBeforeArguments(.clobber)) |diagnostic| {
+            transaction.action_diagnostic = diagnostic;
+            return error.ValueUseActionDiagnostic;
+        }
+    } else if (try selector_state.spillLiveCallerClobbersForCall(transaction.selector)) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+    try refreshCallArguments(Authority, transaction, action.arguments[0..action.argument_count]);
+    try failCallForTest(transaction, .after_preservation, null);
+
+    for (
+        action.arguments[0..action.argument_count],
+        action.argument_types[0..action.argument_count],
+        0..,
+    ) |handle, declared_type, argument_index| {
+        const target = ArgReg.fromIndex(argument_index) catch
+            return error.ValueUseCallArgumentCountUnsupported;
+        try stageDirectCallArgument(Authority, transaction, handle, declared_type, target);
+        try failCallForTest(transaction, .after_argument, @intCast(argument_index));
+    }
+    if (action.result != null)
+        try transaction.accumulator_session.?.finishCallPreparationAfterArguments();
+    try emitCallAndAlignment(Authority, transaction, &action.symbol, action.return_type);
+    if (action.result) |*result| {
+        const owned_result = try composition.ownActionIdentity(Authority, transaction, result);
+        try failCallForTest(transaction, .after_result_identity_ownership, null);
+        try transaction.accumulator_session.?.define(owned_result, result_definition.?);
+        try failCallForTest(transaction, .after_result_definition, null);
+        try transaction.accumulator_session.?.finalize();
+        try failCallForTest(transaction, .after_finalization, null);
+    }
+}
+
+fn validateDirectCallCopySchedule(
+    comptime Authority: type,
+    transaction: anytype,
+    action: *const Types.DirectCallAction,
+) !void {
+    for (action.arguments[0..action.argument_count], 0..) |handle, argument_index| {
+        const destination = ArgReg.fromIndex(argument_index) catch
+            return error.ValueUseCallArgumentCountUnsupported;
+        const source = try preparedCallSourceArgReg(Authority, transaction, handle);
+        if (source != null and source.? == destination) continue;
+        for (action.arguments[argument_index + 1 .. action.argument_count]) |later_handle| {
+            if ((try preparedCallSourceArgReg(Authority, transaction, later_handle)) == destination)
+                return error.ValueUseCopyCycleRequiresO4;
+        }
+    }
+}
+
+fn preparedCallSourceArgReg(
+    comptime Authority: type,
+    transaction: anytype,
+    handle: Types.RequestHandle,
+) !?ArgReg {
+    const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
+    if (!transaction.prepared_view_valid[index])
+        return error.ValueUsePreparedViewMissing;
+    return switch (transaction.prepared_views[index].canonical_source_loc) {
+        .arg32, .scratch32, .arg64, .scratch64 => |reg| reg,
+        else => null,
+    };
+}
+
+fn executeIntByteSizeCall(
+    comptime Authority: type,
+    transaction: anytype,
+    action: *const Types.IntByteSizeCallAction,
+) !void {
+    var next_eflags = transaction.selector.eflags;
+    try next_eflags.apply(.clobber);
+    try composition.beginAccumulatorSessionForPreparedAction(Authority, transaction);
+    if (try transaction.accumulator_session.?.prepareCallBeforeArguments(.clobber)) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+    try refreshCallArguments(Authority, transaction, &.{action.argument});
+    try failCallForTest(transaction, .after_preservation, null);
+    try stageIntByteSizeArgument(Authority, transaction, action.argument);
+    try failCallForTest(transaction, .after_argument, 0);
+    try transaction.accumulator_session.?.finishCallPreparationAfterArguments();
+    try emitCallAndAlignment(Authority, transaction, &action.symbol, .{ .int = 16 });
+    try selector_state.emitEflagsInstruction(transaction.selector, .{ .and_eax_imm32 = 0xffff }, .write);
+    try failCallForTest(transaction, .after_mask, null);
+    const owned_result = try composition.ownActionIdentity(Authority, transaction, &action.result);
+    try failCallForTest(transaction, .after_result_identity_ownership, null);
+    try transaction.accumulator_session.?.define(owned_result, .zeroExtending(16));
+    try failCallForTest(transaction, .after_result_definition, null);
+    try transaction.accumulator_session.?.finalize();
+    try failCallForTest(transaction, .after_finalization, null);
+}
+
+fn emitCallAndAlignment(
+    comptime Authority: type,
+    transaction: anytype,
+    symbol: *const Types.ActionIdentity,
+    return_type: ir.Type,
+) !void {
+    const needs_alignment = transaction.selector.stack_frame_bytes == 0;
+    if (needs_alignment) {
+        try transaction.selector.machine.instructions.append(transaction.selector.allocator, .sub_rsp_8);
+        try failCallForTest(transaction, .after_alignment, null);
+    }
+    const owned_symbol = try composition.ownActionIdentity(Authority, transaction, symbol);
+    try failCallForTest(transaction, .after_symbol_ownership, null);
+    try selector_state.emitEflagsInstruction(
+        transaction.selector,
+        .{ .direct_call = .{ .symbol = owned_symbol, .ret_ty = return_type } },
+        .clobber,
+    );
+    try failCallForTest(transaction, .after_call_append, null);
+    if (needs_alignment) {
+        try transaction.selector.machine.instructions.append(transaction.selector.allocator, .add_rsp_8);
+        try failCallForTest(transaction, .after_unalignment, null);
+    }
+}
+
+fn refreshCallArguments(
+    comptime Authority: type,
+    transaction: anytype,
+    arguments: []const Types.RequestHandle,
+) !void {
+    for (arguments) |handle| {
+        const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
+        transaction.prepared_views[index] = Authority.materialization.buildPreparedRecord(
+            Authority,
+            transaction,
+            index,
+        ) catch |err| {
+            Authority.noteRequestBoundaryError(Authority, transaction, index, err);
+            return err;
+        };
+        transaction.prepared_view_valid[index] = true;
+    }
+}
+
+fn stageDirectCallArgument(
+    comptime Authority: type,
+    transaction: anytype,
+    handle: Types.RequestHandle,
+    declared_type: ir.Type,
+    target: ArgReg,
+) !void {
+    const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
+    validateCallRequest(&transaction.requests[index], declared_type) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, index, err);
+        return err;
+    };
+    stageValidatedCallArgument(Authority, transaction, index, declared_type, target) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, index, err);
+        return err;
+    };
+}
+
+fn stageIntByteSizeArgument(
+    comptime Authority: type,
+    transaction: anytype,
+    handle: Types.RequestHandle,
+) !void {
+    const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
+    const request = &transaction.requests[index];
+    if (!request.expected.ty.eql(.{ .int = 16 }) or
+        request.expected.register_class != .gpr32 or
+        request.form != .gpr32 or
+        request.destination != .prepared_source)
+    {
+        Authority.noteRequestBoundaryError(
+            Authority,
+            transaction,
+            index,
+            error.ValueUseCallArgumentTypeUnsupported,
+        );
+        return error.ValueUseCallArgumentTypeUnsupported;
+    }
+    stageValidatedCallArgument(Authority, transaction, index, .{ .int = 16 }, .rdi) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, index, err);
+        return err;
+    };
+}
+
+fn stageValidatedCallArgument(
+    comptime Authority: type,
+    transaction: anytype,
+    index: u8,
+    declared_type: ir.Type,
+    target: ArgReg,
+) !void {
+    const request = &transaction.requests[index];
+    switch (request.source) {
+        .named => {},
+        .int, .null_value, .unsupported => return error.ValueUseCallArgumentNotNamed,
+    }
+    const current = (try Authority.validateRequestAt(Authority, transaction, index)) orelse
+        return error.ValueUseCallArgumentLocationUnsupported;
+    if (declared_type == .ptr) {
+        const disp = switch (current) {
+            .stack_scalar => |stack| stack.base_disp,
+            .stack128 => |value| value,
+            else => return error.ValueUseCallPointerLocationUnsupported,
+        };
+        try selector_state.clobberArgReg(transaction.selector, target);
+        try transaction.selector.machine.instructions.append(
+            transaction.selector.allocator,
+            .{ .mov_rsp_arg64 = target },
+        );
+        if (disp != 0) {
+            const addend = std.math.cast(i32, disp) orelse
+                return error.ValueUseCallStackDisplacementUnsupported;
+            try selector_state.emitEflagsInstruction(
+                transaction.selector,
+                .{ .add_arg64_imm32 = .{ .reg = target, .imm = addend } },
+                .write,
+            );
+        }
+        return;
+    }
+    const bits = declared_type.int;
+    if (bits <= 32) {
+        materialization.materializeScalar32(
+            transaction.selector,
+            current,
+            .{ .gpr32 = target },
+        ) catch return error.ValueUseCallArgumentLocationUnsupported;
+    } else {
+        materialization.materializeScalar64(
+            transaction.selector,
+            current,
+            .{ .gpr64 = target },
+        ) catch return error.ValueUseCallArgumentLocationUnsupported;
+    }
+}
+
+fn callResultDefinition(return_type: ir.Type) !?AccumulatorDefinition {
+    if (return_type == .void) return null;
+    if (return_type == .ptr) return .fullRax();
+    return switch (return_type) {
+        .int => |bits| switch (bits) {
+            32 => .zeroExtending(32),
+            64 => .fullRax(),
+            else => error.ValueUseCallReturnTypeUnsupported,
+        },
+        else => error.ValueUseCallReturnTypeUnsupported,
+    };
+}
+
+fn failCallForTest(
+    transaction: anytype,
+    boundary: CallTestFailure,
+    argument_index: ?u8,
+) !void {
+    if (builtin.is_test) {
+        const configured = transaction.call_test_failure orelse return;
+        if (configured != @intFromEnum(boundary)) return;
+        if (argument_index) |index| {
+            if (transaction.call_test_argument_index != index) return;
+        }
+        return error.ValueUseCallTestFailure;
+    }
+}
 
 pub fn executeInlineMemcpy(
     comptime Authority: type,

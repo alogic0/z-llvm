@@ -4,6 +4,7 @@ AccumulatorSessionHandle
 ActionIdentity
 AddressOffset
 ByteAddressAction
+CallRequestError
 CopyDestination
 CurrentHomeEqZeroAction
 CurrentHomeEqZeroRequestError
@@ -12,6 +13,7 @@ CurrentHomeSignBitAction
 CurrentHomeSignBitRequestError
 CurrentHomeSignBitTestFailure
 Destination
+DirectCallAction
 ExactI52BinaryAction
 Expected
 I128EqMinAction
@@ -23,6 +25,7 @@ ImmediateLhsScalarAction
 ImmediateRhsScalarAction
 ImmediateScalarRequestError
 ImmediateScalarTestFailure
+IntByteSizeCallAction
 LoadRequestError
 LoadTestFailure
 MemcpyAction
@@ -72,6 +75,7 @@ address_domain_copies_per_request
 address_domain_snapshot_bytes
 address_domain_snapshot_copies
 applySwitchBoundary
+attachCallAction
 attachExactI52BinaryAction
 attachNamedScalarBinaryAction
 attachScalarMultiplyAction

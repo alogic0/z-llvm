@@ -62,7 +62,8 @@ pub const value_use_leaf_paths = [_][]const u8{
 
 pub const value_use_model_pub_names = [_][]const u8{
     "AccumulatorScalarCastAction",      "AccumulatorSessionHandle",       "ActionIdentity",
-    "AddressOffset",                    "ByteAddressAction",              "CopyDestination",
+    "AddressOffset",                    "ByteAddressAction",              "CallRequestError",
+    "CopyDestination",                  "DirectCallAction",               "IntByteSizeCallAction",
     "CurrentHomeEqZeroAction",          "CurrentHomeEqZeroRequestError",  "CurrentHomeEqZeroTestFailure",
     "CurrentHomeSignBitAction",         "CurrentHomeSignBitRequestError", "CurrentHomeSignBitTestFailure",
     "Destination",                      "EarlyPlan",                      "EarlyPreparedHome",
@@ -234,12 +235,18 @@ pub const value_use_scalar_multiply_divide_pub_names = [_][]const u8{
     "validateScalarMultiplyAction",
     "validateUnsignedQuotientAction",
 };
-pub const value_use_calls_pub_names = [_][]const u8{"executeInlineMemcpy"};
+pub const value_use_calls_pub_names = [_][]const u8{
+    "CallTestFailure",
+    "executeAttachedCallAction",
+    "executeInlineMemcpy",
+    "setCallTestFailureForTest",
+    "validateCallActionAttachment",
+};
 
 pub const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
 pub const frozen_bypass_inventory_sha256 = "2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11";
 pub const value_use_facade_manifest_path = "docs/evidence/inbox128_o2_r1_facade_manifest.tsv";
-pub const value_use_facade_manifest_sha256 = "0925a250ac72481edb1b3c06f140d1102b615b920fb0afc98385ea49618ce6be";
+pub const value_use_facade_manifest_sha256 = "2adcd99ee3bfbe0e9f09673f1df02ab305b5ddb2c1b461023152d5d03a079c26";
 pub const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -466,7 +473,7 @@ pub const FunctionBody = struct {
     end: usize,
 };
 
-pub const max_function_bodies = 440;
+pub const max_function_bodies = 512;
 
 pub fn readFrozenBypassInventory(allocator: std.mem.Allocator) ![:0]u8 {
     return std.Io.Dir.cwd().readFileAllocOptions(

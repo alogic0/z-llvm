@@ -67,6 +67,7 @@ const validateCurrentHomeEqZeroIntentSurface = support.validateCurrentHomeEqZero
 const validateSetccEaxCompareIntentSurface = support.validateSetccEaxCompareIntentSurface;
 const validateCurrentHomeSignBitIntentSurface = support.validateCurrentHomeSignBitIntentSurface;
 const validateI128PairIntentSurface = support.validateI128PairIntentSurface;
+const validateCallIntentSurface = support.validateCallIntentSurface;
 const validateScalarCastIntentSurface = support.validateScalarCastIntentSurface;
 const validateImmediateScalarIntentSurface = support.validateImmediateScalarIntentSurface;
 const validateNamedScalarIntentSurface = support.validateNamedScalarIntentSurface;
@@ -83,6 +84,26 @@ const validateCurrentHomeSignBitSequence = support.validateCurrentHomeSignBitSeq
 const validateI128PairSequence = support.validateI128PairSequence;
 const validateScalarCastSequence = support.validateScalarCastSequence;
 const validateDurableActionIdentityOwnership = support.validateDurableActionIdentityOwnership;
+
+test "value-use call intent guard freezes semantic fixed storage and rejects physical hints" {
+    const accepted: [:0]const u8 = @embedFile("../value_use/model.zig");
+    try validateCallIntentSurface(accepted);
+    try std.testing.expectError(
+        error.ValueUseCallPhysicalIntentEscape,
+        validateCallIntentSurface(
+            \\pub const DirectCallAction = struct {
+            \\    symbol: ActionIdentity,
+            \\    result: ?ActionIdentity,
+            \\    return_type: ir.Type,
+            \\    arguments: [max_requests]RequestHandle = undefined,
+            \\    argument_types: [max_requests]ir.Type = undefined,
+            \\    argument_count: u8 = 0,
+            \\    destination: ArgReg,
+            \\};
+            \\pub const IntByteSizeCallAction = struct {
+        ),
+    );
+}
 const validatePreparedViewLeafDiscipline = support.validatePreparedViewLeafDiscipline;
 const validateScratchCompareProductionSites = support.validateScratchCompareProductionSites;
 const validateCurrentHomeEqZeroProductionSites = support.validateCurrentHomeEqZeroProductionSites;

@@ -133,6 +133,7 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateNamedScalarIntentSurface(source);
     try validateScalarMultiplyIntentSurface(source);
     try validateUnsignedQuotientIntentSurface(source);
+    try validateCallIntentSurface(source);
     try validateLifetimeContextAuthority(source);
     if (allow_technical_visibility)
         try validateForwardAdmissionSnapshotAuthority(source);
@@ -144,6 +145,91 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateCurrentHomeSignBitSequence(source);
     try validateI128PairSequence(source);
     try validateScalarCastSequence(source);
+}
+
+pub fn validateCallIntentSurface(source: []const u8) !void {
+    if (std.mem.indexOf(u8, source, "pub const DirectCallAction = struct {")) |start| {
+        const end = std.mem.indexOfPos(
+            u8,
+            source,
+            start,
+            "pub const IntByteSizeCallAction = struct {",
+        ) orelse return error.ValueUseCallIntentMismatch;
+        const body = source[start..end];
+        for ([_][]const u8{
+            "\n    symbol: ActionIdentity,",
+            "\n    result: ?ActionIdentity,",
+            "\n    return_type: ir.Type,",
+            "\n    arguments: [max_requests]RequestHandle = undefined,",
+            "\n    argument_types: [max_requests]ir.Type = undefined,",
+            "\n    argument_count: u8 = 0,",
+        }) |field| {
+            if (countPattern(body, field) != 1)
+                return error.ValueUseCallIntentMismatch;
+        }
+        for ([_][]const u8{
+            "ValueLoc", "PreparedView", "ArgReg",        "home",         "destination",
+            "staging",  "liveness",     "function_name", "functionName",
+        }) |forbidden| {
+            if (std.mem.indexOf(u8, body, forbidden) != null)
+                return error.ValueUseCallPhysicalIntentEscape;
+        }
+    }
+    if (std.mem.indexOf(u8, source, "pub const IntByteSizeCallAction = struct {")) |start| {
+        const end = std.mem.indexOfPos(
+            u8,
+            source,
+            start,
+            "pub const CallRequestError = error{",
+        ) orelse return error.ValueUseCallIntentMismatch;
+        const body = source[start..end];
+        for ([_][]const u8{
+            "\n    symbol: ActionIdentity,",
+            "\n    result: ActionIdentity,",
+            "\n    argument: RequestHandle,",
+        }) |field| {
+            if (countPattern(body, field) != 1)
+                return error.ValueUseCallIntentMismatch;
+        }
+        for ([_][]const u8{
+            "ValueLoc", "PreparedView", "ArgReg",        "home",         "destination",
+            "staging",  "liveness",     "function_name", "functionName",
+        }) |forbidden| {
+            if (std.mem.indexOf(u8, body, forbidden) != null)
+                return error.ValueUseCallPhysicalIntentEscape;
+        }
+    }
+    if (std.mem.indexOf(u8, source, "pub const CallRequestError = error{")) |start| {
+        const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+            return error.InvalidZigSource;
+        const body = source[start .. end + 2];
+        const required = [_][]const u8{
+            "ValueUseCallArgumentNotNamed",
+            "ValueUseCallArgumentTypeUnsupported",
+            "ValueUseCallArgumentWidthUnsupported",
+            "ValueUseCallArgumentLocationUnsupported",
+            "ValueUseCallPointerLocationUnsupported",
+            "ValueUseCallStackDisplacementUnsupported",
+        };
+        for (required) |member| {
+            if (countPattern(body, member) != 1)
+                return error.ValueUseCallIntentMismatch;
+        }
+        if (countPattern(body, ",") != required.len)
+            return error.ValueUseCallIntentMismatch;
+    }
+    if (std.mem.indexOf(u8, source, "pub const PreparedAction = union(enum) {")) |start| {
+        const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+            return error.InvalidZigSource;
+        const body = source[start .. end + 2];
+        if (countPattern(body, "direct_call: DirectCallAction,") != 1 or
+            countPattern(body, "int_byte_size_call: IntByteSizeCallAction,") != 1)
+        {
+            return error.ValueUseCallIntentMismatch;
+        }
+    }
+    if (countPattern(source, "pub fn attachCallAction(") > 1)
+        return error.ValueUseCallIntentMismatch;
 }
 
 pub fn validateForwardAdmissionSnapshotAuthority(source: [:0]const u8) !void {

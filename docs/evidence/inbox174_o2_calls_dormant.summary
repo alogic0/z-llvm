@@ -1,0 +1,256 @@
+# INBOX-174 — dormant ordinary and intByteSize call actions
+
+Status: implementation and the authorized dormant validation are complete;
+stopped before isolation. Production call routing is untouched, the O2 bypass
+ratchet remains 131, and no performance, strengthened Tier 2, or Tier 3
+command was run.
+
+## Frozen basis and scope
+
+```text
+authorization_commit=ed26c326ac140f6983d3ed079bfe162441a2600a
+accepted_INBOX_173=efcac24b
+validation_head_before_worker_commit=eb34b1d80419ebdfbc4b42eaf018898608715f81
+validation_head_delta_from_authorization=watcher-script/.gitignore infrastructure only
+accepted_semantic_ratchet=131 (unchanged)
+stash_at_0=INBOX-93 preserve B2B wiring plus five diagnosis tests (untouched)
+performance_run=none
+strengthened_tier2=not_run
+tier3=not_run
+```
+
+The production consumer and frozen inventory are byte-identical to the
+accepted calls-refresh tree:
+
+```text
+composed_selector_calls_sha256=f1046632d670d61439df7252ba12a1ea474829a4b479ed7758ea4e223866cf2d
+frozen_bypass_inventory_sha256=2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11
+production_call_action_markers=0
+ratchet_before=131
+ratchet_after=131
+direct_credit=0
+helper_collapse_credit=0
+```
+
+`composed_selector_calls.zig` and
+`docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv` have zero
+diff against `ed26c326`. Ordinary calls, `intByteSize`, and their aggregate
+remain separate future isolation subjects; no temporary or production wiring
+was created.
+
+## Closed action and attachment surface
+
+Exactly two `PreparedAction` tags were added:
+
+```text
+direct_call: DirectCallAction
+int_byte_size_call: IntByteSizeCallAction
+```
+
+`DirectCallAction` owns only copied semantic intent: an inline-owned symbol,
+optional inline-owned result identity, return type, fixed
+`[max_requests]RequestHandle` storage, fixed declared-type storage, and an
+explicit count. `IntByteSizeCallAction` owns its copied symbol/result
+identities and one request handle. Neither payload contains a `ValueLoc`,
+prepared view, register, destination, spill, home, liveness value, staging
+order, function name predicate, callback, or runtime planning capability.
+
+The facade expands from exactly 122 to exactly 126 sorted names, using only
+the four reviewed additions:
+
+```text
+CallRequestError
+DirectCallAction
+IntByteSizeCallAction
+attachCallAction
+```
+
+```text
+facade_manifest_sha256=2adcd99ee3bfbe0e9f09673f1df02ab305b5ddb2c1b461023152d5d03a079c26
+facade_symbol_count=126
+direct_forwarding_wrapper_count=49
+```
+
+`attachCallAction` requires the transaction to be active, sealed, and
+uncommitted; permits exactly one attachment; and accepts only the two reviewed
+tags. It validates the complete handle set and source ordering without
+hoisting per-argument legacy checks. Commit fails until the attached action
+has executed, and automatic rollback clears attachment/execution state.
+Zero-argument admission is therefore limited to this closed direct-call
+action rather than becoming a general request-free transaction capability.
+
+## Authority and lifecycle
+
+Core remains the sole exhaustive dispatcher. `materializeAll` first resolves
+all registered sources into private transaction records, then invokes the
+attached call action internally. The calls leaf introduces no planning,
+core, frame, action-leaf, or production-consumer reverse import.
+
+The ordinary action preserves the accepted lifecycle:
+
+1. validate the EFLAGS clobber and reject any ABI copy schedule that would
+   overwrite a later source;
+2. begin the subordinate accumulator session for scalar/pointer results, or
+   invoke the existing caller-clobber preservation exactly once for void;
+3. canonically rederive every source after preservation;
+4. validate and stage each named argument in semantic source order, retaining
+   the legacy post-previous-stage timing;
+5. finish accepted accumulator preparation, align if required, durably own
+   the symbol, append the clobbering direct call, and unalign;
+6. durably own and define i32 (`zeroExtending(32)`), i64/pointer
+   (`fullRax()`), or no result for void; then finalize through the sole outer
+   commit.
+
+The specialized action uses the same authority partition, stages only its
+named i16 request, appends the direct call, emits the accepted
+`and eax, 0xffff` incidental write, and defines the durable result as
+`zeroExtending(16)`.
+
+All action identities are copied into transaction-owned inline storage.
+Before an identity crosses into a durable instruction or selector binding,
+`ownActionIdentity` creates selector-owned backing. Rollback frees speculative
+owned keys exactly once; commit retains them through later instructions and
+transaction teardown. No transaction-owned slice is ever installed as a
+durable selector key.
+
+Same-source/multiple-destination arguments remain accepted. A source/destination
+schedule that would overwrite a later semantic operand fails before caller
+preservation or emission with `ValueUseCopyCycleRequiresO4`; no cycle
+resolution or physical scheduling authority was added.
+
+## Validation and diagnostic ordering
+
+Attachment validates semantic envelope and handle ownership only. Each
+argument's declared type, request form, named-source requirement, canonical
+location, width, and pointer displacement are checked at that argument's
+historical source-order staging point. A focused two-argument test proves the
+first stage boundary occurs before the rejected second i128 form; the
+subsequent unhooked run attributes the width failure only to the RHS handle.
+
+Every request-specific validation/materialization failure is recorded by the
+existing first-failure provenance authority. Later action propagation cannot
+overwrite a precise earlier operand. EFLAGS, caller-clobber diagnostics,
+attachment phase, capacity, alignment, and copy-cycle errors remain
+authority-level and match no request.
+
+The closed `CallRequestError` set distinguishes named-source, type, width,
+scalar location, pointer location, and stack-displacement failures without
+exposing a home or binding query. Immediate, null, i128/pair, XMM, aggregate,
+stack-argument, indirect, multi-result, and unsupported pointer-frontier
+forms gain no new capability.
+
+## Focused dormant coverage
+
+Ten new call-action tests, plus the pre-existing memcpy tests in the same
+leaf, cover:
+
+- zero-argument aligned void calls and unaligned framed calls;
+- i32, i64, and pointer results with durable lookup after teardown;
+- register, spill, and accepted stack-object pointer arguments;
+- multiple arguments, same-source/multiple-destination aliases, and live
+  caller-clobber pressure;
+- exact `intByteSize` staging, alignment, mask, and result binding;
+- sealed-only, exactly-one, two-tag-only attachment;
+- first-request provenance and post-lhs RHS validation timing;
+- retained i128/pair rejection and global copy-schedule rejection;
+- rollback after preservation, each argument stage, alignment, symbol
+  ownership, call append, unalignment, mask, result ownership, definition,
+  and finalization.
+
+Rollback assertions cover instructions, bindings, spills and counters,
+accumulator state, EFLAGS semantics, labels, dependency metadata, result
+ownership, and action phase/storage.
+
+The source guards freeze the exact payload/error/tag/facade surface, the
+five-name technical calls-leaf budget, the 1,200-line calls-leaf ceiling, the
+acyclic import boundary, and zero premature production use of either action
+or `attachCallAction`.
+
+## Size and source budgets
+
+```text
+actions/calls.zig=608 lines (hard ceiling 1200)
+actions/calls_tests.zig=906 lines (hard ceiling 1500)
+model.zig=1889 lines (hard ceiling 1999)
+core.zig=1328 lines (hard ceiling 1499)
+composition.zig=277 lines (hard ceiling 399)
+calls_sha256=a6c892256711989542a2e57b74473ded555bd0c616c33d75a30088e4656d81a4
+calls_tests_sha256=f85e5258ce60e55c9332a839c715563530ed275177fc1d227852bb5f503456fa
+model_sha256=50f0596186c4deec9fbcd89e52beb45b32567f1c175467bbd42759f43e9dbd7c
+core_sha256=22026db467c9fc03c70a86f37ba6cb4323e744b63e2707fa38e34a85d92249c4
+composition_sha256=bcecd26f7faef31621695b940db55bcc4060bf12476c1803404d13f3ec95e82c
+```
+
+The transaction layout proof is updated for the fixed inline action storage:
+`@sizeOf(Transaction)=365728`, alignment 16, with all field offsets pinned.
+The existing snapshot remains the sole rollback snapshot and the address
+domain remains exactly one snapshot copy per authority with zero per-request
+copies.
+
+## Decisive identities
+
+The full report's intentional exit status is 1:
+
+```text
+command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --report-all-codegen-failures --target=x86_64-linux --input-limit=67108864 tmp/inbox92_second_resume2_perf/compiler_rt_frozen.ll >/dev/null 2>tmp/inbox174_o2_calls_dormant/validation/fresh_full_report.log
+report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681
+selected/emitted/failed=443/285/158
+first_failure=compiler_rt.trunc.truncl/UnsupportedLongDoubleAbi
+```
+
+```text
+command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll >tmp/inbox174_o2_calls_dormant/validation/accepted.o 2>tmp/inbox174_o2_calls_dormant/validation/accepted.stderr
+accepted_object_sha256=061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be
+stderr_bytes=0
+```
+
+```text
+command=LC_ALL=C zig-out/bin/z_llvm --emit=selection-owner-manifest --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll >tmp/inbox174_o2_calls_dormant/validation/owner_manifest.tsv 2>tmp/inbox174_o2_calls_dormant/validation/owner_manifest.stderr
+owner_manifest_sha256=5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d
+owner_breakdown=composed_block:40,composed_cfg:127,legacy_envelope:17,structural_fallback:101
+owner_ledger=167/17/101
+stderr_bytes=0
+```
+
+The six pointer-call frontier rows remain byte-identical at their accepted
+diagnostics, and no target row advances.
+
+## Authorized dormant gates
+
+Every retained log is paired with its exact command.
+
+### Source guard
+
+```text
+command=set -o pipefail; /home/oleg/bin/zig test src/codegen/x86_64/generic_cfg/composed_selector_source_guard_tests.zig 2>&1 | tee tmp/inbox174_o2_calls_dormant/validation/source_guard.log
+result=59/59_tests
+log_sha256=432bcb2bad4031448561d715d2a415a1ec237dccc1343c536a2df26ca22e1938
+```
+
+### Full unit
+
+```text
+command=set -o pipefail; /home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox174_o2_calls_dormant/validation/full_unit.log >/dev/null
+result=7/7_steps,1387/1387_tests
+log_sha256=a46440eed0c929abb45a2aefc8f9aba78faf62b49f065f9a919fbe1c655d42cb
+```
+
+### ABI differential
+
+```text
+command=set -o pipefail; /home/oleg/bin/zig build abi-differential --summary all 2>&1 | tee tmp/inbox174_o2_calls_dormant/validation/abi_differential.log >/dev/null
+result=5/5_steps,60/60_cases,30/30_real_functions
+log_sha256=dd2d12377a87097eed5dc9fd4e59dbc0514e1deda3227c2e71abadd08c82d8a9
+```
+
+### Focused codegen canaries
+
+```text
+command=set -o pipefail; /home/oleg/bin/zig build focused-codegen-canaries --summary all 2>&1 | tee tmp/inbox174_o2_calls_dormant/validation/focused_canaries.log >/dev/null
+result=2/2_steps,2/2_canaries,35/35_execution_cases,__multi3_green,fma_green,no_host_libc_substitution
+log_sha256=d704046eacfa8c3c2cf852ed97c86ab42b5a6a07dcfe4dd7de48cb870f2292c6
+```
+
+No integrated-executable, performance, strengthened Tier 2, distribution-all,
+or Tier 3 command was run. INBOX-174 stops here before ordinary-call,
+`intByteSize`, or aggregate isolation.

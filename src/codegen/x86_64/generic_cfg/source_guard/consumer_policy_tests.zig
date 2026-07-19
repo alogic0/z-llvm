@@ -92,6 +92,7 @@ const validateMemcpyActionProductionSites = support.validateMemcpyActionProducti
 const validateSwitchActionProductionSites = support.validateSwitchActionProductionSites;
 const validateBranchActionProductionSites = support.validateBranchActionProductionSites;
 const validateStoreActionProductionSites = support.validateStoreActionProductionSites;
+const validateDormantCallActionProductionSites = support.validateDormantCallActionProductionSites;
 const validateValueUseFacadeSource = support.validateValueUseFacadeSource;
 const validateSplitValueUseTree = support.validateSplitValueUseTree;
 const appendNormalizedValueUseSource = support.appendNormalizedValueUseSource;
@@ -114,6 +115,22 @@ test "composed selector source guard confines forward resolution to the transact
             "fn bad() void { _ = selector_state.resolveForwardValueForUse(undefined, \"x\"); }",
         ),
     );
+}
+
+test "value-use call actions remain dormant in every production consumer" {
+    const accepted: [:0]const u8 = @embedFile("../composed_selector_calls.zig");
+    try validateDormantCallActionProductionSites("composed_selector_calls.zig", accepted);
+    inline for (.{
+        "fn lowerCall() void { transaction.attachCallAction(action); }",
+        "fn lowerCall() void { _ = DirectCallAction; }",
+        "fn lowerIntByteSizeCall() void { _ = IntByteSizeCallAction; }",
+        "fn lowerIntByteSizeCall() void { _ = .int_byte_size_call; }",
+    }) |fixture| {
+        try std.testing.expectError(
+            error.ValueUseCallActionPrematureProductionUse,
+            validateDormantCallActionProductionSites("composed_selector_calls.zig", fixture),
+        );
+    }
 }
 
 test "composed selector source guard admits only the complete ordinary readonly-pointer and table-i16 load action sets" {

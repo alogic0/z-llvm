@@ -328,6 +328,7 @@ pub fn requestDestinationNodes(
                     try result.append(nodeForArgReg(reg));
                 try result.append(.accumulator);
             },
+            .direct_call, .int_byte_size_call => return error.ValueUsePreparedActionFormMismatch,
         },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair => return error.ValueUseNewPairOwnershipUnsupported,
@@ -791,6 +792,7 @@ pub fn requestMappings(
                     .source_request_index = null,
                 });
             },
+            .direct_call, .int_byte_size_call => return error.ValueUsePreparedActionFormMismatch,
             .validate_shape, .emit_copy_to => {},
         }
         if (action != .emit_copy_to) return mappings;

@@ -177,6 +177,11 @@ pub fn materializeAll(comptime Authority: type, transaction: anytype) !void {
         transaction.prepared_view_valid[index] = true;
     }
     transaction.request_phase = .materialized;
+    if (transaction.call_action) |*action| {
+        transaction.request_phase = .views_exposed;
+        try Authority.executeAttachedCallAction(Authority, transaction, action);
+        transaction.call_action_executed = true;
+    }
 }
 fn registeredOperandCurrent(comptime Authority: type, transaction: anytype, handle: RequestHandle) !ValueLoc {
     const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);

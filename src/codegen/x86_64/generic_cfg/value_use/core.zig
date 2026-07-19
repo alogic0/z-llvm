@@ -52,6 +52,9 @@ const StoreI64Action = Types.StoreI64Action;
 const StoreStackPointerAction = Types.StoreStackPointerAction;
 const MemcpyAction = Types.MemcpyAction;
 const MemcpyTestFailure = Types.MemcpyTestFailure;
+const DirectCallAction = Types.DirectCallAction;
+const IntByteSizeCallAction = Types.IntByteSizeCallAction;
+const CallRequestError = Types.CallRequestError;
 const ScalarLoadKind = Types.ScalarLoadKind;
 const ScalarLoadAction = Types.ScalarLoadAction;
 const ReadOnlyPairLoadAction = Types.ReadOnlyPairLoadAction;
@@ -382,6 +385,23 @@ fn core_attachUnsignedQuotientAction(
     try scalar_arithmetic_module.validateUnsignedQuotientAction(&action);
     lhs_request.prepared_action = .{ .unsigned_quotient = action };
 }
+fn core_attachCallAction(
+    comptime Authority: type,
+    transaction: anytype,
+    action: PreparedAction,
+) !void {
+    try Authority.requireActive(Authority, transaction);
+    if (transaction.request_phase != .sealed)
+        return error.ValueUseCallActionRequiresSealedPlan;
+    if (transaction.call_action != null)
+        return error.ValueUseCallActionAlreadyAttached;
+    switch (action) {
+        .direct_call, .int_byte_size_call => {},
+        else => return error.ValueUseCallActionUnsupported,
+    }
+    try calls.validateCallActionAttachment(Authority, transaction, &action);
+    transaction.call_action = action;
+}
 fn core_applySwitchBoundary(
     comptime Authority: type,
     transaction: anytype,
@@ -466,6 +486,8 @@ fn core_commit(comptime Authority: type, transaction: anytype) !void {
     if (transaction.accumulator_session) |*session| {
         if (!session.isFinalized()) return error.ValueUseAccumulatorResultNotFinalized;
     }
+    if (transaction.call_action != null and !transaction.call_action_executed)
+        return error.ValueUseCallActionNotExecuted;
     transaction.request_phase = .committed;
     transaction.lifecycle = .committed;
 }
@@ -579,6 +601,8 @@ fn core_requireActive(comptime _: type, transaction: anytype) !void {
 fn core_rollbackInternal(comptime Authority: type, transaction: anytype) void {
     transaction.snapshot.restore(transaction.selector);
     transaction.accumulator_session = null;
+    transaction.call_action = null;
+    transaction.call_action_executed = false;
     transaction.request_count = 0;
     transaction.request_phase = .registering;
     transaction.write_nodes = [_]bool{false} ** physical_node_count;
@@ -752,6 +776,7 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
         .exact_i52_binary => return error.ValueUsePreparedActionFormMismatch,
         .scalar_multiply => return error.ValueUsePreparedActionFormMismatch,
         .unsigned_quotient => return error.ValueUsePreparedActionFormMismatch,
+        .direct_call, .int_byte_size_call => return error.ValueUsePreparedActionFormMismatch,
     }
 }
 fn core_validateRegisteredOperandHandle(comptime _: type, transaction: anytype, handle: RequestHandle) !u8 {
@@ -818,6 +843,8 @@ fn core_validateActionDependenciesCanonical(comptime Authority: type, transactio
         .load_readonly_pair,
         .load_stack_i128_alias,
         .load_readonly_table_i16,
+        .direct_call,
+        .int_byte_size_call,
         => {},
     }
 }
@@ -1046,6 +1073,7 @@ fn executePreparedActionInternal(
             view,
             &quotient,
         ),
+        .direct_call, .int_byte_size_call => return error.ValueUsePreparedActionFormMismatch,
     }
 }
 fn core_registeredOperandCurrent(comptime Authority: type, transaction: anytype, handle: RequestHandle) !ValueLoc {
@@ -1091,6 +1119,7 @@ fn actionSecondaryOperand(
         .exact_i52_binary => |named| try Authority.validateRegisteredOperandHandle(Authority, transaction, named.rhs),
         .scalar_multiply => |multiply| try Authority.validateRegisteredOperandHandle(Authority, transaction, multiply.rhs),
         .unsigned_quotient => |quotient| try Authority.validateRegisteredOperandHandle(Authority, transaction, quotient.rhs),
+        .direct_call, .int_byte_size_call => null,
         .load_scalar,
         .load_readonly_pair,
         .load_stack_i128_alias,
@@ -1159,6 +1188,8 @@ fn actionTertiaryOperand(
         .exact_i52_binary,
         .scalar_multiply,
         .unsigned_quotient,
+        .direct_call,
+        .int_byte_size_call,
         => null,
     };
 }
@@ -1254,9 +1285,11 @@ const Implementation = struct {
     pub const attachExactI52BinaryAction = core_attachExactI52BinaryAction;
     pub const attachScalarMultiplyAction = core_attachScalarMultiplyAction;
     pub const attachUnsignedQuotientAction = core_attachUnsignedQuotientAction;
+    pub const attachCallAction = core_attachCallAction;
     pub const applySwitchBoundary = core_applySwitchBoundary;
     pub const preparedView = core_preparedView;
     pub const executePreparedAction = core_executePreparedAction;
+    pub const executeAttachedCallAction = calls.executeAttachedCallAction;
     pub const commit = core_commit;
     pub const rollback = core_rollback;
     pub const requestCount = core_requestCount;
