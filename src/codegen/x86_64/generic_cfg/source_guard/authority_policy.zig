@@ -131,6 +131,7 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateScalarCastIntentSurface(source);
     try validateImmediateScalarIntentSurface(source);
     try validateNamedScalarIntentSurface(source);
+    try validateScalarMultiplyIntentSurface(source);
     try validateLifetimeContextAuthority(source);
     if (allow_technical_visibility)
         try validateForwardAdmissionSnapshotAuthority(source);
@@ -726,6 +727,85 @@ pub fn validateNamedScalarIntentSurface(source: []const u8) !void {
     }) |pattern|
         if (countPattern(source, pattern) != 1)
             return error.ValueUseNamedScalarIntentMismatch;
+}
+
+pub fn validateScalarMultiplyIntentSurface(source: []const u8) !void {
+    const declaration = "pub const ScalarMultiplyAction = struct {";
+    const start = std.mem.indexOf(u8, source, declaration) orelse return;
+    const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+        return error.InvalidZigSource;
+    const body = source[start .. end + 2];
+    for ([_][]const u8{
+        "result: ActionIdentity",
+        "integer_ty: ir.Type",
+        "rhs: RequestHandle",
+    }) |field|
+        if (countPattern(body, field) != 1)
+            return error.ValueUseScalarMultiplyIntentMismatch;
+    for ([_][]const u8{
+        "ArgReg",  "ValueLoc", "Destination", "PreparedView", "home",
+        "binding", "scratch",  "spill",       "displacement", "sequence",
+        "phase",
+    }) |forbidden|
+        if (std.mem.indexOf(u8, body, forbidden) != null)
+            return error.ValueUseScalarMultiplyPhysicalIntentEscape;
+    if (countPattern(body, ",") != 3)
+        return error.ValueUseScalarMultiplyIntentMismatch;
+
+    const exact_sets = [_]struct {
+        declaration: []const u8,
+        required: []const []const u8,
+    }{
+        .{
+            .declaration = "pub const ScalarMultiplyRequestError = error{",
+            .required = &.{
+                "ValueUseScalarMultiplyFormUnsupported",
+                "ValueUseScalarMultiplyWidthUnsupported",
+                "ValueUseScalarMultiplyLocationUnsupported",
+                "ValueUseScalarMultiplyDestinationUnavailable",
+            },
+        },
+        .{
+            .declaration = "pub const ScalarMultiplyTestFailure = enum {",
+            .required = &.{
+                "after_destination_selection",
+                "after_lhs_preservation",
+                "after_canonical_refresh",
+                "after_lhs_staging",
+                "after_rhs_resolution",
+                "after_rhs_staging",
+                "after_accumulator_preparation",
+                "after_lhs_accumulator_reload",
+                "after_multiply",
+                "after_result_identity_ownership",
+                "after_result_definition",
+                "after_finalization",
+            },
+        },
+    };
+    for (exact_sets) |entry| {
+        const set_start = std.mem.indexOf(u8, source, entry.declaration) orelse
+            return error.ValueUseScalarMultiplyIntentMissing;
+        const set_end = std.mem.indexOfPos(u8, source, set_start, "};") orelse
+            return error.InvalidZigSource;
+        const set_body = source[set_start .. set_end + 2];
+        for (entry.required) |member|
+            if (countPattern(set_body, member) != 1)
+                return error.ValueUseScalarMultiplyIntentMismatch;
+        if (countPattern(set_body, ",") != entry.required.len)
+            return error.ValueUseScalarMultiplyIntentMismatch;
+    }
+    const action_start = std.mem.indexOf(u8, source, "pub const PreparedAction = union(enum) {") orelse
+        return error.ValueUseScalarMultiplyIntentMissing;
+    const action_end = std.mem.indexOfPos(u8, source, action_start, "};") orelse
+        return error.InvalidZigSource;
+    if (countPattern(
+        source[action_start .. action_end + 2],
+        "scalar_multiply: ScalarMultiplyAction,",
+    ) != 1)
+        return error.ValueUseScalarMultiplyIntentMismatch;
+    if (countPattern(source, "pub fn attachScalarMultiplyAction(") != 1)
+        return error.ValueUseScalarMultiplyIntentMismatch;
 }
 
 pub fn validateScalarCastSequence(source: [:0]const u8) !void {

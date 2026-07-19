@@ -21,7 +21,7 @@ const ActionIdentity = Types.ActionIdentity;
 const physical_node_count = Types.physical_node_count;
 const max_mappings = Types.max_mappings;
 const NodeList = struct {
-    items: [6]Types.PhysicalNode = undefined,
+    items: [7]Types.PhysicalNode = undefined,
     len: u8 = 0,
 
     fn append(list: *NodeList, node: Types.PhysicalNode) !void {
@@ -36,7 +36,7 @@ const NodeList = struct {
 };
 
 const MappingList = struct {
-    items: [6]Mapping = undefined,
+    items: [7]Mapping = undefined,
     len: u8 = 0,
 
     fn append(list: *MappingList, mapping: Mapping) void {
@@ -316,6 +316,11 @@ pub fn requestDestinationNodes(
             .named_scalar_binary, .exact_i52_binary => {
                 try result.append(.rcx);
                 try result.append(.rdx);
+                try result.append(.accumulator);
+            },
+            .scalar_multiply => {
+                for (selector_types.selector_allocatable_regs) |reg|
+                    try result.append(nodeForArgReg(reg));
                 try result.append(.accumulator);
             },
         },
@@ -771,6 +776,7 @@ pub fn requestMappings(
             .immediate_lhs_scalar,
             .named_scalar_binary,
             .exact_i52_binary,
+            .scalar_multiply,
             => {
                 const destinations = try requestDestinationNodes(Authority, transaction, request, current);
                 for (destinations.slice()) |destination| mappings.append(.{

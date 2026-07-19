@@ -82,6 +82,7 @@ const validateScalarCastProductionSites = support.validateScalarCastProductionSi
 const validateImmediateScalarSemanticPartition = support.validateImmediateScalarSemanticPartition;
 const validateImmediateScalarProductionSites = support.validateImmediateScalarProductionSites;
 const validateNamedScalarProductionSites = support.validateNamedScalarProductionSites;
+const validateDormantScalarMultiplyProductionSites = support.validateDormantScalarMultiplyProductionSites;
 const validateLoadDiagnosticMappingProductionSites = support.validateLoadDiagnosticMappingProductionSites;
 const validateDormantLoadActionProductionSites = support.validateDormantLoadActionProductionSites;
 const validateAccumulatorCompositionProductionSites = support.validateAccumulatorCompositionProductionSites;
@@ -775,6 +776,27 @@ test "value-use named scalar production wiring freezes accepted and retained fam
         validateNamedScalarProductionSites(
             "composed_selector_scalar.zig",
             reintroduced_b07_owner_z,
+        ),
+    );
+}
+
+test "scalar multiply action remains dormant in production consumers" {
+    try validateDormantScalarMultiplyProductionSites(
+        "composed_selector_scalar.zig",
+        "fn lowerMul64() void {}",
+    );
+    try std.testing.expectError(
+        error.ValueUseScalarMultiplyPrematureProductionUse,
+        validateDormantScalarMultiplyProductionSites(
+            "composed_selector_scalar.zig",
+            "fn lowerMul64() void { _ = isScalarMultiply(binary); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseScalarMultiplyPrematureProductionUse,
+        validateDormantScalarMultiplyProductionSites(
+            "composed_selector_scalar.zig",
+            "fn lowerMul64() void { try transaction.attachScalarMultiplyAction(lhs, action); }",
         ),
     );
 }

@@ -78,6 +78,7 @@ fn actionSecondaryOperand(
         .immediate_lhs_scalar => null,
         .named_scalar_binary => |named| try Authority.validateRegisteredOperandHandle(Authority, transaction, named.rhs),
         .exact_i52_binary => |named| try Authority.validateRegisteredOperandHandle(Authority, transaction, named.rhs),
+        .scalar_multiply => |multiply| try Authority.validateRegisteredOperandHandle(Authority, transaction, multiply.rhs),
         .load_scalar,
         .load_readonly_pair,
         .load_stack_i128_alias,
@@ -127,6 +128,7 @@ fn actionTertiaryOperand(
         .immediate_lhs_scalar,
         .named_scalar_binary,
         .exact_i52_binary,
+        .scalar_multiply,
         => null,
     };
 }
@@ -443,6 +445,7 @@ pub fn actionOwnsOrderedWrites(action: Types.PreparedAction) bool {
         .immediate_lhs_scalar,
         .named_scalar_binary,
         .exact_i52_binary,
+        .scalar_multiply,
         => true,
         .validate_shape,
         .emit_copy_to,

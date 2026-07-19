@@ -55,6 +55,7 @@ pub const value_use_leaf_paths = [_][]const u8{
     "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_arithmetic.zig",
     "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_cast.zig",
     "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate.zig",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_multiply_divide.zig",
     "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_named.zig",
     "src/codegen/x86_64/generic_cfg/value_use/actions/calls.zig",
 };
@@ -83,7 +84,8 @@ pub const value_use_model_pub_names = [_][]const u8{
     "PreparedViewLease",                "ReadOnlyPairLoadAction",         "ReadOnlyTableAddressAction",
     "ReadOnlyTableI16LoadAction",       "Request",                        "RequestHandle",
     "RequestPhase",                     "ScalarCastRequestError",         "ScalarCastTestFailure",
-    "ScalarLoadAction",                 "ScalarLoadKind",                 "ScaledAddressAction",
+    "ScalarLoadAction",                 "ScalarLoadKind",                 "ScalarMultiplyAction",
+    "ScalarMultiplyRequestError",       "ScalarMultiplyTestFailure",      "ScaledAddressAction",
     "ScratchCompareAction",             "ScratchCompareRhs",              "ScratchCompareTestFailure",
     "SemanticRole",                     "SetccEaxCompareAction",          "SetccEaxCompareRequestError",
     "SetccEaxCompareStructure",         "SetccEaxCompareTestFailure",     "SignExtendScratchAction",
@@ -186,13 +188,15 @@ pub const value_use_scalar_arithmetic_pub_names = [_][]const u8{
     "executeAccumulatorScalarCast",        "executeImmediateLhsScalar",
     "executeImmediateRhsScalar",           "executeExactI52Binary",
     "executeNamedScalarBinary",            "executePairLowScalarCast",
-    "executeSignExtendScratch",            "isAccumulatorScalarCast",
-    "isImmediateLhsScalar",                "isImmediateRhsScalar",
-    "isExactI52Binary",                    "isNamedScalarBinary",
+    "executeScalarMultiply",               "executeSignExtendScratch",
+    "isAccumulatorScalarCast",             "isImmediateLhsScalar",
+    "isImmediateRhsScalar",                "isExactI52Binary",
+    "isNamedScalarBinary",                 "isScalarMultiply",
     "isPairLowScalarCast",                 "isSignExtendScratchCast",
     "validateAccumulatorScalarCastAction", "validateImmediateLhsScalarAction",
     "validateImmediateRhsScalarAction",    "validateExactI52BinaryAction",
     "validateNamedScalarBinaryAction",     "validatePairLowScalarCastAction",
+    "validateScalarMultiplyAction",
 };
 pub const value_use_scalar_cast_pub_names = [_][]const u8{
     "executeAccumulatorScalarCast",
@@ -220,12 +224,17 @@ pub const value_use_scalar_named_pub_names = [_][]const u8{
     "validateExactI52BinaryAction",
     "validateNamedScalarBinaryAction",
 };
+pub const value_use_scalar_multiply_divide_pub_names = [_][]const u8{
+    "executeScalarMultiply",
+    "isScalarMultiply",
+    "validateScalarMultiplyAction",
+};
 pub const value_use_calls_pub_names = [_][]const u8{"executeInlineMemcpy"};
 
 pub const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
 pub const frozen_bypass_inventory_sha256 = "92f921c3ae0e87ec25f6ed64803d667789991831da134a466438474ee29eb755";
 pub const value_use_facade_manifest_path = "docs/evidence/inbox128_o2_r1_facade_manifest.tsv";
-pub const value_use_facade_manifest_sha256 = "9c38e682ff462204ba63a0ab30a9e7f56927ed51ba577dffd710c4222e01a0f8";
+pub const value_use_facade_manifest_sha256 = "477769d5111199b9d6b9a0f5e16a47a19f5e0bb8cdb9fa45bf7aeb0f463c82d5";
 pub const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",
@@ -452,7 +461,7 @@ pub const FunctionBody = struct {
     end: usize,
 };
 
-pub const max_function_bodies = 400;
+pub const max_function_bodies = 440;
 
 pub fn readFrozenBypassInventory(allocator: std.mem.Allocator) ![:0]u8 {
     return std.Io.Dir.cwd().readFileAllocOptions(

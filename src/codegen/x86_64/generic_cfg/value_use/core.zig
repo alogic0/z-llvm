@@ -81,6 +81,7 @@ const ScalarCastTestFailure = Types.ScalarCastTestFailure;
 const ImmediateScalarTestFailure = Types.ImmediateScalarTestFailure;
 const NamedScalarBinaryAction = Types.NamedScalarBinaryAction;
 const ExactI52BinaryAction = Types.ExactI52BinaryAction;
+const ScalarMultiplyAction = Types.ScalarMultiplyAction;
 const max_switch_cases = Types.max_switch_cases;
 const SwitchCaseIntent = Types.SwitchCaseIntent;
 const SwitchCompareChainAction = Types.SwitchCompareChainAction;
@@ -339,6 +340,26 @@ fn core_attachExactI52BinaryAction(
         return error.ValueUsePreparedActionFormMismatch;
     try scalar_arithmetic_module.validateExactI52BinaryAction(&action);
     lhs_request.prepared_action = .{ .exact_i52_binary = action };
+}
+fn core_attachScalarMultiplyAction(
+    comptime Authority: type,
+    transaction: anytype,
+    lhs: RequestHandle,
+    action: ScalarMultiplyAction,
+) !void {
+    try Authority.requireActive(Authority, transaction);
+    if (transaction.request_phase != .registering) return error.ValueUseLateRegistration;
+    const lhs_index = try Authority.validateHandle(Authority, transaction, lhs);
+    const lhs_request = &transaction.requests[lhs_index];
+    if (lhs_request.destination != .prepared_view or
+        lhs_request.form != .named_scalar_operand or
+        lhs_request.prepared_action != null)
+        return error.ValueUsePreparedActionFormMismatch;
+    const rhs_index = try Authority.validateRegisteredOperandHandle(Authority, transaction, action.rhs);
+    if (rhs_index <= lhs_index or transaction.requests[rhs_index].form != .named_scalar_operand)
+        return error.ValueUsePreparedActionFormMismatch;
+    try scalar_arithmetic_module.validateScalarMultiplyAction(&action);
+    lhs_request.prepared_action = .{ .scalar_multiply = action };
 }
 fn core_applySwitchBoundary(
     comptime Authority: type,
@@ -708,6 +729,7 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
         .immediate_lhs_scalar => |*immediate| try scalar_arithmetic_module.validateImmediateLhsScalarAction(immediate),
         .named_scalar_binary => return error.ValueUsePreparedActionFormMismatch,
         .exact_i52_binary => return error.ValueUsePreparedActionFormMismatch,
+        .scalar_multiply => return error.ValueUsePreparedActionFormMismatch,
     }
 }
 fn core_validateRegisteredOperandHandle(comptime _: type, transaction: anytype, handle: RequestHandle) !u8 {
@@ -762,6 +784,7 @@ fn core_validateActionDependenciesCanonical(comptime Authority: type, transactio
         .immediate_lhs_scalar => {},
         .named_scalar_binary => |named| try Authority.validateOperandCanonical(Authority, transaction, named.rhs),
         .exact_i52_binary => |named| try Authority.validateOperandCanonical(Authority, transaction, named.rhs),
+        .scalar_multiply => |multiply| try Authority.validateOperandCanonical(Authority, transaction, multiply.rhs),
         .validate_shape,
         .emit_copy_to,
         .form_readonly_table_address,
@@ -986,6 +1009,13 @@ fn executePreparedActionInternal(
             view,
             &named,
         ),
+        .scalar_multiply => |multiply| try scalar_arithmetic_module.executeScalarMultiply(
+            Authority,
+            transaction,
+            request_index,
+            view,
+            &multiply,
+        ),
     }
 }
 fn core_registeredOperandCurrent(comptime Authority: type, transaction: anytype, handle: RequestHandle) !ValueLoc {
@@ -1029,6 +1059,7 @@ fn actionSecondaryOperand(
         .immediate_lhs_scalar => null,
         .named_scalar_binary => |named| try Authority.validateRegisteredOperandHandle(Authority, transaction, named.rhs),
         .exact_i52_binary => |named| try Authority.validateRegisteredOperandHandle(Authority, transaction, named.rhs),
+        .scalar_multiply => |multiply| try Authority.validateRegisteredOperandHandle(Authority, transaction, multiply.rhs),
         .load_scalar,
         .load_readonly_pair,
         .load_stack_i128_alias,
@@ -1095,6 +1126,7 @@ fn actionTertiaryOperand(
         .immediate_lhs_scalar,
         .named_scalar_binary,
         .exact_i52_binary,
+        .scalar_multiply,
         => null,
     };
 }
@@ -1188,6 +1220,7 @@ const Implementation = struct {
     pub const attachScratchCompareAction = core_attachScratchCompareAction;
     pub const attachNamedScalarBinaryAction = core_attachNamedScalarBinaryAction;
     pub const attachExactI52BinaryAction = core_attachExactI52BinaryAction;
+    pub const attachScalarMultiplyAction = core_attachScalarMultiplyAction;
     pub const applySwitchBoundary = core_applySwitchBoundary;
     pub const preparedView = core_preparedView;
     pub const executePreparedAction = core_executePreparedAction;

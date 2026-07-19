@@ -44,6 +44,9 @@ ScalarCastRequestError
 ScalarCastTestFailure
 ScalarLoadAction
 ScalarLoadKind
+ScalarMultiplyAction
+ScalarMultiplyRequestError
+ScalarMultiplyTestFailure
 ScaledAddressAction
 ScratchCompareAction
 ScratchCompareRhs
@@ -68,6 +71,7 @@ address_domain_snapshot_copies
 applySwitchBoundary
 attachExactI52BinaryAction
 attachNamedScalarBinaryAction
+attachScalarMultiplyAction
 attachScratchCompareAction
 begin
 beginAccumulatorSession

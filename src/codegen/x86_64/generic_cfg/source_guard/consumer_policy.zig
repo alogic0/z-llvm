@@ -91,6 +91,7 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     try validateScalarCastProductionSites(source_name, source);
     try validateImmediateScalarProductionSites(source_name, source);
     try validateNamedScalarProductionSites(source_name, source);
+    try validateDormantScalarMultiplyProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -122,6 +123,22 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
                 return error.ValueUsePreparedLeafRawOperation;
         }
     }
+}
+
+pub fn validateDormantScalarMultiplyProductionSites(
+    source_name: []const u8,
+    source: []const u8,
+) !void {
+    _ = source_name;
+    const forbidden = [_][]const u8{
+        "attachScalarMultiplyAction(",
+        "isScalarMultiply(",
+        ".scalar_multiply",
+        "executeScalarMultiply(",
+    };
+    for (forbidden) |pattern|
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseScalarMultiplyPrematureProductionUse;
 }
 
 pub fn validateNamedScalarProductionSites(

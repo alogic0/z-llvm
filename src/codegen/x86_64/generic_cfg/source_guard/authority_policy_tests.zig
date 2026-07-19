@@ -70,6 +70,7 @@ const validateI128PairIntentSurface = support.validateI128PairIntentSurface;
 const validateScalarCastIntentSurface = support.validateScalarCastIntentSurface;
 const validateImmediateScalarIntentSurface = support.validateImmediateScalarIntentSurface;
 const validateNamedScalarIntentSurface = support.validateNamedScalarIntentSurface;
+const validateScalarMultiplyIntentSurface = support.validateScalarMultiplyIntentSurface;
 const validateScalarCastDisplacementPlan = support.validateScalarCastDisplacementPlan;
 const validateScalarDisplacementAuthorityDistinction = support.validateScalarDisplacementAuthorityDistinction;
 const validateLifetimeContextAuthority = support.validateLifetimeContextAuthority;
@@ -735,6 +736,28 @@ test "value-use named scalar semantic intent is exact and rejects physical choic
         error.ValueUseNamedScalarIntentMissing,
         validateNamedScalarIntentSurface(
             "pub const NamedScalarBinaryAction = struct { result: ActionIdentity, operation: ir.BinaryOp, integer_ty: ir.Type, exact_ei: bool, rhs: RequestHandle, };",
+        ),
+    );
+}
+
+test "value-use scalar multiply semantic intent is exact and rejects physical choices" {
+    const accepted =
+        "pub const ScalarMultiplyAction = struct { result: ActionIdentity, integer_ty: ir.Type, rhs: RequestHandle, };" ++
+        "pub const ScalarMultiplyRequestError = error{ ValueUseScalarMultiplyFormUnsupported, ValueUseScalarMultiplyWidthUnsupported, ValueUseScalarMultiplyLocationUnsupported, ValueUseScalarMultiplyDestinationUnavailable, };" ++
+        "pub const ScalarMultiplyTestFailure = enum { after_destination_selection, after_lhs_preservation, after_canonical_refresh, after_lhs_staging, after_rhs_resolution, after_rhs_staging, after_accumulator_preparation, after_lhs_accumulator_reload, after_multiply, after_result_identity_ownership, after_result_definition, after_finalization, };" ++
+        "pub const PreparedAction = union(enum) { scalar_multiply: ScalarMultiplyAction, };" ++
+        "pub fn attachScalarMultiplyAction() void {}";
+    try validateScalarMultiplyIntentSurface(accepted);
+    try std.testing.expectError(
+        error.ValueUseScalarMultiplyPhysicalIntentEscape,
+        validateScalarMultiplyIntentSurface(
+            "pub const ScalarMultiplyAction = struct { result: ActionIdentity, integer_ty: ir.Type, rhs: RequestHandle, home: ValueLoc, };",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseScalarMultiplyIntentMismatch,
+        validateScalarMultiplyIntentSurface(
+            "pub const ScalarMultiplyAction = struct { result: ActionIdentity, integer_ty: ir.Type, rhs: RequestHandle, plan: bool, };",
         ),
     );
 }

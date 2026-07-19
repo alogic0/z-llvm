@@ -606,6 +606,34 @@ pub const NamedScalarTestFailure = enum {
     after_finalization,
 };
 
+pub const ScalarMultiplyAction = struct {
+    result: ActionIdentity,
+    integer_ty: ir.Type,
+    rhs: RequestHandle,
+};
+
+pub const ScalarMultiplyRequestError = error{
+    ValueUseScalarMultiplyFormUnsupported,
+    ValueUseScalarMultiplyWidthUnsupported,
+    ValueUseScalarMultiplyLocationUnsupported,
+    ValueUseScalarMultiplyDestinationUnavailable,
+};
+
+pub const ScalarMultiplyTestFailure = enum {
+    after_destination_selection,
+    after_lhs_preservation,
+    after_canonical_refresh,
+    after_lhs_staging,
+    after_rhs_resolution,
+    after_rhs_staging,
+    after_accumulator_preparation,
+    after_lhs_accumulator_reload,
+    after_multiply,
+    after_result_identity_ownership,
+    after_result_definition,
+    after_finalization,
+};
+
 /// Pure future-dispatch classifier for the exact pair equality form.
 pub const max_switch_cases = 8;
 
@@ -704,6 +732,7 @@ pub const PreparedAction = union(enum) {
     immediate_lhs_scalar: ImmediateLhsScalarAction,
     named_scalar_binary: NamedScalarBinaryAction,
     exact_i52_binary: ExactI52BinaryAction,
+    scalar_multiply: ScalarMultiplyAction,
 
     pub fn eql(action: PreparedAction, other: PreparedAction) bool {
         return std.meta.eql(action, other);
@@ -1252,6 +1281,9 @@ pub fn Transaction(comptime Impl: type) type {
         pub const ExactI52BinaryAction = Model.ExactI52BinaryAction;
         pub const NamedScalarRequestError = Model.NamedScalarRequestError;
         pub const NamedScalarTestFailure = Model.NamedScalarTestFailure;
+        pub const ScalarMultiplyAction = Model.ScalarMultiplyAction;
+        pub const ScalarMultiplyRequestError = Model.ScalarMultiplyRequestError;
+        pub const ScalarMultiplyTestFailure = Model.ScalarMultiplyTestFailure;
         pub const max_switch_cases = Model.max_switch_cases;
         pub const SwitchCaseIntent = Model.SwitchCaseIntent;
         pub const SwitchCompareChainAction = Model.SwitchCompareChainAction;
@@ -1322,6 +1354,7 @@ pub fn Transaction(comptime Impl: type) type {
         scalar_cast_test_failure: if (builtin.is_test) ?Self.ScalarCastTestFailure else void = if (builtin.is_test) null else {},
         immediate_scalar_test_failure: if (builtin.is_test) ?Self.ImmediateScalarTestFailure else void = if (builtin.is_test) null else {},
         named_scalar_test_failure: if (builtin.is_test) ?Self.NamedScalarTestFailure else void = if (builtin.is_test) null else {},
+        scalar_multiply_test_failure: if (builtin.is_test) ?Self.ScalarMultiplyTestFailure else void = if (builtin.is_test) null else {},
 
         pub fn begin(selector: *ComposedBlockSelector) !Self {
             return Impl.begin(Self, selector);
@@ -1357,6 +1390,14 @@ pub fn Transaction(comptime Impl: type) type {
             action: Self.ExactI52BinaryAction,
         ) !void {
             return Impl.attachExactI52BinaryAction(Impl, transaction, lhs, action);
+        }
+
+        pub fn attachScalarMultiplyAction(
+            transaction: *Self,
+            lhs: Self.RequestHandle,
+            action: Self.ScalarMultiplyAction,
+        ) !void {
+            return Impl.attachScalarMultiplyAction(Impl, transaction, lhs, action);
         }
 
         pub fn seal(transaction: *Self) !void {
