@@ -72,9 +72,6 @@ It's from Watcher:
 Proceed autonomously on Watcher/Reviewer agreement. A failed acceptance blocks
 wider advancement, but it does not block a bounded diagnosis or remediation
 that the Reviewer explicitly authorizes. Dispatch that agreed corrective slice.
-Pause only when there is no mutually agreed safe bounded task, the Reviewer
-disagrees, the next action is destructive/irreversible/materially
-scope-expanding, or a genuine structural blocker requires the user.
 EOF
 )
 
