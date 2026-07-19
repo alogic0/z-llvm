@@ -6,30 +6,30 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-189 v2 preflight portability and serialization closure — AUTHORIZED
+## INBOX-189A exact C01 audit-ledger count correction — AUTHORIZED
 
-INBOX-188 at `59d9cb33` is accepted as a compliant fail-closed stop only.
-Validation is incomplete, and its sole v1 attempt is exhausted. Preserve all
-eight retained preflight files byte-for-byte; never rerun or reuse v1.
+The executable v2 correction in `107f442c` is structurally closed and frozen,
+but final INBOX-189 acceptance is withheld for one factual evidence-record
+error. C01 contains 13 literal `{print $1}` SHA field programs plus one stash
+reader, for 14 C01 AWK programs total; the record currently labels the
+print-field count as 14.
 
-Amend only the accepted contract document. Move every future generated path
-to a fresh, disjoint `baseline_validation_v2` namespace while keeping
-historical v1 evidence immutable. Define cleanliness as exact expected HEAD,
-empty worktree and cached diffs, empty
-`git status --porcelain --untracked-files=no`, and equality with the frozen
-tracked-source manifest. The future C01 cleanliness check must not
-enumerate, whitelist, read, or modify untracked paths.
+Change only the INBOX-189 audit record in the accepted contract document:
+set `c01_literal_awk_print_field_programs=13`, retain
+`c01_literal_awk_stash_programs=1`, and add
+`c01_total_awk_programs=14`. Do not alter executable contract bytes.
 
-Rewrite C01 as one directly quoted `/bin/bash -c` invocation with explicit
-`_` as `$0`, complete positional bindings, and literal AWK field expressions
-protected from shell expansion. Remove `preflight_program` and every eval or
-serialized-program re-evaluation path. Re-audit all 45 templates, statuses,
-producer order, exact v2 pathing, and v1 non-reference.
+Run static/read-only checks only. Preserve the immutable v1 evidence, absent
+v1/v2 outputs, all bundle/input/frozen identities, watcher and stash,
+dormant production, ratchet 131, calls sequence, and mandatory post-calls
+checkpoint. Commit only the amended contract and stop before v2 execution.
 
-Run static/read-only checks only. Change no source, bundle, input, identity,
-pin, tool, threshold, calls sequence, or checkpoint. Commit only the amended
-contract, preserve dormant production and ratchet 131, and stop before v2
-execution.
+## INBOX-189 v2 preflight portability and serialization closure — STRUCTURALLY CLOSED at 107f442c; FINAL ACCEPTANCE WITHHELD
+
+The v2 namespace, tracked-only cleanliness predicate, closed future-HEAD
+binding, direct C01 invocation, 45-template ledger, and Bash syntax are
+accepted and frozen. Final acceptance is withheld solely until INBOX-189A
+corrects the one-count audit-record error. Validation remains unauthorized.
 
 ## INBOX-188 baseline-validation execution — COMPLIANT STOP at 59d9cb33
 
