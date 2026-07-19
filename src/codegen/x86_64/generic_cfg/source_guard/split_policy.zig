@@ -498,6 +498,7 @@ pub fn validateScalarArithmeticFacadeSource(source: []const u8) !void {
         "pub const executeImmediateLhsScalar = scalar_immediate.executeImmediateLhsScalar;\n" ++
         "pub const executeImmediateRhsScalar = scalar_immediate.executeImmediateRhsScalar;\n" ++
         "pub const executeScalarMultiply = scalar_multiply_divide.executeScalarMultiply;\n" ++
+        "pub const executeUnsignedQuotient = scalar_multiply_divide.executeUnsignedQuotient;\n" ++
         "pub const executeExactI52Binary = scalar_named.executeExactI52Binary;\n" ++
         "pub const executeNamedScalarBinary = scalar_named.executeNamedScalarBinary;\n" ++
         "pub const executePairLowScalarCast = scalar_cast.executePairLowScalarCast;\n" ++
@@ -506,6 +507,7 @@ pub fn validateScalarArithmeticFacadeSource(source: []const u8) !void {
         "pub const isImmediateLhsScalar = scalar_immediate.isImmediateLhsScalar;\n" ++
         "pub const isImmediateRhsScalar = scalar_immediate.isImmediateRhsScalar;\n" ++
         "pub const isScalarMultiply = scalar_multiply_divide.isScalarMultiply;\n" ++
+        "pub const isUnsignedQuotient = scalar_multiply_divide.isUnsignedQuotient;\n" ++
         "pub const isExactI52Binary = scalar_named.isExactI52Binary;\n" ++
         "pub const isNamedScalarBinary = scalar_named.isNamedScalarBinary;\n" ++
         "pub const isPairLowScalarCast = scalar_cast.isPairLowScalarCast;\n" ++
@@ -514,6 +516,7 @@ pub fn validateScalarArithmeticFacadeSource(source: []const u8) !void {
         "pub const validateImmediateLhsScalarAction = scalar_immediate.validateImmediateLhsScalarAction;\n" ++
         "pub const validateImmediateRhsScalarAction = scalar_immediate.validateImmediateRhsScalarAction;\n" ++
         "pub const validateScalarMultiplyAction = scalar_multiply_divide.validateScalarMultiplyAction;\n" ++
+        "pub const validateUnsignedQuotientAction = scalar_multiply_divide.validateUnsignedQuotientAction;\n" ++
         "pub const validateExactI52BinaryAction = scalar_named.validateExactI52BinaryAction;\n" ++
         "pub const validateNamedScalarBinaryAction = scalar_named.validateNamedScalarBinaryAction;\n" ++
         "pub const validatePairLowScalarCastAction = scalar_cast.validatePairLowScalarCastAction;\n";
@@ -588,7 +591,7 @@ pub fn validateValueUseFacadeSurfaceManifest(source: [:0]const u8) !void {
         previous = name;
         manifest_count += 1;
     }
-    if (declaration_count != manifest_count or manifest_count != 117)
+    if (declaration_count != manifest_count or manifest_count != 122)
         return error.ValueUseFacadeManifestMismatch;
 }
 
@@ -612,7 +615,7 @@ pub fn validateValueUseDirectForwardingWrappers(transaction_source: [:0]const u8
         wrapper_count += 1;
         cursor = close + 1;
     }
-    if (wrapper_count != 46) return error.ValueUseWrapperNotDirectForward;
+    if (wrapper_count != 48) return error.ValueUseWrapperNotDirectForward;
 }
 
 pub fn validateExactTopLevelPubNames(source: []const u8, expected: []const []const u8) !void {

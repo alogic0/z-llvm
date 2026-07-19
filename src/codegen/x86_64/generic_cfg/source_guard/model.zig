@@ -92,7 +92,8 @@ pub const value_use_model_pub_names = [_][]const u8{
     "Source",                           "StackI128AliasLoadAction",       "StoreI64Action",
     "StoreImmediateAction",             "StoreScalarAction",              "StoreStackPointerAction",
     "StoredRequest",                    "SwitchCaseIntent",               "SwitchCompareChainAction",
-    "Transaction",                      "UseForm",                        "address_domain_copies_per_request",
+    "Transaction",                      "UnsignedQuotientAction",         "UnsignedQuotientRequestError",
+    "UnsignedQuotientTestFailure",      "UseForm",                        "address_domain_copies_per_request",
     "address_domain_snapshot_bytes",    "address_domain_snapshot_copies", "max_identity_bytes",
     "max_forward_dependency_owners",    "max_mappings",                   "max_requests",
     "max_switch_cases",                 "physical_node_count",
@@ -189,14 +190,15 @@ pub const value_use_scalar_arithmetic_pub_names = [_][]const u8{
     "executeImmediateRhsScalar",           "executeExactI52Binary",
     "executeNamedScalarBinary",            "executePairLowScalarCast",
     "executeScalarMultiply",               "executeSignExtendScratch",
-    "isAccumulatorScalarCast",             "isImmediateLhsScalar",
-    "isImmediateRhsScalar",                "isExactI52Binary",
-    "isNamedScalarBinary",                 "isScalarMultiply",
+    "executeUnsignedQuotient",             "isAccumulatorScalarCast",
+    "isImmediateLhsScalar",                "isImmediateRhsScalar",
+    "isExactI52Binary",                    "isNamedScalarBinary",
+    "isScalarMultiply",                    "isUnsignedQuotient",
     "isPairLowScalarCast",                 "isSignExtendScratchCast",
     "validateAccumulatorScalarCastAction", "validateImmediateLhsScalarAction",
     "validateImmediateRhsScalarAction",    "validateExactI52BinaryAction",
     "validateNamedScalarBinaryAction",     "validatePairLowScalarCastAction",
-    "validateScalarMultiplyAction",
+    "validateScalarMultiplyAction",        "validateUnsignedQuotientAction",
 };
 pub const value_use_scalar_cast_pub_names = [_][]const u8{
     "executeAccumulatorScalarCast",
@@ -226,15 +228,18 @@ pub const value_use_scalar_named_pub_names = [_][]const u8{
 };
 pub const value_use_scalar_multiply_divide_pub_names = [_][]const u8{
     "executeScalarMultiply",
+    "executeUnsignedQuotient",
     "isScalarMultiply",
+    "isUnsignedQuotient",
     "validateScalarMultiplyAction",
+    "validateUnsignedQuotientAction",
 };
 pub const value_use_calls_pub_names = [_][]const u8{"executeInlineMemcpy"};
 
 pub const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
 pub const frozen_bypass_inventory_sha256 = "3928114a0fcc55d5f18a367b29865925396c80c3a2589e02c87f4e0a73b23537";
 pub const value_use_facade_manifest_path = "docs/evidence/inbox128_o2_r1_facade_manifest.tsv";
-pub const value_use_facade_manifest_sha256 = "477769d5111199b9d6b9a0f5e16a47a19f5e0bb8cdb9fa45bf7aeb0f463c82d5";
+pub const value_use_facade_manifest_sha256 = "0925a250ac72481edb1b3c06f140d1102b615b920fb0afc98385ea49618ce6be";
 pub const bypass_operations = [_][]const u8{
     "directValueLocInstructionMaterializer",
     "emitBinaryLocIntoAccumulator",

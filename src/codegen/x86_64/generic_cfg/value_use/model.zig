@@ -634,6 +634,32 @@ pub const ScalarMultiplyTestFailure = enum {
     after_finalization,
 };
 
+pub const UnsignedQuotientAction = struct {
+    result: ActionIdentity,
+    integer_ty: ir.Type,
+    rhs: RequestHandle,
+};
+
+pub const UnsignedQuotientRequestError = error{
+    ValueUseUnsignedQuotientFormUnsupported,
+    ValueUseUnsignedQuotientWidthUnsupported,
+    ValueUseUnsignedQuotientLocationUnsupported,
+};
+
+pub const UnsignedQuotientTestFailure = enum {
+    after_rhs_classification,
+    after_rhs_accumulator_staging,
+    after_accumulator_preparation,
+    after_lhs_materialization,
+    after_rhs_non_accumulator_staging,
+    after_rdx_preservation,
+    after_zero_high_dividend,
+    after_divide,
+    after_result_identity_ownership,
+    after_result_definition,
+    after_finalization,
+};
+
 /// Pure future-dispatch classifier for the exact pair equality form.
 pub const max_switch_cases = 8;
 
@@ -733,6 +759,7 @@ pub const PreparedAction = union(enum) {
     named_scalar_binary: NamedScalarBinaryAction,
     exact_i52_binary: ExactI52BinaryAction,
     scalar_multiply: ScalarMultiplyAction,
+    unsigned_quotient: UnsignedQuotientAction,
 
     pub fn eql(action: PreparedAction, other: PreparedAction) bool {
         return std.meta.eql(action, other);
@@ -1284,6 +1311,9 @@ pub fn Transaction(comptime Impl: type) type {
         pub const ScalarMultiplyAction = Model.ScalarMultiplyAction;
         pub const ScalarMultiplyRequestError = Model.ScalarMultiplyRequestError;
         pub const ScalarMultiplyTestFailure = Model.ScalarMultiplyTestFailure;
+        pub const UnsignedQuotientAction = Model.UnsignedQuotientAction;
+        pub const UnsignedQuotientRequestError = Model.UnsignedQuotientRequestError;
+        pub const UnsignedQuotientTestFailure = Model.UnsignedQuotientTestFailure;
         pub const max_switch_cases = Model.max_switch_cases;
         pub const SwitchCaseIntent = Model.SwitchCaseIntent;
         pub const SwitchCompareChainAction = Model.SwitchCompareChainAction;
@@ -1355,6 +1385,7 @@ pub fn Transaction(comptime Impl: type) type {
         immediate_scalar_test_failure: if (builtin.is_test) ?Self.ImmediateScalarTestFailure else void = if (builtin.is_test) null else {},
         named_scalar_test_failure: if (builtin.is_test) ?Self.NamedScalarTestFailure else void = if (builtin.is_test) null else {},
         scalar_multiply_test_failure: if (builtin.is_test) ?Self.ScalarMultiplyTestFailure else void = if (builtin.is_test) null else {},
+        unsigned_quotient_test_failure: if (builtin.is_test) ?Self.UnsignedQuotientTestFailure else void = if (builtin.is_test) null else {},
 
         pub fn begin(selector: *ComposedBlockSelector) !Self {
             return Impl.begin(Self, selector);
@@ -1398,6 +1429,14 @@ pub fn Transaction(comptime Impl: type) type {
             action: Self.ScalarMultiplyAction,
         ) !void {
             return Impl.attachScalarMultiplyAction(Impl, transaction, lhs, action);
+        }
+
+        pub fn attachUnsignedQuotientAction(
+            transaction: *Self,
+            lhs: Self.RequestHandle,
+            action: Self.UnsignedQuotientAction,
+        ) !void {
+            return Impl.attachUnsignedQuotientAction(Impl, transaction, lhs, action);
         }
 
         pub fn seal(transaction: *Self) !void {
@@ -1771,6 +1810,10 @@ pub fn Transaction(comptime Impl: type) type {
 
         pub fn isImmediateLhsScalar(binary: ir.BinaryInst) bool {
             return Impl.scalar_arithmetic.isImmediateLhsScalar(binary);
+        }
+
+        pub fn isUnsignedQuotient(binary: ir.BinaryInst) bool {
+            return Impl.scalar_arithmetic.isUnsignedQuotient(binary);
         }
     };
 }

@@ -323,6 +323,11 @@ pub fn requestDestinationNodes(
                     try result.append(nodeForArgReg(reg));
                 try result.append(.accumulator);
             },
+            .unsigned_quotient => {
+                for (selector_types.selector_allocatable_regs) |reg|
+                    try result.append(nodeForArgReg(reg));
+                try result.append(.accumulator);
+            },
         },
         .stack_argument => return error.ValueUseStackArgumentUnsupported,
         .new_pair => return error.ValueUseNewPairOwnershipUnsupported,
@@ -777,6 +782,7 @@ pub fn requestMappings(
             .named_scalar_binary,
             .exact_i52_binary,
             .scalar_multiply,
+            .unsigned_quotient,
             => {
                 const destinations = try requestDestinationNodes(Authority, transaction, request, current);
                 for (destinations.slice()) |destination| mappings.append(.{

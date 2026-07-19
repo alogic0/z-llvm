@@ -83,6 +83,7 @@ const validateImmediateScalarSemanticPartition = support.validateImmediateScalar
 const validateImmediateScalarProductionSites = support.validateImmediateScalarProductionSites;
 const validateNamedScalarProductionSites = support.validateNamedScalarProductionSites;
 const validateScalarMultiplyProductionSites = support.validateScalarMultiplyProductionSites;
+const validateUnsignedQuotientProductionSites = support.validateUnsignedQuotientProductionSites;
 const validateLoadDiagnosticMappingProductionSites = support.validateLoadDiagnosticMappingProductionSites;
 const validateDormantLoadActionProductionSites = support.validateDormantLoadActionProductionSites;
 const validateAccumulatorCompositionProductionSites = support.validateAccumulatorCompositionProductionSites;
@@ -843,4 +844,24 @@ test "scalar multiply production wiring is complete and exclusive" {
             raw_resolution_z,
         ),
     );
+}
+
+test "unsigned quotient action stays dormant in every production consumer" {
+    const accepted: [:0]const u8 = @embedFile("../composed_selector_scalar.zig");
+    try validateUnsignedQuotientProductionSites("composed_selector_scalar.zig", accepted);
+
+    inline for ([_][:0]const u8{
+        "fn lowerUnsignedDivRem() void { _ = isUnsignedQuotient(binary); }",
+        "fn lowerUnsignedDivRem() void { transaction.attachUnsignedQuotientAction(lhs, action); }",
+        "fn lowerUnsignedDivRem() void { _ = .unsigned_quotient; }",
+        "fn lowerUnsignedDivRem() void { executeUnsignedQuotient(); }",
+    }) |source| {
+        try std.testing.expectError(
+            error.ValueUseUnsignedQuotientPrematureProductionUse,
+            validateUnsignedQuotientProductionSites(
+                "composed_selector_scalar.zig",
+                source,
+            ),
+        );
+    }
 }

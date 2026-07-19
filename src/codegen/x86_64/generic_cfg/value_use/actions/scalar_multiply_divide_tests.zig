@@ -21,6 +21,11 @@ const Handles = struct {
     rhs: Transaction.RequestHandle,
 };
 
+const QuotientHandles = struct {
+    rhs: Transaction.RequestHandle,
+    lhs: Transaction.RequestHandle,
+};
+
 fn registerMultiply(transaction: *Transaction) !Handles {
     const lhs = try transaction.register(.{
         .source = .{ .named = "lhs" },
@@ -40,6 +45,29 @@ fn registerMultiply(transaction: *Transaction) !Handles {
         .rhs = rhs,
     });
     return .{ .lhs = lhs, .rhs = rhs };
+}
+
+fn registerQuotient(transaction: *Transaction, bits: u16) !QuotientHandles {
+    const ty: ir.Type = .{ .int = bits };
+    const class: support.selector_types.VirtualRegClass = if (bits == 32) .gpr32 else .gpr64;
+    const rhs = try transaction.register(.{
+        .source = .{ .named = "rhs" },
+        .expected = expected(ty, class),
+        .form = .named_scalar_operand,
+        .destination = .prepared_source,
+    });
+    const lhs = try transaction.register(.{
+        .source = .{ .named = "lhs" },
+        .expected = expected(ty, class),
+        .form = .named_scalar_operand,
+        .destination = .prepared_view,
+    });
+    try transaction.attachUnsignedQuotientAction(lhs, .{
+        .result = try actionIdentity("result"),
+        .integer_ty = ty,
+        .rhs = rhs,
+    });
+    return .{ .rhs = rhs, .lhs = lhs };
 }
 
 fn installPlan(
@@ -69,6 +97,17 @@ fn blockScratchRegs(
 }
 
 fn executeAndCommit(transaction: *Transaction, handles: Handles) !void {
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.executePreparedAction(try transaction.preparedView(handles.lhs));
+    try transaction.commit();
+}
+
+fn executeQuotientAndCommit(
+    transaction: *Transaction,
+    handles: QuotientHandles,
+) !void {
     try transaction.seal();
     try transaction.prepare();
     try transaction.materializeAll();
@@ -334,6 +373,286 @@ test "scalar multiply rollback is exact at every declared destination and accumu
         try std.testing.expectEqual(
             initial_rhs,
             selector_state.resolveValue(&selector, .{ .named = "rhs" }).?,
+        );
+        try std.testing.expect(selector_state.resolveValue(
+            &selector,
+            .{ .named = "result" },
+        ) == null);
+        try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+    }
+}
+
+test "unsigned quotient classifier and closed action admit only named udiv i32 and i64" {
+    const admitted32 = ir.BinaryInst{
+        .op = .udiv,
+        .ty = .{ .int = 32 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    };
+    try std.testing.expect(scalar_multiply.isUnsignedQuotient(admitted32));
+    var admitted64 = admitted32;
+    admitted64.ty = .{ .int = 64 };
+    try std.testing.expect(scalar_multiply.isUnsignedQuotient(admitted64));
+
+    var rejected = admitted32;
+    rejected.op = .urem;
+    try std.testing.expect(!scalar_multiply.isUnsignedQuotient(rejected));
+    rejected = admitted32;
+    rejected.ty = .{ .int = 16 };
+    try std.testing.expect(!scalar_multiply.isUnsignedQuotient(rejected));
+    rejected = admitted32;
+    rejected.rhs = .{ .int = 7 };
+    try std.testing.expect(!scalar_multiply.isUnsignedQuotient(rejected));
+}
+
+test "unsigned quotient UQ32 derives non-accumulator staging and retains durable result" {
+    var machine = MachineFunction.init("uq32-non-accumulator", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try installPlan(&plan, 1, 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .arg32 = .rsi });
+
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handles = try registerQuotient(&transaction, 32);
+        try executeQuotientAndCommit(&transaction, handles);
+    }
+    try selector_state.emitValueIntoScratch(
+        &selector,
+        .{ .named = "result" },
+        .r9,
+        32,
+    );
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .mov_arg_eax = .rdi },
+        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
+        .xor_edx_edx,
+        .{ .div_arg32 = .rcx },
+        .{ .mov_eax_to_arg = .r9 },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(
+        ValueLoc.eax,
+        selector_state.resolveValue(&selector, .{ .named = "result" }).?,
+    );
+}
+
+test "unsigned quotient UQ32 derives accumulator-first RHS staging" {
+    var machine = MachineFunction.init("uq32-accumulator-rhs", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try installPlan(&plan, 1, 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    try selector_state.bindValueLoc(&selector, "rhs", .eax);
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg32 = .rdi });
+
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handles = try registerQuotient(&transaction, 32);
+        try executeQuotientAndCommit(&transaction, handles);
+    }
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .mov_eax_to_arg = .rcx },
+        .{ .mov_arg_eax = .rdi },
+        .xor_edx_edx,
+        .{ .div_arg32 = .rcx },
+    }, machine.instructions.items);
+}
+
+test "unsigned quotient UQ64 derives non-accumulator staging and retains durable result" {
+    var machine = MachineFunction.init("uq64-non-accumulator", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try installPlan(&plan, 1, 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .arg64 = .rsi });
+
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handles = try registerQuotient(&transaction, 64);
+        try executeQuotientAndCommit(&transaction, handles);
+    }
+    try selector_state.emitValueIntoScratch(
+        &selector,
+        .{ .named = "result" },
+        .r9,
+        64,
+    );
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .mov_arg_rax = .rdi },
+        .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rsi } },
+        .xor_edx_edx,
+        .{ .div_arg64 = .rcx },
+        .{ .mov_rax_to_arg = .r9 },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(
+        ValueLoc.rax,
+        selector_state.resolveValue(&selector, .{ .named = "result" }).?,
+    );
+}
+
+test "unsigned quotient UQ64 derives accumulator-first RHS staging" {
+    var machine = MachineFunction.init("uq64-accumulator-rhs", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try installPlan(&plan, 1, 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    try selector_state.bindValueLoc(&selector, "rhs", .rax);
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi });
+
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handles = try registerQuotient(&transaction, 64);
+        try executeQuotientAndCommit(&transaction, handles);
+    }
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .mov_rax_to_arg = .rcx },
+        .{ .mov_arg_rax = .rdi },
+        .xor_edx_edx,
+        .{ .div_arg64 = .rcx },
+    }, machine.instructions.items);
+}
+
+test "unsigned quotient preserves live RCX and RDX occupants in frozen order" {
+    var machine = MachineFunction.init("uq64-fixed-register-preservation", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try installPlan(&plan, 1, 1);
+    try plan.interval_ends.put("live_rcx", 2);
+    try plan.interval_ends.put("live_rdx", 2);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .arg64 = .rsi });
+    try selector_state.bindValueLoc(&selector, "live_rcx", .{ .scratch64 = .rcx });
+    try selector_state.bindValueLoc(&selector, "live_rdx", .{ .scratch64 = .rdx });
+
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handles = try registerQuotient(&transaction, 64);
+        try executeQuotientAndCommit(&transaction, handles);
+    }
+    try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+        .{ .mov_arg_rax = .rdi },
+        .{ .spill_arg64_rsp = .{ .frame_index = .slot0, .reg = .rcx } },
+        .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rsi } },
+        .{ .spill_arg64_rsp = .{ .frame_index = .slot2, .reg = .rdx } },
+        .xor_edx_edx,
+        .{ .div_arg64 = .rcx },
+    }, machine.instructions.items);
+    try std.testing.expectEqual(
+        ValueLoc{ .spill64 = .slot0 },
+        selector_state.resolveValue(&selector, .{ .named = "live_rcx" }).?,
+    );
+    try std.testing.expectEqual(
+        ValueLoc{ .spill64 = .slot2 },
+        selector_state.resolveValue(&selector, .{ .named = "live_rdx" }).?,
+    );
+}
+
+test "unsigned quotient request failures preserve RHS-before-lhs provenance" {
+    inline for ([_]bool{ true, false }) |fail_rhs| {
+        var machine = MachineFunction.init(if (fail_rhs) "uq-rhs-fail" else "uq-lhs-fail", .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try installPlan(&plan, 1, 1);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        if (fail_rhs)
+            try selector_state.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi })
+        else
+            try selector_state.bindValueLoc(&selector, "rhs", .{ .arg64 = .rsi });
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handles = try registerQuotient(&transaction, 64);
+        try std.testing.expectError(error.ValueUseForwardPlanMissing, transaction.seal());
+        try std.testing.expectEqual(fail_rhs, transaction.failedRequestIs(handles.rhs));
+        try std.testing.expectEqual(!fail_rhs, transaction.failedRequestIs(handles.lhs));
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
+test "unsigned quotient rollback is exact at every declared failure boundary" {
+    inline for (std.meta.tags(Transaction.UnsignedQuotientTestFailure)) |failure| {
+        const accumulator_rhs = failure == .after_rhs_accumulator_staging;
+        var machine = MachineFunction.init(@tagName(failure), .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try installPlan(&plan, 1, 1);
+        try plan.interval_ends.put("live_rdx", 2);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi });
+        try selector_state.bindValueLoc(
+            &selector,
+            "rhs",
+            if (accumulator_rhs) .rax else .{ .arg64 = .rsi },
+        );
+        try selector_state.bindValueLoc(&selector, "live_rdx", .{ .scratch64 = .rdx });
+        const initial_lhs = selector_state.resolveValue(&selector, .{ .named = "lhs" }).?;
+        const initial_rhs = selector_state.resolveValue(&selector, .{ .named = "rhs" }).?;
+        const initial_rdx = selector_state.resolveValue(&selector, .{ .named = "live_rdx" }).?;
+
+        {
+            var transaction = try Transaction.begin(&selector);
+            defer transaction.deinit();
+            const handles = try registerQuotient(&transaction, 64);
+            try transaction.seal();
+            try transaction.prepare();
+            try transaction.materializeAll();
+            transaction.unsigned_quotient_test_failure = failure;
+            try std.testing.expectError(
+                error.ValueUseUnsignedQuotientTestFailure,
+                transaction.executePreparedAction(try transaction.preparedView(handles.lhs)),
+            );
+        }
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(
+            initial_lhs,
+            selector_state.resolveValue(&selector, .{ .named = "lhs" }).?,
+        );
+        try std.testing.expectEqual(
+            initial_rhs,
+            selector_state.resolveValue(&selector, .{ .named = "rhs" }).?,
+        );
+        try std.testing.expectEqual(
+            initial_rdx,
+            selector_state.resolveValue(&selector, .{ .named = "live_rdx" }).?,
         );
         try std.testing.expect(selector_state.resolveValue(
             &selector,

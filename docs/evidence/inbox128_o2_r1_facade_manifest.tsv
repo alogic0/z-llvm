@@ -63,6 +63,9 @@ StoreScalarAction
 StoreStackPointerAction
 SwitchCaseIntent
 SwitchCompareChainAction
+UnsignedQuotientAction
+UnsignedQuotientRequestError
+UnsignedQuotientTestFailure
 UseForm
 actionDiagnostic
 address_domain_copies_per_request
@@ -73,6 +76,7 @@ attachExactI52BinaryAction
 attachNamedScalarBinaryAction
 attachScalarMultiplyAction
 attachScratchCompareAction
+attachUnsignedQuotientAction
 begin
 beginAccumulatorSession
 commit
@@ -91,6 +95,7 @@ isImmediateLhsScalar
 isImmediateRhsScalar
 isPairLowScalarCast
 isSignExtendScratchCast
+isUnsignedQuotient
 materializeAccumulator
 materializeAll
 max_identity_bytes

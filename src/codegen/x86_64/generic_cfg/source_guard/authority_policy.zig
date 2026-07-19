@@ -132,6 +132,7 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateImmediateScalarIntentSurface(source);
     try validateNamedScalarIntentSurface(source);
     try validateScalarMultiplyIntentSurface(source);
+    try validateUnsignedQuotientIntentSurface(source);
     try validateLifetimeContextAuthority(source);
     if (allow_technical_visibility)
         try validateForwardAdmissionSnapshotAuthority(source);
@@ -806,6 +807,83 @@ pub fn validateScalarMultiplyIntentSurface(source: []const u8) !void {
         return error.ValueUseScalarMultiplyIntentMismatch;
     if (countPattern(source, "pub fn attachScalarMultiplyAction(") != 1)
         return error.ValueUseScalarMultiplyIntentMismatch;
+}
+
+pub fn validateUnsignedQuotientIntentSurface(source: []const u8) !void {
+    const declaration = "pub const UnsignedQuotientAction = struct {";
+    const start = std.mem.indexOf(u8, source, declaration) orelse return;
+    const end = std.mem.indexOfPos(u8, source, start, "};") orelse
+        return error.InvalidZigSource;
+    const body = source[start .. end + 2];
+    for ([_][]const u8{
+        "result: ActionIdentity",
+        "integer_ty: ir.Type",
+        "rhs: RequestHandle",
+    }) |field|
+        if (countPattern(body, field) != 1)
+            return error.ValueUseUnsignedQuotientIntentMismatch;
+    for ([_][]const u8{
+        "ArgReg",  "ValueLoc", "Destination", "PreparedView", "home",
+        "binding", "scratch",  "spill",       "displacement", "sequence",
+        "phase",
+    }) |forbidden|
+        if (std.mem.indexOf(u8, body, forbidden) != null)
+            return error.ValueUseUnsignedQuotientPhysicalIntentEscape;
+    if (countPattern(body, ",") != 3)
+        return error.ValueUseUnsignedQuotientIntentMismatch;
+
+    const exact_sets = [_]struct {
+        declaration: []const u8,
+        required: []const []const u8,
+    }{
+        .{
+            .declaration = "pub const UnsignedQuotientRequestError = error{",
+            .required = &.{
+                "ValueUseUnsignedQuotientFormUnsupported",
+                "ValueUseUnsignedQuotientWidthUnsupported",
+                "ValueUseUnsignedQuotientLocationUnsupported",
+            },
+        },
+        .{
+            .declaration = "pub const UnsignedQuotientTestFailure = enum {",
+            .required = &.{
+                "after_rhs_classification",
+                "after_rhs_accumulator_staging",
+                "after_accumulator_preparation",
+                "after_lhs_materialization",
+                "after_rhs_non_accumulator_staging",
+                "after_rdx_preservation",
+                "after_zero_high_dividend",
+                "after_divide",
+                "after_result_identity_ownership",
+                "after_result_definition",
+                "after_finalization",
+            },
+        },
+    };
+    for (exact_sets) |entry| {
+        const set_start = std.mem.indexOf(u8, source, entry.declaration) orelse
+            return error.ValueUseUnsignedQuotientIntentMissing;
+        const set_end = std.mem.indexOfPos(u8, source, set_start, "};") orelse
+            return error.InvalidZigSource;
+        const set_body = source[set_start .. set_end + 2];
+        for (entry.required) |member|
+            if (countPattern(set_body, member) != 1)
+                return error.ValueUseUnsignedQuotientIntentMismatch;
+        if (countPattern(set_body, ",") != entry.required.len)
+            return error.ValueUseUnsignedQuotientIntentMismatch;
+    }
+    const action_start = std.mem.indexOf(u8, source, "pub const PreparedAction = union(enum) {") orelse
+        return error.ValueUseUnsignedQuotientIntentMissing;
+    const action_end = std.mem.indexOfPos(u8, source, action_start, "};") orelse
+        return error.InvalidZigSource;
+    if (countPattern(
+        source[action_start .. action_end + 2],
+        "unsigned_quotient: UnsignedQuotientAction,",
+    ) != 1)
+        return error.ValueUseUnsignedQuotientIntentMismatch;
+    if (countPattern(source, "pub fn attachUnsignedQuotientAction(") != 1)
+        return error.ValueUseUnsignedQuotientIntentMismatch;
 }
 
 pub fn validateScalarCastSequence(source: [:0]const u8) !void {

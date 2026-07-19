@@ -92,6 +92,7 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     try validateImmediateScalarProductionSites(source_name, source);
     try validateNamedScalarProductionSites(source_name, source);
     try validateScalarMultiplyProductionSites(source_name, source);
+    try validateUnsignedQuotientProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -191,6 +192,21 @@ pub fn validateScalarMultiplyProductionSites(
     for (removed_helpers) |declaration|
         if (std.mem.indexOf(u8, source, declaration) != null)
             return error.ValueUseScalarMultiplyPrematureProductionUse;
+}
+
+pub fn validateUnsignedQuotientProductionSites(
+    source_name: []const u8,
+    source: [:0]const u8,
+) !void {
+    _ = source_name;
+    for ([_][]const u8{
+        "attachUnsignedQuotientAction(",
+        "isUnsignedQuotient(",
+        ".unsigned_quotient",
+        "executeUnsignedQuotient(",
+    }) |pattern|
+        if (std.mem.indexOf(u8, source, pattern) != null)
+            return error.ValueUseUnsignedQuotientPrematureProductionUse;
 }
 
 pub fn validateNamedScalarProductionSites(

@@ -56,7 +56,7 @@ const I128PairRollbackBoundary = support.I128PairRollbackBoundary;
 const expectI128PairRollbackExact = support.expectI128PairRollbackExact;
 
 test "value-use generic transaction layout matches frozen R0" {
-    try std.testing.expectEqual(@as(usize, 363904), @sizeOf(Transaction));
+    try std.testing.expectEqual(@as(usize, 363920), @sizeOf(Transaction));
     try std.testing.expectEqual(@as(usize, 16), @alignOf(Transaction));
     const expected_layout = .{
         .{ "selector", 354256 },
@@ -91,6 +91,8 @@ test "value-use generic transaction layout matches frozen R0" {
         .{ "scalar_cast_test_failure", 363895 },
         .{ "immediate_scalar_test_failure", 363897 },
         .{ "named_scalar_test_failure", 363899 },
+        .{ "scalar_multiply_test_failure", 363901 },
+        .{ "unsigned_quotient_test_failure", 363903 },
     };
     inline for (expected_layout) |field|
         try std.testing.expectEqual(@as(usize, field[1]), @offsetOf(Transaction, field[0]));

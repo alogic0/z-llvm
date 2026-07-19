@@ -71,6 +71,7 @@ const validateScalarCastIntentSurface = support.validateScalarCastIntentSurface;
 const validateImmediateScalarIntentSurface = support.validateImmediateScalarIntentSurface;
 const validateNamedScalarIntentSurface = support.validateNamedScalarIntentSurface;
 const validateScalarMultiplyIntentSurface = support.validateScalarMultiplyIntentSurface;
+const validateUnsignedQuotientIntentSurface = support.validateUnsignedQuotientIntentSurface;
 const validateScalarCastDisplacementPlan = support.validateScalarCastDisplacementPlan;
 const validateScalarDisplacementAuthorityDistinction = support.validateScalarDisplacementAuthorityDistinction;
 const validateLifetimeContextAuthority = support.validateLifetimeContextAuthority;
@@ -758,6 +759,28 @@ test "value-use scalar multiply semantic intent is exact and rejects physical ch
         error.ValueUseScalarMultiplyIntentMismatch,
         validateScalarMultiplyIntentSurface(
             "pub const ScalarMultiplyAction = struct { result: ActionIdentity, integer_ty: ir.Type, rhs: RequestHandle, plan: bool, };",
+        ),
+    );
+}
+
+test "value-use unsigned quotient semantic intent is exact and rejects physical choices" {
+    const accepted =
+        "pub const UnsignedQuotientAction = struct { result: ActionIdentity, integer_ty: ir.Type, rhs: RequestHandle, };" ++
+        "pub const UnsignedQuotientRequestError = error{ ValueUseUnsignedQuotientFormUnsupported, ValueUseUnsignedQuotientWidthUnsupported, ValueUseUnsignedQuotientLocationUnsupported, };" ++
+        "pub const UnsignedQuotientTestFailure = enum { after_rhs_classification, after_rhs_accumulator_staging, after_accumulator_preparation, after_lhs_materialization, after_rhs_non_accumulator_staging, after_rdx_preservation, after_zero_high_dividend, after_divide, after_result_identity_ownership, after_result_definition, after_finalization, };" ++
+        "pub const PreparedAction = union(enum) { unsigned_quotient: UnsignedQuotientAction, };" ++
+        "pub fn attachUnsignedQuotientAction() void {}";
+    try validateUnsignedQuotientIntentSurface(accepted);
+    try std.testing.expectError(
+        error.ValueUseUnsignedQuotientPhysicalIntentEscape,
+        validateUnsignedQuotientIntentSurface(
+            "pub const UnsignedQuotientAction = struct { result: ActionIdentity, integer_ty: ir.Type, rhs: RequestHandle, home: ValueLoc, };",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseUnsignedQuotientIntentMismatch,
+        validateUnsignedQuotientIntentSurface(
+            "pub const UnsignedQuotientAction = struct { result: ActionIdentity, integer_ty: ir.Type, rhs: RequestHandle, plan: bool, };",
         ),
     );
 }

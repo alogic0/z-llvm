@@ -18,9 +18,41 @@ const ScalarMultiplyPlan = union(enum) {
     m64_accumulator,
 };
 
+const UnsignedQuotientPlan = enum {
+    uq32,
+    uq64,
+
+    fn bits(plan: UnsignedQuotientPlan) u16 {
+        return switch (plan) {
+            .uq32 => 32,
+            .uq64 => 64,
+        };
+    }
+
+    fn definition(plan: UnsignedQuotientPlan) selector_state.AccumulatorDefinition {
+        return switch (plan) {
+            .uq32 => .zeroExtending(32),
+            .uq64 => .fullRax(),
+        };
+    }
+
+    fn rhsIsAccumulator(plan: UnsignedQuotientPlan, source: ValueLoc) bool {
+        return switch (plan) {
+            .uq32 => source == .eax,
+            .uq64 => source == .rax,
+        };
+    }
+};
+
 pub fn isScalarMultiply(binary: ir.BinaryInst) bool {
     return binary.op == .mul and binary.ty.eql(.{ .int = 64 }) and
         binary.lhs == .named and binary.rhs == .named;
+}
+
+pub fn isUnsignedQuotient(binary: ir.BinaryInst) bool {
+    if (binary.op != .udiv or binary.lhs != .named or binary.rhs != .named)
+        return false;
+    return binary.ty.eql(.{ .int = 32 }) or binary.ty.eql(.{ .int = 64 });
 }
 
 pub fn validateScalarMultiplyAction(action: *const Types.ScalarMultiplyAction) !void {
@@ -31,6 +63,19 @@ pub fn validateScalarMultiplyAction(action: *const Types.ScalarMultiplyAction) !
 fn validateScalarMultiplyForm(action: *const Types.ScalarMultiplyAction) Types.ScalarMultiplyRequestError!void {
     if (!action.integer_ty.eql(.{ .int = 64 }))
         return error.ValueUseScalarMultiplyWidthUnsupported;
+}
+
+pub fn validateUnsignedQuotientAction(action: *const Types.UnsignedQuotientAction) !void {
+    try action.result.validate();
+    _ = try unsignedQuotientPlan(action);
+}
+
+fn unsignedQuotientPlan(
+    action: *const Types.UnsignedQuotientAction,
+) Types.UnsignedQuotientRequestError!UnsignedQuotientPlan {
+    if (action.integer_ty.eql(.{ .int = 32 })) return .uq32;
+    if (action.integer_ty.eql(.{ .int = 64 })) return .uq64;
+    return error.ValueUseUnsignedQuotientWidthUnsupported;
 }
 
 pub fn executeScalarMultiply(
@@ -75,6 +120,103 @@ pub fn executeScalarMultiply(
             action,
         ),
     }
+}
+
+pub fn executeUnsignedQuotient(
+    comptime Authority: type,
+    transaction: anytype,
+    lhs_index: u8,
+    initial_source_view: *const Types.PreparedView,
+    action: *const Types.UnsignedQuotientAction,
+) !void {
+    _ = initial_source_view;
+    const plan = unsignedQuotientPlan(action) catch |err|
+        return quotientRequestError(Authority, transaction, lhs_index, err);
+    const rhs_index = Authority.validateRegisteredOperandHandle(
+        Authority,
+        transaction,
+        action.rhs,
+    ) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, lhs_index, err);
+        return err;
+    };
+
+    _ = try namedSource(Authority, transaction, rhs_index);
+    _ = try namedSource(Authority, transaction, lhs_index);
+    try validateQuotientSource(Authority, transaction, rhs_index, plan);
+    try validateQuotientSource(Authority, transaction, lhs_index, plan);
+
+    const rhs_is_accumulator = plan.rhsIsAccumulator(
+        transaction.prepared_views[rhs_index].canonical_source_loc,
+    );
+    try failQuotientForTest(transaction, .after_rhs_classification);
+    try composition.beginAccumulatorSessionForPreparedAction(Authority, transaction);
+    const session = &transaction.accumulator_session.?;
+
+    if (rhs_is_accumulator) {
+        try stageQuotientSource(Authority, transaction, rhs_index, .rcx, plan);
+        try failQuotientForTest(transaction, .after_rhs_accumulator_staging);
+        try refreshQuotientSource(Authority, transaction, lhs_index);
+        try prepareQuotientAccumulator(
+            Authority,
+            transaction,
+            lhs_index,
+            session,
+            quotientDisplacement(transaction, lhs_index),
+        );
+        try failQuotientForTest(transaction, .after_accumulator_preparation);
+        try refreshQuotientSource(Authority, transaction, lhs_index);
+        try materializeQuotientLhs(Authority, transaction, lhs_index, session, plan);
+        try failQuotientForTest(transaction, .after_lhs_materialization);
+    } else {
+        try prepareQuotientAccumulator(
+            Authority,
+            transaction,
+            lhs_index,
+            session,
+            quotientDisplacement(transaction, lhs_index),
+        );
+        try failQuotientForTest(transaction, .after_accumulator_preparation);
+        try refreshQuotientSource(Authority, transaction, lhs_index);
+        try materializeQuotientLhs(Authority, transaction, lhs_index, session, plan);
+        try failQuotientForTest(transaction, .after_lhs_materialization);
+        try refreshQuotientSource(Authority, transaction, rhs_index);
+        try validateQuotientSource(Authority, transaction, rhs_index, plan);
+        try stageQuotientSource(Authority, transaction, rhs_index, .rcx, plan);
+        try failQuotientForTest(transaction, .after_rhs_non_accumulator_staging);
+    }
+
+    selector_state.clobberArgReg(transaction.selector, .rdx) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, lhs_index, err);
+        return err;
+    };
+    try failQuotientForTest(transaction, .after_rdx_preservation);
+    try selector_state.emitEflagsInstruction(transaction.selector, .xor_edx_edx, .write);
+    try failQuotientForTest(transaction, .after_zero_high_dividend);
+    try selector_state.emitEflagsInstruction(
+        transaction.selector,
+        switch (plan) {
+            .uq32 => .{ .div_arg32 = .rcx },
+            .uq64 => .{ .div_arg64 = .rcx },
+        },
+        .clobber,
+    );
+    try failQuotientForTest(transaction, .after_divide);
+
+    const stored = switch (transaction.requests[lhs_index].prepared_action.?) {
+        .unsigned_quotient => |*quotient| &quotient.result,
+        else => unreachable,
+    };
+    std.debug.assert(std.meta.eql(stored.*, action.result));
+    const result_name = composition.ownActionIdentity(Authority, transaction, stored) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, lhs_index, err);
+        return err;
+    };
+    try failQuotientForTest(transaction, .after_result_identity_ownership);
+    try session.define(result_name, plan.definition());
+    try failQuotientForTest(transaction, .after_result_definition);
+    try session.finalize();
+    try failQuotientForTest(transaction, .after_finalization);
 }
 
 fn selectPlan(
@@ -395,6 +537,134 @@ fn emitWrite(transaction: anytype, instruction: machine_module.Instruction) !voi
     try selector_state.emitEflagsInstruction(transaction.selector, instruction, .write);
 }
 
+fn quotientDisplacement(
+    transaction: anytype,
+    lhs_index: u8,
+) selector_state.AccumulatorDisplacementPolicy {
+    return switch (transaction.prepared_views[lhs_index].canonical_source_loc) {
+        .eax, .rax => .{ .reuse_source = sourceName(transaction, lhs_index) },
+        else => .spill_live,
+    };
+}
+
+fn prepareQuotientAccumulator(
+    comptime Authority: type,
+    transaction: anytype,
+    lhs_index: u8,
+    session: *AccumulatorDefinitionSession,
+    displacement: selector_state.AccumulatorDisplacementPolicy,
+) !void {
+    if (session.prepare(.preserve, displacement) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, lhs_index, err);
+        return err;
+    }) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+}
+
+fn materializeQuotientLhs(
+    comptime Authority: type,
+    transaction: anytype,
+    lhs_index: u8,
+    session: *AccumulatorDefinitionSession,
+    plan: UnsignedQuotientPlan,
+) !void {
+    Authority.availabilityForConsumption(Authority, transaction, lhs_index) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, lhs_index, err);
+        return err;
+    };
+    session.materialize(
+        .{ .named = sourceName(transaction, lhs_index) },
+        plan.definition(),
+    ) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, lhs_index, err);
+        return err;
+    };
+}
+
+fn stageQuotientSource(
+    comptime Authority: type,
+    transaction: anytype,
+    index: u8,
+    reg: ArgReg,
+    plan: UnsignedQuotientPlan,
+) !void {
+    Authority.availabilityForConsumption(Authority, transaction, index) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, index, err);
+        return err;
+    };
+    selector_state.emitValueIntoScratch(
+        transaction.selector,
+        .{ .named = sourceName(transaction, index) },
+        reg,
+        plan.bits(),
+    ) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, index, err);
+        return err;
+    };
+}
+
+fn refreshQuotientSource(
+    comptime Authority: type,
+    transaction: anytype,
+    index: u8,
+) !void {
+    Authority.availabilityForConsumption(Authority, transaction, index) catch |err| {
+        Authority.noteRequestBoundaryError(Authority, transaction, index, err);
+        return err;
+    };
+    transaction.prepared_views[index] =
+        Authority.materialization.buildPreparedRecord(Authority, transaction, index) catch |err| {
+            Authority.noteRequestBoundaryError(Authority, transaction, index, err);
+            return err;
+        };
+    transaction.prepared_view_valid[index] = true;
+}
+
+fn validateQuotientSource(
+    comptime Authority: type,
+    transaction: anytype,
+    index: u8,
+    plan: UnsignedQuotientPlan,
+) !void {
+    _ = try namedSource(Authority, transaction, index);
+    if (!transaction.prepared_view_valid[index]) {
+        Authority.recordRequestFailure(Authority, transaction, index);
+        return error.ValueUsePreparedViewMissing;
+    }
+    const binding = transaction.prepared_views[index].source_vreg;
+    const compatible = switch (plan) {
+        .uq32 => (binding.class == .gpr32 or binding.class == .gpr64) and binding.bits >= 32,
+        .uq64 => binding.class == .gpr64 and binding.bits >= 64,
+    };
+    if (!compatible)
+        return quotientRequestError(
+            Authority,
+            transaction,
+            index,
+            error.ValueUseUnsignedQuotientWidthUnsupported,
+        );
+    const loc = transaction.prepared_views[index].canonical_source_loc;
+    const accepted = switch (plan) {
+        .uq32 => switch (loc) {
+            .arg32, .scratch32, .arg64, .scratch64, .eax, .rax, .spill64 => true,
+            else => false,
+        },
+        .uq64 => switch (loc) {
+            .arg64, .scratch64, .rax, .spill64 => true,
+            else => false,
+        },
+    };
+    if (!accepted)
+        return quotientRequestError(
+            Authority,
+            transaction,
+            index,
+            error.ValueUseUnsignedQuotientLocationUnsupported,
+        );
+}
+
 fn multiplyRequestError(
     comptime Authority: type,
     transaction: anytype,
@@ -405,7 +675,22 @@ fn multiplyRequestError(
     return err;
 }
 
+fn quotientRequestError(
+    comptime Authority: type,
+    transaction: anytype,
+    index: u8,
+    err: Types.UnsignedQuotientRequestError,
+) Types.UnsignedQuotientRequestError {
+    Authority.noteRequestBoundaryError(Authority, transaction, index, err);
+    return err;
+}
+
 fn failForTest(transaction: anytype, boundary: Types.ScalarMultiplyTestFailure) !void {
     if (builtin.is_test and transaction.scalar_multiply_test_failure == boundary)
         return error.ValueUseScalarMultiplyTestFailure;
+}
+
+fn failQuotientForTest(transaction: anytype, boundary: Types.UnsignedQuotientTestFailure) !void {
+    if (builtin.is_test and transaction.unsigned_quotient_test_failure == boundary)
+        return error.ValueUseUnsignedQuotientTestFailure;
 }
