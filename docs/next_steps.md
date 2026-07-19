@@ -6,41 +6,44 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-181 ordinary + `intByteSize` aggregate re-isolation — AUTHORIZED
+## INBOX-182 frozen performance-input recovery audit — AUTHORIZED
 
-INBOX-180a at `a34815ba` and the `intByteSize` family are accepted as
-individually isolated and byte-identical. Ordinary remains individually
-accepted from INBOX-179. Production remains dormant, ratchet remains 131,
-and no wiring or credit is accepted.
+INBOX-181 at `5f076e52`, the aggregate ordinary+`intByteSize` matrix, and
+both families are accepted as ready for a future combined production-wiring
+slice. Production remains dormant and ratchet remains 131.
 
-Generate a fresh minimal combined temporary patch against the accepted
-dormant tree; do not concatenate the individual retained patches blindly.
-Activate only the accepted ordinary GPR/pointer `DirectCallAction` route and
-the accepted `zig.target.intByteSize` `IntByteSizeCallAction` route together.
-Keep every other call family legacy.
+Production wiring is blocked under the accepted procedure because the exact
+standing performance input
+`tmp/inbox92_second_resume2_perf/compiler_rt_frozen.ll`, SHA-256
+`7c91f5f602ec45c57a96ad82d1e097c47a47df7b00809800ebcefc3fccf6760b`,
+is absent and was not retention-pinned. The 285-row cohort and different-hash
+regenerations are not substitutes.
 
-Use a separate, exact combined temporary guard mode. Require both complete
-reviewed lifecycles simultaneously, permit only the exact `intByteSize`
-one-to-zero bypass transition, and reject partial activation, legacy
-coexistence, cross-family markers, unrelated inventory changes, and use
-outside the two approved functions. Do not weaken either individual policy
-or change the canonical TSV/hash or permanent guard policy.
+Perform an evidence-only, repository-local recovery audit. Inventory retained
+files, detached worktrees, archives, caches, Git objects/reflogs, manifests,
+and historical evidence for an already-existing byte-exact blob or lossless
+archived member. Hash Git objects and archive members by streaming only; do
+not check out, extract, copy, rename, synthesize, normalize, or pin anything.
+For any archived match, record container hash and exact member
+identity/metadata plus the decompressed-content target hash.
 
-Run blocking bars in strict stop-on-failure order:
+Trace the INBOX-92 provenance and generation chain from retained evidence,
+but do not execute reconstruction even if it appears deterministic. Run no
+project code, build, test, report, gate, performance, network, cleanup, Git
+maintenance, reflog expiration, garbage collection, or deletion.
 
-1. Fresh exact object `061a64e4`, owner `5d91960e` with ledger `167/17/101`,
-   all `285/0/0` per-function bytes/disassembly, and six frontier proofs.
-2. Full unit plus standalone source guard.
-3. All 35 focused canaries.
-4. Standalone ABI `60/60` plus `30/30` real functions.
+Commit only the INBOX-182 audit document. Preserve all source, artifacts,
+retention surfaces, the watcher, bypass inventory, stash, and ratchet 131,
+then STOP before recovery, protocol amendment, or production wiring.
 
-Stop immediately on failure without diagnosis/fix-forward. The historical
-report remains reference-only; no fresh/substitute report is permitted. No
-production wiring, ratchet credit, performance, higher-tier gates, or
-cleanup. Restore all temporary source/guard/test changes exactly, retain the
-complete aggregate attempt and provenance, commit only the INBOX-181 evidence
-summary, preserve stash/watcher/retention/bypass surfaces, and STOP before
-wiring or credit.
+## INBOX-181 ordinary + `intByteSize` aggregate re-isolation — ACCEPTED at 5f076e52
+
+The fresh two-family aggregate passes exact object/owner and `285/0/0`
+per-function identity, unit `1399/1399`, guard `63/63`, canaries `35/35`,
+and ABI `60/60 + 30/30`. Its exact combined temporary guard rejects partial,
+single-family, cross-family, unrelated-inventory, and legacy-coexistence
+forms. Temporary changes were removed, production remains dormant, and
+ratchet remains 131.
 
 ## INBOX-180a `intByteSize` bypass-transition re-isolation — ACCEPTED at a34815ba
 
