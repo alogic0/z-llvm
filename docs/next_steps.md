@@ -6,7 +6,23 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-169 quotient isolation — dispatched
+## INBOX-169 — UQ64 passes, UQ32 retained on plan-blind fixtures (119de279)
+
+The isolation verdict (verified, evidence-only, ratchet 135): UQ64 alone
+passes all three bars; UQ32 alone and the aggregate fail full unit
+1373/1375 on TWO plan-blind legacy production-path fixtures ("lowers
+named i32 unsigned division and remainder" — bindings but no plan;
+"accumulator-resident udiv lhs keeps accepted fixed-register stream" —
+lhs interval only, no RHS metadata), the familiar B03–B06/M64 pattern:
+fail-closed admission correctly rejects, the fixtures expected legacy
+success. Cohort/object/owner/per-function EXACT in all three builds;
+canaries pass everywhere; the dormant tests with real plans stay green.
+No credit claimed anywhere: the three textual gateways are shared
+between widths, so UQ64 alone earns zero. Sent to the Reviewer proposing
+the proven remedy: fixture alignment (Option-A discipline) →
+re-isolation → wire both widths together.
+
+## Former INBOX-169 dispatch entry — superseded by the landing above
 
 INBOX-168 is **ACCEPTED and INBOX-169 authorized exactly as proposed**
 (Reviewer, 2026-07-18: "UQ32 and UQ64 must each satisfy the three-bar
