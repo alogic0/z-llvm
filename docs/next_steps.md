@@ -6,42 +6,58 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-175 call-family three-build isolation — AUTHORIZED for dispatch
+## INBOX-176 ordinary-call failure diagnosis — AUTHORIZED, PAUSED; NOT DISPATCHED
 
-INBOX-174a at `c1ffd1cc` is **ACCEPTED**. The dormant ordinary-call and
-`zig.target.intByteSize` model is accepted at ratchet 131. Freeze that exact
-clean amended tree and run exactly three temporary consumer builds:
-ordinary admitted direct calls alone, `intByteSize` alone, and their
-aggregate.
+The Reviewer accepts `fd48a962` as compliant INBOX-175 stop evidence, but
+does **not** accept the ordinary family or the incomplete matrix. Ordinary
+remains retained wholesale; `zig.target.intByteSize` and aggregate isolation
+remain unauthorized.
 
-Each build must pass the historical three bars: exact complete cohort,
-report/object/owner, and all 285 per-function bytes/disassembly
-(`49a19f04` / `061a64e4` / `5d91960e`, report 443/285/158 with `truncl`
-first, owner 167/17/101, per-function 285/0/0); full unit 1389/1389; and
-focused canaries 35. A standalone ABI or source-guard run is not an
-additional bar, but every retained full-unit log must demonstrably execute
-the 60/60 source guard, and every temporary function-scoped guard-accounting
-adjustment must be hashed and preserved.
+Dispatch is paused for the user-authorized clean-boundary integration of the
+separately tested clean-tmp tooling commit `6804846c`. That infrastructure
+coordination does not alter the INBOX-175 technical judgment and does not
+authorize the Worker to start INBOX-176.
 
-The ordinary-only build must leave scalar-SSE, indirect, i128/pair,
-pointer-frontier, stack/aggregate, immediate, cycle, tail, and every
-intrinsic family on legacy paths, preserving the six pointer-frontier rows
-exactly. Ordinary migration is semantic-only; `intByteSize` is the sole
-conditionally credit-bearing family.
+When separately dispatched, INBOX-176 is diagnostic/evidence-only. Reapply
+the exact retained ordinary patch from the clean `c1ffd1cc` dormant source
+state and use only guard-confined temporary instrumentation plus project-root
+focused tests needed to identify the three failures.
 
-Temporary changes are limited to the named consumer wiring and its
-function-scoped guard accounting. No action/model/planning/lifetime/Q1/
-materialization/facade/capability amendment. Attribute the first semantic
-instruction divergence. Retain any failing family wholesale. Aggregate only
-individually accepted families; if the aggregate diverges, isolate the
-minimal interacting set for evidence only and do not fix forward.
+For the dies-at-current EAX argument, identify the exact failing phase
+(request construction, seal/Q1, prepare, materialization, or action
+execution), precise error/provenance mapping, interval, canonical binding,
+Q1/Q2/Q3 decisions, accumulator occupancy, accepted legacy displacement and
+staging sequence, and decisive before/after state. Decide whether the
+minimal semantic remedy is an action displacement-plan amendment or a
+narrower classifier envelope, but implement neither. Do not weaken a
+truthful planned legacy-success fixture.
 
-Retain exact baseline and temporary source/patch/artifact/log hashes,
-commands, counts, and provenance. Remove every temporary patch and restore
-the exact clean `c1ffd1cc` dormant tree. Commit evidence only. Ratchet
-remains 131; no production wiring or credit; no standalone ABI, performance,
-integrated-executable, strengthened Tier 2, distribution-all, or Tier 3.
-STOP with evidence for review.
+For the two guard failures, derive function/API-scoped accounting. A generic
+`.direct_call` opcode ban is forbidden, and a call-specific mapper must not
+be required inside an unrelated memcpy-only fixture. Identify the exact
+source/function for each rejection.
+
+No production/action/model/planning/lifetime/Q1/materialization/facade/
+capability/classifier/fixture/guard-policy amendment or fix-forward. Retain
+exact patch, instrumentation, focused-log, command, provenance, and evidence
+hashes; remove temporary changes; restore the exact dormant source state;
+commit evidence only; ratchet 131; stash untouched; STOP for review.
+
+No full unit or isolation rerun, `intByteSize`/aggregate build, canaries, ABI,
+standalone source guard, performance, integrated-exe, strengthened Tier 2,
+distribution-all, Tier 3, production wiring, or ratchet credit.
+
+## INBOX-175 isolation — COMPLIANT STOP evidence ACCEPTED at fd48a962; families NOT accepted
+
+The ordinary temporary build passed exact report/object/owner and all 285
+per-function comparisons, preserving all six pointer-frontier rows, then
+failed full unit at 1386/1389. One planned production-path fixture exposed
+an unresolved dies-at-current EAX argument diagnostic; two failures came
+from over-broad temporary guard accounting. Per the no-fix-forward rule,
+canaries, `intByteSize`, and aggregate were not run. Temporary changes were
+removed, source restored to `c1ffd1cc`, ratchet remains 131, and the
+evidence-only stop commit is clean. No family or isolation credit is
+accepted.
 
 ## INBOX-174a dormant call rollback amendment — ACCEPTED at c1ffd1cc
 
