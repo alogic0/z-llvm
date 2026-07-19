@@ -6,47 +6,55 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-178 dormant call final-use plan amendment — AUTHORIZED for dispatch
+## INBOX-178a call final-use proof/evidence completion — AUTHORIZED for dispatch
 
-INBOX-177 at `0351fe87` is **ACCEPTED**. Implement only its frozen closed
-design from that clean tree. Move the single existing `attachCallAction`
-legal phase from sealed to registering, validate already-registered handles
-before mutation, and use non-null `call_action` storage to close
-registration. Enforce register all requests, attach exactly once, then seal;
-a valid zero-handle direct call attaches before sealing.
+INBOX-178 semantic implementation at `462154a1` is provisionally accepted
+and frozen, but overall acceptance is withheld for missing action-scoped
+proofs and incomplete retained-artifact provenance. Dispatch from composite
+HEAD `4e7ee803`; use `462154a1` as the semantic baseline. The intervening
+watcher-loop commit is provenance-only and its script remains byte-identical
+and out of scope.
 
-Add only the private structural final-use pin and private
-action/handle-scoped lifetime predicate. Require the canonical current
-identity/generation, a real same allocation plan and exact predecessor
-interval, an action-claimed current handle, an admitted EAX/RAX home, and
-existing dependency/type/form/destination compatibility. Missing, older,
-stale, forward, rebound, non-accumulator, unclaimed, foreign, non-call, and
-independently action-owned state remains rejected. Generic Q1 is unchanged.
+Do not change semantic implementation unless a new proof exposes a defect;
+then stop rather than amend automatically. Complete the exact 57-row
+production-faithful matrix with a row-by-row test/assertion map. Add compact
+attached-call coverage for zero position; valid/stale forward cases;
+malformed dependencies; every ineligible home; all attachment handle/order/
+claim/prepared-action errors and precise provenance; canonical mutations
+after prepared construction, preservation/refresh, and before later stages;
+and complete rollback/private-pin clearing at every frozen boundary.
 
-Revalidate the proof during prepared-record construction, after Q2/Q3
-preservation refresh, and before every argument stage. Preserve existing
-Q2/Q3, ordering, diagnostics, provenance, copy-cycle, EFLAGS, result,
-commit, and sole-outer-rollback authorities. Add the complete frozen dormant
-proof matrix and exact function/API-scoped guard policy with conditional
-per-present mapper accounting and negative fixtures. No raw `.direct_call`
-tree ban.
+Generic tests count only when they explicitly exercise the attached-call
+action/handle scope. Use only existing internal access or guard-confined
+test-only hooks. Keep `calls_tests.zig` at or below 1,500 lines. If complete
+coverage requires another test leaf/import or any budget exception, stop
+structurally.
 
-Keep `composed_selector_calls.zig`, its routing/classifier behavior,
-`zig.target.intByteSize` routing, and the bypass inventory byte-identical.
-Ratchet remains 131. Stay within exactly two tags, four facade additions,
-the 126-symbol manifest, existing forms/destination/import DAG, and frozen
-file ceilings. Any required widening, new planning edge, consumer home or
-liveness query, generic-Q1 relaxation, cycle scheduler, or budget exception
-is a structural stop.
+Update the INBOX-178 evidence with the exact row map and the SHA-256, exact
+recovered command/provenance, and supporting/excluded status of every
+retained exploratory IR/log. Preserve them without normalization, deletion,
+or evidence-only reruns.
 
-Run only full unit, standalone source guard, ABI differential, focused
-canaries, and decisive report/object/owner identities. Record exact commands,
-counts, hashes, provenance, source identities, and final budgets in retained
-amendment evidence. Retention files stay frozen; do not run `clean-tmp` or
-delete artifacts. No re-isolation, production wiring, performance,
-integrated executable, strengthened Tier 2, distribution-all, or Tier 3.
-Commit the bounded dormant amendment, preserve stash@{0}, leave a clean
-worktree, and STOP for review.
+The missing canonical 443-row input is an approved preexisting blocked
+condition. Do not regenerate substitutes or claim a fresh full report.
+Acceptance may rely on historical report `49a19f04`, fresh object
+`061a64e4`, fresh owner `5d91960e`, and evidence that the canonical input
+predated INBOX-178 as absent.
+
+Rerun only full unit, standalone guard, ABI, canaries, and fresh object/
+owner. Freeze production call routing/classifier, `intByteSize`, facade/
+manifest, import DAG, bypass inventory, ratchet 131, retention surfaces,
+watcher-loop script, and stash. No isolation, wiring, performance,
+integrated executable, strengthened Tier 2, distribution-all, Tier 3,
+cleanup, deletion, ratchet credit, or substitute report generation. Commit
+the bounded proof/evidence completion and STOP for acceptance review.
+
+## INBOX-178 dormant call final-use amendment — SEMANTIC IMPLEMENTATION PROVISIONALLY ACCEPTED at 462154a1; overall acceptance WITHHELD
+
+The bounded implementation and authorized gates are sound, but the grouped
+proof table does not satisfy the frozen 57-row action-scoped matrix and the
+retained exploratory identity artifacts lack exact committed provenance.
+All isolation and wiring remain unauthorized pending INBOX-178a.
 
 ## INBOX-177 closed call final-use plan design — ACCEPTED at 0351fe87
 
