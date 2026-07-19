@@ -6,7 +6,22 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-163 multiply isolation — dispatched
+## INBOX-163 — M64 retained on plan-blind fixtures (ea6eb87d), Supervisor-verified
+
+The isolation is the B03–B06 pattern repeated: the cohort, object,
+owner, and all 285 per-function comparisons are BYTE-EXACT and canaries
+pass, but full unit fails 4/1365 — four legacy production-path M64
+fixtures that predate plan-required Q1 (missing source intervals or
+whole allocation plans; Q1 correctly fail-closes and the temporary
+consumer maps it to unknown-lhs/rhs). Under the indivisible-family +
+full-unit-mandatory rules M64 is retained wholesale with ZERO credit;
+ratchet stays 140; 135 not reached; no fix-forward attempted (correct).
+Evidence-only diff verified. Sent to the Reviewer proposing the
+INBOX-154-style fixture alignment (test-only, per-fixture manifest, the
+Option-A five-criteria rule for any stream adoption) → re-isolation →
+wiring.
+
+## Former INBOX-163 dispatch entry — superseded by the landing above
 
 INBOX-162 is **ACCEPTED and INBOX-163 authorized exactly as proposed**
 (Reviewer, 2026-07-18: "The isolation must treat M64 as one indivisible
