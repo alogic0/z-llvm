@@ -6,30 +6,40 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-189A exact C01 audit-ledger count correction — AUTHORIZED
+## INBOX-190 exact compiler-rt baseline-validation v2 execution — AUTHORIZED
 
-The executable v2 correction in `107f442c` is structurally closed and frozen,
-but final INBOX-189 acceptance is withheld for one factual evidence-record
-error. C01 contains 13 literal `{print $1}` SHA field programs plus one stash
-reader, for 14 C01 AWK programs total; the record currently labels the
-print-field count as 14.
+INBOX-189A at `2f1a880e` and the corrected INBOX-189 v2 contract are
+accepted. Preserve the corrected contract SHA-256 `499213db…`, immutable
+exhausted v1 evidence, initially absent v2 namespace, all frozen identities,
+dormant production, calls sequence, ratchet 131, and the mandatory post-calls
+checkpoint.
 
-Change only the INBOX-189 audit record in the accepted contract document:
-set `c01_literal_awk_print_field_programs=13`, retain
-`c01_literal_awk_stash_programs=1`, and add
-`c01_total_awk_programs=14`. Do not alter executable contract bytes.
+From this clean operating authorization only, substitute the launcher's sole
+authorization token with the exact full operating HEAD, hash the exact
+token-substituted driver, and supply it exactly once. Execute the accepted
+`baseline_validation_v2` contract exactly once: canonical first; coverage
+only after complete canonical success; restoration and read-only retention
+only after complete coverage success.
 
-Run static/read-only checks only. Preserve the immutable v1 evidence, absent
-v1/v2 outputs, all bundle/input/frozen identities, watcher and stash,
-dormant production, ratchet 131, calls sequence, and mandatory post-calls
-checkpoint. Commit only the amended contract and stop before v2 execution.
+Every launcher/contract command is one-shot. Any discrepancy stops the
+attempt immediately with all evidence retained and no retry, repair,
+normalization, cleanup, substitution, or later phase.
 
-## INBOX-189 v2 preflight portability and serialization closure — STRUCTURALLY CLOSED at 107f442c; FINAL ACCEPTANCE WITHHELD
+Do not adopt identities, modify source or consumers, wire production, run
+production gates, recount, run performance, clean retained state, or claim
+credit. Commit only the exact INBOX-190 execution summary and stop for
+Watcher/Reviewer acceptance.
 
-The v2 namespace, tracked-only cleanliness predicate, closed future-HEAD
-binding, direct C01 invocation, 45-template ledger, and Bash syntax are
-accepted and frozen. Final acceptance is withheld solely until INBOX-189A
-corrects the one-count audit-record error. Validation remains unauthorized.
+## INBOX-189A exact C01 audit-ledger count correction — ACCEPTED at 2f1a880e
+
+The record now exactly states 13 print-field AWK programs, one stash-reader
+program, and 14 total C01 AWK programs. Executable contract bytes are
+unchanged.
+
+## INBOX-189 v2 preflight portability and serialization closure — ACCEPTED
+
+The corrected v2 contract is closed and executable. Validation remains
+separate and is authorized only by INBOX-190.
 
 ## INBOX-188 baseline-validation execution — COMPLIANT STOP at 59d9cb33
 
