@@ -6,7 +6,23 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-170 UQ32 fixture alignment — dispatched
+## INBOX-170 — LANDED at 390945be, Supervisor-verified
+
+The alignment landed test-only (composed_selector_scalar_tests.zig
++47/−2 + evidence + the 425-row hash contract) and is verified: the
+three production files byte-identical to the accepted 135 tree
+(spot-hashed); ratchet 135; zero maxInt; both fixtures aligned with
+bounded production-faithful plans and — notably — NO stream movement at
+all (no Option-A exception needed: the truthful plans preserve the old
+streams); the legacy remainder path untouched; full unit 1375/1375 (the
+two fixtures now pass); guard 57/57; all seven pinned log hashes match
+(the apparent off-by-one was my extraction window missing the
+hash-contract log); the 424/424 production hash proof validates the
+perf omission; identities exact; MY abi + canary reruns pass; no
+Tier 3. Sent to the Reviewer for acceptance + the three-build
+re-isolation (INBOX-171).
+
+## Former INBOX-170 dispatch entry — superseded by the landing above
 
 INBOX-169's split verdict is **ACCEPTED and INBOX-170 authorized**
 (Reviewer, 2026-07-19): the two plan-blind fixtures aligned under the
