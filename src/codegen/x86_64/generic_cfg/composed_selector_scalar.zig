@@ -608,101 +608,90 @@ pub fn lowerPairBinary(selector: *ComposedBlockSelector, result_name: []const u8
 }
 
 pub fn lowerMul64(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
-    const lhs = selector_state.resolveValue(selector, binary.lhs) orelse return .{ .unsupported_value = "composed-block-unknown-lhs" };
-    const dst = switch (lhs) {
-        .scratch64 => |reg| if (selector.allocation_plan == null)
-            reg
-        else
-            reusableScratch64RegForInPlace(selector, binary.lhs) orelse
-                plannedScratch64RegForResult(selector, result_name) orelse
-                scratch64RegForUseAvoiding(selector, null) orelse
-                blk: {
-                    if (try spillScratch64SourceForInPlace(selector, binary.lhs)) |spill_result| switch (spill_result) {
-                        .reg => |spilled_reg| break :blk spilled_reg,
-                        .diagnostic => |diagnostic| return diagnostic,
-                    };
-                    return .{ .no_spill_envelope = "composed-block-mul64-dst" };
-                },
-        .arg64, .rax, .spill64 => plannedScratch64RegForResult(selector, result_name) orelse
-            (scratch64RegForUseAvoiding(selector, null) orelse {
-                if (lhs == .spill64) return try lowerMul64SpillLhsThroughRax(selector, result_name, binary.lhs, binary.rhs);
-                return .{ .no_spill_envelope = "composed-block-mul64-dst" };
-            }),
-        .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-mul64-lhs" },
-    };
-    selector_state.emitValueIntoScratch(selector, binary.lhs, dst, 64) catch return .{ .unsupported_value = "composed-block-mul64-lhs" };
-
-    const rhs = selector_state.resolveValue(selector, binary.rhs) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
-    switch (rhs) {
-        .scratch64, .arg64 => |src| try emitArithmeticWrite(selector, .{ .imul_arg64_arg64 = .{ .dst = dst, .src = src } }),
-        .rax => try emitArithmeticWrite(selector, .{ .imul_arg64_rax = dst }),
-        .spill64 => |frame_index| {
-            if (scratch64RegForUseAvoiding(selector, dst)) |src| {
-                selector_state.emitValueIntoScratch(selector, binary.rhs, src, 64) catch return .{ .unsupported_value = "composed-block-mul64-rhs" };
-                try emitArithmeticWrite(selector, .{ .imul_arg64_arg64 = .{ .dst = dst, .src = src } });
-            } else {
-                if (try selector_state.spillCurrentAccumulator(selector)) |diagnostic| return diagnostic;
-                try selector.machine.instructions.append(selector.allocator, .{ .reload_rsp_rax = frame_index });
-                try emitArithmeticWrite(selector, .{ .imul_arg64_rax = dst });
-            }
-        },
-        .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-mul64-rhs" },
-    }
-    try selector_state.bindScratch(selector, result_name, dst, 64);
-    return null;
-}
-
-pub fn lowerMul64SpillLhsThroughRax(selector: *ComposedBlockSelector, result_name: []const u8, lhs_value: ir.Value, rhs_value: ir.Value) !?Diagnostic {
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    // The complete M64 family uses one instruction-level transaction authority.
+    var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
-    if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
-    transaction.materialize(lhs_value, accumulatorDefinition(64)) catch return .{ .unsupported_value = "composed-block-mul64-lhs" };
-    const rhs = selector_state.resolveValue(selector, rhs_value) orelse return .{ .unsupported_value = "composed-block-unknown-rhs" };
-    switch (rhs) {
-        .arg64, .scratch64 => |src| try emitArithmeticWrite(selector, .{ .imul_rax_arg64 = src }),
-        .spill64 => |frame_index| try emitArithmeticWrite(selector, .{ .imul_rax_rsp = frame_index }),
-        .arg32, .scratch32, .arg128, .scratch128, .xmm, .eax, .rax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-mul64-rhs" },
-    }
-    try finishArithmeticResult(&transaction, result_name, 64);
+    const lhs_request = try transaction.register(.{
+        .source = binary.lhs,
+        .expected = .{ .ty = binary.ty, .register_class = .gpr64 },
+        .form = .named_scalar_operand,
+        .destination = .prepared_view,
+    });
+    const rhs_request = try transaction.register(.{
+        .source = binary.rhs,
+        .expected = .{ .ty = binary.ty, .register_class = .gpr64 },
+        .form = .named_scalar_operand,
+        .destination = .prepared_source,
+    });
+    try transaction.attachScalarMultiplyAction(lhs_request, .{
+        .result = try ValueUseTransaction.ActionIdentity.init(result_name),
+        .integer_ty = binary.ty,
+        .rhs = rhs_request,
+    });
+    transaction.seal() catch |err|
+        return scalarMultiplyValueUseDiagnostic(&transaction, lhs_request, rhs_request, err) orelse return err;
+    transaction.prepare() catch |err|
+        return scalarMultiplyValueUseDiagnostic(&transaction, lhs_request, rhs_request, err) orelse return err;
+    transaction.materializeAll() catch |err|
+        return scalarMultiplyValueUseDiagnostic(&transaction, lhs_request, rhs_request, err) orelse return err;
+    const lease = transaction.preparedView(lhs_request) catch |err|
+        return scalarMultiplyValueUseDiagnostic(&transaction, lhs_request, rhs_request, err) orelse return err;
+    transaction.executePreparedAction(lease) catch |err|
+        return scalarMultiplyValueUseDiagnostic(&transaction, lhs_request, rhs_request, err) orelse return err;
+    try transaction.commit();
     return null;
 }
 
-pub fn plannedScratch64RegForResult(selector: *const ComposedBlockSelector, name: []const u8) ?ArgReg {
-    const plan = selector.allocation_plan orelse return null;
-    const assignment = plan.assignment(name) orelse return null;
-    const reg = switch (assignment) {
-        .gpr64 => |reg| reg,
-        .gpr32, .gpr128, .fp16, .fp32, .fp64, .vector_xmm, .stack_object, .stack_pointer, .spill => return null,
+fn scalarMultiplyValueUseDiagnostic(
+    transaction: *const ValueUseTransaction,
+    lhs_request: ValueUseTransaction.RequestHandle,
+    rhs_request: ValueUseTransaction.RequestHandle,
+    err: anyerror,
+) ?Diagnostic {
+    if (err == error.ValueUseActionDiagnostic) return transaction.actionDiagnostic();
+    const unresolved = switch (err) {
+        error.ValueUseSourcePlanMissing,
+        error.ValueUseSourceIntervalMissing,
+        error.ValueUseSourceGenerationChanged,
+        error.ValueUseUnresolvedSource,
+        error.ValueUseExpiredSource,
+        error.ValueUseUnsupportedSource,
+        error.ValueUseTypeMismatch,
+        error.ValueUseRegisterClassMismatch,
+        error.ValueUseSourceViewMismatch,
+        error.ValueUseForwardPlanMissing,
+        error.ValueUseForwardPlanMalformed,
+        error.ValueUseForwardPlanStale,
+        error.ValueUseForwardIntervalExpired,
+        error.ValueUseForwardTypeMismatch,
+        error.ValueUseForwardAssignmentMissing,
+        error.ValueUseForwardSnapshotCapacityExceeded,
+        => true,
+        else => false,
     };
-    return if (scratch64RegIsAvailableForUse(selector, reg)) reg else null;
-}
-
-pub fn scratch64RegForUseAvoiding(selector: *const ComposedBlockSelector, avoid: ?ArgReg) ?ArgReg {
-    for (selector_allocatable_regs) |reg| {
-        if (avoid != null and reg == avoid.?) continue;
-        if (scratch64RegIsAvailableForUse(selector, reg)) return reg;
+    const rejected = switch (err) {
+        error.ValueUseNamedScalarFormUnsupported,
+        error.ValueUseNamedScalarWidthUnsupported,
+        error.ValueUseNamedScalarLocationUnsupported,
+        error.ValueUseScalarMultiplyFormUnsupported,
+        error.ValueUseScalarMultiplyWidthUnsupported,
+        error.ValueUseScalarMultiplyLocationUnsupported,
+        => true,
+        else => false,
+    };
+    if (!unresolved and !rejected and
+        err != error.ValueUseScalarMultiplyDestinationUnavailable) return null;
+    if (transaction.failedRequestIs(lhs_request)) {
+        if (err == error.ValueUseScalarMultiplyDestinationUnavailable)
+            return .{ .no_spill_envelope = "composed-block-mul64-dst" };
+        if (rejected) return .{ .no_emitter = "composed-block-mul64-lhs" };
+        return .{ .unsupported_value = "composed-block-unknown-lhs" };
+    }
+    if (transaction.failedRequestIs(rhs_request)) {
+        if (rejected) return .{ .no_emitter = "composed-block-mul64-rhs" };
+        return .{ .unsupported_value = "composed-block-unknown-rhs" };
     }
     return null;
-}
-
-pub fn reusableScratch64RegForInPlace(selector: *const ComposedBlockSelector, value: ir.Value) ?ArgReg {
-    return selector_state.reusableScratch64RegForInPlace(selector, value);
-}
-
-const SpillScratchForInPlaceResult = union(enum) {
-    reg: ArgReg,
-    diagnostic: Diagnostic,
-};
-
-pub fn spillScratch64SourceForInPlace(selector: *ComposedBlockSelector, value: ir.Value) !?SpillScratchForInPlaceResult {
-    const source = selector_state.spillScratch64SourceForInPlace(selector, value) orelse return null;
-    if (try selector_state.spillValue(selector, source.name)) |diagnostic| return .{ .diagnostic = diagnostic };
-    return .{ .reg = source.reg };
-}
-
-pub fn scratch64RegIsAvailableForUse(selector: *const ComposedBlockSelector, reg: ArgReg) bool {
-    const status = selector_state.regConflictStatus(selector, reg) orelse return true;
-    return status;
 }
 
 pub fn lowerUnsignedDivRem(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {

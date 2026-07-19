@@ -1,0 +1,217 @@
+# INBOX-166 — M64 production wiring
+
+Status at the production commit: complete M64 wiring and every correctness
+gate are complete. The required post-final-tree counterbalanced
+performance evidence is appended by the follow-up immutable evidence
+commit. No Tier 3 was run.
+
+## Scope and ownership
+
+The complete `mul i64 <named>, <named>` family now uses one
+instruction-level `ValueUseTransaction` authority. `lowerMul64`:
+
+1. begins one transaction;
+2. registers lhs and rhs in source order from semantic identities and
+   expected i64/GPR64 contracts;
+3. attaches the frozen `ScalarMultiplyAction`;
+4. seals before mutation;
+5. prepares and materializes through canonical Q1;
+6. executes the closed action; and
+7. commits only after the durable result is complete.
+
+Request errors map to the legacy lhs/rhs/destination diagnostics only
+through the matching `failedRequestIs` handle. Authority errors
+propagate unchanged. There is no consumer-side home inspection,
+resolution, retry, attempt-then-fallback, function-name admission, or
+partial-family legacy route.
+
+The legacy `lowerMul64SpillLhsThroughRax` path is subsumed by the closed
+action's internally derived M64-R plan. M64-D versus M64-R selection
+remains canonical transaction/action state, never a consumer hint.
+
+R03 `scalar_immediate_live_shared_source_preservation`, R04
+`scalar_immediate_multi_alias_preservation`, pair/full-product,
+fixed-register, remainder, and cycle owners remain unchanged and
+pre-transaction.
+
+## Frozen action, lifetime, and Q1 surface
+
+The production consumer is the only capability change. These frozen
+surfaces are byte-identical to the accepted dormant/re-isolated model:
+
+```text
+value_use/actions/scalar_multiply_divide.zig
+  9a32e275c70a10d9feb09cb98dd7814dc9d6649601e0aa1a226fd6bda50bd1c0
+value_use/model.zig
+  e48c949d0e04a24e7fae8c2e54ae48562b2c38c4a2fb403db8630307fd81bcd7
+value_use/planning/lifetime_admission.zig
+  fff2a6c791f22c47a6b7686fc784919cb35c0c0e6fad0ab0ebbd8e7b6b213f45
+```
+
+No action, model, lifetime, Q1, forward-plan, physical-home, pair, cycle,
+or fixed-register authority changed.
+
+The scoped pre-summary production patch is retained at
+`tmp/inbox166_o2_m64_wiring/production.patch`, SHA-256
+`12e93b37c9a9dc813ed0126d9085374a1686ec66557a78d6281b4bdfd2fd3d7a`.
+
+## Scalar-local helper ownership
+
+The legacy scalar-local wrappers removed with `lowerMul64` are:
+
+```text
+plannedScratch64RegForResult
+scratch64RegForUseAvoiding
+reusableScratch64RegForInPlace
+spillScratch64SourceForInPlace
+scratch64RegIsAvailableForUse
+```
+
+An exact search for declarations in `composed_selector_scalar.zig` and
+for qualified `selector_scalar.<name>` consumers returns zero rows:
+
+```text
+path=tmp/inbox166_o2_m64_wiring/validation/scalar_local_helper_owners.log
+bytes=0
+sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+```
+
+The selector-state authorities with similar names remain in place and
+retain their existing owners. No helper-collapse ratchet credit is
+claimed.
+
+## Structural guard
+
+The source guard now requires the complete M64 lifecycle only inside
+`lowerMul64`, including exact request count/order, action attachment,
+seal/prepare/materialize/execute/commit counts, and the two-handle
+diagnostic mapper. It rejects:
+
+- M64 action use in another production file;
+- a missing/reclassified action attachment;
+- reintroduction of `lowerMul64SpillLhsThroughRax`;
+- raw resolution or materialization in the migrated leaf; and
+- reintroduction of the removed scalar-local wrappers.
+
+Failure-provenance accounting now includes exactly the two M64 request
+queries. The existing R03/R04 and other residual guards remain
+unchanged.
+
+## Ratchet
+
+The frozen bypass TSV uses one function row containing four
+`lowerMul64` occurrences and one function row containing the single
+`lowerMul64SpillLhsThroughRax` occurrence. Those two aggregate TSV rows,
+and exactly those five direct gateways, are removed:
+
+```text
+lowerMul64: emitValueIntoScratch×2 + resolveValue×2 = 4
+lowerMul64SpillLhsThroughRax: resolveValue×1 = 1
+
+ratchet_before=140
+M64_direct_removals=5
+helper_collapses=0
+ratchet_after=135
+```
+
+The updated inventory has SHA-256
+`3928114a0fcc55d5f18a367b29865925396c80c3a2589e02c87f4e0a73b23537`;
+the source guard pins that exact identity.
+
+## Decisive identities
+
+Commands:
+
+```text
+command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --report-all-codegen-failures --target=x86_64-linux --input-limit=67108864 tmp/inbox92_second_resume2_perf/compiler_rt_frozen.ll > /dev/null 2> tmp/inbox166_o2_m64_wiring/validation/fresh_full_report.log
+
+command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll > tmp/inbox166_o2_m64_wiring/validation/accepted.o 2> tmp/inbox166_o2_m64_wiring/validation/accepted.stderr
+
+command=LC_ALL=C zig-out/bin/z_llvm --emit=selection-owner-manifest --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll > tmp/inbox166_o2_m64_wiring/validation/owner_manifest.tsv 2> tmp/inbox166_o2_m64_wiring/validation/owner_manifest.stderr
+
+command=/home/oleg/bin/zig run tmp/inbox142_family_isolation/compare_elf_functions.zig -- tmp/inbox165_o2_m64_reisolation/results/baseline/accepted.o tmp/inbox166_o2_m64_wiring/validation/accepted.o > tmp/inbox166_o2_m64_wiring/validation/function_diff.tsv
+
+command=rg 'composed-block-icmp-lhs-loc' tmp/inbox166_o2_m64_wiring/validation/fresh_full_report.log > tmp/inbox166_o2_m64_wiring/validation/frontier_rows.log
+```
+
+Results:
+
+```text
+report_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681
+report=443 selected / 285 emitted / 158 failed
+first_failure=compiler_rt.trunc.truncl/UnsupportedLongDoubleAbi
+object_sha256=061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be
+owner_sha256=5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d
+owner_ledger=40 composed_block + 127 composed_cfg / 17 legacy / 101 structural
+accepted_stderr_bytes=0
+owner_stderr_bytes=0
+per_function=285 compared / 0 divergent / 0 missing
+per_function_log_sha256=aa378a2733f9b5bbd9160016942ab69a57da10672b1a0b94eabb13b9ff359240
+frontier_rows=6
+frontier_rows_sha256=87c35d64c6f8b8742b3f8449ad3b5bb1701d84cddbbc0624d6b7315a1047855f
+```
+
+The exact whole object and 285/0/0 comparison prove byte identity for
+the complete accepted cohort. The unchanged report proves that none of
+the six `.spill128` frontier rows moved.
+
+## Correctness gates
+
+Every command below ran after the final production source change. Logs
+are retained under `tmp/inbox166_o2_m64_wiring/validation/`.
+
+### Source guard
+
+```text
+command=/home/oleg/bin/zig test src/codegen/x86_64/generic_cfg/composed_selector_source_guard_tests.zig 2>&1 | tee tmp/inbox166_o2_m64_wiring/validation/source_guard.log
+result=55/55 tests passed
+log_sha256=56b813af5fee8ca3bd9737211608fad20cdeccd5a10ccb8fa8ea11c6a34950e5
+```
+
+### Full unit
+
+```text
+command=/home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox166_o2_m64_wiring/validation/full_unit.log
+result=7/7 steps; 1365/1365 tests passed
+log_sha256=6eacde41895eaca89097f86f065e111936433342378aabc9645ab257063b7ce5
+```
+
+### ABI differential
+
+```text
+command=/home/oleg/bin/zig build abi-differential --summary all 2>&1 | tee tmp/inbox166_o2_m64_wiring/validation/abi_differential.log
+result=5/5 steps; 60/60 cases; 30/30 real functions
+log_sha256=3cb2f3b54a80a8e00e725ca9a1e8a093cbbcd46311903a7bbebcc10de9685b5a
+```
+
+### Focused codegen canaries
+
+```text
+command=/home/oleg/bin/zig build focused-codegen-canaries --summary all 2>&1 | tee tmp/inbox166_o2_m64_wiring/validation/focused_canaries.log
+result=2/2 canaries; 35 execution cases; fma and __multi3 exact
+log_sha256=d704046eacfa8c3c2cf852ed97c86ab42b5a6a07dcfe4dd7de48cb870f2292c6
+```
+
+### Integrated executable
+
+```text
+command=/home/oleg/bin/zig build distribution-zig-integrated-exe --summary all 2>&1 | tee tmp/inbox166_o2_m64_wiring/validation/integrated_exe.log
+result=2/2 steps; 7/7 build/run/stdout/exit
+log_sha256=1bde3882401aa625fcc9975f3c0868ee04b729f5cb6e2df42b2522643562d791
+```
+
+### Strengthened Tier 2
+
+```text
+command=/home/oleg/bin/zig build test structural-smoke compare-codegen-asm compare-codegen-objdump compare-codegen-readelf distribution-object distribution-executable distribution-debug-object distribution-debug-executable distribution-releasesafe-object distribution-zig-integrated-exe abi-differential --summary all 2>&1 | tee tmp/inbox166_o2_m64_wiring/validation/strengthened_tier2.log
+result=29/29 steps; 1373/1373 tests; integrated-exe 7/7; ABI 60/60 + 30/30
+log_sha256=474fcd8067633d8107726e75b9dab9ee687401102b10b1504ba4b93740f9a443
+```
+
+No `distribution-all` command and no Tier 3 command was run.
+
+## Counterbalanced performance
+
+Pending the required follow-up immutable evidence commit. The A and B
+artifacts will be built and frozen only after this complete production
+source, guard, inventory, and evidence tree is committed.

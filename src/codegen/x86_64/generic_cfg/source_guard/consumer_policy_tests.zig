@@ -82,7 +82,7 @@ const validateScalarCastProductionSites = support.validateScalarCastProductionSi
 const validateImmediateScalarSemanticPartition = support.validateImmediateScalarSemanticPartition;
 const validateImmediateScalarProductionSites = support.validateImmediateScalarProductionSites;
 const validateNamedScalarProductionSites = support.validateNamedScalarProductionSites;
-const validateDormantScalarMultiplyProductionSites = support.validateDormantScalarMultiplyProductionSites;
+const validateScalarMultiplyProductionSites = support.validateScalarMultiplyProductionSites;
 const validateLoadDiagnosticMappingProductionSites = support.validateLoadDiagnosticMappingProductionSites;
 const validateDormantLoadActionProductionSites = support.validateDormantLoadActionProductionSites;
 const validateAccumulatorCompositionProductionSites = support.validateAccumulatorCompositionProductionSites;
@@ -780,23 +780,67 @@ test "value-use named scalar production wiring freezes accepted and retained fam
     );
 }
 
-test "scalar multiply action remains dormant in production consumers" {
-    try validateDormantScalarMultiplyProductionSites(
-        "composed_selector_scalar.zig",
-        "fn lowerMul64() void {}",
-    );
+test "scalar multiply production wiring is complete and exclusive" {
+    const accepted: [:0]const u8 = @embedFile("../composed_selector_scalar.zig");
+    try validateScalarMultiplyProductionSites("composed_selector_scalar.zig", accepted);
+
     try std.testing.expectError(
         error.ValueUseScalarMultiplyPrematureProductionUse,
-        validateDormantScalarMultiplyProductionSites(
-            "composed_selector_scalar.zig",
+        validateScalarMultiplyProductionSites(
+            "composed_selector_calls.zig",
             "fn lowerMul64() void { _ = isScalarMultiply(binary); }",
         ),
     );
+
+    const missing_action = try std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        accepted,
+        "transaction.attachScalarMultiplyAction(",
+        "transaction.attachNamedScalarBinaryAction(",
+    );
+    defer std.testing.allocator.free(missing_action);
+    const missing_action_z = try std.testing.allocator.dupeZ(u8, missing_action);
+    defer std.testing.allocator.free(missing_action_z);
     try std.testing.expectError(
         error.ValueUseScalarMultiplyPrematureProductionUse,
-        validateDormantScalarMultiplyProductionSites(
+        validateScalarMultiplyProductionSites(
             "composed_selector_scalar.zig",
-            "fn lowerMul64() void { try transaction.attachScalarMultiplyAction(lhs, action); }",
+            missing_action_z,
+        ),
+    );
+
+    const reintroduced_fallback = try std.fmt.allocPrint(
+        std.testing.allocator,
+        "{s}\npub fn lowerMul64SpillLhsThroughRax() void {{}}\n",
+        .{accepted},
+    );
+    defer std.testing.allocator.free(reintroduced_fallback);
+    const reintroduced_fallback_z = try std.testing.allocator.dupeZ(u8, reintroduced_fallback);
+    defer std.testing.allocator.free(reintroduced_fallback_z);
+    try std.testing.expectError(
+        error.ValueUseScalarMultiplyPrematureProductionUse,
+        validateScalarMultiplyProductionSites(
+            "composed_selector_scalar.zig",
+            reintroduced_fallback_z,
+        ),
+    );
+
+    const raw_resolution = try std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        accepted,
+        "var transaction = try ValueUseTransaction.begin(selector);",
+        "_ = selector_state.resolveValue(selector, binary.lhs);\n    var transaction = try ValueUseTransaction.begin(selector);",
+    );
+    defer std.testing.allocator.free(raw_resolution);
+    const raw_resolution_z = try std.testing.allocator.dupeZ(u8, raw_resolution);
+    defer std.testing.allocator.free(raw_resolution_z);
+    try std.testing.expectError(
+        error.ValueUseScalarMultiplyPrematureProductionUse,
+        validateScalarMultiplyProductionSites(
+            "composed_selector_scalar.zig",
+            raw_resolution_z,
         ),
     );
 }

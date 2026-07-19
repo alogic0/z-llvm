@@ -91,7 +91,7 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     try validateScalarCastProductionSites(source_name, source);
     try validateImmediateScalarProductionSites(source_name, source);
     try validateNamedScalarProductionSites(source_name, source);
-    try validateDormantScalarMultiplyProductionSites(source_name, source);
+    try validateScalarMultiplyProductionSites(source_name, source);
     const forbidden = [_][]const u8{
         "bindValueLoc(",
         "bindEax(",
@@ -125,19 +125,71 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
     }
 }
 
-pub fn validateDormantScalarMultiplyProductionSites(
+pub fn validateScalarMultiplyProductionSites(
     source_name: []const u8,
-    source: []const u8,
+    source: [:0]const u8,
 ) !void {
-    _ = source_name;
     const forbidden = [_][]const u8{
         "attachScalarMultiplyAction(",
         "isScalarMultiply(",
         ".scalar_multiply",
         "executeScalarMultiply(",
     };
-    for (forbidden) |pattern|
-        if (std.mem.indexOf(u8, source, pattern) != null)
+    if (!std.mem.eql(u8, source_name, "composed_selector_scalar.zig")) {
+        for (forbidden) |pattern|
+            if (std.mem.indexOf(u8, source, pattern) != null)
+                return error.ValueUseScalarMultiplyPrematureProductionUse;
+        return;
+    }
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const lower_mul64 = functionBodyNamed(bodies, "lowerMul64") orelse
+        return error.ValueUseScalarMultiplyPrematureProductionUse;
+    const mapper = functionBodyNamed(bodies, "scalarMultiplyValueUseDiagnostic") orelse
+        return error.ValueUseScalarMultiplyPrematureProductionUse;
+    if (functionBodyNamed(bodies, "lowerMul64SpillLhsThroughRax") != null)
+        return error.ValueUseScalarMultiplyPrematureProductionUse;
+
+    const body = source[lower_mul64.start..lower_mul64.end];
+    if (countPattern(body, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(body, "transaction.register(") != 2 or
+        countPattern(body, ".form = .named_scalar_operand") != 2 or
+        countPattern(body, "attachScalarMultiplyAction(") != 1 or
+        countPattern(body, "transaction.seal()") != 1 or
+        countPattern(body, "transaction.prepare()") != 1 or
+        countPattern(body, "transaction.materializeAll()") != 1 or
+        countPattern(body, "transaction.preparedView(") != 1 or
+        countPattern(body, "transaction.executePreparedAction(") != 1 or
+        countPattern(body, "transaction.commit()") != 1 or
+        countPattern(body, "AccumulatorDefinitionTransaction.begin(") != 0 or
+        countPattern(body, "selector_state.resolveValue(") != 0 or
+        countPattern(body, "selector_state.emitValueIntoScratch(") != 0 or
+        countPattern(body, "selector_state.emitValueIntoAccumulator(") != 0)
+    {
+        return error.ValueUseScalarMultiplyPrematureProductionUse;
+    }
+
+    const mapper_source = source[mapper.start..mapper.end];
+    if (countPattern(mapper_source, ".failedRequestIs(") != 2 or
+        countPattern(mapper_source, "composed-block-unknown-lhs") != 1 or
+        countPattern(mapper_source, "composed-block-unknown-rhs") != 1 or
+        countPattern(mapper_source, "composed-block-mul64-lhs") != 1 or
+        countPattern(mapper_source, "composed-block-mul64-rhs") != 1 or
+        countPattern(mapper_source, "composed-block-mul64-dst") != 1)
+    {
+        return error.ValueUseScalarMultiplyPrematureProductionUse;
+    }
+
+    const removed_helpers = [_][]const u8{
+        "pub fn plannedScratch64RegForResult(",
+        "pub fn scratch64RegForUseAvoiding(",
+        "pub fn reusableScratch64RegForInPlace(",
+        "pub fn spillScratch64SourceForInPlace(",
+        "pub fn scratch64RegIsAvailableForUse(",
+    };
+    for (removed_helpers) |declaration|
+        if (std.mem.indexOf(u8, source, declaration) != null)
             return error.ValueUseScalarMultiplyPrematureProductionUse;
 }
 
@@ -161,7 +213,7 @@ pub fn validateNamedScalarProductionSites(
             return error.ValueUseNamedScalarActionOutsideAllowlist;
         return;
     }
-    if (countPattern(source, named_form) != 6 or
+    if (countPattern(source, named_form) != 8 or
         countPattern(source, named_attach) != 2 or
         countPattern(source, i52_attach) != 1 or
         countPattern(source, "isNamedScalarBinary(") != 0 or
@@ -1744,10 +1796,13 @@ pub fn validateFailureProvenanceProductionSites(source_name: []const u8, source:
             return error.ValueUseFailureProvenanceOutsideAllowlist;
         const named_mapper = functionBodyNamed(bodies, "namedScalarValueUseDiagnostic") orelse
             return error.ValueUseFailureProvenanceOutsideAllowlist;
+        const multiply_mapper = functionBodyNamed(bodies, "scalarMultiplyValueUseDiagnostic") orelse
+            return error.ValueUseFailureProvenanceOutsideAllowlist;
         if (countPattern(source[cast_mapper.start..cast_mapper.end], ".failedRequestIs(") != 1 or
             countPattern(source[immediate_mapper.start..immediate_mapper.end], ".failedRequestIs(") != 1 or
             countPattern(source[named_mapper.start..named_mapper.end], ".failedRequestIs(") != 2 or
-            query_count != 4)
+            countPattern(source[multiply_mapper.start..multiply_mapper.end], ".failedRequestIs(") != 2 or
+            query_count != 6)
         {
             return error.ValueUseFailureProvenanceAllowlistMismatch;
         }

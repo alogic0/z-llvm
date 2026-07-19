@@ -232,7 +232,7 @@ pub const value_use_scalar_multiply_divide_pub_names = [_][]const u8{
 pub const value_use_calls_pub_names = [_][]const u8{"executeInlineMemcpy"};
 
 pub const frozen_bypass_inventory_path = "docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv";
-pub const frozen_bypass_inventory_sha256 = "92f921c3ae0e87ec25f6ed64803d667789991831da134a466438474ee29eb755";
+pub const frozen_bypass_inventory_sha256 = "3928114a0fcc55d5f18a367b29865925396c80c3a2589e02c87f4e0a73b23537";
 pub const value_use_facade_manifest_path = "docs/evidence/inbox128_o2_r1_facade_manifest.tsv";
 pub const value_use_facade_manifest_sha256 = "477769d5111199b9d6b9a0f5e16a47a19f5e0bb8cdb9fa45bf7aeb0f463c82d5";
 pub const bypass_operations = [_][]const u8{
