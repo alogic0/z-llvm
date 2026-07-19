@@ -6,31 +6,40 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-187A compiler-rt v1 coverage-command closure — AUTHORIZED
+## INBOX-187B compiler-rt v1 execution-order and canonical-status closure — AUTHORIZED
 
-INBOX-187 at `a041487e` has a split disposition. Its read-only patch bundle,
-manifests, apply-check, and restoration evidence are accepted. Closed
-execution-contract acceptance is withheld because section 9 ambiguously
-mixes raw-input reporting with canonical `accepted.ll` reuse.
+INBOX-187A at `527340b6` is not accepted as a closed execution contract.
+It fixed raw-input/subset ambiguity, but both coverage phases read object,
+owner, objdump, and per-function identities before producing them. Canonical
+status files consumed later also lack exact producing commands. Validation
+remains unauthorized.
 
-Amend only the INBOX-187 contract document. Replace section-9 shorthand with
-exact commands, environments, statuses, and full paths. Observation-off and
-observation-on raw report commands must consume adopted raw `INPUT`; neither
-phase may run `llvm-extract` or create another subset. All coverage object,
-owner, objdump, readelf, objcopy, `dd`, and per-function work must consume
-the single absolute canonical repetition-1 `accepted.ll`, whose hash and
-mode are checked before and after both phases.
+Amend only the existing contract. Move successful-subset identity checks
+after their producers. Freeze one exact canonical Bash driver with unique
+stdout, stderr, status, command, environment, and timing records for every
+build/report/parser/extract/object/owner/inspection/per-function/frontier/
+ledger/comparison command. Expected-nonzero commands must explicitly disable
+immediate exit only around one producer, capture `$?`, atomically record it,
+restore strict mode, and validate the expected status. No `|| true`,
+status-obscuring pipeline, or implicit shell state is allowed.
 
-Observation-off must leave the coverage variable unset and all three channel
-paths absent. Observation-on must use three exact absolute, exclusive paths
-for report, object, and owner. Freeze every produced-versus-referenced
-artifact, environment, status, comparison, and absence check; distinguish
-raw-report counter invariants from successful-subset invariants. Do not
-modify the accepted patch bundle.
+Add a complete file-and-directory producer-before-consumer ledger: exactly
+one producer per generated path, every producer before its consumers,
+pairwise-disjoint canonical/off/on roots, and exact hash/mode checks for all
+preflight-immutable inputs. Canonical `accepted.ll` is produced once and
+coverage only consumes it.
 
-Run no project code, build, validation, coverage, gate, performance, wiring,
-pin edit, cleanup, or credit. Commit only the amended contract, preserve
-ratchet 131 and every frozen surface, and stop again before execution.
+Do not modify the accepted patch bundle. Run no project code, build,
+validation, coverage, gate, performance, wiring, pin edit, cleanup, or
+credit. Commit only the amended contract, remove stale closed disposition,
+preserve ratchet 131 and every frozen surface, and stop again before
+execution.
+
+## INBOX-187A coverage-command closure — WITHHELD at 527340b6
+
+Raw input, canonical-subset reuse, and exclusive coverage paths are now
+separated, but producer ordering and canonical status capture remain unsafe.
+Validation execution is not accepted.
 
 ## INBOX-187 baseline-validation contract and patch freeze — SPLIT at a041487e
 
