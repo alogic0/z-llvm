@@ -6,7 +6,22 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-166 M64 wiring (140 → 135) — dispatched
+## INBOX-166 M64 wiring — LANDED at 50acec11 + perf 15082e2d, Supervisor-verified
+
+The M64 wiring landed and is fully verified: ratchet recount **135**
+(the TSV shed the five M64 gateway rows); the frozen value_use
+action/model/planning surface untouched (empty diff); R03/R04 and
+retained owners in place; identities EXACT (report 49a19f04, object
+061a64e4, owner 5d91960e, 285/0/0 per-function — the cohort did not
+move); all gate log hashes re-verified (unit 1365/1365, guard 55/55,
+abi, canaries, integrated-exe, Tier 2) including the perf runner log
+(the one apparent mismatch was my own script's pairing artifact,
+disproven by direct hash comparison); MY abi + canary reruns pass;
+counterbalanced perf PASSED (median Δ −0.190s — the wired build FASTER;
+paired ratio 0.996107; RSS +240 KiB; all gates PASS); no Tier 3. Sent to
+the Reviewer for the acceptance that completes THE MULTIPLY STEP AT 135.
+
+## Former INBOX-166 dispatch entry — superseded by the landing above
 
 INBOX-165 is **ACCEPTED and INBOX-166 authorized** (Reviewer,
 2026-07-18: "Wire M64 as one complete family, moving the ratchet exactly
