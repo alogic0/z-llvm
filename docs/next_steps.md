@@ -6,29 +6,35 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-190 exact compiler-rt baseline-validation v2 execution — AUTHORIZED
+## INBOX-191 v3 source-commit identity and namespace closure — AUTHORIZED
 
-INBOX-189A at `2f1a880e` and the corrected INBOX-189 v2 contract are
-accepted. Preserve the corrected contract SHA-256 `499213db…`, immutable
-exhausted v1 evidence, initially absent v2 namespace, all frozen identities,
-dormant production, calls sequence, ratchet 131, and the mandatory post-calls
-checkpoint.
+INBOX-190 at `49bbb9d0` is accepted as a compliant fail-closed stop only.
+Validation is incomplete and v2 is exhausted. Preserve the entire v2
+namespace and registered detached worktree as immutable evidence.
 
-From this clean operating authorization only, substitute the launcher's sole
-authorization token with the exact full operating HEAD, hash the exact
-token-substituted driver, and supply it exactly once. Execute the accepted
-`baseline_validation_v2` contract exactly once: canonical first; coverage
-only after complete canonical success; restoration and read-only retention
-only after complete coverage success.
+Amend only the accepted contract document. Record the exact INBOX-190/v2
+ledger, move every future generated path to fresh `baseline_validation_v3`,
+and prohibit every executable v1/v2 reference.
 
-Every launcher/contract command is one-shot. Any discrepancy stops the
-attempt immediately with all evidence retained and no retry, repair,
-normalization, cleanup, substitution, or later phase.
+Bind full baseline commit
+`43de59b06ca3a687368bfaf0595c5759c8ab3a57` once as a validated
+40-lowercase-hex constant in each complete executable stream. Use that bound
+identity for every future source creation, comparison, restoration, and
+provenance operation; pass it explicitly to child commands and update the
+argument ledger. No executable short-SHA equality may remain.
 
-Do not adopt identities, modify source or consumers, wire production, run
-production gates, recount, run performance, clean retained state, or claim
-credit. Commit only the exact INBOX-190 execution summary and stop for
-Watcher/Reviewer acceptance.
+Run static/read-only checks only. Change no source, bundle, input, identity,
+pin, tool, threshold, calls sequence, or checkpoint. Commit only the amended
+contract, preserve dormant production and ratchet 131, and stop before v3
+execution.
+
+## INBOX-190 baseline-validation v2 execution — COMPLIANT STOP at 49bbb9d0
+
+The sole v2 attempt passed external preflight and created one clean detached
+source, then stopped because the canonical preflight compared its full HEAD
+to short literal `43de59b0`. Build, repetitions, identities, coverage, and
+restoration were never entered. The retained v2 namespace is immutable and
+validation remains incomplete.
 
 ## INBOX-189A exact C01 audit-ledger count correction — ACCEPTED at 2f1a880e
 
