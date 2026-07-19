@@ -212,6 +212,105 @@ No `distribution-all` command and no Tier 3 command was run.
 
 ## Counterbalanced performance
 
-Pending the required follow-up immutable evidence commit. The A and B
-artifacts will be built and frozen only after this complete production
-source, guard, inventory, and evidence tree is committed.
+The timed artifacts were frozen only after the complete production source,
+guard, inventory, and initial evidence tree was committed:
+
+```text
+A_commit=842a8a224b3545f221a0a6f009f79f69b181bc87
+A_tree=530f96bea82b42dca00eefec1047548810e6e517
+B_commit=50acec11e5fc257a6add7e74646237f64ccbdd7d
+B_tree=6975178c35e5a799db54010722b1aeb7b87023a6
+```
+
+Both binaries were built once in clean detached worktrees and then copied
+to immutable mode `0555`. There were no rebuilds between samples:
+
+```text
+A_build_command=cd tmp/inbox166_o2_m64_wiring/perf/worktree_A && /home/oleg/bin/zig build 2>&1 | tee ../build_A.log
+A_build_log_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+A_path=tmp/inbox166_o2_m64_wiring/perf/artifacts/A/z_llvm
+A_mode_size=0555/104769314
+A_sha256=50632dff809dff6d81f6363b1b0888686700013fb671bc1f504f00986fea8480
+
+B_build_command=cd tmp/inbox166_o2_m64_wiring/perf/worktree_B && /home/oleg/bin/zig build 2>&1 | tee ../build_B.log
+B_build_log_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+B_path=tmp/inbox166_o2_m64_wiring/perf/artifacts/B/z_llvm
+B_mode_size=0555/104714189
+B_sha256=0e1937c4c3006e11976d1f4fe3b6a4c8e0af7b76d2ed14dab4928d334ea361ea
+```
+
+The idle preflight was captured at `2026-07-18T22:14:30-05:00` with load
+averages `1.15 / 1.02 / 1.29` and CPU 0 average idle of `96.32%`:
+
+```text
+path=tmp/inbox166_o2_m64_wiring/perf/idle_preflight.txt
+sha256=0de391f095ef9c5243f56f80f62deb59466205b216f2f320f1c931cff1a17db3
+```
+
+Exactly two warmups per artifact were discarded, followed by the required
+six pairs in `AB, BA, AB, BA, AB, BA` order. Every timed sample was
+retained. There was no discretionary rerun.
+
+Commands and Zig tool identities:
+
+```text
+command=/home/oleg/bin/zig run tmp/inbox166_o2_m64_wiring/run_counterbalanced.zig 2>&1 | tee tmp/inbox166_o2_m64_wiring/perf/run_counterbalanced.log
+runner_sha256=9b5c97fbd990cb7233bd04bd70125b459da85cccb8ce469726be558ce5d858be
+run_log_sha256=d142895d36a766f2de28ff939881c1ca0671ca8a7635c0f9224c7c14f74ff6ec
+
+command=/home/oleg/bin/zig run tmp/inbox166_o2_m64_wiring/analyze_counterbalanced.zig 2>&1 | tee tmp/inbox166_o2_m64_wiring/perf/paired_metrics.tsv
+analyzer_sha256=0db2760411f459a7afb14b4de64034a055c9b7cd3b35aa2ea0ce827b96611040
+metrics_sha256=04fe50f4d674a604ce1f3badb9a29f88d0074985e5c1a9188dd4e9edc2c63c7f
+```
+
+All samples (`wall_seconds`, `maximum_rss_kib`):
+
+```text
+warmup1_A  48.72  88176
+warmup1_B  48.45  89352
+warmup2_A  48.94  89092
+warmup2_B  48.53  89488
+
+pair1_AB  A=48.90/89124  B=48.53/89352  B/A=0.992433538
+pair2_BA  A=48.79/89096  B=48.62/89356  B/A=0.996515679
+pair3_AB  A=48.81/89104  B=48.74/89360  B/A=0.998565868
+pair4_BA  A=48.81/89104  B=48.60/89352  B/A=0.995697603
+pair5_AB  A=48.72/89100  B=48.75/89352  B/A=1.000615764
+pair6_BA  A=48.71/89096  B=48.49/89364  B/A=0.995483474
+```
+
+Blocking criteria:
+
+```text
+median_A_seconds=48.800
+median_B_seconds=48.610
+median_delta_seconds=-0.190
+allowed_delta_seconds=max(48.800*0.05,0.100)=2.440
+aggregate_median_gate=PASS
+
+median_paired_ratio_B_over_A=0.996106641
+paired_ratio_limit=1.05
+paired_ratio_gate=PASS
+
+maximum_rss_A_kib=89124
+maximum_rss_B_kib=89364
+maximum_rss_delta_kib=+240
+maximum_rss_limit_kib=16384
+rss_gate=PASS
+
+exact_reports=16/16
+overall=PASS
+```
+
+The complete raw and normalized report sets are pinned by sorted
+manifests:
+
+```text
+raw_sample_manifest_files=16
+raw_sample_manifest_sha256=c967d9da706bd48897a01505291d2713f97b5c18f8f4f2b76d896994f1f95d7e
+report_manifest_files=16
+report_manifest_sha256=4b7bfd4f25242dc636404558299723ff3c30a1930389243521df54418c92dd98
+```
+
+The counterbalanced performance gate passes both timing criteria and the
+RSS criterion. No Tier 3 was run.
