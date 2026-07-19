@@ -6,44 +6,60 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-174a dormant call rollback amendment — AUTHORIZED for dispatch
+## INBOX-175 call-family three-build isolation — AUTHORIZED for dispatch
 
-INBOX-174 at `fb3ae403` is **NOT ACCEPTED**. The Watcher found, and the
-Reviewer confirmed, that `calls.executeAttachedCallAction` invokes
-`rollbackInternal` inside the outer `materializeAll` rollback path, causing
-double restoration and violating exactly-once rollback ownership. The
-rollback proof also stops at argument index zero and does not directly prove
-cleared transaction phase/request/action storage. INBOX-175/isolation is not
-authorized.
+INBOX-174a at `c1ffd1cc` is **ACCEPTED**. The dormant ordinary-call and
+`zig.target.intByteSize` model is accepted at ratchet 131. Freeze that exact
+clean amended tree and run exactly three temporary consumer builds:
+ordinary admitted direct calls alone, `intByteSize` alone, and their
+aggregate.
 
-Remove only the inner rollback invocation; `materializeAll` remains the sole
-outer automatic rollback authority. Add a later-index multi-argument failure
-that proves every earlier stage and selector mutation restores. Explicitly
-assert post-rollback `.registering` phase, zero request count, and cleared
-call-action attachment/executed storage without widening the facade or
-production capability.
+Each build must pass the historical three bars: exact complete cohort,
+report/object/owner, and all 285 per-function bytes/disassembly
+(`49a19f04` / `061a64e4` / `5d91960e`, report 443/285/158 with `truncl`
+first, owner 167/17/101, per-function 285/0/0); full unit 1389/1389; and
+focused canaries 35. A standalone ABI or source-guard run is not an
+additional bar, but every retained full-unit log must demonstrably execute
+the 60/60 source guard, and every temporary function-scoped guard-accounting
+adjustment must be hashed and preserved.
 
-The Reviewer prefers structural exactly-once proof: the call executor has
-zero `rollbackInternal` references, `materializeAll` has exactly one outer
-`errdefer`, and it is the only executor caller. Source guards and negative
-fixtures must freeze that call graph and authority partition. Dynamic
-counting is permitted only if structural proof is insufficient and must be
-test-only, internal, production-guarded, and facade-neutral.
+The ordinary-only build must leave scalar-SSE, indirect, i128/pair,
+pointer-frontier, stack/aggregate, immediate, cycle, tail, and every
+intrinsic family on legacy paths, preserving the six pointer-frontier rows
+exactly. Ordinary migration is semantic-only; `intByteSize` is the sole
+conditionally credit-bearing family.
 
-Keep production routing and the bypass TSV byte-identical, ratchet 131, and
-identities exact (`49a19f04` / `061a64e4` / `5d91960e`). Update the retained
-INBOX-174 evidence and rerun only full unit, source guard, ABI differential,
-focused canaries, and decisive identities. No performance,
+Temporary changes are limited to the named consumer wiring and its
+function-scoped guard accounting. No action/model/planning/lifetime/Q1/
+materialization/facade/capability amendment. Attribute the first semantic
+instruction divergence. Retain any failing family wholesale. Aggregate only
+individually accepted families; if the aggregate diverges, isolate the
+minimal interacting set for evidence only and do not fix forward.
+
+Retain exact baseline and temporary source/patch/artifact/log hashes,
+commands, counts, and provenance. Remove every temporary patch and restore
+the exact clean `c1ffd1cc` dormant tree. Commit evidence only. Ratchet
+remains 131; no production wiring or credit; no standalone ABI, performance,
 integrated-executable, strengthened Tier 2, distribution-all, or Tier 3.
-Commit the amendment cleanly and STOP for review before any isolation.
+STOP with evidence for review.
 
-## INBOX-174 calls dormant build — DELIVERED at fb3ae403; NOT ACCEPTED
+## INBOX-174a dormant call rollback amendment — ACCEPTED at c1ffd1cc
+
+The double-restore defect was removed: `materializeAll` is the sole rollback
+owner, and the attached-call executor has no rollback authority. Structural
+guards freeze the single caller and invocation, including negative fixtures.
+A three-argument failure after index two proves restoration of earlier
+staging and complete selector state; every rollback boundary explicitly
+checks registering phase, zero requests, and cleared action storage.
+Production routing, bypass TSV, facade, ratchet 131, and decisive identities
+remain exact. Full unit 1389/1389, guard 60/60, ABI, and canaries pass.
+
+## INBOX-174 calls dormant build — ACCEPTED through amendment c1ffd1cc
 
 The combined ordinary direct-call and specialized `intByteSize` dormant
-actions landed with production routing and ratchet 131 unchanged. Retained
-gates and identities are exact, but acceptance is withheld for the rollback
-ownership and proof defects now bounded by INBOX-174a. No isolation is
-authorized from this tree.
+actions landed at `fb3ae403` with production routing and ratchet 131
+unchanged. The rollback-owner amendment at `c1ffd1cc` resolves the two
+withheld acceptance conditions; the dormant call model is now accepted.
 
 ## INBOX-173 calls evidence refresh — ACCEPTED at efcac24b
 
