@@ -6,32 +6,37 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-187 compiler-rt v1 baseline-validation contract and patch freeze — AUTHORIZED
+## INBOX-187A compiler-rt v1 coverage-command closure — AUTHORIZED
 
-INBOX-186 at `43de59b0` is accepted as exact v1 input adoption plus explicit
-retention protection only. Produce a closed, non-executing validation
-contract and read-only future coverage patch bundle.
+INBOX-187 at `a041487e` has a split disposition. Its read-only patch bundle,
+manifests, apply-check, and restoration evidence are accepted. Closed
+execution-contract acceptance is withheld because section 9 ambiguously
+mixes raw-input reporting with canonical `accepted.ll` reuse.
 
-Canonical baseline identities must come from exactly three independent
-non-timing repetitions using one immutable artifact from the exact clean,
-dormant ratchet-131 tree. No aggregate or observer patch may define those
-identities. Freeze all report/object/owner/objdump/per-function/frontier
-commands, environments, outputs, comparisons, and new
-`o2_calls_crt_v1_r131_*` names before execution.
+Amend only the INBOX-187 contract document. Replace section-9 shorthand with
+exact commands, environments, statuses, and full paths. Observation-off and
+observation-on raw report commands must consume adopted raw `INPUT`; neither
+phase may run `llvm-extract` or create another subset. All coverage object,
+owner, objdump, readelf, objcopy, `dd`, and per-function work must consume
+the single absolute canonical repetition-1 `accepted.ll`, whose hash and
+mode are checked before and after both phases.
 
-The separately frozen aggregate-consumer/observer/guard bundle is for
-dynamic coverage only. It must use fixed non-allocating observation state,
-count only ordinary `DirectCallAction` and `IntByteSizeCallAction` lifecycle
-boundaries, emit through a separate channel, admit no third family, and
-change no semantic behavior. Observation-off and observation-on outputs
-must equal the canonical identities exactly. This temporary artifact is
-excluded from performance.
+Observation-off must leave the coverage variable unset and all three channel
+paths absent. Observation-on must use three exact absolute, exclusive paths
+for report, object, and owner. Freeze every produced-versus-referenced
+artifact, environment, status, comparison, and absence check; distinguish
+raw-report counter invariants from successful-subset invariants. Do not
+modify the accepted patch bundle.
 
-Retain the patch bundle read-only beneath the pinned adopted root, prove it
-apply-checks, and restore exact source. Run no project code, build,
-validation, coverage, gate, performance, wiring, pin edit, cleanup, or
-credit. Commit only the INBOX-187 contract document, preserve ratchet 131
-and every frozen surface, and stop before validation execution.
+Run no project code, build, validation, coverage, gate, performance, wiring,
+pin edit, cleanup, or credit. Commit only the amended contract, preserve
+ratchet 131 and every frozen surface, and stop again before execution.
+
+## INBOX-187 baseline-validation contract and patch freeze — SPLIT at a041487e
+
+The read-only aggregate-consumer/observer/guard patch bundle and exact
+restoration evidence are accepted. Closed-contract acceptance and validation
+execution are withheld pending INBOX-187A coverage-command closure.
 
 ## INBOX-186 exact compiler-rt v1 adoption and retention pin — ACCEPTED at 43de59b0
 
