@@ -13,8 +13,14 @@ INBOX-187A corrected section 9, but closed-contract acceptance was withheld
 because successful-subset checks preceded their producers and canonical
 status production remained implicit. INBOX-187B, authorized from operating
 commit `1d996a1abddfc584bcad2b747705fca7f6a3642d`, corrects only this
-document. It does not change or execute the accepted patch bundle,
-validation protocol, compiler, or any retained artifact.
+document. Closed-contract acceptance of INBOX-187B commit
+`22da533a8b7ee5596671beb91dd4f5575e5708b9` was withheld because its
+canonical owner-ledger left the report-summary argument unbound inside
+AWK. INBOX-187C, authorized from clean operating commit
+`d34fd6dee198f5f8e823b2d8b842d4d142b221a8`, closes only that
+argument-binding class and records the complete static invocation audit. It
+does not change or execute the accepted patch bundle, validation protocol,
+compiler, or any retained artifact.
 
 ## 1. Accepted basis and current preflight
 
@@ -26,6 +32,8 @@ original_INBOX_187_operating_tree=b065779d17e5726dd81bc6b3c19bedf61a74b942
 INBOX_187_document_commit=a041487eee50f86b594beeeedb2071479842c093
 INBOX_187A_document_commit=527340b6
 INBOX_187B_operating_commit=1d996a1abddfc584bcad2b747705fca7f6a3642d
+INBOX_187B_document_commit=22da533a8b7ee5596671beb91dd4f5575e5708b9
+INBOX_187C_operating_commit=d34fd6dee198f5f8e823b2d8b842d4d142b221a8
 exact_dormant_ratchet_131_source_commit=43de59b0
 INBOX_184_contract_commit=1c343ec8
 INBOX_185_reproduction_commit=b1567ace
@@ -891,7 +899,7 @@ for repetition in 1 2 3; do
     /bin/bash -c '
       set -euo pipefail
       temporary="$3"
-      LC_ALL=C /usr/bin/awk -F "\t" -v summary="$3" '\''
+      LC_ALL=C /usr/bin/awk -F "\t" '\''
         { key = $3 "\t" $4 "\t" $2; count[key] += 1 }
         END { for (key in count) print key "\t" count[key] }
       '\'' "$1" >"$temporary"
@@ -1141,7 +1149,8 @@ for repetition in 1 2 3; do
     "$REC/owner-ledger.stdout" "$REC/owner-ledger.stderr" \
     /bin/bash -c '
       set -euo pipefail
-      LC_ALL=C /usr/bin/awk -F "\t" '\''
+      summary="$3"
+      LC_ALL=C /usr/bin/awk -F "\t" -v summary="$summary" '\''
         NR == 1 {
           if ($1 != "row_identity" ||
               $2 != "selection_owner") exit 92
@@ -1497,6 +1506,94 @@ object/owner command references the immutable absolute `$ACCEPTED`.
 Every report command references the immutable absolute `$INPUT`. Any
 duplicate producer, read-before-produce, unlisted output, root overlap, or
 implicit path is a contract failure.
+
+### 7.4 Complete `/bin/bash -c` argument-binding audit
+
+This is the closed invocation ledger for all **45** `/bin/bash -c`
+templates in sections 5–9: 27 canonical templates and 18 coverage
+templates. Every invocation supplies the literal `_` as `$0`; no script
+body receives a path through `$0`. “AWK input” names an explicit file
+argument or pipeline standard input. “No `-v`” means the AWK program uses
+only its records and AWK-local variables. The sole shell-to-AWK binding in
+these templates is C24’s `-v summary="$summary"`.
+
+`run_step` is the unique status producer for C02–C27. Its status argument
+is the path shown below; loop expansion makes every repetition and
+six-digit function ID a disjoint invocation. C01 is the pre-root preflight
+and writes its status exactly once through `write_status_once`.
+`run_recorded` is the unique status producer for F01–F18; F18 expands once
+for `object` and once for `owner`, with disjoint record prefixes. These
+recorder-owned status files are never command stdout or semantic output.
+
+#### Canonical templates
+
+| ID | Command and explicit binding (`$0` is `_`) | Shell-variable bindings | AWK binding and consumed path | Producer-before-consumer and sole status |
+|---|---|---|---|---|
+| C01 | immutable preflight: `$1=$REPO`, `$2=$INPUT`, `$3=$BUNDLE` | `repo=$1`; `input=$2`; `bundle=$3`; manifest loops bind `payload_path`, `payload_bytes`, `payload_mode`, `expected`, and `tool_path`; capacity checks bind `available_blocks` and `block_size` | no `-v`; SHA readers consume pipeline stdin; stash reader consumes `git stash list` stdin; mode/tool manifests are consumed through their explicit redirections | runs before `$ROOT` creation; produces only preflight records; `$PREFLIGHT_RECORD.status` |
+| C02 | source preflight: `$1=$CANONICAL/source` | `source_root=$1` | none | consumes the worktree-add result before build; `$CANONICAL/source-preflight.status` |
+| C03 | canonical build: `$1=$CANONICAL/source`, `$2=$CANONICAL/build/prefix`, `$3=$CANONICAL/build/cache/local`, `$4=$CANONICAL/build/cache/global` | no aliases; all four positions are consumed directly | none | consumes C02’s verified source, produces the build prefix; `$CANONICAL/build/build.status` |
+| C04 | artifact identity: `$1=$ARTIFACT`, `$2=$CANONICAL/artifact.identity.tsv` | `artifact=$1`; `output=$2` | no `-v`; SHA field reader consumes `sha256sum` stdin | consumes artifact-install, produces artifact identity before reports; `$CANONICAL/artifact-identity.status` |
+| C05 | repetition report: `$1=$ARTIFACT`, `$2=$INPUT`, `$3=$REP/report.stdout.raw`, `$4=$REP/report.stderr.raw` | `artifact=$1`; `input=$2`; `semantic_stdout=$3`; `semantic_stderr=$4` | none | consumes C04 artifact and adopted raw input; produces one raw report per repetition; `$REP/report.status` |
+| C06 | report summary: `$1=$REP/report.stderr.raw`, `$2=$REP/report.summary.txt` | none | no `-v`; AWK consumes `$1`; shell redirects AWK stdout to `$2` | consumes C05, produces the sole summary; `$REP/report-summary.status` |
+| C07 | report validation: `$1=$REP/report.stdout.raw`, `$2=$REP/report.summary.txt` | none | no `-v`; AWK consumes `$2`; shell separately requires `$1` empty | consumes C05/C06; no semantic output; `$REP/report-validate.status` |
+| C08 | failures in report order: `$1=$REP/report.stderr.raw`, `$2=$REP/failed-functions.in-report-order.txt` | none | no `-v`; AWK consumes `$1`; shell redirects to `$2` | consumes C05 before unique sort/extract; `$REP/failures-in-order.status` |
+| C09 | frontier: `$1=$REP/report.stderr.raw`, `$2=$REP/frontier.tsv`, `$3=$REP/frontier.unsorted.tsv` | `temporary=$3` | no `-v`; AWK consumes `$1` and writes `$temporary`; sort consumes `$temporary` and produces `$2` | consumes C05 before grouping/identity; `$REP/frontier.status` |
+| C10 | grouped frontier: `$1=$REP/frontier.tsv`, `$2=$REP/frontier-grouped.tsv`, `$3=$REP/frontier-grouped.unsorted.tsv` | `temporary=$3` | no `-v`; AWK consumes `$1` and writes `$temporary`; sort consumes `$temporary` and produces `$2` | consumes C09; `$REP/frontier-grouped.status` |
+| C11 | report-count validation: `$1=$REP/report.summary.txt`, `$2=$REP/failed-functions.in-report-order.txt`, `$3=$REP/failed-functions.sorted.txt`, `$4=$REP/frontier.tsv` | `expected`, `ordered`, `unique`, and `frontier` are derived from the corresponding positions | no `-v`; four count AWKs consume `$1`–`$4`; the syntax AWK consumes `$3` | consumes C06, C08, failures-sorted, and C09; `$REP/report-counts-validate.status` |
+| C12 | repetition-1 extraction: `$1=$REP/failed-functions.sorted.txt`, `$2=$INPUT`, `$3=$ACCEPTED`, `$4=$REP/extract.stdout.raw`, `$5=$REP/extract.stderr.raw` | `failure_file=$1`; `input=$2`; `accepted=$3`; `semantic_stdout=$4`; `semantic_stderr=$5`; array `extract_args` and loop variable `function_name` are built only from `$failure_file` | none | consumes sorted failures and raw input; sole producer of `$ACCEPTED`; `$REP/extract.status` |
+| C13 | accepted-input freeze: `$1=$ACCEPTED`, `$2=$REP/accepted.identity.tsv`, `$3=$REP/extract.stdout.raw`, `$4=$REP/extract.stderr.raw` | `accepted=$1`; `identity=$2`; `$3`/`$4` are consumed directly as empty channels | no `-v`; SHA field reader consumes `sha256sum` stdin | consumes C12, freezes `$ACCEPTED` before every object/owner consumer; `$REP/accepted-freeze.status` |
+| C14 | canonical object: `$1=$ARTIFACT`, `$2=$ACCEPTED`, `$3=$REP/accepted.o`, `$4=$REP/object.stderr.raw` | no aliases; all positions consumed directly | none | consumes frozen C13 input and C04 artifact; produces object; `$REP/object.status` |
+| C15 | canonical owner: `$1=$ARTIFACT`, `$2=$ACCEPTED`, `$3=$REP/owner.tsv`, `$4=$REP/owner.stderr.raw` | no aliases; all positions consumed directly | none | consumes frozen C13 input and C04 artifact; produces owner manifest; `$REP/owner.status` |
+| C16 | canonical objdump: `$1=$REP` | no alias; `$1` becomes working directory | none | consumes C14 object; produces objdump files; `$REP/objdump.status` |
+| C17 | section readelf: `$1=$REP/accepted.o`, `$2=$REP/sections.readelf`, `$3=$REP/sections.stderr.raw` | no aliases; all positions consumed directly | none | consumes C14 object; `$REP/readelf-sections.status` |
+| C18 | symbol readelf: `$1=$REP/accepted.o`, `$2=$REP/symbols.readelf`, `$3=$REP/symbols.stderr.raw` | no aliases; all positions consumed directly | none | consumes C14 object; `$REP/readelf-symbols.status` |
+| C19 | text extraction: `$1=$REP/accepted.o`, `$2=$REP/text.bin`, `$3=$REP/objcopy.stdout.raw`, `$4=$REP/objcopy.stderr.raw` | no aliases; all positions consumed directly | none | consumes C14 object; produces text for function extraction; `$REP/objcopy-text.status` |
+| C20 | function sorting: `$1=$REP/symbols.readelf`, `$2=$REP/functions.sorted.tsv`, `$3=$REP/functions.unsorted.tsv` | `temporary=$3` | no `-v`; AWK consumes `$1` and writes `$temporary`; sort produces `$2` | consumes C18 before the finite per-function loop; `$REP/functions-sorted.status` |
+| C21 | per-function objdump: `$1=$REP`, `$2=$function_name`, `$3=$id` | no aliases; all positions consumed directly | none | consumes C14/C20; produces `functions/$id.objdump`; `$REP/functions/$id.objdump.status` |
+| C22 | per-function identity: `$1=$REP/functions/$id.code.bin`, `$2=$REP/functions/$id.objdump.stderr`, `$3=$size_dec`, `$4=$id`, `$5=$function_name`, `$6=$value_hex`, `$7=$REP/functions/$id.objdump`, `$8=$REP/functions/$id.identity.tsv` | no aliases; all positions consumed directly | no `-v`; two SHA field readers consume `sha256sum` stdin for `$1` and `$7` | consumes function `dd` and C21; produces one identity row; `$REP/functions/$id.identity.status` |
+| C23 | per-function aggregate: `$1=$REP/functions`, `$2=$REP/per-function-identities.tsv`, `$3=$REP/functions.sorted.tsv` | `functions=$1`; `output=$2`; `source_manifest=$3`; array `rows`, `expected_rows`, and loop variables `row_path` and `row_text` derive from those paths | no `-v`; row-count AWK consumes `$source_manifest` | consumes every C22 row and C20 manifest; `$REP/per-function.status` |
+| C24 | owner ledger: `$1=$REP/owner.tsv`, `$2=$REP/owner-ledger.txt`, `$3=$REP/report.summary.txt` | `summary=$3` before AWK | `-v summary="$summary"` binds the exact report-summary path; AWK records consume `$1`; `getline` consumes `summary`; shell redirects to `$2` | consumes C15 and C06; produces checked ledger before identity/comparison; `$REP/owner-ledger.status` |
+| C25 | canonical identity manifest: `$1=$INPUT`, `$2=$ARTIFACT`, `$3=$BASE`, `$4=$CANONICAL/o2_calls_crt_v1_r131.identities.tsv`, `$5=$ACCEPTED` | `input=$1`; `artifact=$2`; `base=$3`; `output=$4`; `accepted=$5`; `summary`, `population`, `first_failure`, `frontier_population`, and `function_count` derive only from those bindings | no `-v`; AWKs consume `$base/report.summary.txt`, `$base/frontier.tsv`, `$base/per-function-identities.tsv`, status/ledger files, or SHA pipeline stdin | consumes all three exact repetitions and comparisons; produces canonical identities; `$CANONICAL/identity-manifest.status` |
+| C26 | repetition finalizer: `$1=$REP`, `$2=$CANONICAL/manifests/repetition-$repetition.final.tsv` | `rep=$1`; `manifest=$2`; array `paths` is the closed glob rooted at `$rep`; both loops bind `path` | no `-v`; SHA field readers consume pipeline stdin | consumes the completed repetition; produces its final manifest; `$CANONICAL/repetition-$repetition-finalize.status` |
+| C27 | canonical finalizer: `$1=$CANONICAL`, `$2=$CANONICAL/o2_calls_crt_v1_r131.identities.tsv`, `$3=$ARTIFACT`, `$4=$ACCEPTED` | `canonical=$1`; `identities=$2`; `artifact=$3`; `$4` is consumed directly for the accepted-input mode check | no `-v`; SHA field reader consumes `sha256sum` stdin | consumes C25, C04, and C13; produces `identities.final.tsv`; `$CANONICAL/canonical-finalize.status` |
+
+#### Coverage templates
+
+| ID | Command and explicit binding (`$0` is `_`) | Shell-variable bindings | AWK binding and consumed path | Producer-before-consumer and sole status |
+|---|---|---|---|---|
+| F01 | off report summary: `$1=$OFF/report.stderr.raw` | none | no `-v`; AWK consumes `$1`; recorder stdout is `$OFF/report.summary.txt` | consumes off raw report before comparisons; `$OFF/records/report-summary.status` |
+| F02 | off failures in order: `$1=$OFF/report.stderr.raw` | none | no `-v`; AWK consumes `$1`; recorder stdout is the ordered-failures file | consumes off raw report before unique sort; `$OFF/records/failures-in-order.status` |
+| F03 | off frontier: `$1=$OFF/report.stderr.raw` | none | no `-v`; AWK consumes `$1` and pipes to sort; recorder stdout is `$OFF/frontier.tsv` | consumes off raw report before grouping/comparison; `$OFF/records/frontier.status` |
+| F04 | off grouped frontier: `$1=$OFF/frontier.tsv` | none | no `-v`; AWK consumes `$1` and pipes to sort; recorder stdout is `$OFF/frontier-grouped.tsv` | consumes F03; `$OFF/records/frontier-grouped.status` |
+| F05 | off objdump: `$1=$OFF` | no alias; `$1` becomes working directory | none | consumes off object before fixed comparisons; `$OFF/records/objdump.status` |
+| F06 | off function sorting: `$1=$OFF/symbols.readelf` | none | no `-v`; AWK consumes `$1` and pipes to sort; recorder stdout is `$OFF/functions.sorted.tsv` | consumes off readelf-symbols before F07; `$OFF/records/functions-sorted.status` |
+| F07 | off per-function manifest: `$1=$OFF` | `phase=$1`; `row`, read-loop variables `function_name`, `value_hex`, and `size_dec`, plus `id`, `offset`, `code_sha`, and `dis_sha`, derive only from `$phase/functions.sorted.tsv` and its object/text outputs | no `-v`; the manifest read is `$phase/functions.sorted.tsv`; SHA field readers consume pipeline stdin | consumes off object/text/F06 and produces all finite function files plus recorder stdout; `$OFF/records/per-function.status` |
+| F08 | off owner ledger: `$1=$OFF/owner.tsv` | none | no `-v`; AWK consumes `$1`; recorder stdout is `$OFF/owner-ledger.txt` | consumes off owner before comparisons; `$OFF/records/owner-ledger.status` |
+| F09 | on report summary: `$1=$ON/report.stderr.raw` | none | no `-v`; AWK consumes `$1`; recorder stdout is `$ON/report.summary.txt` | consumes on raw report before comparisons; `$ON/records/report-summary.status` |
+| F10 | on failures in order: `$1=$ON/report.stderr.raw` | none | no `-v`; AWK consumes `$1`; recorder stdout is the ordered-failures file | consumes on raw report before unique sort; `$ON/records/failures-in-order.status` |
+| F11 | on frontier: `$1=$ON/report.stderr.raw` | none | no `-v`; AWK consumes `$1` and pipes to sort; recorder stdout is `$ON/frontier.tsv` | consumes on raw report before grouping/comparison; `$ON/records/frontier.status` |
+| F12 | on grouped frontier: `$1=$ON/frontier.tsv` | none | no `-v`; AWK consumes `$1` and pipes to sort; recorder stdout is `$ON/frontier-grouped.tsv` | consumes F11; `$ON/records/frontier-grouped.status` |
+| F13 | on objdump: `$1=$ON` | no alias; `$1` becomes working directory | none | consumes on object before fixed comparisons; `$ON/records/objdump.status` |
+| F14 | on function sorting: `$1=$ON/symbols.readelf` | none | no `-v`; AWK consumes `$1` and pipes to sort; recorder stdout is `$ON/functions.sorted.tsv` | consumes on readelf-symbols before F15; `$ON/records/functions-sorted.status` |
+| F15 | on per-function manifest: `$1=$ON` | `phase=$1`; `row`, read-loop variables `function_name`, `value_hex`, and `size_dec`, plus `id`, `offset`, `code_sha`, and `dis_sha`, derive only from `$phase/functions.sorted.tsv` and its object/text outputs | no `-v`; the manifest read is `$phase/functions.sorted.tsv`; SHA field readers consume pipeline stdin | consumes on object/text/F14 and produces all finite function files plus recorder stdout; `$ON/records/per-function.status` |
+| F16 | on owner ledger: `$1=$ON/owner.tsv` | none | no `-v`; AWK consumes `$1`; recorder stdout is `$ON/owner-ledger.txt` | consumes on owner before comparisons; `$ON/records/owner-ledger.status` |
+| F17 | report-counter validator: `$1=$REPORT_CHANNEL` | none | no `-v`; AWK consumes `$1`; recorder owns the validation channels | consumes the sole on-report channel after its producer; `$ON/records/validate-report-counters.status` |
+| F18 | successful-subset counter validator: `$1=$channel`, where the loop binds `$channel` first to `$OBJECT_CHANNEL` and then `$OWNER_CHANNEL` | no alias inside the child; parent `channel_label` selects the disjoint record prefix only | no `-v`; AWK consumes `$1`; recorder owns each validation channel | each invocation follows its sole object/owner channel producer; `$ON/records/validate-object-counters.status` and `$ON/records/validate-owner-counters.status` |
+
+The audit has two and only two same-class corrections:
+
+1. C24 now binds its third Bash argument to shell variable `summary` and
+   passes that exact path to AWK with `-v summary="$summary"` before
+   `getline line < summary`.
+2. C10 no longer passes its unrelated temporary-output argument as an
+   unused AWK variable named `summary`; the grouped-frontier AWK consumes
+   only `$1`, exactly as its body requires.
+
+Every other template already supplies `_`, supplies at least its highest
+referenced positional argument, consumes only the paths mapped above, and
+has a producer before its first generated-path consumer. There is no
+unbound positional parameter, AWK path variable, duplicate generated
+status, or coverage producer for `accepted.ll`.
 
 ## 8. Coverage-only artifact and guard
 
@@ -3048,6 +3145,85 @@ credit.
 
 ```text
 contract=CORRECTED_PENDING_WATCHER_REVIEWER_ACCEPTANCE
+patch_bundle=UNCHANGED_ACCEPTED
+canonical_identity=NOT_YET_DEFINED
+coverage=NOT_RUN
+validation=NOT_RUN
+production=UNCHANGED_DORMANT
+ratchet=131
+next=STOP_BEFORE_VALIDATION_EXECUTION
+```
+
+## 16. INBOX-187C argument-binding closure record
+
+INBOX-187C started from clean tracked operating commit
+`d34fd6dee198f5f8e823b2d8b842d4d142b221a8`, whose parent is the
+withheld INBOX-187B document commit
+`22da533a8b7ee5596671beb91dd4f5575e5708b9`. The operating delta from
+that parent is only `docs/next_steps.md`; the INBOX-187B contract blob had
+SHA-256
+`26ef0df76e087487331318dd99d87e99e3907c42aa044ca9428be9624a262512`.
+The only tracked INBOX-187C change is this contract.
+
+The static audit found and corrected exactly two defects in the same
+argument-binding class:
+
+1. the canonical owner-ledger now binds Bash `$3` as `summary` and passes
+   the exact `$REP/report.summary.txt` path to AWK with
+   `-v summary="$summary"` before `getline`; and
+2. the canonical grouped-frontier parser no longer binds its unrelated
+   temporary-output argument as an unused AWK variable named `summary`.
+
+Section 7.4 maps all 45 `/bin/bash -c` templates: 27 canonical and 18
+coverage templates. Each row records the literal `_` `$0` sentinel, every
+positional argument, every shell alias, every AWK binding and input,
+producer-before-consumer placement, and its sole status producer. The
+static closure check found 45 command templates, 45 explicit sentinels, 27
+canonical ledger rows, and 18 coverage ledger rows. Both the concatenated
+sections 5–6 canonical Bash stream and the concatenated sections 8–9
+coverage Bash stream pass `/bin/bash -n`.
+
+The final read-only recheck observed:
+
+```text
+starting_head=d34fd6dee198f5f8e823b2d8b842d4d142b221a8
+starting_parent=22da533a8b7ee5596671beb91dd4f5575e5708b9
+bundle_manifest_mode_bytes_sha256=0444/2519/0576d5803400ea9575d65fc501b87d514c97e806540be29018fb5192bd68e7f0
+bundle_manifest_check_status=0
+combined_patch_mode_bytes_sha256=0444/41140/7508d1d8f74b7e9b97ae5722a0822a86c8d2079779a25cd37559ce5bc651036f
+combined_patch_apply_check_status=0
+bundle_root_mode=0555
+bundle_payload_modes=0444
+adopted_input_mode_bytes_sha256=0444/1897410/9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1
+adoption_manifest_mode_bytes_sha256=0444/4394/500e73c8433aa73159adfba5de8a6708ae4030140b97b823ef895caa1528f2bf
+reproduction_manifest_mode_bytes_sha256=0664/458294/885008980c8a272e82d06cf89b81652ab5a9669e89364b01d7b9e2761135ff1e
+retention_pins_mode_bytes_sha256=0664/3051/1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3
+retention_policy_mode_bytes_sha256=0664/10622/a31e3fbf7aa03c8544fc5f9921e350c25e4e470cc3c779dfb356136634e052dd
+cleanup_source_mode_bytes_sha256=0664/50100/8e0c54ad6fed9e46326049dbe64bff743daddcc2527c1dc4d5e02be15fba2d5e
+watcher_head_index_worktree_blob=b64131cf60dd0ef638e815cd33db9ae8595a72cf
+stash_at_0=7985c6d01040a6e47e4ce5b918866d0e89517ac7
+pinned_zig_head=bdee02bc0c7f227c0f11bc9a449df673fe803540
+pinned_zig_tree=aa032b2b82a48a4684657f909e6e270a6c925e33
+pinned_stage4_mode_bytes_sha256=0775/530327885/dcea3478273d7ffe3895709c8eed4ccc0724548869cdb86183fc7356164410b7
+source_surface_diff_from_43de59b0=empty
+bypass_inventory_sha256=2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11
+facade_manifest_sha256=2adcd99ee3bfbe0e9f09673f1df02ab305b5ddb2c1b461023152d5d03a079c26
+canonical_bash_c_templates=27
+coverage_bash_c_templates=18
+explicit_bash_c_sentinels=45
+canonical_bash_syntax_status=0
+coverage_bash_syntax_status=0
+ratchet=131
+```
+
+INBOX-187C ran no project code, build, Zig command, `z_llvm`,
+selector/report, object generation, guard/test/gate, validation, coverage,
+performance, protocol adoption, production wiring, pin edit, cleanup, or
+credit. The future post-calls checkpoint changes no authority in this
+slice.
+
+```text
+contract=ARGUMENT_BINDINGS_CORRECTED_PENDING_WATCHER_REVIEWER_ACCEPTANCE
 patch_bundle=UNCHANGED_ACCEPTED
 canonical_identity=NOT_YET_DEFINED
 coverage=NOT_RUN
