@@ -6,7 +6,28 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-172 quotient wiring — LANDED at dc96b63d + perf 2af10ae7, Supervisor-verified
+## INBOX-173 calls evidence refresh — AUTHORIZED and dispatched
+
+INBOX-172 is **ACCEPTED; THE QUOTIENT STEP IS COMPLETE AT RATCHET 131**.
+The Reviewer authorized an evidence-only refresh from the accepted 131
+tree. Re-enumerate current call-lowering ownership without inheriting
+the stale 18-site estimate. Partition argument value uses, callee
+resolution, caller-clobber preservation, argument-register staging,
+call emission, EFLAGS effects, and result definition as distinct
+authorities. Preserve source-order validation and multi-operand
+diagnostic provenance. Count direct credits separately from conditional
+last-owner collapses. Exclude migrated memcpy and explicitly name
+retained indirect-call, multi-result, pair, cycle, and post-call-liveness
+owners. Derive action/facade/import/size budgets from the actual
+partition, with no speculative empty surface, and record the future
+isolation-plus-aggregate validation plan.
+
+Deliver only `docs/evidence/inbox173_o2_calls_refresh.md` plus the
+required operating-document references. No production, tests, guards,
+tools, manifests, gates, performance, Tier 3, or ratchet change. Commit
+docs, leave the tree clean, and STOP before dormant implementation.
+
+## INBOX-172 quotient wiring — ACCEPTED at dc96b63d + perf 2af10ae7; quotient complete at 131
 
 The quotient wiring landed and is fully verified: **ratchet 131** — the
 last-owner collapse PROVED (the final source contains neither a
@@ -18,7 +39,7 @@ identities EXACT (49a19f04 / 061a64e4 / 5d91960e — the cohort did not
 move); all six gate log hashes match; counterbalanced perf PASSED
 (median Δ +0.385s vs the allowance, paired ratio 1.006311, RSS pass,
 overall PASS, no rerun); MY abi + canary reruns pass; no Tier 3. Sent to
-the Reviewer for the acceptance that completes THE QUOTIENT STEP AT 131.
+the Reviewer and accepted: **THE QUOTIENT STEP IS COMPLETE AT 131**.
 
 ## Former INBOX-172 dispatch entry — superseded by the landing above
 
