@@ -6,37 +6,39 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-188 exact compiler-rt v1 baseline-validation execution — AUTHORIZED
+## INBOX-189 v2 preflight portability and serialization closure — AUTHORIZED
 
-INBOX-187C at `8411478a` and the corrected INBOX-187 contract are accepted.
-Execute that contract exactly once. Run the canonical phase first from one
-detached clean `43de59b0` worktree: exact preflight, one artifact build, and
-exactly three non-timing repetitions. Every identity, status, semantic
-artifact, owner/per-function/frontier invariant, and byte-equality comparison
-must pass.
+INBOX-188 at `59d9cb33` is accepted as a compliant fail-closed stop only.
+Validation is incomplete, and its sole v1 attempt is exhausted. Preserve all
+eight retained preflight files byte-for-byte; never rerun or reuse v1.
 
-Do not create or enter coverage before complete canonical success. Freeze
-the sole canonical `accepted.ll` read-only. Then use a separate detached
-`43de59b0` worktree for the exact component-bundle apply, source-manifest
-check, one temporary guard, one coverage build, and observation-off/on
-flows. Require unchanged canonical input, byte-identical semantics, three
-exclusive channels, nonzero two-family lifecycle coverage, zero unexpected
-or overflow events, and every defined equality.
+Amend only the accepted contract document. Move every future generated path
+to a fresh, disjoint `baseline_validation_v2` namespace while keeping
+historical v1 evidence immutable. Define cleanliness as exact expected HEAD,
+empty worktree and cached diffs, empty
+`git status --porcelain --untracked-files=no`, and equality with the frozen
+tracked-source manifest. The future C01 cleanliness check must not
+enumerate, whitelist, read, or modify untracked paths.
 
-Every command is single-attempt. Any discrepancy stops executable work
-immediately; retain everything and skip later phases without retry, repair,
-normalization, cleanup, deletion, pin edit, alternate candidate, or
-improvised restoration. On full success perform only the exact contracted
-reverse-patch/restoration proof and read-only freeze. Retain all worktrees,
-caches, logs, and artifacts.
+Rewrite C01 as one directly quoted `/bin/bash -c` invocation with explicit
+`_` as `$0`, complete positional bindings, and literal AWK field expressions
+protected from shell expansion. Remove `preflight_program` and every eval or
+serialized-program re-evaluation path. Re-audit all 45 templates, statuses,
+producer order, exact v2 pathing, and v1 non-reference.
 
-Do not adopt identities, modify source, wire production, run production
-gates, recount, run performance, clean retained state, or claim credit.
-Commit only
-`docs/evidence/inbox188_o2_compiler_rt_v1_baseline_validation.summary`
-with the exact successful evidence or fail-closed stop, leave the main
-tracked tree clean, preserve dormant production and ratchet 131, and stop
-for acceptance.
+Run static/read-only checks only. Change no source, bundle, input, identity,
+pin, tool, threshold, calls sequence, or checkpoint. Commit only the amended
+contract, preserve dormant production and ratchet 131, and stop before v2
+execution.
+
+## INBOX-188 baseline-validation execution — COMPLIANT STOP at 59d9cb33
+
+The sole v1 attempt stopped at its first sanitized preflight assertion:
+user-global ignores were absent and Git exposed an untracked tooling path.
+The root, worktrees, build, repetitions, identities, coverage, and
+restoration were never entered. Eight exact preflight records are retained;
+there was no retry, repair, cleanup, substitution, adoption, wiring,
+performance, or credit. Validation is not complete.
 
 ## INBOX-187C canonical-driver argument-binding closure — ACCEPTED at 8411478a
 
