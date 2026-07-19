@@ -6,7 +6,17 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-162 dormant multiply — LANDED at a93b2c82, Supervisor-verified
+## INBOX-163 multiply isolation — dispatched
+
+INBOX-162 is **ACCEPTED and INBOX-163 authorized exactly as proposed**
+(Reviewer, 2026-07-18: "The isolation must treat M64 as one indivisible
+semantic family. Exact cohort identities, 285/0/0 per-function
+comparison, full unit, and canaries are mandatory; any divergence
+retains the whole family without amendment or partial credit. Ratchet
+remains 140, with 135 conditional on successful isolation and separate
+wiring approval."). Dispatched.
+
+## INBOX-162 dormant multiply — ACCEPTED at a93b2c82, Supervisor-verified
 
 The dormant build landed (18 files, +1,210/−12: the 411-line leaf with
 exactly the three frozen public declarations; 344 test lines; facade
