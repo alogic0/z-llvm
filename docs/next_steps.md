@@ -6,7 +6,22 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-168 quotient dormant — dispatched
+## INBOX-168 — LANDED at d1e6fcbd, Supervisor-verified
+
+The dormant quotient build landed (18 files, +1,072/−9: the leaf at 696
+lines under the 2,000 ceiling; tests +319; model +43, core +33, small
+planning additions; guards to 57) and is verified:
+composed_selector_scalar.zig (incl lowerUnsignedDivRem/lowerUnsignedRem)
+byte-identical to the accepted 135 tree; no wiring; the facade at 26
+names per the recorded inbox167 amendment; internal width/staging
+selection (constraint 1) and the unresolved 131/132 credit (constraint
+2) both honored; 11-boundary rollback coverage; ratchet 135; identities
+EXACT; all four gate log hashes verified by direct pairing (unit
+1375/1375, guard 57/57, abi, canaries); MY abi + canary reruns pass; no
+perf/Tier 3. Sent to the Reviewer for acceptance + the quotient
+isolation (INBOX-169).
+
+## Former INBOX-168 dispatch entry — superseded by the landing above
 
 INBOX-167 is **ACCEPTED and INBOX-168 authorized** (Reviewer,
 2026-07-18) with two explicit constraints: width and RHS-staging branch
