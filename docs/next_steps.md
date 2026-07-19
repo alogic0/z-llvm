@@ -6,59 +6,51 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-178b call accumulator-alias remediation — AUTHORIZED for dispatch
+## INBOX-179 ordinary direct-call re-isolation — AUTHORIZED for dispatch
 
-INBOX-178a at `3a7ab346` is accepted as a compliant hard-stop and evidence
-record. Overall INBOX-178 remains unaccepted; isolation and wiring remain
-unauthorized. Proceed from user-amended composite HEAD `5e1cb6f1`, with
-`462154a1` as the exact pre-fix semantic baseline, `3a7ab346` as the
-accepted stop/evidence commit, `28e46b9f` as the tracked authorization, and
-the retained INBOX-178a proof/logs as provenance. User-authorized
-infrastructure commit `5e1cb6f1` removes only the watcher pause clause and
-grants no additional INBOX-178b code authority.
+INBOX-178b at `c0f43aea` and overall INBOX-178 are accepted as the completed
+dormant call final-use amendment. Ratchet remains 131 and production routing
+remains unchanged. Start from clean `c0f43aea`; preserve user infrastructure
+commit `5e1cb6f1` and watcher blob
+`8f3be1dd08dadc6f42ede169ca05e84daae773ab`.
 
-Amend only the call-local shared authority used by
-`spillLiveCallerClobbersForCall`. Snapshot every live logical alias of the
-EAX/RAX occupant before mutation, preserve the physical occupant exactly
-once, and rebind every live alias to the same preserved home while retaining
-its semantic width/view. Do not rebind dead aliases, emit more than one
-physical move/spill or slot allocation, or leave a live alias in EAX/RAX.
-Do not broaden generic `spillCurrentAccumulator`; if existing internal APIs
-cannot support a call-local fix, stop structurally.
+Regenerate the smallest temporary consumer/function-scoped-guard patch
+against the accepted tree. Route only admitted ordinary GPR/pointer direct
+calls through the accepted dormant `DirectCallAction` lifecycle and a pure
+semantic classifier. Do not blindly reuse the stale INBOX-175 patch.
+Scalar-SSE, indirect, i128/pair, pointer-frontier, stack/aggregate, immediate,
+cycle, tail, intrinsic, and `zig.target.intByteSize` families remain on exact
+legacy paths. No model/action/authority/import/facade or diagnostic widening.
 
-Reapply and compact the retained production-faithful proof. Make row 13
-pass, complete rows 11, 15, and 49, and finish with all 57 rows explicitly
-passing. Prove EAX/RAX, live/dead discrimination, no-alias/no-spill behavior,
-one instruction/slot, per-alias canonical width/view, EFLAGS identity,
-request provenance, and complete rollback of bindings, spill ownership and
-counters, instructions, transaction state, and private pins.
-`calls_tests.zig` remains capped at 1,500 lines; inability to fit is a
-structural stop. Add only function-scoped guard coverage/negative fixtures
-needed to freeze the bounded authority.
+Run blocking bars in strict stop-on-failure order:
 
-No public/facade helper, import/test leaf, action tag/form/destination,
-callback, planning edge, consumer query, generic-Q1 change, scheduler,
-routing/classifier change, bypass/ratchet credit, or budget exception.
-Freeze production call routing, `intByteSize`, facade/126-symbol manifest,
-imports, bypass inventory, ratchet 131, retention surfaces, and stash.
-Freeze the watcher loop at user-authorized `5e1cb6f1` blob
-`8f3be1dd08dadc6f42ede169ca05e84daae773ab`; do not restore or commit prior
-blob `c4cf987d`.
+1. Fresh exact object `061a64e4`, owner `5d91960e` with ledger `167/17/101`,
+   all `285/0/0` per-function bytes/disassembly, and all six frozen frontier
+   rows. Record the first semantic divergence separately from downstream
+   offsets.
+2. Full unit plus standalone source guard.
+3. All 35 focused canaries.
+4. Standalone ABI `60/60` plus `30/30` real functions.
 
-Run only full unit, standalone guard, ABI, canaries, and fresh exact
-object/owner. Preserve the absent-443-row exception and retained historical
-`49a19f04`; do not regenerate substitutes or claim a fresh report. Update
-the exact 57-row evidence and all commands/hashes/provenance. No isolation,
-wiring, cleanup/deletion, performance, integrated executable, strengthened
-Tier 2, distribution-all, or Tier 3. Commit the bounded remediation, clean
-the tree, preserve stash@{0}, and STOP for acceptance review.
+The canonical 443-row input remains preexisting absent. Do not generate a
+substitute or claim/attempt a fresh report; retained `49a19f04` is an
+immutable historical reference only. Fresh object/owner/per-function/six-row
+results decide identity. Any failed bar retains the ordinary family
+wholesale and stops all later bars; no fix-forward.
 
-## INBOX-178 dormant call final-use amendment — SEMANTIC IMPLEMENTATION PROVISIONALLY ACCEPTED at 462154a1; overall acceptance WITHHELD
+Do not run `intByteSize` or aggregate isolation, production wiring, ratchet
+credit, performance, integrated executable, strengthened Tier 2,
+distribution-all, Tier 3, cleanup/deletion, or `clean_tmp`. Restore temporary
+source/guard files exactly, retain all evidence, commit only the evidence
+summary, clean the tree, preserve stash/watcher/retention surfaces, and STOP
+before any next family or wiring.
 
-The bounded implementation and authorized gates are sound, but the grouped
-proof table does not satisfy the frozen 57-row action-scoped matrix and the
-retained exploratory identity artifacts lack exact committed provenance.
-All isolation and wiring remain unauthorized pending INBOX-178a.
+## INBOX-178 dormant call final-use amendment — ACCEPTED at c0f43aea
+
+The exact 57-row matrix passes, the call-local multi-alias preservation defect
+is remediated with one physical preservation and canonical live-alias
+rebinding, all authorized gates and exact identities pass, ratchet remains
+131, and production routing remains dormant.
 
 ## INBOX-177 closed call final-use plan design — ACCEPTED at 0351fe87
 
