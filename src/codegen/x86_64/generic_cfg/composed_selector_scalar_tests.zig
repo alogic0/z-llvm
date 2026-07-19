@@ -168,6 +168,10 @@ test "generic cfg selector materializes mul64 lhs into planned register" {
     defer plan.deinit();
     try plan.assignments.put("old", .{ .gpr64 = .r8 });
     try plan.interval_ends.put("old", 1);
+    try plan.assignments.put("lhs", .{ .gpr64 = .rdi });
+    try plan.interval_ends.put("lhs", 2);
+    try plan.assignments.put("rhs", .{ .gpr64 = .rsi });
+    try plan.interval_ends.put("rhs", 2);
     try plan.assignments.put("product", .{ .gpr64 = .r8 });
     try plan.interval_ends.put("product", 2);
 
@@ -202,11 +206,21 @@ test "generic cfg selector reloads spilled mul64 rhs through rax when scratch re
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
     defer plan.deinit();
     try plan.interval_ends.put("live_rdi", 10);
+    try plan.assignments.put("live_rdi", .{ .gpr64 = .rdi });
     try plan.interval_ends.put("live_rsi", 10);
+    try plan.assignments.put("live_rsi", .{ .gpr64 = .rsi });
     try plan.interval_ends.put("lhs", 4);
+    try plan.assignments.put("lhs", .{ .gpr64 = .rdx });
+    try plan.interval_ends.put("rhs", 4);
+    try plan.assignments.put("rhs", .{ .spill = 1 });
     try plan.interval_ends.put("live_rcx", 10);
+    try plan.assignments.put("live_rcx", .{ .gpr64 = .rcx });
     try plan.interval_ends.put("live_r8", 10);
+    try plan.assignments.put("live_r8", .{ .gpr64 = .r8 });
     try plan.interval_ends.put("live_r9", 10);
+    try plan.assignments.put("live_r9", .{ .gpr64 = .r9 });
+    try plan.interval_ends.put("product", 4);
+    try plan.assignments.put("product", .{ .gpr64 = .rdx });
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
@@ -242,8 +256,19 @@ test "generic cfg selector multiplies by an rax-resident i64 rhs" {
     defer machine.deinit(std.testing.allocator);
     try machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rsi });
 
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.assignments.put("lhs", .{ .gpr64 = .rdi });
+    try plan.interval_ends.put("lhs", 0);
+    try plan.assignments.put("rhs", .{ .gpr64 = .rsi });
+    try plan.interval_ends.put("rhs", 0);
+    try plan.assignments.put("product", .{ .gpr64 = .rdi });
+    try plan.interval_ends.put("product", 0);
+
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 0;
     try selector_state.bindValueLoc(&selector, "lhs", .{ .arg64 = .rdi });
     try selector_state.bindValueLoc(&selector, "rhs", .rax);
 
@@ -255,14 +280,15 @@ test "generic cfg selector multiplies by an rax-resident i64 rhs" {
     });
 
     try std.testing.expect(diagnostic == null);
-    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, selector_state.valueLoc(&selector, "product").?);
+    try std.testing.expectEqual(ValueLoc{ .scratch64 = .rsi }, selector_state.valueLoc(&selector, "product").?);
     try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "rhs").?);
     try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
         .{ .mov_arg_rax = .rsi },
-        .{ .imul_arg64_rax = .rdi },
+        .{ .mov_arg64_arg = .{ .dst = .rsi, .src = .rdi } },
+        .{ .imul_arg64_rax = .rsi },
     }, machine.instructions.items);
 
-    try machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rdi });
+    try machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rsi });
     try machine.instructions.append(std.testing.allocator, .ret);
     const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
     defer std.testing.allocator.free(bytes);
@@ -275,8 +301,18 @@ test "generic cfg selector multiplies by an rax-resident i64 rhs" {
 
     var near_miss_machine = MachineFunction.init("mul64-eax-rhs", .{ .int = 64 });
     defer near_miss_machine.deinit(std.testing.allocator);
+    var near_miss_plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer near_miss_plan.deinit();
+    try near_miss_plan.assignments.put("lhs", .{ .gpr64 = .rdi });
+    try near_miss_plan.interval_ends.put("lhs", 0);
+    try near_miss_plan.assignments.put("rhs", .{ .gpr64 = .rsi });
+    try near_miss_plan.interval_ends.put("rhs", 0);
+    try near_miss_plan.assignments.put("product", .{ .gpr64 = .rdi });
+    try near_miss_plan.interval_ends.put("product", 0);
     var near_miss_selector = ComposedBlockSelector.init(std.testing.allocator, &near_miss_machine);
     defer near_miss_selector.deinit();
+    near_miss_selector.allocation_plan = &near_miss_plan;
+    near_miss_selector.current_position = 0;
     try selector_state.bindValueLoc(&near_miss_selector, "lhs", .{ .arg64 = .rdi });
     try selector_state.bindValueLoc(&near_miss_selector, "rhs", .eax);
     const near_miss = (try selector_scalar.lowerMul64(&near_miss_selector, "product", .{
@@ -338,12 +374,23 @@ test "generic cfg selector reloads spilled mul64 lhs through rax when scratch re
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
     defer plan.deinit();
     try plan.interval_ends.put("live_rax", 10);
+    try plan.assignments.put("live_rax", .{ .spill = 0 });
     try plan.interval_ends.put("live_rdi", 10);
+    try plan.assignments.put("live_rdi", .{ .gpr64 = .rdi });
     try plan.interval_ends.put("live_rsi", 10);
+    try plan.assignments.put("live_rsi", .{ .gpr64 = .rsi });
     try plan.interval_ends.put("live_rdx", 10);
+    try plan.assignments.put("live_rdx", .{ .gpr64 = .rdx });
     try plan.interval_ends.put("live_rcx", 10);
+    try plan.assignments.put("live_rcx", .{ .gpr64 = .rcx });
     try plan.interval_ends.put("live_r8", 10);
+    try plan.assignments.put("live_r8", .{ .gpr64 = .r8 });
     try plan.interval_ends.put("live_r9", 10);
+    try plan.assignments.put("live_r9", .{ .gpr64 = .r9 });
+    try plan.interval_ends.put("lhs", 4);
+    try plan.assignments.put("lhs", .{ .spill = 5 });
+    try plan.interval_ends.put("rhs", 4);
+    try plan.assignments.put("rhs", .{ .spill = 6 });
 
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
