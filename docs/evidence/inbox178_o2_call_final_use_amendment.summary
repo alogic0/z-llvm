@@ -1,7 +1,9 @@
 # INBOX-178 — dormant call final-use plan amendment
 
-Status: implemented and stopped before re-isolation. Production call routing
-remains dormant and byte-identical. The O2 bypass ratchet remains 131.
+Status: INBOX-178 semantic implementation remains provisionally frozen at
+`462154a1`; INBOX-178a proof completion HARD-STOPPED on a newly exposed
+semantic defect. Production call routing remains dormant and byte-identical.
+The O2 bypass ratchet remains 131.
 
 Baseline provenance:
 
@@ -12,6 +14,185 @@ accepted_design_commit=0351fe87
 zig=/home/oleg/bin/zig
 zig_version=0.16.0-dev.364+bdee02bc0
 ```
+
+## INBOX-178a proof stop
+
+The row-13 attached-call proof constructed an exact-final-use EAX argument
+plus two unrelated named `gpr32` bindings in EAX whose real allocation-plan
+intervals survive the call. The direct-call action preserved only the first
+live accumulator identity. The second binding remained in EAX after the
+call:
+
+```text
+test=value-use call final-use plan preserves Q2 source and unrelated Q3 occupant
+expected=alias2.loc != .eax
+actual=alias2.loc == .eax
+result=FAIL
+```
+
+The precise frozen path is:
+
+```text
+executeAttachedCallAction
+  -> executeDirectCall
+  -> spillLiveCallerClobbersForCall
+  -> spillCurrentAccumulator
+  -> liveAccumulatorName (one lookup)
+  -> spillValue (one name)
+```
+
+`spillLiveCallerClobbersForCall` iterates XMM occupants with `while`, but
+invokes `spillCurrentAccumulator` only once. `bindValueLoc` updates only the
+selected name. Consequently another live name sharing the EAX/RAX occupant
+is neither relocated nor canonically updated before the call clobber. Giving
+the two names the same virtual-register metadata does not change this code
+path: the selector map retains a location per name and the one-name
+rebind does not refresh the other alias. This violates frozen design row 13,
+“multiple aliases of the unrelated live occupant do not duplicate the
+physical preservation”: one physical preservation must update every alias,
+not leave an alias in the clobbered accumulator.
+
+This is not a fixture expectation about which spill slot is selected. The
+first exploratory assertion incorrectly required the second alias to share
+the first alias's `.spill64` home; that was narrowed to the semantic
+requirement that it leave EAX. The second run still failed. Per INBOX-178a,
+the semantic implementation was not amended and no further gate was run.
+The complete proof patch was retained losslessly and all four temporary
+source/test/guard changes were then removed:
+
+```text
+proof_patch=tmp/inbox178a_o2_call_final_use_proof/inbox178a_semantic_defect_proof.patch
+proof_patch_sha256=eda30f1f4f6503c80176511ea03cff28a80591d04f1de765690aac08cd0a3e26
+semantic_restore=git diff --exit-code 462154a1 -- calls.zig calls_tests.zig authority_policy.zig authority_policy_tests.zig
+semantic_restore_result=exact
+calls_tests_proof_line_count=1500/1500
+```
+
+### Exact 57-row status and assertion map
+
+The names below refer to tests in the retained proof patch, not to landed
+tests. `PASS` means the assertion ran successfully in the 1397-test proof
+batch; `GAP` means the stop occurred before an exact action-scoped proof was
+completed; `FAIL` is the semantic stop.
+
+| row | status | retained test/assertion |
+|---:|:---:|---|
+| 1 | PASS | `...admits exact EAX and RAX argument positions`: EAX position 0 emits only `mov_eax_to_arg rdi` before the call. |
+| 2 | PASS | `...supports middle last repeated and specialized operands`: EAX middle position preserves source order. |
+| 3 | PASS | Same test: EAX last position stages after all earlier operands. |
+| 4 | PASS | Exact-position test: RAX position 0 uses the accepted 64-bit argument move. |
+| 5 | PASS | Exact-position test: later RAX staging is source ordered. |
+| 6 | PASS | Middle/repeated/specialized test: `int_byte_size_call` accepts the same EAX final-use boundary. |
+| 7 | PASS | Middle/repeated/specialized test: one registered handle serves repeated nonconflicting argument destinations. |
+| 8 | PASS | `...attachment is pre-seal unique...`: zero handles, attached action present, framed/aligned zero-argument call path. |
+| 9 | PASS | Existing dormant direct-call result test: result resolves after transaction teardown. |
+| 10 | PASS | `...preserves Q2 source...`: live-after EAX source spills once, reloads, and remains spill-backed. |
+| 11 | GAP | No separate live-after RAX source assertion was completed before the row-13 stop. |
+| 12 | PASS | `...unrelated Q3 occupant`: first live EAX occupant is preserved and final-use source stages. |
+| 13 | FAIL | Same attached-call test: a second live accumulator alias remains EAX after the call-preservation phase. |
+| 14 | PASS | Exact EAX/RAX positives assert zero spill when no unrelated occupant exists. |
+| 15 | GAP | No separate attached-call assertion observed EFLAGS between preservation and the final call clobber. |
+| 16 | PASS | `...admission rejects incomplete and ineligible state`: missing plan is request-attributable and emits nothing. |
+| 17 | PASS | Same table: missing interval fails request-attributably with rollback. |
+| 18 | PASS | Same table: older interval fails exact-boundary admission. |
+| 19 | PASS | Same table: position zero follows unchanged generic Q1 and has no final-use pin. |
+| 20 | PASS | `...structural pin fails closed...`: allocation-plan identity mutation fails before later emission. |
+| 21 | PASS | Same loop: interval mutation fails closed. |
+| 22 | PASS | Same loop: binding removal fails closed. |
+| 23 | PASS | Same loop: generation mutation fails closed. |
+| 24 | PASS | Same loop: admitted home changed to a non-accumulator home fails closed. |
+| 25 | PASS | Admission table: stale owner/edge metadata returns `AddressDependencyStaleEdge` with exact provenance. |
+| 26 | PASS | `...keeps forward Q1 distinct...`: valid canonical forward entry succeeds through forward Q1 and receives no final-use pin. |
+| 27 | PASS | Same test: forward metadata mutation after prepare returns `ValueUseForwardPlanStale`, emits nothing, and attributes the request. |
+| 28 | PASS | Admission table covers arg32, scratch32, spill64, pointer, arg128, XMM, aggregate, and stack homes with frozen errors. |
+| 29 | PASS | Attachment-error table rejects a non-call/independently owned prepared action. |
+| 30 | PASS | Attachment-error table returns `ValueUseCallRequestUnclaimed` and attributes the unclaimed request. |
+| 31 | PASS | Attachment-error table rejects foreign and stale handles authority-wide with no false provenance. |
+| 32 | PASS | Attachment-error table returns `ValueUsePreparedActionUnexpected` for the independently owned request. |
+| 33 | PASS | Attachment-error table proves an action cannot claim an unregistered/foreign required handle. |
+| 34 | PASS | Attachment lifecycle test rejects duplicate attachment. |
+| 35 | PASS | Same test rejects request registration and other request-action attachment after call attachment. |
+| 36 | PASS | Same test rejects attachment after seal. |
+| 37 | PASS | Same attached-action transaction returns `ValueUsePrepareBeforeSeal`. |
+| 38 | PASS | Same transaction returns `ValueUseMaterializeBeforePrepare`. |
+| 39 | PASS | Same transaction forces the materialized pre-execution phase and returns `ValueUseCallActionNotExecuted`. |
+| 40 | PASS | Existing specialized-action validation rejects zero-request `int_byte_size_call`. |
+| 41 | PASS | Attachment lifecycle rejects `.branch_condition` as `ValueUseCallActionUnsupported`. |
+| 42 | PASS | Attachment-error table returns `ValueUseCallArgumentSourceOrder` and attributes the first offending handle. |
+| 43 | PASS | Attachment-error table attributes the exact unclaimed registered request once. |
+| 44 | PASS | Existing attached direct-call copy-cycle proof rejects before preservation/emission. |
+| 45 | PASS | Exact positives plus phase-revalidation test exercise unchanged construction, refresh, and every stage. |
+| 46 | PASS | Structural-pin loop and phase-revalidation test mutate every pin fact at construction, refresh, and later-stage boundaries. |
+| 47 | PASS | Attachment lifecycle rolls back immediately and asserts action/request/pin storage cleared. |
+| 48 | PASS | Admission/structural failures after seal assert all private lifetime pins null after rollback. |
+| 49 | GAP | Existing call rollback covers caller-clobber preservation, but the exact multiple-Q3-alias rollback proof was blocked by row 13. |
+| 50 | PASS | Existing complete rollback enum plus later-index proof restores every partial argument stage. |
+| 51 | PASS | Existing call-append rollback proves owned symbol freed exactly once. |
+| 52 | PASS | Existing result ownership/definition/finalization rollback proves durable identity freed once. |
+| 53 | PASS | Provenance and later-index tests preserve the first precise request failure across rollback. |
+| 54 | PASS | Exact EAX final-use stream remains the truthful INBOX-176 no-spill stream. |
+| 55 | PASS | Frozen calls source/routing hash and existing retained-form tests preserve all non-final-use forms. |
+| 56 | PASS | Function/API-scoped production guard retains all excluded envelopes before any transaction. |
+| 57 | PASS | Frozen `composed_selector_calls.zig` hash proves `zig.target.intByteSize` routing unchanged. |
+
+Rows 11, 15, and 49 remain explicit proof gaps; they were not silently
+credited after the mandatory row-13 stop.
+
+### Retained exploratory commands and logs
+
+All four attempts used the authorized full-unit gate. The first attempt
+found two proof-fixture model errors (position-zero generic-Q1 expectation
+and a noncanonical forward definition position); both were corrected without
+semantic changes. Attempt 2 passed before the final guard/phase/multi-alias
+proofs were added. The final two attempts expose row 13 and are excluded
+from acceptance:
+
+| artifact | SHA-256 | status |
+|---|---|---|
+| `tmp/inbox178a_o2_call_final_use_proof/validation/full_unit.log` | `d003556b399160aa882a3908f051345fe551827ed197fb4be4b138f57c8f7611` | exploratory fixture-model failures, excluded |
+| `tmp/inbox178a_o2_call_final_use_proof/validation/full_unit_attempt2.log` | `adf412714b296a6c7c126312cd765beba3aad94e9ab48f584f27f831305626ae` | supporting intermediate 1396/1396 only; not final |
+| `tmp/inbox178a_o2_call_final_use_proof/validation/full_unit_final.log` | `de4c032fea90cb61252f7fa4a7f079fd769c194fcba76ca2bc3ad292e03b1129` | row-13 failure, excluded |
+| `tmp/inbox178a_o2_call_final_use_proof/validation/full_unit_final2.log` | `c64803a5e76948eae8f25091f862269f8538cba97598dd16a24ac7243858c1c8` | decisive row-13 failure, 1396/1397, excluded |
+
+Exact recovered commands:
+
+```text
+set -o pipefail; /home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox178a_o2_call_final_use_proof/validation/full_unit.log
+set -o pipefail; /home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox178a_o2_call_final_use_proof/validation/full_unit_attempt2.log
+set -o pipefail; /home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox178a_o2_call_final_use_proof/validation/full_unit_final.log
+/home/oleg/bin/zig fmt src/codegen/x86_64/generic_cfg/value_use/actions/calls_tests.zig && set -o pipefail; /home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox178a_o2_call_final_use_proof/validation/full_unit_final2.log
+```
+
+The final command's `zig fmt` component only formatted the test proof before
+the authorized full-unit run. No guard, ABI, canary, object, or owner rerun
+was performed after the defect stop.
+
+### INBOX-178 retained artifact inventory
+
+The following preexisting INBOX-178 artifacts were preserved without
+normalization, deletion, or formatting-only reruns:
+
+| artifact | SHA-256 | status |
+|---|---|---|
+| `compiler_rt_regenerated.ll` | `fc2f433e2106ee431285722bec533e6799748abcfe6b750acbdfb25bd5d7464f` | excluded substitute |
+| `compiler_rt_regenerated_safe.ll` | `9f8772b6c46701ace5bbaf891267f12d8e7325c07b129fc1c3cfe7390d0db88b` | excluded substitute |
+| `compiler_rt_regenerated_small.ll` | `8cc6381b35cc063e4e0cf70f0ac387c94238333b849513ed66a57a1a46a6fde8` | excluded substitute |
+| `validation/abi_differential.log` | `3e9b63a31eae201c45f6009882e1adef17856ef07aa2c58ddec7011420621c1a` | supporting INBOX-178 |
+| `validation/accepted.o` | `061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be` | supporting INBOX-178 |
+| `validation/accepted.stderr` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | supporting INBOX-178 |
+| `validation/focused_canaries.log` | `d704046eacfa8c3c2cf852ed97c86ab42b5a6a07dcfe4dd7de48cb870f2292c6` | supporting INBOX-178 |
+| `validation/fresh_full_report.log` | `8605d5b68c88c21d3e9df6fd70a3ca16c9f0a4b55a4ed327d9ce7801cdeb635c` | excluded 285-row substitute |
+| `validation/fresh_full_report_regenerated.log` | `6df127fc1d08158b91c79fbb5906628c5947b9af87147d91280f137628a095b0` | excluded regenerated input |
+| `validation/full_unit.log` | `0371c11deeaf60a56ef1b94441460c0d72711e1153d03ec7d7b3ff24e6458c13` | supporting INBOX-178 |
+| `validation/owner_manifest.stderr` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | supporting INBOX-178 |
+| `validation/owner_manifest.tsv` | `5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d` | supporting INBOX-178 |
+| `validation/report_safe.log` | `17d9d2839d862b337361f261edd1f0bfca95fe845c5c33f0b4004f7c93326aa6` | excluded substitute |
+| `validation/report_small.log` | `7ac0bb6f23ad7b892edf523a201ff5deb76da5885dbeba5b5e493746bc4707b2` | excluded substitute |
+| `validation/source_guard.log` | `d2da7fa47675c14778b74a9d83dbe9829e48a407907afc84a7bb36de38a60995` | supporting INBOX-178 |
+
+Paths in this table are relative to `tmp/inbox178_o2_call_final_use/`.
+The accepted canonical 443-row input remains absent exactly as recorded
+below; no substitute report was generated for INBOX-178a.
 
 ## Bounded implementation
 
