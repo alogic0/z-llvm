@@ -6,7 +6,25 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## SCALAR SLICE 3 COMPLETE AT RATCHET 140 — INBOX-161 multiply refresh dispatched
+## INBOX-161 multiply refresh — LANDED at 2006570f, Supervisor-verified
+
+The refresh landed docs-only (482 lines) and is verified: my grep
+confirms the enumeration (lowerMul64 ×2 sites, lowerMul64SpillLhsThroughRax
+×2 occurrences in the selector, matching the five-credit inventory);
+**honest conditional target 135 = 140 − 5**, ALL-OR-NOTHING for the
+complete i64 named-multiply family (no partial credit by home, helper,
+function, or occurrence); last-owner credit ZERO (the three shared
+displacement helpers retained by R03/R04, fixed-register quotient, and
+the call consumer); the old 133 projection explicitly REJECTED; N32
+narrow multiply already landed in slice 3; M64-D destination-selection
+and M64-R spill-through-RAX forms partitioned under their exact existing
+authorities; quotient/division inventoried but outside the
+authorization; the scalar_multiply_divide.zig boundary frozen (facade
+20 names / 24 lines baseline recorded); the isolation + aggregate gates
+defined. Ratchet 140. Sent to the Reviewer for the dormant multiply
+authorization (INBOX-162).
+
+## SCALAR SLICE 3 COMPLETE AT RATCHET 140 — recorded
 
 INBOX-160 is **ACCEPTED** (Reviewer, 2026-07-18: "I accept INBOX-160.
 Scalar Slice 3 is complete at ratchet 140."). **The full named+i52
