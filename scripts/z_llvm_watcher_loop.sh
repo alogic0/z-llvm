@@ -7,6 +7,8 @@ WORKER_PANE="${2:-worker:0.0}"
 REVIEWER_PANE="${3:-worker:1.0}"
 POLL_SECONDS="${WATCHER_POLL_SECONDS:-15}"
 STOP_CONFIRM_SECONDS="${WORKER_STOP_CONFIRM_SECONDS:-45}"
+REMINDER_SECONDS="${WATCHER_REMINDER_SECONDS:-900}"
+HEARTBEAT_SECONDS="${WATCHER_HEARTBEAT_SECONDS:-300}"
 PID_FILE="/tmp/z_llvm_watcher_loop.pid"
 LOG_FILE="/tmp/z_llvm_watcher_loop.log"
 BUFFER_NAME="z_llvm_watcher_directive"
@@ -14,6 +16,14 @@ BUFFER_NAME="z_llvm_watcher_directive"
 log() {
     printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >>"$LOG_FILE"
 }
+
+for interval_name in POLL_SECONDS STOP_CONFIRM_SECONDS REMINDER_SECONDS HEARTBEAT_SECONDS; do
+    interval_value="${!interval_name}"
+    if [[ ! "$interval_value" =~ ^[1-9][0-9]*$ ]]; then
+        printf '%s must be a positive integer, got %q\n' "$interval_name" "$interval_value" >&2
+        exit 2
+    fi
+done
 
 if [[ -f "$PID_FILE" ]]; then
     old_pid="$(<"$PID_FILE")"
@@ -59,12 +69,22 @@ It's from Watcher:
 7. After agreement, add the new directive to docs/worker_inbox.md, update docs/next_steps.md to the sole current authorized action, commit only tracked operating-document changes, and dispatch the agreed task to worker:0.0 using tmux bracketed paste.
 8. Confirm the Worker acknowledged the directive and its stop conditions.
 
-Proceed autonomously on Watcher/Reviewer agreement. Ask the user only for destructive, irreversible, or materially scope-expanding actions. On divergence or failed acceptance conditions, stop advancement and report instead of fixing forward.
+Proceed autonomously on Watcher/Reviewer agreement. A failed acceptance blocks
+wider advancement, but it does not block a bounded diagnosis or remediation
+that the Reviewer explicitly authorizes. Dispatch that agreed corrective slice.
+Pause only when there is no mutually agreed safe bounded task, the Reviewer
+disagrees, the next action is destructive/irreversible/materially
+scope-expanding, or a genuine structural blocker requires the user.
 EOF
 )
 
 WORKER_STOPPED_MESSAGE=$(cat <<'EOF'
-The monitoring script detected that the Worker has stopped. Inspect worker:0.0 now and determine what it completed. Verify the source diff and retained logs without running project code. Then discuss acceptance and the next bounded task with the Reviewer on worker:1.0; begin every Reviewer message exactly with "It's from Watcher:". Obtain explicit agreement before updating the operating documents or assigning another task to the Worker.
+The monitoring script detected that the Worker has stopped. Inspect worker:0.0 now and determine what it completed. Verify the source diff and retained logs without running project code. Then discuss acceptance and the next bounded task with the Reviewer on worker:1.0; begin every Reviewer message exactly with "It's from Watcher:". Obtain explicit agreement before updating the operating documents or assigning another task to the Worker. If acceptance failed but the Reviewer authorizes a bounded diagnosis or remediation, dispatch that corrective slice; failed acceptance alone is not a reason to leave the Worker idle.
+EOF
+)
+
+WORKER_STILL_STOPPED_MESSAGE=$(cat <<'EOF'
+Reminder: the Worker remains stopped after the previous notification. Check whether the Worker/Reviewer review produced an agreed next action. If the Reviewer authorized a bounded diagnosis or remediation after withheld acceptance, update the operating documents and dispatch it now. Leave the Worker stopped only for Reviewer disagreement, no mutually agreed safe bounded task, a destructive/irreversible/materially scope-expanding action requiring the user, or a genuine structural blocker; report that blocker explicitly.
 EOF
 )
 
@@ -143,7 +163,7 @@ paste_message() {
     tmux send-keys -t "$WATCHER_PANE" Enter
 }
 
-log "started watcher=$WATCHER_PANE worker=$WORKER_PANE reviewer=$REVIEWER_PANE stop_confirm=${STOP_CONFIRM_SECONDS}s"
+log "started watcher=$WATCHER_PANE worker=$WORKER_PANE reviewer=$REVIEWER_PANE stop_confirm=${STOP_CONFIRM_SECONDS}s reminder=${REMINDER_SECONDS}s heartbeat=${HEARTBEAT_SECONDS}s"
 
 while ! pane_exists "$WATCHER_PANE" ||
     ! agent_is_running "$WATCHER_PANE" ||
@@ -156,15 +176,24 @@ log "sent general initial directive to $WATCHER_PANE"
 
 worker_state="unknown"
 idle_since=0
+next_reminder_at=0
+last_heartbeat_at="$(date +%s)"
 
 while true; do
     sleep "$POLL_SECONDS"
+    now="$(date +%s)"
+
+    if (( now - last_heartbeat_at >= HEARTBEAT_SECONDS )); then
+        log "heartbeat worker_state=$worker_state"
+        last_heartbeat_at="$now"
+    fi
 
     if ! pane_exists "$WORKER_PANE" || ! agent_is_running "$WORKER_PANE"; then
         if [[ "$worker_state" != "unavailable" ]]; then
             log "Worker agent unavailable; waiting"
             worker_state="unavailable"
             idle_since=0
+            next_reminder_at=0
         fi
         continue
     fi
@@ -175,10 +204,10 @@ while true; do
         fi
         worker_state="busy"
         idle_since=0
+        next_reminder_at=0
         continue
     fi
 
-    now="$(date +%s)"
     if [[ "$worker_state" == "busy" || "$worker_state" == "unknown" || "$worker_state" == "unavailable" ]]; then
         worker_state="idle_candidate"
         idle_since="$now"
@@ -192,6 +221,29 @@ while true; do
         fi
         worker_state="stopped_pending"
         log "Worker stop confirmed; notification pending"
+    fi
+
+    if [[ "$worker_state" == "stopped_notified" ]]; then
+        if (( now < next_reminder_at )); then
+            continue
+        fi
+
+        if ! pane_exists "$WATCHER_PANE" || ! agent_is_running "$WATCHER_PANE"; then
+            log "Watcher unavailable; reminder deferred"
+            next_reminder_at=$((now + POLL_SECONDS))
+            continue
+        fi
+
+        if pane_reports_busy "$WATCHER_PANE"; then
+            log "Watcher busy; reminder deferred"
+            next_reminder_at=$((now + POLL_SECONDS))
+            continue
+        fi
+
+        paste_message "$WORKER_STILL_STOPPED_MESSAGE"
+        next_reminder_at=$((now + REMINDER_SECONDS))
+        log "reminded $WATCHER_PANE that the Worker remains stopped"
+        continue
     fi
 
     if [[ "$worker_state" != "stopped_pending" ]]; then
@@ -210,5 +262,6 @@ while true; do
 
     paste_message "$WORKER_STOPPED_MESSAGE"
     worker_state="stopped_notified"
+    next_reminder_at=$((now + REMINDER_SECONDS))
     log "notified $WATCHER_PANE that the Worker stopped"
 done
