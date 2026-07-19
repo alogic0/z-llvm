@@ -6,7 +6,20 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-164 M64 fixture alignment — dispatched
+## INBOX-164 — LANDED at b301456d, Supervisor-verified
+
+The alignment landed test-only (composed_selector_scalar_tests.zig
++53/−3 + evidence + the 425-row hash contract) and is verified: all four
+production/guard files byte-identical to the accepted 140 tree
+(spot-hashed); ratchet 140; zero maxInt in the new hunk; one reviewed
+Option-A plan-visible correction documented with the detached no-plan
+artifact proof; full unit 1365/1365 (the four M64 fixtures now pass);
+guard 55/55; abi/canaries/integrated-exe/Tier 2 green; identities exact;
+all five gate log hashes re-verified; the perf omission validated by the
+424-file hash-identity proof; MY abi + canary reruns pass; no Tier 3.
+Sent to the Reviewer for acceptance + the M64 re-isolation (INBOX-165).
+
+## Former INBOX-164 dispatch entry — superseded by the landing above
 
 INBOX-163's retention verdict is **ACCEPTED and INBOX-164 authorized**
 (Reviewer, 2026-07-18: "The alignment must remain test/evidence-only and
