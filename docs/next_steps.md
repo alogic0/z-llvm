@@ -6,37 +6,42 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-184 reproducible compiler-rt corpus contract — AUTHORIZED
+## INBOX-185 compiler-rt v1 three-generation reproduction — AUTHORIZED
 
-INBOX-183 at `ad7bb4ab` is accepted as a compliant non-binding design stop.
-Watcher and Reviewer select strategy C in principle: define a new
-reproducible compiler-rt corpus because the exact historical input is absent
-and no existing candidate satisfies the complete-manifest contract. This
-directional selection accepts no exact bytes, identities, materialization,
-pinning, validation, production wiring, or ratchet credit. AC285 and all
-INBOX-178 regenerations remain unauthorized.
+INBOX-184 at `1c343ec8` is accepted as the complete non-binding v1 corpus
+contract. Strategy C remains selected in principle; no generated input,
+identity, protocol, adoption, pin, validation, wiring, or credit is accepted.
 
-Produce only an evidence contract for one deterministic v1 corpus. Freeze
-exact source revisions and inclusion/order rules, compiler/exporter
-identities, modes, target/features, flags, environment/cache policy, future
-commands and output locations, and a new candidate ID. Define a later
-three-independent-generation byte-reproduction procedure, fail-closed
-ratchet-131 baseline validation with new identities and guard-confined
-nonzero dynamic coverage of both accepted call routes, immutable retention,
-and the unchanged counterbalanced A/B contract. Execute none of it now.
+Perform only the reversible three-generation materialization/reproduction
+stage. Complete all source/tool/frozen-identity, absence, and capacity
+preflights before creating any root. Then create three independently empty
+HOME/TMP/cache/output/log environments and run exactly the three frozen
+ReleaseFast `x86_64-linux-gnu` baseline stage4 invocations sequentially,
+once each, with no retry or alternative.
 
-Preserve the clean user-authorized infrastructure boundary `9f84022c`,
-`5555afb6`, and formatting-only `7bcb7fab`, with watcher HEAD/index/worktree
-blob `b64131cf`. The previous `75c9a932` and pre-commit `accca76b` identities
-are superseded. Do not modify, stage, or revert the watcher; every tracked
-path must start and finish clean.
+Retain raw stdout, stderr, status, commands, environments, modes, byte
+counts, SHA-256 values, timings as provenance only, source/tool/dependency
+manifests, and all three pairwise raw comparisons. Require successful,
+nonempty, byte-identical outputs. Recheck pinned source-tree, stage4,
+watcher, stash, and every frozen identity afterward. Any discrepancy stops
+without cleanup, deletion, repair, fallback, or rerun.
 
-Run no project code, Zig, generation, materialization, pinning, selector,
-gate, performance, cleanup, network, source/tool/build/test/guard/inventory/
-retention change, protocol execution, wiring, or credit. Commit only
-`docs/evidence/inbox184_o2_reproducible_compiler_rt_corpus_contract.md`;
-preserve ratchet 131, stash, and all frozen surfaces, then stop before any
-implementation or validation.
+Success proves reproducibility only. Do not adopt/copy the output, pin it,
+run z_llvm, selectors, gates, coverage, validation, performance, protocol
+execution, source/tool/test/guard/build/inventory/retention changes, wiring,
+or credit. Commit only
+`docs/evidence/inbox185_o2_compiler_rt_v1_three_generation_materialization.summary`,
+retain ignored generation roots, preserve ratchet 131 and watcher blob
+`b64131cf`, and stop before adoption or validation.
+
+## INBOX-184 reproducible compiler-rt corpus contract — ACCEPTED at 1c343ec8
+
+The 631-line evidence contract fixes the raw single-module ReleaseFast
+`x86_64-linux-gnu`/baseline generation contract, pinned source/tool
+provenance, isolated three-generation byte-equality procedure, future new
+identities, guard-confined dynamic coverage, immutable retention, unchanged
+A/B thresholds, and separate later authorization boundaries. It changed
+only its evidence document and ran no executable stage.
 
 ## INBOX-183 calls performance-protocol amendment design — ACCEPTED at ad7bb4ab
 
