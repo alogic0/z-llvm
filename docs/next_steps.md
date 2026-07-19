@@ -6,7 +6,22 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-162 dormant multiply — dispatched
+## INBOX-162 dormant multiply — LANDED at a93b2c82, Supervisor-verified
+
+The dormant build landed (18 files, +1,210/−12: the 411-line leaf with
+exactly the three frozen public declarations; 344 test lines; facade
+grown to exactly 23 names / 28 lines per the frozen budget; model +41,
+core +33, small planning additions; guards extended to 55) and is
+verified: composed_selector_scalar.zig (incl lowerMul64 and the
+spill-through-RAX fallback) byte-identical to the accepted 140 tree;
+zero scalar_multiply_divide references in the selector (no wiring);
+ratchet 140; identities EXACT (49a19f04 / 061a64e4 / 5d91960e); all four
+gate log hashes re-verified (guard 55/55, unit 1365/1365, abi
+60/60+30/30, canaries 35); MY abi + canary reruns pass; no perf, no
+Tier 3. Sent to the Reviewer for acceptance + the isolation directive
+(INBOX-163).
+
+## Former INBOX-162 dispatch entry — superseded by the landing above
 
 INBOX-161 is **ACCEPTED and INBOX-162 authorized** (Reviewer,
 2026-07-18) with two refinements: M64-D vs M64-R selection derived
