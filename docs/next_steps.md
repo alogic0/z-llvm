@@ -6,36 +6,45 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-183 calls performance-protocol amendment design — AUTHORIZED
+## INBOX-184 reproducible compiler-rt corpus contract — AUTHORIZED
 
-INBOX-182 at `5e84e795` is accepted as a compliant, exhaustive
-repository-local no-candidate stop. It does not prove the historical input
-cannot exist externally. Under the frozen procedure, production wiring
-remains blocked; no substitute or protocol amendment is accepted.
+INBOX-183 at `ad7bb4ab` is accepted as a compliant non-binding design stop.
+Watcher and Reviewer select strategy C in principle: define a new
+reproducible compiler-rt corpus because the exact historical input is absent
+and no existing candidate satisfies the complete-manifest contract. This
+directional selection accepts no exact bytes, identities, materialization,
+pinning, validation, production wiring, or ratchet credit. AC285 and all
+INBOX-178 regenerations remain unauthorized.
 
-Produce a non-binding evidence-only design. Using retained evidence and
-existing files only, separate the performance gate's measurement invariants
-from the lost historical input identity, compare repository-local candidate
-foundations, and keep every candidate unauthorized under the current
-protocol. Record hashes, sizes, provenance gaps, proven population/coverage,
-representativeness risks, retention status, and required future authority.
+Produce only an evidence contract for one deterministic v1 corpus. Freeze
+exact source revisions and inclusion/order rules, compiler/exporter
+identities, modes, target/features, flags, environment/cache policy, future
+commands and output locations, and a new candidate ID. Define a later
+three-independent-generation byte-reproduction procedure, fail-closed
+ratchet-131 baseline validation with new identities and guard-confined
+nonzero dynamic coverage of both accepted call routes, immutable retention,
+and the unchanged counterbalanced A/B contract. Execute none of it now.
 
-Every candidate option must include a future ratchet-131 baseline-validation
-stage that establishes exact pinned bytes and a complete generation/source/
-tool manifest, deterministic repeated outputs, verified dynamic coverage of
-both accepted call routes, newly named report/object/owner identities, and
-immutable retention and reproducibility before any A/B wiring comparison.
-Do not run that validation now.
+Preserve the clean user-authorized infrastructure boundary `9f84022c` plus
+`5555afb6` and watcher HEAD/index/worktree blob `75c9a932`. The superseded
+pre-commit working identity `accca76b` is not valid. Do not modify or stage
+the watcher; every tracked path must start and finish clean.
 
-Freeze the standing counterbalanced sampling and pass criteria in the design,
-separate all future decision stages, and identify each material acceptance-
-gate change requiring user authorization. Do not select a replacement, amend
-the protocol, materialize/generate/pin an input, execute project code, or
-authorize wiring.
+Run no project code, Zig, generation, materialization, pinning, selector,
+gate, performance, cleanup, network, source/tool/build/test/guard/inventory/
+retention change, protocol execution, wiring, or credit. Commit only
+`docs/evidence/inbox184_o2_reproducible_compiler_rt_corpus_contract.md`;
+preserve ratchet 131, stash, and all frozen surfaces, then stop before any
+implementation or validation.
 
-Commit only the INBOX-183 design document. Preserve source, retained
-artifacts, retention surfaces, watcher, bypass inventory, stash, and ratchet
-131, then STOP before protocol adoption, baseline validation, or wiring.
+## INBOX-183 calls performance-protocol amendment design — ACCEPTED at ad7bb4ab
+
+The non-binding design separates measurement invariants from the lost input,
+keeps all four retained candidates unauthorized, defines fail-closed
+ratchet-131 baseline validation and new identities, preserves the standing
+A/B thresholds and no-rerun rules, and records every later authorization
+boundary. It ran no project code, generation, pinning, validation, protocol
+change, wiring, or credit.
 
 ## INBOX-182 frozen performance-input recovery audit — ACCEPTED at 5e84e795
 
