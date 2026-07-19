@@ -113,6 +113,9 @@ const materialization = @import("../materialization.zig");
 const composition = @import("../composition.zig");
 
 pub const CallTestFailure = enum(u8) {
+    mutate_after_prepared_construction,
+    mutate_after_refresh,
+    mutate_before_argument,
     after_preservation,
     after_argument,
     after_alignment,
@@ -307,8 +310,10 @@ fn executeDirectCall(
     transaction: anytype,
     action: *const Types.DirectCallAction,
 ) !void {
+    mutateCallSourceForTest(transaction, .mutate_after_prepared_construction, null);
     var next_eflags = transaction.selector.eflags;
     try next_eflags.apply(.clobber);
+    const preservation_eflags = transaction.selector.eflags.snapshot();
     try validateDirectCallCopySchedule(Authority, transaction, action);
     const result_definition = try callResultDefinition(action.return_type);
     if (action.result != null) {
@@ -322,6 +327,10 @@ fn executeDirectCall(
         return error.ValueUseActionDiagnostic;
     }
     try refreshCallArguments(Authority, transaction, action.arguments[0..action.argument_count]);
+    mutateCallSourceForTest(transaction, .mutate_after_refresh, null);
+    if (builtin.is_test and
+        transaction.call_test_failure == @intFromEnum(CallTestFailure.after_preservation))
+        try transaction.selector.eflags.validateSnapshot(preservation_eflags);
     try failCallForTest(transaction, .after_preservation, null);
 
     for (
@@ -329,6 +338,7 @@ fn executeDirectCall(
         action.argument_types[0..action.argument_count],
         0..,
     ) |handle, declared_type, argument_index| {
+        mutateCallSourceForTest(transaction, .mutate_before_argument, @intCast(argument_index));
         const target = ArgReg.fromIndex(argument_index) catch
             return error.ValueUseCallArgumentCountUnsupported;
         try stageDirectCallArgument(Authority, transaction, handle, declared_type, target);
@@ -572,6 +582,22 @@ fn failCallForTest(
         }
         return error.ValueUseCallTestFailure;
     }
+}
+
+fn mutateCallSourceForTest(
+    transaction: anytype,
+    boundary: CallTestFailure,
+    argument_index: ?u8,
+) void {
+    if (!builtin.is_test) return;
+    const configured = transaction.call_test_failure orelse return;
+    if (configured != @intFromEnum(boundary)) return;
+    if (argument_index) |index| {
+        if (transaction.call_test_argument_index != index) return;
+    }
+    const request_index = transaction.call_test_argument_index;
+    const name = transaction.requests[request_index].source.named.slice();
+    transaction.selector.values.getPtr(name).?.vreg.index += 1;
 }
 
 pub fn executeInlineMemcpy(

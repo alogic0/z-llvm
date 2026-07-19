@@ -2387,7 +2387,35 @@ fn dropExpiredAccumulatorBindingsExcept(selector: *ComposedBlockSelector, exclud
 }
 
 pub fn spillLiveCallerClobbersForCall(selector: *ComposedBlockSelector) !?Diagnostic {
-    if (try spillCurrentAccumulator(selector)) |diagnostic| return diagnostic;
+    const AccumulatorAlias = struct {
+        name: []const u8,
+        loc: ValueLoc,
+    };
+    var accumulator_aliases: std.ArrayList(AccumulatorAlias) = .empty;
+    defer accumulator_aliases.deinit(selector.allocator);
+    var preserve_name: ?[]const u8 = null;
+    var values = selector.values.iterator();
+    while (values.next()) |entry| {
+        const loc = entry.value_ptr.loc;
+        switch (loc) {
+            .eax, .rax => {},
+            else => continue,
+        }
+        if (!try valueIsLiveAtOrAfterCurrent(selector, entry.key_ptr.*)) continue;
+        try accumulator_aliases.append(selector.allocator, .{
+            .name = entry.key_ptr.*,
+            .loc = loc,
+        });
+        if (preserve_name == null or loc == .rax) preserve_name = entry.key_ptr.*;
+    }
+    if (preserve_name) |name| {
+        if (try spillValue(selector, name)) |diagnostic| return diagnostic;
+        const preserved_home = selector.values.get(name).?.loc;
+        for (accumulator_aliases.items) |alias| {
+            if (std.mem.eql(u8, alias.name, name)) continue;
+            try bindValueLoc(selector, alias.name, preserved_home);
+        }
+    }
     for (selector_allocatable_regs) |reg| {
         if (try livePairNameContainingReg(selector, reg)) |name| {
             if (try spillPairValue(selector, name)) |diagnostic| return diagnostic;

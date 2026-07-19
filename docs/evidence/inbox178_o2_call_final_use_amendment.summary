@@ -1,21 +1,24 @@
 # INBOX-178 — dormant call final-use plan amendment
 
-Status: INBOX-178 semantic implementation remains provisionally frozen at
-`462154a1`; INBOX-178a proof completion HARD-STOPPED on a newly exposed
-semantic defect. Production call routing remains dormant and byte-identical.
-The O2 bypass ratchet remains 131.
+Status: INBOX-178b bounded remediation complete and stopped before
+re-isolation. The INBOX-178a multi-alias hard stop is resolved locally in
+the shared call-clobber authority; all 57 frozen proof rows pass. Production
+call routing remains dormant and byte-identical. The O2 bypass ratchet
+remains 131.
 
 Baseline provenance:
 
 ```text
 operating_head=f0a99e88001fc4cfb1c228ef1a85c2947ab7a37e
+composite_operating_head=662e5a1a33fd0dc08accf67387bfc0a13c70b729
+authorized_infrastructure_commit=5e1cb6f174f788aec458806855576079a05edd45
 accepted_design=docs/evidence/inbox177_o2_call_final_use_plan_design.md
 accepted_design_commit=0351fe87
 zig=/home/oleg/bin/zig
 zig_version=0.16.0-dev.364+bdee02bc0
 ```
 
-## INBOX-178a proof stop
+## INBOX-178a proof stop and INBOX-178b resolution
 
 The row-13 attached-call proof constructed an exact-final-use EAX argument
 plus two unrelated named `gpr32` bindings in EAX whose real allocation-plan
@@ -68,12 +71,28 @@ semantic_restore_result=exact
 calls_tests_proof_line_count=1500/1500
 ```
 
+INBOX-178b reapplied that proof at its recorded SHA and amended only
+`spillLiveCallerClobbersForCall`. Before mutation it enumerates every
+current-inclusive live EAX/RAX logical name, chooses a RAX view when any
+alias requires 64 bits, physically spills that representative exactly once,
+then canonically rebinds every other live name to the same spill home through
+the existing `bindValueLoc` authority. Each binding retains its original
+virtual register, class, and defined width. Dead aliases are not enumerated
+or rebound. The generic `spillCurrentAccumulator` body is unchanged.
+
+The final proof covers mixed EAX/RAX live aliases, a dead RAX alias, one
+three-instruction `spill_rax`/stage/call stream, one spill-slot allocation,
+shared canonical home, retained 32/64-bit virtual metadata, EAX and RAX Q2
+reloads, EFLAGS equality at the exact post-preservation hook, and complete
+multiple-alias rollback. Function-scoped guards freeze pre-mutation
+enumeration, current-inclusive liveness, one physical `spillValue`, one
+canonical alias-rebind loop, widest-view selection, and unchanged generic
+spill authority.
+
 ### Exact 57-row status and assertion map
 
-The names below refer to tests in the retained proof patch, not to landed
-tests. `PASS` means the assertion ran successfully in the 1397-test proof
-batch; `GAP` means the stop occurred before an exact action-scoped proof was
-completed; `FAIL` is the semantic stop.
+The names below refer to the landed INBOX-178b tests. Every row passed in
+the final 1398-test batch.
 
 | row | status | retained test/assertion |
 |---:|:---:|---|
@@ -87,11 +106,11 @@ completed; `FAIL` is the semantic stop.
 | 8 | PASS | `...attachment is pre-seal unique...`: zero handles, attached action present, framed/aligned zero-argument call path. |
 | 9 | PASS | Existing dormant direct-call result test: result resolves after transaction teardown. |
 | 10 | PASS | `...preserves Q2 source...`: live-after EAX source spills once, reloads, and remains spill-backed. |
-| 11 | GAP | No separate live-after RAX source assertion was completed before the row-13 stop. |
+| 11 | PASS | Q2 table: live-after RAX source emits one `spill_rax_rsp`, reloads through `reload_arg64_rsp`, and retains one spill home. |
 | 12 | PASS | `...unrelated Q3 occupant`: first live EAX occupant is preserved and final-use source stages. |
-| 13 | FAIL | Same attached-call test: a second live accumulator alias remains EAX after the call-preservation phase. |
+| 13 | PASS | Mixed EAX/RAX live aliases share one `.spill64` home after exactly one physical `spill_rax_rsp`; both retain their original virtual widths. |
 | 14 | PASS | Exact EAX/RAX positives assert zero spill when no unrelated occupant exists. |
-| 15 | GAP | No separate attached-call assertion observed EFLAGS between preservation and the final call clobber. |
+| 15 | PASS | The test-confined `after_preservation` boundary validates the exact pre-preservation EFLAGS snapshot before the call clobber. |
 | 16 | PASS | `...admission rejects incomplete and ineligible state`: missing plan is request-attributable and emits nothing. |
 | 17 | PASS | Same table: missing interval fails request-attributably with rollback. |
 | 18 | PASS | Same table: older interval fails exact-boundary admission. |
@@ -125,7 +144,7 @@ completed; `FAIL` is the semantic stop.
 | 46 | PASS | Structural-pin loop and phase-revalidation test mutate every pin fact at construction, refresh, and later-stage boundaries. |
 | 47 | PASS | Attachment lifecycle rolls back immediately and asserts action/request/pin storage cleared. |
 | 48 | PASS | Admission/structural failures after seal assert all private lifetime pins null after rollback. |
-| 49 | GAP | Existing call rollback covers caller-clobber preservation, but the exact multiple-Q3-alias rollback proof was blocked by row 13. |
+| 49 | PASS | `after_preservation` rollback restores both mixed-width alias bindings, the sole spill entry/counter, instructions, EFLAGS, request/action state, and private pins. |
 | 50 | PASS | Existing complete rollback enum plus later-index proof restores every partial argument stage. |
 | 51 | PASS | Existing call-append rollback proves owned symbol freed exactly once. |
 | 52 | PASS | Existing result ownership/definition/finalization rollback proves durable identity freed once. |
@@ -134,9 +153,6 @@ completed; `FAIL` is the semantic stop.
 | 55 | PASS | Frozen calls source/routing hash and existing retained-form tests preserve all non-final-use forms. |
 | 56 | PASS | Function/API-scoped production guard retains all excluded envelopes before any transaction. |
 | 57 | PASS | Frozen `composed_selector_calls.zig` hash proves `zig.target.intByteSize` routing unchanged. |
-
-Rows 11, 15, and 49 remain explicit proof gaps; they were not silently
-credited after the mandatory row-13 stop.
 
 ### Retained exploratory commands and logs
 
@@ -193,6 +209,93 @@ normalization, deletion, or formatting-only reruns:
 Paths in this table are relative to `tmp/inbox178_o2_call_final_use/`.
 The accepted canonical 443-row input remains absent exactly as recorded
 below; no substitute report was generated for INBOX-178a.
+
+## INBOX-178b authorized gates
+
+Every retained log is paired with its exact command. The first full-unit
+attempt stopped at a proof-only helper-name compile typo. The second reached
+all semantic tests but one negative guard fixture had replaced an earlier
+unrelated liveness occurrence. Both logs are retained and excluded; neither
+required a semantic or authority change. Attempt 3 passed before the final
+explicit three-instruction count was added. The final batch is the
+acceptance-grade unit result.
+
+```text
+command=set -o pipefail; /home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox178b_o2_call_alias_remediation/validation/full_unit.log
+result=compile_fixture_error,excluded
+log_sha256=840665d4b130d014992351c1f055d9b34f7ffa4b08836bf26c50891aed3dcabc
+
+command=/home/oleg/bin/zig fmt src/codegen/x86_64/generic_cfg/source_guard/authority_policy_tests.zig && set -o pipefail; /home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox178b_o2_call_alias_remediation/validation/full_unit_attempt2.log
+result=1397/1398,negative_fixture_scope_error,excluded
+log_sha256=d5b651bab00fbe60ad3f7d3429f3f5f0f85e89267b8081aa34ee7dbb63cc001d
+
+command=/home/oleg/bin/zig fmt src/codegen/x86_64/generic_cfg/source_guard/authority_policy_tests.zig && set -o pipefail; /home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox178b_o2_call_alias_remediation/validation/full_unit_attempt3.log
+result=7/7_steps,1398/1398_tests,supporting_pre-final-assertion
+log_sha256=6a39f0dbfc8cbe85094e9c91a75831caf29017de2b6a4f717369e552c7b01a35
+
+command=/home/oleg/bin/zig fmt src/codegen/x86_64/generic_cfg/value_use/actions/calls_tests.zig && set -o pipefail; /home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox178b_o2_call_alias_remediation/validation/full_unit_final.log
+result=7/7_steps,1398/1398_tests,pass
+log_sha256=abf0f95fcc51781b4fdaeecca0886366a4095a122eb0e8fb31e489649461fc10
+```
+
+### Standalone source guard
+
+```text
+command=set -o pipefail; /home/oleg/bin/zig test src/codegen/x86_64/generic_cfg/composed_selector_source_guard_tests.zig 2>&1 | tee tmp/inbox178b_o2_call_alias_remediation/validation/source_guard.log
+result=62/62_tests,pass
+log_sha256=9aaf7c9a3fa9dde6476a2401d1b0b2b32961d0245dd8cc64ba3997f9a6954692
+```
+
+### ABI differential
+
+```text
+command=set -o pipefail; /home/oleg/bin/zig build abi-differential --summary all 2>&1 | tee tmp/inbox178b_o2_call_alias_remediation/validation/abi_differential.log
+result=5/5_steps,60/60_cases,30/30_real_functions,pass
+log_sha256=1ace471b9199d3f953f2c72ae974a6356fb995b192d288f3ff1eebaa9da3fde3
+```
+
+### Focused canaries
+
+```text
+command=set -o pipefail; /home/oleg/bin/zig build focused-codegen-canaries --summary all 2>&1 | tee tmp/inbox178b_o2_call_alias_remediation/validation/focused_canaries.log
+result=2/2_steps,35/35_execution_cases,__multi3_green,fma_green,pass
+log_sha256=d704046eacfa8c3c2cf852ed97c86ab42b5a6a07dcfe4dd7de48cb870f2292c6
+```
+
+### Fresh accepted-cohort object and owner
+
+The final-tree commands and identities are:
+
+```text
+command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll >tmp/inbox178b_o2_call_alias_remediation/validation/accepted_final.o 2>tmp/inbox178b_o2_call_alias_remediation/validation/accepted_final.stderr
+object_sha256=061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be
+stderr_bytes=0
+
+command=LC_ALL=C zig-out/bin/z_llvm --emit=selection-owner-manifest --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll >tmp/inbox178b_o2_call_alias_remediation/validation/owner_manifest_final.tsv 2>tmp/inbox178b_o2_call_alias_remediation/validation/owner_manifest_final.stderr
+owner_sha256=5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d
+owner_breakdown=composed_block:40,composed_cfg:127,legacy_envelope:17,structural_fallback:101
+owner_ledger=167/17/101
+stderr_bytes=0
+```
+
+The canonical 443-row source remains absent. No substitute was generated
+and no fresh report is claimed. The retained acceptance-grade report remains
+`49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681`
+with 443/285/158 and first failure
+`compiler_rt.trunc.truncl/UnsupportedLongDoubleAbi`.
+
+During the gate run, user-authorized infrastructure commit `5e1cb6f1`
+removed the watcher pause clause and became the frozen script provenance.
+The Reviewer confirmed that this infrastructure amendment grants no
+additional semantic, test, gate, routing, isolation, wiring, cleanup, or
+ratchet authority. Operating-document commit `662e5a1a` records that
+boundary and is the final composite operating HEAD. The index, working tree,
+and HEAD all retain the committed watcher blob:
+
+```text
+scripts/z_llvm_watcher_loop.sh_git_blob=8f3be1dd08dadc6f42ede169ca05e84daae773ab
+scripts/z_llvm_watcher_loop.sh_sha256=ac1d08eed3aadc8ed9ccf7afb5df93889630c95a68e7fe594aba67a760a89dd7
+```
 
 ## Bounded implementation
 
@@ -311,8 +414,8 @@ Final file budgets:
 value_use/model.zig=1896/1999
 value_use/core.zig=1334/1499
 value_use/planning/lifetime_admission.zig=689/2000
-value_use/actions/calls.zig=678/1200
-value_use/actions/calls_tests.zig=1304/1500
+value_use/actions/calls.zig=704/1200
+value_use/actions/calls_tests.zig=1498/1500
 ```
 
 Final principal source hashes:
@@ -322,9 +425,12 @@ model=3bd22867b20587918132090143f407e042f32d44a3948ad3d7dc23a4cd02dfd7
 core=d0e8fe7c03120d7ad8044f575a95c71c945b4bc145c7b7b7e9d3467423a8b819
 lifetime_admission=b4514ccbeec603c6597b53f1229ec963fa4418a893cc501140ab902d85541690
 materialization=05dcc41b8d408adee5c16d6f959d7bb62b815200005d3f1c0b8b0b673aa683a8
-calls=166f6211c019320117705ce42792c7d790178bfa6bac66895a3a603b3dfc6d4d
-calls_tests=b2030d9ae4976be4a6d3d22487d0eaee0ef16ec80bf4548364c186fa0e0dba7d
-authority_guard=ede45872b4c7c292da95859e392d5c32b1ee49a4b04de06adc3841d6468713e7
+selector_state=edde3d94150b535133ba4c727f420287f8f1ea84e339661f2c5efdd7dc6f5188
+calls=ee5e8d740a42ed1165461cbf2357d63e68347534988915c7f92625cc88032ed0
+calls_tests=7eb154f10bb6d7163f5e5f3988b1bb6a633e542fc65988ca5fbd74cc576e4c29
+source_guard_core=2b03554266798dd7b89819eb4c440d4dbaa7bfd0eae5f2d2a825645636b2682e
+authority_guard=84b0ff40da35876b92f1591537f8362ff1c20c4a9886991e516ebf8d38b2f86a
+authority_guard_tests=5075af61097c194b5c00da12dbd68cecf9226584abab81ca6f147cede4970232
 consumer_guard=f7076f86ee49705daf25bb762f1f244728e1c0a1bedb850494ee704ec33ac3d9
 ```
 
@@ -337,6 +443,8 @@ Retention surfaces remain byte-identical to the operating baseline:
 docs/retention_headroom_policy.md=a31e3fbf7aa03c8544fc5f9921e350c25e4e470cc3c779dfb356136634e052dd
 docs/evidence/tmp_retention_pins.tsv=f4374187d77ec6b7c42ee1b64538ead1a2d599697595a7f59c28b23dae5c6614
 tools/clean_tmp.zig=8e0c54ad6fed9e46326049dbe64bff743daddcc2527c1dc4d5e02be15fba2d5e
+scripts/z_llvm_watcher_loop.sh_git_blob=8f3be1dd08dadc6f42ede169ca05e84daae773ab
+scripts/z_llvm_watcher_loop.sh_sha256=ac1d08eed3aadc8ed9ccf7afb5df93889630c95a68e7fe594aba67a760a89dd7
 stash0=7985c6d (INBOX-93 preservation)
 ```
 

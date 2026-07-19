@@ -286,6 +286,32 @@ pub fn validateCallIntentSurface(source: [:0]const u8) !void {
             return error.ValueUseCallFinalUseRevalidationMismatch;
         }
     }
+    if (functionBodyNamed(bodies, "mutateCallSourceForTest")) |body| {
+        const mutation = source[body.start..body.end];
+        if (countPattern(mutation, "if (!builtin.is_test) return;") != 1 or
+            countPattern(mutation, "transaction.call_test_failure") != 1 or
+            countPattern(mutation, "transaction.call_test_argument_index") != 2 or
+            countPattern(mutation, "transaction.selector.values.getPtr(name).?.vreg.index += 1;") != 1 or
+            countPattern(source, "mutateCallSourceForTest(") != 4)
+        {
+            return error.ValueUseCallTestMutationHookMismatch;
+        }
+        for ([_][]const u8{ "callback", "function_name", "functionName" }) |forbidden|
+            if (std.mem.indexOf(u8, mutation, forbidden) != null)
+                return error.ValueUseCallTestMutationHookMismatch;
+    }
+    if (functionBodyNamed(bodies, "executeDirectCall")) |body| {
+        const direct = source[body.start..body.end];
+        if (std.mem.indexOf(u8, direct, "const preservation_eflags =")) |_| {
+            if (countPattern(direct, "transaction.selector.eflags.snapshot()") != 1 or
+                countPattern(direct, "builtin.is_test and") != 1 or
+                countPattern(direct, "CallTestFailure.after_preservation") != 1 or
+                countPattern(direct, "validateSnapshot(preservation_eflags)") != 1)
+            {
+                return error.ValueUseCallTestMutationHookMismatch;
+            }
+        }
+    }
 }
 
 pub fn validateForwardAdmissionSnapshotAuthority(source: [:0]const u8) !void {

@@ -104,6 +104,35 @@ test "value-use call intent guard freezes semantic fixed storage and rejects phy
         ),
     );
 }
+
+test "value-use call mutation proof hook is test confined and structurally bounded" {
+    const accepted: [:0]const u8 =
+        @embedFile("../value_use/actions/calls.zig");
+    try validateCallIntentSurface(accepted);
+    const unguarded = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "if (!builtin.is_test) return;",
+        "if (false) return;",
+    );
+    defer std.testing.allocator.free(unguarded);
+    try std.testing.expectError(
+        error.ValueUseCallTestMutationHookMismatch,
+        validateCallIntentSurface(unguarded),
+    );
+    const unchecked_flags = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "builtin.is_test and",
+        "false and",
+    );
+    defer std.testing.allocator.free(unchecked_flags);
+    try std.testing.expectError(
+        error.ValueUseCallTestMutationHookMismatch,
+        validateCallIntentSurface(unchecked_flags),
+    );
+}
+
 const validatePreparedViewLeafDiscipline = support.validatePreparedViewLeafDiscipline;
 const validateScratchCompareProductionSites = support.validateScratchCompareProductionSites;
 const validateCurrentHomeEqZeroProductionSites = support.validateCurrentHomeEqZeroProductionSites;
@@ -170,6 +199,25 @@ test "composed selector source guard rejects the retired stack pointer liveness 
         error.StackPointerLivenessSpecialCaseReintroduced,
         validateProductionSource("composed_selector_state.zig", reintroduced),
     );
+}
+test "composed selector source guard freezes call-local accumulator alias preservation" {
+    const accepted: [:0]const u8 = @embedFile("../composed_selector_state.zig");
+    try validateAddressDependencyStateAuthority(accepted);
+    inline for (.{
+        .{
+            "if (!try valueIsLiveAtOrAfterCurrent(selector, entry.key_ptr.*)) continue;\n        try accumulator_aliases.append",
+            "if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;\n        try accumulator_aliases.append",
+        },
+        .{ "try bindValueLoc(selector, alias.name, preserved_home);", "try spillValue(selector, alias.name);" },
+        .{ "liveAccumulatorName(selector)", "liveAccumulatorNameAfterCurrent(selector)" },
+    }) |replacement| {
+        const rejected = try replaceOnceSentinel(std.testing.allocator, accepted, replacement[0], replacement[1]);
+        defer std.testing.allocator.free(rejected);
+        try std.testing.expectError(
+            error.CallAccumulatorAliasPreservationMismatch,
+            validateAddressDependencyStateAuthority(rejected),
+        );
+    }
 }
 test "composed selector source guard rejects function and family predicates in the address dependency domain" {
     try validateProductionSource(

@@ -174,6 +174,32 @@ pub fn validateAddressDependencyStateAuthority(source: [:0]const u8) !void {
     const liveness_body = source[body.start..body.end];
     if (std.mem.indexOf(u8, liveness_body, "stack_i32_ptr") != null)
         return error.StackPointerLivenessSpecialCaseReintroduced;
+    const call_body_ref = functionBodyNamed(bodies, "spillLiveCallerClobbersForCall") orelse return;
+    const call_body = source[call_body_ref.start..call_body_ref.end];
+    const alias_start = std.mem.indexOf(u8, call_body, "const AccumulatorAlias = struct") orelse
+        return error.CallAccumulatorAliasPreservationMismatch;
+    const alias_end = std.mem.indexOfPos(u8, call_body, alias_start, "for (selector_allocatable_regs)") orelse
+        return error.CallAccumulatorAliasPreservationMismatch;
+    const alias_body = call_body[alias_start..alias_end];
+    if (countPattern(alias_body, "selector.values.iterator()") != 1 or
+        countPattern(alias_body, "valueIsLiveAtOrAfterCurrent(") != 1 or
+        countPattern(alias_body, "try accumulator_aliases.append") != 1 or
+        countPattern(alias_body, "if (try spillValue(selector, name))") != 1 or
+        countPattern(alias_body, "try bindValueLoc(selector, alias.name, preserved_home)") != 1 or
+        countPattern(alias_body, ".eax, .rax") != 1 or
+        countPattern(alias_body, "loc == .rax") != 1 or
+        std.mem.indexOf(u8, alias_body, "machine.instructions.append") != null or
+        std.mem.indexOf(u8, alias_body, "allocateSpillSlot") != null or
+        std.mem.indexOf(u8, call_body, "spillCurrentAccumulator(") != null)
+    {
+        return error.CallAccumulatorAliasPreservationMismatch;
+    }
+    const generic_body_ref = functionBodyNamed(bodies, "spillCurrentAccumulator") orelse
+        return error.CallAccumulatorAliasPreservationMismatch;
+    const generic_body = source[generic_body_ref.start..generic_body_ref.end];
+    if (countPattern(generic_body, "liveAccumulatorName(selector)") != 1 or
+        countPattern(generic_body, "spillValue(selector, name)") != 1)
+        return error.CallAccumulatorAliasPreservationMismatch;
 }
 
 pub fn validateAddressDependencyDomainSource(source: [:0]const u8) !void {

@@ -56,10 +56,7 @@ const I128PairRollbackBoundary = support.I128PairRollbackBoundary;
 const expectI128PairRollbackExact = support.expectI128PairRollbackExact;
 const call_actions = @import("calls.zig");
 
-fn callRequest(
-    name: []const u8,
-    ty: ir.Type,
-) Transaction.Request {
+fn callRequest(name: []const u8, ty: ir.Type) Transaction.Request {
     const class: selector_types.VirtualRegClass = if (ty == .ptr)
         .stack_object
     else if (ty.int <= 32)
@@ -73,17 +70,12 @@ fn callRequest(
         if (ty == .ptr) .stack_object_address else if (ty.int <= 32) .gpr32 else .gpr64,
     );
 }
-
-fn runAttachedCall(
-    transaction: *Transaction,
-    action: Transaction.PreparedAction,
-) !void {
+fn runAttachedCall(transaction: *Transaction, action: Transaction.PreparedAction) !void {
     try transaction.attachCallAction(action);
     try transaction.seal();
     try transaction.prepare();
     try transaction.materializeAll();
 }
-
 fn expectCallInstructions(
     expected_instructions: []const machine_module.Instruction,
     actual_instructions: []const machine_module.Instruction,
@@ -100,14 +92,66 @@ fn expectCallInstructions(
         }
     }
 }
-
 fn expectCallRollbackStorageCleared(transaction: *const Transaction) !void {
     try std.testing.expectEqual(Transaction.RequestPhase.registering, transaction.phase());
     try std.testing.expectEqual(@as(usize, 0), transaction.requestCount());
     try std.testing.expect(transaction.call_action == null);
     try std.testing.expect(!transaction.call_action_executed);
+    for (transaction.lifetime_context.pins) |pin| try std.testing.expect(pin == null);
 }
-
+const CallAttachmentErrorCase = enum { unclaimed, inverted, foreign, stale, non_prepared, independently_owned };
+fn expectCallAttachmentError(case: CallAttachmentErrorCase) !void {
+    var machine = MachineFunction.init(@tagName(case), .void);
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    var first_request = callRequest("first", .{ .int = 32 });
+    if (case == .non_prepared) first_request.destination = .prepared_view;
+    if (case == .independently_owned)
+        first_request.prepared_action = .{ .emit_copy_to = .eax };
+    const first = try transaction.register(first_request);
+    const second = try transaction.register(callRequest("second", .{ .int = 32 }));
+    var foreign_transaction = try Transaction.begin(&selector);
+    defer foreign_transaction.deinit();
+    const foreign = try foreign_transaction.register(callRequest("foreign", .{ .int = 32 }));
+    var stale = first;
+    stale.generation += 1;
+    var handles = [_]Transaction.RequestHandle{ first, second };
+    const types = [_]ir.Type{ .{ .int = 32 }, .{ .int = 32 } };
+    var count: usize = 1;
+    switch (case) {
+        .unclaimed, .non_prepared, .independently_owned => {},
+        .inverted => handles = .{ second, first },
+        .foreign => handles[0] = foreign,
+        .stale => handles[0] = stale,
+    }
+    if (case == .inverted) count = 2;
+    const expected_error = switch (case) {
+        .unclaimed => error.ValueUseCallRequestUnclaimed,
+        .inverted => error.ValueUseCallArgumentSourceOrder,
+        .foreign, .stale => error.ValueUseActionOperandNotRegistered,
+        .non_prepared => error.ValueUseActionOperandNotPreparedSource,
+        .independently_owned => error.ValueUsePreparedActionUnexpected,
+    };
+    try std.testing.expectError(expected_error, transaction.attachCallAction(.{
+        .direct_call = try Transaction.DirectCallAction.init(
+            "callee",
+            null,
+            .void,
+            handles[0..count],
+            types[0..count],
+        ),
+    }));
+    try std.testing.expect(transaction.call_action == null);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(case == .inverted or case == .non_prepared or
+        case == .independently_owned, transaction.failedRequestIs(first));
+    try std.testing.expectEqual(case == .unclaimed, transaction.failedRequestIs(second));
+    try transaction.rollback();
+    try expectCallRollbackStorageCleared(&transaction);
+}
 test "value-use inline memcpy action owns exact preservation staging and call clobber" {
     var machine = MachineFunction.init("value-use-inline-memcpy", .void);
     defer machine.deinit(std.testing.allocator);
@@ -651,6 +695,7 @@ test "value-use dormant call attachment is pre-seal unique and closes registrati
     try std.testing.expectEqual(Transaction.RequestPhase.registering, transaction.phase());
     try std.testing.expectEqual(@as(usize, 0), transaction.requestCount());
     try std.testing.expect(transaction.call_action != null);
+    try std.testing.expectError(error.ValueUsePrepareBeforeSeal, transaction.prepare());
     try std.testing.expectError(error.ValueUseCallActionAlreadyAttached, transaction.attachCallAction(action));
     try std.testing.expectError(error.ValueUseLateRegistration, transaction.register(callRequest("late", .{ .int = 32 })));
     try std.testing.expectError(
@@ -659,6 +704,12 @@ test "value-use dormant call attachment is pre-seal unique and closes registrati
     );
     try transaction.seal();
     try std.testing.expectError(error.ValueUseLateRegistration, transaction.attachCallAction(action));
+    try std.testing.expectError(error.ValueUseMaterializeBeforePrepare, transaction.materializeAll());
+    try transaction.prepare();
+    transaction.request_phase = .materialized;
+    try std.testing.expectError(error.ValueUseCallActionNotExecuted, transaction.commit());
+    try transaction.rollback();
+    try expectCallRollbackStorageCleared(&transaction);
     try std.testing.expectError(
         error.ValueUseCallActionUnsupported,
         blk: {
@@ -673,6 +724,9 @@ test "value-use dormant call attachment is pre-seal unique and closes registrati
     try attached_then_rolled_back.attachCallAction(action);
     try attached_then_rolled_back.rollback();
     try expectCallRollbackStorageCleared(&attached_then_rolled_back);
+
+    inline for (std.meta.tags(CallAttachmentErrorCase)) |case|
+        try expectCallAttachmentError(case);
 }
 
 test "value-use dormant call request provenance is source ordered and survives rollback" {
@@ -862,16 +916,20 @@ test "value-use dormant call rollback restores every declared mutation boundary"
         var plan = SelectorAllocationPlan.init(std.testing.allocator);
         defer plan.deinit();
         try addAtCurrent(&plan, "argument");
-        const has_live_caller_clobber = boundary == .after_preservation;
-        if (has_live_caller_clobber) try addLive(&plan, "live-rcx");
+        const after_preservation = boundary == .after_preservation;
+        if (after_preservation) inline for (&.{ "alias32", "alias64" }) |name| try addLive(&plan, name);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
         selector.allocation_plan = &plan;
-        if (has_live_caller_clobber) selector.stack_frame_bytes = 128;
+        if (after_preservation) selector.stack_frame_bytes = 128;
         try selector_state.bindValueLoc(&selector, "argument", .{ .spill64 = .slot3 });
-        if (has_live_caller_clobber) try selector_state.bindValueLoc(&selector, "live-rcx", .{ .arg64 = .rcx });
+        if (after_preservation) {
+            try selector_state.bindValueLoc(&selector, "alias32", .eax);
+            try selector_state.bindValueLoc(&selector, "alias64", .rax);
+        }
         const argument_binding = selector.values.get("argument").?;
-        const live_binding = selector.values.get("live-rcx");
+        const alias32_binding = selector.values.get("alias32");
+        const alias64_binding = selector.values.get("alias64");
         const next_vreg = selector.next_virtual_reg;
         const next_spill = selector.next_spill_slot;
         const saved_flags = selector.eflags.snapshot();
@@ -893,7 +951,8 @@ test "value-use dormant call rollback restores every declared mutation boundary"
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
         try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
         try std.testing.expectEqual(argument_binding, selector.values.get("argument").?);
-        try std.testing.expectEqual(live_binding, selector.values.get("live-rcx"));
+        try std.testing.expectEqual(alias32_binding, selector.values.get("alias32"));
+        try std.testing.expectEqual(alias64_binding, selector.values.get("alias64"));
         try std.testing.expect(selector.values.get("result") == null);
         try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
         try std.testing.expectEqual(next_vreg, selector.next_virtual_reg);
@@ -1026,7 +1085,6 @@ test "value-use call final-use plan admits exact EAX and RAX argument positions"
         try std.testing.expectEqual(ValueLoc.eax, selector.values.get("result").?.loc);
         try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
     }
-
     {
         var machine = MachineFunction.init("value-use-call-final-rax-later", .void);
         defer machine.deinit(std.testing.allocator);
@@ -1064,7 +1122,6 @@ test "value-use call final-use plan admits exact EAX and RAX argument positions"
         try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
     }
 }
-
 test "value-use call final-use plan supports middle last repeated and specialized operands" {
     var machine = MachineFunction.init("value-use-call-final-positions", .void);
     defer machine.deinit(std.testing.allocator);
@@ -1145,10 +1202,9 @@ test "value-use call final-use plan supports middle last repeated and specialize
     try std.testing.expectEqual(machine_module.Instruction{ .mov_eax_to_arg = .rdi }, specialized_machine.instructions.items[0]);
     try std.testing.expectEqual(machine_module.Instruction{ .and_eax_imm32 = 0xffff }, specialized_machine.instructions.items[2]);
 }
-
 test "value-use call final-use plan preserves Q2 source and unrelated Q3 occupant" {
-    {
-        var machine = MachineFunction.init("value-use-call-q2-source", .void);
+    inline for (.{ @as(u16, 32), 64 }) |bits| {
+        var machine = MachineFunction.init(if (bits == 32) "value-use-call-q2-eax" else "value-use-call-q2-rax", .void);
         defer machine.deinit(std.testing.allocator);
         var plan = SelectorAllocationPlan.init(std.testing.allocator);
         defer plan.deinit();
@@ -1158,37 +1214,49 @@ test "value-use call final-use plan preserves Q2 source and unrelated Q3 occupan
         selector.allocation_plan = &plan;
         selector.current_position = 1;
         selector.stack_frame_bytes = 128;
-        try selector_state.bindValueLoc(&selector, "source", .eax);
+        try selector_state.bindValueLoc(&selector, "source", if (bits == 32) .eax else .rax);
         var transaction = try Transaction.begin(&selector);
         defer transaction.deinit();
-        const source = try transaction.register(callRequest("source", .{ .int = 32 }));
+        const ty: ir.Type = .{ .int = bits };
+        const source = try transaction.register(callRequest("source", ty));
         try runAttachedCall(&transaction, .{ .direct_call = try Transaction.DirectCallAction.init(
             "callee_q2",
             null,
             .void,
             &.{source},
-            &.{.{ .int = 32 }},
+            &.{ty},
         ) });
         try transaction.commit();
-        try std.testing.expectEqual(machine_module.Instruction{ .spill_eax_rsp = .slot0 }, machine.instructions.items[0]);
-        try std.testing.expectEqual(machine_module.Instruction{ .reload_arg_rsp = .{ .reg = .rdi, .frame_index = .slot0 } }, machine.instructions.items[1]);
+        try std.testing.expectEqual(if (bits == 32)
+            machine_module.Instruction{ .spill_eax_rsp = .slot0 }
+        else
+            machine_module.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
+        try std.testing.expectEqual(if (bits == 32)
+            machine_module.Instruction{ .reload_arg_rsp = .{ .reg = .rdi, .frame_index = .slot0 } }
+        else
+            machine_module.Instruction{ .reload_arg64_rsp = .{ .reg = .rdi, .frame_index = .slot0 } }, machine.instructions.items[1]);
         try std.testing.expect(selector.values.get("source").?.loc == .spill64);
+        try std.testing.expectEqual(@as(usize, 1), selector.spill_slots.count());
     }
-
     {
         var machine = MachineFunction.init("value-use-call-q3-alias", .void);
         defer machine.deinit(std.testing.allocator);
         var plan = SelectorAllocationPlan.init(std.testing.allocator);
         defer plan.deinit();
         try plan.interval_ends.put("source", 0);
-        try addLive(&plan, "alias");
+        inline for (&.{ "alias32", "alias64" }) |name| try addLive(&plan, name);
+        try plan.interval_ends.put("dead", 0);
         var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
         defer selector.deinit();
         selector.allocation_plan = &plan;
         selector.current_position = 1;
         selector.stack_frame_bytes = 128;
         try selector_state.bindValueLoc(&selector, "source", .eax);
-        try selector_state.bindValueLoc(&selector, "alias", .eax);
+        try selector_state.bindValueLoc(&selector, "alias32", .eax);
+        try selector_state.bindValueLoc(&selector, "alias64", .rax);
+        try selector_state.bindValueLoc(&selector, "dead", .rax);
+        const alias32_vreg = selector.values.get("alias32").?.vreg;
+        const alias64_vreg = selector.values.get("alias64").?.vreg;
         var transaction = try Transaction.begin(&selector);
         defer transaction.deinit();
         const source = try transaction.register(callRequest("source", .{ .int = 32 }));
@@ -1200,24 +1268,38 @@ test "value-use call final-use plan preserves Q2 source and unrelated Q3 occupan
             &.{.{ .int = 32 }},
         ) });
         try transaction.commit();
-        try std.testing.expectEqual(machine_module.Instruction{ .spill_eax_rsp = .slot0 }, machine.instructions.items[0]);
+        try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
+        try std.testing.expectEqual(machine_module.Instruction{ .spill_rax_rsp = .slot0 }, machine.instructions.items[0]);
         try std.testing.expectEqual(machine_module.Instruction{ .mov_eax_to_arg = .rdi }, machine.instructions.items[1]);
-        try std.testing.expect(selector.values.get("alias").?.loc == .spill64);
+        try std.testing.expect(selector.values.get("alias32").?.loc == .spill64);
+        try std.testing.expect(selector.values.get("alias64").?.loc == .spill64);
+        try std.testing.expectEqual(alias32_vreg, selector.values.get("alias32").?.vreg);
+        try std.testing.expectEqual(alias64_vreg, selector.values.get("alias64").?.vreg);
+        try std.testing.expect(selector.values.get("dead").?.loc == .rax);
+        try std.testing.expectEqual(@as(usize, 1), selector.spill_slots.count());
     }
 }
-
 test "value-use call final-use admission rejects incomplete and ineligible state" {
     const cases = [_]struct {
         name: []const u8,
         current_position: usize,
         interval: ?usize,
         loc: ValueLoc,
-        expected_error: anyerror,
+        expected_error: ?anyerror,
     }{
         .{ .name = "missing-plan", .current_position = 1, .interval = null, .loc = .eax, .expected_error = error.ValueUseSourcePlanMissing },
         .{ .name = "missing-interval", .current_position = 1, .interval = null, .loc = .eax, .expected_error = error.ValueUseSourceIntervalMissing },
         .{ .name = "older", .current_position = 2, .interval = 0, .loc = .eax, .expected_error = error.ValueUseExpiredSource },
-        .{ .name = "non-accumulator", .current_position = 1, .interval = 0, .loc = .{ .arg32 = .r8 }, .expected_error = error.ValueUseCallArgumentLocationUnsupported },
+        .{ .name = "position-zero", .current_position = 0, .interval = 0, .loc = .eax, .expected_error = null },
+        .{ .name = "argument", .current_position = 1, .interval = 0, .loc = .{ .arg32 = .r8 }, .expected_error = error.ValueUseCallArgumentLocationUnsupported },
+        .{ .name = "scratch", .current_position = 1, .interval = 0, .loc = .{ .scratch32 = .r8 }, .expected_error = error.ValueUseCallArgumentLocationUnsupported },
+        .{ .name = "spill", .current_position = 1, .interval = 0, .loc = .{ .spill64 = .slot3 }, .expected_error = error.ValueUseCallArgumentLocationUnsupported },
+        .{ .name = "pointer", .current_position = 1, .interval = 0, .loc = .{ .stack_i32_ptr = .{ .disp = 0 } }, .expected_error = error.ValueUseRegisterClassMismatch },
+        .{ .name = "pair", .current_position = 1, .interval = 0, .loc = .{ .arg128 = selector_types.pair_a }, .expected_error = error.ValueUseRegisterClassMismatch },
+        .{ .name = "xmm", .current_position = 1, .interval = 0, .loc = .{ .xmm = .{ .reg = .xmm0, .bits = 32 } }, .expected_error = error.ValueUseRegisterClassMismatch },
+        .{ .name = "aggregate", .current_position = 1, .interval = 0, .loc = .{ .aggregate_sse = .{ .packed_f32x2 = null } }, .expected_error = error.ValueUseRegisterClassMismatch },
+        .{ .name = "stack", .current_position = 1, .interval = 0, .loc = .{ .stack_scalar = .{ .base_disp = 0, .bits = 32 } }, .expected_error = error.ValueUseRegisterClassMismatch },
+        .{ .name = "malformed-dependencies", .current_position = 1, .interval = 0, .loc = .eax, .expected_error = error.AddressDependencyStaleEdge },
     };
     for (cases, 0..) |case, case_index| {
         var machine = MachineFunction.init(case.name, .void);
@@ -1230,7 +1312,15 @@ test "value-use call final-use admission rejects incomplete and ineligible state
         if (case_index != 0) selector.allocation_plan = &plan;
         selector.current_position = case.current_position;
         selector.stack_frame_bytes = 128;
-        try selector_state.bindValueLoc(&selector, "argument", case.loc);
+        if (std.mem.eql(u8, case.name, "malformed-dependencies")) {
+            try plan.interval_ends.put("index", 1);
+            try selector_state.bindValueLoc(&selector, "index", .{ .arg32 = .r8 });
+            try selector_state.bindValueLoc(&selector, "argument", .{ .stack_i32_ptr = .{
+                .disp = 0,
+                .index = .{ .reg = .r8, .name = "index" },
+            } });
+            selector.values.getPtr("argument").?.loc = .eax;
+        } else try selector_state.bindValueLoc(&selector, "argument", case.loc);
         var transaction = try Transaction.begin(&selector);
         defer transaction.deinit();
         const argument = try transaction.register(callRequest("argument", .{ .int = 32 }));
@@ -1241,9 +1331,61 @@ test "value-use call final-use admission rejects incomplete and ineligible state
             &.{argument},
             &.{.{ .int = 32 }},
         ) });
-        try std.testing.expectError(case.expected_error, transaction.seal());
-        try std.testing.expect(transaction.failedRequestIs(argument));
+        if (case.expected_error) |expected_error| {
+            try std.testing.expectError(expected_error, transaction.seal());
+            try std.testing.expect(transaction.failedRequestIs(argument));
+        } else {
+            try transaction.seal();
+            try std.testing.expect(transaction.lifetime_context.pins[0].?.call_final_use == null);
+            try transaction.rollback();
+            try expectCallRollbackStorageCleared(&transaction);
+        }
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
+test "value-use attached call keeps forward Q1 distinct from final-use admission" {
+    inline for (.{ false, true }) |stale| {
+        var machine = MachineFunction.init(if (stale) "call-forward-stale" else "call-forward-valid", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("argument", 2);
+        try plan.forward_values.put("argument", .{
+            .definition_position = 2,
+            .metadata = .{ .class = .gpr32, .bits = 32 },
+        });
+        try plan.assignments.put("argument", .{ .gpr32 = .r8 });
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const argument = try transaction.register(callRequest("argument", .{ .int = 32 }));
+        try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
+            "callee_forward",
+            null,
+            .void,
+            &.{argument},
+            &.{.{ .int = 32 }},
+        ) });
+        try transaction.seal();
+        try transaction.prepare();
+        if (stale) {
+            plan.forward_values.getPtr("argument").?.metadata.bits = 31;
+            try std.testing.expectError(error.ValueUseForwardPlanStale, transaction.materializeAll());
+            try std.testing.expect(transaction.failedRequestIs(argument));
+            try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+            try expectCallRollbackStorageCleared(&transaction);
+        } else {
+            try transaction.materializeAll();
+            try transaction.commit();
+            try std.testing.expectEqual(
+                machine_module.Instruction{ .mov_arg_arg = .{ .dst = .rdi, .src = .r8 } },
+                machine.instructions.items[0],
+            );
+        }
     }
 }
 
@@ -1300,5 +1442,57 @@ test "value-use call final-use structural pin fails closed on canonical mutation
         try expectCallRollbackStorageCleared(&transaction);
         if (std.mem.eql(u8, mutation, "interval"))
             try plan.interval_ends.put("argument", 0);
+    }
+}
+
+test "value-use attached call revalidates after construction refresh and before later stage" {
+    inline for (.{
+        call_actions.CallTestFailure.mutate_after_prepared_construction,
+        .mutate_after_refresh,
+        .mutate_before_argument,
+    }) |boundary| {
+        const later = boundary == .mutate_before_argument;
+        var machine = MachineFunction.init(@tagName(boundary), .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "first");
+        try plan.interval_ends.put("final", 0);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "first", .{ .arg32 = .r8 });
+        try selector_state.bindValueLoc(&selector, "final", .eax);
+        const first_binding = selector.values.get("first").?;
+        const final_binding = selector.values.get("final").?;
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        var handles: [2]Transaction.RequestHandle = undefined;
+        var types = [_]ir.Type{.{ .int = 32 }} ** 2;
+        var count: usize = 1;
+        if (later) {
+            handles[0] = try transaction.register(callRequest("first", .{ .int = 32 }));
+            count = 2;
+        }
+        handles[count - 1] = try transaction.register(callRequest("final", .{ .int = 32 }));
+        try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
+            "callee_revalidate",
+            null,
+            .void,
+            handles[0..count],
+            types[0..count],
+        ) });
+        try transaction.seal();
+        try call_actions.setCallTestFailureForTest(&transaction, boundary, @intCast(count - 1));
+        try transaction.prepare();
+        try std.testing.expectError(error.ValueUseSourceGenerationChanged, transaction.materializeAll());
+        try std.testing.expect(transaction.failedRequestIs(handles[count - 1]));
+        if (later) try std.testing.expect(!transaction.failedRequestIs(handles[0]));
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(first_binding, selector.values.get("first").?);
+        try std.testing.expectEqual(final_binding, selector.values.get("final").?);
+        try expectCallRollbackStorageCleared(&transaction);
     }
 }
