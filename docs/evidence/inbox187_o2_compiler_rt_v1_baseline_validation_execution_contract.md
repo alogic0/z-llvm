@@ -7,6 +7,13 @@ It deliberately separates canonical identity creation from temporary call
 coverage. No command in the future procedure was executed in INBOX-187.
 Production remains dormant and the bypass ratchet remains **131**.
 
+INBOX-187A closed the previously withheld section-9 command contract from
+operating-document commit
+`e4a8952633c101949093130b935db8503e921b68`. The accepted INBOX-187 document
+commit is `a041487eee50f86b594beeeedb2071479842c093`. The correction changes only
+this document: it does not change or execute the accepted patch bundle,
+validation protocol, compiler, or any retained artifact.
+
 ## 1. Accepted basis and current preflight
 
 The tracked authorization and source basis are:
@@ -719,106 +726,1193 @@ not use it for timing.
 
 ## 9. Observation-off and observation-on executions
 
-Use canonical repetition 1's `accepted.ll` as the already derived,
-candidate-specific successful subset.
-
-### 9.1 Observation disabled
-
-Run the complete section-6 report/object/owner/objdump/per-function/frontier
-procedure with the coverage artifact and with
-`ZLLVM_CALL_COVERAGE_PATH` absent. Store it under:
+Coverage uses two distinct immutable inputs for two distinct purposes:
 
 ```text
-$ROOT/coverage/observation-off
+raw report input:
+  /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/compiler_rt_v1.ll
+
+successful-subset input:
+  /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical/repetition-1/accepted.ll
 ```
 
-Require no coverage-channel file exists.
+The raw input is used only by each phase's `--report-all-codegen-failures`
+command. The single canonical `accepted.ll` is referenced by every coverage
+object/owner command and by all downstream object inspection. Neither
+coverage phase runs `llvm-extract`, creates an `accepted.ll`, copies one,
+normalizes one, or chooses another successful subset.
 
-### 9.2 Observation enabled
+### 9.1 Exact paths, shell state, and command recorder
 
-Repeat the same semantic commands under:
+The following blocks are one ordered command stream supplied to one
+`/bin/bash --noprofile --norc` process. Launch that process exactly from the
+coverage source root with an otherwise empty environment:
+
+```bash
+/usr/bin/mkdir -p \
+  /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/driver/home \
+  /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/driver/tmp
+(
+  cd /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/source
+  exec /usr/bin/env -i \
+    HOME=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/driver/home \
+    TMPDIR=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/driver/tmp \
+    PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
+    LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
+    /bin/bash --noprofile --norc
+)
+```
+
+The driver environment deliberately contains no coverage variable. Before
+any coverage command, set exactly:
+
+```bash
+set -euo pipefail
+umask 022
+
+readonly ROOT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1
+readonly RAW_INPUT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/compiler_rt_v1.ll
+readonly COVERAGE_ARTIFACT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/artifact/z_llvm
+readonly CANONICAL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical/repetition-1
+readonly CANONICAL_ACCEPTED=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical/repetition-1/accepted.ll
+readonly CANONICAL_IDENTITIES=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical/o2_calls_crt_v1_r131.identities.tsv
+readonly OFF=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/observation-off
+readonly ON=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/observation-on
+readonly REPORT_CHANNEL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/observation-on/report.coverage.tsv
+readonly OBJECT_CHANNEL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/observation-on/object.coverage.tsv
+readonly OWNER_CHANNEL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/observation-on/owner.coverage.tsv
+```
+
+Section 7 must have written `CANONICAL_IDENTITIES` as two-column TSV
+`name<TAB>value`, with exactly one row for each frozen
+`o2_calls_crt_v1_r131_*` name. Section 6.5 command retention must place the
+canonical repetition-1 statuses at these exact paths:
 
 ```text
-$ROOT/coverage/observation-on
+$CANONICAL/report.status                     = 1
+$CANONICAL/report-summary.status             = 0
+$CANONICAL/failures-in-order.status           = 0
+$CANONICAL/failures-sorted.status             = 0
+$CANONICAL/frontier.status                    = 0
+$CANONICAL/frontier-grouped.status            = 0
+$CANONICAL/object.status                     = 0
+$CANONICAL/owner.status                      = 0
+$CANONICAL/objdump.status                    = 0
+$CANONICAL/readelf-sections.status           = 0
+$CANONICAL/readelf-symbols.status            = 0
+$CANONICAL/objcopy-text.status               = 0
+$CANONICAL/functions-sorted.status           = 0
+$CANONICAL/per-function.status               = 0
+$CANONICAL/owner-ledger.status               = 0
 ```
 
-Add exactly one unique environment entry to each `z_llvm` invocation:
+Every coverage command below is recorded through this one exact,
+non-transforming Bash function:
+
+```bash
+run_recorded() {
+  local record_prefix="$1"
+  local expected_status="$2"
+  local stdout_path="$3"
+  local stderr_path="$4"
+  shift 4
+
+  printf '%q ' "$@" >"${record_prefix}.command.txt"
+  printf '\n' >>"${record_prefix}.command.txt"
+  pwd -P >"${record_prefix}.cwd.txt"
+  /usr/bin/env | LC_ALL=C /usr/bin/sort \
+    >"${record_prefix}.environment.txt"
+  printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 >"${record_prefix}.start.utc"
+  set +e
+  "$@" >"$stdout_path" 2>"$stderr_path"
+  local status="$?"
+  set -e
+  printf '%s\n' "$status" >"${record_prefix}.status"
+  printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 >"${record_prefix}.end.utc"
+  test "$status" -eq "$expected_status"
+}
+
+require_identity_sha() {
+  local identity_name="$1"
+  local input_path="$2"
+  local record_prefix="$3"
+  local expected_path="${record_prefix}.expected.sha256"
+  local actual_path="${record_prefix}.actual.sha256"
+
+  /usr/bin/awk -F '\t' -v name="$identity_name" \
+    '$1 == name { print $2; found += 1 }
+     END { if (found != 1) exit 96 }' \
+    "$CANONICAL_IDENTITIES" >"$expected_path"
+  /usr/bin/sha256sum "$input_path" |
+    /usr/bin/awk '{print $1}' >"$actual_path"
+  run_recorded "${record_prefix}.cmp" 0 \
+    "${record_prefix}.cmp.stdout" \
+    "${record_prefix}.cmp.stderr" \
+    /usr/bin/cmp "$expected_path" "$actual_path"
+}
+```
+
+Thus each invocation retains exact argv, start/end UTC, status, raw stdout,
+and raw stderr. No command output is piped through `tee` or normalized.
+
+Create only the declared phase directories:
+
+```bash
+test ! -e "$OFF"
+test ! -e "$ON"
+/usr/bin/mkdir -p \
+  "$OFF/home" "$OFF/tmp" "$OFF/records" "$OFF/functions" \
+  "$ON/home" "$ON/tmp" "$ON/records" "$ON/functions" \
+  "$ROOT/coverage/reference"
+printf '0\n' >"$ROOT/coverage/records-directory-creation.status"
+```
+
+The three prospective channel paths must all be absent before observation
+off:
+
+```bash
+test ! -e "$REPORT_CHANNEL"
+test ! -e "$OBJECT_CHANNEL"
+test ! -e "$OWNER_CHANNEL"
+printf 'all-three-absent\n' \
+  >"$ROOT/coverage/reference/channels.before-observation-off.txt"
+```
+
+### 9.2 Freeze and verify the sole canonical successful subset
+
+The accepted-input identity is captured before either coverage phase:
+
+```bash
+test -f "$CANONICAL_ACCEPTED"
+test "$(/usr/bin/stat -c '%a' "$CANONICAL_ACCEPTED")" = 444
+accepted_bytes=$(/usr/bin/stat -c '%s' "$CANONICAL_ACCEPTED")
+accepted_sha=$(/usr/bin/sha256sum "$CANONICAL_ACCEPTED" |
+  /usr/bin/awk '{print $1}')
+expected_sha=$(/usr/bin/awk -F '\t' \
+  '$1 == "o2_calls_crt_v1_r131_accepted_input_sha256" {
+     print $2; found += 1
+   }
+   END { if (found != 1) exit 94 }' \
+  "$CANONICAL_IDENTITIES")
+test "$accepted_sha" = "$expected_sha"
+printf 'path\tbytes\tmode\tsha256\n%s\t%s\t0444\t%s\n' \
+  "$CANONICAL_ACCEPTED" "$accepted_bytes" "$accepted_sha" \
+  >"$ROOT/coverage/reference/canonical-accepted.before.tsv"
+```
+
+`canonical-accepted.before.tsv` freezes the required absolute path, byte
+count, mode, and SHA-256. The same four fields are re-read and raw-compared
+after observation off and after observation on.
+
+### 9.3 Observation-off raw report: adopted raw input only
+
+The observation-off report command is first and consumes `RAW_INPUT`:
+
+```bash
+run_recorded \
+  "$OFF/records/report" 1 \
+  "$OFF/report.stdout.raw" \
+  "$OFF/report.stderr.raw" \
+  /usr/bin/env -i \
+    HOME="$OFF/home" \
+    TMPDIR="$OFF/tmp" \
+    PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
+    LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
+    "$COVERAGE_ARTIFACT" \
+    --emit=obj \
+    --generic-cfg-selector \
+    --report-all-codegen-failures \
+    --target=x86_64-linux \
+    --input-limit=67108864 \
+    "$RAW_INPUT"
+```
+
+The `env -i` list contains no `ZLLVM_CALL_COVERAGE_PATH`. Require empty
+stdout, status `1`, and exactly one summary:
+
+```bash
+test ! -s "$OFF/report.stdout.raw"
+
+run_recorded \
+  "$OFF/records/report-summary" 0 \
+  "$OFF/report.summary.txt" \
+  "$OFF/report-summary.stderr.raw" \
+  /bin/bash -c '
+    /usr/bin/awk '\''
+      $1 == "summary" && $2 == "zllvm-codegen-report-all" {
+        print; found += 1
+      }
+      END { if (found != 1) exit 95 }
+    '\'' "$1"
+  ' _ "$OFF/report.stderr.raw"
+
+run_recorded \
+  "$OFF/records/failures-in-order" 0 \
+  "$OFF/failed-functions.in-report-order.txt" \
+  "$OFF/failures-in-order.stderr.raw" \
+  /bin/bash -c '
+    LC_ALL=C /usr/bin/awk '\''
+      $1 == "zllvm-codegen-failure" {
+        if ($2 !~ /^function=/) exit 91;
+        sub(/^function=/, "", $2);
+        print $2
+      }
+    '\'' "$1"
+  ' _ "$OFF/report.stderr.raw"
+
+run_recorded \
+  "$OFF/records/failures-sorted" 0 \
+  "$OFF/failed-functions.sorted.txt" \
+  "$OFF/failures-sorted.stderr.raw" \
+  /usr/bin/sort -u "$OFF/failed-functions.in-report-order.txt"
+
+run_recorded \
+  "$OFF/records/frontier" 0 \
+  "$OFF/frontier.tsv" \
+  "$OFF/frontier.stderr.raw" \
+  /bin/bash -c '
+    LC_ALL=C /usr/bin/awk '\''
+      $1 == "zllvm-codegen-failure" {
+        function = diagnostic = selector_tag = selector_detail = "";
+        for (i = 2; i <= NF; i++) {
+          if ($i ~ /^function=/) {
+            function = $i; sub(/^function=/, "", function)
+          } else if ($i ~ /^diagnostic=/) {
+            diagnostic = $i; sub(/^diagnostic=/, "", diagnostic)
+          } else if ($i ~ /^selector_tag=/) {
+            selector_tag = $i; sub(/^selector_tag=/, "", selector_tag)
+          } else if ($i ~ /^selector_detail=/) {
+            selector_detail = $i; sub(/^selector_detail=/, "", selector_detail)
+          }
+        }
+        if (function == "" || diagnostic == "" ||
+            selector_tag == "" || selector_detail == "") exit 93;
+        print function "\t" diagnostic "\t" selector_tag "\t" selector_detail
+      }
+    '\'' "$1" | LC_ALL=C /usr/bin/sort -t "$(printf "\t")" -k1,1
+  ' _ "$OFF/report.stderr.raw"
+
+run_recorded \
+  "$OFF/records/frontier-grouped" 0 \
+  "$OFF/frontier-grouped.tsv" \
+  "$OFF/frontier-grouped.stderr.raw" \
+  /bin/bash -c '
+    LC_ALL=C /usr/bin/awk -F "\t" '\''
+      { key = $3 "\t" $4 "\t" $2; count[key] += 1 }
+      END { for (key in count) print key "\t" count[key] }
+    '\'' "$1" | LC_ALL=C /usr/bin/sort
+  ' _ "$OFF/frontier.tsv"
+```
+
+No extraction command occurs. Require:
+
+```bash
+test ! -e "$OFF/accepted.ll"
+run_recorded "$OFF/records/cmp-report-stdout" 0 \
+  "$OFF/cmp-report-stdout.stdout" "$OFF/cmp-report-stdout.stderr" \
+  /usr/bin/cmp "$CANONICAL/report.stdout.raw" "$OFF/report.stdout.raw"
+run_recorded "$OFF/records/cmp-report-stderr" 0 \
+  "$OFF/cmp-report-stderr.stdout" "$OFF/cmp-report-stderr.stderr" \
+  /usr/bin/cmp "$CANONICAL/report.stderr.raw" "$OFF/report.stderr.raw"
+run_recorded "$OFF/records/cmp-report-status" 0 \
+  "$OFF/cmp-report-status.stdout" "$OFF/cmp-report-status.stderr" \
+  /usr/bin/cmp "$CANONICAL/report.status" "$OFF/records/report.status"
+run_recorded "$OFF/records/cmp-report-summary" 0 \
+  "$OFF/cmp-report-summary.stdout" "$OFF/cmp-report-summary.stderr" \
+  /usr/bin/cmp "$CANONICAL/report.summary.txt" "$OFF/report.summary.txt"
+run_recorded "$OFF/records/cmp-failures-in-order" 0 \
+  "$OFF/cmp-failures-in-order.stdout" "$OFF/cmp-failures-in-order.stderr" \
+  /usr/bin/cmp "$CANONICAL/failed-functions.in-report-order.txt" \
+  "$OFF/failed-functions.in-report-order.txt"
+run_recorded "$OFF/records/cmp-failures-sorted" 0 \
+  "$OFF/cmp-failures-sorted.stdout" "$OFF/cmp-failures-sorted.stderr" \
+  /usr/bin/cmp "$CANONICAL/failed-functions.sorted.txt" \
+  "$OFF/failed-functions.sorted.txt"
+run_recorded "$OFF/records/cmp-frontier" 0 \
+  "$OFF/cmp-frontier.stdout" "$OFF/cmp-frontier.stderr" \
+  /usr/bin/cmp "$CANONICAL/frontier.tsv" "$OFF/frontier.tsv"
+run_recorded "$OFF/records/cmp-frontier-grouped" 0 \
+  "$OFF/cmp-frontier-grouped.stdout" "$OFF/cmp-frontier-grouped.stderr" \
+  /usr/bin/cmp "$CANONICAL/frontier-grouped.tsv" \
+  "$OFF/frontier-grouped.tsv"
+
+for status_name in \
+  report-summary failures-in-order failures-sorted frontier frontier-grouped
+do
+  run_recorded "$OFF/records/cmp-canonical-$status_name-status" 0 \
+    "$OFF/cmp-canonical-$status_name-status.stdout" \
+    "$OFF/cmp-canonical-$status_name-status.stderr" \
+    /usr/bin/cmp "$CANONICAL/$status_name.status" \
+    "$OFF/records/$status_name.status"
+done
+
+require_identity_sha o2_calls_crt_v1_r131_object_sha256 \
+  "$OFF/accepted.o" "$OFF/records/object-identity"
+require_identity_sha o2_calls_crt_v1_r131_owner_sha256 \
+  "$OFF/owner.tsv" "$OFF/records/owner-identity"
+require_identity_sha o2_calls_crt_v1_r131_objdump_sha256 \
+  "$OFF/accepted.objdump" "$OFF/records/objdump-identity"
+require_identity_sha o2_calls_crt_v1_r131_per_function_manifest_sha256 \
+  "$OFF/per-function-identities.tsv" \
+  "$OFF/records/per-function-identity"
+require_identity_sha o2_calls_crt_v1_r131_frontier_manifest_sha256 \
+  "$OFF/frontier.tsv" "$OFF/records/frontier-identity"
+```
+
+These are raw-report invariants. They do not use `accepted.ll` and do not
+assert successful-transaction counter equality.
+
+Freeze the raw report hash against the newly named canonical identity:
+
+```bash
+require_identity_sha \
+  o2_calls_crt_v1_r131_report_sha256 \
+  "$OFF/report.stderr.raw" \
+  "$OFF/records/report-identity"
+```
+
+### 9.4 Observation-off successful-subset outputs
+
+The object and owner commands reference the one absolute
+`CANONICAL_ACCEPTED` path:
+
+```bash
+run_recorded \
+  "$OFF/records/object" 0 \
+  "$OFF/accepted.o" \
+  "$OFF/object.stderr.raw" \
+  /usr/bin/env -i \
+    HOME="$OFF/home" \
+    TMPDIR="$OFF/tmp" \
+    PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
+    LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
+    "$COVERAGE_ARTIFACT" \
+    --emit=obj \
+    --generic-cfg-selector \
+    --target=x86_64-linux \
+    --input-limit=67108864 \
+    "$CANONICAL_ACCEPTED"
+
+run_recorded \
+  "$OFF/records/owner" 0 \
+  "$OFF/owner.tsv" \
+  "$OFF/owner.stderr.raw" \
+  /usr/bin/env -i \
+    HOME="$OFF/home" \
+    TMPDIR="$OFF/tmp" \
+    PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
+    LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
+    "$COVERAGE_ARTIFACT" \
+    --emit=selection-owner-manifest \
+    --generic-cfg-selector \
+    --target=x86_64-linux \
+    --input-limit=67108864 \
+    "$CANONICAL_ACCEPTED"
+```
+
+Again, neither environment contains the coverage variable. Require both
+stderr files empty. Derive only from `OFF/accepted.o`:
+
+```bash
+run_recorded "$OFF/records/objdump" 0 \
+  "$OFF/accepted.objdump" "$OFF/objdump.stderr.raw" \
+  /bin/bash -c 'cd "$1" && exec /usr/bin/objdump -d accepted.o' _ "$OFF"
+
+run_recorded "$OFF/records/readelf-sections" 0 \
+  "$OFF/sections.readelf" "$OFF/sections.stderr.raw" \
+  /usr/bin/readelf -SW "$OFF/accepted.o"
+
+run_recorded "$OFF/records/readelf-symbols" 0 \
+  "$OFF/symbols.readelf" "$OFF/symbols.stderr.raw" \
+  /usr/bin/readelf -sW "$OFF/accepted.o"
+
+run_recorded "$OFF/records/objcopy-text" 0 \
+  "$OFF/objcopy.stdout.raw" "$OFF/objcopy.stderr.raw" \
+  /usr/bin/objcopy --dump-section ".text=$OFF/text.bin" "$OFF/accepted.o"
+
+run_recorded "$OFF/records/functions-sorted" 0 \
+  "$OFF/functions.sorted.tsv" "$OFF/functions-sorted.stderr.raw" \
+  /bin/bash -c '
+    LC_ALL=C /usr/bin/awk '\''
+      $4 == "FUNC" && $7 == "1" && ($3 + 0) > 0 {
+        print $8 "\t" $2 "\t" $3
+      }
+    '\'' "$1" | LC_ALL=C /usr/bin/sort -t "$(printf "\t")" -k1,1
+  ' _ "$OFF/symbols.readelf"
+
+run_recorded "$OFF/records/per-function" 0 \
+  "$OFF/per-function-identities.tsv" "$OFF/per-function.stderr.raw" \
+  /bin/bash -c '
+    set -euo pipefail
+    phase="$1"
+    row=0
+    while IFS=$'\''\t'\'' read -r function_name value_hex size_dec; do
+      row=$((row + 1))
+      id=$(printf "%06d" "$row")
+      offset=$((16#$value_hex))
+      /usr/bin/dd if="$phase/text.bin" \
+        of="$phase/functions/$id.code.bin" \
+        bs=1 skip="$offset" count="$size_dec" status=none
+      (
+        cd "$phase"
+        LC_ALL=C /usr/bin/objdump -dr \
+          --disassemble="$function_name" accepted.o \
+          >"functions/$id.objdump" \
+          2>"functions/$id.objdump.stderr"
+      )
+      test ! -s "$phase/functions/$id.objdump.stderr"
+      test "$(/usr/bin/stat -c "%s" "$phase/functions/$id.code.bin")" \
+        -eq "$size_dec"
+      code_sha=$(/usr/bin/sha256sum "$phase/functions/$id.code.bin" |
+        /usr/bin/awk "{print \\$1}")
+      dis_sha=$(/usr/bin/sha256sum "$phase/functions/$id.objdump" |
+        /usr/bin/awk "{print \\$1}")
+      printf "%s\t%s\t%s\t%s\t%s\t%s\n" \
+        "$id" "$function_name" "$size_dec" "$value_hex" \
+        "$code_sha" "$dis_sha"
+    done <"$phase/functions.sorted.tsv"
+  ' _ "$OFF"
+
+run_recorded "$OFF/records/owner-ledger" 0 \
+  "$OFF/owner-ledger.txt" "$OFF/owner-ledger.stderr.raw" \
+  /bin/bash -c '
+    LC_ALL=C /usr/bin/awk -F "\t" '\''
+      NR == 1 {
+        if ($1 != "row_identity" || $2 != "selection_owner") exit 92;
+        next
+      }
+      { count[$2] += 1; total += 1 }
+      END {
+        printf("composed_block=%d\n", count["composed_block"]);
+        printf("composed_cfg=%d\n", count["composed_cfg"]);
+        printf("legacy_envelope=%d\n", count["legacy_envelope"]);
+        printf("structural_fallback=%d\n", count["structural_fallback"]);
+        printf("ledger=%d/%d/%d\n",
+          count["composed_block"] + count["composed_cfg"],
+          count["legacy_envelope"],
+          count["structural_fallback"]);
+        printf("total=%d\n", total);
+      }
+    '\'' "$1"
+  ' _ "$OFF/owner.tsv"
+```
+
+Raw-compare the fixed outputs:
+
+```bash
+for relative in \
+  accepted.o object.stderr.raw owner.tsv owner.stderr.raw \
+  accepted.objdump objdump.stderr.raw sections.readelf sections.stderr.raw \
+  symbols.readelf symbols.stderr.raw text.bin objcopy.stdout.raw \
+  objcopy.stderr.raw functions.sorted.tsv per-function-identities.tsv \
+  owner-ledger.txt
+do
+  label=${relative//[^A-Za-z0-9]/-}
+  run_recorded "$OFF/records/cmp-canonical-$label" 0 \
+    "$OFF/cmp-canonical-$label.stdout" \
+    "$OFF/cmp-canonical-$label.stderr" \
+    /usr/bin/cmp "$CANONICAL/$relative" "$OFF/$relative"
+done
+
+while IFS=$'\t' read -r id function_name size_dec value_hex code_sha dis_sha
+do
+  run_recorded "$OFF/records/cmp-canonical-$id-code" 0 \
+    "$OFF/cmp-canonical-$id-code.stdout" \
+    "$OFF/cmp-canonical-$id-code.stderr" \
+    /usr/bin/cmp "$CANONICAL/functions/$id.code.bin" \
+    "$OFF/functions/$id.code.bin"
+  run_recorded "$OFF/records/cmp-canonical-$id-objdump" 0 \
+    "$OFF/cmp-canonical-$id-objdump.stdout" \
+    "$OFF/cmp-canonical-$id-objdump.stderr" \
+    /usr/bin/cmp "$CANONICAL/functions/$id.objdump" \
+    "$OFF/functions/$id.objdump"
+done <"$CANONICAL/per-function-identities.tsv"
+
+for status_name in \
+  object owner objdump readelf-sections readelf-symbols objcopy-text \
+  functions-sorted per-function owner-ledger
+do
+  run_recorded "$OFF/records/cmp-canonical-$status_name-status" 0 \
+    "$OFF/cmp-canonical-$status_name-status.stdout" \
+    "$OFF/cmp-canonical-$status_name-status.stderr" \
+    /usr/bin/cmp "$CANONICAL/$status_name.status" \
+    "$OFF/records/$status_name.status"
+done
+```
+
+The comparison loop is driven only by the immutable canonical manifest. It
+must compare the canonical function count exactly once with no missing or
+extra `OFF/functions` file.
+
+Observation off must still have no channel and no local accepted subset:
+
+```bash
+test ! -e "$REPORT_CHANNEL"
+test ! -e "$OBJECT_CHANNEL"
+test ! -e "$OWNER_CHANNEL"
+test ! -e "$OFF/accepted.ll"
+printf 'all-three-absent\n' \
+  >"$ROOT/coverage/reference/channels.after-observation-off.txt"
+
+test "$(/usr/bin/stat -c '%a' "$CANONICAL_ACCEPTED")" = 444
+printf 'path\tbytes\tmode\tsha256\n%s\t%s\t0444\t%s\n' \
+  "$CANONICAL_ACCEPTED" \
+  "$(/usr/bin/stat -c '%s' "$CANONICAL_ACCEPTED")" \
+  "$(/usr/bin/sha256sum "$CANONICAL_ACCEPTED" |
+    /usr/bin/awk '{print $1}')" \
+  >"$ROOT/coverage/reference/canonical-accepted.after-off.tsv"
+/usr/bin/cmp "$ROOT/coverage/reference/canonical-accepted.before.tsv" \
+  "$ROOT/coverage/reference/canonical-accepted.after-off.tsv"
+printf '0\n' \
+  >"$ROOT/coverage/reference/canonical-accepted.after-off.cmp.status"
+```
+
+### 9.5 Observation-on raw report: one exclusive report channel
+
+Before the raw report:
+
+```bash
+test ! -e "$REPORT_CHANNEL"
+test ! -e "$OBJECT_CHANNEL"
+test ! -e "$OWNER_CHANNEL"
+test ! -e "$ON/accepted.ll"
+```
+
+Run exactly one report producer, against `RAW_INPUT`:
+
+```bash
+run_recorded \
+  "$ON/records/report" 1 \
+  "$ON/report.stdout.raw" \
+  "$ON/report.stderr.raw" \
+  /usr/bin/env -i \
+    HOME="$ON/home" \
+    TMPDIR="$ON/tmp" \
+    PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
+    LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
+    ZLLVM_CALL_COVERAGE_PATH="$REPORT_CHANNEL" \
+    "$COVERAGE_ARTIFACT" \
+    --emit=obj \
+    --generic-cfg-selector \
+    --report-all-codegen-failures \
+    --target=x86_64-linux \
+    --input-limit=67108864 \
+    "$RAW_INPUT"
+
+test -f "$REPORT_CHANNEL"
+test ! -e "$OBJECT_CHANNEL"
+test ! -e "$OWNER_CHANNEL"
+printf 'report-created-once\n' \
+  >"$ON/records/report-channel.presence.txt"
+```
+
+Parse the raw report with these five commands, in order:
+
+```bash
+test ! -s "$ON/report.stdout.raw"
+
+run_recorded \
+  "$ON/records/report-summary" 0 \
+  "$ON/report.summary.txt" \
+  "$ON/report-summary.stderr.raw" \
+  /bin/bash -c '
+    /usr/bin/awk '\''
+      $1 == "summary" && $2 == "zllvm-codegen-report-all" {
+        print; found += 1
+      }
+      END { if (found != 1) exit 95 }
+    '\'' "$1"
+  ' _ "$ON/report.stderr.raw"
+
+run_recorded \
+  "$ON/records/failures-in-order" 0 \
+  "$ON/failed-functions.in-report-order.txt" \
+  "$ON/failures-in-order.stderr.raw" \
+  /bin/bash -c '
+    LC_ALL=C /usr/bin/awk '\''
+      $1 == "zllvm-codegen-failure" {
+        if ($2 !~ /^function=/) exit 91;
+        sub(/^function=/, "", $2);
+        print $2
+      }
+    '\'' "$1"
+  ' _ "$ON/report.stderr.raw"
+
+run_recorded \
+  "$ON/records/failures-sorted" 0 \
+  "$ON/failed-functions.sorted.txt" \
+  "$ON/failures-sorted.stderr.raw" \
+  /usr/bin/sort -u "$ON/failed-functions.in-report-order.txt"
+
+run_recorded \
+  "$ON/records/frontier" 0 \
+  "$ON/frontier.tsv" \
+  "$ON/frontier.stderr.raw" \
+  /bin/bash -c '
+    LC_ALL=C /usr/bin/awk '\''
+      $1 == "zllvm-codegen-failure" {
+        function = diagnostic = selector_tag = selector_detail = "";
+        for (i = 2; i <= NF; i++) {
+          if ($i ~ /^function=/) {
+            function = $i; sub(/^function=/, "", function)
+          } else if ($i ~ /^diagnostic=/) {
+            diagnostic = $i; sub(/^diagnostic=/, "", diagnostic)
+          } else if ($i ~ /^selector_tag=/) {
+            selector_tag = $i; sub(/^selector_tag=/, "", selector_tag)
+          } else if ($i ~ /^selector_detail=/) {
+            selector_detail = $i; sub(/^selector_detail=/, "", selector_detail)
+          }
+        }
+        if (function == "" || diagnostic == "" ||
+            selector_tag == "" || selector_detail == "") exit 93;
+        print function "\t" diagnostic "\t" selector_tag "\t" selector_detail
+      }
+    '\'' "$1" | LC_ALL=C /usr/bin/sort -t "$(printf "\t")" -k1,1
+  ' _ "$ON/report.stderr.raw"
+
+run_recorded \
+  "$ON/records/frontier-grouped" 0 \
+  "$ON/frontier-grouped.tsv" \
+  "$ON/frontier-grouped.stderr.raw" \
+  /bin/bash -c '
+    LC_ALL=C /usr/bin/awk -F "\t" '\''
+      { key = $3 "\t" $4 "\t" $2; count[key] += 1 }
+      END { for (key in count) print key "\t" count[key] }
+    '\'' "$1" | LC_ALL=C /usr/bin/sort
+  ' _ "$ON/frontier.tsv"
+```
+
+These five commands consume only `$ON/report.stderr.raw`; they receive no
+coverage environment variable and invoke neither `z_llvm` nor
+`llvm-extract`.
+
+Raw-compare all seven report artifacts and status to canonical repetition 1
+and observation off:
+
+```bash
+for relative in \
+  report.stdout.raw report.stderr.raw report.summary.txt \
+  failed-functions.in-report-order.txt failed-functions.sorted.txt \
+  frontier.tsv frontier-grouped.tsv
+do
+  label=${relative//[^A-Za-z0-9]/-}
+  run_recorded "$ON/records/cmp-canonical-$label" 0 \
+    "$ON/cmp-canonical-$label.stdout" \
+    "$ON/cmp-canonical-$label.stderr" \
+    /usr/bin/cmp "$CANONICAL/$relative" "$ON/$relative"
+  run_recorded "$ON/records/cmp-off-$label" 0 \
+    "$ON/cmp-off-$label.stdout" \
+    "$ON/cmp-off-$label.stderr" \
+    /usr/bin/cmp "$OFF/$relative" "$ON/$relative"
+done
+
+run_recorded "$ON/records/cmp-canonical-report-status" 0 \
+  "$ON/cmp-canonical-report-status.stdout" \
+  "$ON/cmp-canonical-report-status.stderr" \
+  /usr/bin/cmp "$CANONICAL/report.status" "$ON/records/report.status"
+run_recorded "$ON/records/cmp-off-report-status" 0 \
+  "$ON/cmp-off-report-status.stdout" \
+  "$ON/cmp-off-report-status.stderr" \
+  /usr/bin/cmp "$OFF/records/report.status" "$ON/records/report.status"
+
+for status_name in \
+  report-summary failures-in-order failures-sorted frontier frontier-grouped
+do
+  run_recorded "$ON/records/cmp-canonical-$status_name-status" 0 \
+    "$ON/cmp-canonical-$status_name-status.stdout" \
+    "$ON/cmp-canonical-$status_name-status.stderr" \
+    /usr/bin/cmp "$CANONICAL/$status_name.status" \
+    "$ON/records/$status_name.status"
+  run_recorded "$ON/records/cmp-off-$status_name-status" 0 \
+    "$ON/cmp-off-$status_name-status.stdout" \
+    "$ON/cmp-off-$status_name-status.stderr" \
+    /usr/bin/cmp "$OFF/records/$status_name.status" \
+    "$ON/records/$status_name.status"
+done
+
+require_identity_sha o2_calls_crt_v1_r131_object_sha256 \
+  "$ON/accepted.o" "$ON/records/object-identity"
+require_identity_sha o2_calls_crt_v1_r131_owner_sha256 \
+  "$ON/owner.tsv" "$ON/records/owner-identity"
+require_identity_sha o2_calls_crt_v1_r131_objdump_sha256 \
+  "$ON/accepted.objdump" "$ON/records/objdump-identity"
+require_identity_sha o2_calls_crt_v1_r131_per_function_manifest_sha256 \
+  "$ON/per-function-identities.tsv" \
+  "$ON/records/per-function-identity"
+require_identity_sha o2_calls_crt_v1_r131_frontier_manifest_sha256 \
+  "$ON/frontier.tsv" "$ON/records/frontier-identity"
+```
+
+`accepted.ll` is neither produced nor referenced by the report command.
+
+Freeze the observation-on raw report hash against the same canonical
+identity:
+
+```bash
+require_identity_sha \
+  o2_calls_crt_v1_r131_report_sha256 \
+  "$ON/report.stderr.raw" \
+  "$ON/records/report-identity"
+```
+
+### 9.6 Observation-on successful-subset outputs: two exclusive channels
+
+The object command is the sole producer of `OBJECT_CHANNEL`:
+
+```bash
+test ! -e "$OBJECT_CHANNEL"
+run_recorded \
+  "$ON/records/object" 0 \
+  "$ON/accepted.o" \
+  "$ON/object.stderr.raw" \
+  /usr/bin/env -i \
+    HOME="$ON/home" \
+    TMPDIR="$ON/tmp" \
+    PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
+    LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
+    ZLLVM_CALL_COVERAGE_PATH="$OBJECT_CHANNEL" \
+    "$COVERAGE_ARTIFACT" \
+    --emit=obj \
+    --generic-cfg-selector \
+    --target=x86_64-linux \
+    --input-limit=67108864 \
+    "$CANONICAL_ACCEPTED"
+test -f "$OBJECT_CHANNEL"
+test ! -e "$OWNER_CHANNEL"
+printf 'object-created-once\n' \
+  >"$ON/records/object-channel.presence.txt"
+```
+
+The owner command is the sole producer of `OWNER_CHANNEL`:
+
+```bash
+test ! -e "$OWNER_CHANNEL"
+run_recorded \
+  "$ON/records/owner" 0 \
+  "$ON/owner.tsv" \
+  "$ON/owner.stderr.raw" \
+  /usr/bin/env -i \
+    HOME="$ON/home" \
+    TMPDIR="$ON/tmp" \
+    PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
+    LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
+    ZLLVM_CALL_COVERAGE_PATH="$OWNER_CHANNEL" \
+    "$COVERAGE_ARTIFACT" \
+    --emit=selection-owner-manifest \
+    --generic-cfg-selector \
+    --target=x86_64-linux \
+    --input-limit=67108864 \
+    "$CANONICAL_ACCEPTED"
+test -f "$OWNER_CHANNEL"
+printf 'owner-created-once\n' \
+  >"$ON/records/owner-channel.presence.txt"
+```
+
+The downstream commands are exactly:
+
+```bash
+run_recorded "$ON/records/objdump" 0 \
+  "$ON/accepted.objdump" "$ON/objdump.stderr.raw" \
+  /bin/bash -c 'cd "$1" && exec /usr/bin/objdump -d accepted.o' _ "$ON"
+
+run_recorded "$ON/records/readelf-sections" 0 \
+  "$ON/sections.readelf" "$ON/sections.stderr.raw" \
+  /usr/bin/readelf -SW "$ON/accepted.o"
+
+run_recorded "$ON/records/readelf-symbols" 0 \
+  "$ON/symbols.readelf" "$ON/symbols.stderr.raw" \
+  /usr/bin/readelf -sW "$ON/accepted.o"
+
+run_recorded "$ON/records/objcopy-text" 0 \
+  "$ON/objcopy.stdout.raw" "$ON/objcopy.stderr.raw" \
+  /usr/bin/objcopy --dump-section ".text=$ON/text.bin" "$ON/accepted.o"
+
+run_recorded "$ON/records/functions-sorted" 0 \
+  "$ON/functions.sorted.tsv" "$ON/functions-sorted.stderr.raw" \
+  /bin/bash -c '
+    LC_ALL=C /usr/bin/awk '\''
+      $4 == "FUNC" && $7 == "1" && ($3 + 0) > 0 {
+        print $8 "\t" $2 "\t" $3
+      }
+    '\'' "$1" | LC_ALL=C /usr/bin/sort -t "$(printf "\t")" -k1,1
+  ' _ "$ON/symbols.readelf"
+
+run_recorded "$ON/records/per-function" 0 \
+  "$ON/per-function-identities.tsv" "$ON/per-function.stderr.raw" \
+  /bin/bash -c '
+    set -euo pipefail
+    phase="$1"
+    row=0
+    while IFS=$'\''\t'\'' read -r function_name value_hex size_dec; do
+      row=$((row + 1))
+      id=$(printf "%06d" "$row")
+      offset=$((16#$value_hex))
+      /usr/bin/dd if="$phase/text.bin" \
+        of="$phase/functions/$id.code.bin" \
+        bs=1 skip="$offset" count="$size_dec" status=none
+      (
+        cd "$phase"
+        LC_ALL=C /usr/bin/objdump -dr \
+          --disassemble="$function_name" accepted.o \
+          >"functions/$id.objdump" \
+          2>"functions/$id.objdump.stderr"
+      )
+      test ! -s "$phase/functions/$id.objdump.stderr"
+      test "$(/usr/bin/stat -c "%s" "$phase/functions/$id.code.bin")" \
+        -eq "$size_dec"
+      code_sha=$(/usr/bin/sha256sum "$phase/functions/$id.code.bin" |
+        /usr/bin/awk "{print \\$1}")
+      dis_sha=$(/usr/bin/sha256sum "$phase/functions/$id.objdump" |
+        /usr/bin/awk "{print \\$1}")
+      printf "%s\t%s\t%s\t%s\t%s\t%s\n" \
+        "$id" "$function_name" "$size_dec" "$value_hex" \
+        "$code_sha" "$dis_sha"
+    done <"$phase/functions.sorted.tsv"
+  ' _ "$ON"
+
+run_recorded "$ON/records/owner-ledger" 0 \
+  "$ON/owner-ledger.txt" "$ON/owner-ledger.stderr.raw" \
+  /bin/bash -c '
+    LC_ALL=C /usr/bin/awk -F "\t" '\''
+      NR == 1 {
+        if ($1 != "row_identity" || $2 != "selection_owner") exit 92;
+        next
+      }
+      { count[$2] += 1; total += 1 }
+      END {
+        printf("composed_block=%d\n", count["composed_block"]);
+        printf("composed_cfg=%d\n", count["composed_cfg"]);
+        printf("legacy_envelope=%d\n", count["legacy_envelope"]);
+        printf("structural_fallback=%d\n", count["structural_fallback"]);
+        printf("ledger=%d/%d/%d\n",
+          count["composed_block"] + count["composed_cfg"],
+          count["legacy_envelope"],
+          count["structural_fallback"]);
+        printf("total=%d\n", total);
+      }
+    '\'' "$1"
+  ' _ "$ON/owner.tsv"
+```
+
+These commands consume only `$ON/accepted.o` or `$ON/owner.tsv`; pass no
+coverage variable; and invoke neither `z_llvm` nor `llvm-extract`.
+
+Compare every fixed successful-subset artifact to both references:
+
+```bash
+for relative in \
+  accepted.o object.stderr.raw owner.tsv owner.stderr.raw \
+  accepted.objdump objdump.stderr.raw sections.readelf sections.stderr.raw \
+  symbols.readelf symbols.stderr.raw text.bin objcopy.stdout.raw \
+  objcopy.stderr.raw functions.sorted.tsv per-function-identities.tsv \
+  owner-ledger.txt
+do
+  label=${relative//[^A-Za-z0-9]/-}
+  run_recorded "$ON/records/cmp-canonical-$label" 0 \
+    "$ON/cmp-canonical-$label.stdout" \
+    "$ON/cmp-canonical-$label.stderr" \
+    /usr/bin/cmp "$CANONICAL/$relative" "$ON/$relative"
+  run_recorded "$ON/records/cmp-off-$label" 0 \
+    "$ON/cmp-off-$label.stdout" \
+    "$ON/cmp-off-$label.stderr" \
+    /usr/bin/cmp "$OFF/$relative" "$ON/$relative"
+done
+
+while IFS=$'\t' read -r id function_name size_dec value_hex code_sha dis_sha
+do
+  run_recorded "$ON/records/cmp-canonical-$id-code" 0 \
+    "$ON/cmp-canonical-$id-code.stdout" \
+    "$ON/cmp-canonical-$id-code.stderr" \
+    /usr/bin/cmp "$CANONICAL/functions/$id.code.bin" \
+    "$ON/functions/$id.code.bin"
+  run_recorded "$ON/records/cmp-off-$id-code" 0 \
+    "$ON/cmp-off-$id-code.stdout" \
+    "$ON/cmp-off-$id-code.stderr" \
+    /usr/bin/cmp "$OFF/functions/$id.code.bin" \
+    "$ON/functions/$id.code.bin"
+  run_recorded "$ON/records/cmp-canonical-$id-objdump" 0 \
+    "$ON/cmp-canonical-$id-objdump.stdout" \
+    "$ON/cmp-canonical-$id-objdump.stderr" \
+    /usr/bin/cmp "$CANONICAL/functions/$id.objdump" \
+    "$ON/functions/$id.objdump"
+  run_recorded "$ON/records/cmp-off-$id-objdump" 0 \
+    "$ON/cmp-off-$id-objdump.stdout" \
+    "$ON/cmp-off-$id-objdump.stderr" \
+    /usr/bin/cmp "$OFF/functions/$id.objdump" \
+    "$ON/functions/$id.objdump"
+done <"$CANONICAL/per-function-identities.tsv"
+
+for status_name in \
+  object owner objdump readelf-sections readelf-symbols objcopy-text \
+  functions-sorted per-function owner-ledger
+do
+  run_recorded "$ON/records/cmp-canonical-$status_name-status" 0 \
+    "$ON/cmp-canonical-$status_name-status.stdout" \
+    "$ON/cmp-canonical-$status_name-status.stderr" \
+    /usr/bin/cmp "$CANONICAL/$status_name.status" \
+    "$ON/records/$status_name.status"
+  run_recorded "$ON/records/cmp-off-$status_name-status" 0 \
+    "$ON/cmp-off-$status_name-status.stdout" \
+    "$ON/cmp-off-$status_name-status.stderr" \
+    /usr/bin/cmp "$OFF/records/$status_name.status" \
+    "$ON/records/$status_name.status"
+done
+```
+
+The loop must consume every canonical manifest row exactly once. The only
+per-function filenames are the six-digit IDs generated from those rows,
+each with `.code.bin`, `.objdump`, and empty `.objdump.stderr` companions.
+There must be no missing, extra, or duplicate per-function output.
+
+Finally recheck the sole canonical accepted input:
+
+```bash
+test ! -e "$ON/accepted.ll"
+test "$(/usr/bin/stat -c '%a' "$CANONICAL_ACCEPTED")" = 444
+printf 'path\tbytes\tmode\tsha256\n%s\t%s\t0444\t%s\n' \
+  "$CANONICAL_ACCEPTED" \
+  "$(/usr/bin/stat -c '%s' "$CANONICAL_ACCEPTED")" \
+  "$(/usr/bin/sha256sum "$CANONICAL_ACCEPTED" |
+    /usr/bin/awk '{print $1}')" \
+  >"$ROOT/coverage/reference/canonical-accepted.after-on.tsv"
+/usr/bin/cmp "$ROOT/coverage/reference/canonical-accepted.before.tsv" \
+  "$ROOT/coverage/reference/canonical-accepted.after-on.tsv"
+printf '0\n' \
+  >"$ROOT/coverage/reference/canonical-accepted.after-on.cmp.status"
+```
+
+### 9.7 Exact counter checks
+
+The report counter is a raw-report observation. Validate it with:
+
+```bash
+run_recorded "$ON/records/validate-report-counters" 0 \
+  "$ON/validate-report-counters.stdout" \
+  "$ON/validate-report-counters.stderr" \
+  /bin/bash -c '
+    /usr/bin/awk -F "\t" '\''
+      $1 == "schema" {
+        if ($2 != "o2_calls_crt_v1_coverage_v1") exit 101;
+        schema += 1
+      }
+      NF == 8 && ($1 == "direct_call" ||
+                  $1 == "int_byte_size_call") {
+        family[$1] += 1;
+        for (i = 2; i <= 8; i++) if (($i + 0) <= 0) exit 102;
+      }
+      $1 == "unexpected_family_events" {
+        if (($2 + 0) != 0) exit 103; unexpected += 1
+      }
+      $1 == "argument_index_overflow_events" {
+        if (($2 + 0) != 0) exit 104; overflow += 1
+      }
+      END {
+        if (schema != 1 || family["direct_call"] != 1 ||
+            family["int_byte_size_call"] != 1 ||
+            unexpected != 1 || overflow != 1) exit 105
+      }
+    '\'' "$1"
+  ' _ "$REPORT_CHANNEL"
+```
+
+This requires every family lifecycle boundary nonzero, but deliberately
+does not require transaction/success equality because report-all continues
+after failing functions.
+
+Object and owner consume only canonical successful functions. Validate each
+with the same exact successful-subset checker:
+
+```bash
+for channel in "$OBJECT_CHANNEL" "$OWNER_CHANNEL"; do
+  channel_label=${channel##*/}
+  channel_label=${channel_label%.coverage.tsv}
+  run_recorded "$ON/records/validate-$channel_label-counters" 0 \
+    "$ON/validate-$channel_label-counters.stdout" \
+    "$ON/validate-$channel_label-counters.stderr" \
+    /bin/bash -c '
+      /usr/bin/awk -F "\t" '\''
+        $1 == "schema" {
+          if ($2 != "o2_calls_crt_v1_coverage_v1") exit 111;
+          schema += 1
+        }
+        NF == 8 && ($1 == "direct_call" ||
+                    $1 == "int_byte_size_call") {
+          name = $1;
+          family[name] += 1;
+          transactions[name] = $2 + 0;
+          requests[name] = $3 + 0;
+          attachments[name] = $4 + 0;
+          stages[name] = $5 + 0;
+          materializations[name] = $6 + 0;
+          actions[name] = $7 + 0;
+          commits[name] = $8 + 0;
+        }
+        NF == 4 && ($1 == "direct_call" ||
+                    $1 == "int_byte_size_call") {
+          name = $1; position = $2 + 0;
+          if (position < 0 || position > 5) exit 112;
+          position_rows[name, position] += 1;
+          position_requests[name, position] = $3 + 0;
+          position_stages[name, position] = $4 + 0;
+        }
+        $1 == "unexpected_family_events" {
+          if (($2 + 0) != 0) exit 113; unexpected += 1
+        }
+        $1 == "argument_index_overflow_events" {
+          if (($2 + 0) != 0) exit 114; overflow += 1
+        }
+        END {
+          if (schema != 1 || unexpected != 1 || overflow != 1) exit 115;
+          for (f = 1; f <= 2; f++) {
+            name = (f == 1 ? "direct_call" : "int_byte_size_call");
+            if (family[name] != 1 || transactions[name] <= 0) exit 116;
+            if (transactions[name] != attachments[name] ||
+                transactions[name] != materializations[name] ||
+                transactions[name] != actions[name] ||
+                transactions[name] != commits[name]) exit 117;
+            if (requests[name] != stages[name]) exit 118;
+            for (p = 0; p <= 5; p++) {
+              if (position_rows[name, p] != 1) exit 119;
+              if (position_requests[name, p] !=
+                  position_stages[name, p]) exit 120;
+            }
+          }
+          if (requests["direct_call"] <= 0 ||
+              stages["direct_call"] <= 0) exit 121;
+          if (requests["int_byte_size_call"] !=
+              transactions["int_byte_size_call"]) exit 122;
+          if (position_requests["int_byte_size_call", 0] !=
+              transactions["int_byte_size_call"]) exit 123;
+          for (p = 1; p <= 5; p++) {
+            if (position_requests["int_byte_size_call", p] != 0)
+              exit 124;
+          }
+        }
+      '\'' "$1"
+    ' _ "$channel"
+done
+
+run_recorded "$ON/records/cmp-object-owner-counters" 0 \
+  "$ON/cmp-object-owner-counters.stdout" \
+  "$ON/cmp-object-owner-counters.stderr" \
+  /usr/bin/cmp "$OBJECT_CHANNEL" "$OWNER_CHANNEL"
+```
+
+The counter TSVs are evidence only; they are never compared to or included
+in canonical semantic identity hashes.
+
+### 9.8 Produced-versus-referenced closure and final records
+
+Observation off references:
 
 ```text
-ZLLVM_CALL_COVERAGE_PATH=<command-specific exclusive .tsv path>
+RAW_INPUT for report
+CANONICAL_ACCEPTED for object and owner
+CANONICAL report/object/owner/objdump/readelf/per-function/frontier outputs
+COVERAGE_ARTIFACT
 ```
 
-The exact paths are:
+It newly produces only its command records, raw report and parsings,
+object/owner outputs, object inspections, per-function files, ledgers,
+comparisons, and final manifest under `OFF`. It produces no channel file and
+no successful-subset input.
 
-```text
-report.coverage.tsv
-object.coverage.tsv
-owner.coverage.tsv
+Observation on references the same four sets. It additionally produces
+exactly the three exclusive channel files and nothing else outside `ON`.
+`REPORT_CHANNEL` is produced only by the raw-input report command;
+`OBJECT_CHANNEL` only by the canonical-subset object command; and
+`OWNER_CHANNEL` only by the canonical-subset owner command.
+
+After all comparisons:
+
+```bash
+test -f "$REPORT_CHANNEL"
+test -f "$OBJECT_CHANNEL"
+test -f "$OWNER_CHANNEL"
+test ! -e "$OFF/accepted.ll"
+test ! -e "$ON/accepted.ll"
+
+shopt -s globstar nullglob
+off_paths=("$OFF"/**)
+for path in "${off_paths[@]}"; do
+  test -f "$path" && test ! -L "$path" || continue
+  /usr/bin/sha256sum "$path"
+done |
+  LC_ALL=C /usr/bin/sort \
+  >"$ROOT/coverage/observation-off.files.sha256"
+on_paths=("$ON"/**)
+for path in "${on_paths[@]}"; do
+  test -f "$path" && test ! -L "$path" || continue
+  /usr/bin/sha256sum "$path"
+done |
+  LC_ALL=C /usr/bin/sort \
+  >"$ROOT/coverage/observation-on.files.sha256"
+
+for path in "${off_paths[@]}"; do
+  test -f "$path" && test ! -L "$path" || continue
+  /usr/bin/chmod 0444 "$path"
+done
+for path in "${on_paths[@]}"; do
+  test -f "$path" && test ! -L "$path" || continue
+  /usr/bin/chmod 0444 "$path"
+done
+
+reference_paths=("$ROOT/coverage/reference"/**)
+for path in "${reference_paths[@]}"; do
+  test -f "$path" && test ! -L "$path" || continue
+  /usr/bin/chmod 0444 "$path"
+done
+/usr/bin/chmod 0444 \
+  "$ROOT/coverage/observation-off.files.sha256" \
+  "$ROOT/coverage/observation-on.files.sha256"
+
+{
+  printf 'path\tbytes\tmode\tsha256\n'
+  {
+    for path in "${off_paths[@]}"; do
+      test -f "$path" && test ! -L "$path" || continue
+      printf '%s\t%s\t%s\t%s\n' \
+        "$path" \
+        "$(/usr/bin/stat -c '%s' "$path")" \
+        "$(/usr/bin/stat -c '%a' "$path")" \
+        "$(/usr/bin/sha256sum "$path" | /usr/bin/awk '{print $1}')"
+    done
+  } | LC_ALL=C /usr/bin/sort -t "$(printf '\t')" -k1,1
+} >"$ROOT/coverage/observation-off.final.tsv"
+
+{
+  printf 'path\tbytes\tmode\tsha256\n'
+  {
+    for path in "${on_paths[@]}"; do
+      test -f "$path" && test ! -L "$path" || continue
+      printf '%s\t%s\t%s\t%s\n' \
+        "$path" \
+        "$(/usr/bin/stat -c '%s' "$path")" \
+        "$(/usr/bin/stat -c '%a' "$path")" \
+        "$(/usr/bin/sha256sum "$path" | /usr/bin/awk '{print $1}')"
+    done
+  } | LC_ALL=C /usr/bin/sort -t "$(printf '\t')" -k1,1
+} >"$ROOT/coverage/observation-on.final.tsv"
+
+/usr/bin/chmod 0444 \
+  "$ROOT/coverage/observation-off.final.tsv" \
+  "$ROOT/coverage/observation-on.final.tsv"
+/usr/bin/sha256sum \
+  "$ROOT/coverage/observation-off.final.tsv" \
+  "$ROOT/coverage/observation-on.final.tsv" \
+  >"$ROOT/coverage/final-manifests.sha256"
+/usr/bin/chmod 0444 "$ROOT/coverage/final-manifests.sha256"
 ```
 
-Each path must be absent before its command and must be created exactly once.
-No coverage variable is passed to `llvm-extract`, `objdump`, `readelf`,
-`objcopy`, `dd`, hashing, parsing, or comparison commands.
+The two final TSVs record path, bytes, mode, and SHA-256 for every phase
+file after its final mode change. They are outside the enumerated phase
+roots and are then made `0444`; their hashes are frozen in the separately
+mode-frozen `final-manifests.sha256`. Any extra output, channel reuse,
+missing status record, changed canonical accepted input, semantic mismatch,
+zero/invalid counter, or mode/hash movement is an immediate stop.
 
-### 9.3 Semantic comparisons
-
-Raw-compare every semantic output from observation-off and observation-on to
-canonical repetition 1:
-
-```text
-report bytes/status/population/first failure
-failed-function lists and accepted.ll
-object bytes/status/stderr
-owner bytes/status/stderr/ledger
-whole objdump
-all per-function bytes and disassemblies
-per-function manifest
-complete frontier and grouped proof
-```
-
-All three sets must be exactly equal. The coverage artifact cannot establish
-or replace a canonical value.
-
-### 9.4 Counter invariants
-
-Every coverage TSV must have the exact schema and two family rows emitted by
-the frozen observer. `unexpected_family_events` and
-`argument_index_overflow_events` must be zero in all three files.
-
-For `object.coverage.tsv` and `owner.coverage.tsv`, independently require:
-
-```text
-direct_call.transactions > 0
-int_byte_size_call.transactions > 0
-
-for each family:
-  transactions
-    == actions_attached
-    == materializations_completed
-    == actions_completed
-    == commits
-  requests_registered == arguments_staged
-  requests_registered[position N] == arguments_staged[position N]
-    for every N in 0..5
-
-int_byte_size_call.requests_registered
-  == int_byte_size_call.transactions
-int_byte_size_call.position_0
-  == int_byte_size_call.transactions
-int_byte_size_call.position_1..5 == 0
-
-direct_call.requests_registered > 0
-direct_call.arguments_staged > 0
-```
-
-The complete object and owner counter files must be byte-identical. For the
-raw-input report counter file, require every listed lifecycle count for both
-families to be nonzero and both unexpected/overflow counts zero. It is not
-used to assert success-count equality because report-all deliberately
-continues after failed functions.
-
-Static classifier matches, patch content, and INBOX-181 isolation are
-supporting provenance only; they cannot replace any nonzero dynamic count.
+Static classifier matches, patch content, and INBOX-181 isolation remain
+supporting provenance only; they cannot replace any dynamic count.
 
 ## 10. Exact restoration proof
 
@@ -931,6 +2025,44 @@ canonical_identity=NOT_YET_DEFINED
 coverage=NOT_RUN
 validation=NOT_RUN
 protocol=NOT_ADOPTED
+production=UNCHANGED_DORMANT
+ratchet=131
+next=STOP_FOR_WATCHER_REVIEWER_BEFORE_VALIDATION_EXECUTION
+```
+
+## 14. INBOX-187A command-closure correction record
+
+INBOX-187A started from clean operating-document commit
+`e4a8952633c101949093130b935db8503e921b68` above accepted INBOX-187
+document commit `a041487eee50f86b594beeeedb2071479842c093`. The only tracked
+change is this document.
+
+The final read-only recheck observed:
+
+```text
+bundle_manifest_sha256=0576d5803400ea9575d65fc501b87d514c97e806540be29018fb5192bd68e7f0
+combined_patch_sha256=7508d1d8f74b7e9b97ae5722a0822a86c8d2079779a25cd37559ce5bc651036f
+combined_patch_apply_check_status=0
+adopted_input_sha256=9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1
+adoption_manifest_sha256=500e73c8433aa73159adfba5de8a6708ae4030140b97b823ef895caa1528f2bf
+reproduction_manifest_sha256=885008980c8a272e82d06cf89b81652ab5a9669e89364b01d7b9e2761135ff1e
+retention_pins_sha256=1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3
+watcher_head_index_worktree_blob=b64131cf60dd0ef638e815cd33db9ae8595a72cf
+stash_at_0=7985c6d01040a6e47e4ce5b918866d0e89517ac7
+source_surface_diff_from_43de59b0=empty
+ratchet=131
+```
+
+All bundle payloads remain mode `0444` and the bundle root remains mode
+`0555`. The correction ran no project code, build, Zig command, `z_llvm`,
+report/object generation, guard/test/gate, validation, coverage,
+performance, wiring, pin edit, cleanup, or credit.
+
+```text
+section_9=EXACT_COMMAND_CLOSURE_CORRECTED_PENDING_REVIEW
+patch_bundle=UNCHANGED_ACCEPTED
+validation=NOT_RUN
+coverage=NOT_RUN
 production=UNCHANGED_DORMANT
 ratchet=131
 next=STOP_FOR_WATCHER_REVIEWER_BEFORE_VALIDATION_EXECUTION
