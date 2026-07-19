@@ -6,50 +6,62 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-176 ordinary-call failure diagnosis — AUTHORIZED for dispatch
+## INBOX-177 closed call final-use plan design — AUTHORIZED for dispatch
 
-The Reviewer accepts `fd48a962` as compliant INBOX-175 stop evidence, but
-does **not** accept the ordinary family or the incomplete matrix. Ordinary
-remains retained wholesale; `zig.target.intByteSize` and aggregate isolation
-remain unauthorized.
+INBOX-176 at `afd97d55` is **ACCEPTED**. The exact failure is seal/Q1
+`ValueUseExpiredSource` for a truthful planned final-use EAX argument;
+ordinary remains retained wholesale and `zig.target.intByteSize`/aggregate
+isolation remain unauthorized.
 
-Dispatch is authorized from composite HEAD `dc8609a4`. The separately tested
-clean-tmp tooling patch `6804846c` was integrated byte-for-byte at the clean
-boundary. Use `c1ffd1cc` as the exact codegen-source baseline and `dc8609a4`
-as the composite provenance HEAD.
+INBOX-177 is docs-only. Prefer moving the existing `attachCallAction` to a
+registering/pre-seal lifecycle rather than creating another mechanism:
+register all argument requests, attach exactly one action, then seal.
+Zero-argument calls attach their zero-handle action before sealing. If this
+cannot fit the frozen surface and budgets, record a structural stop.
 
-When separately dispatched, INBOX-176 is diagnostic/evidence-only. Reapply
-the exact retained ordinary patch from the clean `c1ffd1cc` dormant source
-state and use only guard-confined temporary instrumentation plus project-root
-focused tests needed to identify the three failures.
+Freeze an action-and-handle-scoped final-use admission predicate requiring a
+current canonical identity/generation match, a real plan and interval whose
+exact final-use boundary matches the current call position, an admitted
+accumulator home, and canonical revalidation before staging. Reject forward
+plans, missing or stale metadata, noncanonical sources, non-accumulator
+homes, foreign/unclaimed handles, other tags, and every non-call request.
+Generic Q1 must remain unchanged.
 
-For the dies-at-current EAX argument, identify the exact failing phase
-(request construction, seal/Q1, prepare, materialization, or action
-execution), precise error/provenance mapping, interval, canonical binding,
-Q1/Q2/Q3 decisions, accumulator occupancy, accepted legacy displacement and
-staging sequence, and decisive before/after state. Decide whether the
-minimal semantic remedy is an action displacement-plan amendment or a
-narrower classifier envelope, but implement neither. Do not weaken a
-truthful planned legacy-success fixture.
+Freeze the complete attachment/seal/prepare/materialize/action/commit and
+rollback lifecycle, validation and diagnostic precedence, zero-request
+behavior, and exact phase/error rules. Prove Q2-surviving sources and
+unrelated Q3 aliases retain their existing preservation authorities.
 
-For the two guard failures, derive function/API-scoped accounting. A generic
-`.direct_call` opcode ban is forbidden, and a call-specific mapper must not
-be required inside an unrelated memcpy-only fixture. Identify the exact
-source/function for each rejection.
+Preserve the pure semantic consumer classifier and accepted two tags,
+four facade additions/126 symbols, existing use forms/destinations, import
+graph, and file budgets. No home/liveness query, `ValueLoc`, physical hint,
+callback, function predicate, fallback, hidden attachment API, fifth facade
+symbol, or runtime planning edge.
 
-No production/action/model/planning/lifetime/Q1/materialization/facade/
-capability/classifier/fixture/guard-policy amendment or fix-forward. Retain
-exact patch, instrumentation, focused-log, command, provenance, and evidence
-hashes; remove temporary changes; restore the exact dormant source state;
-commit evidence only; ratchet 131; stash untouched; STOP for review.
+Freeze production-faithful dormant proofs for final-use EAX/RAX across
+argument positions, Q2/Q3 preservation, aliases, cycles, stale/missing plan
+cases, non-accumulator sources, handle/phase errors, canonical revalidation,
+zero arguments, rollback boundaries, and unchanged legacy streams and
+diagnostics. Freeze function/API-scoped guards and per-present provenance
+mappers with negative fixtures; no raw `.direct_call` opcode ban.
 
-No full unit or isolation rerun, `intByteSize`/aggregate build, canaries, ABI,
-standalone source guard, performance, integrated-exe, strengthened Tier 2,
-distribution-all, Tier 3, production wiring, or ratchet credit.
+Add only `docs/evidence/inbox177_o2_call_final_use_plan_design.md`. No code,
+tests, guards, tools, facade/manifest/bypass changes, Zig/project commands,
+identities, or gates. Ratchet 131; retention tooling frozen; no `clean-tmp`
+or deletion. Commit the one document and STOP before implementation or
+re-isolation.
 
-The retention tooling and policy files are out of scope and must remain
-byte-identical to `dc8609a4`. Do not execute `clean-tmp`, delete retained
-artifacts, or infer cleanup authority from the infrastructure commit.
+## INBOX-176 ordinary-call diagnosis — ACCEPTED at afd97d55
+
+The diagnosis proves registration succeeds and seal/Q1 rejects the current
+final-use EAX source with `ValueUseExpiredSource`, preserving request
+provenance and exact rollback state. The legacy control stages
+`mov_eax_to_arg rdi`, emits the call without spilling, removes the expired
+argument, and defines the result in EAX. The remedy class is a closed action
+displacement/admission plan—not classifier narrowing or generic Q1
+weakening. Both guard failures are confirmed temporary accounting defects:
+the generic opcode match hits `composed_selector_eflags.instructionEffect`,
+and the memcpy-only fixture is incorrectly coupled to the call mapper.
 
 ## INBOX-175 isolation — COMPLIANT STOP evidence ACCEPTED at fd48a962; families NOT accepted
 
