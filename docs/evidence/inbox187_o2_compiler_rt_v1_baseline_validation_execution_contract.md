@@ -1,7 +1,7 @@
 # INBOX-187 — compiler-rt v1 baseline-validation execution contract
 
-Status: **contract correction pending Watcher/Reviewer acceptance; execution
-not authorized or performed**.
+Status: **v2 preflight portability/serialization correction pending
+Watcher/Reviewer acceptance; v2 execution not authorized or performed**.
 
 This document defines the proposed future ratchet-131 baseline-validation
 procedure.
@@ -22,6 +22,16 @@ argument-binding class and records the complete static invocation audit. It
 does not change or execute the accepted patch bundle, validation protocol,
 compiler, or any retained artifact.
 
+INBOX-188 then executed the v1 contract once. Its first C01 assertion
+failed closed because the sanitized environment exposed a preexisting
+untracked tooling path, and static inspection found the unreached
+double-evaluation defect that corrupts the AWK `$1` programs. INBOX-189,
+authorized from clean operating commit
+`b7eaafa7230bc4d2b6305f99fbbcac757258a067`, preserves that exhausted v1
+attempt byte for byte and defines a wholly disjoint v2 namespace. No v1
+command, record, root, or external record prefix may be rerun, repaired,
+renamed, normalized, or reused.
+
 ## 1. Accepted basis and current preflight
 
 The tracked authorization and source basis are:
@@ -34,6 +44,11 @@ INBOX_187A_document_commit=527340b6
 INBOX_187B_operating_commit=1d996a1abddfc584bcad2b747705fca7f6a3642d
 INBOX_187B_document_commit=22da533a8b7ee5596671beb91dd4f5575e5708b9
 INBOX_187C_operating_commit=d34fd6dee198f5f8e823b2d8b842d4d142b221a8
+INBOX_187C_document_commit=8411478a
+INBOX_188_operating_commit=d0c1d262
+INBOX_188_compliant_stop_commit=59d9cb335f37fdb1df07bb25769a551760c4207a
+INBOX_188_summary_sha256=802990e44f4a283a0d2bc95568b1602dfa108d97e1c13c36d792fca0d6002c24
+INBOX_189_operating_commit=b7eaafa7230bc4d2b6305f99fbbcac757258a067
 exact_dormant_ratchet_131_source_commit=43de59b0
 INBOX_184_contract_commit=1c343ec8
 INBOX_185_reproduction_commit=b1567ace
@@ -234,14 +249,16 @@ Future execution may use only:
 REPO=/home/oleg/prog/z_llvm
 INPUT=$REPO/tmp/o2_calls_perf/compiler_rt_v1/compiler_rt_v1.ll
 BUNDLE=$REPO/tmp/o2_calls_perf/compiler_rt_v1/inbox187_baseline_validation_contract_bundle
-ROOT=$REPO/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1
+ROOT=$REPO/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2
 SOURCE_COMMIT=43de59b0
 TARGET=x86_64-linux
 INPUT_LIMIT=67108864
 ```
 
-`$ROOT` must be absent. The exact adopted input and all section-1 surfaces
-must pass again before `$ROOT` is created. The future tool hashes must equal
+`$ROOT`, `$PARENT/baseline_validation_v2.preflight.*`, and
+`$PARENT/baseline_validation_v2.driver.*` must all be absent. The exact
+adopted input and all section-1 surfaces must pass again before `$ROOT` is
+created. The future tool hashes must equal
 `$BUNDLE/manifests/future-tool-identities.sha256`; in particular:
 
 ```text
@@ -279,6 +296,33 @@ No inherited environment variable is allowed. Build commands additionally
 use explicit, initially empty local/global cache directories. A command,
 environment, tool, or output path not named here is prohibited.
 
+### 4.1 V2 namespace and exhausted-v1 separation
+
+The future generated namespace is closed to these two prefixes:
+
+```text
+/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2
+/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2.{preflight,driver}
+```
+
+Every future canonical root, coverage root, status, manifest, comparison,
+record, and generated-ledger path in sections 5–12 is beneath one of those
+prefixes. The root/prefix absence checks execute before any producer. No
+future executable command or generated-ledger entry names
+`baseline_validation_v1`, follows a symlink into it, or accepts a
+generated-path parameter outside the closed v2 variables. Outside this
+separation statement, v1 paths occur only in the immutable historical
+INBOX-188 ledger in section 15.1; they are review inputs, never command
+inputs or outputs.
+
+The tracked-cleanliness portion of C01 uses only the exact expected tracked
+`HEAD`, the worktree diff, the cached diff,
+`status --porcelain --untracked-files=no`, and the frozen tracked-source
+manifest. It does not enumerate, whitelist, read, hash, consume, modify, or
+grant an exception for `.claude` or any other untracked workspace path.
+The separately named adopted input and read-only bundle remain immutable
+contract inputs, not cleanliness exceptions.
+
 ## 5. One exact canonical Bash driver
 
 Sections 5–7 are one ordered `/bin/bash --noprofile --norc` driver. The
@@ -295,11 +339,17 @@ shown here:
     TMPDIR=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1 \
     PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
     LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
-    /bin/bash --noprofile --norc
+    /bin/bash --noprofile --norc -s -- \
+    __BASELINE_VALIDATION_V2_AUTHORIZED_HEAD__
 )
 ```
 
 The driver block is supplied exactly once on that shell's standard input.
+The final launcher argument is the single closed future-authorization
+binding. A later v2 execution authorization must replace that token with
+its exact 40-lowercase-hex tracked operating `HEAD`; no command is
+authorized while the token remains. The driver accepts exactly that one
+argument and C01 compares it to `git rev-parse HEAD`.
 The already pinned parent is used only for the driver shell's `HOME` and
 `TMPDIR`; every build and workload command still receives its separately
 empty phase directories. The driver begins in strict mode and never uses
@@ -318,15 +368,23 @@ no expected-nonzero producer is placed in a pipeline.
 set -euo pipefail
 umask 022
 
+test "$#" -eq 1
+readonly EXPECTED_MAIN_HEAD="$1"
+shift
+test "$#" -eq 0
+test "${#EXPECTED_MAIN_HEAD}" -eq 40
+test -z "${EXPECTED_MAIN_HEAD//[0-9a-f]/}"
+
 readonly REPO=/home/oleg/prog/z_llvm
 readonly PARENT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1
 readonly INPUT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/compiler_rt_v1.ll
 readonly BUNDLE=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/inbox187_baseline_validation_contract_bundle
-readonly ROOT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1
-readonly CANONICAL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical
-readonly ARTIFACT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical/artifact/z_llvm
-readonly ACCEPTED=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical/repetition-1/accepted.ll
-readonly DRIVER_RECORD=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.driver
+readonly ROOT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2
+readonly CANONICAL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/canonical
+readonly ARTIFACT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/canonical/artifact/z_llvm
+readonly ACCEPTED=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/canonical/repetition-1/accepted.ll
+readonly DRIVER_RECORD=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2.driver
+readonly TRACKED_SOURCE_MANIFEST="$BUNDLE/manifests/baseline-source.sha256"
 readonly PATH_VALUE=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin
 
 write_status_once() {
@@ -406,7 +464,7 @@ run_step() {
 
 test "$PWD" = "$REPO"
 test ! -e "$ROOT"
-readonly PREFLIGHT_RECORD="$PARENT/baseline_validation_v1.preflight"
+readonly PREFLIGHT_RECORD="$PARENT/baseline_validation_v2.preflight"
 for suffix in \
   command.txt environment.txt cwd.txt start.utc end.utc \
   stdout.raw stderr.raw status records.tsv
@@ -419,19 +477,33 @@ done
 pwd -P >"$PREFLIGHT_RECORD.cwd.txt"
 printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1 \
   >"$PREFLIGHT_RECORD.start.utc"
-preflight_program='
+preflight_command=(
+  /bin/bash -c '
   set -euo pipefail
   repo="$1"
   input="$2"
   bundle="$3"
+  expected_main_head="$4"
+  tracked_source_manifest="$5"
 
-  test -z "$(/usr/bin/git -C "$repo" status --porcelain)"
+  test "$(/usr/bin/git -C "$repo" rev-parse HEAD)" = \
+    "$expected_main_head"
+  /usr/bin/git -C "$repo" diff --quiet --exit-code
+  /usr/bin/git -C "$repo" diff --cached --quiet --exit-code
+  test -z "$(/usr/bin/git -C "$repo" status --porcelain \
+    --untracked-files=no)"
+  test -f "$tracked_source_manifest"
+  test ! -L "$tracked_source_manifest"
+  (
+    cd "$repo"
+    /usr/bin/sha256sum -c "$tracked_source_manifest"
+  )
   test -f "$input"
   test ! -L "$input"
   test "$(/usr/bin/stat -c "%a" "$input")" = 444
   test "$(/usr/bin/stat -c "%s" "$input")" = 1897410
   test "$(/usr/bin/sha256sum "$input" |
-    /usr/bin/awk "{print \\$1}")" = \
+    /usr/bin/awk '\''{print $1}'\'')" = \
     9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1
   test "$(/usr/bin/stat -c "%a" \
     "$repo/tmp/o2_calls_perf/compiler_rt_v1/adoption_manifest.tsv")" = 444
@@ -439,7 +511,7 @@ preflight_program='
     "$repo/tmp/o2_calls_perf/compiler_rt_v1/adoption_manifest.tsv")" = 4394
   test "$(/usr/bin/sha256sum \
     "$repo/tmp/o2_calls_perf/compiler_rt_v1/adoption_manifest.tsv" |
-    /usr/bin/awk "{print \\$1}")" = \
+    /usr/bin/awk '\''{print $1}'\'')" = \
     500e73c8433aa73159adfba5de8a6708ae4030140b97b823ef895caa1528f2bf
   test -d "$bundle"
   test ! -L "$bundle"
@@ -450,7 +522,7 @@ preflight_program='
     "$bundle/manifests/bundle-files.sha256")" = 2519
   test "$(/usr/bin/sha256sum \
     "$bundle/manifests/bundle-files.sha256" |
-    /usr/bin/awk "{print \\$1}")" = \
+    /usr/bin/awk '\''{print $1}'\'')" = \
     0576d5803400ea9575d65fc501b87d514c97e806540be29018fb5192bd68e7f0
   test "$(/usr/bin/stat -c "%a" \
     "$bundle/patches/aggregate-consumer-observer-guard.patch")" = 444
@@ -458,7 +530,7 @@ preflight_program='
     "$bundle/patches/aggregate-consumer-observer-guard.patch")" = 41140
   test "$(/usr/bin/sha256sum \
     "$bundle/patches/aggregate-consumer-observer-guard.patch" |
-    /usr/bin/awk "{print \\$1}")" = \
+    /usr/bin/awk '\''{print $1}'\'')" = \
     7508d1d8f74b7e9b97ae5722a0822a86c8d2079779a25cd37559ce5bc651036f
   (
     cd "$repo"
@@ -479,7 +551,7 @@ preflight_program='
     "$repo/tmp/inbox184_o2_compiler_rt_v1/materialize/comparison/retained-files-final.tsv")" = 458294
   test "$(/usr/bin/sha256sum \
     "$repo/tmp/inbox184_o2_compiler_rt_v1/materialize/comparison/retained-files-final.tsv" |
-    /usr/bin/awk "{print \\$1}")" = \
+    /usr/bin/awk '\''{print $1}'\'')" = \
     885008980c8a272e82d06cf89b81652ab5a9669e89364b01d7b9e2761135ff1e
   test "$(/usr/bin/stat -c "%a" \
     "$repo/docs/evidence/tmp_retention_pins.tsv")" = 664
@@ -487,7 +559,7 @@ preflight_program='
     "$repo/docs/evidence/tmp_retention_pins.tsv")" = 3051
   test "$(/usr/bin/sha256sum \
     "$repo/docs/evidence/tmp_retention_pins.tsv" |
-    /usr/bin/awk "{print \\$1}")" = \
+    /usr/bin/awk '\''{print $1}'\'')" = \
     1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3
   test "$(/usr/bin/stat -c "%a" \
     "$repo/docs/retention_headroom_policy.md")" = 664
@@ -495,12 +567,12 @@ preflight_program='
     "$repo/docs/retention_headroom_policy.md")" = 10622
   test "$(/usr/bin/sha256sum \
     "$repo/docs/retention_headroom_policy.md" |
-    /usr/bin/awk "{print \\$1}")" = \
+    /usr/bin/awk '\''{print $1}'\'')" = \
     a31e3fbf7aa03c8544fc5f9921e350c25e4e470cc3c779dfb356136634e052dd
   test "$(/usr/bin/stat -c "%a" "$repo/tools/clean_tmp.zig")" = 664
   test "$(/usr/bin/stat -c "%s" "$repo/tools/clean_tmp.zig")" = 50100
   test "$(/usr/bin/sha256sum "$repo/tools/clean_tmp.zig" |
-    /usr/bin/awk "{print \\$1}")" = \
+    /usr/bin/awk '\''{print $1}'\'')" = \
     8e0c54ad6fed9e46326049dbe64bff743daddcc2527c1dc4d5e02be15fba2d5e
   test "$(/usr/bin/stat -c "%a" \
     "$repo/scripts/z_llvm_watcher_loop.sh")" = 775
@@ -516,7 +588,8 @@ preflight_program='
     HEAD:scripts/z_llvm_watcher_loop.sh)" = \
     b64131cf60dd0ef638e815cd33db9ae8595a72cf
   test "$(/usr/bin/git -C "$repo" stash list \
-    --format="%H" | /usr/bin/awk "NR == 1 { print; exit }")" = \
+    --format="%H" |
+    /usr/bin/awk '\''NR == 1 { print; exit }'\'')" = \
     7985c6d01040a6e47e4ce5b918866d0e89517ac7
   test "$(/usr/bin/stat -c "%a" \
     "$repo/docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv")" = 664
@@ -524,7 +597,7 @@ preflight_program='
     "$repo/docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv")" = 5188
   test "$(/usr/bin/sha256sum \
     "$repo/docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv" |
-    /usr/bin/awk "{print \\$1}")" = \
+    /usr/bin/awk '\''{print $1}'\'')" = \
     2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11
   test "$(/usr/bin/stat -c "%a" \
     "$repo/docs/evidence/inbox128_o2_r1_facade_manifest.tsv")" = 664
@@ -532,7 +605,7 @@ preflight_program='
     "$repo/docs/evidence/inbox128_o2_r1_facade_manifest.tsv")" = 2686
   test "$(/usr/bin/sha256sum \
     "$repo/docs/evidence/inbox128_o2_r1_facade_manifest.tsv" |
-    /usr/bin/awk "{print \\$1}")" = \
+    /usr/bin/awk '\''{print $1}'\'')" = \
     2adcd99ee3bfbe0e9f09673f1df02ab305b5ddb2c1b461023152d5d03a079c26
   test "$(/usr/bin/stat -c "%a" \
     "$repo/src/codegen/x86_64/generic_cfg/composed_selector_value_use_transaction.zig")" = 664
@@ -540,7 +613,7 @@ preflight_program='
     "$repo/src/codegen/x86_64/generic_cfg/composed_selector_value_use_transaction.zig")" = 103
   test "$(/usr/bin/sha256sum \
     "$repo/src/codegen/x86_64/generic_cfg/composed_selector_value_use_transaction.zig" |
-    /usr/bin/awk "{print \\$1}")" = \
+    /usr/bin/awk '\''{print $1}'\'')" = \
     4f5887e9d2bce0943df26c1e08e8360053440da64eefd19ddfd9d53225dddd7a
   test "$(/usr/bin/git -C /home/oleg/prog/ziglang rev-parse HEAD)" = \
     bdee02bc0c7f227c0f11bc9a449df673fe803540
@@ -552,13 +625,13 @@ preflight_program='
     /home/oleg/prog/ziglang/build/stage4/bin/zig)" = 530327885
   test "$(/usr/bin/sha256sum \
     /home/oleg/prog/ziglang/build/stage4/bin/zig |
-    /usr/bin/awk "{print \\$1}")" = \
+    /usr/bin/awk '\''{print $1}'\'')" = \
     dcea3478273d7ffe3895709c8eed4ccc0724548869cdb86183fc7356164410b7
   while IFS="  " read -r expected tool_path; do
     test -n "$expected"
     test -n "$tool_path"
     test "$(/usr/bin/sha256sum "$tool_path" |
-      /usr/bin/awk "{print \\$1}")" = "$expected"
+      /usr/bin/awk '\''{print $1}'\'')" = "$expected"
   done <"$bundle/manifests/future-tool-identities.sha256"
   /usr/bin/git -C "$repo" diff --quiet 43de59b0 -- \
     src build.zig build.zig.zon tools scripts \
@@ -570,9 +643,8 @@ preflight_program='
   block_size=$(/usr/bin/stat -f -c "%S" "$repo")
   test "$((available_blocks * block_size))" -ge 17179869184
   printf "preflight=pass\nroot_absent=1\n"
-'
-preflight_command=(
-  /bin/bash -c "$preflight_program" _ "$REPO" "$INPUT" "$BUNDLE"
+  ' _ "$REPO" "$INPUT" "$BUNDLE" "$EXPECTED_MAIN_HEAD" \
+  "$TRACKED_SOURCE_MANIFEST"
 )
 printf '%q ' "${preflight_command[@]}" \
   >"$PREFLIGHT_RECORD.command.txt"
@@ -1432,8 +1504,8 @@ Mode, size, and identity movement is a stop.
 
 | Generated path or finite pattern | Sole producer | First consumer |
 |---|---|---|
-| `$PARENT/baseline_validation_v1.preflight.{command.txt,environment.txt,cwd.txt,start.utc,end.utc,stdout.raw,stderr.raw,status,records.tsv}` | immutable-input preflight record/write | review |
-| `$PARENT/baseline_validation_v1.driver.{command.txt,environment.txt,cwd.txt,start.utc,end.utc,stdout.raw,stderr.raw,status,records.tsv}` | driver bootstrap record/write | review |
+| `$PARENT/baseline_validation_v2.preflight.{command.txt,environment.txt,cwd.txt,start.utc,end.utc,stdout.raw,stderr.raw,status,records.tsv}` | immutable-input preflight record/write | review |
+| `$PARENT/baseline_validation_v2.driver.{command.txt,environment.txt,cwd.txt,start.utc,end.utc,stdout.raw,stderr.raw,status,records.tsv}` | driver bootstrap record/write | review |
 | `$ROOT/canonical/{records,manifests,comparisons,build/*,artifact,repetition-{1,2,3}/{home,tmp,records,functions}}` | driver bootstrap `mkdir` | subsequent named step |
 | `$ROOT/canonical/source` | `worktree-add` | `source-preflight`, then build |
 | `$ROOT/canonical/{worktree-add,source-preflight,artifact-install,artifact-identity,identity-manifest,repetition-{1,2,3}-finalize,canonical-finalize}.status` | corresponding named `run_step` | final evidence |
@@ -1529,7 +1601,7 @@ recorder-owned status files are never command stdout or semantic output.
 
 | ID | Command and explicit binding (`$0` is `_`) | Shell-variable bindings | AWK binding and consumed path | Producer-before-consumer and sole status |
 |---|---|---|---|---|
-| C01 | immutable preflight: `$1=$REPO`, `$2=$INPUT`, `$3=$BUNDLE` | `repo=$1`; `input=$2`; `bundle=$3`; manifest loops bind `payload_path`, `payload_bytes`, `payload_mode`, `expected`, and `tool_path`; capacity checks bind `available_blocks` and `block_size` | no `-v`; SHA readers consume pipeline stdin; stash reader consumes `git stash list` stdin; mode/tool manifests are consumed through their explicit redirections | runs before `$ROOT` creation; produces only preflight records; `$PREFLIGHT_RECORD.status` |
+| C01 | immutable preflight: direct `/bin/bash -c '<literal body>' _ "$REPO" "$INPUT" "$BUNDLE" "$EXPECTED_MAIN_HEAD" "$TRACKED_SOURCE_MANIFEST"`; `$0=_`, `$1=$REPO`, `$2=$INPUT`, `$3=$BUNDLE`, `$4=$EXPECTED_MAIN_HEAD`, `$5=$TRACKED_SOURCE_MANIFEST` | `repo=$1`; `input=$2`; `bundle=$3`; `expected_main_head=$4`; `tracked_source_manifest=$5`; manifest loops bind `payload_path`, `payload_bytes`, `payload_mode`, `expected`, and `tool_path`; capacity checks bind `available_blocks` and `block_size` | no `-v`; every AWK program is a literal single-quoted field program inside the direct child body; SHA readers consume pipeline stdin; stash reader consumes `git stash list` stdin; mode/tool manifests are consumed through their explicit redirections | verifies exact main `HEAD`, empty worktree/index/tracked-only status, and the frozen tracked-source manifest before `$ROOT` creation; produces only v2 preflight records; `$PREFLIGHT_RECORD.status` |
 | C02 | source preflight: `$1=$CANONICAL/source` | `source_root=$1` | none | consumes the worktree-add result before build; `$CANONICAL/source-preflight.status` |
 | C03 | canonical build: `$1=$CANONICAL/source`, `$2=$CANONICAL/build/prefix`, `$3=$CANONICAL/build/cache/local`, `$4=$CANONICAL/build/cache/global` | no aliases; all four positions are consumed directly | none | consumes C02’s verified source, produces the build prefix; `$CANONICAL/build/build.status` |
 | C04 | artifact identity: `$1=$ARTIFACT`, `$2=$CANONICAL/artifact.identity.tsv` | `artifact=$1`; `output=$2` | no `-v`; SHA field reader consumes `sha256sum` stdin | consumes artifact-install, produces artifact identity before reports; `$CANONICAL/artifact-identity.status` |
@@ -1580,7 +1652,7 @@ recorder-owned status files are never command stdout or semantic output.
 | F17 | report-counter validator: `$1=$REPORT_CHANNEL` | none | no `-v`; AWK consumes `$1`; recorder owns the validation channels | consumes the sole on-report channel after its producer; `$ON/records/validate-report-counters.status` |
 | F18 | successful-subset counter validator: `$1=$channel`, where the loop binds `$channel` first to `$OBJECT_CHANNEL` and then `$OWNER_CHANNEL` | no alias inside the child; parent `channel_label` selects the disjoint record prefix only | no `-v`; AWK consumes `$1`; recorder owns each validation channel | each invocation follows its sole object/owner channel producer; `$ON/records/validate-object-counters.status` and `$ON/records/validate-owner-counters.status` |
 
-The audit has two and only two same-class corrections:
+The INBOX-187C audit had two and only two same-class corrections:
 
 1. C24 now binds its third Bash argument to shell variable `summary` and
    passes that exact path to AWK with `-v summary="$summary"` before
@@ -1594,6 +1666,28 @@ referenced positional argument, consumes only the paths mapped above, and
 has a producer before its first generated-path consumer. There is no
 unbound positional parameter, AWK path variable, duplicate generated
 status, or coverage producer for `accepted.ll`.
+
+INBOX-189 re-audited all 45 rows against the v2 driver. C02–C27 and
+F01–F18 retain their accepted bindings and producer/status order. C01 now
+has this exact argv:
+
+```text
+argv[0]=/bin/bash
+argv[1]=-c
+argv[2]=the single literal C01 body in section 5
+argv[3]=_
+argv[4]=$REPO
+argv[5]=$INPUT
+argv[6]=$BUNDLE
+argv[7]=$EXPECTED_MAIN_HEAD
+argv[8]=$TRACKED_SOURCE_MANIFEST
+```
+
+The child receives `_` as `$0` and the five paths or bindings as `$1`
+through `$5`. There is no `preflight_program`, `eval`, serialized-program
+re-evaluation, or other intermediate parser. Every C01 AWK field program
+is a literal single-quoted child-script token and reaches AWK as
+`{print $1}` or `NR == 1 { print; exit }`, with no parent-shell expansion.
 
 ## 8. Coverage-only artifact and guard
 
@@ -1691,7 +1785,7 @@ raw report input:
   /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/compiler_rt_v1.ll
 
 successful-subset input:
-  /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical/repetition-1/accepted.ll
+  /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/canonical/repetition-1/accepted.ll
 ```
 
 The raw input is used only by each phase's `--report-all-codegen-failures`
@@ -1708,10 +1802,10 @@ coverage source root with an otherwise empty environment:
 
 ```bash
 (
-  cd /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/source
+  cd /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/coverage/source
   exec /usr/bin/env -i \
-    HOME=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage \
-    TMPDIR=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage \
+    HOME=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/coverage \
+    TMPDIR=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/coverage \
     PATH=/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin \
     LC_ALL=C LANG=C TZ=UTC SOURCE_DATE_EPOCH=0 \
     /bin/bash --noprofile --norc
@@ -1725,17 +1819,17 @@ any coverage command, set exactly:
 set -euo pipefail
 umask 022
 
-readonly ROOT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1
+readonly ROOT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2
 readonly RAW_INPUT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/compiler_rt_v1.ll
-readonly COVERAGE_ARTIFACT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/artifact/z_llvm
-readonly CANONICAL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical/repetition-1
-readonly CANONICAL_ACCEPTED=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical/repetition-1/accepted.ll
-readonly CANONICAL_IDENTITIES=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/canonical/o2_calls_crt_v1_r131.identities.tsv
-readonly OFF=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/observation-off
-readonly ON=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/observation-on
-readonly REPORT_CHANNEL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/observation-on/report.coverage.tsv
-readonly OBJECT_CHANNEL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/observation-on/object.coverage.tsv
-readonly OWNER_CHANNEL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1/coverage/observation-on/owner.coverage.tsv
+readonly COVERAGE_ARTIFACT=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/coverage/artifact/z_llvm
+readonly CANONICAL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/canonical/repetition-1
+readonly CANONICAL_ACCEPTED=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/canonical/repetition-1/accepted.ll
+readonly CANONICAL_IDENTITIES=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/canonical/o2_calls_crt_v1_r131.identities.tsv
+readonly OFF=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/coverage/observation-off
+readonly ON=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/coverage/observation-on
+readonly REPORT_CHANNEL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/coverage/observation-on/report.coverage.tsv
+readonly OBJECT_CHANNEL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/coverage/observation-on/object.coverage.tsv
+readonly OWNER_CHANNEL=/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/coverage/observation-on/owner.coverage.tsv
 ```
 
 Section 6 must have written `CANONICAL_IDENTITIES` as two-column TSV
@@ -3152,6 +3246,135 @@ validation=NOT_RUN
 production=UNCHANGED_DORMANT
 ratchet=131
 next=STOP_BEFORE_VALIDATION_EXECUTION
+```
+
+## 15.1 INBOX-188 exhausted-v1 compliant-stop record
+
+INBOX-188 started from clean tracked operating commit `d0c1d262` above
+accepted INBOX-187C document commit `8411478a`. Its sole v1 execution
+attempt stopped at C01 before any validation root, detached worktree,
+build, repetition, identity, coverage, or restoration path was created.
+The committed compliant-stop evidence is
+`59d9cb335f37fdb1df07bb25769a551760c4207a`; its summary SHA-256 is
+`802990e44f4a283a0d2bc95568b1602dfa108d97e1c13c36d792fca0d6002c24`.
+
+The eight retained v1 files are immutable historical evidence:
+
+| Exact path | Bytes | Mode | SHA-256 |
+|---|---:|---:|---|
+| `tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.preflight.command.txt` | 7,590 | `0644` | `6e0b79fe54a666343a35159c76ee9a535d0725fa33d7c7a6cd722beb3b3b6500` |
+| `tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.preflight.environment.txt` | 272 | `0644` | `2eb1eedb2c1d2c52fe21e6540ca227bdff057c23a62c531a057ddc3ed7783202` |
+| `tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.preflight.cwd.txt` | 23 | `0644` | `0e1ea70040234514d54c24539ae63de2b78042567c3ca45697f85dbac7dab734` |
+| `tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.preflight.start.utc` | 21 | `0644` | `8c706bdca3eb50fa2ce3c51d1d6ad236323995ca6e48f351c9d029af7bafea8d` |
+| `tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.preflight.end.utc` | 21 | `0644` | `8c706bdca3eb50fa2ce3c51d1d6ad236323995ca6e48f351c9d029af7bafea8d` |
+| `tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.preflight.stdout.raw` | 0 | `0644` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.preflight.stderr.raw` | 0 | `0644` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.preflight.status` | 2 | `0644` | `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865` |
+
+The following v1 outputs were and remain absent:
+
+```text
+tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.preflight.records.tsv
+tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1
+tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.driver.command.txt
+tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.driver.environment.txt
+tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.driver.cwd.txt
+tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.driver.start.utc
+tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.driver.end.utc
+tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.driver.stdout.raw
+tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.driver.stderr.raw
+tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.driver.status
+tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v1.driver.records.tsv
+```
+
+The attempted C01 failed its first tracked-tree assertion because the
+sanitized `HOME` exposed the preexisting untracked `.claude/` tooling
+path. It produced no semantic output. Static inspection then established
+that its separately assigned `preflight_program` passed AWK field programs
+through an extra shell evaluation and corrupted literal `$1` before the
+unreached immutable-input checks. The v1 namespace is therefore exhausted:
+none of the eight files or absent paths may be rerun, repaired, chmodded,
+copied, renamed, rewritten, normalized, deleted, or reused as a v2
+input/output.
+
+## 15.2 INBOX-189 v2 portability and serialization closure record
+
+INBOX-189 started from clean tracked operating commit
+`b7eaafa7230bc4d2b6305f99fbbcac757258a067`, whose parent is the accepted
+INBOX-188 compliant-stop commit
+`59d9cb335f37fdb1df07bb25769a551760c4207a`. The only tracked INBOX-189
+change is this contract.
+
+The v2 correction is closed as follows:
+
+1. every future generated path and both external record prefixes use
+   `baseline_validation_v2`;
+2. C01 binds the exact future-authorized tracked `HEAD` through the single
+   launcher token and checks worktree, cached/index, and tracked-only
+   porcelain cleanliness plus the frozen tracked-source manifest;
+3. C01 is one direct `/bin/bash -c` vector with `_` as `$0`, the complete
+   `$1`–`$5` ledger in section 7.4, and literal protected AWK programs;
+4. no `preflight_program`, `eval`, or equivalent re-evaluation layer
+   remains;
+5. all 45 templates retain one explicit `_`, closed positional/variable/
+   AWK bindings, producer-before-consumer order, and one status producer;
+   and
+6. the executable blocks and generated-ledger entries in sections 4–12
+   contain no `baseline_validation_v1` reference, while section 15.1 is the
+   sole historical-v1 path ledger.
+
+The static/read-only audit observed:
+
+```text
+starting_head=b7eaafa7230bc4d2b6305f99fbbcac757258a067
+starting_parent=59d9cb335f37fdb1df07bb25769a551760c4207a
+retained_v1_files=8_exact
+v1_records_manifest=absent
+v1_root=absent
+v1_driver_records=absent
+v2_root=absent
+v2_preflight_records=absent
+v2_driver_records=absent
+canonical_bash_c_templates=27
+coverage_bash_c_templates=18
+explicit_bash_c_sentinels=45
+canonical_bash_syntax_status=0
+coverage_bash_syntax_status=0
+c01_serialized_argv_count=9
+c01_child_body_sha256=bdd8af559a93383a6d0cafde2931bc4e6a2083095a819ca0bf8e28bd2ce54f12
+c01_child_bash_syntax_status=0
+c01_literal_awk_print_field_programs=14
+c01_literal_awk_stash_programs=1
+future_executable_v1_path_references=0
+preflight_program_references_in_future_driver=0
+eval_references_in_future_driver=0
+bundle_manifest_mode_bytes_sha256=0444/2519/0576d5803400ea9575d65fc501b87d514c97e806540be29018fb5192bd68e7f0
+combined_patch_mode_bytes_sha256=0444/41140/7508d1d8f74b7e9b97ae5722a0822a86c8d2079779a25cd37559ce5bc651036f
+combined_patch_apply_check_status=0
+adopted_input_mode_bytes_sha256=0444/1897410/9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1
+adoption_manifest_mode_bytes_sha256=0444/4394/500e73c8433aa73159adfba5de8a6708ae4030140b97b823ef895caa1528f2bf
+reproduction_manifest_mode_bytes_sha256=0664/458294/885008980c8a272e82d06cf89b81652ab5a9669e89364b01d7b9e2761135ff1e
+retention_pins_mode_bytes_sha256=0664/3051/1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3
+watcher_head_index_worktree_blob=b64131cf60dd0ef638e815cd33db9ae8595a72cf
+stash_at_0=7985c6d01040a6e47e4ce5b918866d0e89517ac7
+source_surface_diff_from_43de59b0=empty
+ratchet=131
+```
+
+INBOX-189 ran only static/read-only inspection. It ran no project code,
+build, Zig command, `z_llvm`, validation, coverage, guard/test/gate,
+performance, production wiring, retention reporter, cleanup, deletion, or
+credit.
+
+```text
+contract=V2_PREFLIGHT_CORRECTED_PENDING_WATCHER_REVIEWER_ACCEPTANCE
+v1_attempt=EXHAUSTED_IMMUTABLE
+v2_execution=NOT_AUTHORIZED_OR_RUN
+canonical_identity=NOT_YET_DEFINED
+coverage=NOT_RUN
+production=UNCHANGED_DORMANT
+ratchet=131
+next=STOP_BEFORE_V2_EXECUTION
 ```
 
 ## 16. INBOX-187C argument-binding closure record
