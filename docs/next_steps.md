@@ -6,7 +6,17 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-171 quotient re-isolation — dispatched
+## INBOX-171 — ALL THREE BUILDS PASS (c532fe82), Supervisor-verified
+
+The re-isolation from the aligned tree succeeds completely: UQ32 alone,
+UQ64 alone, and the aggregate each pass all three bars (cohort/object/
+owner/per-function byte-exact; full unit 1375/1375; canaries 35). The
+aligned fixtures removed the only INBOX-169 failures. Evidence-only
+diff; ratchet 135. The quotient family is proven and ready for the
+wiring (132/131 by the final owner recount at the wired tree). Sent to
+the Reviewer requesting INBOX-172.
+
+## Former INBOX-171 dispatch entry — superseded by the landing above
 
 INBOX-170 is **ACCEPTED and INBOX-171 authorized exactly as proposed**
 (Reviewer, 2026-07-19: "Repeat UQ32, UQ64, and aggregate isolation from
