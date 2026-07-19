@@ -6,33 +6,42 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-185 compiler-rt v1 three-generation reproduction — AUTHORIZED
+## INBOX-186 exact compiler-rt v1 adoption and retention pin — AUTHORIZED
 
-INBOX-184 at `1c343ec8` is accepted as the complete non-binding v1 corpus
-contract. Strategy C remains selected in principle; no generated input,
-identity, protocol, adoption, pin, validation, wiring, or credit is accepted.
+INBOX-185 at `b1567ace` is accepted as successful three-generation
+reproducibility proof for the full artifact ID ending in SHA-256
+`9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1`.
+This proves deterministic bytes only.
 
-Perform only the reversible three-generation materialization/reproduction
-stage. Complete all source/tool/frozen-identity, absence, and capacity
-preflights before creating any root. Then create three independently empty
-HOME/TMP/cache/output/log environments and run exactly the three frozen
-ReleaseFast `x86_64-linux-gnu` baseline stage4 invocations sequentially,
-once each, with no retry or alternative.
+Perform only exact adoption and explicit retention protection. After the
+complete clean/identity/absence/capacity preflight, run the contract's exact
+`install -D -m 0444` command once, using only gen-1. Require the adopted
+1,897,410-byte file to match all three generations exactly. Create the
+complete adoption manifest; make both input and manifest read-only; hash
+both after final modes.
 
-Retain raw stdout, stderr, status, commands, environments, modes, byte
-counts, SHA-256 values, timings as provenance only, source/tool/dependency
-manifests, and all three pairwise raw comparisons. Require successful,
-nonempty, byte-identical outputs. Recheck pinned source-tree, stage4,
-watcher, stash, and every frozen identity afterward. Any discrepancy stops
-without cleanup, deletion, repair, fallback, or rerun.
+Append exactly two live-pin rows, without changing or reordering existing
+rows, for top-level `tmp/inbox184_o2_compiler_rt_v1` and
+`tmp/o2_calls_perf`, keyed to INBOX-186 and the full artifact ID. Run the
+retention reporter exactly once in report-only/no-delete mode and require
+both paths protected by `explicit-live-pin`. Any failure or postflight
+identity movement retains all artifacts and stops without retry, repair,
+replacement, deletion, or cleanup.
 
-Success proves reproducibility only. Do not adopt/copy the output, pin it,
-run z_llvm, selectors, gates, coverage, validation, performance, protocol
-execution, source/tool/test/guard/build/inventory/retention changes, wiring,
-or credit. Commit only
-`docs/evidence/inbox185_o2_compiler_rt_v1_three_generation_materialization.summary`,
-retain ignored generation roots, preserve ratchet 131 and watcher blob
-`b64131cf`, and stop before adoption or validation.
+Run no workload validation, protocol adoption, z_llvm, gates, coverage,
+performance, production change, wiring, or credit. Commit only the pin TSV
+and INBOX-186 evidence summary, preserve ratchet 131, watcher blob
+`b64131cf`, stash, ignored roots, and frozen surfaces, and stop before
+baseline validation.
+
+## INBOX-185 compiler-rt v1 three-generation reproduction — ACCEPTED at b1567ace
+
+Three independently isolated one-shot generations succeeded and produced
+pairwise byte-identical 1,897,410-byte outputs with SHA-256
+`9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1`.
+The complete ignored reproduction bundle remains retained. No adoption,
+pinning, validation, wiring, performance, cleanup, or credit occurred;
+ratchet remains 131.
 
 ## INBOX-184 reproducible compiler-rt corpus contract — ACCEPTED at 1c343ec8
 
