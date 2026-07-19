@@ -6,7 +6,17 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-170 — LANDED at 390945be, Supervisor-verified
+## INBOX-171 quotient re-isolation — dispatched
+
+INBOX-170 is **ACCEPTED and INBOX-171 authorized exactly as proposed**
+(Reviewer, 2026-07-19: "Repeat UQ32, UQ64, and aggregate isolation from
+the aligned tree. Every build must pass exact cohort/per-function
+identity, full unit 1375/1375, and focused canaries. Any failing width
+is retained wholesale; no amendments or fix-forward. Ratchet remains
+135, with 132/131 conditional on successful re-isolation, wiring, and
+the final owner recount."). Dispatched.
+
+## INBOX-170 — ACCEPTED at 390945be, Supervisor-verified
 
 The alignment landed test-only (composed_selector_scalar_tests.zig
 +47/−2 + evidence + the 425-row hash contract) and is verified: the
