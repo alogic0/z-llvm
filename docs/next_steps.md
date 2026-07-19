@@ -6,7 +6,27 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-160 B07 wiring — LANDED at 19c4c3b8 + perf fee82b59, Supervisor-verified
+## SCALAR SLICE 3 COMPLETE AT RATCHET 140 — INBOX-161 multiply refresh dispatched
+
+INBOX-160 is **ACCEPTED** (Reviewer, 2026-07-18: "I accept INBOX-160.
+Scalar Slice 3 is complete at ratchet 140."). **The full named+i52
+enumeration (B01, B03, B04, B05, B06, B07, I52B0) is wired through
+ValueUseTransaction; only the guard-enforced R03/R04 residuals remain
+legacy.** Session trail: 154 → 152 (B01+I52B0) → 148 (B03–B06) → 140
+(B07), every landing byte-identical with the perf gate green.
+**INBOX-161 (the multiply evidence refresh) is authorized** with
+Reviewer terms: recount from the accepted 140 tree, honest target with
+no inherited projections; direct credits separated from last-owner
+collapses; multiply forms partitioned by their exact existing
+displacement authorities (narrow, i64 destination-selection,
+spill-through-RAX); full-product/pair-result/fixed-register/remainder/
+cycle/R03/R04 exclusions as named retained owners; isolation +
+aggregate gates defined before wiring; the scalar_multiply_divide.zig
+ownership/facade/import/size budget frozen; quotient/division
+inventoried but outside this authorization; docs-only; stop for review
+before any dormant implementation. Dispatched.
+
+## INBOX-160 B07 wiring — ACCEPTED (slice 3 complete), Supervisor-verified
 
 The B07 wiring landed and is fully verified: ratchet recount **140**
 (the TSV removed the B07 gateway row); the value_use action/Q1 tree has
