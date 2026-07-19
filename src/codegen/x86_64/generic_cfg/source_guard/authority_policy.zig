@@ -147,7 +147,7 @@ pub fn validateValueUseAuthoritySourceWithVisibility(
     try validateScalarCastSequence(source);
 }
 
-pub fn validateCallIntentSurface(source: []const u8) !void {
+pub fn validateCallIntentSurface(source: [:0]const u8) !void {
     if (std.mem.indexOf(u8, source, "pub const DirectCallAction = struct {")) |start| {
         const end = std.mem.indexOfPos(
             u8,
@@ -230,6 +230,62 @@ pub fn validateCallIntentSurface(source: []const u8) !void {
     }
     if (countPattern(source, "pub fn attachCallAction(") > 1)
         return error.ValueUseCallIntentMismatch;
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    if (functionBodyNamed(bodies, "core_attachCallAction")) |body| {
+        const attachment = source[body.start..body.end];
+        const validation = std.mem.indexOf(
+            u8,
+            attachment,
+            "validateCallActionAttachment(",
+        ) orelse return error.ValueUseCallAttachmentLifecycleMismatch;
+        const assignment = std.mem.indexOf(
+            u8,
+            attachment,
+            "transaction.call_action = action;",
+        ) orelse return error.ValueUseCallAttachmentLifecycleMismatch;
+        if (countPattern(attachment, "transaction.request_phase != .registering") != 1 or
+            countPattern(attachment, "error.ValueUseLateRegistration") != 1 or
+            countPattern(attachment, "transaction.call_action != null") != 1 or
+            countPattern(attachment, "error.ValueUseCallActionAlreadyAttached") != 1 or
+            validation >= assignment)
+        {
+            return error.ValueUseCallAttachmentLifecycleMismatch;
+        }
+        const registration = functionBodyNamed(bodies, "core_register") orelse
+            return error.ValueUseCallAttachmentLifecycleMismatch;
+        if (countPattern(
+            source[registration.start..registration.end],
+            "transaction.call_action != null",
+        ) != 1) {
+            return error.ValueUseCallAttachmentLifecycleMismatch;
+        }
+    }
+    if (functionBodyNamed(bodies, "buildPreparedRecordUnchecked")) |body| {
+        const prepared = source[body.start..body.end];
+        if (countPattern(prepared, "pin.call_final_use != null") != 1 or
+            countPattern(prepared, "Authority.validateRequestAt(") < 2)
+        {
+            return error.ValueUseCallFinalUseRevalidationMismatch;
+        }
+    }
+    if (functionBodyNamed(bodies, "refreshCallArguments")) |body| {
+        if (countPattern(
+            source[body.start..body.end],
+            "buildPreparedRecord(",
+        ) != 1) {
+            return error.ValueUseCallFinalUseRevalidationMismatch;
+        }
+    }
+    if (functionBodyNamed(bodies, "stageValidatedCallArgument")) |body| {
+        if (countPattern(
+            source[body.start..body.end],
+            "validateRequestAt(",
+        ) != 1) {
+            return error.ValueUseCallFinalUseRevalidationMismatch;
+        }
+    }
 }
 
 pub fn validateForwardAdmissionSnapshotAuthority(source: [:0]const u8) !void {
@@ -338,7 +394,7 @@ pub fn validateForwardAdmissionSnapshotAuthority(source: [:0]const u8) !void {
 }
 
 pub fn validateLifetimeContextAuthority(source: [:0]const u8) !void {
-    const pin_start = std.mem.indexOf(u8, source, "const LifetimePin = struct {") orelse
+    const pin_start = std.mem.indexOf(u8, source, "const CallFinalUsePin = struct {") orelse
         return error.ValueUseLifetimeContextMissing;
     const context_start = std.mem.indexOfPos(
         u8,
@@ -348,7 +404,15 @@ pub fn validateLifetimeContextAuthority(source: [:0]const u8) !void {
     ) orelse return error.ValueUseLifetimeContextMissing;
     const pin = source[pin_start..context_start];
     if (std.mem.indexOf(u8, pin, "ValueLoc") != null or
+        std.mem.indexOf(u8, pin, "const LifetimePin = struct {") == null or
         std.mem.indexOf(u8, pin, "generation: usize") == null or
+        std.mem.indexOf(u8, pin, "const CallFinalUsePin = struct {") == null or
+        std.mem.indexOf(u8, pin, "plan_identity: usize") == null or
+        std.mem.indexOf(u8, pin, "admission_position: usize") == null or
+        std.mem.indexOf(u8, pin, "interval_end: usize") == null or
+        std.mem.indexOf(u8, pin, "call_final_use: ?CallFinalUsePin = null") == null or
+        std.mem.indexOf(u8, pin, "[]") != null or
+        std.mem.indexOf(u8, pin, "*") != null or
         std.mem.indexOf(u8, source, "pub const LifetimePin") != null or
         std.mem.indexOf(u8, source, "pub const LifetimeContext") != null or
         std.mem.indexOf(u8, source, "pub fn availabilityForConsumption") != null or
@@ -375,6 +439,18 @@ pub fn validateLifetimeContextAuthority(source: [:0]const u8) !void {
     const availability = source[availability_body.start..availability_body.end];
     const survival = source[survival_body.start..survival_body.end];
     const occupant = source[occupant_body.start..occupant_body.end];
+    const admit_body = functionBodyNamed(bodies, "admitCallFinalUse") orelse
+        return error.ValueUseCallFinalUseAuthorityMissing;
+    const revalidate_body = functionBodyNamed(bodies, "revalidateCallFinalUse") orelse
+        return error.ValueUseCallFinalUseAuthorityMissing;
+    const claim_body = functionBodyNamed(bodies, "callFinalUseClaim") orelse
+        return error.ValueUseCallFinalUseAuthorityMissing;
+    const validate_body = functionBodyNamed(bodies, "validateCallFinalUseRequest") orelse
+        return error.ValueUseCallFinalUseAuthorityMissing;
+    const admit = source[admit_body.start..admit_body.end];
+    const revalidate = source[revalidate_body.start..revalidate_body.end];
+    const claim = source[claim_body.start..claim_body.end];
+    const final_validate = source[validate_body.start..validate_body.end];
     const availability_required = [_][]const u8{
         ".int, .null_value => return",
         "error.ValueUseSourcePlanMissing",
@@ -384,6 +460,8 @@ pub fn validateLifetimeContextAuthority(source: [:0]const u8) !void {
         "error.ValueUseExpiredSource",
         "pin.generation != binding.vreg.index",
         "error.ValueUseSourceGenerationChanged",
+        "admitCallFinalUse(",
+        "revalidateCallFinalUse(",
     };
     for (availability_required) |pattern| {
         if (std.mem.indexOf(u8, availability, pattern) == null)
@@ -400,6 +478,38 @@ pub fn validateLifetimeContextAuthority(source: [:0]const u8) !void {
         countPattern(occupant, "valueIsLiveAtOrAfterCurrent(") != 0)
     {
         return error.ValueUseLifetimeContextBoundaryMismatch;
+    }
+    for ([_][]const u8{
+        "position == 0",
+        "interval_end != position - 1",
+        "@intFromPtr(plan)",
+        ".call_final_use = .{",
+    }) |pattern| {
+        if (std.mem.indexOf(u8, admit, pattern) == null)
+            return error.ValueUseCallFinalUseAuthorityMismatch;
+    }
+    for ([_][]const u8{
+        "final_use.plan_identity",
+        "final_use.admission_position",
+        "final_use.interval_end",
+        "error.ValueUseSourceGenerationChanged",
+    }) |pattern| {
+        if (std.mem.indexOf(u8, revalidate, pattern) == null)
+            return error.ValueUseCallFinalUseAuthorityMismatch;
+    }
+    if (countPattern(claim, ".direct_call") != 1 or
+        countPattern(claim, ".int_byte_size_call") != 1 or
+        countPattern(final_validate, "binding.loc != .eax") != 2 or
+        countPattern(final_validate, "binding.loc != .rax") != 1 or
+        countPattern(source, "fn admitCallFinalUse(") != 1 or
+        countPattern(source, "fn revalidateCallFinalUse(") != 1 or
+        std.mem.indexOf(u8, source, "pub fn admitCallFinalUse(") != null or
+        std.mem.indexOf(u8, source, "pub fn revalidateCallFinalUse(") != null or
+        std.mem.indexOf(u8, admit, "valueIsLive") != null or
+        std.mem.indexOf(u8, revalidate, "valueIsLive") != null or
+        std.mem.indexOf(u8, final_validate, "valueIsLive") != null)
+    {
+        return error.ValueUseCallFinalUseAuthorityMismatch;
     }
 }
 

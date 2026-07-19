@@ -269,7 +269,12 @@ pub fn core_availabilityForConsumption(
         .int, .null_value => return,
         .unsupported => return,
     };
+    const existing_pin = transaction.lifetime_context.pins[index];
     const binding = transaction.selector.values.get(identity.slice()) orelse {
+        if (existing_pin) |pin| {
+            if (pin.call_final_use != null)
+                return error.ValueUseSourceGenerationChanged;
+        }
         const current = captureForwardAdmissionSnapshot(transaction, index) catch |err| {
             if (transaction.lifetime_context.forward_snapshots[index] != null)
                 return error.ValueUseForwardPlanStale;
@@ -282,27 +287,178 @@ pub fn core_availabilityForConsumption(
         }
         return;
     };
-    const plan = transaction.selector.allocation_plan orelse
+    if (existing_pin) |pin| {
+        if (!pin.identity.eql(identity) or pin.generation != binding.vreg.index)
+            return error.ValueUseSourceGenerationChanged;
+    }
+    const plan = transaction.selector.allocation_plan orelse {
+        if (existing_pin != null and existing_pin.?.call_final_use != null)
+            return error.ValueUseSourceGenerationChanged;
         return error.ValueUseSourcePlanMissing;
-    _ = plan.intervalEnd(identity.slice()) orelse
+    };
+    const interval_end = plan.intervalEnd(identity.slice()) orelse {
+        if (existing_pin != null and existing_pin.?.call_final_use != null)
+            return error.ValueUseSourceGenerationChanged;
         return error.ValueUseSourceIntervalMissing;
+    };
     try selector_state.validateAddressDependenciesForUse(
         transaction.selector,
         identity.slice(),
     );
+    if (existing_pin) |pin| {
+        if (pin.call_final_use) |final_use| {
+            try revalidateCallFinalUse(
+                transaction,
+                index,
+                &binding,
+                plan,
+                interval_end,
+                final_use,
+            );
+            return;
+        }
+    }
     if (!try selector_state.valueIsLiveAtOrAfterCurrent(
         transaction.selector,
         identity.slice(),
-    )) return error.ValueUseExpiredSource;
+    )) {
+        if (existing_pin == null and transaction.request_phase == .registering and
+            try admitCallFinalUse(transaction, index, identity, &binding, plan, interval_end))
+        {
+            return;
+        }
+        return error.ValueUseExpiredSource;
+    }
 
-    if (transaction.lifetime_context.pins[index]) |*pin| {
-        if (!pin.identity.eql(identity) or pin.generation != binding.vreg.index)
-            return error.ValueUseSourceGenerationChanged;
-    } else {
+    if (existing_pin == null) {
         transaction.lifetime_context.pins[index] = .{
             .identity = identity.*,
             .generation = binding.vreg.index,
         };
+    }
+}
+
+const CallFinalUseClaim = enum {
+    direct_i32,
+    direct_i64,
+    int_byte_size_i16,
+};
+
+fn admitCallFinalUse(
+    transaction: anytype,
+    index: u8,
+    identity: *const Types.Identity,
+    binding: *const ValueBinding,
+    plan: anytype,
+    interval_end: usize,
+) !bool {
+    const position = transaction.selector.current_position;
+    if (position == 0 or interval_end != position - 1) return false;
+    const claim = callFinalUseClaim(transaction, index) orelse return false;
+    try validateCallFinalUseRequest(transaction, index, binding, claim);
+    transaction.lifetime_context.pins[index] = .{
+        .identity = identity.*,
+        .generation = binding.vreg.index,
+        .call_final_use = .{
+            .plan_identity = @intFromPtr(plan),
+            .admission_position = position,
+            .interval_end = interval_end,
+        },
+    };
+    return true;
+}
+
+fn revalidateCallFinalUse(
+    transaction: anytype,
+    index: u8,
+    binding: *const ValueBinding,
+    plan: anytype,
+    interval_end: usize,
+    final_use: anytype,
+) !void {
+    if (@intFromPtr(plan) != final_use.plan_identity or
+        transaction.selector.current_position != final_use.admission_position or
+        interval_end != final_use.interval_end)
+    {
+        return error.ValueUseSourceGenerationChanged;
+    }
+    const claim = callFinalUseClaim(transaction, index) orelse
+        return error.ValueUseSourceGenerationChanged;
+    try validateCallFinalUseRequest(transaction, index, binding, claim);
+}
+
+fn callFinalUseClaim(transaction: anytype, index: u8) ?CallFinalUseClaim {
+    const action = transaction.call_action orelse return null;
+    return switch (action) {
+        .direct_call => |direct| blk: {
+            for (
+                direct.arguments[0..direct.argument_count],
+                direct.argument_types[0..direct.argument_count],
+            ) |handle, declared_type| {
+                if (!handleClaimsRequest(transaction, handle, index)) continue;
+                if (declared_type.eql(.{ .int = 32 })) break :blk .direct_i32;
+                if (declared_type.eql(.{ .int = 64 })) break :blk .direct_i64;
+            }
+            break :blk null;
+        },
+        .int_byte_size_call => |specialized| if (handleClaimsRequest(
+            transaction,
+            specialized.argument,
+            index,
+        ))
+            .int_byte_size_i16
+        else
+            null,
+        else => null,
+    };
+}
+
+fn handleClaimsRequest(transaction: anytype, handle: Types.RequestHandle, index: u8) bool {
+    return handle.authority == @intFromPtr(transaction) and
+        handle.generation == transaction.view_generation and
+        handle.index == index and
+        index < transaction.request_count;
+}
+
+fn validateCallFinalUseRequest(
+    transaction: anytype,
+    index: u8,
+    binding: *const ValueBinding,
+    claim: CallFinalUseClaim,
+) !void {
+    const request = &transaction.requests[index];
+    if (request.destination != .prepared_source or request.prepared_action != null)
+        return error.ValueUseCallArgumentLocationUnsupported;
+    try compatibility.validateBindingCompatibility(binding.*, request, binding.loc);
+    try compatibility.validateSourceView(binding.loc, request.form);
+    switch (claim) {
+        .direct_i32 => {
+            if (!request.expected.ty.eql(.{ .int = 32 }) or
+                request.expected.register_class != .gpr32 or request.form != .gpr32)
+            {
+                return error.ValueUseCallArgumentTypeUnsupported;
+            }
+            if (binding.loc != .eax)
+                return error.ValueUseCallArgumentLocationUnsupported;
+        },
+        .direct_i64 => {
+            if (!request.expected.ty.eql(.{ .int = 64 }) or
+                request.expected.register_class != .gpr64 or request.form != .gpr64)
+            {
+                return error.ValueUseCallArgumentTypeUnsupported;
+            }
+            if (binding.loc != .rax)
+                return error.ValueUseCallArgumentLocationUnsupported;
+        },
+        .int_byte_size_i16 => {
+            if (!request.expected.ty.eql(.{ .int = 16 }) or
+                request.expected.register_class != .gpr32 or request.form != .gpr32)
+            {
+                return error.ValueUseCallArgumentTypeUnsupported;
+            }
+            if (binding.loc != .eax)
+                return error.ValueUseCallArgumentLocationUnsupported;
+        },
     }
 }
 

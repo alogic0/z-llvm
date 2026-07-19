@@ -128,17 +128,125 @@ pub fn validatePreparedViewLeafDiscipline(source_name: []const u8, source: [:0]c
 }
 
 pub fn validateDormantCallActionProductionSites(
-    _: []const u8,
+    source_name: []const u8,
     source: [:0]const u8,
 ) !void {
+    const attachment_count = countPattern(source, "attachCallAction(");
+    const direct_action_count = countPattern(source, "DirectCallAction");
+    const specialized_action_count = countPattern(source, "IntByteSizeCallAction") +
+        countPattern(source, ".int_byte_size_call");
+    if (attachment_count == 0 and
+        direct_action_count == 0 and
+        specialized_action_count == 0)
+    {
+        return;
+    }
+    if (!std.mem.eql(u8, source_name, "composed_selector_calls.zig") or
+        specialized_action_count != 0)
+    {
+        return error.ValueUseCallActionPrematureProductionUse;
+    }
+
+    var body_storage: [max_function_bodies]FunctionBody = undefined;
+    const bodies = try collectFunctionBodies(source, &body_storage);
+    const lower_call = functionBodyNamed(bodies, "lowerCall") orelse
+        return error.ValueUseCallActionPrematureProductionUse;
+    const classifier = functionBodyNamed(bodies, "isAdmittedOrdinaryDirectCall") orelse
+        return error.ValueUseCallActionPrematureProductionUse;
+    const helper = functionBodyNamed(bodies, "lowerOrdinaryDirectCallValueUse") orelse
+        return error.ValueUseCallActionPrematureProductionUse;
+    const helper_source = source[helper.start..helper.end];
+    const classifier_source = source[classifier.start..classifier.end];
+    const lower_call_source = source[lower_call.start..lower_call.end];
+
+    if (countPattern(helper_source, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(helper_source, "transaction.register(") != 1 or
+        countPattern(helper_source, "transaction.attachCallAction(") != 1 or
+        countPattern(helper_source, "transaction.seal()") != 1 or
+        countPattern(helper_source, "transaction.prepare()") != 1 or
+        countPattern(helper_source, "transaction.materializeAll()") != 1 or
+        countPattern(helper_source, "transaction.commit()") != 1 or
+        countPattern(helper_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
+        countPattern(helper_source, "else |err|") != 0 or
+        attachment_count != 1 or
+        direct_action_count != 1)
+    {
+        return error.ValueUseCallActionPrematureProductionUse;
+    }
+    const registration = std.mem.indexOf(
+        u8,
+        helper_source,
+        "transaction.register(",
+    ) orelse return error.ValueUseCallActionPrematureProductionUse;
+    const attachment = std.mem.indexOf(
+        u8,
+        helper_source,
+        "transaction.attachCallAction(",
+    ) orelse return error.ValueUseCallActionPrematureProductionUse;
+    const seal = std.mem.indexOf(
+        u8,
+        helper_source,
+        "transaction.seal()",
+    ) orelse return error.ValueUseCallActionPrematureProductionUse;
+    const prepare = std.mem.indexOf(
+        u8,
+        helper_source,
+        "transaction.prepare()",
+    ) orelse return error.ValueUseCallActionPrematureProductionUse;
+    const materialize = std.mem.indexOf(
+        u8,
+        helper_source,
+        "transaction.materializeAll()",
+    ) orelse return error.ValueUseCallActionPrematureProductionUse;
+    const commit = std.mem.indexOf(
+        u8,
+        helper_source,
+        "transaction.commit()",
+    ) orelse return error.ValueUseCallActionPrematureProductionUse;
+    if (!(registration < attachment and
+        attachment < seal and
+        seal < prepare and
+        prepare < materialize and
+        materialize < commit))
+    {
+        return error.ValueUseCallActionPrematureProductionUse;
+    }
     for ([_][]const u8{
-        "attachCallAction(",
-        "DirectCallAction",
-        "IntByteSizeCallAction",
-        ".int_byte_size_call",
+        "resolveValue(",
+        "valueIsLive",
+        "valueLoc",
+        ".loc",
+        "preparedView(",
+        "executePreparedAction(",
     }) |pattern| {
-        if (std.mem.indexOf(u8, source, pattern) != null)
+        if (std.mem.indexOf(u8, helper_source, pattern) != null or
+            std.mem.indexOf(u8, classifier_source, pattern) != null)
+        {
             return error.ValueUseCallActionPrematureProductionUse;
+        }
+    }
+    for ([_][]const u8{
+        "selector.",
+        "selector_state.",
+        "function_name",
+        "functionName",
+    }) |pattern| {
+        if (std.mem.indexOf(u8, classifier_source, pattern) != null)
+            return error.ValueUseCallActionPrematureProductionUse;
+    }
+    if (countPattern(lower_call_source, "isAdmittedOrdinaryDirectCall(") != 1 or
+        countPattern(lower_call_source, "lowerOrdinaryDirectCallValueUse(") != 1)
+    {
+        return error.ValueUseCallActionPrematureProductionUse;
+    }
+    for (bodies) |body| {
+        if (std.mem.eql(u8, body.name, "lowerOrdinaryDirectCallValueUse")) continue;
+        const function_source = source[body.start..body.end];
+        if (std.mem.indexOf(u8, function_source, "attachCallAction(") != null or
+            std.mem.indexOf(u8, function_source, "DirectCallAction") != null)
+        {
+            return error.ValueUseCallActionPrematureProductionUse;
+        }
     }
 }
 
@@ -1939,11 +2047,20 @@ pub fn validateFailureProvenanceProductionSites(source_name: []const u8, source:
 
     var body_storage: [max_function_bodies]FunctionBody = undefined;
     const bodies = try collectFunctionBodies(source, &body_storage);
-    const mapper = functionBodyNamed(bodies, "inlineMemcpyValueUseDiagnostic") orelse
+    var expected_count: usize = 0;
+    if (functionBodyNamed(bodies, "inlineMemcpyValueUseDiagnostic")) |mapper| {
+        if (countPattern(source[mapper.start..mapper.end], ".failedRequestIs(") != 3)
+            return error.ValueUseFailureProvenanceAllowlistMismatch;
+        expected_count += 3;
+    }
+    if (functionBodyNamed(bodies, "directCallValueUseDiagnostic")) |mapper| {
+        if (countPattern(source[mapper.start..mapper.end], ".failedRequestIs(") != 1)
+            return error.ValueUseFailureProvenanceAllowlistMismatch;
+        expected_count += 1;
+    }
+    if (expected_count == 0)
         return error.ValueUseFailureProvenanceOutsideAllowlist;
-    if (countPattern(source[mapper.start..mapper.end], ".failedRequestIs(") != 3 or
-        query_count != 3)
-    {
+    if (query_count != expected_count) {
         return error.ValueUseFailureProvenanceAllowlistMismatch;
     }
 }

@@ -406,6 +406,10 @@ fn buildPreparedRecordUnchecked(comptime Authority: type, transaction: anytype, 
         },
         else => return error.ValueUsePreparedViewUnsupported,
     }
+    if (transaction.lifetime_context.pins[index]) |pin| {
+        if (pin.call_final_use != null)
+            _ = try Authority.validateRequestAt(Authority, transaction, index);
+    }
     const binding = requestSourceBinding(transaction, index) orelse
         return if (transaction.lifetime_context.forward_snapshots[index] != null)
             error.ValueUseForwardPlanStale

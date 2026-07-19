@@ -181,16 +181,48 @@ fn validateDirectCallAttachment(
         action.arguments[0..action.argument_count],
         action.argument_types[0..action.argument_count],
     ) |handle, declared_type| {
-        const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
+        const index = Authority.validateRegisteredOperandHandle(
+            Authority,
+            transaction,
+            handle,
+        ) catch |err| {
+            noteCallAttachmentHandleError(Authority, transaction, handle, err);
+            return err;
+        };
+        if (transaction.requests[index].prepared_action != null) {
+            Authority.noteRequestBoundaryError(
+                Authority,
+                transaction,
+                index,
+                error.ValueUsePreparedActionUnexpected,
+            );
+            return error.ValueUsePreparedActionUnexpected;
+        }
         if (previous_index) |previous| {
-            if (index < previous) return error.ValueUseCallArgumentSourceOrder;
+            if (index < previous) {
+                Authority.noteRequestBoundaryError(
+                    Authority,
+                    transaction,
+                    index,
+                    error.ValueUseCallArgumentSourceOrder,
+                );
+                return error.ValueUseCallArgumentSourceOrder;
+            }
         }
         previous_index = index;
         _ = declared_type;
         seen[index] = true;
     }
-    for (seen[0..transaction.request_count]) |present| {
-        if (!present) return error.ValueUseCallRequestUnclaimed;
+    for (seen[0..transaction.request_count], 0..) |present, index| {
+        if (!present) {
+            Authority.noteRequestBoundaryError(
+                Authority,
+                transaction,
+                @intCast(index),
+                error.ValueUseCallRequestUnclaimed,
+            );
+            return error.ValueUseCallRequestUnclaimed;
+        }
     }
 }
 
@@ -203,8 +235,47 @@ fn validateIntByteSizeAttachment(
     try action.result.validate();
     if (transaction.request_count != 1)
         return error.ValueUseCallArgumentCountUnsupported;
-    const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, action.argument);
-    if (index != 0) return error.ValueUseCallArgumentSourceOrder;
+    const index = Authority.validateRegisteredOperandHandle(
+        Authority,
+        transaction,
+        action.argument,
+    ) catch |err| {
+        noteCallAttachmentHandleError(Authority, transaction, action.argument, err);
+        return err;
+    };
+    if (transaction.requests[index].prepared_action != null) {
+        Authority.noteRequestBoundaryError(
+            Authority,
+            transaction,
+            index,
+            error.ValueUsePreparedActionUnexpected,
+        );
+        return error.ValueUsePreparedActionUnexpected;
+    }
+    if (index != 0) {
+        Authority.noteRequestBoundaryError(
+            Authority,
+            transaction,
+            index,
+            error.ValueUseCallArgumentSourceOrder,
+        );
+        return error.ValueUseCallArgumentSourceOrder;
+    }
+}
+
+fn noteCallAttachmentHandleError(
+    comptime Authority: type,
+    transaction: anytype,
+    handle: Types.RequestHandle,
+    err: anyerror,
+) void {
+    if (handle.authority != @intFromPtr(transaction) or
+        handle.generation != transaction.view_generation or
+        handle.index >= transaction.request_count)
+    {
+        return;
+    }
+    Authority.noteRequestBoundaryError(Authority, transaction, handle.index, err);
 }
 
 fn validateCallRequest(request: *const Types.StoredRequest, declared_type: ir.Type) !void {

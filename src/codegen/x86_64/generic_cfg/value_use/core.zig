@@ -250,6 +250,7 @@ fn core_deinit(comptime Authority: type, transaction: anytype) void {
 fn core_register(comptime Authority: type, transaction: anytype, request: Request) !RequestHandle {
     try Authority.requireActive(Authority, transaction);
     if (transaction.request_phase != .registering) return error.ValueUseLateRegistration;
+    if (transaction.call_action != null) return error.ValueUseLateRegistration;
     if (request.prepared_action) |action| try Authority.validateActionRegistration(Authority, transaction, action);
     const stored = StoredRequest{
         .source = try Source.from(request.source),
@@ -282,6 +283,7 @@ fn core_attachScratchCompareAction(
 ) !void {
     try Authority.requireActive(Authority, transaction);
     if (transaction.request_phase != .registering) return error.ValueUseLateRegistration;
+    if (transaction.call_action != null) return error.ValueUseLateRegistration;
     const lhs_index = try Authority.validateHandle(Authority, transaction, lhs);
     const lhs_request = &transaction.requests[lhs_index];
     if (lhs_request.destination != .prepared_view or
@@ -313,6 +315,7 @@ fn core_attachNamedScalarBinaryAction(
 ) !void {
     try Authority.requireActive(Authority, transaction);
     if (transaction.request_phase != .registering) return error.ValueUseLateRegistration;
+    if (transaction.call_action != null) return error.ValueUseLateRegistration;
     const lhs_index = try Authority.validateHandle(Authority, transaction, lhs);
     const lhs_request = &transaction.requests[lhs_index];
     if (lhs_request.destination != .prepared_view or
@@ -333,6 +336,7 @@ fn core_attachExactI52BinaryAction(
 ) !void {
     try Authority.requireActive(Authority, transaction);
     if (transaction.request_phase != .registering) return error.ValueUseLateRegistration;
+    if (transaction.call_action != null) return error.ValueUseLateRegistration;
     const lhs_index = try Authority.validateHandle(Authority, transaction, lhs);
     const lhs_request = &transaction.requests[lhs_index];
     if (lhs_request.destination != .prepared_view or
@@ -353,6 +357,7 @@ fn core_attachScalarMultiplyAction(
 ) !void {
     try Authority.requireActive(Authority, transaction);
     if (transaction.request_phase != .registering) return error.ValueUseLateRegistration;
+    if (transaction.call_action != null) return error.ValueUseLateRegistration;
     const lhs_index = try Authority.validateHandle(Authority, transaction, lhs);
     const lhs_request = &transaction.requests[lhs_index];
     if (lhs_request.destination != .prepared_view or
@@ -373,6 +378,7 @@ fn core_attachUnsignedQuotientAction(
 ) !void {
     try Authority.requireActive(Authority, transaction);
     if (transaction.request_phase != .registering) return error.ValueUseLateRegistration;
+    if (transaction.call_action != null) return error.ValueUseLateRegistration;
     const lhs_index = try Authority.validateHandle(Authority, transaction, lhs);
     const lhs_request = &transaction.requests[lhs_index];
     if (lhs_request.destination != .prepared_view or
@@ -391,8 +397,8 @@ fn core_attachCallAction(
     action: PreparedAction,
 ) !void {
     try Authority.requireActive(Authority, transaction);
-    if (transaction.request_phase != .sealed)
-        return error.ValueUseCallActionRequiresSealedPlan;
+    if (transaction.request_phase != .registering)
+        return error.ValueUseLateRegistration;
     if (transaction.call_action != null)
         return error.ValueUseCallActionAlreadyAttached;
     switch (action) {

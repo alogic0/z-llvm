@@ -1,0 +1,243 @@
+# INBOX-178 — dormant call final-use plan amendment
+
+Status: implemented and stopped before re-isolation. Production call routing
+remains dormant and byte-identical. The O2 bypass ratchet remains 131.
+
+Baseline provenance:
+
+```text
+operating_head=f0a99e88001fc4cfb1c228ef1a85c2947ab7a37e
+accepted_design=docs/evidence/inbox177_o2_call_final_use_plan_design.md
+accepted_design_commit=0351fe87
+zig=/home/oleg/bin/zig
+zig_version=0.16.0-dev.364+bdee02bc0
+```
+
+## Bounded implementation
+
+The one existing `attachCallAction` method is now legal only while the
+transaction is registering. It validates the complete already-registered
+handle set before assigning `call_action`. A non-null `call_action` closes
+registration and every other per-request attachment path. The resulting
+order is:
+
+```text
+register all requests -> attach exactly once -> seal -> prepare
+  -> materializeAll/action execution -> commit
+```
+
+A zero-handle direct action attaches before seal without a fake request.
+Duplicate attachment remains `ValueUseCallActionAlreadyAttached`; attachment,
+registration, or another per-request action after attachment is
+`ValueUseLateRegistration`. The former sealed-only error was not repurposed
+as another mechanism.
+
+The private `CallFinalUsePin` adds only:
+
+```text
+plan_identity: usize
+admission_position: usize
+interval_end: usize
+```
+
+It is nested in the existing private lifetime pin and contains no `ValueLoc`,
+slice, callback, mutable-plan pointer, physical-home capability, or public
+accessor. Admission is limited to a current named request claimed by the
+already attached `.direct_call` or `.int_byte_size_call` action. It requires
+the exact predecessor boundary, the same real allocation plan, canonical
+identity/generation, canonical dependencies, existing type/class/width/form/
+destination compatibility, and the action's closed EAX/RAX home. Generic Q1
+and forward Q1 are unchanged.
+
+Canonical revalidation occurs during prepared-record construction, every
+post-preservation call-argument refresh, and every argument stage. A plan,
+position, interval, binding, generation, home, handle, or action-claim
+change fails request-attributably before further emission. Q2 survival and
+Q3 occupant preservation remain independent. `materializeAll` remains the
+sole automatic rollback owner.
+
+Attachment validation now records the first precise request failure for a
+valid in-authority handle, source-order inversion, unexpected independent
+request action, and an unclaimed registered request. Phase, tag, identity,
+count, and foreign/no-matching-handle failures remain authority-level.
+
+## Proof matrix
+
+The frozen 57-case design matrix is covered by the existing call-action
+matrix plus the following amended proof groups:
+
+| design rows | proof |
+|---|---|
+| 1–9 | `value-use call final-use plan admits exact EAX and RAX argument positions`; `supports middle last repeated and specialized operands`; existing zero-argument/result-durability call tests |
+| 10–15 | `value-use call final-use plan preserves Q2 source and unrelated Q3 occupant`; existing caller-clobber/multi-alias call tests |
+| 16–32 | `value-use call final-use admission rejects incomplete and ineligible state`; `structural pin fails closed on canonical mutation`; existing forward-Q1, retained-form, handle, type/home, and dependency negatives |
+| 33–44 | `value-use dormant call attachment is pre-seal unique and closes registration`; existing provenance, validation-order, phase, copy-cycle, and retained-form tests |
+| 45–53 | exact-final-use positive and structural-mutation tests plus the existing complete call rollback matrix and later-index three-argument rollback proof |
+| 54–57 | byte-identical production source hashes, decisive accepted-cohort identities, focused canaries, and dormant production guards |
+
+The structural-pin mutation loop independently changes the allocation-plan
+identity, current position, interval, binding presence, virtual generation,
+and admitted home. Attachment tests explicitly pin registering phase,
+zero-request state, successful attachment state, registration closure,
+duplicate rejection, and cleared action/execution storage after rollback.
+The transaction layout proof now pins size 366240, alignment 16, field order,
+defaults, and every field offset.
+
+## Structural guards
+
+The authority guard freezes:
+
+- registering-only attachment, validation-before-assignment, duplicate
+  rejection, and registration closure;
+- private inline final-use storage and exact predecessor arithmetic;
+- direct-call/intByteSize handle claims and exact EAX/RAX admission;
+- prepared-record, refresh, and per-stage canonical revalidation;
+- no public final-use helper, retained raw location, liveness callback, or
+  generic-Q1 widening.
+
+The production guard is function/API scoped. A future ordinary wiring shape
+is accepted only in `lowerCall`, the pure
+`isAdmittedOrdinaryDirectCall` classifier, and
+`lowerOrdinaryDirectCallValueUse`, with lexical register-before-attach-before-
+seal ordering and one authority. Negative fixtures reject relocation,
+attachment after seal, registration after attachment, duplicate attachment,
+specialized premature wiring, and selector/home/liveness inspection. The
+guard deliberately accepts `.direct_call` in an EFLAGS instruction-effect
+fixture and does not impose an opcode-wide ban.
+
+Failure-provenance accounting is conditional: a present memcpy mapper owns
+exactly three query sites and a present direct-call mapper owns exactly one
+per-handle-loop query site. A memcpy-only fixture is not required to invent a
+call mapper.
+
+## Frozen surfaces and budgets
+
+```text
+composed_selector_calls.zig_sha256=f1046632d670d61439df7252ba12a1ea474829a4b479ed7758ea4e223866cf2d
+bypass_tsv_sha256=2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11
+facade_sha256=4f5887e9d2bce0943df26c1e08e8360053440da64eefd19ddfd9d53225dddd7a
+facade_manifest_sha256=2adcd99ee3bfbe0e9f09673f1df02ab305b5ddb2c1b461023152d5d03a079c26
+facade_manifest_symbols=126
+call_action_tags=2
+call_facade_additions=4
+new_import_edges=0
+ratchet=131
+```
+
+Final file budgets:
+
+```text
+value_use/model.zig=1896/1999
+value_use/core.zig=1334/1499
+value_use/planning/lifetime_admission.zig=689/2000
+value_use/actions/calls.zig=678/1200
+value_use/actions/calls_tests.zig=1304/1500
+```
+
+Final principal source hashes:
+
+```text
+model=3bd22867b20587918132090143f407e042f32d44a3948ad3d7dc23a4cd02dfd7
+core=d0e8fe7c03120d7ad8044f575a95c71c945b4bc145c7b7b7e9d3467423a8b819
+lifetime_admission=b4514ccbeec603c6597b53f1229ec963fa4418a893cc501140ab902d85541690
+materialization=05dcc41b8d408adee5c16d6f959d7bb62b815200005d3f1c0b8b0b673aa683a8
+calls=166f6211c019320117705ce42792c7d790178bfa6bac66895a3a603b3dfc6d4d
+calls_tests=b2030d9ae4976be4a6d3d22487d0eaee0ef16ec80bf4548364c186fa0e0dba7d
+authority_guard=ede45872b4c7c292da95859e392d5c32b1ee49a4b04de06adc3841d6468713e7
+consumer_guard=f7076f86ee49705daf25bb762f1f244728e1c0a1bedb850494ee704ec33ac3d9
+```
+
+The line count and `calls_tests` hash above are rechecked immediately before
+commit; any commit-time discrepancy is a stop.
+
+Retention surfaces remain byte-identical to the operating baseline:
+
+```text
+docs/retention_headroom_policy.md=a31e3fbf7aa03c8544fc5f9921e350c25e4e470cc3c779dfb356136634e052dd
+docs/evidence/tmp_retention_pins.tsv=f4374187d77ec6b7c42ee1b64538ead1a2d599697595a7f59c28b23dae5c6614
+tools/clean_tmp.zig=8e0c54ad6fed9e46326049dbe64bff743daddcc2527c1dc4d5e02be15fba2d5e
+stash0=7985c6d (INBOX-93 preservation)
+```
+
+`clean-tmp` was not executed and no retained artifact was deleted.
+
+## Authorized gates
+
+Every retained log is paired with its exact command.
+
+### Full unit
+
+```text
+command=set -o pipefail; /home/oleg/bin/zig build test --summary all 2>&1 | tee tmp/inbox178_o2_call_final_use/validation/full_unit.log
+result=7/7_steps,1394/1394_tests
+log_sha256=0371c11deeaf60a56ef1b94441460c0d72711e1153d03ec7d7b3ff24e6458c13
+```
+
+### Standalone source guard
+
+```text
+command=set -o pipefail; /home/oleg/bin/zig test src/codegen/x86_64/generic_cfg/composed_selector_source_guard_tests.zig 2>&1 | tee tmp/inbox178_o2_call_final_use/validation/source_guard.log
+result=60/60_tests
+log_sha256=d2da7fa47675c14778b74a9d83dbe9829e48a407907afc84a7bb36de38a60995
+```
+
+### ABI differential
+
+```text
+command=set -o pipefail; /home/oleg/bin/zig build abi-differential --summary all 2>&1 | tee tmp/inbox178_o2_call_final_use/validation/abi_differential.log
+result=5/5_steps,60/60_cases,30/30_real_functions
+log_sha256=3e9b63a31eae201c45f6009882e1adef17856ef07aa2c58ddec7011420621c1a
+```
+
+### Focused canaries
+
+```text
+command=set -o pipefail; /home/oleg/bin/zig build focused-codegen-canaries --summary all 2>&1 | tee tmp/inbox178_o2_call_final_use/validation/focused_canaries.log
+result=2/2_steps,2/2_canaries,35/35_execution_cases,__multi3_green,fma_green
+log_sha256=d704046eacfa8c3c2cf852ed97c86ab42b5a6a07dcfe4dd7de48cb870f2292c6
+```
+
+## Decisive identities and frozen-input provenance
+
+Fresh accepted-cohort object and owner projections are exact:
+
+```text
+input=tmp/inbox63_accepted_cohort.ll
+input_sha256=d8da86cae494d7d4a58053ab24b1e8be944859263072b85ffa164880b0110cd4
+command=LC_ALL=C zig-out/bin/z_llvm --emit=obj --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll >tmp/inbox178_o2_call_final_use/validation/accepted.o 2>tmp/inbox178_o2_call_final_use/validation/accepted.stderr
+object_sha256=061a64e4241c92be1fafbdd9800f00cd3ac7bd1d2d3bef460d79ea1d5a32a0be
+stderr_bytes=0
+
+command=LC_ALL=C zig-out/bin/z_llvm --emit=selection-owner-manifest --generic-cfg-selector --target=x86_64-linux --input-limit=67108864 tmp/inbox63_accepted_cohort.ll >tmp/inbox178_o2_call_final_use/validation/owner_manifest.tsv 2>tmp/inbox178_o2_call_final_use/validation/owner_manifest.stderr
+owner_sha256=5d91960e5a01a0e6387f7ef2894dae4a1de93d2ce648c28377f97cd4afa0229d
+owner_breakdown=composed_block:40,composed_cfg:127,legacy_envelope:17,structural_fallback:101
+owner_ledger=167/17/101
+stderr_bytes=0
+```
+
+The historical 443-row input
+`tmp/inbox92_second_resume2_perf/compiler_rt_frozen.ll` was already absent
+at operating HEAD `f0a99e88`; it is not retention-pinned. Therefore this
+slice does not falsely describe the available 285-row accepted input as a
+fresh 443-row report. The retained acceptance-grade full report remains:
+
+```text
+retained_log=tmp/inbox174a_o2_call_rollback/validation/fresh_full_report.log
+retained_log_sha256=49a19f04ad9f5cddf82a9464c74216c0284b1f8600448a1669ee4f6c38415681
+selected/emitted/failed=443/285/158
+first_failure=compiler_rt.trunc.truncl/UnsupportedLongDoubleAbi
+```
+
+A run against `tmp/inbox63_accepted_cohort.ll` correctly produced 285/285/0
+and is excluded from full-report evidence. Three locally regenerated
+compiler-rt variants did not match frozen input hash
+`7c91f5f602ec45c57a96ad82d1e097c47a47df7b00809800ebcefc3fccf6760b`
+or its 443-row population and are likewise excluded. No retained artifact
+was overwritten or deleted. Because `composed_selector_calls.zig` and the
+bypass inventory are byte-identical and the complete fresh accepted object
+and owner projections are exact, the dormant amendment has no production
+routing or accepted-stream movement.
+
+No isolation, production wiring, performance, integrated-executable,
+strengthened Tier 2, distribution-all, or Tier 3 command was run. This slice
+stops after its clean amendment commit for Watcher/Reviewer review.

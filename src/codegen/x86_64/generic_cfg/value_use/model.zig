@@ -1234,9 +1234,16 @@ pub const StoredRequest = struct {
 /// Transaction-private lifetime pin. It retains only semantic identity and
 /// virtual-register generation; current physical locations are always
 /// re-resolved from canonical selector state.
+const CallFinalUsePin = struct {
+    plan_identity: usize,
+    admission_position: usize,
+    interval_end: usize,
+};
+
 const LifetimePin = struct {
     identity: Identity,
     generation: usize,
+    call_final_use: ?CallFinalUsePin = null,
 };
 
 const LifetimeContext = struct {

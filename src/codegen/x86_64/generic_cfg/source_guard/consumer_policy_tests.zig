@@ -117,14 +117,58 @@ test "composed selector source guard confines forward resolution to the transact
     );
 }
 
-test "value-use call actions remain dormant in every production consumer" {
+test "value-use call action wiring is function scoped and registration precedes attachment" {
     const accepted: [:0]const u8 = @embedFile("../composed_selector_calls.zig");
     try validateDormantCallActionProductionSites("composed_selector_calls.zig", accepted);
+    const wired: [:0]const u8 =
+        "fn lowerCall() void { if (isAdmittedOrdinaryDirectCall(call)) " ++
+        "return lowerOrdinaryDirectCallValueUse(selector, call); } " ++
+        "fn isAdmittedOrdinaryDirectCall(call: Call) bool { " ++
+        "return call.kind == .direct and call.return_type == .i32; } " ++
+        "fn lowerOrdinaryDirectCallValueUse() void { " ++
+        "var transaction = ValueUseTransaction.begin(selector); " ++
+        "for (arguments) |argument| _ = transaction.register(argument); " ++
+        "_ = transaction.attachCallAction(DirectCallAction); " ++
+        "_ = transaction.seal(); _ = transaction.prepare(); " ++
+        "_ = transaction.materializeAll(); _ = transaction.commit(); }";
+    try validateDormantCallActionProductionSites("composed_selector_calls.zig", wired);
+    try validateDormantCallActionProductionSites(
+        "composed_selector_eflags.zig",
+        "fn instructionEffect() void { _ = .direct_call; }",
+    );
     inline for (.{
         "fn lowerCall() void { transaction.attachCallAction(action); }",
-        "fn lowerCall() void { _ = DirectCallAction; }",
+        wired ++ " fn other() void { _ = transaction.attachCallAction(action); }",
         "fn lowerIntByteSizeCall() void { _ = IntByteSizeCallAction; }",
         "fn lowerIntByteSizeCall() void { _ = .int_byte_size_call; }",
+        "fn lowerCall() void { if (isAdmittedOrdinaryDirectCall(call)) " ++
+            "return lowerOrdinaryDirectCallValueUse(selector, call); } " ++
+            "fn isAdmittedOrdinaryDirectCall() bool { return selector.valueIsLive(); } " ++
+            "fn lowerOrdinaryDirectCallValueUse() void { " ++
+            "var transaction = ValueUseTransaction.begin(selector); " ++
+            "_ = transaction.register(argument); " ++
+            "_ = transaction.attachCallAction(DirectCallAction); " ++
+            "_ = transaction.seal(); _ = transaction.prepare(); " ++
+            "_ = transaction.materializeAll(); _ = transaction.commit(); }",
+        "fn lowerCall() void { if (isAdmittedOrdinaryDirectCall(call)) " ++
+            "return lowerOrdinaryDirectCallValueUse(selector, call); } " ++
+            "fn isAdmittedOrdinaryDirectCall() bool { return true; } " ++
+            "fn lowerOrdinaryDirectCallValueUse() void { " ++
+            "var transaction = ValueUseTransaction.begin(selector); " ++
+            "_ = transaction.attachCallAction(DirectCallAction); " ++
+            "_ = transaction.register(argument); _ = transaction.seal(); " ++
+            "_ = transaction.prepare(); _ = transaction.materializeAll(); " ++
+            "_ = transaction.commit(); }",
+        "fn lowerCall() void { if (isAdmittedOrdinaryDirectCall(call)) " ++
+            "return lowerOrdinaryDirectCallValueUse(selector, call); } " ++
+            "fn isAdmittedOrdinaryDirectCall() bool { return true; } " ++
+            "fn lowerOrdinaryDirectCallValueUse() void { " ++
+            "var transaction = ValueUseTransaction.begin(selector); " ++
+            "_ = transaction.register(argument); _ = transaction.seal(); " ++
+            "_ = transaction.attachCallAction(DirectCallAction); " ++
+            "_ = transaction.prepare(); _ = transaction.materializeAll(); " ++
+            "_ = transaction.commit(); }",
+        wired ++ " fn duplicate() void { _ = transaction.attachCallAction(action); }",
     }) |fixture| {
         try std.testing.expectError(
             error.ValueUseCallActionPrematureProductionUse,
@@ -272,13 +316,18 @@ test "composed selector source guard confines load diagnostic mapping without ho
         ),
     );
 }
-test "composed selector source guard confines failure provenance to the memcpy mapper" {
-    const accepted: [:0]const u8 =
+test "composed selector source guard conditionally confines call provenance mappers" {
+    const memcpy: [:0]const u8 =
         "fn inlineMemcpyValueUseDiagnostic() void { " ++
         "_ = transaction.failedRequestIs(destination); " ++
         "_ = transaction.failedRequestIs(source); " ++
         "_ = transaction.failedRequestIs(length); }";
-    try validateFailureProvenanceProductionSites("composed_selector_calls.zig", accepted);
+    const direct: [:0]const u8 =
+        "fn directCallValueUseDiagnostic() void { " ++
+        "for (arguments) |argument| _ = transaction.failedRequestIs(argument); }";
+    try validateFailureProvenanceProductionSites("composed_selector_calls.zig", memcpy);
+    try validateFailureProvenanceProductionSites("composed_selector_calls.zig", direct);
+    try validateFailureProvenanceProductionSites("composed_selector_calls.zig", memcpy ++ direct);
     try validateFailureProvenanceProductionSites("composed_selector_calls.zig", "fn lowerInlineMemcpy() void {}");
     try std.testing.expectError(
         error.ValueUseFailureProvenanceOutsideAllowlist,
@@ -307,7 +356,14 @@ test "composed selector source guard confines failure provenance to the memcpy m
         error.ValueUseFailureProvenanceAllowlistMismatch,
         validateFailureProvenanceProductionSites(
             "composed_selector_calls.zig",
-            accepted ++ " fn successPath() void { _ = transaction.failedRequestIs(source); }",
+            memcpy ++ " fn successPath() void { _ = transaction.failedRequestIs(source); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseFailureProvenanceAllowlistMismatch,
+        validateFailureProvenanceProductionSites(
+            "composed_selector_calls.zig",
+            direct ++ " fn successPath() void { _ = transaction.failedRequestIs(source); }",
         ),
     );
 }

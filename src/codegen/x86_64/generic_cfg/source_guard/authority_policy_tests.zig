@@ -213,7 +213,10 @@ test "composed selector source guard rejects frozen bypass inventory growth" {
 }
 test "composed selector source guard rejects function predicates in the value-use authority" {
     const accepted =
-        "const LifetimePin = struct { identity: u8, generation: usize };" ++
+        "const CallFinalUsePin = struct { plan_identity: usize, " ++
+        "admission_position: usize, interval_end: usize };" ++
+        "const LifetimePin = struct { identity: u8, generation: usize, " ++
+        "call_final_use: ?CallFinalUsePin = null };" ++
         "const LifetimeContext = struct { pins: u8 };" ++
         "fn core_availabilityForConsumption() void {" ++
         "switch (source) { .int, .null_value => return, else => {} }" ++
@@ -223,7 +226,17 @@ test "composed selector source guard rejects function predicates in the value-us
         "_ = valueIsLiveAtOrAfterCurrent(source);" ++
         "_ = error.ValueUseExpiredSource;" ++
         "if (pin.generation != binding.vreg.index) _ = error.ValueUseSourceGenerationChanged;" ++
+        "_ = admitCallFinalUse(source); _ = revalidateCallFinalUse(source);" ++
         "}" ++
+        "fn admitCallFinalUse() void { if (position == 0 or " ++
+        "interval_end != position - 1) return; _ = @intFromPtr(plan); " ++
+        "_ = .{ .call_final_use = .{} }; }" ++
+        "fn revalidateCallFinalUse() void { _ = final_use.plan_identity; " ++
+        "_ = final_use.admission_position; _ = final_use.interval_end; " ++
+        "_ = error.ValueUseSourceGenerationChanged; }" ++
+        "fn callFinalUseClaim() void { _ = .direct_call; _ = .int_byte_size_call; }" ++
+        "fn validateCallFinalUseRequest() void { if (binding.loc != .eax) return; " ++
+        "if (binding.loc != .eax) return; if (binding.loc != .rax) return; }" ++
         "fn core_mustSurviveInstruction() void {" ++
         "_ = core_availabilityForConsumption(source);" ++
         "_ = valueIsLiveAfterCurrent(source);" ++
@@ -625,6 +638,54 @@ test "composed selector source guard freezes private three-question lifetime aut
     try std.testing.expectError(
         error.ValueUseLifetimeContextMissing,
         validateLifetimeContextAuthority(collapsed_interval_error),
+    );
+
+    const public_final_use = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "fn admitCallFinalUse(",
+        "pub fn admitCallFinalUse(",
+    );
+    defer std.testing.allocator.free(public_final_use);
+    try std.testing.expectError(
+        error.ValueUseCallFinalUseAuthorityMismatch,
+        validateLifetimeContextAuthority(public_final_use),
+    );
+
+    const widened_final_use = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "interval_end != position - 1",
+        "interval_end > position",
+    );
+    defer std.testing.allocator.free(widened_final_use);
+    try std.testing.expectError(
+        error.ValueUseCallFinalUseAuthorityMismatch,
+        validateLifetimeContextAuthority(widened_final_use),
+    );
+
+    const missing_home_boundary = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "binding.loc != .eax",
+        "false",
+    );
+    defer std.testing.allocator.free(missing_home_boundary);
+    try std.testing.expectError(
+        error.ValueUseCallFinalUseAuthorityMismatch,
+        validateLifetimeContextAuthority(missing_home_boundary),
+    );
+
+    const borrowed_final_use = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted,
+        "const CallFinalUsePin = struct {\n    plan_identity: usize,",
+        "const CallFinalUsePin = struct {\n    location: ValueLoc,\n    plan_identity: usize,",
+    );
+    defer std.testing.allocator.free(borrowed_final_use);
+    try std.testing.expectError(
+        error.ValueUseLifetimeContextEscaped,
+        validateLifetimeContextAuthority(borrowed_final_use),
     );
 }
 

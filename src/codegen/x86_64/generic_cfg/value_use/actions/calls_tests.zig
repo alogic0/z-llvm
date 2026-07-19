@@ -78,8 +78,8 @@ fn runAttachedCall(
     transaction: *Transaction,
     action: Transaction.PreparedAction,
 ) !void {
-    try transaction.seal();
     try transaction.attachCallAction(action);
+    try transaction.seal();
     try transaction.prepare();
     try transaction.materializeAll();
 }
@@ -629,7 +629,7 @@ test "value-use dormant intByteSize owns aligned staging mask and durable result
     try std.testing.expectEqualStrings("result", machine.owned_labels.items[1]);
 }
 
-test "value-use dormant call attachment is sealed unique and closed" {
+test "value-use dormant call attachment is pre-seal unique and closes registration" {
     var machine = MachineFunction.init("value-use-call-attachment", .void);
     defer machine.deinit(std.testing.allocator);
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
@@ -637,6 +637,9 @@ test "value-use dormant call attachment is sealed unique and closed" {
 
     var transaction = try Transaction.begin(&selector);
     defer transaction.deinit();
+    try std.testing.expectEqual(Transaction.RequestPhase.registering, transaction.phase());
+    try std.testing.expectEqual(@as(usize, 0), transaction.requestCount());
+    try std.testing.expect(transaction.call_action == null);
     const action: Transaction.PreparedAction = .{ .direct_call = try Transaction.DirectCallAction.init(
         "callee",
         null,
@@ -644,19 +647,32 @@ test "value-use dormant call attachment is sealed unique and closed" {
         &.{},
         &.{},
     ) };
-    try std.testing.expectError(error.ValueUseCallActionRequiresSealedPlan, transaction.attachCallAction(action));
-    try transaction.seal();
     try transaction.attachCallAction(action);
+    try std.testing.expectEqual(Transaction.RequestPhase.registering, transaction.phase());
+    try std.testing.expectEqual(@as(usize, 0), transaction.requestCount());
+    try std.testing.expect(transaction.call_action != null);
     try std.testing.expectError(error.ValueUseCallActionAlreadyAttached, transaction.attachCallAction(action));
+    try std.testing.expectError(error.ValueUseLateRegistration, transaction.register(callRequest("late", .{ .int = 32 })));
+    try std.testing.expectError(
+        error.ValueUseLateRegistration,
+        transaction.attachScratchCompareAction(undefined, undefined),
+    );
+    try transaction.seal();
+    try std.testing.expectError(error.ValueUseLateRegistration, transaction.attachCallAction(action));
     try std.testing.expectError(
         error.ValueUseCallActionUnsupported,
         blk: {
             var unsupported = try Transaction.begin(&selector);
             defer unsupported.deinit();
-            try unsupported.seal();
             break :blk unsupported.attachCallAction(.branch_condition);
         },
     );
+
+    var attached_then_rolled_back = try Transaction.begin(&selector);
+    defer attached_then_rolled_back.deinit();
+    try attached_then_rolled_back.attachCallAction(action);
+    try attached_then_rolled_back.rollback();
+    try expectCallRollbackStorageCleared(&attached_then_rolled_back);
 }
 
 test "value-use dormant call request provenance is source ordered and survives rollback" {
@@ -677,7 +693,6 @@ test "value-use dormant call request provenance is source ordered and survives r
     defer transaction.deinit();
     const lhs = try transaction.register(callRequest("lhs", .{ .int = 32 }));
     const rhs = try transaction.register(callRequest("rhs", .{ .int = 32 }));
-    try transaction.seal();
     try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
         "callee",
         null,
@@ -685,6 +700,7 @@ test "value-use dormant call request provenance is source ordered and survives r
         &.{ lhs, rhs },
         &.{ .{ .int = 32 }, .{ .int = 32 } },
     ) });
+    try transaction.seal();
     try transaction.prepare();
     selector.values.getPtr("lhs").?.loc = .{ .xmm = .{ .reg = .xmm0, .bits = 32 } };
     selector.values.getPtr("rhs").?.loc = .{ .xmm = .{ .reg = .xmm1, .bits = 32 } };
@@ -717,7 +733,6 @@ test "value-use dormant direct call preserves post-lhs rhs validation timing" {
             .gpr128,
             .pair_low_high,
         ));
-        try transaction.seal();
         try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
             "callee_order",
             null,
@@ -725,6 +740,7 @@ test "value-use dormant direct call preserves post-lhs rhs validation timing" {
             &.{ lhs, rhs },
             &.{ .{ .int = 32 }, .{ .int = 128 } },
         ) });
+        try transaction.seal();
         try call_actions.setCallTestFailureForTest(&transaction, .after_argument, 0);
         try transaction.prepare();
         try std.testing.expectError(error.ValueUseCallTestFailure, transaction.materializeAll());
@@ -741,7 +757,6 @@ test "value-use dormant direct call preserves post-lhs rhs validation timing" {
         .gpr128,
         .pair_low_high,
     ));
-    try transaction.seal();
     try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
         "callee_order",
         null,
@@ -749,6 +764,7 @@ test "value-use dormant direct call preserves post-lhs rhs validation timing" {
         &.{ lhs, rhs },
         &.{ .{ .int = 32 }, .{ .int = 128 } },
     ) });
+    try transaction.seal();
     try transaction.prepare();
     try std.testing.expectError(error.ValueUseCallArgumentWidthUnsupported, transaction.materializeAll());
     try std.testing.expect(!transaction.failedRequestIs(lhs));
@@ -775,7 +791,6 @@ test "value-use dormant call retained forms reject without mutation" {
         .gpr128,
         .pair_low_high,
     ));
-    try transaction.seal();
     try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
         "callee_pair",
         null,
@@ -783,6 +798,7 @@ test "value-use dormant call retained forms reject without mutation" {
         &.{wide},
         &.{.{ .int = 128 }},
     ) });
+    try transaction.seal();
     try transaction.prepare();
     try std.testing.expectError(
         error.ValueUseCallArgumentWidthUnsupported,
@@ -811,7 +827,6 @@ test "value-use dormant direct call rejects genuine copy scheduling before mutat
     defer transaction.deinit();
     const lhs = try transaction.register(callRequest("lhs", .{ .int = 64 }));
     const rhs = try transaction.register(callRequest("rhs", .{ .int = 64 }));
-    try transaction.seal();
     try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
         "callee_cycle",
         null,
@@ -819,6 +834,7 @@ test "value-use dormant direct call rejects genuine copy scheduling before mutat
         &.{ lhs, rhs },
         &.{ .{ .int = 64 }, .{ .int = 64 } },
     ) });
+    try transaction.seal();
     try transaction.prepare();
     try std.testing.expectError(error.ValueUseCopyCycleRequiresO4, transaction.materializeAll());
     try std.testing.expect(!transaction.failedRequestIs(lhs));
@@ -863,7 +879,6 @@ test "value-use dormant call rollback restores every declared mutation boundary"
         var transaction = try Transaction.begin(&selector);
         defer transaction.deinit();
         const argument = try transaction.register(callRequest("argument", .{ .int = 64 }));
-        try transaction.seal();
         try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
             "callee",
             "result",
@@ -871,6 +886,7 @@ test "value-use dormant call rollback restores every declared mutation boundary"
             &.{argument},
             &.{.{ .int = 64 }},
         ) });
+        try transaction.seal();
         try call_actions.setCallTestFailureForTest(&transaction, boundary, 0);
         try transaction.prepare();
         try std.testing.expectError(error.ValueUseCallTestFailure, transaction.materializeAll());
@@ -900,12 +916,12 @@ test "value-use dormant call rollback restores every declared mutation boundary"
     var mask_transaction = try Transaction.begin(&mask_selector);
     defer mask_transaction.deinit();
     const mask_argument = try mask_transaction.register(callRequest("argument", .{ .int = 16 }));
-    try mask_transaction.seal();
     try mask_transaction.attachCallAction(.{ .int_byte_size_call = try Transaction.IntByteSizeCallAction.init(
         "zig.target.intByteSize",
         "result",
         mask_argument,
     ) });
+    try mask_transaction.seal();
     try call_actions.setCallTestFailureForTest(&mask_transaction, .after_mask, 0);
     try mask_transaction.prepare();
     try std.testing.expectError(error.ValueUseCallTestFailure, mask_transaction.materializeAll());
@@ -945,7 +961,6 @@ test "value-use dormant call later argument failure rolls back earlier stages ex
     const first = try transaction.register(callRequest("first", .{ .int = 64 }));
     const second = try transaction.register(callRequest("second", .{ .int = 32 }));
     const third = try transaction.register(callRequest("third", .{ .int = 64 }));
-    try transaction.seal();
     try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
         "callee_later_failure",
         null,
@@ -953,6 +968,7 @@ test "value-use dormant call later argument failure rolls back earlier stages ex
         &.{ first, second, third },
         &.{ .{ .int = 64 }, .{ .int = 32 }, .{ .int = 64 } },
     ) });
+    try transaction.seal();
     try call_actions.setCallTestFailureForTest(&transaction, .after_argument, 2);
     try transaction.prepare();
     try std.testing.expectError(error.ValueUseCallTestFailure, transaction.materializeAll());
@@ -972,4 +988,317 @@ test "value-use dormant call later argument failure rolls back earlier stages ex
     try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
     try selector.eflags.validateSnapshot(saved_eflags);
     try expectCallRollbackStorageCleared(&transaction);
+}
+
+test "value-use call final-use plan admits exact EAX and RAX argument positions" {
+    {
+        var machine = MachineFunction.init("value-use-call-final-eax", .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("final", 0);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "final", .eax);
+
+        {
+            var transaction = try Transaction.begin(&selector);
+            defer transaction.deinit();
+            const final = try transaction.register(callRequest("final", .{ .int = 32 }));
+            try runAttachedCall(&transaction, .{ .direct_call = try Transaction.DirectCallAction.init(
+                "callee_final_eax",
+                "result",
+                .{ .int = 32 },
+                &.{final},
+                &.{.{ .int = 32 }},
+            ) });
+            try transaction.commit();
+        }
+
+        const expected_stream = [_]machine_module.Instruction{
+            .{ .mov_eax_to_arg = .rdi },
+            .{ .direct_call = .{ .symbol = "callee_final_eax", .ret_ty = .{ .int = 32 } } },
+        };
+        try expectCallInstructions(&expected_stream, machine.instructions.items);
+        try std.testing.expectEqual(ValueLoc.eax, selector.values.get("result").?.loc);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    }
+
+    {
+        var machine = MachineFunction.init("value-use-call-final-rax-later", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "first");
+        try plan.interval_ends.put("final", 0);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "first", .{ .arg32 = .r8 });
+        try selector_state.bindValueLoc(&selector, "final", .rax);
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const first = try transaction.register(callRequest("first", .{ .int = 32 }));
+        const final = try transaction.register(callRequest("final", .{ .int = 64 }));
+        try runAttachedCall(&transaction, .{ .direct_call = try Transaction.DirectCallAction.init(
+            "callee_final_rax",
+            null,
+            .void,
+            &.{ first, final },
+            &.{ .{ .int = 32 }, .{ .int = 64 } },
+        ) });
+        try transaction.commit();
+
+        const expected_stream = [_]machine_module.Instruction{
+            .{ .mov_arg_arg = .{ .dst = .rdi, .src = .r8 } },
+            .{ .mov_rax_to_arg = .rsi },
+            .{ .direct_call = .{ .symbol = "callee_final_rax", .ret_ty = .void } },
+        };
+        try expectCallInstructions(&expected_stream, machine.instructions.items);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    }
+}
+
+test "value-use call final-use plan supports middle last repeated and specialized operands" {
+    var machine = MachineFunction.init("value-use-call-final-positions", .void);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addAtCurrent(&plan, "first");
+    try plan.interval_ends.put("middle", 0);
+    try addAtCurrent(&plan, "last");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "first", .{ .arg32 = .r8 });
+    try selector_state.bindValueLoc(&selector, "middle", .eax);
+    try selector_state.bindValueLoc(&selector, "last", .{ .arg64 = .r9 });
+
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const first = try transaction.register(callRequest("first", .{ .int = 32 }));
+    const middle = try transaction.register(callRequest("middle", .{ .int = 32 }));
+    const last = try transaction.register(callRequest("last", .{ .int = 64 }));
+    try runAttachedCall(&transaction, .{ .direct_call = try Transaction.DirectCallAction.init(
+        "callee_final_middle",
+        null,
+        .void,
+        &.{ first, middle, last },
+        &.{ .{ .int = 32 }, .{ .int = 32 }, .{ .int = 64 } },
+    ) });
+    try transaction.commit();
+    try std.testing.expectEqual(machine_module.Instruction{ .mov_eax_to_arg = .rsi }, machine.instructions.items[1]);
+
+    var repeated_machine = MachineFunction.init("value-use-call-final-repeated", .void);
+    defer repeated_machine.deinit(std.testing.allocator);
+    var repeated_plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer repeated_plan.deinit();
+    try repeated_plan.interval_ends.put("shared", 0);
+    var repeated_selector = ComposedBlockSelector.init(std.testing.allocator, &repeated_machine);
+    defer repeated_selector.deinit();
+    repeated_selector.allocation_plan = &repeated_plan;
+    repeated_selector.current_position = 1;
+    repeated_selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&repeated_selector, "shared", .eax);
+    var repeated = try Transaction.begin(&repeated_selector);
+    defer repeated.deinit();
+    const shared = try repeated.register(callRequest("shared", .{ .int = 32 }));
+    try runAttachedCall(&repeated, .{ .direct_call = try Transaction.DirectCallAction.init(
+        "callee_final_repeated",
+        null,
+        .void,
+        &.{ shared, shared },
+        &.{ .{ .int = 32 }, .{ .int = 32 } },
+    ) });
+    try repeated.commit();
+    try std.testing.expectEqual(machine_module.Instruction{ .mov_eax_to_arg = .rdi }, repeated_machine.instructions.items[0]);
+    try std.testing.expectEqual(machine_module.Instruction{ .mov_eax_to_arg = .rsi }, repeated_machine.instructions.items[1]);
+
+    var specialized_machine = MachineFunction.init("value-use-call-final-specialized", .{ .int = 16 });
+    defer specialized_machine.deinit(std.testing.allocator);
+    var specialized_plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer specialized_plan.deinit();
+    try specialized_plan.interval_ends.put("argument", 0);
+    var specialized_selector = ComposedBlockSelector.init(std.testing.allocator, &specialized_machine);
+    defer specialized_selector.deinit();
+    specialized_selector.allocation_plan = &specialized_plan;
+    specialized_selector.current_position = 1;
+    specialized_selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&specialized_selector, "argument", .eax);
+    var specialized = try Transaction.begin(&specialized_selector);
+    defer specialized.deinit();
+    const argument = try specialized.register(callRequest("argument", .{ .int = 16 }));
+    try runAttachedCall(&specialized, .{ .int_byte_size_call = try Transaction.IntByteSizeCallAction.init(
+        "zig.target.intByteSize",
+        "result",
+        argument,
+    ) });
+    try specialized.commit();
+    try std.testing.expectEqual(machine_module.Instruction{ .mov_eax_to_arg = .rdi }, specialized_machine.instructions.items[0]);
+    try std.testing.expectEqual(machine_module.Instruction{ .and_eax_imm32 = 0xffff }, specialized_machine.instructions.items[2]);
+}
+
+test "value-use call final-use plan preserves Q2 source and unrelated Q3 occupant" {
+    {
+        var machine = MachineFunction.init("value-use-call-q2-source", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addLive(&plan, "source");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "source", .eax);
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const source = try transaction.register(callRequest("source", .{ .int = 32 }));
+        try runAttachedCall(&transaction, .{ .direct_call = try Transaction.DirectCallAction.init(
+            "callee_q2",
+            null,
+            .void,
+            &.{source},
+            &.{.{ .int = 32 }},
+        ) });
+        try transaction.commit();
+        try std.testing.expectEqual(machine_module.Instruction{ .spill_eax_rsp = .slot0 }, machine.instructions.items[0]);
+        try std.testing.expectEqual(machine_module.Instruction{ .reload_arg_rsp = .{ .reg = .rdi, .frame_index = .slot0 } }, machine.instructions.items[1]);
+        try std.testing.expect(selector.values.get("source").?.loc == .spill64);
+    }
+
+    {
+        var machine = MachineFunction.init("value-use-call-q3-alias", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("source", 0);
+        try addLive(&plan, "alias");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "source", .eax);
+        try selector_state.bindValueLoc(&selector, "alias", .eax);
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const source = try transaction.register(callRequest("source", .{ .int = 32 }));
+        try runAttachedCall(&transaction, .{ .direct_call = try Transaction.DirectCallAction.init(
+            "callee_q3",
+            null,
+            .void,
+            &.{source},
+            &.{.{ .int = 32 }},
+        ) });
+        try transaction.commit();
+        try std.testing.expectEqual(machine_module.Instruction{ .spill_eax_rsp = .slot0 }, machine.instructions.items[0]);
+        try std.testing.expectEqual(machine_module.Instruction{ .mov_eax_to_arg = .rdi }, machine.instructions.items[1]);
+        try std.testing.expect(selector.values.get("alias").?.loc == .spill64);
+    }
+}
+
+test "value-use call final-use admission rejects incomplete and ineligible state" {
+    const cases = [_]struct {
+        name: []const u8,
+        current_position: usize,
+        interval: ?usize,
+        loc: ValueLoc,
+        expected_error: anyerror,
+    }{
+        .{ .name = "missing-plan", .current_position = 1, .interval = null, .loc = .eax, .expected_error = error.ValueUseSourcePlanMissing },
+        .{ .name = "missing-interval", .current_position = 1, .interval = null, .loc = .eax, .expected_error = error.ValueUseSourceIntervalMissing },
+        .{ .name = "older", .current_position = 2, .interval = 0, .loc = .eax, .expected_error = error.ValueUseExpiredSource },
+        .{ .name = "non-accumulator", .current_position = 1, .interval = 0, .loc = .{ .arg32 = .r8 }, .expected_error = error.ValueUseCallArgumentLocationUnsupported },
+    };
+    for (cases, 0..) |case, case_index| {
+        var machine = MachineFunction.init(case.name, .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        if (case.interval) |interval| try plan.interval_ends.put("argument", interval);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        if (case_index != 0) selector.allocation_plan = &plan;
+        selector.current_position = case.current_position;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "argument", case.loc);
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const argument = try transaction.register(callRequest("argument", .{ .int = 32 }));
+        try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
+            "callee_negative",
+            null,
+            .void,
+            &.{argument},
+            &.{.{ .int = 32 }},
+        ) });
+        try std.testing.expectError(case.expected_error, transaction.seal());
+        try std.testing.expect(transaction.failedRequestIs(argument));
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
+test "value-use call final-use structural pin fails closed on canonical mutation" {
+    inline for (.{ "plan", "position", "interval", "binding", "generation", "home" }) |mutation| {
+        var machine = MachineFunction.init("value-use-call-final-stale", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("argument", 0);
+        var replacement_plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer replacement_plan.deinit();
+        try replacement_plan.interval_ends.put("argument", 0);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "argument", .eax);
+        const saved_binding = selector.values.get("argument").?;
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const argument = try transaction.register(callRequest("argument", .{ .int = 32 }));
+        try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
+            "callee_stale",
+            null,
+            .void,
+            &.{argument},
+            &.{.{ .int = 32 }},
+        ) });
+        try transaction.seal();
+        try transaction.prepare();
+        if (std.mem.eql(u8, mutation, "plan")) {
+            selector.allocation_plan = &replacement_plan;
+        } else if (std.mem.eql(u8, mutation, "position")) {
+            selector.current_position = 2;
+        } else if (std.mem.eql(u8, mutation, "interval")) {
+            try plan.interval_ends.put("argument", 1);
+        } else if (std.mem.eql(u8, mutation, "binding")) {
+            _ = selector.values.remove("argument");
+        } else if (std.mem.eql(u8, mutation, "generation")) {
+            selector.values.getPtr("argument").?.vreg.index += 1;
+        } else {
+            selector.values.getPtr("argument").?.loc = .{ .arg32 = .r8 };
+        }
+        const expected_error = if (std.mem.eql(u8, mutation, "home"))
+            error.ValueUseCallArgumentLocationUnsupported
+        else
+            error.ValueUseSourceGenerationChanged;
+        try std.testing.expectError(expected_error, transaction.materializeAll());
+        try std.testing.expect(transaction.failedRequestIs(argument));
+        try std.testing.expectEqual(saved_binding, selector.values.get("argument").?);
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try expectCallRollbackStorageCleared(&transaction);
+        if (std.mem.eql(u8, mutation, "interval"))
+            try plan.interval_ends.put("argument", 0);
+    }
 }
