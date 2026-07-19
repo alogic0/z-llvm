@@ -167,13 +167,12 @@ pub fn validateNamedScalarProductionSites(
         return error.ValueUseNamedScalarActionAllowlistMismatch;
     const mapper = functionBodyNamed(bodies, "namedScalarValueUseDiagnostic") orelse
         return error.ValueUseNamedScalarActionAllowlistMismatch;
-    const b07 = functionBodyNamed(bodies, "scalar_named_b07_rhs_admission") orelse
-        return error.ValueUseNamedScalarRhsResidualMissing;
     const migrated_residuals = [_][]const u8{
         "scalar_named_b03_interval_admission",
         "scalar_named_b04_interval_admission",
         "scalar_named_b05_interval_admission",
         "scalar_named_b06_interval_admission",
+        "scalar_named_b07_rhs_admission",
     };
     for (migrated_residuals) |name| {
         if (functionBodyNamed(bodies, name) != null)
@@ -256,8 +255,8 @@ pub fn validateNamedScalarProductionSites(
     const b07_dispatch = std.mem.indexOf(
         u8,
         lower_binary_source,
-        "return scalar_named_b07_rhs_admission(selector, result_name, binary, bits, exact_ei_narrow, op);",
-    ) orelse return error.ValueUseNamedScalarRhsResidualMissing;
+        "return lowerNamedScalarBinary(selector, result_name, binary, bits, exact_ei_narrow, .b07);",
+    ) orelse return error.ValueUseNamedScalarDispatchMismatch;
     if (!(b01_dispatch < b03_dispatch and b03_dispatch < b04_dispatch and
         b04_dispatch < b05_dispatch and b05_dispatch < b06_dispatch and
         b06_dispatch < b07_dispatch) or
@@ -273,17 +272,6 @@ pub fn validateNamedScalarProductionSites(
         countPattern(i52_dispatch_source, "AccumulatorDefinitionTransaction.begin(") != 0)
     {
         return error.ValueUseNamedScalarDispatchMismatch;
-    }
-
-    const b07_source = source[b07.start..b07.end];
-    if (countPattern(b07_source, "ValueUseTransaction.begin(") != 0 or
-        countPattern(b07_source, "AccumulatorDefinitionTransaction.begin(selector)") != 4 or
-        countPattern(b07_source, "selector_state.resolveValue(") != 4 or
-        countPattern(b07_source, "selector_state.emitValueIntoScratch(") != 2 or
-        countPattern(b07_source, "selector_state.emitValueIntoScratchAndRelocate(") != 1 or
-        countPattern(b07_source, "selector_state.emitBinaryLocIntoAccumulator(") != 1)
-    {
-        return error.ValueUseNamedScalarRhsResidualOwnershipMismatch;
     }
 }
 

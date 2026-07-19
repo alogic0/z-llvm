@@ -744,39 +744,37 @@ test "value-use named scalar production wiring freezes accepted and retained fam
         ),
     );
 
-    const missing_rhs_owner = try std.mem.replaceOwned(
+    const missing_b07_dispatch = try std.mem.replaceOwned(
         u8,
         std.testing.allocator,
         accepted,
-        "scalar_named_b07_rhs_admission",
-        "scalar_named_b07_unclassified",
+        "binary, bits, exact_ei_narrow, .b07",
+        "binary, bits, exact_ei_narrow, .b06",
     );
-    defer std.testing.allocator.free(missing_rhs_owner);
-    const missing_rhs_owner_z = try std.testing.allocator.dupeZ(u8, missing_rhs_owner);
-    defer std.testing.allocator.free(missing_rhs_owner_z);
+    defer std.testing.allocator.free(missing_b07_dispatch);
+    const missing_b07_dispatch_z = try std.testing.allocator.dupeZ(u8, missing_b07_dispatch);
+    defer std.testing.allocator.free(missing_b07_dispatch_z);
     try std.testing.expectError(
-        error.ValueUseNamedScalarRhsResidualMissing,
+        error.ValueUseNamedScalarDispatchMismatch,
         validateNamedScalarProductionSites(
             "composed_selector_scalar.zig",
-            missing_rhs_owner_z,
+            missing_b07_dispatch_z,
         ),
     );
 
-    const transactional_rhs_owner = try std.mem.replaceOwned(
-        u8,
+    const reintroduced_b07_owner = try std.fmt.allocPrint(
         std.testing.allocator,
-        accepted,
-        "selector_state.emitValueIntoScratchAndRelocate(",
-        "/* ValueUseTransaction.begin(selector) */ selector_state.emitValueIntoScratchAndRelocate(",
+        "{s}\nfn scalar_named_b07_rhs_admission() void {{}}\n",
+        .{accepted},
     );
-    defer std.testing.allocator.free(transactional_rhs_owner);
-    const transactional_rhs_owner_z = try std.testing.allocator.dupeZ(u8, transactional_rhs_owner);
-    defer std.testing.allocator.free(transactional_rhs_owner_z);
+    defer std.testing.allocator.free(reintroduced_b07_owner);
+    const reintroduced_b07_owner_z = try std.testing.allocator.dupeZ(u8, reintroduced_b07_owner);
+    defer std.testing.allocator.free(reintroduced_b07_owner_z);
     try std.testing.expectError(
-        error.ValueUseNamedScalarRhsResidualOwnershipMismatch,
+        error.ValueUseNamedScalarMigratedResidualReintroduced,
         validateNamedScalarProductionSites(
             "composed_selector_scalar.zig",
-            transactional_rhs_owner_z,
+            reintroduced_b07_owner_z,
         ),
     );
 }
