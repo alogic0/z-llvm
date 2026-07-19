@@ -6,44 +6,55 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-179 ordinary direct-call re-isolation — AUTHORIZED for dispatch
+## INBOX-180 `intByteSize`-only re-isolation — AUTHORIZED for dispatch
 
-INBOX-178b at `c0f43aea` and overall INBOX-178 are accepted as the completed
-dormant call final-use amendment. Ratchet remains 131 and production routing
-remains unchanged. Start from clean `c0f43aea`; preserve user infrastructure
-commit `5e1cb6f1` and watcher blob
-`8f3be1dd08dadc6f42ede169ca05e84daae773ab`.
+INBOX-179 at `262f4880` and the ordinary GPR/pointer direct-call family are
+accepted as individually isolated and byte-identical. The evidence-only
+owner-count status 1 is accepted as a nontechnical post-processing failure:
+the exact immutable selector outputs already existed and only the obsolete
+parser was corrected. Production remains dormant and ratchet remains 131.
 
-Regenerate the smallest temporary consumer/function-scoped-guard patch
-against the accepted tree. Route only admitted ordinary GPR/pointer direct
-calls through the accepted dormant `DirectCallAction` lifecycle and a pure
-semantic classifier. Do not blindly reuse the stale INBOX-175 patch.
-Scalar-SSE, indirect, i128/pair, pointer-frontier, stack/aggregate, immediate,
-cycle, tail, intrinsic, and `zig.target.intByteSize` families remain on exact
-legacy paths. No model/action/authority/import/facade or diagnostic widening.
+Start from clean `262f4880`. Regenerate the smallest temporary consumer and
+function-scoped guard-accounting patch against the accepted tree. Route only
+`zig.target.intByteSize` through the dormant `IntByteSizeCallAction`. Keep
+ordinary and every other call family on exact legacy paths; do not build the
+aggregate.
+
+Preserve the legacy validation/diagnostic order before admission: required
+result, call form, tail kind, i16 return/one-argument signature, and i16
+argument type. Use only the accepted
+register/attach/seal/prepare/materialize/commit lifecycle and existing
+request-specific diagnostic mapping. No action/model/Q1/materialization/
+facade/import/capability change, fallback, function predicate, consumer query,
+or diagnostic normalization.
 
 Run blocking bars in strict stop-on-failure order:
 
 1. Fresh exact object `061a64e4`, owner `5d91960e` with ledger `167/17/101`,
-   all `285/0/0` per-function bytes/disassembly, and all six frozen frontier
-   rows. Record the first semantic divergence separately from downstream
-   offsets.
+   all `285/0/0` per-function bytes/disassembly, and six frontier rows/proofs.
 2. Full unit plus standalone source guard.
 3. All 35 focused canaries.
 4. Standalone ABI `60/60` plus `30/30` real functions.
 
 The canonical 443-row input remains preexisting absent. Do not generate a
-substitute or claim/attempt a fresh report; retained `49a19f04` is an
-immutable historical reference only. Fresh object/owner/per-function/six-row
-results decide identity. Any failed bar retains the ordinary family
-wholesale and stops all later bars; no fix-forward.
+substitute or claim/attempt a fresh report; retained `49a19f04` is historical
+reference only. Fresh object/owner/per-function/frontier proof decides
+identity. Any failed bar retains `intByteSize` wholesale, stops later bars,
+and permits no fix-forward.
 
-Do not run `intByteSize` or aggregate isolation, production wiring, ratchet
-credit, performance, integrated executable, strengthened Tier 2,
-distribution-all, Tier 3, cleanup/deletion, or `clean_tmp`. Restore temporary
-source/guard files exactly, retain all evidence, commit only the evidence
-summary, clean the tree, preserve stash/watcher/retention surfaces, and STOP
-before any next family or wiring.
+Do not run ordinary/aggregate isolation, production wiring, ratchet credit,
+performance, integrated executable, strengthened Tier 2, distribution-all,
+Tier 3, cleanup/deletion, or `clean_tmp`. Restore temporary source/guard files
+exactly, retain all evidence, commit only the INBOX-180 evidence summary,
+clean the tree, preserve stash/watcher/retention surfaces, and STOP before
+aggregate isolation or wiring.
+
+## INBOX-179 ordinary direct-call re-isolation — ACCEPTED at 262f4880
+
+All four blocking bars pass with exact object/owner, `285/0/0` per-function
+identity, unit `1398/1398`, guard `62/62`, canaries `35/35`, and ABI
+`60/60 + 30/30`. Temporary wiring was removed, production remains dormant,
+and ratchet remains 131.
 
 ## INBOX-178 dormant call final-use amendment — ACCEPTED at c0f43aea
 
