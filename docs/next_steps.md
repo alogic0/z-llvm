@@ -6,7 +6,32 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-173 calls evidence refresh — COMPLETE, awaiting review
+## INBOX-174 calls dormant build — AUTHORIZED and dispatched
+
+INBOX-173 at efcac24b is **ACCEPTED**. The Reviewer authorized one
+combined dormant slice for the ordinary direct-call and specialized
+`intByteSize` actions in the existing calls leaf; do not split them
+before their shared attachment and authority partition are reviewed.
+Production call routing remains byte-identical and the ratchet remains
+131.
+
+`attachCallAction` is closed to the two reviewed tags, requires a sealed
+uncommitted transaction, and permits exactly one action without making
+arbitrary request-free transactions admissible. Handles use fixed
+transaction-owned storage plus an explicit count. Action identities and
+slices are copied into transaction ownership, and durable selector keys
+become selector-owned before insertion. Zero-argument support cannot
+weaken nonzero validation or commit/finalization. Preserve all frozen
+authorities, validation order, diagnostic provenance, retained owners,
+import/facade/size budgets, and rollback boundaries.
+
+Required dormant validation is full unit, source guard, ABI differential,
+and focused canaries with exact identities and retained evidence. No
+production wiring, ratchet movement, performance, strengthened Tier 2, or
+Tier 3. STOP before the separate ordinary/`intByteSize`/aggregate
+isolation.
+
+## INBOX-173 calls evidence refresh — ACCEPTED at efcac24b
 
 The accepted ratchet-131 tree has been recounted without the stale
 18-site projection. Only three remaining gateways belong to true
