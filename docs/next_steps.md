@@ -6,30 +6,45 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-187C compiler-rt v1 canonical-driver argument-binding closure — AUTHORIZED
+## INBOX-188 exact compiler-rt v1 baseline-validation execution — AUTHORIZED
 
-INBOX-187B at `22da533a` is not accepted as a closed execution contract.
-Its owner-ledger command passes the report summary as Bash `$3`, but never
-binds that argument to the `awk` variable used by
-`getline line < summary`. The exact driver therefore fails during canonical
-repetition 1. Validation remains unauthorized.
+INBOX-187C at `8411478a` and the corrected INBOX-187 contract are accepted.
+Execute that contract exactly once. Run the canonical phase first from one
+detached clean `43de59b0` worktree: exact preflight, one artifact build, and
+exactly three non-timing repetitions. Every identity, status, semantic
+artifact, owner/per-function/frontier invariant, and byte-equality comparison
+must pass.
 
-Amend only the existing contract. Bind the exact report-summary argument,
-then add and audit a complete ledger for every canonical and coverage
-`/bin/bash -c` invocation: explicit `$0` sentinel, every positional-argument
-mapping, shell-variable binding, `awk -v` binding and consumed path,
-producer-before-consumer order, and unique status producer. Fix only
-additional same-class documentation defects found by that audit and record
-each correction. Preserve the corrected producer ordering, one canonical
-`accepted.ll` producer, all paths/statuses, validation semantics, protocol
-identities, thresholds, and calls sequence.
+Do not create or enter coverage before complete canonical success. Freeze
+the sole canonical `accepted.ll` read-only. Then use a separate detached
+`43de59b0` worktree for the exact component-bundle apply, source-manifest
+check, one temporary guard, one coverage build, and observation-off/on
+flows. Require unchanged canonical input, byte-identical semantics, three
+exclusive channels, nonzero two-family lifecycle coverage, zero unexpected
+or overflow events, and every defined equality.
 
-Do not modify the accepted patch bundle or any source. Run only static
-syntax/source checks and read-only bundle/apply/restoration/frozen-identity
-checks. Run no project code, build, validation, coverage, gate, performance,
-wiring, pin edit, cleanup, or credit. Commit only the amended contract,
-preserve ratchet 131 and every frozen surface, and stop again before
-execution.
+Every command is single-attempt. Any discrepancy stops executable work
+immediately; retain everything and skip later phases without retry, repair,
+normalization, cleanup, deletion, pin edit, alternate candidate, or
+improvised restoration. On full success perform only the exact contracted
+reverse-patch/restoration proof and read-only freeze. Retain all worktrees,
+caches, logs, and artifacts.
+
+Do not adopt identities, modify source, wire production, run production
+gates, recount, run performance, clean retained state, or claim credit.
+Commit only
+`docs/evidence/inbox188_o2_compiler_rt_v1_baseline_validation.summary`
+with the exact successful evidence or fail-closed stop, leave the main
+tracked tree clean, preserve dormant production and ratchet 131, and stop
+for acceptance.
+
+## INBOX-187C canonical-driver argument-binding closure — ACCEPTED at 8411478a
+
+The owner-ledger report-summary binding is exact, the stray grouped-frontier
+AWK binding is removed, all 45 `/bin/bash -c` templates have complete
+argument/status ledgers and explicit `$0` sentinels, both command streams
+parse, canonical `accepted.ll` has one producer, and coverage has none.
+The accepted contract remains separate from protocol adoption.
 
 ## Mandatory post-calls evidence/design checkpoint — FUTURE BLOCKING BOUNDARY
 
