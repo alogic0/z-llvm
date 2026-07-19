@@ -178,6 +178,16 @@ policy and explicit authorization.
 path, class, logical size, age, pin/key, status, reason, regeneration cost,
 reclaimable bytes, and headroom projections. The mode rejects `--delete`.
 
+`--retention-cleanup` reuses that classifier for a single-tool cleanup
+workflow. It is a dry-run by default and reports `would-delete` for candidates.
+Deletion requires the additional explicit `--delete` flag. Delete mode
+recomputes the classification from the live filesystem, preserves explicit
+pins, the active and unaccepted INBOXes, the acceptance grace window,
+unclassified paths, current export-cache mode pairs, the patched-Zig cache,
+and any tree containing a `.git` worktree marker. It also requires `lsof` and
+fails closed if a candidate path is open. This capability does not itself
+authorize a cleanup; the user must still approve the reviewed dry-run.
+
 The tracked result is
 [`docs/evidence/inbox59_would_remove.tsv`](evidence/inbox59_would_remove.tsv).
 It is a proposal only: `candidate` means eligible for review, not permission to

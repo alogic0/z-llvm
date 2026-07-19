@@ -13,10 +13,14 @@ const export_cache_name = "real_rows_air_export_cache";
 const usage =
     \\usage: zig build clean-tmp -- [--delete] [--tmp-dir=PATH] [--pin-file=PATH] [--older-than-seconds=N] [--keep-newest-per-mode]
     \\       zig build clean-tmp -- --retention-report [report options]
+    \\       zig build clean-tmp -- --retention-cleanup [--delete] [retention options]
     \\
     \\Dry-run is the default. --delete is required to remove stale tmp files.
     \\--keep-newest-per-mode keeps at most one current-pin export-cache entry per mode.
     \\--retention-report emits the deterministic INBOX retention/headroom manifest and rejects --delete.
+    \\--retention-cleanup applies the same pin/INBOX/grace classifier to per-INBOX
+    \\  directories and export-cache pairs. It is a dry-run unless --delete is also
+    \\  present; delete mode fails closed on Git worktrees or open files.
     \\Report options: --retention-manifest=PATH --patched-zig-cache=PATH
     \\  --accepted-through-inbox=N --active-inbox=N --grace-seconds=N --now-seconds=N
     \\  --filesystem-total-bytes=N --filesystem-free-bytes=N --sharding-peak-bytes=N
@@ -31,6 +35,7 @@ const Options = struct {
     older_than_seconds: u64 = default_max_age_seconds,
     keep_newest_per_mode: bool = false,
     retention_report: bool = false,
+    retention_cleanup: bool = false,
     retention_manifest: []const u8 = default_retention_manifest,
     patched_zig_cache: ?[]const u8 = null,
     accepted_through_inbox: u32 = 0,
@@ -77,6 +82,9 @@ pub fn main(init: std.process.Init) !void {
     const current_pin = try readPin(allocator, io, options.pin_file);
     defer allocator.free(current_pin);
 
+    if (options.retention_report and options.retention_cleanup) {
+        try common.validationError(io, "--retention-report and --retention-cleanup are mutually exclusive\n", .{});
+    }
     if (options.retention_report) {
         if (options.delete) {
             try common.validationError(io, "--retention-report is report-only and rejects --delete\n", .{});
@@ -100,6 +108,14 @@ pub fn main(init: std.process.Init) !void {
             }
             try stdout.print("fixture report-only path={s} preserved=true\n", .{path});
         }
+        try stdout.flush();
+        return;
+    }
+    if (options.retention_cleanup) {
+        var stdout_buffer: [4096]u8 = undefined;
+        var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+        const stdout = &stdout_writer.interface;
+        try runRetentionCleanup(allocator, io, options, current_pin, stdout);
         try stdout.flush();
         return;
     }
@@ -152,6 +168,8 @@ fn parseOptions(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init
             options.delete = true;
         } else if (std.mem.eql(u8, arg, "--retention-report")) {
             options.retention_report = true;
+        } else if (std.mem.eql(u8, arg, "--retention-cleanup")) {
+            options.retention_cleanup = true;
         } else if (std.mem.eql(u8, arg, "--keep-newest-per-mode")) {
             options.keep_newest_per_mode = true;
         } else if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
@@ -444,6 +462,7 @@ const TreeFacts = struct {
     size: u64 = 0,
     newest_mtime_ns: i128 = std.math.minInt(i128),
     contains_protected_file: bool = false,
+    contains_git_marker: bool = false,
 };
 
 fn treeFacts(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !TreeFacts {
@@ -452,6 +471,7 @@ fn treeFacts(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !TreeFa
         .size = stat.size,
         .newest_mtime_ns = stat.mtime.nanoseconds,
         .contains_protected_file = isProtectedFileName(std.fs.path.basename(path)),
+        .contains_git_marker = std.mem.eql(u8, std.fs.path.basename(path), ".git"),
     };
     if (stat.kind != .directory) return facts;
 
@@ -467,6 +487,7 @@ fn treeFacts(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !TreeFa
             facts.size += child_facts.size;
             facts.newest_mtime_ns = @max(facts.newest_mtime_ns, child_facts.newest_mtime_ns);
             facts.contains_protected_file = facts.contains_protected_file or child_facts.contains_protected_file;
+            facts.contains_git_marker = facts.contains_git_marker or child_facts.contains_git_marker;
             continue;
         }
 
@@ -477,6 +498,7 @@ fn treeFacts(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !TreeFa
         facts.size += child_stat.size;
         facts.newest_mtime_ns = @max(facts.newest_mtime_ns, child_stat.mtime.nanoseconds);
         facts.contains_protected_file = facts.contains_protected_file or isProtectedFileName(entry.name);
+        facts.contains_git_marker = facts.contains_git_marker or std.mem.eql(u8, entry.name, ".git");
     }
     return facts;
 }
@@ -694,6 +716,199 @@ fn runRetentionReport(
     );
 }
 
+fn runRetentionCleanup(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    options: Options,
+    current_pin: []const u8,
+    stdout: *std.Io.Writer,
+) !void {
+    if (options.accepted_through_inbox == 0 or options.active_inbox == 0) {
+        try common.validationError(io, "--retention-cleanup requires accepted and active INBOX numbers\n", .{});
+    }
+    if (options.delete and !try common.commandExists(allocator, io, "lsof")) {
+        try common.validationError(io, "--retention-cleanup --delete requires lsof for open-path checks\n", .{});
+    }
+
+    const now_seconds = options.now_seconds orelse @as(u64, @intCast(@divFloor(
+        std.Io.Timestamp.now(io, .real).nanoseconds,
+        std.time.ns_per_s,
+    )));
+    const pins = try std.Io.Dir.cwd().readFileAlloc(io, options.retention_manifest, allocator, .limited(64 * 1024));
+    defer allocator.free(pins);
+
+    var items: std.ArrayListUnmanaged(RetentionItem) = .empty;
+    defer {
+        for (items.items) |item| item.deinit(allocator);
+        items.deinit(allocator);
+    }
+
+    try collectExportRetentionItems(allocator, io, options, current_pin, pins, now_seconds, &items);
+    try collectTmpRetentionItems(allocator, io, options, pins, now_seconds, &items);
+    if (options.patched_zig_cache) |path| {
+        const facts = try treeFacts(allocator, io, path);
+        try appendRetentionItem(
+            allocator,
+            &items,
+            path,
+            "patched-zig-build-cache",
+            facts.size,
+            retentionAgeSeconds(now_seconds, facts.newest_mtime_ns),
+            current_pin,
+            .protected,
+            if (retentionPathPinned(pins, path)) "live-pin-current-accepted-generation" else "current-accepted-generation",
+            "full-patched-zig-rebuild",
+        );
+    }
+    std.mem.sort(RetentionItem, items.items, {}, retentionItemLessThan);
+
+    var candidate_count: usize = 0;
+    var protected_count: usize = 0;
+    var deleted_count: usize = 0;
+    var reclaimable_bytes: u64 = 0;
+    var deleted_bytes: u64 = 0;
+
+    try stdout.print(
+        "# clean-tmp-retention schema=1 mode={s} observed_at_unix={} tmp_dir={s} retention_manifest={s}\n",
+        .{
+            if (options.delete) "delete" else "dry-run",
+            now_seconds,
+            options.tmp_dir,
+            options.retention_manifest,
+        },
+    );
+    try stdout.writeAll("path\tclass\tsize_bytes\tage_seconds\tpin_or_key\tstatus\treason\tregeneration_cost\taction\n");
+    if (options.delete) {
+        for (items.items) |item| {
+            if (item.status == .candidate) {
+                try ensureRetentionCandidateUnused(allocator, io, item);
+            }
+        }
+    }
+    for (items.items) |item| {
+        var action: []const u8 = "preserve";
+        switch (item.status) {
+            .protected => protected_count += 1,
+            .candidate => {
+                candidate_count += 1;
+                reclaimable_bytes +|= item.size_bytes;
+                action = if (options.delete) "delete" else "would-delete";
+                if (options.delete) {
+                    // Repeat immediately before deletion to close most of the
+                    // gap between the all-candidate preflight and mutation.
+                    try ensureRetentionCandidateUnused(allocator, io, item);
+                    try deleteRetentionCandidate(allocator, io, item);
+                    deleted_count += 1;
+                    deleted_bytes +|= item.size_bytes;
+                }
+            },
+        }
+        try stdout.print(
+            "{s}\t{s}\t{}\t{}\t{s}\t{s}\t{s}\t{s}\t{s}\n",
+            .{
+                item.path,
+                item.class,
+                item.size_bytes,
+                item.age_seconds,
+                item.pin_or_key,
+                @tagName(item.status),
+                item.reason,
+                item.regeneration_cost,
+                action,
+            },
+        );
+    }
+    try stdout.print(
+        "# totals entries={} protected={} candidates={} total_reclaimable_bytes={} deleted={} bytes_deleted={} local_fail=0\n",
+        .{
+            items.items.len,
+            protected_count,
+            candidate_count,
+            reclaimable_bytes,
+            deleted_count,
+            deleted_bytes,
+        },
+    );
+}
+
+fn ensureRetentionCandidateUnused(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    item: RetentionItem,
+) !void {
+    const stat = try std.Io.Dir.cwd().statFile(io, item.path, .{});
+    try ensurePathUnused(allocator, io, item.path, stat.kind == .directory);
+    if (!std.mem.eql(u8, item.class, "real-rows-air-export-pair")) return;
+
+    const sibling = try exportPairSiblingPath(allocator, item.path);
+    defer allocator.free(sibling);
+    if (try common.fileExists(io, sibling)) {
+        try ensurePathUnused(allocator, io, sibling, false);
+    }
+}
+
+fn ensurePathUnused(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    path: []const u8,
+    recursive: bool,
+) !void {
+    const argv: []const []const u8 = if (recursive)
+        &.{ "lsof", "-w", "-F", "p", "+D", path }
+    else
+        &.{ "lsof", "-w", "-F", "p", "--", path };
+    const result = try std.process.run(allocator, io, .{
+        .argv = argv,
+        .stdout_limit = .limited(4 * 1024 * 1024),
+        .stderr_limit = .limited(4 * 1024 * 1024),
+    });
+    defer common.freeRunResult(allocator, result);
+    if (result.stdout.len != 0) {
+        try common.validationError(io, "retention candidate is in use and cannot be deleted: {s}\n{s}", .{ path, result.stdout });
+    }
+    switch (result.term) {
+        .exited => |code| switch (code) {
+            0 => return,
+            1 => return,
+            else => try common.validationError(io, "lsof failed for retention candidate {s} with exit code {}\n{s}", .{ path, code, result.stderr }),
+        },
+        else => try common.validationError(io, "lsof terminated abnormally for retention candidate {s}\n", .{path}),
+    }
+}
+
+fn deleteRetentionCandidate(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    item: RetentionItem,
+) !void {
+    if (!std.mem.eql(u8, item.class, "real-rows-air-export-pair")) {
+        try std.Io.Dir.cwd().deleteTree(io, item.path);
+        return;
+    }
+
+    try deleteFileIfPresent(io, item.path);
+    const sibling = try exportPairSiblingPath(allocator, item.path);
+    defer allocator.free(sibling);
+    try deleteFileIfPresent(io, sibling);
+}
+
+fn deleteFileIfPresent(io: std.Io, path: []const u8) !void {
+    std.Io.Dir.cwd().deleteFile(io, path) catch |err| switch (err) {
+        error.FileNotFound => {},
+        else => return err,
+    };
+}
+
+fn exportPairSiblingPath(allocator: std.mem.Allocator, path: []const u8) ![]u8 {
+    if (std.mem.endsWith(u8, path, ".meta")) {
+        return std.fmt.allocPrint(allocator, "{s}.air", .{path[0 .. path.len - ".meta".len]});
+    }
+    if (std.mem.endsWith(u8, path, ".air")) {
+        return std.fmt.allocPrint(allocator, "{s}.meta", .{path[0 .. path.len - ".air".len]});
+    }
+    return error.InvalidRetentionExportPairPath;
+}
+
 fn appendRetentionItem(
     allocator: std.mem.Allocator,
     items: *std.ArrayListUnmanaged(RetentionItem),
@@ -787,6 +1002,8 @@ fn collectTmpRetentionItems(
         var reason: []const u8 = "unclassified-manual-review";
         if (retentionPathPinned(pins, path)) {
             reason = "explicit-live-pin";
+        } else if (facts.contains_git_marker) {
+            reason = "contains-git-worktree-marker";
         } else if (age_seconds < options.older_than_seconds) {
             reason = "two-hour-short-run-window";
         } else if (inbox_number) |number| {
