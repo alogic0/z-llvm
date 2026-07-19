@@ -6,48 +6,47 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-178a call final-use proof/evidence completion — AUTHORIZED for dispatch
+## INBOX-178b call accumulator-alias remediation — AUTHORIZED for dispatch
 
-INBOX-178 semantic implementation at `462154a1` is provisionally accepted
-and frozen, but overall acceptance is withheld for missing action-scoped
-proofs and incomplete retained-artifact provenance. Dispatch from composite
-HEAD `4e7ee803`; use `462154a1` as the semantic baseline. The intervening
-watcher-loop commit is provenance-only and its script remains byte-identical
-and out of scope.
+INBOX-178a at `3a7ab346` is accepted as a compliant hard-stop and evidence
+record. Overall INBOX-178 remains unaccepted; isolation and wiring remain
+unauthorized. Begin from clean `3a7ab346`, with `462154a1` as the exact
+pre-fix semantic baseline and the retained INBOX-178a proof/logs as
+provenance.
 
-Do not change semantic implementation unless a new proof exposes a defect;
-then stop rather than amend automatically. Complete the exact 57-row
-production-faithful matrix with a row-by-row test/assertion map. Add compact
-attached-call coverage for zero position; valid/stale forward cases;
-malformed dependencies; every ineligible home; all attachment handle/order/
-claim/prepared-action errors and precise provenance; canonical mutations
-after prepared construction, preservation/refresh, and before later stages;
-and complete rollback/private-pin clearing at every frozen boundary.
+Amend only the call-local shared authority used by
+`spillLiveCallerClobbersForCall`. Snapshot every live logical alias of the
+EAX/RAX occupant before mutation, preserve the physical occupant exactly
+once, and rebind every live alias to the same preserved home while retaining
+its semantic width/view. Do not rebind dead aliases, emit more than one
+physical move/spill or slot allocation, or leave a live alias in EAX/RAX.
+Do not broaden generic `spillCurrentAccumulator`; if existing internal APIs
+cannot support a call-local fix, stop structurally.
 
-Generic tests count only when they explicitly exercise the attached-call
-action/handle scope. Use only existing internal access or guard-confined
-test-only hooks. Keep `calls_tests.zig` at or below 1,500 lines. If complete
-coverage requires another test leaf/import or any budget exception, stop
-structurally.
+Reapply and compact the retained production-faithful proof. Make row 13
+pass, complete rows 11, 15, and 49, and finish with all 57 rows explicitly
+passing. Prove EAX/RAX, live/dead discrimination, no-alias/no-spill behavior,
+one instruction/slot, per-alias canonical width/view, EFLAGS identity,
+request provenance, and complete rollback of bindings, spill ownership and
+counters, instructions, transaction state, and private pins.
+`calls_tests.zig` remains capped at 1,500 lines; inability to fit is a
+structural stop. Add only function-scoped guard coverage/negative fixtures
+needed to freeze the bounded authority.
 
-Update the INBOX-178 evidence with the exact row map and the SHA-256, exact
-recovered command/provenance, and supporting/excluded status of every
-retained exploratory IR/log. Preserve them without normalization, deletion,
-or evidence-only reruns.
+No public/facade helper, import/test leaf, action tag/form/destination,
+callback, planning edge, consumer query, generic-Q1 change, scheduler,
+routing/classifier change, bypass/ratchet credit, or budget exception.
+Freeze production call routing, `intByteSize`, facade/126-symbol manifest,
+imports, bypass inventory, ratchet 131, retention surfaces, watcher loop,
+and stash.
 
-The missing canonical 443-row input is an approved preexisting blocked
-condition. Do not regenerate substitutes or claim a fresh full report.
-Acceptance may rely on historical report `49a19f04`, fresh object
-`061a64e4`, fresh owner `5d91960e`, and evidence that the canonical input
-predated INBOX-178 as absent.
-
-Rerun only full unit, standalone guard, ABI, canaries, and fresh object/
-owner. Freeze production call routing/classifier, `intByteSize`, facade/
-manifest, import DAG, bypass inventory, ratchet 131, retention surfaces,
-watcher-loop script, and stash. No isolation, wiring, performance,
-integrated executable, strengthened Tier 2, distribution-all, Tier 3,
-cleanup, deletion, ratchet credit, or substitute report generation. Commit
-the bounded proof/evidence completion and STOP for acceptance review.
+Run only full unit, standalone guard, ABI, canaries, and fresh exact
+object/owner. Preserve the absent-443-row exception and retained historical
+`49a19f04`; do not regenerate substitutes or claim a fresh report. Update
+the exact 57-row evidence and all commands/hashes/provenance. No isolation,
+wiring, cleanup/deletion, performance, integrated executable, strengthened
+Tier 2, distribution-all, or Tier 3. Commit the bounded remediation, clean
+the tree, preserve stash@{0}, and STOP for acceptance review.
 
 ## INBOX-178 dormant call final-use amendment — SEMANTIC IMPLEMENTATION PROVISIONALLY ACCEPTED at 462154a1; overall acceptance WITHHELD
 
