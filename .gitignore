@@ -23,3 +23,7 @@ docs/worker_inbox.md
 
 # Vim swp files
 **/.*.swp
+
+# log files
+**/*.log
+
