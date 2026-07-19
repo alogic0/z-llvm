@@ -66,7 +66,8 @@ WHEN NOTIFIED THAT THE WORKER STOPPED:
 It's from Watcher:
 5. Reach explicit agreement before assigning anything to the Worker. Incorporate all Reviewer refinements.
 6. Surface relevant Worker and Reviewer dialogue verbatim to the user.
-7. After agreement, add the new directive to docs/worker_inbox.md, update docs/next_steps.md to the sole current authorized action, commit only tracked operating-document changes, and dispatch the agreed task to worker:0.0 using tmux bracketed paste.
+7. After agreement, add the new directive to docs/worker_inbox.md, update docs/next_steps.md to the sole current authorized action,
+   commit only tracked operating-document changes, and dispatch the agreed task to worker:0.0 using tmux bracketed paste.
 8. Confirm the Worker acknowledged the directive and its stop conditions.
 
 DECISION AUTHORITY:
