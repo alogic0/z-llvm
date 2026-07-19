@@ -6,26 +6,26 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-173 calls evidence refresh — AUTHORIZED and dispatched
+## INBOX-173 calls evidence refresh — COMPLETE, awaiting review
 
-INBOX-172 is **ACCEPTED; THE QUOTIENT STEP IS COMPLETE AT RATCHET 131**.
-The Reviewer authorized an evidence-only refresh from the accepted 131
-tree. Re-enumerate current call-lowering ownership without inheriting
-the stale 18-site estimate. Partition argument value uses, callee
-resolution, caller-clobber preservation, argument-register staging,
-call emission, EFLAGS effects, and result definition as distinct
-authorities. Preserve source-order validation and multi-operand
-diagnostic provenance. Count direct credits separately from conditional
-last-owner collapses. Exclude migrated memcpy and explicitly name
-retained indirect-call, multi-result, pair, cycle, and post-call-liveness
-owners. Derive action/facade/import/size budgets from the actual
-partition, with no speculative empty surface, and record the future
-isolation-plus-aggregate validation plan.
+The accepted ratchet-131 tree has been recounted without the stale
+18-site projection. Only three remaining gateways belong to true
+machine-call staging: the two `lowerDirectCallArg/resolveValue` rows are
+shared with the retained scalar-SSE/O3 path and therefore carry **zero**
+textual credit, while the distinct `intByteSize/emitValueIntoScratch`
+row carries one conditional future credit. There is no proven
+last-owner collapse. The honest conditional target is therefore 130,
+not an inherited 113-style projection; the ratchet remains **131** in
+this docs-only slice.
 
-Deliver only `docs/evidence/inbox173_o2_calls_refresh.md` plus the
-required operating-document references. No production, tests, guards,
-tools, manifests, gates, performance, Tier 3, or ratchet change. Commit
-docs, leave the tree clean, and STOP before dormant implementation.
+`docs/evidence/inbox173_o2_calls_refresh.md` freezes the distinct
+callee, operand-admission, caller-clobber, ABI staging, emission,
+EFLAGS, result, rollback, and post-call-liveness authorities; exact
+source-order/provenance rules; every retained owner; derived
+action/facade/import/size budgets; and the future family-isolation plus
+aggregate procedure. Migrated memcpy is excluded. No production,
+tests, guards, tools, manifests, gates, performance, or Tier 3 ran or
+changed. STOP before dormant implementation.
 
 ## INBOX-172 quotient wiring — ACCEPTED at dc96b63d + perf 2af10ae7; quotient complete at 131
 
