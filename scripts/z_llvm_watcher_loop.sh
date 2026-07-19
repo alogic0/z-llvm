@@ -60,14 +60,20 @@ stash entries and existing patches.
 
 WHEN NOTIFIED THAT THE WORKER STOPPED:
 1. Preserve the Worker’s final report verbatim.
-2. Inspect the commit, worktree, source diff, evidence, and retained logs. Do not run the project code yourself; review source and existing logs only.
-3. Verify every active-inbox condition, including scope, ratchet, identities, gates, prohibited actions, clean worktree, and untouched stash.
-4. Discuss acceptance and the next bounded task with the Reviewer on worker:1.0. Every Reviewer message must begin exactly:
+2. Inspect the commit, worktree, source diff, evidence, and retained logs. Do
+   not run the project code yourself; review source and existing logs only.
+3. Verify every active-inbox condition, including scope, ratchet, identities,
+   gates, prohibited actions, clean worktree, and untouched stash.
+4. Discuss acceptance and the next bounded task with the Reviewer on
+   worker:1.0. Every Reviewer message must begin exactly:
 It's from Watcher:
-5. Reach explicit agreement before assigning anything to the Worker. Incorporate all Reviewer refinements.
+5. Reach explicit agreement before assigning anything to the Worker.
+   Incorporate all Reviewer refinements.
 6. Surface relevant Worker and Reviewer dialogue verbatim to the user.
-7. After agreement, add the new directive to docs/worker_inbox.md, update docs/next_steps.md to the sole current authorized action,
-   commit only tracked operating-document changes, and dispatch the agreed task to worker:0.0 using tmux bracketed paste.
+7. After agreement, add the new directive to docs/worker_inbox.md, update
+   docs/next_steps.md to the sole current authorized action, commit only
+   tracked operating-document changes, and dispatch the agreed task to
+   worker:0.0 using tmux bracketed paste.
 8. Confirm the Worker acknowledged the directive and its stop conditions.
 
 DECISION AUTHORITY:
@@ -92,12 +98,32 @@ EOF
 )
 
 WORKER_STOPPED_MESSAGE=$(cat <<'EOF'
-The monitoring script detected that the Worker has stopped. Inspect worker:0.0 now and determine what it completed. Verify the source diff and retained logs without running project code. Then discuss acceptance and the next bounded task with the Reviewer on worker:1.0; begin every Reviewer message exactly with "It's from Watcher:". Watcher/Reviewer mutual agreement is sufficient for all non-destructive decisions, including benchmark/workload selection, protocol or identity amendment, materialization, pinning, validation, remediation, and bounded scope changes. Do not ask the user to choose or wait for user approval. After agreement, update the operating documents, dispatch the agreed task to the Worker, and confirm acknowledgment. If acceptance failed, dispatch the agreed corrective slice. If no proposed option is acceptable, jointly define and dispatch the smallest reversible task that reduces the blocker.
+The monitoring script detected that the Worker has stopped. Inspect
+worker:0.0 now and determine what it completed. Verify the source diff and
+retained logs without running project code. Then discuss acceptance and the
+next bounded task with the Reviewer on worker:1.0; begin every Reviewer
+message exactly with "It's from Watcher:". Watcher/Reviewer mutual agreement
+is sufficient for all non-destructive decisions, including benchmark/workload
+selection, protocol or identity amendment, materialization, pinning,
+validation, remediation, and bounded scope changes. Do not ask the user to
+choose or wait for user approval. After agreement, update the operating
+documents, dispatch the agreed task to the Worker, and confirm acknowledgment.
+If acceptance failed, dispatch the agreed corrective slice. If no proposed
+option is acceptable, jointly define and dispatch the smallest reversible
+task that reduces the blocker.
 EOF
 )
 
 WORKER_STILL_STOPPED_MESSAGE=$(cat <<'EOF'
-Reminder: the Worker remains stopped after the previous notification. Reach Watcher/Reviewer agreement and dispatch the agreed next task now; do not wait for user selection or approval. Mutual agreement is sufficient for non-destructive benchmark/workload, protocol, identity, materialization, pinning, validation, remediation, and bounded-scope decisions. If the current options remain unacceptable, agree on and dispatch the smallest reversible evidence, design, validation, or implementation task that reduces the blocker. Communicate the decision to the user as a status update and confirm the Worker's acknowledgment.
+Reminder: the Worker remains stopped after the previous notification. Reach
+Watcher/Reviewer agreement and dispatch the agreed next task now; do not wait
+for user selection or approval. Mutual agreement is sufficient for
+non-destructive benchmark/workload, protocol, identity, materialization,
+pinning, validation, remediation, and bounded-scope decisions. If the current
+options remain unacceptable, agree on and dispatch the smallest reversible
+evidence, design, validation, or implementation task that reduces the blocker.
+Communicate the decision to the user as a status update and confirm the
+Worker's acknowledgment.
 EOF
 )
 
@@ -176,7 +202,9 @@ paste_message() {
     tmux send-keys -t "$WATCHER_PANE" Enter
 }
 
-log "started watcher=$WATCHER_PANE worker=$WORKER_PANE reviewer=$REVIEWER_PANE stop_confirm=${STOP_CONFIRM_SECONDS}s reminder=${REMINDER_SECONDS}s heartbeat=${HEARTBEAT_SECONDS}s"
+log "started watcher=$WATCHER_PANE worker=$WORKER_PANE" \
+    "reviewer=$REVIEWER_PANE stop_confirm=${STOP_CONFIRM_SECONDS}s" \
+    "reminder=${REMINDER_SECONDS}s heartbeat=${HEARTBEAT_SECONDS}s"
 
 while ! pane_exists "$WATCHER_PANE" ||
     ! agent_is_running "$WATCHER_PANE" ||
@@ -221,7 +249,10 @@ while true; do
         continue
     fi
 
-    if [[ "$worker_state" == "busy" || "$worker_state" == "unknown" || "$worker_state" == "unavailable" ]]; then
+    if [[ "$worker_state" == "busy" ||
+        "$worker_state" == "unknown" ||
+        "$worker_state" == "unavailable" ]]
+    then
         worker_state="idle_candidate"
         idle_since="$now"
         log "Worker appears idle; confirming for ${STOP_CONFIRM_SECONDS}s"
