@@ -6,50 +6,55 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-177 closed call final-use plan design — AUTHORIZED for dispatch
+## INBOX-178 dormant call final-use plan amendment — AUTHORIZED for dispatch
 
-INBOX-176 at `afd97d55` is **ACCEPTED**. The exact failure is seal/Q1
-`ValueUseExpiredSource` for a truthful planned final-use EAX argument;
-ordinary remains retained wholesale and `zig.target.intByteSize`/aggregate
-isolation remain unauthorized.
+INBOX-177 at `0351fe87` is **ACCEPTED**. Implement only its frozen closed
+design from that clean tree. Move the single existing `attachCallAction`
+legal phase from sealed to registering, validate already-registered handles
+before mutation, and use non-null `call_action` storage to close
+registration. Enforce register all requests, attach exactly once, then seal;
+a valid zero-handle direct call attaches before sealing.
 
-INBOX-177 is docs-only. Prefer moving the existing `attachCallAction` to a
-registering/pre-seal lifecycle rather than creating another mechanism:
-register all argument requests, attach exactly one action, then seal.
-Zero-argument calls attach their zero-handle action before sealing. If this
-cannot fit the frozen surface and budgets, record a structural stop.
+Add only the private structural final-use pin and private
+action/handle-scoped lifetime predicate. Require the canonical current
+identity/generation, a real same allocation plan and exact predecessor
+interval, an action-claimed current handle, an admitted EAX/RAX home, and
+existing dependency/type/form/destination compatibility. Missing, older,
+stale, forward, rebound, non-accumulator, unclaimed, foreign, non-call, and
+independently action-owned state remains rejected. Generic Q1 is unchanged.
 
-Freeze an action-and-handle-scoped final-use admission predicate requiring a
-current canonical identity/generation match, a real plan and interval whose
-exact final-use boundary matches the current call position, an admitted
-accumulator home, and canonical revalidation before staging. Reject forward
-plans, missing or stale metadata, noncanonical sources, non-accumulator
-homes, foreign/unclaimed handles, other tags, and every non-call request.
-Generic Q1 must remain unchanged.
+Revalidate the proof during prepared-record construction, after Q2/Q3
+preservation refresh, and before every argument stage. Preserve existing
+Q2/Q3, ordering, diagnostics, provenance, copy-cycle, EFLAGS, result,
+commit, and sole-outer-rollback authorities. Add the complete frozen dormant
+proof matrix and exact function/API-scoped guard policy with conditional
+per-present mapper accounting and negative fixtures. No raw `.direct_call`
+tree ban.
 
-Freeze the complete attachment/seal/prepare/materialize/action/commit and
-rollback lifecycle, validation and diagnostic precedence, zero-request
-behavior, and exact phase/error rules. Prove Q2-surviving sources and
-unrelated Q3 aliases retain their existing preservation authorities.
+Keep `composed_selector_calls.zig`, its routing/classifier behavior,
+`zig.target.intByteSize` routing, and the bypass inventory byte-identical.
+Ratchet remains 131. Stay within exactly two tags, four facade additions,
+the 126-symbol manifest, existing forms/destination/import DAG, and frozen
+file ceilings. Any required widening, new planning edge, consumer home or
+liveness query, generic-Q1 relaxation, cycle scheduler, or budget exception
+is a structural stop.
 
-Preserve the pure semantic consumer classifier and accepted two tags,
-four facade additions/126 symbols, existing use forms/destinations, import
-graph, and file budgets. No home/liveness query, `ValueLoc`, physical hint,
-callback, function predicate, fallback, hidden attachment API, fifth facade
-symbol, or runtime planning edge.
+Run only full unit, standalone source guard, ABI differential, focused
+canaries, and decisive report/object/owner identities. Record exact commands,
+counts, hashes, provenance, source identities, and final budgets in retained
+amendment evidence. Retention files stay frozen; do not run `clean-tmp` or
+delete artifacts. No re-isolation, production wiring, performance,
+integrated executable, strengthened Tier 2, distribution-all, or Tier 3.
+Commit the bounded dormant amendment, preserve stash@{0}, leave a clean
+worktree, and STOP for review.
 
-Freeze production-faithful dormant proofs for final-use EAX/RAX across
-argument positions, Q2/Q3 preservation, aliases, cycles, stale/missing plan
-cases, non-accumulator sources, handle/phase errors, canonical revalidation,
-zero arguments, rollback boundaries, and unchanged legacy streams and
-diagnostics. Freeze function/API-scoped guards and per-present provenance
-mappers with negative fixtures; no raw `.direct_call` opcode ban.
+## INBOX-177 closed call final-use plan design — ACCEPTED at 0351fe87
 
-Add only `docs/evidence/inbox177_o2_call_final_use_plan_design.md`. No code,
-tests, guards, tools, facade/manifest/bypass changes, Zig/project commands,
-identities, or gates. Ratchet 131; retention tooling frozen; no `clean-tmp`
-or deletion. Commit the one document and STOP before implementation or
-re-isolation.
+The accepted design selects the existing registering/pre-seal
+`attachCallAction` lifecycle, freezes the private exact final-use proof,
+retains generic Q1 and Q2/Q3 authority, and fits the two-tag/four-addition/
+126-symbol/import/file budgets. Its 57-case dormant proof matrix and scoped
+guard design are the exact INBOX-178 implementation contract.
 
 ## INBOX-176 ordinary-call diagnosis — ACCEPTED at afd97d55
 
