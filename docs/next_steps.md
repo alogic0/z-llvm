@@ -6,7 +6,19 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-165 — M64 PASSES re-isolation (fcb2375c), Supervisor-verified
+## INBOX-166 M64 wiring (140 → 135) — dispatched
+
+INBOX-165 is **ACCEPTED and INBOX-166 authorized** (Reviewer,
+2026-07-18: "Wire M64 as one complete family, moving the ratchet exactly
+140 → 135 with no helper-collapse credit. Any scalar-local helper
+removal or privatization requires a verified zero-owner result and must
+not alter the frozen action/lifetime/Q1 surface. Exact identities, full
+gates, and post-final-tree counterbalanced performance are blocking.
+R03/R04 and all retained owners remain unchanged; no fallback or partial
+landing."). On acceptance the multiply step is complete at 135.
+Dispatched.
+
+## INBOX-165 — M64 PASSES re-isolation (fcb2375c), ACCEPTED
 
 All three bars pass simultaneously: cohort byte-exact (443/285/158 with
 the frozen first-failure, object 061a64e4, owner 5d91960e, 285/0/0
