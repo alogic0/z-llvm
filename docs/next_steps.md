@@ -24,7 +24,173 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AJ orchestration invocation-instance closure audit — AUTHORIZED
+## INBOX-206AK corrected Stage-1 orchestration audit continuation — AUTHORIZED
+
+Accept INBOX-206AJ only as a compliant fail-closed Stage-1 draft. It receives
+no Stage-1, lifecycle-audit, `AUDIT_COMPLETE`, implementation, execution,
+validation, ratchet, credit, or downstream acceptance. Preserve all four
+retained AJ files permanently and never repair, complete, rerun, copy,
+normalize, or modify AJ.
+
+The Worker final report is:
+
+```text
+INBOX-206AJ stopped fail-closed at the first AJ authority/replay/candidate gate with status 1.
+
+Retained AJ contains the four newly created mode-0644 files:
+
+- authority_boundary.tsv
+- ai_replay.tsv
+- candidate_runtime_binding.tsv
+- gate_markers.tsv
+
+AUDIT_COMPLETE is absent. Lifecycle enumeration, atomic-defect expansion, and dependency planning were not reached. No failure inspection, diagnosis, repair, retry, cleanup, or later command ran.
+
+AI’s 14-file identities and seven-row candidate namespace had replayed exactly before AJ creation. Main/control and protected state were confirmed exact at the operating gate.
+```
+
+Static review and the exact retained JSONL establish that AJ contains exactly
+four top-level regular, non-symlink, non-executable mode-`0644` files and no
+`AUDIT_COMPLETE`. Its full identities are:
+
+```text
+paths_sha256=d795e95612e89993c3e05834f17d8fd07af2599e24205a83268988dbeb090dde
+inventory_sha256=4f6f0b76cdd1dc30e88fe50ac0aa7be4100a8505aa80c0e6b787c3343448925a
+ledger_sha256=cddb8505402bb8315afbd320be86b5f33e364e404a28c5110c332c1824d7f5df
+```
+
+The exact file ledger is:
+
+```text
+bac87eb0586a15e70f325a86b4f9d9bb785f4d99c48270c39f7a7597704ea66b	1231	644	ai_replay.tsv
+ef358b8ac444651333d781726a391a321f7a3009cf1d724bdb503071877cbf02	454	644	authority_boundary.tsv
+dee4ed302e146a1b1178ce6f4fdd2cc485199d5c9403da56fbba1b350234a1dc	440	644	candidate_runtime_binding.tsv
+d688b6e35939ed448b2bcaefed586a0d536e19891fc511159f4716e98f0b7a80	428	644	gate_markers.tsv
+```
+
+The failed command validated AJ file modes, the retained AI candidate source
+hash and seven source rows, and the AJ authority boundary. It then checked
+`ai_replay.tsv`. That file correctly contains one header plus 14 unique
+four-field data records, total `NR == 15`, with all expected and replayed
+values exact. The gate incorrectly required `NR == 16` and stopped before
+checking `gate_markers.tsv` or completion absence.
+
+Static review separately establishes:
+
+- `authority_boundary.tsv`: one header plus 11 unique data records,
+  total 12, with exact authority and pending audit;
+- `ai_replay.tsv`: one header plus 14 unique data records, total 15;
+- `candidate_runtime_binding.tsv`: one header plus 10 unique data records,
+  total 11, with exact candidate source hash, seven IDs, namespace, no
+  lifecycle reachability, and no mutation; and
+- `gate_markers.tsv`: one header plus seven ordered, truthful pass markers,
+  total 8.
+
+The failed command did not contain a content/schema check for
+`candidate_runtime_binding.tsv` beyond file mode and the separate retained AI
+source-table check. Therefore AJ earns no Stage-1 candidate-binding gate
+credit even though its retained content is statically valid. The failure was
+an off-by-one Worker gate literal, not retained data drift.
+
+Create one non-merge operating commit changing only this file. The Watcher
+dispatch binds its exact commit, parent, tree, changed path, and final ignored
+inbox SHA-256.
+
+Preserve AJ, AI, AH, and every earlier retained root and record exactly.
+Create only fresh absent, non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak
+```
+
+Before any AI replay or AK creation, run independently blocking read-only AJ
+checks. Freeze exact command bytes, labels, serializers, and expected results:
+
+```text
+aj_top_level_file_count=4
+aj_nonfiles=0
+aj_non_mode_0644=0
+aj_execute_bits=0
+aj_audit_complete=absent
+aj_paths_sha256=d795e95612e89993c3e05834f17d8fd07af2599e24205a83268988dbeb090dde
+aj_inventory_sha256=4f6f0b76cdd1dc30e88fe50ac0aa7be4100a8505aa80c0e6b787c3343448925a
+aj_ledger_sha256=cddb8505402bb8315afbd320be86b5f33e364e404a28c5110c332c1824d7f5df
+```
+
+The paths serializer is top-level `%P\n`, bytewise sorted. The inventory
+serializer is top-level `%P\t%y\t%m\t%s\t%l\n`, bytewise sorted. The ledger
+serializer is the NUL-path-sorted loop emitting
+`sha256\tbytes\tmode\trelative_path\n`. Independently validate every row of
+the exact four-file ledger above. No serializer, scope, field order,
+separator, result, or file identity may substitute for another. Any mismatch
+leaves AK absent and stops without diagnosis, construction, retry, cleanup,
+or later action.
+
+Only after every AJ check passes, independently rerun the complete exact AI
+structure, root-identity, 10-file-ledger, and 10-subject-snapshot replay from
+INBOX-206AJ. AI and AJ remain immutable. Any mismatch leaves AK absent and
+stops.
+
+Only after all retained checks pass, create AK. Reproduce `ai_replay.tsv` and
+`candidate_runtime_binding.tsv` byte-for-byte from AJ. Create a fresh
+`authority_boundary.tsv` bound to AK's exact operating identities and
+truthful initial marker records.
+
+Before any later construction, run four separately blocking schema/content
+gates. Each gate must count header and data rows independently and require:
+
+```text
+authority_boundary.tsv: header=1 data=11 total=12
+ai_replay.tsv: header=1 data=14 total=15
+candidate_runtime_binding.tsv: header=1 data=10 total=11
+initial gate markers: header=1 data=7 total=8
+```
+
+The gates must validate every expected/replayed field, operating authority
+field, candidate source identity, all seven ordered candidate IDs, exact
+namespace, no lifecycle reachability, no mutation, ordered truthful markers,
+mode `0644`, no execute bits, and absent `AUDIT_COMPLETE`. A row-count-only
+gate is insufficient.
+
+Record successful corrected Stage 1 in a new later-batch file. Do not append
+to or modify any already-gated file. Use exactly one explicit-name,
+pre-first-gate `chmod 0644` over only each new AK regular-file batch. Use no
+glob, recursion, directory, prior root, already-gated file, post-gate mode
+change, or post-failure repair.
+
+Only complete success across all four Stage-1 gates permits continuation of
+the complete Reviewer-approved INBOX-206AJ audit scope unchanged:
+
+- enumerate W01–W08 by invocation instance;
+- give prestate and poststate distinct exact callsites and outputs;
+- preserve the exact seven-row candidate-runtime closure;
+- keep ordinary inherited-environment semantics separate from the fully
+  closed hermetic probe, without exposing secrets;
+- separately account for watcher worktree, index, and conditionally required
+  HEAD identities;
+- reconcile all 68 fields and wrapper stages bijectively;
+- expand grouped blockers into atomic executable, argv, environment, path,
+  callsite, multiplicity, producer, and consumer defects; and
+- produce a dependency-ordered implementation, installation,
+  materialization, and execution-package plan without performing any such
+  work.
+
+`AUDIT_COMPLETE` may be the final content creation only after exhaustive,
+independently gated audit-enumeration and identity closure. It is audit-only,
+never `REVIEW_COMPLETE`, and grants no completed-design, implementation,
+build/install, materialization, execution, validation, activation, ratchet,
+credit, or downstream authority.
+
+Any failure retains AK and stops without inspection, diagnosis, repair,
+retry, cleanup, mode change, or later work. No source/analyzer
+implementation, build registration, build/install, materialization,
+invocation, cache creation, validator, validation, registered-worktree
+directory access, worktree traversal, broad discovery, protected-path
+change, receipt, activation, compatibility, validation-v3, ratchet, cleanup,
+wiring, credit, or downstream action is authorized. Do not access
+`.claude/settings.local.json`.
+
+## INBOX-206AJ orchestration invocation-instance closure audit — COMPLIANT FAIL-CLOSED STAGE-1 DRAFT; NO AUDIT CREDIT
 
 Accept INBOX-206AI as a compliant fail-closed terminal-review companion. Its
 exact AH replay and exact seven-process `candidate_runtime` closure are
