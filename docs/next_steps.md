@@ -24,7 +24,64 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-203 documentation-only exact authority-transition composite design — AUTHORIZED
+## INBOX-203A documentation-only exact hash and production-consumer inventory correction — AUTHORIZED
+
+INBOX-203 commit
+`8f04b147a6012c0a3df00fbc0827bc854889938c` is accepted only as a
+scope-compliant documentation stop. Design acceptance is withheld.
+
+Modify and commit only:
+
+```text
+docs/evidence/inbox203_local_state_authority_transition_design.md
+```
+
+Make one new corrective commit; do not amend INBOX-203.
+
+The document's two INBOX-202 evidence bindings incorrectly contain:
+
+```text
+4b532daac81ff8d418c9534dc646c1eb3efba95259f604934473203b0885452e
+```
+
+Independently require both the current file and committed `e35cfaa6` blob to
+equal:
+
+```text
+4b532daabe33e7c6eaca7f0ab412d9c271b55b6b1de8235dd3d4f65d7ab6f7a6
+```
+
+Replace exactly the two wrong occurrences: the frozen
+`accepted_INBOX_202_evidence_sha256` and prospective payload-copy receipt
+`copy_evidence_sha256`. Preserve the receipt schema and all other identities.
+
+Correct the active-consumer inventory using finite tracked-file and exact
+source inspection:
+
+- production default authority is derived by `resolveAuthority` from
+  `main_git_common_dir`;
+- `default_store` is test/boundary-only unless another exact production use
+  is proven;
+- add exact file/symbol/source-identity and behavior anchors for
+  `RegistrationGuard`, registration capture/current/store-root checks,
+  expected path/topology/non-main hashes, store access, and every production
+  resolver construction/consumer.
+
+Revalidate every frozen identity and cross-reference read-only. Any further
+mismatch stops rather than broadening the correction.
+
+Preserve all prospective schemas, the acyclic transition sequence,
+candidate/active separation, fail-closed states, validation matrix, rollback
+model, stores, control bytes, protected paths/worktrees, pins, stash, both
+v3 absences, source authority, destination non-authority, and ratchet 131.
+
+No control mutation, implementation, authority transition, source/tool/
+manifest/contract/pin/script/build edit, project or Zig execution,
+validation, compatibility work, publication, cleanup, ratchet movement, or
+credit is authorized. Failure stops without commit. Success commits only the
+corrected INBOX-203 evidence and stops for re-review.
+
+## INBOX-203 documentation-only exact authority-transition composite design — SCOPE-COMPLIANT STOP; DESIGN ACCEPTANCE WITHHELD; INCORPORATED INTO INBOX-203A
 
 INBOX-202I and commit
 `e35cfaa6505e26f3c13a2a54a339f247817febdd` are accepted. The exact
