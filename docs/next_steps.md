@@ -24,6 +24,63 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-206L corrected preparation algorithms and observable diagnostic — AUTHORIZED
+
+Accept INBOX-206K only as a compliant one-shot preparation failure. It
+receives no diagnostic or Phase-3 credit. Neither K preparation nor
+diagnostic may be invoked again.
+
+Preserve every I/J/K byte. Freeze K exactly:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206k
+file_count=54
+inventory_sha256=5256ea47a3ccce388458c3c7d64d2357ad53cc38c7eaa22184c38706f5d5d9aa
+ledger_sha256=e19c42095368283a39ccd9d821052906d5a08120781c69e965f82d26a0da0986
+prepare_status=1
+prepare_stderr=prepare_freeze=fail:i-inventory
+diagnostic_state=never-invoked
+```
+
+Create records only beneath fresh absent, non-symlink, protected-disjoint:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206l
+```
+
+Derive L from K with mechanical operating `HEAD`/parent and K-to-L path
+substitutions. Preserve the complete diagnostic assertions, order,
+observability, launcher, environment, and capture policy exactly.
+
+The L preparation may differ semantically from K only through:
+
+1. `inventory_hash` uses the established recursive serialization, including
+   the root and size field:
+   `%y\t%m\t%s\t%P\t%l`, `LC_ALL=C` sorted;
+2. `ledger_hash` uses the established recursive NUL-sorted relative-file
+   loop, emitting raw `sha256sum` absolute-path rows before the terminal
+   SHA-256; and
+3. the J-to-L transform substitutes exact J parent
+   `6af124c5d28ed68b1439ae7886b0899559366179`.
+
+Freeze mechanical and semantic diffs proving no other change. Predeclare
+every preparation and diagnostic command, environment, invocation, capture,
+checkpoint, result, prepared snapshot, and original `pre.*` record before
+either invocation.
+
+Invoke preparation exactly once. Failure retains L and stops without
+diagnostic execution, diagnosis, repair, retry, or new record construction.
+Preparation success alone permits exactly one invocation of the already
+frozen diagnostic in the same closed environment. After it returns, only
+predeclared captures, checkpoints, results, and original `pre.*` records may
+change. Stop after diagnostic success or failure without construction,
+diagnosis, or retry.
+
+No harness, Zig command, compilation, test, validator, structural/state
+guard, real-candidate validation, evidence edit, main commit, ratchet
+recount, receipt, activation, compatibility, v3, compiler/performance work,
+cleanup, wiring, credit, or downstream work is authorized.
+
 ## INBOX-206K corrected freeze and observable diagnostic pre-state — AUTHORIZED
 
 Accept INBOX-206J only as a compliant pre-invocation construction failure.
