@@ -24,6 +24,101 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-206I Phase-3 exact-real candidate read-only validation — AUTHORIZED
+
+Accept INBOX-206H commit
+`bd5c0f9c62835c8a7101aac87762538471159c86` and the complete
+INBOX-206D–206H dormant-remediation composite. The evidence now reproduces
+the implemented control-Git argv exactly. The accepted tool SHA-256 is
+`073bdddeeac4a0b99e39cd54e5b2ea7db403796d25416dcf5ac578ea7ff5ad14`;
+the accepted contract SHA-256 is
+`eb112e86d0ea43dfae6fde3974fd77294eae7ee8c68b4cf0b4c293b80f4f4cc6`;
+the corrected dormant-evidence SHA-256 is
+`34c1900ea54b0247d8f985e16c129b37af7b3dcb3980db79f96f42b688cdfab5`.
+The accepted synthetic suite remains `9/9`, the accepted G guard remains
+status `0`, and ratchet remains `131`. Do not rerun them.
+
+Preserve all INBOX-206/206A/206B and INBOX-206D–206H records, caches,
+commits, evidence, and protected identities. Preserve all 43 registered
+worktrees and their directories, supplemental control commit
+`9c55bda34088e1230b0b91a126d35795a3ac70b4` / tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e`, stash
+`7985c6d01040a6e47e4ce5b918866d0e89517ac7`, watcher blob
+`b64131cf60dd0ef638e815cd33db9ae8595a72cf`, pins, both stores,
+candidate/control bytes, paths, modes, registrations, and authority state.
+The existing payload-copy publication receipt is required and must remain
+exact; absence applies only to later validation, activation, terminal, and
+live-selection metadata.
+
+After proving it absent and non-symlink, create records only beneath:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206i
+```
+
+Prove this continuation is bidirectionally disjoint by containment from
+every registered worktree and supplemental control path. Never traverse or
+modify a registered worktree. Preserve every existing A/B file and cache.
+
+Freeze a byte-copy of the accepted tool in I and append exactly one uniquely
+named test-only caller. It must construct owned state with
+`DormantAuthorityConfig.initExactRealCandidate`, defer complete
+deinitialization under `std.testing.allocator`, call
+`validateDormantAuthorityCandidate`, and require exactly:
+
+```text
+payload_files=20
+payload_bytes=9970364
+objects=18
+snapshots=2
+generation_manifest_sha256=61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d
+```
+
+Use the accepted inventory, ledger, destination-ledger, and copy-evidence
+identities from INBOX-206. Freeze the tool prefix, appended suffix, full
+harness, sole-private-caller proof, and production/public non-reachability.
+
+Before compilation, freeze and invoke one complete structural call-graph
+guard. It must prove the exact path from the appended test through the
+exact-real constructor and validator has no reachable create, write,
+truncate, rename, link, chmod, delete, remove, extraction, publication,
+proof workspace, cleanup, or other mutation. Control-repository reads are
+limited to the accepted six exact Git commands and four-file no-follow
+allowlist. Source-store access is root-identity-only. Destination reads are
+limited to manifest-enumerated objects and snapshots and their exact named
+ancestors. No broad traversal is authorized. Structural failure retains I
+and stops without retry, diagnosis, repair, evidence edit, or commit.
+
+Capture the complete protected pre-state. Freeze Zig `0.16.0`, a clean
+environment, isolated I caches, exact command, and invocation. Invoke the
+temporary harness exactly once with a unique exact test filter and require
+exactly `1/1`. Do not rerun a synthetic or historical gate. Test failure,
+including allocator leak or incomplete cleanup, retains I and stops without
+retry, diagnosis, repair, evidence edit, or commit.
+
+Test success alone permits one complete read-only state/source guard. Compare
+post-state exactly to the frozen pre-state: control Git and four files,
+manifest-enumerated payload bytes/modes, both repositories, all
+registrations, stash, watcher, pins, ratchet `131`, all prior retained
+records, candidate state, later-metadata absence, source authority,
+destination non-authority, and production/public unreachability. Guard
+failure retains I and stops without retry, diagnosis, repair, evidence edit,
+or commit.
+
+Complete success alone permits adding and committing exactly:
+
+```text
+docs/evidence/zllvm_artifact_authority_validation_v1.md
+```
+
+Record the historical A/B failure, accepted D–H remediation, sole real
+positive, exact retained identities and pre/post equality, and the strictly
+candidate-consistency/no-activation meaning. Run only read-only final
+identity/status checks and `git diff --check`; commit only that evidence
+file. Leave main and control clean and stop before any validation receipt,
+activation, compatibility, v3, compiler or performance work, cleanup,
+wiring, ratchet movement, credit, or other downstream authority work.
+
 ## INBOX-206H exact control-Git argv evidence correction — AUTHORIZED
 
 Accept the INBOX-206D–206G technical implementation, retention contract,
