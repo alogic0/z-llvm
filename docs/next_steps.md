@@ -24,6 +24,89 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-195A read-only authoritative-store verification continuation — AUTHORIZED
+
+INBOX-195 at unchanged HEAD
+`c298d8810f65f9d0844f5b77d355f1531bfe2726` is accepted as a compliant
+fail-closed publication stop. The sole publication itself succeeded and
+produced the expected authoritative bytes, but publication acceptance remains
+withheld until complete post-publication verification passes.
+
+Preserve the complete retained state exactly:
+
+```text
+HEAD=c298d8810f65f9d0844f5b77d355f1531bfe2726
+real_store=/home/oleg/prog/z_llvm-artifacts
+real_store_mode=0775
+real_store_inventory_sha256=3234fb508d370878efe082cf1accb5af3b488372bf3f1ee7e9e87408a37a2d7c
+real_store_file_count=21
+real_store_file_ledger_sha256=a06c48e1549d16b9f924cc2b5f0404e60d7755a785bf3a4a23311c2383279a65
+real_store_objects=18_mode_0444
+real_store_snapshots=2_mode_0444
+real_store_manifests=1_mode_0444
+real_store_snapshot_work=empty
+real_store_snapshot_proof=empty
+live_manifest_sha256=61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d
+tracked_manifest=docs/evidence/artifact_manifest_v1.tsv
+tracked_manifest_state=untracked_mode_0644_exact_live_bytes
+inbox195_record_count=23
+inbox195_record_ledger_sha256=39064e35bfd7551642228417219fc8f4cfe8cf5b46c1ee3481fa47a538caaa13
+new_validation_namespace=tmp/inbox195a_calls_real_store_verification/validation
+new_validation_namespace_initial_state=absent
+```
+
+The INBOX-195 plan returned status 0 and equaled the frozen proposed fragment
+at `ced7f4e1...`. The sole pipeline-free closed-environment publication
+launcher `f55544d3...` ran exactly once, returned status 0, and retained empty
+stderr. Publication stdout, the authoritative
+`manifests/generation-00000001.tsv`, and the untracked manifest copy are
+byte-identical at `61b7426b...`.
+
+The failed postcheck is closed as verification-only. Its snapshot filename
+derivation concatenated the two-digit directory and basename without removing
+the schema-mandated `.tar.zst` suffix, then compared that suffixed string with
+the content SHA-256. Correct only this derivation: require exactly two
+lowercase hex characters followed by exactly 62 lowercase hex characters and
+the exact `.tar.zst` suffix; strip only that suffix before reconstructing the
+64-character digest.
+
+Static review also closes one not-yet-reached verifier overconstraint.
+Snapshot-member media is exactly `application/octet-stream`; target objects
+retain their reviewed source media. Compare members to their target objects
+only through the accepted key/member path, target ID, SHA-256, bytes,
+immutable mode, snapshot, and constituent relationships. Never require
+target-media equality.
+
+Use only the fresh ignored INBOX-195A namespace. Freeze exactly one
+pipeline-free, closed-environment shell verification command with separate
+stdout, separate stderr, and numeric status. Run no artifact-tool command:
+no compilation, plan, publication, resolution, or other project execution.
+Perform no store, manifest, source, root, pin, retained-record, historical
+path, or registered-worktree mutation.
+
+Re-run the complete verification from its first invariant, not merely the two
+corrected checks. Recompute the frozen inventory and file ledger; prove
+three-way live-manifest equality; prove the exact 35-row activation and
+exactly two constituent objects, two snapshots, and 16 member additions;
+prove store shape, modes, empty proof/work directories, and absence of
+partial/incoming files; verify all content-addressed paths and accepted
+relationships; and recheck every canonical source, registration, retained
+root/record ledger, watcher, stash, pins, audit, calls boundary, checkpoint,
+v3 absence, and ratchet 131. Before success, require the Git status to contain
+only the expected untracked manifest copy.
+
+Failure retains the complete store, untracked manifest, INBOX-195 records,
+new records, and all prior state and stops without diagnosis, retry, repair,
+cleanup, alternate verification, commit, or semantic change. Success writes
+one INBOX-195A evidence summary, commits only the existing exact manifest copy
+and that summary, preserves the authoritative store and ignored records, and
+stops for publication acceptance.
+
+No compatibility copy, pin or contract amendment, v3 amendment or execution,
+cleanup, wiring, performance, Tier work, checkpoint change, ratchet movement,
+or credit is authorized. Validation-v3 remains blocked pending publication
+acceptance.
+
 ## INBOX-195 one-shot authoritative calls-input publication — AUTHORIZED
 
 INBOX-194D is fully accepted at
