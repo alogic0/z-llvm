@@ -24,7 +24,73 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BA pre-frozen three-process preconstruction remediation — AUTHORIZED
+## INBOX-206BB inert Phase-3 wrapper-package specification — AUTHORIZED
+
+INBOX-206BA is accepted as a compliant fail-closed absent-artifact continuation. Credit is limited to its exact literal canary, exact operating-document binding, complete six-checkpoint preconstruction replay, read-only provenance, and correct terminal stop. The missing post-preconstruction wrapper package is an authorization-package defect, not a Worker defect. Grant no construction, keyed-gate, marker, D01, implementation, execution, validation, production, ratchet, D02, or downstream credit. Preserve BA absent/non-symlink; preserve AY/AV exact and AZ/AX/AW absent.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BA stopped fail-closed after all three frozen processes passed exactly.
+
+- Canary: passed.
+- Operating binding: passed.
+- Preconstruction replay: all six checkpoints passed.
+- BA remains absent.
+
+The next wrapper’s complete pre-frozen source and hashes were not provided or available without an unauthorized unlisted execution. This is the directive’s terminal missing-source/hash condition. No later command, inspection, construction, retry, repair, or cleanup was performed.
+```
+
+Static Watcher review ran no project or Zig code. Main/source/index are clean at `63197dba206a14010ebf699077e026533f31e9e6`, parent `4d46b265809a43bd9b93e7b2a0c85b3c195b8e16`, tree `278981ccbcc29aeb99f714ceda3eaff27fa0d155`, with sole commit path `docs/next_steps.md`. Documents are exact at `35690d2067fed3653b0f6be3d8e75fae0d487c59153dc003c4101e4b4de8f552` / `3f2e57036186e90bce1fca545a0abd9ebbf55c39189c83ec0c77beffaa40426c`. Main/control, stash, watcher, pins, bypass, tool, build, registration identities, ratchet 131, AV, and AY remain exact. BA remains absent/non-symlink. Retained turn `019f81d6-e300-7fe3-ab91-a0c33d29b1ab` contains exactly the three authorized tool calls and exact outputs, followed by the final report and `task_complete`; no fourth call exists.
+
+Reviewer agreement is preserved verbatim:
+
+```text
+I accept INBOX-206BA as a compliant fail-closed absent-artifact continuation. Credit includes the exact canary, binding, six-checkpoint preconstruction replay, read-only provenance, and correct stop. The missing post-preconstruction wrapper package is an authorization-package defect, not a Worker defect. No construction, marker, D01, or downstream credit is granted. Preserve BA absent and all retained roots unchanged.
+
+I authorize INBOX-206BB as evidence/design-only with these refinements:
+
+- First create one non-merge operating commit changing only docs/next_steps.md, parented exactly by 63197dba206a14010ebf699077e026533f31e9e6; update the ignored inbox separately.
+- Create no BB continuation root, cache, executable artifact, or temporary evidence package.
+- Add and commit exactly one result file: docs/evidence/inbox206bb_phase3_wrapper_package_specification.md.
+- The specification must enumerate every post-preconstruction process in exact order, with prerequisites, allowed reads/writes, inputs, outputs, schemas, checkpoints, failure boundary, producer/consumer edges, and complete ordinary-string inner/outer source authority.
+
+- Include the six-copy/four-keyed construction; independent 19-line boundary and 20-line derivation gates; remaining environment/invocation/conflict/dependency gates; marker derivation; exclusive finalizer; and post-marker closures.
+
+- For identity-independent wrappers, freeze complete exact source bytes, SHA-256, and byte counts.
+- Future operating HEAD/tree/inbox/root values cannot be frozen as executable bytes now. For affected wrappers, freeze invariant templates plus a closed typed substitution manifest, exact occurrence counts, canonical ordering, and a separately reviewed future materialization boundary. Do not claim materialized wrapper hashes or execution readiness.
+
+- Prohibit chained/global substitution, template ambiguity, JavaScript template literals, generated executable logic, eval, and execution of any wrapper.
+- Static shell/JavaScript parsing and streamed block-hash verification are permitted only through frozen read-only commands; they must not invoke wrapper behavior or write package artifacts.
+
+- Completion must state package_kind=inert_template_specification, implementation_ready=false, and execution_authority=none.
+- Success commits only the specification file and stops clean. If any template cannot be made unambiguous and mechanically materializable, retain the document as an uncommitted draft and stop without claiming package completion.
+
+No source, project, Zig/build/install, validation, cache, registered-worktree access, ratchet, production-AWK, D02, credit, or downstream authority is granted.
+```
+
+Create one non-merge operating commit parented exactly by `63197dba206a14010ebf699077e026533f31e9e6`, changing only tracked `docs/next_steps.md`; update only the ignored inbox separately. Then bind the final HEAD, parent, tree, sole path, and both document SHA-256 identities in the authoritative dispatch.
+
+The Worker may create and commit exactly one result file: `docs/evidence/inbox206bb_phase3_wrapper_package_specification.md`. Create no BB continuation root, cache, executable artifact, temporary evidence package, or other file. Preserve every existing root and protected identity.
+
+The specification must enumerate every post-preconstruction process in exact order, with prerequisites, authorized reads/writes, inputs, outputs, schemas, stable checkpoints, failure boundaries, producer/consumer edges, and complete ordinary-string inner/outer source authority. Cover the six-copy/four-keyed construction; independent 19-line boundary and 20-line derivation gates; all remaining authority/environment/invocation/conflict/dependency/audit gates; marker derivation; exclusive finalizer; and post-marker closures.
+
+Freeze complete exact source bytes, byte counts, and SHA-256 for identity-independent wrappers. For future-identity-dependent wrappers, freeze invariant templates plus a closed typed substitution manifest with canonical encodings, exact occurrence counts and order, validation predicates, and a separately reviewed future materialization boundary. Do not claim materialized hashes or execution readiness. Prohibit chained/global substitution, ambiguous placeholders, JavaScript template literals, generated executable logic, sourced executable text, concatenated command generation, `eval`, and all wrapper execution.
+
+Only predeclared frozen read-only static parsing and streamed block-hash checks are permitted. They must not invoke wrapper behavior, write package artifacts outside the single tracked result, enter registered-worktree directories, or run project/Zig/build/install/validation code. If any template is ambiguous or not mechanically materializable, retain the document as an uncommitted draft and stop without claiming completion.
+
+Success is one non-merge Worker commit changing only the result file, both repositories clean, and these exact completion fields:
+
+```text
+package_kind=inert_template_specification
+implementation_ready=false
+execution_authority=none
+```
+
+Ratchet remains 131. No source/production change, implementation, wrapper execution, continuation construction, marker write, project/validation execution, cache, registered-worktree access, production AWK, D01/D02 credit, or downstream action is authorized. Never access `.claude/settings.local.json`.
+
+
+## INBOX-206BA pre-frozen three-process preconstruction remediation — COMPLIANT PRECONSTRUCTION STOP; SUPERSEDED BY INBOX-206BB
 
 INBOX-206AZ is accepted only as a compliant fail-closed absent-artifact continuation. Credit is limited to the exact canary, exact operating-document binding, read-only provenance, and correct stop behavior. Its thirteen un-prehashed post-binding probes receive no technical gate credit and are a process-compliance defect. Grant no protected/preconstruction gate completion, evidence construction, marker, D01, implementation, execution, validation, production, ratchet, D02, or downstream credit. Preserve AZ permanently absent; preserve AY/AV exact and AX/AW absent.
 
