@@ -24,7 +24,206 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AK corrected Stage-1 orchestration audit continuation — AUTHORIZED
+## INBOX-206AL environment and invocation-atomic audit closure — AUTHORIZED
+
+INBOX-206AK's corrected Stage 1 and invocation-instance enumeration are
+accepted as evidence. D01 audit closure, `AUDIT_COMPLETE`, implementation
+readiness, execution, validation, ratchet movement, credit, and downstream
+acceptance remain withheld. Preserve every AK byte permanently.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206AK stopped fail-closed at the final atomic audit-closure gate.
+
+Retained AK:
+
+- Files: 20, all regular non-executable mode 0644
+- Paths SHA-256: 5a3ecb77f8a3b4e49ace3b997f5d9885147f0eece263a5a3500097ebde28b0b0
+- Inventory SHA-256: 3017c5c7041e6220b90a90d9136c5f83db8244cce10e1d3508d8bd85d0fef4ac
+- Ledger SHA-256: 66381fec1e01d925b08cc6356a366c15f398d34c18321c183993c1602d8c871f
+- AUDIT_COMPLETE: absent
+
+Passed gates included all AJ/AI identity replays, the four separate Stage-1 gates, separate Stage-1 completion, lifecycle/environment/watcher audit, 68-field namespace mapping, atomic dependency audit, and AK identity/snapshot replay.
+
+Cardinalities:
+
+- Lifecycle roots: 8
+- Lifecycle children: 46
+- candidate_runtime: 7, closed and unchanged
+- execution_orchestration: 54, enumerated but not identity-closed
+- Atomic rows: 65
+- Atomic unresolved: 34
+- Dependency steps: 12
+- Remaining conflicts: 8
+
+Dependency order is: audit acceptance → implement capture/analyzer/comparator/guard/finalizer → construct execution package → isolated build/install → close atomic authorities → authorize direct-child execution → W01–W03 → W04–W05 → W06–W08.
+
+Remaining conflicts cover missing installed identities, exact argv/path bindings, Zig harness/filter/cache authority, inherited ordinary-Git environment bindings, and final process-identity closure.
+
+AJ, AI, AH, earlier roots, main/control, stash, watcher, pins, bypass inventory, ratchet 131, and protected state were confirmed exact before the failed gate. No later command, repair, retry, cleanup, implementation, execution, or marker creation occurred.
+```
+
+Watcher review used only Git/source text, retained TSVs, exact root metadata,
+and the retained Worker JSONL. It ran no project code. The clean non-merge
+authority was
+`7606ed7c1817bd1860cd473f9a01856a85192194`, parent
+`f39fa6eb1c6de8f688936876157661e49dce4289`, tree
+`1b5cae3045bf1cb43613f59f258694d8873d5251`, sole changed path
+`docs/next_steps.md`, and ignored-inbox SHA-256
+`ebba48912084e5be684eb3a9cc068b4573b67a680b7087c2a9909b9404f6f1b1`.
+Main/index/source and supplemental control were clean. Control remained
+`9c55bda34088e1230b0b91a126d35795a3ac70b4` / tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e` / `main` / no remote.
+Stash, watcher HEAD/index/worktree, tool, build, pins, bypass, ratchet, and
+read-only 43-worktree registration metadata replayed exactly.
+
+AK contains exactly 20 top-level regular, non-symlink, non-executable
+mode-`0644` files and no `AUDIT_COMPLETE`. The full identities in the report
+and the 16-subject snapshot replay exactly:
+
+```text
+snapshot_paths_sha256=220d91ce9ddd56085e798133c8dd20deb7d3d43686280e805dd4a27f7d490968
+snapshot_inventory_sha256=41f48034450c97ea4554cf7f35841550e1a8beefc8d0bc1303592070a17fdae3
+snapshot_ledger_sha256=008b8f5a4bbdc7e5f6812bb67518dff27fa6d5f58333ccf9d975bca09f449f3e
+```
+
+Static schema/relation replay confirms unique ordered sets of eight lifecycle
+roots, 46 children, 68 fields, 65 defect rows, 12 dependency steps, eight
+conflicts, and 15 truthful pass gates. The retained 65-row matrix reports 31
+resolved and 34 unresolved rows.
+
+AK nevertheless does not close D01. Its child table references
+`closed-git`, `closed-hermetic-git`, and `closed-minimal`, but its environment
+authority table does not define those tokens or bind them to exact maps.
+`HERMETIC_SET` is not explicitly equated to `closed-hermetic-git`;
+`closed-git` and `closed-minimal` have no definitions. Its defect matrix is
+dimension-split but not consistently invocation-atomic: most visibly, A055
+and A057 combine the unresolved LI08 root with W08C01–W08C04 utilities that
+have separately known executable identities and environment labels. U01 and
+U05 also combine distinct pre/post or AA/prepost authorities. Those are
+unrecorded audit-closure defects, not authority to implement forward.
+
+Reviewer dialogue is preserved verbatim:
+
+```text
+I accept INBOX-206AK’s corrected Stage 1 and invocation-instance enumeration as evidence. I withhold D01 audit closure, AUDIT_COMPLETE, and implementation readiness.
+
+I authorize INBOX-206AL with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md; update only ignored docs/worker_inbox.md, freeze its hash, and bind the final HEAD.
+- Create only fresh continuations/inbox206al; preserve AK exactly.
+- Bind and replay all 20 AK files and the 16-subject snapshot before constructing AL.
+- Define every environment-authority token referenced by the 54 invocation instances exactly once.
+- Each environment definition must specify ordered variables, literal/unset/presence/hash policy, executable resolution, unknown-variable failure, and secret-safe handling. Never persist arbitrary secret-bearing environment values.
+
+- Explicitly equate closed-hermetic-git with the reviewed hermetic map and fully define closed-git and closed-minimal.
+- Split defects to invocation-atomic rows whenever callsites, dimensions, identities, authorities, or dispositions differ. Shared rows are permitted only when every relevant field and resolution state is identical.
+
+- Recompute counts, conflicts, dependencies, and resolved/unresolved totals from the corrected atomic matrix.
+- Prove bijectively that every lifecycle child’s environment token resolves once and every invocation/dimension is represented.
+- AUDIT_COMPLETE may coexist with future unresolved implementation identities only if enumeration is fully closed. Its record must explicitly state:
+  - enumeration/schema/environment closure passed;
+  - unresolved count and conflict set;
+  - implementation_ready=false;
+  - no execution authority.
+
+- Any unknown token, unmapped invocation/dimension, mixed atomic row, or schema gap leaves AUDIT_COMPLETE absent and stops.
+
+All files must be mode 0644, and completion remains the final write. No implementation, build/install, invocation, cache, validation, ratchet, or downstream work is authorized. The proposed private Zig state-capture direction is future-only; production AWK remains prohibited and D02 is not yet authorized.
+```
+
+Create one non-merge operating commit changing only this file. The Watcher
+dispatch binds its exact commit, parent, tree, sole changed path, and final
+ignored-inbox SHA-256.
+
+Before AL creation, preserve and independently replay AK exactly:
+
+```text
+ak_top_level_regular_files=20
+ak_nonfiles=0
+ak_non_mode_0644=0
+ak_execute_bits=0
+ak_audit_complete=absent
+ak_paths_sha256=5a3ecb77f8a3b4e49ace3b997f5d9885147f0eece263a5a3500097ebde28b0b0
+ak_inventory_sha256=3017c5c7041e6220b90a90d9136c5f83db8244cce10e1d3508d8bd85d0fef4ac
+ak_ledger_sha256=66381fec1e01d925b08cc6356a366c15f398d34c18321c183993c1602d8c871f
+ak_snapshot_subjects=16
+ak_snapshot_paths_sha256=220d91ce9ddd56085e798133c8dd20deb7d3d43686280e805dd4a27f7d490968
+ak_snapshot_inventory_sha256=41f48034450c97ea4554cf7f35841550e1a8beefc8d0bc1303592070a17fdae3
+ak_snapshot_ledger_sha256=008b8f5a4bbdc7e5f6812bb67518dff27fa6d5f58333ccf9d975bca09f449f3e
+```
+
+Independently replay every row of `ak_identity_ledger.tsv`, every snapshot
+subject, and the exact AK schema/cardinalities before constructing anything.
+Any mismatch leaves AL absent and stops without diagnosis, repair, retry, or
+later action.
+
+Only after all AK gates pass, create fresh absent, non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206al
+```
+
+AL is an evidence/design-only correction companion. It must:
+
+1. Reproduce the immutable AK authority and accepted Stage-1 disposition.
+2. Enumerate every environment-authority token referenced by all 54
+   `execution_orchestration` invocation instances exactly once.
+3. For every token, freeze the ordered variable set and each variable's
+   literal, unset, presence-only, or reviewed-hash policy; executable
+   resolution; unknown-variable failure; and secret-safe capture rule.
+   Arbitrary secret-bearing values must never be persisted.
+4. Explicitly equate `closed-hermetic-git` to the reviewed hermetic map and
+   fully define `closed-git` and `closed-minimal`. Do not add a process.
+5. Split every defect into invocation-atomic rows whenever callsite,
+   dimension, identity, authority, or disposition differs. A shared row is
+   legal only when every relevant field and resolution state is identical.
+6. Recompute all row counts, resolved/unresolved totals, conflicts, and
+   dependency mappings from the corrected matrix rather than copying AK's
+   totals.
+7. Prove bijectively that every lifecycle/root/child environment token
+   resolves exactly once and every invocation/dimension is represented.
+   Unknown tokens, unmapped invocation/dimensions, mixed rows, duplicate
+   coverage, and schema gaps are blocking.
+
+`AUDIT_COMPLETE` may be the final content write only after independent
+enumeration, schema, environment, atomicity, count, conflict, and dependency
+gates all pass. It must truthfully record the remaining future unresolved
+count and conflict set, plus exactly:
+
+```text
+enumeration_schema_environment_closure=passed
+implementation_ready=false
+execution_authority=none
+```
+
+Future unresolved implementation identities do not themselves prevent this
+audit-only marker. The marker grants no implementation, build/install,
+materialization, invocation, cache, validation, activation, ratchet, credit,
+or downstream authority.
+
+Use explicit-name, pre-first-gate `chmod 0644` only on each new AL file batch.
+All AL files must be regular, non-symlink, non-executable mode `0644`.
+Completion remains the final write. Any failure retains AL and stops without
+inspection, diagnosis, repair, retry, cleanup, mode change, or later work.
+
+No source or Zig implementation, build registration, build/install,
+materialization, invocation, cache creation, validation, registered-worktree
+directory access or traversal, broad discovery, protected-path change,
+receipt, activation, compatibility, validation-v3, cleanup, wiring, ratchet,
+credit, or downstream action is authorized. Production AWK is prohibited.
+D02 and the future private Zig 0.16 state-capture implementation remain
+unauthorized. Do not access `.claude/settings.local.json`.
+
+Stop after the first failed blocking gate or after a complete AL companion
+with `AUDIT_COMPLETE` written last. Report all AL identities, every gate,
+environment-token coverage, corrected atomic cardinalities, resolved and
+unresolved totals, conflicts, dependency order, marker presence, and exact
+protected-state preservation. Acknowledge INBOX-206AL and all stop conditions
+before acting.
+
+## INBOX-206AK corrected Stage-1 orchestration audit continuation — STAGE 1 AND INVOCATION ENUMERATION ACCEPTED AS EVIDENCE; D01 WITHHELD
 
 Accept INBOX-206AJ only as a compliant fail-closed Stage-1 draft. It receives
 no Stage-1, lifecycle-audit, `AUDIT_COMPLETE`, implementation, execution,
