@@ -24,58 +24,87 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206X frozen closure/terminal execution — AUTHORIZED
+## INBOX-206Y fresh predicate-order remediation construction — AUTHORIZED
 
-Accept INBOX-206W as the complete inert 61-file construction freeze, with
-construction credit only. Preserve I–W and every protected identity exactly.
-W's frozen identities are:
+Accept INBOX-206X only as a compliant fail-closed closure failure. Preserve
+W permanently at its exact postfailure state; never rerun, reset, truncate,
+repair, or modify it:
 
 ```text
 root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206w
 file_count=61
-eventual_terminal_file_count=64
-inventory_sha256=91ce440affecde9c4af052e48f25a893c81262af4319553fc41ed69911cbde2b
-ledger_sha256=4585385e0f575ffe1f48fd571ba1ffcecb846ad2ba8777e8219404087e98fa7f
+inventory_sha256=a7d38c061612fce1a990d6a14c81c0eeb0a8570f1df990a3d04845431c545281
+ledger_sha256=4e30d3bc4ba989a99dab5588638118b16cdf688663f24e7ac7f13f8e99f4ec64
 top_level_paths_sha256=f4ee65dbb43e8a63d82b34eed8dde1b2565b471ac3deae4202354fdf3a556569
-execute_bits=0
-terminal_snapshots=absent
+closure_status=1
+closure_pass_rows=163
+closure_checkpoint=S0164 identity-sha256:classifications.tsv
+terminal_invocations=0
 ```
 
-The INBOX-206X operating commit must be a non-merge direct child of
-`073faa2e6c7106e730a0286d659d80ebf59092ad`, change only
+X receives no closure, terminal, validation, ratchet, credit, or downstream
+acceptance.
+
+The INBOX-206Y operating commit must be non-merge, change only
 `docs/next_steps.md`, pass `git diff --check`, and leave ordinary and
-exact-L-hermetic main status clean. Bind its full hash after commit. Any
-amend, merge, intervening commit, extra changed path, ancestry mismatch, or
-dirty status invalidates W and stops before execution.
+exact-L-hermetic main status clean. It becomes Y's construction-authority
+HEAD. Preserve I–W and every protected identity exactly.
 
-After exact frozen preflight, invoke no diagnostic body, administrative
-worktree listing/check, preparation, project/Zig code, validator, or
-unrecorded command.
+Create records only beneath fresh absent non-symlink:
 
-Invoke the frozen W static closure exactly once through one frozen
-wrapper/process, using its exact recorded environment, argv, and body. That
-same invocation alone may populate only the predeclared
-`static_closure.stdout`, `static_closure.stderr`, `static_closure.status`,
-checkpoint, and results records. Any nonzero closure status stops
-immediately. It permits no subsequent command, inspection, diagnosis,
-repair, postprocessing, retry, cleanup, or terminal invocation.
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206y
+```
 
-Closure status `0` alone authorizes exactly one frozen terminal-generator
-invocation through one process, using its exact recorded environment, argv,
-and body. That invocation alone may populate only its predeclared stdout,
-stderr, and status captures and atomically create the three previously absent
-terminal inventory, ledger, and freeze records. No external postprocessing is
-authorized.
+Build Y only from W's immutable source records. Never copy W's populated
+checkpoint, results, status, stdout, or stderr. Keep every Y diagnostic,
+closure, and terminal capture empty and all terminal snapshots absent.
 
-Any terminal failure stops immediately with no subsequent command,
-inspection, diagnosis, repair, retry, cleanup, or later action. Terminal
-success also permits no further command: stop immediately for Watcher review
-of the expected exact 64-file terminal state.
+Keep diagnostic, closure, and terminal active bodies as fixed quoted-literal
+authority. Prove raw normalized byte equality to W outside only authorized Y
+path and new construction/future-direct-child identity substitutions.
 
-No additional listing/check, repository/control/source/evidence/store/
-artifact/protected-file change, registered-directory access, validation,
-ratchet, wiring, cleanup, credit, or downstream action is authorized. Stop
-main and control clean.
+Correct exactly the static predicate-order contract:
+
+- the active predicate-order file is fixed literal authority; no generator
+  may write it;
+- its classification block follows `classifications.tsv` loop order;
+- its identity block follows exact `immutable_identities.tsv` row order,
+  excluding header and `self_exclusion`, with SHA/bytes/mode labels in that
+  order;
+- its fixed prefix and tail remain exact;
+- it contains exactly 270 coherent rows `S0001`–`S0270`;
+- required anchors are `S0158 administrative_worktree.audit.tsv`,
+  `S0161 ancestry.audit.tsv`, `S0164 classifications.tsv`, and fixed tail
+  beginning `S0248 wrapper-identity`.
+
+Independently derive an inert expected order from the frozen body loop
+semantics and metadata, then require raw byte equality with the fixed active
+order. Update and independently verify every affected immutable identity,
+changed-path record, and exact 61/64 construction freeze.
+
+Use independently blocking construction stages. Any failure retains fresh Y
+and stops immediately without inspection, diagnosis, repair, regeneration,
+retry, cleanup, or later stage.
+
+Complete success stops at the inert 61-file boundary. Future execution
+requires a separately reviewed non-merge direct child of Y's construction
+HEAD.
+
+No diagnostic, closure, terminal, preparation, project/Zig execution,
+validator, validation, ratchet, wiring, cleanup, credit, downstream work,
+registered-directory access, or repository/control/source/store/artifact/
+protected-state change beyond the operating-document commit is authorized.
+Stop main and control clean.
+
+## INBOX-206X frozen closure/terminal execution — COMPLIANT CLOSURE FAILURE; CLOSED
+
+X invoked the frozen closure exactly once. It recorded status `1`, 163
+passing predicates, and checkpoint
+`S0164 identity-sha256:classifications.tsv`, then stopped without inspection
+or terminal invocation. The classifications identity was exact; the frozen
+order file used a different immutable-row ordering from the body loop.
+Preserve W's postfailure state permanently.
 
 ## INBOX-206W isolated inert-normalizer correction — CONSTRUCTION ACCEPTED; CLOSED
 
