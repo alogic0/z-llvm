@@ -24,7 +24,91 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-205B test-only retained-boundary correction — AUTHORIZED
+## INBOX-205C guard-only acceptance completion — AUTHORIZED
+
+INBOX-205B is accepted only as a compliant failed-gate attempt. Its one-shot
+focused suite result is accepted: 3/3 build steps and 9/9 tests passed.
+Technical acceptance remains withheld only because the strengthened source
+guard failed status `1`.
+
+The failure is a guard-construction defect. A permitted multiline
+`openDirAbsolute` call places its argument on the line after the call
+opening. The failed line-oriented exclusion inspected only the opening line,
+could not see the permitted argument, and required the resulting count to
+be zero. Source and generated comparison records independently show that the
+approved lstat-only function and production identities are exact.
+
+Before the corrected guard, make no source, contract, evidence, build,
+mirror, control, store, manifest, test, or authority change. Do not rerun
+formatting, compilation, the focused suite, the failed guard, a project
+command, or a Zig command.
+
+Preserve byte-for-byte every INBOX-205/205A/205B root, record, cache, dirty
+file, command, and log. Current frozen identities include:
+
+```text
+tool:
+306b3b21c182ae5031d71d82a38744c05161f0519ea80ff2cc20784e21a21f15
+build.zig:
+a0c923499cd4515326fb287d729c53ae6d68bb465a4b4a033a737a19466ce466
+production main:
+2c4697e9315cc8f38787ccc989d6daa9764cbe72b585333e25cf50eafa43a935
+production resolveAuthority:
+86600533dde4d458614ea09cfc2ca7df4b180e0689bd51547ff7e0dc5ef830a9
+public surface:
+02bb7f87292d6e67f170ee04e085b65ed92eef055d8c1648f3fa3db832641d70
+raw retained-boundary function:
+53bd7f4bc7cae1b30c10631bf9edeefd9e94776d0e399adaf74867b0556cfd8c
+normalized retained-boundary function:
+a47e16b6d56e7c74d28bbd8b76c8df5f3d459d22dd0678d5061f1c09fb5c70e1
+passed-suite stderr:
+40ae720630910be4865c9adae4dcd6dd7b3354953d3943724e2f9e504d87580f
+INBOX-205B tree inventory:
+f42b7fa5cf6fc8dcb75d5ebc3b1d7c3dd76cc667a8a56dcaefeed25459bcdab2
+INBOX-205B file count / ledger:
+865 / d652ed21bd0489c6f1c520d6c176839ee57e24c192d58fdf5d8b45d7e14bc727
+```
+
+Create only fresh records beneath
+`tmp/inbox205c_o2_authority_dormant/validation/`. Freeze the corrected
+read-only guard before invocation and retain its exact command, environment,
+stdout, stderr, and numeric status.
+
+Replace only the failed multiline textual filter with an unambiguous,
+single-match extraction of `assertRetainedMaterializeBoundaries`. Require
+the exact raw-function, normalized-function, and whole-tool hashes above.
+Independently re-extract current production `main`, `resolveAuthority`,
+public surface, and current `build.zig`; compare them to their frozen
+identities rather than trusting earlier records.
+
+Also require exactly three `default_store` references; every dormant
+validator entry, fixture/replacement/mismatch helper, and all five receipt
+bindings test-private and production-unreachable; optional-mirror absence;
+lstat-only real-store directory/mode-`0775` treatment; every retained
+identity and full INBOX-205B ledger; control/registration/stash/watcher/
+ratchet identities; and both fresh roots absent.
+
+The two test-only retain-on-failure strings that still say `INBOX-205A` are
+documentation debt. Do not change them or any source in this guard-only
+slice.
+
+Invoke the corrected guard exactly once. Failure retains all INBOX-205C
+records and stops without retry, diagnosis, repair, cleanup, evidence edit,
+or commit.
+
+Only after guard success update
+`docs/evidence/zllvm_artifact_authority_dormant_v1.md` with all failed
+attempts, the accepted suite, guard correction, retained provenance, and the
+stale diagnostic-label debt. Do not edit the tool or contract after the
+guard. Run only read-only identity/status and `git diff --check`, then commit
+exactly the already-approved tool, retention contract, and evidence files.
+
+Leave main and control clean and stop before real candidate validation,
+activation, v3, compatibility, project compiler gates, performance, cleanup,
+ratchet movement, or credit. Control remains exact at `9c55bda3...`;
+ratchet remains 131.
+
+## INBOX-205B test-only retained-boundary correction — COMPLIANT FAILED GATE; 9/9 SUITE ACCEPTED; INCORPORATED INTO INBOX-205C
 
 INBOX-205A is accepted only as a compliant failed remediation; technical
 acceptance is withheld. Format and compile-only passed. The sole focused
