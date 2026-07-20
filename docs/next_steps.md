@@ -24,7 +24,62 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-202C bounded ratchet-preflight correction and copy resume — AUTHORIZED
+## INBOX-202D numeric static-verifier correction and copy resume — AUTHORIZED
+
+INBOX-202C is accepted only as a compliant post-root, pre-transaction
+static-verification stop at unchanged HEAD `15d12eba...`. All pre-root checks
+passed and the one ratchet AWK recount was retained successfully, but the
+valid zero-pipeline-match case became an empty numeric operand:
+
+```text
+/bin/bash: line 14: [: : integer expression expected
+```
+
+No driver transaction ran. Preserve both existing evidence roots and all
+destination bytes/inodes exactly. The fresh C root contains exactly four
+prelaunch files with frozen hashes:
+
+```text
+capacity.tsv=e083a4e2c076c74ac960b8cfda4f029acffef5c91c1a9676b9a338ef88e8943f
+driver.command=ccd1c83ae3d9549e8132c1e73102932e041931ed4b56ff9e4a03299ded4b678c
+driver.environment=36c835e0bba43df1b2733a6bdb12c44abbfcd6f0861c7e8a8503468f326a4fc6
+payload-table.tsv=7911a06f40adf5376020f81a1dc9b51bfcfbf2dfc7076360d852c956dd5198bf
+```
+
+Do not rerun the ratchet AWK. Verify the TSV identity and retained
+`capacity.tsv` hash/ratchet fields proving the prior one-time recount.
+Repeat every other read-only preflight, including fresh capacity.
+
+Require a fresh absent/disjoint root exactly
+`/tmp/zllvm-inbox202d-local-state-copy-verify-evidence`. After preflight,
+copy the retained C table and `driver.command` byte-for-byte. Derive the D
+environment through exactly one `RECORDS=` and one
+`EXPECTED_MAIN_HEAD=` substitution. Retain exact substitution counts, raw
+hashes, normalized hashes, normalized byte equality, and an exact diff
+showing only those two lines. No other driver byte may change.
+
+Retain all shell syntax/static checks. Replace only the empty-result
+pipeline verifier with:
+
+```text
+/usr/bin/env -i PATH=/usr/bin:/bin LC_ALL=C /usr/bin/awk '{ count += gsub(/[|]/, "&") } END { printf "pipeline_operator_count=%d\n", count+0; exit(count == 0 ? 0 : 1) }' /tmp/zllvm-inbox202d-local-state-copy-verify-evidence/driver.command
+```
+
+Require stdout exactly `pipeline_operator_count=0\n`, empty stderr, and
+status `0`; retain the exact command/environment/output/status before
+invocation.
+
+Then execute the still-unconsumed sole 20-file/9,970,364-byte transaction
+under every incorporated INBOX-202B/C copy, durability, snapshot, inventory,
+retention, and failure rule. Any failure retains all three roots and partial
+state without retry, repair, or cleanup.
+
+Full success commits only
+`docs/evidence/inbox202_local_state_artifact_copy_verify.md`, records every
+prior stop and final result, and stops. Source authority and ratchet 131
+remain unchanged. No Zig build/install or project execution is authorized.
+
+## INBOX-202C bounded ratchet-preflight correction and copy resume — INCORPORATED INTO INBOX-202D; PAYLOAD TRANSACTION UNCONSUMED
 
 INBOX-202B is accepted only as a compliant no-mutation preflight stop at
 unchanged HEAD `ec54a643...`. Its supplemental ratchet-reference check named
