@@ -24,7 +24,66 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-196 documentation-only v3 durable-authority amendment — AUTHORIZED
+## INBOX-197 documentation-only v3 artifact CLI surface design — AUTHORIZED
+
+INBOX-196 commit
+`df907d336ffb13e84ecf2b0bc1966d1fb847c834` is accepted as a compliant
+documentation-only stop. Its 19-reference/two-snapshot mapping, 27 finite
+future families, protected-source exclusions, atomic compatibility rules,
+finite nonrecursive DAG, and four missing CLI surfaces are accepted. The
+amended contract is frozen at
+`d445f6a45f039415052cb0fb1efc71b1975f2ea68d28e3637aede503145fc387`;
+contract acceptance and validation-v3 remain withheld.
+
+Create only
+`docs/evidence/inbox197_v3_artifact_cli_surface_design.md`. Define four
+versioned, machine-oriented capabilities with non-overlapping authority:
+read-only logical-ID resolution, read-only standalone verification, exact
+one-target atomic compatibility materialization, and finite immutable
+output-group publication.
+
+For each capability specify exact argv, canonical stdin/stdout and empty-output
+rules, closed errors and exit behavior, environment, authority checks,
+mutation boundary, rollback, and retained receipt. Define deterministic
+versioned resolution, group-specification, publication-receipt, verification,
+and compatibility-result schemas.
+
+Resolution and verification first prove tracked/live and authoritative
+generation-manifest byte equality, then verify referenced immutable bytes and
+relationships. Generation 1 is immutable. Define an append-only,
+content-addressed successor-generation/parent relationship; if the existing
+schema cannot represent it, record the exact additional structural blocker
+without repairing it.
+
+Inputs and members come only from finite canonical specifications, never
+recursive discovery. Keep publication evidence finite and acyclic. A group
+cannot contain its own publication or verification evidence. Compatibility
+materialization is traversal-safe, no-follow, atomic, no-overwrite, and rejects
+unequal/nonregular/symlink/directory/unsafe/protected-worktree targets.
+
+Map existing frozen `Store` functions to each surface and identify missing
+implementation. Freeze later synthetic and negative tests and the bounded
+implementation order: resolver/verifier, compatibility materializer,
+publisher, contract re-amendment/re-review. Implement and execute nothing.
+
+The Watcher's stopped broad read-only traversal was a non-contaminating
+process violation: it produced no retained output and made no write. Do not
+cite or reuse it. No broad or recursive filesystem discovery or hashing is
+allowed. Registered-worktree discovery is limited to read-only Git
+registration metadata and exact already-named path-level checks; never
+traverse or hash inside any of the 43 protected worktrees.
+
+Freeze manifest `61b7426b...`, tool `94dfc1fc...`, store
+`3234fb50...` / `a06c48e...`, watcher `b64131cf...`, stash `7985c6d0...`,
+pins `1ef9803c...`, audit `5a7e019e...`, worktrees
+`f31d8542...` / `6c868e3b...` / `ebc30a37...`, absent v3, and ratchet 131.
+
+Perform static/read-only main-worktree checks only. Commit only the new design
+document and stop. No code/tool/build/test/artifact command, store, manifest,
+path, compatibility, worktree, pin, contract, cleanup, v3, wiring,
+performance, Tier, checkpoint, ratchet, or credit action is authorized.
+
+## INBOX-196 documentation-only v3 durable-authority amendment — ACCEPTED
 
 INBOX-195C commit `a22f027081cf491969c7448ad80dae4d6e54c67e`
 and the authoritative calls-input publication are fully accepted. Accepted
