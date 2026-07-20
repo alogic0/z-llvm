@@ -3728,3 +3728,420 @@ production=UNCHANGED_DORMANT
 ratchet=131
 next=STOP_BEFORE_V3_EXECUTION
 ```
+
+## 19. INBOX-196 durability-authority amendment
+
+### 19.1 Disposition and immutable authority
+
+This amendment started from exact operating commit
+`bd8c67029041921f26dc4d92b504862e6d203c96`, whose exact parent is
+`a22f027081cf491969c7448ad80dae4d6e54c67e`. INBOX-195C and the calls-input
+publication are accepted. The following bytes are immutable:
+
+```text
+tracked_live_manifest=docs/evidence/artifact_manifest_v1.tsv
+tracked_live_manifest_sha256=61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d
+generation_manifest=/home/oleg/prog/z_llvm-artifacts/manifests/generation-00000001.tsv
+generation_manifest_sha256=61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d
+real_store_inventory_sha256=3234fb508d370878efe082cf1accb5af3b488372bf3f1ee7e9e87408a37a2d7c
+real_store_file_ledger_sha256=a06c48e1549d16b9f924cc2b5f0404e60d7755a785bf3a4a23311c2383279a65
+INBOX_195C_record_count=75
+INBOX_195C_record_ledger_sha256=e80b6a5f540451529bbed0612b60d53cae822ccf3d08a92159a522c9239293ae
+frozen_tool_sha256=94dfc1fc27ffe1268eb02453bcac1a3634aa11af38d0c94fbaa3b43decd25859
+accepted_durability_audit_sha256=5a7e019eb107e5b66947490a65fdf47444154fc4f1483ca30ab0fc6e381f33e6
+pre_amendment_contract_sha256=448482a91a47f00cfd0c0e89d73c5c7332a49beb21906e529914913491f383ba
+ratchet=131
+```
+
+The byte-identical tracked live manifest and authoritative generation manifest
+are jointly the sole artifact authority. Both must exist, be regular immutable
+files, have the frozen hash above, and compare byte-for-byte before any later
+resolution. A disagreement or missing side is a hard stop. An object path,
+snapshot path, compatibility path, `tmp/` path, retained record, source
+specification, or proposed manifest is never authority by itself.
+
+The mapping columns below have these closed meanings:
+
+- **Logical ID** is the only caller-visible durable name. A family ending in
+  `<...>` is a finite future-required definition, not a wildcard accepted by
+  the authority.
+- **Authority** is either an accepted active manifest row, protected Git
+  control state, or `future-required / absent`. No fourth authority exists.
+- **Class** is one of the four accepted retention classes:
+  `canonical-input`, `irreplaceable-acceptance-evidence`,
+  `reproducible-cache`, or `ephemeral-scratch`; protected control state is
+  explicitly outside all four.
+- **Access** is read-only resolution, atomic no-overwrite compatibility
+  materialization, producer-only creation, or protected-control access.
+- **Producer** is the sole producer. A generated group never includes its own
+  publisher, receipt, publication log, or publication verification.
+- **Consumers** is exhaustive at the family grain.
+- **Compatibility** describes a non-authoritative local path. Equality never
+  promotes that path to authority.
+- **WT intersection** is the registered-worktree result. `protected` means
+  excluded from every artifact operation; `none required` must be re-proved
+  against a frozen registration set before every later write.
+- **Later permission** states the minimum separate authorization. This
+  amendment grants none.
+
+### 19.2 Accepted active inputs: all 19 logical references
+
+Every authority cell below means the matching active logical-ref row in both
+accepted manifests and its exact `target_id` object row. Each object must be
+verified by key, SHA-256, bytes, immutable object mode `0444`, and media
+identity before use. The source-mode value in the source specification is not
+an object-mode exception.
+
+| Logical ID | Authority | Class | Access | Producer | Consumers | Compatibility | WT intersection | Later permission |
+|---|---|---|---|---|---|---|---|---|
+| `calls/input/accepted-cohort-ac285/v1` | active row -> object `d8da86ca…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | retained cohort identity checks only; not the v3 raw input | existing `tmp/inbox63_accepted_cohort.ll` may be read only after resolution and exact byte/mode verification | none required; re-freeze | later resolver/materializer directive |
+| `calls/input/compiler-rt-v1/raw/adoption-final/v1` | active row -> object `00cee290…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | immutable-input provenance preflight and final review | existing `tmp/o2_calls_perf/compiler_rt_v1/adoption_final.sha256` is non-authoritative | none required; re-freeze | later resolver/materializer directive |
+| `calls/input/compiler-rt-v1/raw/adoption-manifest/v1` | active row -> object `500e73c8…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | immutable-input provenance preflight and final review | existing `tmp/o2_calls_perf/compiler_rt_v1/adoption_manifest.tsv` is non-authoritative | none required; re-freeze | later resolver/materializer directive |
+| `calls/input/compiler-rt-v1/raw/module/v1` | active row -> object `9b8d6993…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | `$INPUT`; all three canonical raw-report producers and both coverage raw-report producers | existing `tmp/o2_calls_perf/compiler_rt_v1/compiler_rt_v1.ll` may be reused only after exact resolve/verify | none required; re-freeze | later resolver/materializer directive |
+| `calls/input/validation-v3/coverage-bundle/manifests/baseline-source.sha256/v1` | active row -> object `c918f0f4…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | coverage source creation, restoration, and identity checks | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer and protected-path directives |
+| `calls/input/validation-v3/coverage-bundle/manifests/bundle-files.sha256/v1` | active row -> object `0576d580…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | bundle completeness preflight and coverage source preparation | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer directive |
+| `calls/input/validation-v3/coverage-bundle/manifests/bundled-source.sha256/v1` | active row -> object `0b216fc8…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | coverage source apply proof | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer directive |
+| `calls/input/validation-v3/coverage-bundle/manifests/combined-apply-source.sha256/v1` | active row -> object `0b216fc8…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | combined-patch source proof | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer directive |
+| `calls/input/validation-v3/coverage-bundle/manifests/future-tool-identities.sha256/v1` | active row -> object `05ea0083…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | future tool identity preflight | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer directive |
+| `calls/input/validation-v3/coverage-bundle/manifests/patch-manifest.tsv/v1` | active row -> object `7717db66…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | ordered coverage patch validation | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer directive |
+| `calls/input/validation-v3/coverage-bundle/manifests/payload-final-modes.tsv/v1` | active row -> object `0ece5ced…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | coverage payload mode validation | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer directive |
+| `calls/input/validation-v3/coverage-bundle/manifests/preflight-and-apply-proof.txt/v1` | active row -> object `d03c18a2…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | coverage patch preflight proof | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer directive |
+| `calls/input/validation-v3/coverage-bundle/manifests/restored-source.sha256/v1` | active row -> object `c918f0f4…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | coverage restoration proof | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer and protected-path directives |
+| `calls/input/validation-v3/coverage-bundle/manifests/sequential-apply-source.sha256/v1` | active row -> object `0b216fc8…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | sequential-patch source proof | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer directive |
+| `calls/input/validation-v3/coverage-bundle/manifests/touched-paths.txt/v1` | active row -> object `9f755c67…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | coverage source touched-path fence | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer and protected-path directives |
+| `calls/input/validation-v3/coverage-bundle/patches/01-aggregate-consumer.patch/v1` | active row -> object `8b5750fa…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | coverage source sequential apply and combined-patch equivalence | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer and protected-path directives |
+| `calls/input/validation-v3/coverage-bundle/patches/02-fixed-observer.patch/v1` | active row -> object `db05812e…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | coverage source sequential apply and combined-patch equivalence | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer and protected-path directives |
+| `calls/input/validation-v3/coverage-bundle/patches/03-exact-combined-guard.patch/v1` | active row -> object `9263f132…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | coverage source sequential apply and combined-patch equivalence | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer and protected-path directives |
+| `calls/input/validation-v3/coverage-bundle/patches/aggregate-consumer-observer-guard.patch/v1` | active row -> object `7508d1d8…` | canonical-input | read-only resolve/verify | accepted INBOX-195 publication | `$BUNDLE`; coverage source sole accepted combined apply | matching bundle path is non-authoritative | none required; re-freeze | later resolver/materializer and protected-path directives |
+
+### 19.3 Accepted snapshots
+
+The snapshot rows are alternative integrity/retention proofs for the same
+accepted objects, not a second authority and not permission to extract.
+
+| Logical ID | Authority | Class | Access | Producer | Consumers | Compatibility | WT intersection | Later permission |
+|---|---|---|---|---|---|---|---|---|
+| `snapshot/calls-inputs/v1` | active snapshot row `a545221b…`, exact constituent `1d5aa3cc…`, four exact members | canonical-input | read-only whole-snapshot verification | accepted INBOX-195 publication | future durability preflight for AC285 and compiler-rt core inputs | no extraction or compatibility destination authorized | none required; re-freeze | later standalone-verifier directive |
+| `snapshot/calls-validation-inputs/v1` | active snapshot row `69593839…`, exact constituent `e7e26c87…`, twelve exact members | canonical-input | read-only whole-snapshot verification | accepted INBOX-195 publication | future durability preflight for the coverage bundle | no extraction or compatibility destination authorized | none required; re-freeze | later standalone-verifier directive |
+
+### 19.4 Protected control paths and namespace containers
+
+`$PARENT` remains
+`/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1` and `$ROOT` remains
+`$PARENT/baseline_validation_v3`. These names are protocol namespaces, not
+artifact identities. The following mapping is exhaustive for parents, roots,
+and protected source paths:
+
+| Logical ID | Authority | Class | Access | Producer | Consumers | Compatibility | WT intersection | Later permission |
+|---|---|---|---|---|---|---|---|---|
+| none: `$PARENT` | main-tree filesystem namespace only | ephemeral-scratch container | later no-follow parent validation only | pre-existing main tree | external preflight/driver and `$ROOT` containment | not resolvable from artifact authority | main worktree; never an artifact row | later path-specific directive |
+| none: `$ROOT` | future v3 namespace, currently absent | ephemeral-scratch container | later atomic namespace creation only | future authorized bootstrap | canonical and coverage containers | not resolvable from artifact authority | main worktree untracked area; re-freeze | later path-specific directive |
+| none: `$ROOT/canonical` | future canonical container | mixed children; container has no class | producer-only directory creation | future canonical bootstrap | canonical groups only | no artifact row | none required before source registration; re-freeze | later path-specific directive |
+| none: `$ROOT/coverage` | future coverage container | mixed children; container has no class | producer-only directory creation | future coverage bootstrap after canonical success | coverage groups only | no artifact row | none required before source registration; re-freeze | later path-specific directive |
+| none: `$ROOT/canonical/source` | Git commit `43de59b06ca3a687368bfaf0595c5759c8ab3a57` only | protected control; outside four classes | Git worktree control access only | separately authorized `git worktree add` | source preflight, canonical build, restoration proof | **never** an object, snapshot, resolver input, or compatibility destination | protected registered worktree | separate explicit user permission naming this exact path for creation; separate permission again for modification or removal |
+| none: `$ROOT/coverage/source` | same Git commit plus accepted bundle transformation proof | protected control; outside four classes | Git worktree control access only | separately authorized worktree creation and bundle application | coverage build and restoration proof | **never** an object, snapshot, resolver input, or compatibility destination | protected registered worktree | separate explicit user permission naming this exact path for creation; separate permission again for modification or removal |
+
+No durability pre-wrapper, post-wrapper, resolver, verifier, publisher, or
+finalizer may create, enter, inspect recursively, hash, classify, copy,
+materialize, publish, repair, remove, or prune either protected `source` path.
+Registration topology must be frozen outside those paths. Any intersection
+between a proposed artifact/compatibility path and any registered worktree is a
+hard stop.
+
+### 19.5 Complete finite future-v3 output mapping
+
+The following rows close every path family in accepted contract sections 7.2
+and 7.3 and accepted audit section 12. Each logical-ID family is
+`future-required / absent`: it creates no live row, object, snapshot, or
+authority in this amendment. Angle-bracket domains are finite:
+
+- `<external-kind>` is exactly `preflight` or `driver`;
+- `<external-name>` is exactly `command.txt`, `environment.txt`, `cwd.txt`,
+  `start.utc`, `end.utc`, `stdout.raw`, `stderr.raw`, `status`, or
+  `records.tsv`;
+- `<N>` is exactly `1`, `2`, or `3`;
+- `<step>` is one of the exact 27 canonical or 18 coverage ledger step names
+  frozen in sections 7.2 and 7.3;
+- `<record-part>` is exactly `command`, `environment`, `cwd`, `start`, `end`,
+  `stdout`, or `stderr`;
+- `<function-id>` is drawn only from the corresponding bytewise-sorted
+  generated function manifest;
+- `<channel>` is exactly `report`, `object`, or `owner`.
+
+| Logical ID / contract path family | Authority | Class | Access | Producer | Consumers | Compatibility | WT intersection | Later permission |
+|---|---|---|---|---|---|---|---|---|
+| `calls/validation-v3/<external-kind>/<external-name>/v1`; `$PARENT/baseline_validation_v3.<external-kind>.<external-name>` | future-required / absent | irreplaceable-acceptance-evidence | producer writes once; post-wrapper may publish only after group closure | sole external preflight or driver launcher | bootstrap review and terminal evidence | external prefix is eventual atomic no-overwrite compatibility path | none required; re-freeze | future-output publisher plus path-specific directive |
+| none; `$ROOT/{canonical,coverage}/{records,manifests,comparisons,build,artifact,reference,observation-off,observation-on}` parents | namespace only | mixed container | producer-only directory creation | exact phase bootstrap | contained finite groups | no artifact row for directory alone | none required; re-freeze | later path-specific directive |
+| `calls/validation-v3/canonical/cache/<tree-path>/v1`; `$ROOT/canonical/build/{cache,prefix}/**` | future-required / absent | reproducible-cache | producer writes; optional later publish | sole canonical build | canonical artifact build only | local build path; never acceptance authority | none required; re-freeze | later build and optional publisher directive |
+| `calls/validation-v3/canonical/repetition-<N>/{home,tmp}/<tree-path>/v1`; repetition working trees | future-required / absent | ephemeral-scratch unless a fail-stop separately promotes exact records | producer working access | corresponding report producer | that producer only | no durable compatibility promise | none required; re-freeze | later validation directive |
+| `calls/validation-v3/canonical/artifact/z_llvm/v1`; `$ROOT/canonical/artifact/z_llvm` | future-required / absent | canonical-input | producer writes; later consumers resolve exact immutable object | sole canonical build/install | all canonical and coverage report/object/owner producers | path becomes compatibility copy only after publication | none required; re-freeze | later build, publisher, and compatibility directives |
+| `calls/validation-v3/canonical/artifact/identity/v1`; `artifact.identity.tsv` | future-required / absent | irreplaceable-acceptance-evidence | producer writes once | canonical artifact identity step | canonical/coverage preflight and final review | atomic no-overwrite copy after publication | none required; re-freeze | later publisher directive |
+| `calls/validation-v3/canonical/step/<step>/status/v1` and `/record/<record-part>/v1`; exact canonical status and record paths | future-required / absent | irreplaceable-acceptance-evidence | each exact path has one producer | corresponding `run_step` | step validator, canonical finalizer, review | no synthesized missing member; group copy after close | none required; re-freeze | later validation and publisher directives |
+| `calls/validation-v3/canonical/build/{stdout,stderr,status}/v1`; exact build records | future-required / absent | irreplaceable-acceptance-evidence | sole build launcher | canonical build | artifact identity and review | group copy after close | none required; re-freeze | later validation and publisher directives |
+| `calls/validation-v3/canonical/repetition-<N>/raw-report/<name>/v1`; `report.{stdout,stderr,status,summary}`, failure and frontier files | future-required / absent | irreplaceable-acceptance-evidence | exact report/parser producer writes once | repetition `<N>` raw report and parsers | report comparison, accepted subset, finalizer | sealed repetition report-proof group | none required; re-freeze | later validation and publisher directives |
+| `calls/validation-v3/canonical/accepted-ll/object/v1`; `repetition-1/accepted.ll` | future-required / absent | canonical-input | produced exactly once, then read-only | repetition-1 accepted-subset extraction | all canonical object/owner and both coverage phases | atomic no-overwrite compatibility copy after publication | none required; re-freeze | later validation, publisher, and compatibility directives |
+| `calls/validation-v3/canonical/accepted-ll/proof/<name>/v1`; extract/freeze/identity records | future-required / absent | irreplaceable-acceptance-evidence | each proof has one producer | repetition-1 accepted-subset finalizer | canonical and coverage preflight, review | sealed with accepted-ll proof group | none required; re-freeze | later validation and publisher directives |
+| `calls/validation-v3/canonical/repetition-<N>/successful-subset/{accepted.o,owner.tsv,objdump,readelf,text,functions-manifest,owner-ledger}/v1` | future-required / absent | irreplaceable-acceptance-evidence | exact sole producers | repetition object/owner/inspection steps | identity and comparison finalizers | sealed repetition successful-subset group | none required; re-freeze | later validation and publisher directives |
+| `calls/validation-v3/canonical/repetition-<N>/function/<function-id>/{bytes,disassembly,identity}/v1` | future-required / absent, finite manifest-derived IDs | irreplaceable-acceptance-evidence | sole per-function extractor | repetition per-function step | 285/0/0 comparisons and finalizer | membership must equal frozen sorted function manifest | none required; re-freeze | later validation and publisher directives |
+| `calls/validation-v3/canonical/comparison/<name>/v1`; `$CANONICAL/comparisons/*` | future-required / absent | irreplaceable-acceptance-evidence | sole comparison step | exact canonical comparator | canonical finalizer and review | publish only after all inputs exist | none required; re-freeze | later validation and publisher directives |
+| `calls/validation-v3/canonical/identities/v1`; canonical identity TSV | future-required / absent | canonical-input and irreplaceable-acceptance-evidence | sole identity finalizer | canonical three-repetition equality step | coverage reference/off/on comparisons and review | atomic no-overwrite compatibility copy after publication | none required; re-freeze | later validation, publisher, and compatibility directives |
+| `calls/validation-v3/canonical/repetition-<N>/final-manifest/v1` and `canonical/final-manifest/v1` | future-required / absent | irreplaceable-acceptance-evidence | sole repetition or canonical finalizer | corresponding finalizer | review and coverage preflight | publication only after semantic group closes | none required; re-freeze | later validation and publisher directives |
+| `calls/validation-v3/coverage/cache/<tree-path>/v1`; `$ROOT/coverage/build/{cache,prefix}/**` | future-required / absent | reproducible-cache | producer writes; optional later publish | sole coverage build | coverage artifact build only | local build path; excluded from performance | none required excluding protected source; re-freeze | later build and optional publisher directive |
+| `calls/validation-v3/coverage/artifact/{z_llvm,identity}/v1`; coverage artifact paths | future-required / absent | canonical-input for coverage only; identity proof is evidence | producer writes; read-only by off/on | sole coverage build/install | observation-off and observation-on producers | compatibility only after publication; excluded from performance | none required excluding protected source; re-freeze | later build, publisher, compatibility directives |
+| `calls/validation-v3/coverage/reference/<name>/v1`; reference identity/channel/accepted checks | future-required / absent | irreplaceable-acceptance-evidence | sole reference producer | coverage bootstrap from canonical identities | off/on validators and finalizer | sealed reference group | none required; re-freeze | later coverage and publisher directives |
+| `calls/validation-v3/coverage/off/step/<step>/{status,record-<record-part>}/v1` and `/semantic/<name>/v1`; all `$OFF` outputs | future-required / absent | irreplaceable-acceptance-evidence | sole off producer per path | observation-off stream | on comparator and coverage finalizer | channels must be absent before and after off | none required; re-freeze | later coverage and publisher directives |
+| `calls/validation-v3/coverage/on/channel/<channel>/v1`; exact three `*.coverage.tsv` paths | future-required / absent | irreplaceable-acceptance-evidence | each path has exactly one producer | corresponding observation-on report/object/owner producer | counter validators only | absent before sole producer; no fallback/cross-channel reuse | none required; re-freeze | later coverage and publisher directives |
+| `calls/validation-v3/coverage/on/step/<step>/{status,record-<record-part>}/v1` and `/semantic/<name>/v1`; remaining `$ON` outputs | future-required / absent | irreplaceable-acceptance-evidence | sole on producer per path | observation-on stream | equality/counter checks and finalizer | sealed on group after exact semantic equality | none required; re-freeze | later coverage and publisher directives |
+| `calls/validation-v3/coverage/{off,on}/function/<function-id>/{bytes,disassembly,identity}/v1` | future-required / absent, finite manifest-derived IDs | irreplaceable-acceptance-evidence | sole phase extractor | off or on per-function step | canonical/off/on equality and finalizer | membership must equal the canonical sorted manifest | none required; re-freeze | later coverage and publisher directives |
+| `calls/validation-v3/coverage/comparison/<name>/v1`; off/on/canonical comparisons and counter validations | future-required / absent | irreplaceable-acceptance-evidence | sole comparison producer | coverage comparator | coverage finalizer and review | publish only after all compared inputs exist | none required; re-freeze | later coverage and publisher directives |
+| `calls/validation-v3/coverage/{off,on}/final/v1` and `coverage/final/v1`; `*.files.sha256`, `*.final.tsv`, `final-manifests.sha256` | future-required / absent | irreplaceable-acceptance-evidence | sole phase/final finalizer | exact off, on, or coverage finalizer | terminal review | final coverage semantic group, excluding publication evidence | none required; re-freeze | later coverage and publisher directives |
+| `calls/validation-v3/publication/<group-id>/{command,environment,stdout,stderr,status,receipt,verification}/v1` | future-required / absent | irreplaceable-acceptance-evidence | post-wrapper only | separately authorized publisher/verifier after group closure | terminal durability ledger | never included in `<group-id>` itself | none required; re-freeze | later publisher/verifier directive |
+| `calls/validation-v3/durability-terminal/v1` | future-required definition only; deliberately not publishable | irreplaceable-acceptance-evidence | terminal review only | finite ledger over all expected publication groups | human/Reviewer acceptance | no compatibility copy and no self-publication | none required; re-freeze | later terminal-evidence directive |
+
+Any future-v3 path not matched by the exact finite domains above has no logical
+ID, no authority, no producer, and no compatibility permission. It fails
+closed. A function-ID family cannot be instantiated until its one sorted
+function manifest exists; the manifest closes the set and is itself outside
+that member family.
+
+### 19.6 Compatibility-copy contract
+
+An existing regular `tmp/` file is usable only through this ordered
+pre-wrapper contract:
+
+1. freeze the exact 43-registration topology without entering any non-main
+   registered worktree;
+2. establish the sole manifest pair and exact equality from section 19.1;
+3. resolve exactly one active logical ID; reject zero rows, duplicates,
+   non-active status, unexpected kind, ambiguous targets, a missing target
+   object/snapshot/member, or any field mismatch;
+4. no-follow every authority and destination ancestor; reject symlinks,
+   non-directories, unsafe or non-canonical traversal, registered-worktree
+   intersection, and changed registration;
+5. verify the authoritative object/snapshot by key, SHA-256, bytes, immutable
+   mode, media, constituent recipe, and complete member relationships as
+   applicable;
+6. if the compatibility destination is an existing regular file, require its
+   exact bytes and reviewed compatibility mode and allocate/write nothing;
+7. if absent, require fresh capacity and path-specific authorization, create
+   an authority-verified incoming file in the same destination directory,
+   set and verify its final mode, sync it, publish with atomic no-replace,
+   sync the directory ancestry, and re-read/verify the final;
+8. if the destination exists as stale/mismatched bytes or mode, a symlink,
+   directory, other node, or appears during publication, retain it unchanged
+   and fail closed; never replace, normalize, chmod, repair, retry, or fall
+   back to another path.
+
+This contract is intentionally not executable today. Resolution,
+compatibility creation, and verification require the missing frozen-tool
+surfaces in section 19.9. No shell implementation or invented CLI is accepted
+as a substitute.
+
+Every later store mutation or compatibility write additionally requires a
+fresh capacity observation, the frozen registration proof, all no-follow and
+path-safety proofs, explicit authorization naming the destination, and a
+separate directive. Read-only equality of a historical path waives none of
+those requirements.
+
+### 19.7 Pre/post wrapper boundary and semantic-body freeze
+
+Durability may wrap, but never enter, the accepted semantic streams:
+
+```text
+durability_preflight
+  -> accepted semantic producer body, byte-for-byte unchanged
+  -> accepted semantic validation/comparison, byte-for-byte unchanged
+  -> durability_postpublish_for_closed_group
+  -> next accepted semantic producer
+```
+
+The pre-wrapper may only resolve/verify immutable inputs and, with later
+authority, establish exact compatibility copies. The post-wrapper may only
+publish a fully closed finite group and verify its receipt. Neither wrapper may
+change a producer environment, command, cwd, stdout, stderr, status, timing,
+counter, channel presence/exclusivity, output, comparison, or equality rule.
+Wrapper failure stops before the next semantic producer. Publication failure
+does not rerun the producer.
+
+No executable wrapper can be emitted with the frozen CLI. Therefore no
+composed stream exists and no composed hash may be invented:
+
+```text
+canonical_semantic_body_sha256=9fecf6990636f2bf4b7a325e951260a4ce7ee34964aedd739d2f6aa3a7e53a18
+coverage_semantic_body_sha256=e8a1871bf46f50ef0533062a9af068724a56dddc71d433b5c4514fb8c2d70b2e
+canonical_semantic_body_change=none
+coverage_semantic_body_change=none
+canonical_durability_wrapper_sha256=WITHHELD_MISSING_CLI_SURFACE
+coverage_durability_wrapper_sha256=WITHHELD_MISSING_CLI_SURFACE
+canonical_composed_stream_sha256=WITHHELD_MISSING_CLI_SURFACE
+coverage_composed_stream_sha256=WITHHELD_MISSING_CLI_SURFACE
+```
+
+This is the required hash-change record: semantic-body hashes remain frozen;
+wrapper and composed hashes are not defined because defining an executable
+wrapper would require invented syntax. A later contract amendment must record
+exact wrapper and composed hashes after, and only after, the missing
+capabilities are implemented and accepted.
+
+The only Bash text newly specified by INBOX-196 is the fail-closed placeholder
+below. It is not a validation command and cannot authorize execution:
+
+```bash
+printf '%s\n' \
+  'BLOCKED: frozen artifact CLI lacks v3 resolver/materializer/publisher/verifier surfaces' >&2
+exit 125
+```
+
+### 19.8 Acyclic producer/publication DAG and terminal closure
+
+The finite DAG is:
+
+```text
+A0 accepted-manifest-pair + frozen-registration + capacity
+  -> A1 resolve-and-verify accepted inputs
+  -> A2 optional authorized compatibility establishment
+  -> C0 external preflight group
+  -> C1 protected canonical/source creation [separate explicit permission]
+  -> C2 canonical build/cache
+  -> C3 canonical artifact group
+  -> C4 canonical repetitions 1..3
+  -> C5 canonical accepted.ll and successful-subset groups
+  -> C6 canonical comparisons/identities/final groups
+  -> V0 resolve-and-verify coverage bundle and canonical accepted.ll
+  -> V1 protected coverage/source creation [separate explicit permission]
+  -> V2 coverage build/artifact/reference
+  -> V3 observation-off
+  -> V4 observation-on
+  -> V5 coverage comparisons/counters/final groups
+  -> T0 durability-terminal ledger
+```
+
+For every closed semantic group `G`, an optional post-wrapper publication node
+`P(G)` depends on `G`; its verification node `Q(G)` depends on `P(G)`.
+Downstream semantic consumers depend on `Q(G)` when they require durable
+resolution. Neither `P(G)` nor `Q(G)` is a member of `G`. The publication
+command, environment, stdout, stderr, status, receipt, and verification result
+are members of the distinct finite `publication/<group-id>` evidence group.
+That evidence group is listed once in `T0`; it is never published. `T0` has no
+publisher, receipt, verifier, or successor and therefore terminates without
+recursion.
+
+Edges always move from a lower numbered canonical/coverage node to a higher
+numbered node. `P(G)` and `Q(G)` point only forward to a consumer or `T0`.
+Protected source nodes are Git control dependencies, never children of an
+artifact publication node. No publication group contains itself, its own
+publication evidence, or `T0`. This closes the DAG finitely.
+
+### 19.9 Frozen-tool CLI surface audit and structural blocker
+
+Static inspection of frozen tool
+`94dfc1fc27ffe1268eb02453bcac1a3634aa11af38d0c94fbaa3b43decd25859`
+found exactly these command forms:
+
+```text
+zllvm-artifact-store resolve-authority
+zllvm-artifact-store materialize-spec plan docs/evidence/inbox194_calls_canonical_source_spec_v1.tsv
+zllvm-artifact-store materialize-spec publish docs/evidence/inbox194_calls_canonical_source_spec_v1.tsv
+```
+
+`resolve-authority` returns only the authority root. `materialize-spec` rejects
+any specification path other than the frozen canonical source specification;
+`plan` only renders its proposed generation; `publish` only performs the
+accepted generation-1 canonical-source publication. Internal `Store` methods
+are not a contract-visible command or API and cannot be called by a future
+shell stream.
+
+The following required surfaces are absent:
+
+| Required capability | Exact missing command/API surface | Consequence |
+|---|---|---|
+| logical-ID resolver | no CLI accepting an accepted manifest plus one logical ID and returning/verifying its unique active object or snapshot identity | accepted inputs cannot be resolved under the sole-authority rule |
+| compatibility materializer | no CLI accepting a resolved identity and separately authorized destination with atomic no-overwrite/no-follow verification | historical `tmp/` paths cannot be established or accepted by durability wrappers |
+| future-output publisher | no CLI accepting a finite closed future-output group, publishing objects/snapshot, and atomically creating a later generation without rewriting generation 1 | no canonical or coverage output group can become authoritative |
+| standalone verifier | no CLI verifying an existing generation manifest, object, snapshot, constituent, complete member set, registration boundary, and final compatibility result without publication | preflight, postpublication, and later-consumer verification cannot be expressed |
+
+The existing `materialize-spec publish` command is not any of these surfaces
+and must not be repurposed. Invented flags, subcommands, shell access to store
+internals, direct object-path reads, and ad hoc manifest parsers are prohibited.
+
+Therefore:
+
+```text
+mapping=COMPLETE
+accepted_logical_refs=19
+accepted_snapshots=2
+protected_source_paths=2_EXCLUDED
+future_output_families=FINITE_FUTURE_REQUIRED_ONLY
+producer_publication_DAG=FINITE_ACYCLIC
+terminal_evidence=FINITE_NONRECURSIVE
+artifact_authority=TRACKED_LIVE_PLUS_GENERATION_MANIFEST_ONLY
+frozen_cli_surface=INSUFFICIENT
+structural_blockers=4
+durability_wrappers=NOT_DEFINED
+contract_acceptance=WITHHELD_STRUCTURAL_BLOCKER
+validation_v3=NOT_AUTHORIZED_OR_RUN
+```
+
+### 19.10 Static/read-only closure record
+
+INBOX-196 permits only static/read-only contract checks. The check set is:
+
+1. the pre-amendment contract is a byte-exact prefix of this file;
+2. this amendment names all 19 active logical references and both accepted
+   snapshots;
+3. every path family in contract sections 7.2 and 7.3 and accepted audit
+   section 12 maps to exactly one finite row above, or is an explicitly invalid
+   unlisted path;
+4. no exhausted-attempt path occurs in any executable amendment block;
+5. both protected source paths occur only as protected Git control rows and
+   never as logical IDs, objects, snapshots, resolver inputs, publishers, or
+   compatibility destinations;
+6. the tracked/live and generation manifests are the sole authority;
+7. every DAG edge is forward, publication evidence is disjoint from the group
+   it describes, and terminal evidence is not published;
+8. the frozen CLI audit is limited to source inspection and records all
+   missing surfaces without invented syntax;
+9. the sole new Bash block parses successfully and exits closed before any
+   semantic body; and
+10. only this contract differs from the operating commit.
+
+The performed static checks recorded:
+
+```text
+operating_head=bd8c67029041921f26dc4d92b504862e6d203c96
+operating_parent=a22f027081cf491969c7448ad80dae4d6e54c67e
+pre_amendment_contract_bytes=168785
+pre_amendment_contract_sha256=448482a91a47f00cfd0c0e89d73c5c7332a49beb21906e529914913491f383ba
+pre_amendment_prefix_cmp_status=0
+tracked_live_manifest_sha256=61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d
+frozen_tool_sha256=94dfc1fc27ffe1268eb02453bcac1a3634aa11af38d0c94fbaa3b43decd25859
+active_manifest_vs_mapping_diff=empty
+snapshot_manifest_vs_mapping_diff=empty
+active_logical_reference_rows=19
+accepted_snapshot_rows=2
+namespace_and_protected_control_rows=6
+future_output_family_rows=27
+mapping_rows_with_wrong_column_count=0
+protected_source_rows=2
+missing_CLI_surface_rows=4
+amendment_executable_v1_v2_path_references=0
+amendment_bash_syntax_status=0
+diff_check_status=0
+changed_tracked_paths=1
+changed_tracked_path=docs/evidence/inbox187_o2_compiler_rt_v1_baseline_validation_execution_contract.md
+```
+
+No project code, artifact tool, resolver, publisher, compatibility writer,
+validation, registered-worktree command, gate, performance, cleanup, wiring,
+store/manifest/path/pin/source/tool/namespace mutation, ratchet action,
+checkpoint action, or credit action ran in INBOX-196.
+
+```text
+INBOX_196=STATIC_DURABILITY_AUTHORITY_AMENDMENT_COMPLETE
+contract_acceptance=WITHHELD_STRUCTURAL_BLOCKER
+v1_v2_evidence=UNCHANGED_EXHAUSTED
+v3_execution=UNAUTHORIZED
+production=UNCHANGED_DORMANT
+ratchet=131
+next=STOP_FOR_WATCHER_REVIEWER_CONTRACT_REVIEW
+```
