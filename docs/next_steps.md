@@ -24,7 +24,96 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-194B pinned no-follow diagnostic correction and one logged continuation — AUTHORIZED
+## INBOX-194C source-mode versus immutable-object-mode correction and one logged continuation — AUTHORIZED
+
+INBOX-194B at unchanged HEAD `f97e2ee2` is accepted only as a compliant
+retain-and-stop. Neither implementation nor protocol acceptance is granted:
+the first publish exposed an incorrect mode model, the CLI did not complete,
+and the required separate stdout/stderr records are absent. Do not synthesize
+those missing records.
+
+Preserve the complete partial INBOX-194B store and every INBOX-194/194A/194B
+record exactly. The retained INBOX-194B root is mode 0775 and contains only
+one mode-0444 accepted-cohort object with SHA-256 `d8da86ca...`; its inventory
+SHA-256 is `afc51246...`. Preserve the complete INBOX-194A root and exact
+symlink. The INBOX-194 root, real store, and v3 namespace remain absent.
+
+Correct the mode model without changing artifact content or publication
+authority:
+
+- rename the canonical source-specification field `mode` to `source_mode`,
+  preserving every existing value and all other field order and semantics;
+- verify each audited source against `source_mode` without chmod or mutation;
+- require every immutable artifact object, constituent object,
+  snapshot-member, and snapshot row to use store mode 0444;
+- allow a logical-reference row to retain its reviewed `source_mode` solely as
+  future compatibility metadata; and
+- require each logical reference to resolve through `target_id` to the exact
+  object key, SHA-256, byte count, and media identity. Only its reviewed mode
+  may differ. Object rows with any non-0444 mode remain invalid.
+
+Recompute every identity actually derived from immutable object-mode metadata.
+Preserve source/group identities only where their canonical inputs truly
+exclude the changed object mode. Require production-generated proposed output
+to equal the tracked proposed fragment byte-for-byte. Add focused coverage for
+a mode-0664 source becoming a mode-0444 object while retaining logical mode
+0664, plus negative logical-reference hash, byte, key, media, and target
+mismatches. Preserve all existing object-mode mismatch coverage. Add no
+compatibility writer.
+
+Use only the initially absent, canonical, worktree-disjoint continuation root:
+
+`/home/oleg/prog/z_llvm-inbox194c-artifact-store-synthetic`.
+
+Use a fresh record namespace beneath
+`tmp/inbox194c_o2_artifact_store_cli_dormant/validation/`. The sole
+orchestration must be invoked by a pipeline-free wrapper with no inherited
+shell state. It must freeze the exact command and closed environment before
+execution and retain separate stdout, separate stderr, and numeric status even
+on failure.
+
+Run formatting/static/compile-only checks first, then exactly one fully
+recorded orchestration. No component may be retried, substituted, or invoked
+independently. Before and after every phase, verify the absent INBOX-194 and
+real-store paths, exact retained INBOX-194A symlink state, and exact partial
+INBOX-194B inventory/object/records.
+
+Failure retains the complete INBOX-194C root, records, and patch and stops
+without diagnosis, repair, cleanup, commit, alternate command, or fix-forward.
+Complete success alone may remove only the reverified INBOX-194C root,
+preserves both failed roots and all earlier state, records all four attempt
+ledgers, commits only the bounded tool, amended specification, generated-equal
+proposed fragment, and evidence, and stops for review.
+
+The retained dispatch ledger is:
+
+```text
+HEAD=f97e2ee2163362d8e972a72caf4600fee56aa879
+tools/zllvm_artifact_store.zig=modified,3802_lines,148283_bytes,sha256:8ed1440f984337d5e594d561ce61f36aed5feb6cadd7073b3f4d660ee9aef886
+docs/evidence/inbox194_calls_canonical_source_spec_v1.tsv=untracked,21_lines,14410_bytes,sha256:0cccda72e172c09cdb8baade7269c23727b17533f517505829528d15076b5e3d
+docs/evidence/inbox194_calls_proposed_live_manifest_v1.tsv=untracked,37_lines,13743_bytes,sha256:9634b973f452c86e5575e721ca1b09c6151363f29bb95f803c07db8ae638a54a
+inbox194_root=absent
+inbox194a_root=retained_mode_0775_exact_symlink_authority-symlink_to_dot
+inbox194b_root=retained_mode_0775_one_mode_0444_object_d8da86ca
+inbox194b_inventory_sha256=afc512463fb1763f812f943ff1d48535d858369ae724ec82a49af7f0eab39710
+inbox194b_record_ledger_sha256=9f7396d0799ca08d12601e88176df55aa62cef436a04b1f8a09c5a1ac5fb0a4c
+inbox194b_command_sha256=8747f428021eedc92d8fff006111db7cdc0890c4d362dbe72910684ad455eef2
+inbox194b_environment_sha256=bbf2299a100f0e4e78176a14cef88989c7542c6cec0266a8372a0f90e5e83a2a
+inbox194b_stdout=absent_protocol_failure_do_not_synthesize
+inbox194b_stderr=absent_protocol_failure_do_not_synthesize
+inbox194b_status_sha256=4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865
+registration_before_sha256=02828c20624bb8e8df094d88eeac152cc08c2bcb671506bf350f68bdb09147b3
+real_store=absent
+v3=absent
+```
+
+All existing infrastructure identities, protected-worktree rules, pins,
+contracts except this explicit mode-field clarification, calls sequence,
+mandatory post-calls checkpoint, and ratchet 131 remain unchanged. No real
+publication, live rows, compatibility copies, v3 work, cleanup, wiring,
+performance, Tier work, ratchet movement, or credit is authorized.
+
+## INBOX-194B pinned no-follow diagnostic correction and one logged continuation — COMPLIANT RETAIN-AND-STOP; IMPLEMENTATION AND PROTOCOL WITHHELD
 
 INBOX-194A at unchanged HEAD `aefdae5d` is accepted only as a compliant
 retain-and-stop. Its sole continuation orchestration stopped in the first unit
