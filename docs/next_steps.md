@@ -24,7 +24,133 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AQ SHA-literal-safe keyed derivation and invocation-atomic audit closure — AUTHORIZED
+## INBOX-206AR exact-serializer-bound keyed derivation and invocation-atomic audit closure — AUTHORIZED
+
+INBOX-206AQ is accepted only as a compliant fail-closed preconstruction
+stop. Credit is limited to its 50 independent SHA-256 syntax gates and its
+passed operating/protected-state, AK-structure, AK-paths, and corrected
+AK-inventory gates. It receives no ledger, snapshot, per-row, AN/AO replay,
+construction, D01, marker, implementation, execution, ratchet, credit, or
+downstream acceptance. Preserve AP/AQ absent; never rerun either.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206AQ stopped fail-closed at the independent AK ledger serializer gate.
+
+Passed beforehand:
+
+- All 50 expected SHA-256 syntax gates
+- Operating/protected-state gate
+- AK structure gate
+- AK paths serializer
+- Corrected AK inventory serializer
+
+The AK ledger command returned status 1 before its success marker. Per directive, I performed no inspection, diagnosis, repair, retry, cleanup, creation, or later work. AQ remains absent; no repository or retained-root changes were made.
+```
+
+Static review ran no project/Zig code. Clean authority was
+`b6d6d52fb65af22bfa2edd50c24e0f0a8f8930a4`, parent
+`02740b320c9b2fa14e6e430f09af3e94bbe22474`, tree
+`420c5ac4f25963086503d1555d7d50f93ee6ae08`, sole
+`docs/next_steps.md`, and inbox
+`b4b1c2589b7964bdbe45918aa5e116badf3cbcf63a93735e8bff17e539d4f365`.
+Source/index/control were clean; AK/AN/AO and protected state were exact;
+AP/AQ were absent; retained logs show no later Worker command.
+
+AQ used the AN/AO compact ledger, which yields
+`6a2b21e508dd23338f2b3d45ac91116ec03b756aede55e5c56619094d3368954`,
+instead of AK's field-rich `sha256/bytes/mode/path` serializer, which yields
+`66381fec1e01d925b08cc6356a366c15f398d34c18321c183993c1602d8c871f`.
+This is prohibited serializer substitution, not AK drift.
+
+Reviewer dialogue is preserved verbatim:
+
+```text
+I explicitly accept INBOX-206AQ only as a compliant fail-closed preconstruction stop. Credit is limited to the 50 syntax gates and the passed operating, AK-structure, paths, and corrected-inventory gates. Preserve AP/AQ absent; no ledger, snapshot, AN/AO replay, D01, marker, or downstream credit is granted.
+
+I authorize fresh evidence-only INBOX-206AR with these refinements:
+
+- Commit only docs/next_steps.md as a non-merge child of b6d6d52f…; update the ignored inbox separately and bind the final full HEAD/tree/inbox hashes.
+- Freeze a complete canonical serializer-binding table before dispatch: root, label, exact command-byte hash, output schema, expected output hash, and expected row count.
+- Independently gate table completeness, unique (root,label) keys, literal validity, and command-byte identities.
+- Do not execute table content through eval or another generated-command mechanism. Invoke fixed literal read-only commands whose bytes independently match the table.
+- Use only AK’s field-rich NUL-sorted ledger emitting sha256<TAB>bytes<TAB>mode<TAB>relative_path<LF>; AN/AO retain their separately bound compact serializers.
+- Replay AK paths, inventory, ledger, snapshot, and each snapshot/ledger row before any AN/AO replay.
+- Then replay AN and AO serializers and per-file identities independently. No root may inherit or substitute another root’s serializer.
+- Only complete replay permits the previously approved keyed derivation and invocation-atomic closure.
+
+The first failure preserves AR absent or exactly partial and stops without diagnosis, retry, repair, or fix-forward. AUDIT_COMPLETE remains final and audit-only with implementation_ready=false and execution_authority=none. All implementation, Zig/build/install, execution, validation, registered-worktree access, ratchet, credit, production-AWK, D02, and downstream prohibitions remain unchanged.
+```
+
+Create one non-merge commit changing only this file, with parent exactly
+`b6d6d52fb65af22bfa2edd50c24e0f0a8f8930a4`. Update only ignored
+`docs/worker_inbox.md`; its final SHA-256 is
+`141e6dbef26a39eb8ba90b71e12b28684728d0ed3740375c214e5affe51d3bc8`. Bind
+dispatch to final full commit, parent, tree, sole path, and inbox identity.
+
+Preserve AK/AN/AO byte-for-byte and AP/AQ absent. Create only fresh absent,
+non-symlink `continuations/inbox206ar`. Before dispatch, the Watcher froze
+this complete canonical serializer binding. Each `command_sha256` hashes
+the corresponding exact one-line command below plus one terminating LF;
+each `output_sha256` hashes raw stdout:
+
+```text
+root label command_sha256 output_schema rows output_sha256
+AK AK_PATHS 7d18b9913ebb3deaa26c2dd14e4b6c68a2a2138b3641a08b7e9a8153360473dc relative_path<LF> 20 5a3ecb77f8a3b4e49ace3b997f5d9885147f0eece263a5a3500097ebde28b0b0
+AK AK_INVENTORY f799e88c448cf9b2534667db3dc46a72c8bafbcd5f8c6a07c1869c183678b5ff relative_path<TAB>type<TAB>mode<TAB>bytes<TAB>link_target<LF> 20 3017c5c7041e6220b90a90d9136c5f83db8244cce10e1d3508d8bd85d0fef4ac
+AK AK_LEDGER 5158492edcb57b3866d82d0548f0893b71533c03e2f7fc0fdb75ae2b59b12e1e sha256<TAB>bytes<TAB>mode<TAB>relative_path<LF> 20 66381fec1e01d925b08cc6356a366c15f398d34c18321c183993c1602d8c871f
+AK AK_SNAPSHOT_PATHS 5827e8008d89f35a4bbfcac00def6c8894d96376582c8ae410d48f7bd4ffc12b relative_path<LF> 16 220d91ce9ddd56085e798133c8dd20deb7d3d43686280e805dd4a27f7d490968
+AK AK_SNAPSHOT_INVENTORY 2642d18745a72c434e42e2ae4e37f59779a4dd9195a60d40a9aea883fa19a617 relative_path<TAB>type<TAB>mode<TAB>bytes<TAB>link_target<LF> 16 41f48034450c97ea4554cf7f35841550e1a8beefc8d0bc1303592070a17fdae3
+AK AK_SNAPSHOT_LEDGER 8ce155f69a807b146dc073cd314c5ccd42f90414d24f38df8bbf14aba6e1d148 sha256<TAB>bytes<TAB>mode<TAB>relative_path<LF> 16 008b8f5a4bbdc7e5f6812bb67518dff27fa6d5f58333ccf9d975bca09f449f3e
+AN AN_PATHS 7b7ff2a2a3aa5f5ed86a02fee2b97ecd30a968b5221000771ac093101f72631f relative_path<LF> 7 2f3fd17af4e93b4ed5cf3e1f1242911f1980c89e2a7a514917ba6e8bf24f2176
+AN AN_INVENTORY 69097c2f64875c6c64236eecccc151266060933a7d31522c4771120980535f3d relative_path<TAB>type<TAB>mode<TAB>bytes<TAB>link_target<LF> 7 345850df1b03135a3250a97e40b807088d0f987fa494e3b6c6f6dc9b6aaf14bf
+AN AN_LEDGER e1151f433ad0b2c5bbf023d75089ead5440b6ffdf99dcbcaaec3682f9c6a79be sha256sum_compact_line<LF> 7 3686e5c196333c1930dc16c559a063f000d06ee70979f781c472ba4bd5f6bbc7
+AO AO_PATHS d978e5e3cc1fbe07ee8423670d94f7619fac90c8e8c34f1dbde8c7e1ad87c0fe relative_path<LF> 7 2f3fd17af4e93b4ed5cf3e1f1242911f1980c89e2a7a514917ba6e8bf24f2176
+AO AO_INVENTORY 5d101b222967985941bc1327509eb631c7b662fb964ddc1ee445946de6f0cffe relative_path<TAB>type<TAB>mode<TAB>bytes<TAB>link_target<LF> 7 0fee66c06d7876e4a1da58193286a8118d4b1e821ca514bf0cc47be1840daeec
+AO AO_LEDGER a2e026937f2121fcce12c330997193feb49b6e5f8e7fb1600dbbf519bd55c297 sha256sum_compact_line<LF> 7 2d019f3a2cd720410e760a1ee4307ec098dba9d2c1371d618e7eb8822f3febea
+```
+
+Exact command bytes, excluding the label prefix and `=`, are:
+
+```text
+AK_PATHS=find -P /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak -mindepth 1 -maxdepth 1 -printf '%P\n' | LC_ALL=C sort
+AK_INVENTORY=find -P /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak -mindepth 1 -maxdepth 1 -printf '%P\t%y\t%m\t%s\t%l\n' | LC_ALL=C sort
+AK_LEDGER=find -P /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak -mindepth 1 -maxdepth 1 -type f -printf '%P\0' | LC_ALL=C sort -z | while IFS= read -r -d '' rel; do sha=$(sha256sum "/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak/$rel" | cut -d ' ' -f 1); bytes=$(stat -c '%s' "/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak/$rel"); mode=$(stat -c '%a' "/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak/$rel"); printf '%s\t%s\t%s\t%s\n' "$sha" "$bytes" "$mode" "$rel"; done
+AK_SNAPSHOT_PATHS=find -P /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak -mindepth 1 -maxdepth 1 -type f ! -name ak_identity_ledger.tsv ! -name ak_audit_snapshot.tsv ! -name audit_gate_results.tsv ! -name audit_disposition.tsv ! -name AUDIT_COMPLETE -printf '%P\n' | LC_ALL=C sort
+AK_SNAPSHOT_INVENTORY=find -P /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak -mindepth 1 -maxdepth 1 -type f ! -name ak_identity_ledger.tsv ! -name ak_audit_snapshot.tsv ! -name audit_gate_results.tsv ! -name audit_disposition.tsv ! -name AUDIT_COMPLETE -printf '%P\t%y\t%m\t%s\t%l\n' | LC_ALL=C sort
+AK_SNAPSHOT_LEDGER=find -P /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak -mindepth 1 -maxdepth 1 -type f ! -name ak_identity_ledger.tsv ! -name ak_audit_snapshot.tsv ! -name audit_gate_results.tsv ! -name audit_disposition.tsv ! -name AUDIT_COMPLETE -printf '%P\0' | LC_ALL=C sort -z | while IFS= read -r -d '' rel; do sha=$(sha256sum "/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak/$rel" | cut -d ' ' -f 1); bytes=$(stat -c '%s' "/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak/$rel"); mode=$(stat -c '%a' "/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ak/$rel"); printf '%s\t%s\t%s\t%s\n' "$sha" "$bytes" "$mode" "$rel"; done
+AN_PATHS=cd /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206an && find . -mindepth 1 -maxdepth 1 -printf '%P\n' | LC_ALL=C sort
+AN_INVENTORY=cd /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206an && find . -mindepth 1 -maxdepth 1 -printf '%P\t%y\t%m\t%s\t%l\n' | LC_ALL=C sort
+AN_LEDGER=cd /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206an && find . -mindepth 1 -maxdepth 1 -type f -printf '%P\0' | LC_ALL=C sort -z | xargs -0 -r sha256sum --
+AO_PATHS=cd /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ao && find . -mindepth 1 -maxdepth 1 -printf '%P\n' | LC_ALL=C sort
+AO_INVENTORY=cd /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ao && find . -mindepth 1 -maxdepth 1 -printf '%P\t%y\t%m\t%s\t%l\n' | LC_ALL=C sort
+AO_LEDGER=cd /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ao && find . -mindepth 1 -maxdepth 1 -type f -printf '%P\0' | LC_ALL=C sort -z | xargs -0 -r sha256sum --
+```
+
+Independently gate exactly 12 complete unique bindings, every literal and
+command-byte identity, schema, count, and output. Never `eval`, source, or
+execute table text; invoke fixed literal commands matching the binding.
+
+Run AK structure, paths, inventory, field-rich ledger, snapshot serializers,
+every ledger row, and every snapshot subject/identity first. Only total AK
+success permits separately bound AN then AO paths/inventory/compact-ledger
+and per-file identities. No root may borrow another root's serializer.
+
+Only complete replay permits fresh `inbox206ar`, the approved keyed
+field/row derivation, and invocation-atomic closure. Every check is labeled,
+independently blocking, returns zero explicitly, and emits its marker only
+after its full assertion. Chained/global replacement remains prohibited.
+
+First failure leaves AR absent or exact and stops without inspection,
+diagnosis, retry, repair, cleanup, regeneration, mode change, fix-forward,
+or later command. `AUDIT_COMPLETE` is final-write/audit-only with
+`implementation_ready=false` and `execution_authority=none`. No source,
+production, Zig/build/install, execution, validation, cache, registered-
+worktree access, ratchet, credit, production AWK, D02, or downstream action.
+Do not access `.claude/settings.local.json`.
+
+## INBOX-206AQ SHA-literal-safe keyed derivation and invocation-atomic audit closure — COMPLIANT FAIL-CLOSED PRECONSTRUCTION STOP; SUPERSEDED BY INBOX-206AR
 
 INBOX-206AP is accepted only as a compliant fail-closed preconstruction
 stop. Its operating, AK-structure, and AK-path gates receive evidence credit
