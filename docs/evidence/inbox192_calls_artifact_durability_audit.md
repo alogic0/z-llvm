@@ -1,15 +1,21 @@
 # INBOX-192 calls artifact durability audit
 
-Status: evidence and design audit only. No artifact store, object, archive,
-snapshot, manifest implementation, resolver, publisher, compatibility copy, or
-pin was created. No current artifact, path, mode, pin, contract, source, tool,
+Status: INBOX-192A registered-worktree exclusion recount. INBOX-192 is
+accepted only as a compliant read-only stop; its original artifact scope,
+identities, arithmetic, and capacity record are superseded by this amendment.
+No artifact store, object, archive, snapshot, manifest implementation,
+resolver, publisher, compatibility copy, or pin was created. No current
+artifact, registered worktree, path, mode, pin, contract, source, tool,
 protocol, identity, calls sequence, checkpoint, or ratchet was changed.
 
 ## 1. Scope and starting boundary
 
-The read-only audit started from clean tracked operating commit
-`bce22f9e503347eac14425215f80c27eb959db7a`, immediately above accepted
-INBOX-191 commit `b510d277f0e4dcd86a9a362030549af498edea52`.
+The INBOX-192A read-only amendment started from clean tracked operating commit
+`5e782f0abdad31ad7efcff14acb8a9c26437bd1c`, immediately above accepted
+compliant-stop INBOX-192 commit
+`742260643621cc80481683546911c2c0aaa2f4f4`. The INBOX-192 underlying
+artifact observations were made from its recorded clean boundary; INBOX-192A
+recounted only eligible non-worktree content under the standing exclusion.
 The accepted validation contract and complete future streams remain:
 
 ```text
@@ -19,6 +25,7 @@ coverage_stream_sha256=e8a1871bf46f50ef0533062a9af068724a56dddc71d433b5c4514fb8c
 source_commit=43de59b06ca3a687368bfaf0595c5759c8ab3a57
 source_tree=d56a8d1aad6c8c80b9106fa3ee9bf8b10630fc2f
 production_tools_build_diff_from_source_commit=empty
+accepted_inbox192_document_sha256=393516965d1129b3d269173d88cccd7f240c895926460b2b068da3d352264404
 ratchet=131
 ```
 
@@ -43,6 +50,120 @@ Validation-v1 and validation-v2 remain exhausted immutable evidence.
 Validation-v3 remains blocked and unexecuted. The mandatory post-calls
 checkpoint remains future-only.
 
+### 1.1 Standing registered-worktree protection
+
+The controlling user rule is fail-closed:
+
+> No registered Git worktree or its directory may be deleted, removed,
+> pruned, relocated, repaired, normalized, cleaned, materialized over, or
+> otherwise modified without explicit user permission naming each specific
+> affected path. Watcher/Reviewer agreement is insufficient. Every registered
+> worktree and its complete directory tree is excluded from artifact
+> discovery, traversal, hashing, totals, classification, objects, snapshots,
+> manifests, publication, resolution, compatibility materialization,
+> migration, cleanup, deletion, and retirement. Read-only registration
+> metadata is permitted. “Prune” means calculation-only exclusion, never a
+> Git command or filesystem operation.
+
+The exact start-time registration record is:
+
+```text
+registered_worktrees=43
+under_repository_tmp=33
+under_/tmp=8
+elsewhere_including_main=2
+historical_full_porcelain_sha256_at_74226064=473f97cecd31ec4dd16ebc09b7ba9a1dce42f1c2489a148d5c70536b578c180c
+start_full_porcelain_sha256_at_5e782f0a=40fd5306d9df8c5454e23d49f09dccddc018f8281338b4c20b28d3036a0d37de
+stable_path_list_sha256=f31d8542baafc7b64cd5ee6fe8cc4194842ca696b97a7ffc8df06ce12d553d7e
+stable_path_topology_sha256=6c868e3b6d436cfba92a1e2b21dbd616391763961f1cba9b6670b1ed4a6ebb62
+non_main_registration_records_sha256=ebc30a376b3db4c6fbf788f49ea85f4ce792471e539c0a89308068efdf96ebbe
+```
+
+The stable path hash is over the path value from each `worktree` line in
+porcelain order. The stable topology hash is over those path values plus the
+unchanged `branch`, `detached`, `locked`, and `prunable` lines, omitting HEAD
+lines and blank lines. There are no `locked` or `prunable` records. Replacing
+only the main record’s start-time HEAD with
+`742260643621cc80481683546911c2c0aaa2f4f4` reproduces the historical full
+hash exactly. Thus the sole registration change is the authorized main HEAD
+advance to `5e782f0abdad31ad7efcff14acb8a9c26437bd1c`; every non-main path, HEAD,
+branch/detached state, and registration-extra record is exact.
+
+The later main HEAD advance caused by committing INBOX-192A is expected and
+does not create a recursive self-hash requirement.
+
+### 1.2 Exact 43-path registration inventory
+
+`extras=none` means the porcelain record has neither `locked` nor `prunable`.
+This table is registration metadata only. No listed directory was entered,
+statted, hashed, inspected, or classified as artifact content during the
+INBOX-192A recount.
+
+| # | Registered path | HEAD | State | Extras |
+|---:|---|---|---|---|
+| 1 | `/home/oleg/prog/z_llvm` | `5e782f0abdad31ad7efcff14acb8a9c26437bd1c` | branch `refs/heads/x86_64-codegen-expanded-frontier` | none |
+| 2 | `/home/oleg/prog/z_llvm/tmp/inbox100_base_tree` | `2b9ec55859135aa25ea41dd12c82a44c0634318e` | detached | none |
+| 3 | `/home/oleg/prog/z_llvm/tmp/inbox102_base_tree` | `0ef5a3247ff18c72f8e286eed82879697b5dbed5` | detached | none |
+| 4 | `/home/oleg/prog/z_llvm/tmp/inbox112_icmp_scratch_perf/worktrees/A` | `bd223c83c30ee865450d5a54d6dfb8fa5afa2bfc` | detached | none |
+| 5 | `/home/oleg/prog/z_llvm/tmp/inbox114_icmp_scratch_perf/worktrees/A` | `d6d9efc82360819db9653dc059c58f809b738f7c` | detached | none |
+| 6 | `/home/oleg/prog/z_llvm/tmp/inbox116_icmp_scratch_perf/worktrees/A` | `ffd716431686e836bb2249131c50c90f9ccfe479` | detached | none |
+| 7 | `/home/oleg/prog/z_llvm/tmp/inbox116_icmp_scratch_perf/worktrees/B` | `ffd716431686e836bb2249131c50c90f9ccfe479` | detached | none |
+| 8 | `/home/oleg/prog/z_llvm/tmp/inbox118_icmp_eq0_perf/worktrees/A` | `aa4305917ad4a2cd0496bf0a67ffe3f74683a5a8` | detached | none |
+| 9 | `/home/oleg/prog/z_llvm/tmp/inbox118_icmp_eq0_perf/worktrees/B` | `aa4305917ad4a2cd0496bf0a67ffe3f74683a5a8` | detached | none |
+| 10 | `/home/oleg/prog/z_llvm/tmp/inbox120_icmp_setcc_perf/worktrees/A` | `ba3967f674013a26ed107f1110158626244c2e87` | detached | none |
+| 11 | `/home/oleg/prog/z_llvm/tmp/inbox120_icmp_setcc_perf/worktrees/B` | `ba3967f674013a26ed107f1110158626244c2e87` | detached | none |
+| 12 | `/home/oleg/prog/z_llvm/tmp/inbox122_icmp_signbit_perf/worktrees/A` | `c7ff1984a742015728fedb2fb7f94b8afcd705ee` | detached | none |
+| 13 | `/home/oleg/prog/z_llvm/tmp/inbox122_icmp_signbit_perf/worktrees/B` | `c7ff1984a742015728fedb2fb7f94b8afcd705ee` | detached | none |
+| 14 | `/home/oleg/prog/z_llvm/tmp/inbox124_icmp_pair_perf/worktrees/A` | `72981e88a8de03438a04c0c05c8a0896deac4c5a` | detached | none |
+| 15 | `/home/oleg/prog/z_llvm/tmp/inbox128_o2_r1/worktrees/B` | `80198d402f5ce0168b6b2db366d93e22c534e688` | detached | none |
+| 16 | `/home/oleg/prog/z_llvm/tmp/inbox128_r0_worktree` | `4c0a69f730975fed988274c4f54e434676e94b1e` | detached | none |
+| 17 | `/home/oleg/prog/z_llvm/tmp/inbox133_cast_wiring/perf/worktrees/A` | `83110e82d1cb973d5e299357351890f462959a0b` | detached | none |
+| 18 | `/home/oleg/prog/z_llvm/tmp/inbox133_cast_wiring/perf/worktrees/B` | `3d829cd4f353e2a86a28648a62296a290b681e95` | detached | none |
+| 19 | `/home/oleg/prog/z_llvm/tmp/inbox135_immediate_wiring/baseline_tree` | `49fcc04dde83f947513e6869cf4556f3b4155524` | detached | none |
+| 20 | `/home/oleg/prog/z_llvm/tmp/inbox152_o2_scalar_named_wiring/perf/worktree_A` | `eb1ad794fe243613b6dce4f4fff4d297e08088a7` | detached | none |
+| 21 | `/home/oleg/prog/z_llvm/tmp/inbox152_o2_scalar_named_wiring/perf/worktree_B` | `e048ff5cb7818f0b1e99d6971b9542562ffcf086` | detached | none |
+| 22 | `/home/oleg/prog/z_llvm/tmp/inbox157_o2_scalar_named_wiring2/perf/worktree_A` | `16222bf2c67a7918655b23e27e26fc691e3ca8c2` | detached | none |
+| 23 | `/home/oleg/prog/z_llvm/tmp/inbox157_o2_scalar_named_wiring2/perf/worktree_B` | `6b478652108ee431acb2ffdc216c7d383c0c0794` | detached | none |
+| 24 | `/home/oleg/prog/z_llvm/tmp/inbox160_o2_b07_wiring/perf/worktree_A` | `ee2ac4d7a56d811484cd6b9c6bb99ba1d4b936db` | detached | none |
+| 25 | `/home/oleg/prog/z_llvm/tmp/inbox160_o2_b07_wiring/perf/worktree_B` | `19c4c3b86a0f604cb5e566b4a776c95843fdcce0` | detached | none |
+| 26 | `/home/oleg/prog/z_llvm/tmp/inbox166_o2_m64_wiring/perf/worktree_A` | `842a8a224b3545f221a0a6f009f79f69b181bc87` | detached | none |
+| 27 | `/home/oleg/prog/z_llvm/tmp/inbox166_o2_m64_wiring/perf/worktree_B` | `50acec11e5fc257a6add7e74646237f64ccbdd7d` | detached | none |
+| 28 | `/home/oleg/prog/z_llvm/tmp/inbox172_o2_quotient_wiring/perf/worktree_A` | `7af7f0700d0abf976f1e63ead29217b095f11934` | detached | none |
+| 29 | `/home/oleg/prog/z_llvm/tmp/inbox172_o2_quotient_wiring/perf/worktree_B` | `dc96b63d7ef25e651f0dc16d9df3309c9371871f` | detached | none |
+| 30 | `/home/oleg/prog/z_llvm/tmp/inbox74_commit5_fma_diagnosis/commit4_tree` | `6b74acea13ada849787eae221ea05b15345dafb0` | detached | none |
+| 31 | `/home/oleg/prog/z_llvm/tmp/inbox77_scalar_reconstruction` | `b0873b5b087c9e0e54342ba0715a4345a311f6d2` | branch `refs/heads/scratch/inbox77-scalar-reconstruction` | none |
+| 32 | `/home/oleg/prog/z_llvm/tmp/inbox78_accepted5c_tree` | `4cb867b5737fd6d95ac662eab8e1af16a9114dcc` | detached | none |
+| 33 | `/home/oleg/prog/z_llvm/tmp/inbox78_call_results` | `697c3bd4c443367247a7092425e606def7d56bea` | branch `refs/heads/scratch/inbox78-call-results` | none |
+| 34 | `/home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/canonical/source` | `43de59b06ca3a687368bfaf0595c5759c8ab3a57` | detached | none |
+| 35 | `/home/oleg/prog/zllvm-inbox45-p0` | `b93e2d578bf35423488d4ac44aedd701bed83d9c` | detached | none |
+| 36 | `/tmp/z_llvm_clean_tmp_update` | `6804846c951625450eef547035243524b91f6a11` | branch `refs/heads/clean-tmp-retention-delete` | none |
+| 37 | `/tmp/zllvm-inbox104-before` | `94ab402b2c11aa6f39167dd2ad5f79734bb87fc4` | detached | none |
+| 38 | `/tmp/zllvm-inbox107-before` | `79f69f192c4c3ae3ecdf142fd609578e369acd55` | detached | none |
+| 39 | `/tmp/zllvm-inbox108-a` | `79f69f192c4c3ae3ecdf142fd609578e369acd55` | detached | none |
+| 40 | `/tmp/zllvm-inbox108-b` | `79f69f192c4c3ae3ecdf142fd609578e369acd55` | detached | none |
+| 41 | `/tmp/zllvm-inbox109-a` | `55efa5019dc0a7cc4d8cc60f0740143cc64a87f8` | detached | none |
+| 42 | `/tmp/zllvm-inbox109-b` | `55efa5019dc0a7cc4d8cc60f0740143cc64a87f8` | detached | none |
+| 43 | `/tmp/zllvm_check` | `b28210b5bb2267f520d43dd7e795bc85ea236a52` | detached | none |
+
+### 1.3 Mandatory discovery exclusion
+
+Every future audit, publisher, resolver, migration, cleanup, or retirement
+operation must obtain the registration set from the main Git common directory
+before any filesystem traversal. It must reject relative, unresolved,
+traversal-unsafe, duplicate, ambiguous, changed, or non-main-within-non-main
+nested registrations. Containment beneath the main worktree is allowed only
+where represented by the exact frozen topology; it never makes the nested
+worktree traversable. The operation must lexically exclude every exact
+registered directory and descendant before any type check, `stat`, hash, open,
+or descent. Encountering a protected path is not an artifact row and supplies
+no size, identity, or class.
+
+The registered set must stay frozen throughout the operation. Any change
+fails closed. No manifest, object, snapshot, publisher, resolver,
+compatibility copy, migration, cleanup, deletion, or retirement rule may
+target a registered path. A registration nested below an otherwise eligible
+root remains excluded.
+
 ## 2. Audit identity convention
 
 No manifest file was generated. To give bounded directories exact identities
@@ -55,11 +176,16 @@ symlink: L<TAB>relative-path<TAB>mode<TAB>link-target<LF>
 order:   LC_ALL=C bytewise ascending relative-path
 ```
 
-The selected roots contain no symlink or other special-file rows. Directory
-counts include each bounded root directory. A “manifest SHA-256” below is the
-hash of that streamed observation, not a proposed store manifest and not an
-authority. Virtual groups use the same regular-file record with the displayed
-full current path.
+The INBOX-192A recount first matched each directory entry lexically against the
+43-path registered set. A match was excluded before any type check, `stat`,
+hash, open, or descent. Only non-worktree siblings emitted records. The
+corrected selected scope contains no symlink or other special-file rows.
+Directory counts include each eligible bounded root but never a protected
+worktree root. A “manifest SHA-256” below is the hash of that streamed
+non-worktree observation, not a proposed store manifest and not an authority.
+Virtual groups use the same regular-file record with the displayed full
+current path. Every INBOX-192 parent identity that included a worktree is
+superseded.
 
 The four and only four proposed retention classes are:
 
@@ -132,9 +258,12 @@ The five component totals reconcile exactly to that envelope.
 ### 3.4 Adopted input, validation bundle, and exhausted v1/v2
 
 The top-level live pin covers `tmp/o2_calls_perf`. Its exact envelope is mode
-`0755`, 2,384 files, 124 directories, 38,281,361 bytes, manifest
-`5fa94bf8ae0e8a2ce58cda31aa07274c02e027ddba21bc1737d5032774a964bc`.
-The following disjoint logical groups reconcile exactly to it.
+`0755`, 69 files, 33 directories, 2,041,239 bytes, manifest
+`afa41ceef986f2ca39a83e9bbf99257c3e3679647f5ee2b02deab47c15673fa4`.
+The registered worktree at
+`tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/canonical/source`
+is excluded before traversal. The following disjoint non-worktree logical
+groups reconcile exactly to the corrected envelope.
 
 | Current bounded group | Exact observed state | Authority / consumers / reconstruction / consequence | Proposed authority |
 |---|---|---|---|
@@ -143,7 +272,17 @@ The following disjoint logical groups reconcile exactly to it.
 | `inbox187_baseline_validation_contract_bundle` | mode `0555`; 15 files, 3 directories, 97,645 bytes; manifest `00490ee1d69aaed9654f5d68328caa8cd4d979f01d755d3a3c05f4d0189c2462` | Accepted future aggregate-consumer/observer/guard bundle. Consumers are future v3 coverage build/apply-check only. Git may contain source patches, but the sealed accepted bundle and its proof are the reviewed authority. | `calls/input/validation-v3/coverage-bundle/v1`; primary `calls-validation-inputs`; snapshot `snapshot/calls-validation-inputs/v1`; `canonical-input` |
 | exhausted v1 preflight: eight `baseline_validation_v1.preflight.*` files | mixed exact member mode `0644`; 8 files, 7,929 bytes; virtual manifest `0c7f91efc3d1a1fae29f200076d83d2cb60b093a8d0d4f0180e3d35bb0873b8f` | INBOX-188 compliant stop. No retry or reuse. Loss erases why v1 was exhausted. | `calls/evidence/validation-v1-stop/v1`; primary `compiler-rt-v1-validation-evidence`; snapshot `snapshot/compiler-rt-v1-validation-evidence/v1`; `irreplaceable-acceptance-evidence` |
 | exhausted v2 external preflight/driver records | 18 files, 16,005 bytes, mode `0444`; virtual manifest `de51eda971576c7dab38ac866e11c408b6c18555fd67f6d087fc945d111c8030` | INBOX-190 launcher/preflight record. No retry or reuse. | `calls/evidence/validation-v2-external-stop/v1`; same primary/snapshot; `irreplaceable-acceptance-evidence` |
-| `baseline_validation_v2` | mode `0755`; 2,332 files, 119 directories, 36,243,052 bytes; manifest `cf8dde0ea07b95db623c136c981f1e725863db604616e225b48ea23f73dd0594` | Exhausted immutable v2 root. Its clean detached source is commit `43de59b0…`, tree `d56a8d1a…`; source-preflight failed before build. Exact source subtree: 2,315 files, 91 directories, 36,240,122 bytes, manifest `5c2ffa508a5b5aecd079a75307db5a42ac6b627aa7e6549d2f2eecfdec1ea1c9`. Git can recreate source content, but not the failed-attempt records or registered-root evidence. | `calls/evidence/validation-v2-stop/v1`; same primary/snapshot; `irreplaceable-acceptance-evidence` |
+| `baseline_validation_v2`, excluding registered `canonical/source` | mode `0755`; 17 files, 28 directories, 2,930 bytes; manifest `022dcdf8f12016fca01b436b367f6bfa36b946718fdc42e3ca029ad129b0a172` | Exhausted immutable v2 attempt records outside the protected source worktree. Source-preflight failed before build. The registered source is not an artifact constituent and its content supplies no count, hash, or reconstruction row. | `calls/evidence/validation-v2-stop/v1`; same primary/snapshot; `irreplaceable-acceptance-evidence` |
+
+The excluded `baseline_validation_v2/canonical/source` is protected control
+state, registered detached at commit
+`43de59b06ca3a687368bfaf0595c5759c8ab3a57` and tree
+`d56a8d1aad6c8c80b9106fa3ee9bf8b10630fc2f`. Those identities come only from
+registration and Git metadata already recorded at the boundary; its directory
+was not traversed. It belongs to none of the four retention classes, has no
+logical artifact ID, primary object, snapshot, publisher path, resolver path,
+or compatibility mapping. Later modification or removal requires explicit
+user permission naming that exact registered path.
 
 All expected v2 build, artifact, repetition, identity, coverage, restoration,
 and read-only-retention outputs remain absent. Their absence is part of the
@@ -152,32 +291,35 @@ accepted stop ledger, not missing data to fill.
 ## 4. Accepted performance evidence
 
 These are the surviving accepted performance roots. They are all unpinned and
-all are currently sole path authorities. Each includes immutable A/B artifacts
-and raw/derived timing evidence; exact samples and environmental observations
+all are currently sole path authorities for the eligible non-worktree
+constituents. Registered A/B worktrees are protected control state and are
+excluded. The remaining immutable artifacts and raw/derived timing evidence
 are not reconstructible. The tracked evidence summary provides provenance and
 commands, but a rerun would be a new experiment rather than reconstruction.
 
 | Current bounded root | Exact observed state | Proposed logical ID / primary / snapshot / class |
 |---|---|---|
-| `tmp/inbox116_icmp_scratch_perf` | mode `0775`; 4,998 files, 201 directories, 742,293,602 bytes; manifest `68d92ad153f88ef335d6cd14cd0f710927981ff3207c1068fddf2ca47e96f2c7` | `performance/accepted/inbox116`; `accepted-performance`; `snapshot/performance-inbox116/v1`; `irreplaceable-acceptance-evidence` |
-| `tmp/inbox118_icmp_eq0_perf` | mode `0775`; 4,994 files, 201 directories, 742,614,741 bytes; manifest `4001a1e8032c2fa1b9313b380e0adae0c824e7d3d43c2c173b07393d28aede99` | `performance/accepted/inbox118`; same primary; `snapshot/performance-inbox118/v1`; same class |
-| `tmp/inbox120_icmp_setcc_perf` | mode `0775`; 4,997 files, 201 directories, 743,033,240 bytes; manifest `7696a5f8f7366a3d845caddd29e80b8fe91181edf0023885a2965192b287750e` | `performance/accepted/inbox120`; same primary; `snapshot/performance-inbox120/v1`; same class |
-| `tmp/inbox122_icmp_signbit_perf` | mode `0775`; 5,002 files, 201 directories, 743,649,247 bytes; manifest `08c36107c53d50f76e299f7209e666188a5c09d2ccdc60d756fa4ff1a6fac145` | `performance/accepted/inbox122`; same primary; `snapshot/performance-inbox122/v1`; same class |
+| `tmp/inbox116_icmp_scratch_perf` | mode `0775`; 70 files, 7 directories, 182,413,714 bytes; 2 worktree roots excluded; manifest `fe62970e6cc3f95112b1e965ce18456a855b5d4d4fcd33ecc7c3dc4cfffe458f` | `performance/accepted/inbox116`; `accepted-performance`; `snapshot/performance-inbox116/v1`; `irreplaceable-acceptance-evidence` |
+| `tmp/inbox118_icmp_eq0_perf` | mode `0775`; 62 files, 7 directories, 182,490,762 bytes; 2 worktree roots excluded; manifest `11c6510995d4a90f81b773c484196b1cac0501d4d19cd60e09a75738cf261e4c` | `performance/accepted/inbox118`; same primary; `snapshot/performance-inbox118/v1`; same class |
+| `tmp/inbox120_icmp_setcc_perf` | mode `0775`; 61 files, 7 directories, 182,155,795 bytes; 2 worktree roots excluded; manifest `e4ed9260add3c36580be4876aa904d4fa5d3ca2841e1556f3c7343fb72a7d214` | `performance/accepted/inbox120`; same primary; `snapshot/performance-inbox120/v1`; same class |
+| `tmp/inbox122_icmp_signbit_perf` | mode `0775`; 62 files, 7 directories, 182,144,939 bytes; 2 worktree roots excluded; manifest `69dd61728eacf11c07fa6e1c6f3c3f64d1fcfec913f1421b39a22f3ed08135b7` | `performance/accepted/inbox122`; same primary; `snapshot/performance-inbox122/v1`; same class |
 | `tmp/inbox128_o2_r1/perf` | mode `0775`; 44 files, 6 directories, 182,489,168 bytes; manifest `c84272f8a81c0585309157953f695de822b70708f7e8e586581338ed3c85cceb` | `performance/accepted/inbox128-r1`; same primary; `snapshot/performance-inbox128/v1`; same class |
-| `tmp/inbox133_cast_wiring/perf` | mode `0775`; 5,191 files, 207 directories, 744,167,240 bytes; manifest `ed27f4576659c13ba87fe6ec88046786f7cb37129fb1817b99550d3945a66377` | `performance/accepted/inbox133`; same primary; `snapshot/performance-inbox133/v1`; same class |
-| `tmp/inbox152_o2_scalar_named_wiring/perf` | mode `0775`; 5,304 files, 208 directories, 807,737,661 bytes; manifest `e6766a943578e22e752ee661fe8c9b8a81556ee8581a4e324c8f1fb451027d4e` | `performance/accepted/inbox152`; same primary; `snapshot/performance-inbox152/v1`; same class |
-| `tmp/inbox157_o2_scalar_named_wiring2/perf` | mode `0775`; 5,316 files, 208 directories, 844,567,907 bytes; manifest `2ceb579fe7510a6ed0dda0f5aded72cdc07610c2cf14715433ed6b0a8e5beaeb` | `performance/accepted/inbox157`; same primary; `snapshot/performance-inbox157/v1`; same class |
-| `tmp/inbox160_o2_b07_wiring/perf` | mode `0775`; 5,322 files, 208 directories, 844,453,235 bytes; manifest `6530bbbd20d79a72210dd5d7dfe664df0c6ce72e6c74c262db94564dbc03a96b` | `performance/accepted/inbox160`; same primary; `snapshot/performance-inbox160/v1`; same class |
-| `tmp/inbox166_o2_m64_wiring/perf` | mode `0775`; 5,344 files, 208 directories, 836,300,198 bytes; manifest `797e8f48b32c1edd039a48e7e238ba50513e60ca0b73b765de7400907c8ff3dc` | `performance/accepted/inbox166`; same primary; `snapshot/performance-inbox166/v1`; same class |
-| `tmp/inbox172_o2_quotient_wiring/perf` | mode `0775`; 5,358 files, 208 directories, 833,211,354 bytes; manifest `b4a7e35e39ba1b8e546d3fef073b800b4a301fdfb36986eafd8a406345a7fcf1` | `performance/accepted/inbox172`; same primary; `snapshot/performance-inbox172/v1`; same class |
+| `tmp/inbox133_cast_wiring/perf` | mode `0775`; 41 files, 7 directories, 180,803,123 bytes; 2 worktree roots excluded; manifest `3ce4d1ceb4c67a66656cb90d1f5efdad909d80d2048e60942f8be838bbf9caeb` | `performance/accepted/inbox133`; same primary; `snapshot/performance-inbox133/v1`; same class |
+| `tmp/inbox152_o2_scalar_named_wiring/perf` | mode `0775`; 41 files, 6 directories, 200,994,137 bytes; 2 worktree roots excluded; manifest `925700a7271c82aef6883501409259d56d4074853a46e7eac164dc4d736dd9a6` | `performance/accepted/inbox152`; same primary; `snapshot/performance-inbox152/v1`; same class |
+| `tmp/inbox157_o2_scalar_named_wiring2/perf` | mode `0775`; 41 files, 6 directories, 213,006,890 bytes; 2 worktree roots excluded; manifest `e87ce0dc2c8996087eda287a1b415e830f9c43f344a79b821c7c9aae7f967348` | `performance/accepted/inbox157`; same primary; `snapshot/performance-inbox157/v1`; same class |
+| `tmp/inbox160_o2_b07_wiring/perf` | mode `0775`; 41 files, 6 directories, 212,872,065 bytes; 2 worktree roots excluded; manifest `233db1c5a0c270e3cea9950de21fe7cbadd2ad8e97a2ad6e9f974a959692e945` | `performance/accepted/inbox160`; same primary; `snapshot/performance-inbox160/v1`; same class |
+| `tmp/inbox166_o2_m64_wiring/perf` | mode `0775`; 41 files, 6 directories, 209,934,550 bytes; 2 worktree roots excluded; manifest `37038c55e6e633db8ebb63dde3a3a5971e2053f586a7f9f9ce9aac48f5d9f4af` | `performance/accepted/inbox166`; same primary; `snapshot/performance-inbox166/v1`; same class |
+| `tmp/inbox172_o2_quotient_wiring/perf` | mode `0775`; 41 files, 6 directories, 208,691,314 bytes; 2 worktree roots excluded; manifest `f0ab6c372b9bc65d4c48112f0e3686cb2b1ef38e6e0931aa04840823180ae81c` | `performance/accepted/inbox172`; same primary; `snapshot/performance-inbox172/v1`; same class |
 
-Subtotal: 51,870 files, 2,057 directories, 8,064,517,593 bytes.
+Subtotal: 545 files, 71 directories, 2,137,996,457 bytes.
 
 Examples of the small decision records embedded in the five newest roots are
 the paired-metrics SHA-256 values `47e2055e…` (INBOX-152), `2e709631…`
 (157), `56c67ca4…` (160), `04fe50f4…` (166), and `4dc11268…` (172).
-Those compact records are not substitutes for the immutable artifacts, raw
-samples, worktree/source identities, and logs in their bounded snapshots.
+Those compact records are not substitutes for the eligible immutable
+artifacts, raw samples, and logs in their bounded snapshots. Registered
+worktree identities are separately frozen control metadata and never snapshot
+constituents.
 
 ### 4.1 Already absent accepted performance material
 
@@ -212,6 +354,58 @@ other candidate.
 The historical absences demonstrate that tracked summaries and live-pin policy
 are not durable byte retention.
 
+### 4.2 Protected intersections and subtraction proof
+
+Exactly 21 registered worktrees intersect the roots counted by INBOX-192:
+
+```text
+tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/canonical/source
+tmp/inbox116_icmp_scratch_perf/worktrees/A
+tmp/inbox116_icmp_scratch_perf/worktrees/B
+tmp/inbox118_icmp_eq0_perf/worktrees/A
+tmp/inbox118_icmp_eq0_perf/worktrees/B
+tmp/inbox120_icmp_setcc_perf/worktrees/A
+tmp/inbox120_icmp_setcc_perf/worktrees/B
+tmp/inbox122_icmp_signbit_perf/worktrees/A
+tmp/inbox122_icmp_signbit_perf/worktrees/B
+tmp/inbox133_cast_wiring/perf/worktrees/A
+tmp/inbox133_cast_wiring/perf/worktrees/B
+tmp/inbox152_o2_scalar_named_wiring/perf/worktree_A
+tmp/inbox152_o2_scalar_named_wiring/perf/worktree_B
+tmp/inbox157_o2_scalar_named_wiring2/perf/worktree_A
+tmp/inbox157_o2_scalar_named_wiring2/perf/worktree_B
+tmp/inbox160_o2_b07_wiring/perf/worktree_A
+tmp/inbox160_o2_b07_wiring/perf/worktree_B
+tmp/inbox166_o2_m64_wiring/perf/worktree_A
+tmp/inbox166_o2_m64_wiring/perf/worktree_B
+tmp/inbox172_o2_quotient_wiring/perf/worktree_A
+tmp/inbox172_o2_quotient_wiring/perf/worktree_B
+```
+
+These paths were identified from registration metadata, not filesystem
+discovery. The original INBOX-192 parent totals minus the new eligible
+non-worktree parent totals prove the excluded contribution without entering
+any protected directory:
+
+| Parent | Excluded files | Excluded directories | Excluded bytes |
+|---|---:|---:|---:|
+| validation-v2 | 2,315 | 91 | 36,240,122 |
+| INBOX-116 | 4,928 | 194 | 559,879,888 |
+| INBOX-118 | 4,932 | 194 | 560,123,979 |
+| INBOX-120 | 4,936 | 194 | 560,877,445 |
+| INBOX-122 | 4,940 | 194 | 561,504,308 |
+| INBOX-133 | 5,150 | 200 | 563,364,117 |
+| INBOX-152 | 5,263 | 202 | 606,743,524 |
+| INBOX-157 | 5,275 | 202 | 631,561,017 |
+| INBOX-160 | 5,281 | 202 | 631,581,170 |
+| INBOX-166 | 5,303 | 202 | 626,365,648 |
+| INBOX-172 | 5,317 | 202 | 624,520,040 |
+| **exact excluded total** | **53,640** | **2,077** | **5,962,761,258** |
+
+This is calculation-only exclusion. It is not a request or authorization to
+run `git worktree prune`, remove a registration, inspect a worktree, or change
+any protected byte.
+
 ## 5. Accepted Tier-3 evidence
 
 | Current dependency | Exact observed state | Pin / provenance / consequence | Proposed authority |
@@ -240,18 +434,25 @@ The non-overlapping present inventory above reconciles as follows:
 | accepted cohort | 1 | 7,215,373 |
 | calls dormant/isolation evidence | 193 | 786,533,105 |
 | compiler-rt reproduction | 2,544 | 176,441,527 |
-| adopted input + validation bundle + v1/v2 evidence | 2,384 | 38,281,361 |
-| surviving accepted performance evidence | 51,870 | 8,064,517,593 |
+| adopted input + validation bundle + v1/v2 evidence | 69 | 2,041,239 |
+| surviving accepted performance evidence | 545 | 2,137,996,457 |
 | surviving accepted Tier-3 evidence | 10 | 2,042,354 |
-| **total** | **57,002** | **9,075,031,313** |
+| **total** | **3,362** | **3,112,270,055** |
 
-The bounded roots contain 2,280 directories and no symlink or special-file
-entries. The total is 8.451782 GiB of regular-file content before
-content-addressed deduplication.
+The bounded non-worktree roots contain 203 directories and no symlink or
+special-file entries. The total is 2.898527 GiB of regular-file content before
+content-addressed deduplication. This reconciles exactly from the superseded
+INBOX-192 totals:
+
+```text
+files:       57,002 - 53,640 = 3,362
+directories:  2,280 -  2,077 =   203
+bytes: 9,075,031,313 - 5,962,761,258 = 3,112,270,055
+```
 
 Closed gap findings:
 
-1. None of the 57,002 files has both a primary store object and a sealed
+1. None of the 3,362 eligible files has both a primary store object and a sealed
    snapshot. Every current path is therefore a single local path authority.
 2. AC285, every calls proof root, every surviving performance root, and three
    of four present Tier-3 groups are unpinned.
@@ -267,6 +468,9 @@ Closed gap findings:
    logical copies protect against accidental path loss, stale compatibility
    copies, and partial publication on this disk; they are not
    hardware-independent redundancy.
+7. Registered worktrees are protected control state, not durability gaps,
+   artifact candidates, migration inputs, or capacity constituents. Their
+   exclusion cannot be interpreted as evidence that they are removable.
 
 ## 7. Proposed local authority and resolution
 
@@ -382,9 +586,13 @@ environment: env -i PATH=/usr/bin:/bin LC_ALL=C TZ=UTC SOURCE_DATE_EPOCH=0
 
 The recipe is:
 
-1. Resolve and verify every primary object using descriptor-relative,
-   no-follow opens. Build the unique member list from the reviewed snapshot
-   manifest only; never walk `tmp/` or discover members from a directory.
+1. Freeze and validate the registered-worktree set from the main Git common
+   directory before resolving members. Reject any manifest source,
+   compatibility path, object provenance path, or archive member source equal
+   to or below a registered path before any filesystem operation. Then resolve
+   and verify eligible primary objects using descriptor-relative, no-follow
+   opens. Build the unique member list from the reviewed snapshot manifest
+   only; never walk `tmp/` or discover members from a directory.
 2. Sort the NUL-delimited object keys bytewise under `LC_ALL=C`. All object
    member paths fit ustar and are regular files.
 3. Stream GNU tar with `--format=ustar`, `--sort=name`, `--mtime=@0`,
@@ -413,22 +621,23 @@ logical-ID manifest supplies reconstruction and compatibility mappings.
 ## 10. Capacity design
 
 The proposed store and repository are on the same ext4 filesystem. Audit-time
-free space was 97,743,224,832 bytes; free inodes were 56,229,442. This is an
+free space was 97,738,616,832 bytes. This is an
 observation, not a reservation.
 
-For the present 57,002-file scope, a conservative non-deduplicated ustar size
+For the present 3,362-file non-worktree scope, a conservative
+non-deduplicated ustar size
 computed from each current file size is:
 
 ```text
-logical_regular_bytes=9075031313
-ustar_bytes=9119899136
-ustar_overhead_bytes=44867823
-snapshot_capacity_bound=2*ustar_bytes+1048576=18240846848
+logical_regular_bytes=3112270055
+ustar_bytes=3114939904
+ustar_overhead_bytes=2669849
+snapshot_capacity_bound=2*ustar_bytes+1048576=6230928384
 existing_validation_reserve=49112001332
 manifest_and_metadata_bound=67108864
-incoming_object_temp_upper_bound=9075031313
-conservative_required_free=85570019670
-audit_time_headroom=12173205162
+incoming_object_temp_upper_bound=3112270055
+conservative_required_free=61634578690
+audit_time_headroom=36104038142
 ```
 
 The `2 * ustar + 1 MiB` snapshot bound deliberately does not assume compression
@@ -449,11 +658,12 @@ required_free =
 ```
 
 Require both free bytes and free inodes after accounting for all existing live
-store objects. Refuse work if the filesystem, store identity, available space,
-or reserve moves between preflight and publication. Do not migrate wholesale
-`tmp/`; admit only reviewed bounded logical groups. Compatibility
-materialization has its own capacity preflight and may not consume the
-validation reserve.
+store objects. Refuse work if the filesystem, store identity, registered
+worktree set, available space, or reserve moves between preflight and
+publication. Registered worktrees contribute zero artifact bytes and may not
+be traversed to refine capacity. Do not migrate wholesale `tmp/`; admit only
+reviewed bounded logical groups. Compatibility materialization has its own
+capacity preflight and may not consume the validation reserve.
 
 ## 11. Fail-closed publisher and compatibility resolver
 
@@ -463,6 +673,9 @@ This is design only.
 
 The future publisher must:
 
+- freeze the registered-worktree set before source discovery and reject every
+  equal-or-descendant source, provenance, destination, compatibility, or
+  manifest path lexically before type checks or descriptor opens;
 - resolve manifest and object paths through directory descriptors;
 - reject traversal, symlink components, non-regular sources or destinations,
   partial incoming files, unknown rows, duplicate/colliding unequal bytes,
@@ -482,8 +695,10 @@ manifest storage.
 ### 11.2 `tmp/` compatibility copies
 
 The future resolver takes a logical ID, never a caller-provided object path. It
-selects the deterministic active manifest row, verifies the primary object and
-the required snapshot, and then:
+first freezes the registered-worktree set and rejects any equal-or-descendant
+compatibility destination before type checks, `stat`, open, or traversal. It
+then selects the deterministic active manifest row, verifies the primary
+object and the required snapshot, and:
 
 1. validates the reviewed compatibility path beneath the exact repository
    root with no symlink or traversal component;
@@ -511,7 +726,7 @@ hard-coded producer/consumer path in its sections 7.2 and 7.3.
 | adopted `$INPUT` and accepted coverage `$BUNDLE` | immutable preflight; canonical/coverage reports and coverage build | existing `calls/input/compiler-rt-v1/raw/v1` and `calls/input/validation-v3/coverage-bundle/v1`; `canonical-input` | resolve and verify before root creation; historical paths may remain exact verified compatibility copies |
 | `$PARENT/baseline_validation_v3.preflight.{command.txt,environment.txt,cwd.txt,start.utc,end.utc,stdout.raw,stderr.raw,status,records.tsv}` | sole immutable-input preflight record; review consumer | `calls/validation-v3/preflight/<name>`; snapshot `snapshot/calls-validation-v3-preflight/v1`; `irreplaceable-acceptance-evidence` | publish after the one attempt; external prefix paths are atomic compatibility copies |
 | `$PARENT/baseline_validation_v3.driver.{command.txt,environment.txt,cwd.txt,start.utc,end.utc,stdout.raw,stderr.raw,status,records.tsv}` | sole driver bootstrap record; review | `calls/validation-v3/driver/<name>`; same snapshot; same class | same |
-| `$ROOT/canonical/source` | worktree-add; source-preflight/build; later restoration proof | Git commit `43de59b0…` remains source authority; generated checkout is `reproducible-cache` | no wholesale source snapshot; recreate only from verified full commit under authorized contract |
+| `$ROOT/canonical/source` | future worktree-add; source-preflight/build; later restoration proof | **protected control path**, not an artifact; Git commit `43de59b0…` remains source authority | exclude from all four classes, logical IDs, objects, snapshots, publishers, resolvers, and compatibility copies; after registration, modification or removal requires explicit user permission naming this exact path |
 | `$ROOT/canonical/build/{cache/**,prefix/**}` and repetition `{home,tmp}` | build/report working state | `calls/validation-v3/cache/...`; `reproducible-cache` for successful deterministic build products, otherwise `ephemeral-scratch` | compatibility-only; not required in the sealed acceptance snapshot unless an exact failure makes it evidentiary |
 | `$ROOT/canonical/artifact/z_llvm` and `artifact.identity.tsv` | artifact install/identity; all report/object/owner producers | after successful validation, `calls/validation-v3/canonical-artifact`; `canonical-input` | verify object and snapshot before each consumer; atomic compatibility copy |
 | all canonical named-step `status`, `records/*.{command,environment,cwd,start,end,stdout,stderr}`, and build raw/status records | each contract `run_step`; final evidence | `calls/validation-v3/canonical-record/<step>`; `irreplaceable-acceptance-evidence` | publish each closed step group after its sole producer; never synthesize a missing status |
@@ -519,7 +734,8 @@ hard-coded producer/consumer path in its sections 7.2 and 7.3.
 | `repetition-1/accepted.ll` plus extract/freeze/identity records | sole repetition-1 extract; all canonical and coverage object/owner consumers | `calls/validation-v3/canonical-accepted-ll`; `canonical-input` plus associated `irreplaceable-acceptance-evidence` records | publish once, mode `0444`, then all later phases resolve the same object identity |
 | `repetition-N/accepted.o`, owner TSV, objdump/readelf/objcopy output, function manifests/files, per-function identities, owner ledger | canonical object/owner and inspection producers; comparisons/identity | `calls/validation-v3/repetition-N/successful-subset-proof`; `irreplaceable-acceptance-evidence` | one sealed repetition snapshot with exact finite function-member mapping |
 | `$CANONICAL/comparisons/*`, identity TSV, repetition/final manifests | comparison, identity, finalizers; review and coverage identity checks | `calls/validation-v3/canonical-final`; `irreplaceable-acceptance-evidence`; the identity TSV is also a future validation input | publish only after all three repetitions agree |
-| `$ROOT/coverage/source` and coverage build/cache/artifact | worktree creation, accepted bundle application, coverage build; off/on producers | source is Git-authoritative; build cache `reproducible-cache`; coverage artifact `canonical-input` for the two coverage phases only | separate from canonical artifact and excluded from performance |
+| `$ROOT/coverage/source` | future worktree creation, accepted bundle application, coverage build | **protected control path**, not an artifact; source is Git-authoritative | same registered-worktree exclusion and exact-path user-permission rule as canonical/source |
+| `$ROOT/coverage/build/{cache/**,prefix/**}` and coverage artifact | coverage build; off/on producers | build cache `reproducible-cache`; coverage artifact `canonical-input` for the two coverage phases only | separate from canonical artifact and excluded from performance; neither row grants access to coverage/source |
 | coverage directory-creation records and `$ROOT/coverage/reference/*` channel/accepted identity records | directory creation and before/after checks; review | `calls/validation-v3/coverage-reference`; `irreplaceable-acceptance-evidence` | publish as one closed reference group |
 | `$OFF` report, parsed raw report, object/owner, inspections, functions, per-function, owner-ledger, records/status | observation-off sole producers; comparisons | `calls/validation-v3/coverage-off`; `irreplaceable-acceptance-evidence` | sealed off snapshot; channel paths must remain absent |
 | `$ON/report.coverage.tsv`, `object.coverage.tsv`, `owner.coverage.tsv` | exactly one corresponding on producer; counter validators | `calls/validation-v3/coverage-on/channel/<kind>`; `irreplaceable-acceptance-evidence` | absent before producer; no cross-channel fallback |
@@ -537,7 +753,12 @@ Coverage creates no `accepted.ll`; it consumes the one canonical object.
 The v3 root and prefixes are absent today. Their logical rows would initially
 have `future-required` status and no object key. They become active only after
 their sole contracted producer succeeds and a separately authorized publisher
-verifies both local logical copies.
+verifies both local logical copies. The two future `source` paths are the
+exception: they never receive logical rows. Before creating either worktree, a
+future separately authorized execution must freeze the registration set;
+immediately after registration, the exact path and every descendant are
+protected control state. Neither this durability design nor the validation
+contract grants permission to modify or remove them after use.
 
 ## 13. Ordered next sequence
 
@@ -546,13 +767,20 @@ The only safe sequence is:
 1. Review and accept or amend this audit.
 2. Separately authorize and implement a non-destructive local copy-and-verify
    store, manifest, primary-object publisher, deterministic snapshot publisher,
-   and compatibility resolver.
+   and compatibility resolver with the exact registered-worktree exclusion
+   boundary in sections 1.3, 9, and 11.
 3. Review the implementation and the exact retained identities. No current
-   `tmp/` path is removed, replaced, or demoted during that step.
+   `tmp/` path is removed, replaced, or demoted during that step. No registered
+   worktree is traversed or becomes an artifact constituent.
 4. Separately amend and re-review the v3 contract so the durable logical
    manifest is authoritative and every hard-coded `tmp/` input/output is an
-   atomic verified compatibility copy.
-5. Only then consider authorizing one v3 execution.
+   atomic verified compatibility copy, except the two protected `source`
+   worktree paths.
+5. Before any future v3 worktree creation, separately authorize the exact
+   creation operation and freeze the registration transition. Any later
+   modification or removal requires explicit user permission naming
+   `$ROOT/canonical/source` and/or `$ROOT/coverage/source` as applicable.
+6. Only then consider authorizing one v3 execution.
 
 Deletion, relocation, compatibility-path retirement, stale-pin removal, or
 cleanup requires a later explicit ruling. Protocol adoption, calls production
@@ -561,6 +789,10 @@ checkpoint remain outside INBOX-192.
 
 ```text
 audit=COMPLETE_READ_ONLY
+registered_worktrees=43
+excluded_registered_intersections=21
+eligible_regular_files=3362
+eligible_regular_bytes=3112270055
 proposed_store=/home/oleg/prog/z_llvm-artifacts
 store_created=false
 primary_objects_created=0
