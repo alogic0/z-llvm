@@ -24,7 +24,78 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206Q observable fresh construction and terminal freeze — AUTHORIZED
+## INBOX-206R fresh fail-closed construction correction — AUTHORIZED
+
+INBOX-206Q is not accepted. Its retained source and logs prove that an
+initial construction command returned nonzero and was followed by diagnosis,
+rewriting, identity regeneration, and later stages. Its terminal freeze is
+also malformed: four required identity/count rows contain literal `\t` bytes
+instead of real TSV separators. Q receives no construction-freeze,
+diagnostic, Phase-3, validation, ratchet, credit, or downstream acceptance.
+Never rerun, edit, or repair Q. Preserve its exact failed state:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206q
+file_count=64
+inventory_sha256=806da28257a2975e0885155ae73105dda7bd2568c00bc0a1aaadccbbac0eb875
+ledger_sha256=626da91b4eb6797f0e07fe3eb48234eef0055aadf06e5c33ae517db2c6879743
+top_level_paths_sha256=e81ec7e7355a1745cb2dea05da87af448d1eeb6ed0fddfcdf9fb350a924d50ed
+terminal_inventory_sha256=ba4ecc25b52652d287538b66a726972f8fc85552d7036c813fac91d0342c78db
+terminal_ledger_sha256=a065a8e9211c58062269c74b218118347566ce29da96a2c78a2bc7cefe7d9323
+terminal_freeze_sha256=98bf20348c4f16c2dbde5a9c1788ca8377e47822cf5346f041a25cf9bdbe2a37
+execute_bits=0
+```
+
+Preserve I–Q and every protected identity byte-for-byte. Require the exact
+operating `HEAD` named in the Watcher dispatch and its exact direct parent.
+Require ordinary and exact-L-hermetic main status empty and control
+exact/main/clean/no-remote.
+
+After proving it fresh, absent, and non-symlink, create records only beneath:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206r
+```
+
+Before R creation, permit exactly one sentinel-preserved,
+status-propagating administrative `git worktree list --porcelain` through
+the accepted wrapper. Require count `43` and exact path/topology/non-main
+hashes `f31d8542...` / `6c868e3b...` / `ebc30a37...`, plus bidirectional
+lexical disjointness of R and control from every registration. Failure
+consumes the listing and stops before R creation. Never enter, stat, hash,
+or inspect a registered-worktree directory; no other worktree command is
+authorized.
+
+Create the 61-file R preclosure structure from Q's retained nonterminal
+structure, excluding Q's three terminal records. Reset only R's closure,
+terminal, and future-diagnostic mutable records to empty. Correct only the
+new R path, exact operating bindings, the frozen preclosure/final counts
+`61`/`64`, and the two Q defects. Enumerate every permitted Q-to-R
+difference and require exact reverse diagnostic equivalence.
+
+Generate terminal-freeze rows only with a real-tab operation such as
+`printf '%s\t%s\n'`. Before either one-shot stage, statically require the
+frozen terminal schema to have its exact key order and exactly two
+tab-separated fields per row. Predeclare and freeze the closure and
+terminal-generation commands plus every identity before closure.
+
+Every construction command after R creation is independently blocking.
+Any nonzero result stops immediately with no inspection, diagnosis,
+rewriting, identity regeneration, retry, or later command. Invoke closure
+exactly once. Failure leaves terminal files absent and stops. Closure
+success alone permits one terminal-generation invocation. Failure retains
+partial terminal state and stops. Complete success must produce the
+accepted non-circular coverage and make no later R-byte change.
+
+The previously accepted bounded read-only main/control Git identity checks
+remain permitted; no separate registered-worktree traversal is authorized.
+No diagnostic/preparation invocation, project/Zig command, compilation,
+test, validator, repository/control/source/evidence/protected-file/store/
+artifact change, registered-directory access, validation, ratchet, wiring,
+cleanup, credit, or downstream work is authorized. Stop main and control
+clean.
+
+## INBOX-206Q observable fresh construction and terminal freeze — FAILED ACCEPTANCE; CLOSED
 
 Accept INBOX-206P fully as a successful one-shot non-reproduction. It proves
 that all 177 O preterminal predicates currently pass, but grants no O
