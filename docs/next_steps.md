@@ -24,7 +24,92 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-194C source-mode versus immutable-object-mode correction and one logged continuation — AUTHORIZED
+## INBOX-194D generated snapshot-member key correction and one logged continuation — AUTHORIZED
+
+INBOX-194C at unchanged HEAD `53b0e1cd` is accepted as a compliant
+fail-closed stop with protocol acceptance. Implementation acceptance remains
+withheld. Its sole pipeline-free orchestration passed all 7 unit tests,
+verified the amended source specification and proposed fragment, published
+all 18 immutable objects and both sealed snapshots, then stopped with
+`ConflictingManifestKey` before publishing a manifest.
+
+Preserve the entire partial INBOX-194C root and all
+INBOX-194/194A/194B/194C records exactly. The root is mode 0775, has 18
+mode-0444 objects, two mode-0444 snapshots, empty snapshot work/proof
+directories, and no manifest. Its exact inventory SHA-256 is `8296a00b...`
+under the standing `find -P` serialization, and its 20-file identity-ledger
+SHA-256 is `472f30bc...`. Preserve INBOX-194A and INBOX-194B exactly; keep the
+INBOX-194 root, real store, and v3 namespace absent.
+
+Correct only the production generator call in `appendPublishedSnapshot` that
+sets a snapshot-member row's `key`: replace `"-"` with the corresponding
+`object.key`. Preserve `member_path`, `target_id`, SHA-256, bytes, immutable
+mode 0444, source-mode/logical-reference behavior, schemas, specifications,
+proposed rows, snapshot behavior, store/authority logic, and every identity.
+
+Do not change `validateRelationships`, duplicate-key policy, or
+`sameIdentity`. Add production-generator coverage with at least two distinct
+objects proving canonical parse/re-encode succeeds, every generated member
+key and member path equal its target object's key, and object/member shared
+keys require exact hash, bytes, and mode. Add focused proof that `"-"` and any
+mismatched member key fail closed under the existing validator. If these
+tests cannot pass without validator or policy change, stop rather than widen
+the slice.
+
+Any source-specification, proposed-fragment, schema, non-tool identity, or
+unrelated tool drift is a hard stop. Use only the initially absent, canonical,
+worktree-disjoint continuation root:
+
+`/home/oleg/prog/z_llvm-inbox194d-artifact-store-synthetic`.
+
+Use a fresh record namespace beneath
+`tmp/inbox194d_o2_artifact_store_cli_dormant/validation/`. Run
+formatting/static/compile-only checks first, then exactly one pipeline-free,
+closed-environment orchestration retaining exact command, environment,
+separate stdout/stderr, and numeric status even on failure. No component may
+be retried, substituted, or invoked independently.
+
+Before and after every phase, verify INBOX-194 absent, INBOX-194A/194B/194C
+exact, and real store absent. Failure retains the complete INBOX-194D root,
+records, and patch and stops without diagnosis, repair, cleanup, commit,
+alternate command, or fix-forward. Complete success alone may remove only the
+reverified INBOX-194D root; preserve all three failed continuation roots and
+all earlier records, commit only the bounded tool, unchanged spec/proposed
+files, and evidence, and stop for review.
+
+The retained dispatch ledger is:
+
+```text
+HEAD=53b0e1cdd4d026db5e574521b8938889fe12333a
+tools/zllvm_artifact_store.zig=modified,4017_lines,157970_bytes,sha256:ee2969c2d8b46b6cb8e2fa1cbd86270c64971630d659f3449ec6ca1e0af274d9
+docs/evidence/inbox194_calls_canonical_source_spec_v1.tsv=untracked,21_lines,14417_bytes,sha256:0dd908eed246b09fbea8fd87241ce899b100823b8d83c7223d4e48928e7c599b
+docs/evidence/inbox194_calls_proposed_live_manifest_v1.tsv=untracked,37_lines,13743_bytes,sha256:ced7f4e13e1ce646e114460805162aa27fcd8c20c75c4d325c6bd762ce0b6263
+inbox194_root=absent
+inbox194a_root=retained_exact
+inbox194b_root=retained_exact
+inbox194c_root=retained_mode_0775_18_objects_2_snapshots_no_manifest
+inbox194c_inventory_sha256=8296a00b5ad29f4f5fdb3cbe232e788ec9ebbae60d5472c30862246300ee5ddd
+inbox194c_file_identity_ledger_sha256=472f30bc4d3319086c0a8d48c6e1210013dd668d951591114793f13356cd464e
+inbox194c_record_count=74
+inbox194c_record_ledger_sha256=50a3deacf44c49ebfee47ded1d0ed5975c4731eee5235f878123b72587891238
+inbox194c_command_sha256=f388e26cf0d1912a5067da3d36ee59db543e1e2851740040ff07e452b1008c4d
+inbox194c_environment_sha256=dc30693c22735824510d393b734eade47fdbed87f55c5de92def02f30efb5631
+inbox194c_launcher_sha256=b54b22560ca1a00cc9a8b22bd33027a2577f73a324ca3ceec19a19aa0e9eac1d
+inbox194c_stdout_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+inbox194c_stderr_sha256=b54101a5dfd17d17a59f875920061d47eafcfa07fa093a7f9771d8000b7619c3
+inbox194c_status_sha256=4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865
+registration_initial_sha256=ee5160ba938a8769eb308c3eb25ed583ded18cc79d3b3350d6e4d4f1a5c91291
+real_store=absent
+v3=absent
+```
+
+All existing protected-worktree rules, infrastructure identities, pins,
+contracts, calls sequence, mandatory post-calls checkpoint, and ratchet 131
+remain unchanged. No real publication, live rows, compatibility copies, v3
+work, cleanup, wiring, performance, Tier work, ratchet movement, or credit is
+authorized.
+
+## INBOX-194C source-mode versus immutable-object-mode correction and one logged continuation — COMPLIANT FAIL-CLOSED STOP; PROTOCOL ACCEPTED; IMPLEMENTATION WITHHELD
 
 INBOX-194B at unchanged HEAD `f97e2ee2` is accepted only as a compliant
 retain-and-stop, with protocol acceptance. Implementation acceptance remains
