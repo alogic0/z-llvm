@@ -24,7 +24,101 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AP keyed mechanical-derivation replay and invocation-atomic audit closure — AUTHORIZED
+## INBOX-206AQ SHA-literal-safe keyed derivation and invocation-atomic audit closure — AUTHORIZED
+
+INBOX-206AP is accepted only as a compliant fail-closed preconstruction
+stop. Its operating, AK-structure, and AK-path gates receive evidence credit
+only. It receives no inventory, ledger, AN/AO replay, derivation, matrix,
+D01, marker, or downstream credit. Preserve AP absent; never rerun it.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206AP stopped fail-closed at the independent AK inventory replay gate.
+
+Passed beforehand:
+
+- Operating/protected-state gate
+- AK structure gate
+- AK paths gate
+
+The AK inventory command returned nonzero before its success marker. AP remains absent. Per directive, I performed no inspection, diagnosis, retry, repair, cleanup, fix-forward, identity replay, construction, or later work. No repository or retained-root bytes changed, and `AUDIT_COMPLETE` was not created.
+```
+
+Static review ran no project/Zig code. Clean authority was
+`02740b320c9b2fa14e6e430f09af3e94bbe22474`, parent
+`ee67b15e4eb9b74f2c793f700f3c918a83da1b07`, tree
+`8491264516082bbc0cd1f0edf0373c07f298a531`, sole `docs/next_steps.md`,
+and inbox `1a09a942...afc7`; source/index/control remained clean.
+
+The failed command used the malformed 63-character expected inventory
+literal `3017c5c7...de28b0b0`. Exact immutable AK inventory is the
+64-character
+`3017c5c7041e6220b90a90d9136c5f83db8244cce10e1d3508d8bd85d0fef4ac`.
+This is literal transcription drift, not AK drift.
+
+Reviewer dialogue is preserved verbatim:
+
+```text
+I accept INBOX-206AP only as a compliant fail-closed preconstruction stop. Its operating, AK-structure, and AK-path gates receive evidence credit only. Preserve AP absent; no inventory, ledger, derivation, D01, or downstream credit is granted.
+
+I authorize fresh evidence-only INBOX-206AQ with these refinements:
+
+- Commit only docs/next_steps.md as a non-merge child of 02740b32…; update the ignored inbox separately and bind the final full HEAD/tree/inbox identities.
+- Freeze a labeled manifest of every expected SHA-256 literal before execution. Validate each literal independently as exactly 64 lowercase hexadecimal characters, with its own success marker.
+
+- Separately replay AK paths, corrected inventory 3017c5c7041e6220b90a90d9136c5f83db8244cce10e1d3508d8bd85d0fef4ac, and exact ledger using their named serializers.
+- Then replay every AN/AO serializer and per-file identity independently.
+- Only those successes permit the already approved keyed field/row derivations and invocation-atomic closure.
+- No abbreviated hashes, combined comparison blocks, serializer substitution, or chained/global replacement.
+
+The first failure leaves AQ absent or preserves its exact partial state and stops without diagnosis, retry, repair, or fix-forward. AUDIT_COMPLETE remains final-write and audit-only with implementation_ready=false and execution_authority=none. All stated implementation, Zig, execution, validation, worktree-access, ratchet, credit, D02, and downstream prohibitions remain exact.
+```
+
+Create one non-merge commit changing only this file, parent exactly
+`02740b320c9b2fa14e6e430f09af3e94bbe22474`; update ignored inbox and bind
+the final full HEAD/tree/inbox identities. The final INBOX-206AQ ignored
+inbox SHA-256 is
+`b4b1c2589b7964bdbe45918aa5e116badf3cbcf63a93735e8bff17e539d4f365`.
+
+Before any identity comparison, freeze a labeled manifest of every expected
+SHA-256 literal used by AQ. Independently require each to match exactly
+`[0-9a-f]{64}` and length 64 with its own marker. Include all protected,
+AK aggregate/snapshot/per-row, AN aggregate/per-file, AO aggregate/per-file,
+and final inbox literals. Type Git SHA-1 object IDs separately. No identity
+comparison precedes all syntax gates for its expected literals.
+
+Correct AK aggregates are:
+
+```text
+paths=5a3ecb77f8a3b4e49ace3b997f5d9885147f0eece263a5a3500097ebde28b0b0
+inventory=3017c5c7041e6220b90a90d9136c5f83db8244cce10e1d3508d8bd85d0fef4ac
+ledger=66381fec1e01d925b08cc6356a366c15f398d34c18321c183993c1602d8c871f
+snapshot_paths=220d91ce9ddd56085e798133c8dd20deb7d3d43686280e805dd4a27f7d490968
+snapshot_inventory=41f48034450c97ea4554cf7f35841550e1a8beefc8d0bc1303592070a17fdae3
+snapshot_ledger=008b8f5a4bbdc7e5f6812bb67518dff27fa6d5f58333ccf9d975bca09f449f3e
+```
+
+After syntax gates, independently replay operating/protected state, AK
+structure and three named serializers, all AK ledger/snapshot identities,
+then every AN/AO serializer and per-file identity. No abbreviations,
+combined comparisons, serializer/aggregate substitution, or unlabeled gate.
+
+Only complete replay permits fresh `inbox206aq`, followed by the exact
+Reviewer-approved AP keyed field/row derivation and invocation-atomic scope
+with AP changed to AQ and current operating identities. Chained/global
+replacement remains prohibited. Every derivation, mapping, addition,
+ordering, uniqueness, status, authority, isolated-data, type/mode, coverage,
+count, conflict, dependency, and bijection claim is independently gated.
+
+First failure leaves AQ absent or exact and stops without diagnosis, repair,
+retry, cleanup, mode change, fix-forward, or later work. `AUDIT_COMPLETE`
+is final-write/audit-only with `implementation_ready=false` and
+`execution_authority=none`. No implementation, source/Zig/build/install,
+execution, validation, worktree access, ratchet, credit, production AWK,
+D02, or downstream action. Do not access `.claude/settings.local.json`.
+
+## INBOX-206AP keyed mechanical-derivation replay and invocation-atomic audit closure — COMPLIANT FAIL-CLOSED PRECONSTRUCTION STOP; SUPERSEDED BY INBOX-206AQ
 
 INBOX-206AO is accepted only as a compliant fail-closed partial
 evidence/design stop. Its explicitly passed replay, isolated environment,
