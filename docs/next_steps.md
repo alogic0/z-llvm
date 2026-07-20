@@ -24,7 +24,181 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AC source-derived guard and complete state-contract freeze — AUTHORIZED
+## INBOX-206AD exact analyzer and state-authority remediation design — AUTHORIZED
+
+Accept INBOX-206AC only as a compliant fail-closed inert draft. It receives
+no Stage-2 or Stage-3 semantic acceptance, complete-package identity,
+structural/state-contract acceptance, execution, Phase-3, ratchet, credit,
+or downstream acceptance.
+
+Preserve AC permanently and do not repair, regenerate, complete, or rerun it.
+Its exact retained failed state is:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ac
+file_count=82
+empty_future_captures=30
+nonfiles=0
+execute_bits=0
+cache_roots=absent
+top_level_paths_sha256=0eb02c6880d3815af72ef3b0fcbaf687aa8c8986a26b8876f573bbea3fbd9b9f
+path_type_mode_bytes_sha256=48402e7d2446d38e9cddb6e6a3a227eca3531efcc0184fa2b11029379ecc2ad8
+sha_bytes_mode_path_sha256=0147a51ec3f8ea1b1d85203602cc19fcfe0a77a5214b8d6798049303996d1664
+classifications_sha256=00c01f7b627f36db3b672322d2cd813a70203a6649f910e6749d00e69ec33259
+immutable_identities_sha256=87d45f873c80767d961a224fbe1efb5711e7b56d6fd73660749aadd553def51e
+```
+
+All 51 non-self immutable rows match their retained SHA-256 and byte count.
+Forty-seven rows declare mode `664` while every retained file is actually
+mode `644`; this is the immediate final-gate failure. The retained
+`construction.audit.tsv` and `freeze.audit.tsv` were written prematurely
+with false Stage-3/completion claims and are draft data only.
+`inventory.tsv`, `ledger.tsv`, `top_level_paths.tsv`,
+`construction.stage3.tsv`, and `STAGE3_COMPLETE` are absent.
+
+Static review also withholds AC's design because it does not canonically
+raw-compare derived direct edges or closure bytes; auto-allows broad call
+classes; does not bind exact process argv at callsites; hard-codes rather
+than observes protected state; accesses destination keys before complete
+traversal validation; does not use its comparison-rule files to cover every
+schema field; and freezes no complete wrapper/status sequencing contract.
+
+Create one non-merge operating commit changing only this file. The Watcher
+dispatch binds its exact commit, parent, tree, changed path, and final
+ignored-inbox SHA-256.
+
+Create only fresh absent, non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ad
+```
+
+AD is evidence/design only. Preserve AC, AB, Y, every earlier retained root
+and record, and every protected identity exactly. Permit only exact named
+reads of accepted operating documents, source, and retained AC/AB/Y records.
+Do not copy a harness, edit source, traverse a registered-worktree
+directory, perform broad discovery, access `.claude/settings.local.json`,
+implement an analyzer/capture/comparison body, invoke a frozen body, run
+Zig/project code, create a cache, or mutate control, either store, artifacts,
+manifests, receipts, pins, scripts, compatibility paths, or protected state.
+
+### A. Exact AC defect and authority ledger
+
+Freeze a complete defect ledger tied to the exact retained AC file hashes.
+For every immediate serialization failure and every source-visible
+structural, call-resolution, state-observation, path-safety, comparison,
+wrapper, atomicity, or finalization defect, record:
+
+- exact affected AC path and SHA-256;
+- violated accepted requirement;
+- demonstrated failure mode;
+- required replacement invariant;
+- design artifact that closes it; and
+- future independent acceptance gate.
+
+No retained AC claim may be treated as true merely because its file says
+`pass` or `complete`.
+
+### B. Pinned Zig 0.16 AST analyzer design
+
+Freeze a design for a source-derived analyzer implemented later with pinned
+Zig `0.16.0` AST facilities. Treat AST parsing as syntax only, never as
+automatic semantic resolution. Do not implement, build, install, format,
+compile, test, or invoke the analyzer in AD. Freeze a separately reviewed
+future `zig build install` or equivalent materialization boundary.
+
+The design must enumerate every reachable direct, method, builtin, aliased,
+indirect, function-value, and comptime-selected call. Every call must resolve
+through one explicit reviewed rule or fail structurally. Do not auto-allow
+`std.*`, base-name methods, builtins, effect labels, allocator calls, or
+process calls.
+
+Define canonical direct-edge and transitive-closure schemas with stable
+caller, callee, source callsite, and call-kind fields. Independently derived
+canonical bytes must raw-compare with separately reviewed authority.
+Define exhaustive call-resolution, allocator ownership/deinitialization,
+filesystem-mutator, process, and forbidden-effect classifications and their
+failure attribution.
+
+### C. Seven-process protocol amendment
+
+Supersede the contradictory exact-six-only process rule for the exact-real
+route. Freeze exactly seven permitted future processes:
+
+1. the six accepted exact read-only control Git commands; and
+2. one distinct administrative
+   `/usr/bin/git -C <main-root> worktree list --porcelain`.
+
+The seventh process is required by `RegistrationGuard` and is
+registration-metadata-only. It may not access a registered-worktree
+directory. Freeze exact argv, closed environment, accepted status, stdout
+schema and maximum, stderr rule, callsite, and one-invocation bound for all
+seven. No other process execution may be reachable.
+
+### D. Complete 68-field state-authority matrix
+
+Enumerate all 68 state fields. For every field record:
+
+- the actual bounded probe;
+- accepted authority and exact expected form;
+- AA-to-future-prestate rule;
+- execution-prestate-to-poststate rule;
+- named absence behavior;
+- cache behavior where applicable; and
+- precise failure attribution.
+
+Never represent a hard-coded expected value as an observation. Probe
+protected, prior-record, source, registration, watcher HEAD/index/worktree,
+stash, pin, bypass, ratchet, authority, publication, and named future
+metadata from their actual bounded sources. Use distinct exact ordinary and
+hermetic Git-status probes.
+
+AA-to-prestate may vary only for separately authorized operating identity
+and initially absent execution-cache paths. Prestate-to-poststate must keep
+HEAD and inbox byte-identical. Only fully bounded, manifest-accounted
+isolated-cache contents may change; every other field must compare
+byte-for-byte.
+
+### E. Path, descriptor, and absence safety
+
+Validate every relative key for canonical traversal safety before any join,
+resolution, stat, or open. Design descriptor-relative no-follow opens,
+post-open type/mode/size checks, bounded reads from the verified descriptor,
+and closed descriptor ownership. Eliminate lstat-then-path-read races.
+Probe every required named absence explicitly and reject symlinks,
+unexpected types, oversize records, and paths outside the exact authority
+root before reading payload bytes.
+
+### F. Wrapper, serialization, and truthful finalization contracts
+
+Freeze complete future wrapper contracts for stdout, stderr, status,
+checkpoint, results, one-shot sequencing, prerequisites, failure stops,
+temporary outputs, atomic replacement, completion markers, and final
+directory synchronization. No unreviewed wrapper or status-capture logic may
+remain for a later execution task.
+
+Require every retained AD file to be regular, non-executable, and exact mode
+`0644`. Define canonical inventory, ledger, path-list, classification,
+identity, and self-exclusion serialization. Pass or completion claims may be
+written only after every independent gate has succeeded. A final completion
+record must be the last write and may not describe an unverified stage as
+passed.
+
+### G. Blocking design construction and stop
+
+Use independently blocking design-construction stages. Any failure retains
+fresh AD and stops immediately without inspection, diagnosis, repair,
+regeneration, retry, cleanup, or a later stage.
+
+Complete success stops at the inert evidence/design freeze. No harness copy,
+analyzer/capture/comparison implementation, build/install, invocation,
+cache creation, execution-package credit, guard, state capture, Zig/project
+command, validator, validation, evidence edit outside AD, receipt,
+activation, compatibility, validation-v3, compiler/performance work,
+ratchet recount or movement, cleanup, wiring, credit, or downstream action
+is authorized.
+
+## INBOX-206AC source-derived guard and complete state-contract freeze — COMPLIANT STAGE-3 FAILURE; DRAFT ONLY
 
 Accept INBOX-206AB only for compliant inert construction mechanics, exact
 harness construction, and faithful stop. Withhold execution-package
