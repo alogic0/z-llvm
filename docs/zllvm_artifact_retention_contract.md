@@ -62,11 +62,38 @@ of these five fields changed fails as `DormantReceiptMismatched`.
 
 ## Root, registration, and destination checks
 
-All configured roots must be absolute, normalized, existing no-follow
-directories with mode `0755`, mutually disjoint where required, and disjoint
-from every registered worktree. Registration full, path, topology, and
-non-main identities are captured at configuration creation and revalidated
-before and after validation.
+Dormant admission validates four private roles in fixed order: control,
+authority, payload, then source. The exact real-candidate policy owns the
+literal paths, role modes, inter-role relations, registered-worktree
+snapshot, and control identities for its lifetime:
+
+| Role | Exact path | Mode | Admission |
+|---|---|---:|---|
+| control | `/home/oleg/prog/z_llvm/local-state/control` | `0775` | exact clean supplemental Git repository; only the four named `0644` files |
+| authority | `control/authority/zllvm/v1` | `0755` | intentional containment within control and main; disjoint from every non-main registration |
+| payload | `/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1` | `0755` | the sole reviewed main-contained payload path; disjoint from non-main registrations and supplemental control |
+| source | `/home/oleg/prog/z_llvm-artifacts` | `0775` | external identity-only root; disjoint from every main and supplemental registration and every other role |
+
+Before any control-file open, bounded closed-environment `/usr/bin/git`
+observations prove the exact control commit, tree, `main` branch, empty
+status, empty remotes, and the four-entry NUL-delimited
+`authority/zllvm/v1` tree allowlist. Each later control read matches one
+allowlisted component and is no-follow with its exact Git mode and accepted
+SHA-256/byte/mode identity. No directory discovery supplies an admitted
+control key.
+
+Every role requires normalized absolute equality, no-follow ancestry, its
+exact mode, and the narrow containment or disjointness rule above. There is
+no generic main-descendant exception. Synthetic tests use a distinct
+allocator-owned, `builtin.is_test`-closed policy with injected owned control
+observations; it cannot select real control, authority, payload, or source
+paths. Its negative matrix closes wrong roles and escapes, every root mode,
+symlinked ancestry, an unlisted fifth control key, injected non-main or
+supplemental-control intersections, and commit/tree/branch/status/remotes/
+tree-entry drift. Failures never write, chmod, repair, normalize, discover,
+or fall back. Registration full, path, topology, and non-main identities are
+captured at configuration creation and revalidated before and after
+validation.
 
 The payload root is a closed tree consisting only of:
 

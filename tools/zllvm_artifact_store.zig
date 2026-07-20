@@ -1539,6 +1539,117 @@ const dormant_lineage_header =
 const dormant_receipt_magic = "zllvm-payload-copy-receipt-v1";
 const dormant_receipt_header =
     "receipt_id\tgeneration\tsource_root\tdestination_root\tsource_inventory_sha256\tsource_file_ledger_sha256\tsource_destination_ledger_sha256\tpayload_files\tpayload_bytes\tobjects\tsnapshots\tdestination_modes\tcopy_evidence_path\tcopy_evidence_sha256\tresult";
+const dormant_real_control_root = "/home/oleg/prog/z_llvm/local-state/control";
+const dormant_real_authority_root =
+    "/home/oleg/prog/z_llvm/local-state/control/authority/zllvm/v1";
+const dormant_real_payload_root =
+    "/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1";
+const dormant_real_source_root = "/home/oleg/prog/z_llvm-artifacts";
+const dormant_git_executable = "/usr/bin/git";
+const dormant_git_bytes = 4_066_232;
+const dormant_git_sha256 = "2a8c18fbf43da9f692d75474c72bea9dfd796c260b0f3dfe456376abc3bbd668";
+const dormant_control_commit = "9c55bda34088e1230b0b91a126d35795a3ac70b4";
+const dormant_control_tree = "756369ad4a89d806f463bd8094c5159d8c973d7e";
+
+const ControlGitEntrySpec = struct {
+    mode: []const u8,
+    kind: []const u8,
+    object_id: []const u8,
+    path: []const u8,
+};
+
+const dormant_real_control_entries = [_]ControlGitEntrySpec{
+    .{
+        .mode = "100644",
+        .kind = "blob",
+        .object_id = "1652b3dae95b0cd7e26efbdd3e989588f7abcbd4",
+        .path = dormant_lineage_key,
+    },
+    .{
+        .mode = "100644",
+        .kind = "blob",
+        .object_id = "ad3dfaf211a583481eea31b78fce77a901dcce34",
+        .path = dormant_candidate_key,
+    },
+    .{
+        .mode = "100644",
+        .kind = "blob",
+        .object_id = "aa4637a2747d09afd450c925cc38bf01843e6cb3",
+        .path = dormant_generation_key,
+    },
+    .{
+        .mode = "100644",
+        .kind = "blob",
+        .object_id = "e0a872bd03847c63e0ece6d3f17a74042a7049bc",
+        .path = dormant_receipt_key,
+    },
+};
+
+const dormant_synthetic_control_entries = [_]ControlGitEntrySpec{
+    .{
+        .mode = "100644",
+        .kind = "blob",
+        .object_id = "1111111111111111111111111111111111111111",
+        .path = dormant_lineage_key,
+    },
+    .{
+        .mode = "100644",
+        .kind = "blob",
+        .object_id = "2222222222222222222222222222222222222222",
+        .path = dormant_candidate_key,
+    },
+    .{
+        .mode = "100644",
+        .kind = "blob",
+        .object_id = "3333333333333333333333333333333333333333",
+        .path = dormant_generation_key,
+    },
+    .{
+        .mode = "100644",
+        .kind = "blob",
+        .object_id = "4444444444444444444444444444444444444444",
+        .path = dormant_receipt_key,
+    },
+};
+
+const DormantControlFileExpectationSpec = struct {
+    component: DormantComponent,
+    path: []const u8,
+    sha256: []const u8,
+    bytes: u64,
+    mode: u16,
+};
+
+const dormant_real_control_file_expectations = [_]DormantControlFileExpectationSpec{
+    .{
+        .component = .candidate,
+        .path = dormant_candidate_key,
+        .sha256 = "7c0aa46fb6c0cb2b93034bbb6b520b6d4831fedea333983002622197a74c832b",
+        .bytes = 899,
+        .mode = 0o644,
+    },
+    .{
+        .component = .generation,
+        .path = dormant_generation_key,
+        .sha256 = "61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d",
+        .bytes = 27_823,
+        .mode = 0o644,
+    },
+    .{
+        .component = .lineage,
+        .path = dormant_lineage_key,
+        .sha256 = "f8b22b687f3d3cb727ba82e92c3a346c7025958387f3a45d4143fb42936c6a3a",
+        .bytes = 378,
+        .mode = 0o644,
+    },
+    .{
+        .component = .receipt,
+        .path = dormant_receipt_key,
+        .sha256 = "9c6748234292c963c9716504a1451c4da0cdb0fe2ce1642d1c5fa83264aa19a3",
+        .bytes = 792,
+        .mode = 0o644,
+    },
+};
 
 const DormantComponent = enum {
     candidate,
@@ -1594,10 +1705,467 @@ const DormantOwnedRow = struct {
     }
 };
 
+const ControlGitEntry = struct {
+    mode: [6]u8,
+    kind: [4]u8,
+    object_id: [40]u8,
+    path: []u8,
+
+    fn deinit(entry: *ControlGitEntry, allocator: std.mem.Allocator) void {
+        allocator.free(entry.path);
+        entry.* = undefined;
+    }
+};
+
+const ControlGitObservation = struct {
+    allocator: std.mem.Allocator,
+    commit: [40]u8,
+    tree: [40]u8,
+    branch: []u8,
+    status: []u8,
+    remotes: []u8,
+    entries: []ControlGitEntry,
+
+    fn initOwned(
+        allocator: std.mem.Allocator,
+        commit: []const u8,
+        tree: []const u8,
+        branch: []const u8,
+        status: []const u8,
+        remotes: []const u8,
+        specs: []const ControlGitEntrySpec,
+    ) !ControlGitObservation {
+        const owned_branch = try allocator.dupe(u8, branch);
+        errdefer allocator.free(owned_branch);
+        const owned_status = try allocator.dupe(u8, status);
+        errdefer allocator.free(owned_status);
+        const owned_remotes = try allocator.dupe(u8, remotes);
+        errdefer allocator.free(owned_remotes);
+        const entries = try allocator.alloc(ControlGitEntry, specs.len);
+        errdefer allocator.free(entries);
+        var initialized: usize = 0;
+        errdefer for (entries[0..initialized]) |*entry| entry.deinit(allocator);
+        for (specs, entries) |spec, *entry| {
+            if (!std.mem.eql(u8, spec.mode, "100644") or
+                !std.mem.eql(u8, spec.kind, "blob") or
+                spec.object_id.len != 40)
+            {
+                return error.DormantControlGitMalformed;
+            }
+            for (spec.object_id) |byte| {
+                if (!std.ascii.isDigit(byte) and (byte < 'a' or byte > 'f')) {
+                    return error.DormantControlGitMalformed;
+                }
+            }
+            validateRelativeKey(spec.path) catch return error.DormantControlGitMalformed;
+            entry.* = .{
+                .mode = spec.mode[0..6].*,
+                .kind = spec.kind[0..4].*,
+                .object_id = spec.object_id[0..40].*,
+                .path = try allocator.dupe(u8, spec.path),
+            };
+            initialized += 1;
+        }
+        return .{
+            .allocator = allocator,
+            .commit = try controlGitObjectId(commit),
+            .tree = try controlGitObjectId(tree),
+            .branch = owned_branch,
+            .status = owned_status,
+            .remotes = owned_remotes,
+            .entries = entries,
+        };
+    }
+
+    fn initRealExpected(allocator: std.mem.Allocator) !ControlGitObservation {
+        return initOwned(
+            allocator,
+            dormant_control_commit,
+            dormant_control_tree,
+            "main",
+            "",
+            "",
+            &dormant_real_control_entries,
+        );
+    }
+
+    fn initSyntheticExpected(allocator: std.mem.Allocator) !ControlGitObservation {
+        if (!builtin.is_test) return error.TestOnlyOperation;
+        return initOwned(
+            allocator,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "main",
+            "",
+            "",
+            &dormant_synthetic_control_entries,
+        );
+    }
+
+    fn deinit(observation: *ControlGitObservation) void {
+        for (observation.entries) |*entry| entry.deinit(observation.allocator);
+        observation.allocator.free(observation.entries);
+        observation.allocator.free(observation.remotes);
+        observation.allocator.free(observation.status);
+        observation.allocator.free(observation.branch);
+        observation.* = undefined;
+    }
+};
+
+const DormantRolePolicyKind = enum {
+    exact_real,
+    synthetic_test,
+};
+
+const DormantControlFileExpectation = struct {
+    component: DormantComponent,
+    path: []u8,
+    sha256: [64]u8,
+    bytes: u64,
+    mode: u16,
+
+    fn deinit(expectation: *DormantControlFileExpectation, allocator: std.mem.Allocator) void {
+        allocator.free(expectation.path);
+        expectation.* = undefined;
+    }
+};
+
+const DormantRootPolicy = struct {
+    allocator: std.mem.Allocator,
+    kind: DormantRolePolicyKind,
+    main_root: []u8,
+    control_root: []u8,
+    authority_root: []u8,
+    payload_root: []u8,
+    source_root: []u8,
+    supplemental_control_root: []u8,
+    non_main_roots: [][]u8,
+    control_files: []DormantControlFileExpectation,
+    observed_control: ControlGitObservation,
+    expected_control: ControlGitObservation,
+
+    fn initOwned(
+        allocator: std.mem.Allocator,
+        kind: DormantRolePolicyKind,
+        main_root: []const u8,
+        control_root: []const u8,
+        authority_root: []const u8,
+        payload_root: []const u8,
+        source_root: []const u8,
+        supplemental_control_root: []const u8,
+        non_main_roots: []const []const u8,
+        control_file_specs: []const DormantControlFileExpectationSpec,
+        observed_control: *ControlGitObservation,
+        expected_control: *ControlGitObservation,
+    ) !DormantRootPolicy {
+        const owned_main = try allocator.dupe(u8, main_root);
+        errdefer allocator.free(owned_main);
+        const owned_control = try allocator.dupe(u8, control_root);
+        errdefer allocator.free(owned_control);
+        const owned_authority = try allocator.dupe(u8, authority_root);
+        errdefer allocator.free(owned_authority);
+        const owned_payload = try allocator.dupe(u8, payload_root);
+        errdefer allocator.free(owned_payload);
+        const owned_source = try allocator.dupe(u8, source_root);
+        errdefer allocator.free(owned_source);
+        const owned_supplemental = try allocator.dupe(u8, supplemental_control_root);
+        errdefer allocator.free(owned_supplemental);
+        const owned_non_main = try allocator.alloc([]u8, non_main_roots.len);
+        errdefer allocator.free(owned_non_main);
+        var initialized: usize = 0;
+        errdefer for (owned_non_main[0..initialized]) |path| allocator.free(path);
+        for (non_main_roots, owned_non_main) |path, *owned| {
+            owned.* = try allocator.dupe(u8, path);
+            initialized += 1;
+        }
+        const owned_control_files = try allocator.alloc(
+            DormantControlFileExpectation,
+            control_file_specs.len,
+        );
+        errdefer allocator.free(owned_control_files);
+        var initialized_control_files: usize = 0;
+        var seen_control_components = [_]bool{false} ** 4;
+        errdefer for (owned_control_files[0..initialized_control_files]) |*expectation| {
+            expectation.deinit(allocator);
+        };
+        for (control_file_specs, owned_control_files) |spec, *expectation| {
+            const component_index = @intFromEnum(spec.component);
+            if (!dormantControlKeyMatches(spec.component, spec.path) or
+                seen_control_components[component_index] or
+                spec.mode != 0o644 or
+                spec.bytes > 4 * 1024 * 1024)
+            {
+                return error.DormantControlGitMalformed;
+            }
+            try validateSha(spec.sha256);
+            expectation.* = .{
+                .component = spec.component,
+                .path = try allocator.dupe(u8, spec.path),
+                .sha256 = spec.sha256[0..64].*,
+                .bytes = spec.bytes,
+                .mode = spec.mode,
+            };
+            seen_control_components[component_index] = true;
+            initialized_control_files += 1;
+        }
+        if (owned_control_files.len != 4) return error.DormantControlGitMalformed;
+        const policy: DormantRootPolicy = .{
+            .allocator = allocator,
+            .kind = kind,
+            .main_root = owned_main,
+            .control_root = owned_control,
+            .authority_root = owned_authority,
+            .payload_root = owned_payload,
+            .source_root = owned_source,
+            .supplemental_control_root = owned_supplemental,
+            .non_main_roots = owned_non_main,
+            .control_files = owned_control_files,
+            .observed_control = observed_control.*,
+            .expected_control = expected_control.*,
+        };
+        observed_control.* = undefined;
+        expected_control.* = undefined;
+        return policy;
+    }
+
+    fn deinit(policy: *DormantRootPolicy) void {
+        policy.expected_control.deinit();
+        policy.observed_control.deinit();
+        for (policy.control_files) |*expectation| expectation.deinit(policy.allocator);
+        policy.allocator.free(policy.control_files);
+        for (policy.non_main_roots) |path| policy.allocator.free(path);
+        policy.allocator.free(policy.non_main_roots);
+        policy.allocator.free(policy.supplemental_control_root);
+        policy.allocator.free(policy.source_root);
+        policy.allocator.free(policy.payload_root);
+        policy.allocator.free(policy.authority_root);
+        policy.allocator.free(policy.control_root);
+        policy.allocator.free(policy.main_root);
+        policy.* = undefined;
+    }
+};
+
+fn controlGitObjectId(value: []const u8) ![40]u8 {
+    if (value.len != 40) return error.DormantControlGitMalformed;
+    for (value) |byte| {
+        if (!std.ascii.isDigit(byte) and (byte < 'a' or byte > 'f')) {
+            return error.DormantControlGitMalformed;
+        }
+    }
+    return value[0..40].*;
+}
+
+fn controlGitSingleLine(output: []const u8) ![]const u8 {
+    if (output.len < 2 or output[output.len - 1] != '\n' or
+        std.mem.indexOfScalar(u8, output, '\r') != null or
+        std.mem.indexOfScalar(u8, output[0 .. output.len - 1], '\n') != null)
+    {
+        return error.DormantControlGitMalformed;
+    }
+    return output[0 .. output.len - 1];
+}
+
+fn parseControlGitTreeSpecs(
+    allocator: std.mem.Allocator,
+    output: []const u8,
+) ![]ControlGitEntrySpec {
+    if (output.len == 0 or output[output.len - 1] != 0) {
+        return error.DormantControlGitMalformed;
+    }
+    var specs: std.ArrayList(ControlGitEntrySpec) = .empty;
+    errdefer specs.deinit(allocator);
+    var records = std.mem.splitScalar(u8, output, 0);
+    while (records.next()) |record| {
+        if (record.len == 0) {
+            if (records.next() != null) return error.DormantControlGitMalformed;
+            break;
+        }
+        if (specs.items.len == 16) return error.DormantControlGitMalformed;
+        const first_space = std.mem.indexOfScalar(u8, record, ' ') orelse
+            return error.DormantControlGitMalformed;
+        const second_space_offset = std.mem.indexOfScalar(
+            u8,
+            record[first_space + 1 ..],
+            ' ',
+        ) orelse return error.DormantControlGitMalformed;
+        const second_space = first_space + 1 + second_space_offset;
+        const tab = std.mem.indexOfScalar(u8, record, '\t') orelse
+            return error.DormantControlGitMalformed;
+        if (second_space + 1 >= tab or
+            std.mem.indexOfScalar(u8, record[tab + 1 ..], '\t') != null)
+        {
+            return error.DormantControlGitMalformed;
+        }
+        try specs.append(allocator, .{
+            .mode = record[0..first_space],
+            .kind = record[first_space + 1 .. second_space],
+            .object_id = record[second_space + 1 .. tab],
+            .path = record[tab + 1 ..],
+        });
+    }
+    return specs.toOwnedSlice(allocator);
+}
+
+fn cleanControlGitEnvironment(
+    allocator: std.mem.Allocator,
+) !std.process.Environ.Map {
+    var environment = std.process.Environ.Map.init(allocator);
+    errdefer environment.deinit();
+    try environment.put("PATH", "/usr/bin:/bin");
+    try environment.put("LC_ALL", "C");
+    try environment.put("HOME", "/nonexistent");
+    try environment.put("XDG_CONFIG_HOME", "/nonexistent");
+    try environment.put("GIT_CONFIG_NOSYSTEM", "1");
+    try environment.put("GIT_CONFIG_GLOBAL", "/dev/null");
+    try environment.put("GIT_CONFIG_SYSTEM", "/dev/null");
+    try environment.put("GIT_OPTIONAL_LOCKS", "0");
+    try environment.put("GIT_TERMINAL_PROMPT", "0");
+    try environment.put("GIT_PAGER", "cat");
+    try environment.put("PAGER", "cat");
+    return environment;
+}
+
+fn runControlGit(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    args: []const []const u8,
+) ![]u8 {
+    var environment = try cleanControlGitEnvironment(allocator);
+    defer environment.deinit();
+    const result = try std.process.run(allocator, io, .{
+        .argv = args,
+        .environ_map = &environment,
+        .stdout_limit = .limited(64 * 1024),
+        .stderr_limit = .limited(64 * 1024),
+    });
+    if (!termSuccess(result.term) or result.stderr.len != 0) {
+        freeRunResult(allocator, result);
+        return error.DormantControlGitFailed;
+    }
+    allocator.free(result.stderr);
+    return result.stdout;
+}
+
+fn acquireControlGitObservation(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+) !ControlGitObservation {
+    var executable = try std.Io.Dir.openFileAbsolute(io, dormant_git_executable, .{
+        .allow_directory = false,
+        .follow_symlinks = false,
+    });
+    defer executable.close(io);
+    var executable_identity = try identityOfOpenFileAnyMode(allocator, io, executable);
+    defer executable_identity.deinit(allocator);
+    if (executable_identity.mode != 0o755 or
+        executable_identity.bytes != dormant_git_bytes or
+        !std.mem.eql(u8, &executable_identity.sha256, dormant_git_sha256))
+    {
+        return error.DormantControlGitIdentityMismatch;
+    }
+
+    const commit_output = try runControlGit(allocator, io, &.{
+        dormant_git_executable,
+        "-C",
+        dormant_real_control_root,
+        "rev-parse",
+        "--verify",
+        "HEAD",
+    });
+    defer allocator.free(commit_output);
+    const tree_output = try runControlGit(allocator, io, &.{
+        dormant_git_executable,
+        "-C",
+        dormant_real_control_root,
+        "rev-parse",
+        "HEAD^{tree}",
+    });
+    defer allocator.free(tree_output);
+    const branch_output = try runControlGit(allocator, io, &.{
+        dormant_git_executable,
+        "-C",
+        dormant_real_control_root,
+        "symbolic-ref",
+        "--quiet",
+        "--short",
+        "HEAD",
+    });
+    defer allocator.free(branch_output);
+    const status_output = try runControlGit(allocator, io, &.{
+        dormant_git_executable,
+        "-C",
+        dormant_real_control_root,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+    });
+    defer allocator.free(status_output);
+    const remotes_output = try runControlGit(allocator, io, &.{
+        dormant_git_executable,
+        "-C",
+        dormant_real_control_root,
+        "remote",
+    });
+    defer allocator.free(remotes_output);
+    const entries_output = try runControlGit(allocator, io, &.{
+        dormant_git_executable,
+        "-C",
+        dormant_real_control_root,
+        "ls-tree",
+        "-r",
+        "-z",
+        "--full-tree",
+        "HEAD",
+        "--",
+        "authority/zllvm/v1",
+    });
+    defer allocator.free(entries_output);
+    const entry_specs = try parseControlGitTreeSpecs(allocator, entries_output);
+    defer allocator.free(entry_specs);
+    return ControlGitObservation.initOwned(
+        allocator,
+        try controlGitSingleLine(commit_output),
+        try controlGitSingleLine(tree_output),
+        try controlGitSingleLine(branch_output),
+        status_output,
+        remotes_output,
+        entry_specs,
+    );
+}
+
+fn validateControlGitObservation(
+    observed: ControlGitObservation,
+    expected: ControlGitObservation,
+) !void {
+    if (!std.mem.eql(u8, &observed.commit, &expected.commit) or
+        !std.mem.eql(u8, &observed.tree, &expected.tree) or
+        !std.mem.eql(u8, observed.branch, expected.branch) or
+        !std.mem.eql(u8, observed.status, expected.status) or
+        !std.mem.eql(u8, observed.remotes, expected.remotes) or
+        observed.entries.len != expected.entries.len)
+    {
+        return error.DormantUnsafeRoot;
+    }
+    for (observed.entries, expected.entries) |actual, wanted| {
+        if (!std.mem.eql(u8, &actual.mode, &wanted.mode) or
+            !std.mem.eql(u8, &actual.kind, &wanted.kind) or
+            !std.mem.eql(u8, &actual.object_id, &wanted.object_id) or
+            !std.mem.eql(u8, actual.path, wanted.path))
+        {
+            return error.DormantUnsafeRoot;
+        }
+    }
+}
+
+fn pathsIntersect(a: []const u8, b: []const u8) bool {
+    return pathContains(a, b) or pathContains(b, a);
+}
+
 const DormantAuthorityConfig = struct {
     allocator: std.mem.Allocator,
     io: std.Io,
     guard: RegistrationGuard,
+    root_policy: DormantRootPolicy,
     control_root: []u8,
     authority_root: []u8,
     payload_root: []u8,
@@ -1613,12 +2181,132 @@ const DormantAuthorityConfig = struct {
     expected_registration_topology_hash: [64]u8,
     expected_registration_non_main_hash: [64]u8,
 
-    fn init(
+    fn initExactRealCandidate(
         allocator: std.mem.Allocator,
         io: std.Io,
+        source_manifest_sha256: []const u8,
+        source_inventory_sha256: []const u8,
+        source_file_ledger_sha256: []const u8,
+        source_destination_ledger_sha256: []const u8,
+        copy_evidence_path: []const u8,
+        copy_evidence_sha256: []const u8,
+    ) !DormantAuthorityConfig {
+        var guard = try RegistrationGuard.init(allocator, io);
+        errdefer guard.deinit();
+        if (!std.mem.eql(u8, guard.frozen.paths[0], main_repository)) {
+            return error.DormantRegistrationStale;
+        }
+        var observed = try acquireControlGitObservation(allocator, io);
+        var observed_transferred = false;
+        errdefer if (!observed_transferred) observed.deinit();
+        var expected = try ControlGitObservation.initRealExpected(allocator);
+        var expected_transferred = false;
+        errdefer if (!expected_transferred) expected.deinit();
+        var policy = try DormantRootPolicy.initOwned(
+            allocator,
+            .exact_real,
+            main_repository,
+            dormant_real_control_root,
+            dormant_real_authority_root,
+            dormant_real_payload_root,
+            dormant_real_source_root,
+            dormant_real_control_root,
+            guard.frozen.paths[1..],
+            &dormant_real_control_file_expectations,
+            &observed,
+            &expected,
+        );
+        observed_transferred = true;
+        expected_transferred = true;
+        errdefer policy.deinit();
+        return initOwned(
+            allocator,
+            io,
+            &guard,
+            &policy,
+            source_manifest_sha256,
+            source_inventory_sha256,
+            source_file_ledger_sha256,
+            source_destination_ledger_sha256,
+            copy_evidence_path,
+            copy_evidence_sha256,
+        );
+    }
+
+    fn initSynthetic(
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        main_root: []const u8,
         control_root: []const u8,
         payload_root: []const u8,
         source_root: []const u8,
+        supplemental_control_root: []const u8,
+        non_main_roots: []const []const u8,
+        observed_control: *ControlGitObservation,
+        control_file_specs: []const DormantControlFileExpectationSpec,
+        source_manifest_sha256: []const u8,
+        source_inventory_sha256: []const u8,
+        source_file_ledger_sha256: []const u8,
+        source_destination_ledger_sha256: []const u8,
+        copy_evidence_path: []const u8,
+        copy_evidence_sha256: []const u8,
+    ) !DormantAuthorityConfig {
+        if (!builtin.is_test) return error.TestOnlyOperation;
+        const roots = [_][]const u8{ main_root, control_root, payload_root, source_root };
+        for (roots) |root| {
+            if (!pathContains(dormant_test_root, root) or
+                pathsIntersect(root, dormant_real_control_root) or
+                pathsIntersect(root, dormant_real_payload_root) or
+                pathsIntersect(root, dormant_real_source_root))
+            {
+                return error.DormantUnsafeRoot;
+            }
+        }
+        const authority_root = try std.fs.path.join(
+            allocator,
+            &.{ control_root, "authority", "zllvm", "v1" },
+        );
+        defer allocator.free(authority_root);
+        var guard = try RegistrationGuard.init(allocator, io);
+        errdefer guard.deinit();
+        var expected = try ControlGitObservation.initSyntheticExpected(allocator);
+        var expected_transferred = false;
+        errdefer if (!expected_transferred) expected.deinit();
+        var policy = try DormantRootPolicy.initOwned(
+            allocator,
+            .synthetic_test,
+            main_root,
+            control_root,
+            authority_root,
+            payload_root,
+            source_root,
+            supplemental_control_root,
+            non_main_roots,
+            control_file_specs,
+            observed_control,
+            &expected,
+        );
+        expected_transferred = true;
+        errdefer policy.deinit();
+        return initOwned(
+            allocator,
+            io,
+            &guard,
+            &policy,
+            source_manifest_sha256,
+            source_inventory_sha256,
+            source_file_ledger_sha256,
+            source_destination_ledger_sha256,
+            copy_evidence_path,
+            copy_evidence_sha256,
+        );
+    }
+
+    fn initOwned(
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        guard: *RegistrationGuard,
+        root_policy: *DormantRootPolicy,
         source_manifest_sha256: []const u8,
         source_inventory_sha256: []const u8,
         source_file_ledger_sha256: []const u8,
@@ -1632,25 +2320,21 @@ const DormantAuthorityConfig = struct {
         try validateSha(source_destination_ledger_sha256);
         try validateRelativeKey(copy_evidence_path);
         try validateSha(copy_evidence_sha256);
-        var guard = try RegistrationGuard.init(allocator, io);
-        errdefer guard.deinit();
-        const owned_control = try allocator.dupe(u8, control_root);
+        const owned_control = try allocator.dupe(u8, root_policy.control_root);
         errdefer allocator.free(owned_control);
-        const owned_authority = try std.fs.path.join(
-            allocator,
-            &.{ control_root, "authority", "zllvm", "v1" },
-        );
+        const owned_authority = try allocator.dupe(u8, root_policy.authority_root);
         errdefer allocator.free(owned_authority);
-        const owned_payload = try allocator.dupe(u8, payload_root);
+        const owned_payload = try allocator.dupe(u8, root_policy.payload_root);
         errdefer allocator.free(owned_payload);
-        const owned_source = try allocator.dupe(u8, source_root);
+        const owned_source = try allocator.dupe(u8, root_policy.source_root);
         errdefer allocator.free(owned_source);
         const owned_copy_evidence_path = try allocator.dupe(u8, copy_evidence_path);
         errdefer allocator.free(owned_copy_evidence_path);
-        return .{
+        const result: DormantAuthorityConfig = .{
             .allocator = allocator,
             .io = io,
-            .guard = guard,
+            .guard = guard.*,
+            .root_policy = root_policy.*,
             .control_root = owned_control,
             .authority_root = owned_authority,
             .payload_root = owned_payload,
@@ -1666,15 +2350,19 @@ const DormantAuthorityConfig = struct {
             .expected_registration_topology_hash = guard.frozen.topology_hash,
             .expected_registration_non_main_hash = guard.frozen.non_main_hash,
         };
+        guard.* = undefined;
+        root_policy.* = undefined;
+        return result;
     }
 
     fn deinit(config: *DormantAuthorityConfig) void {
-        config.guard.deinit();
         config.allocator.free(config.expected_copy_evidence_path);
         config.allocator.free(config.source_root);
         config.allocator.free(config.payload_root);
         config.allocator.free(config.authority_root);
         config.allocator.free(config.control_root);
+        config.root_policy.deinit();
+        config.guard.deinit();
         config.* = undefined;
     }
 
@@ -1768,10 +2456,14 @@ fn readDormantControlFile(
     component: DormantComponent,
     relative_path: []const u8,
 ) ![]u8 {
-    validateRelativeKey(relative_path) catch return component.unsafe();
+    if (!dormantControlKeyMatches(component, relative_path)) return component.unsafe();
+    const expectation = dormantControlFileExpectation(
+        &config.root_policy,
+        component,
+        relative_path,
+    ) orelse return component.unsafe();
     var control = std.Io.Dir.openDirAbsolute(config.io, config.control_root, .{
         .access_sub_paths = true,
-        .iterate = true,
         .follow_symlinks = false,
     }) catch |err| return switch (err) {
         error.FileNotFound => component.missing(),
@@ -1780,7 +2472,7 @@ fn readDormantControlFile(
     };
     defer control.close(config.io);
     const control_stat = control.stat(config.io) catch return component.unsafe();
-    if (@as(u16, @intCast(control_stat.permissions.toMode() & 0o7777)) != 0o755) {
+    if (@as(u16, @intCast(control_stat.permissions.toMode() & 0o7777)) != 0o775) {
         return component.mismatched();
     }
     const parent_path = std.fs.path.dirname(relative_path) orelse ".";
@@ -1818,7 +2510,10 @@ fn readDormantControlFile(
     defer file.close(config.io);
     const stat = file.stat(config.io) catch return component.malformed();
     if (stat.kind != .file) return component.unsafe();
-    if (@as(u16, @intCast(stat.permissions.toMode() & 0o7777)) != 0o644) {
+    if (@as(u16, @intCast(stat.permissions.toMode() & 0o7777)) != expectation.mode) {
+        return component.mismatched();
+    }
+    if (config.root_policy.kind == .exact_real and stat.size != expectation.bytes) {
         return component.mismatched();
     }
     const size = std.math.cast(usize, stat.size) orelse return component.malformed();
@@ -1842,45 +2537,158 @@ fn readDormantControlFile(
         bytes.len,
     ) catch return component.malformed();
     if (extra_count != 0) return component.malformed();
+    if (config.root_policy.kind == .exact_real and
+        !std.mem.eql(u8, &sha256Hex(bytes), &expectation.sha256))
+    {
+        return component.mismatched();
+    }
     return bytes;
 }
 
-fn validateDormantRoots(config: *const DormantAuthorityConfig) !void {
-    const roots = [_][]const u8{
-        config.control_root,
-        config.authority_root,
-        config.payload_root,
-        config.source_root,
-    };
-    for (roots) |root| {
-        const normalized = normalizedAbsolute(config.allocator, root) catch
-            return error.DormantUnsafeRoot;
-        defer config.allocator.free(normalized);
-        if (!std.mem.eql(u8, normalized, root)) return error.DormantUnsafeRoot;
-        config.guard.assertStoreRoot(root) catch return error.DormantUnsafeRoot;
-        const exists = validateAuthorityAncestry(config.allocator, config.io, root) catch
-            return error.DormantUnsafeRoot;
-        if (!exists) return error.DormantDestinationPartial;
-        var directory = std.Io.Dir.openDirAbsolute(config.io, root, .{
-            .iterate = true,
-            .follow_symlinks = false,
-        }) catch return error.DormantUnsafeRoot;
-        defer directory.close(config.io);
-        const stat = directory.stat(config.io) catch return error.DormantUnsafeRoot;
-        if (@as(u16, @intCast(stat.permissions.toMode() & 0o7777)) != 0o755) {
-            return error.DormantUnsafeRoot;
+fn dormantControlFileExpectation(
+    policy: *const DormantRootPolicy,
+    component: DormantComponent,
+    relative_path: []const u8,
+) ?*const DormantControlFileExpectation {
+    var found: ?*const DormantControlFileExpectation = null;
+    for (policy.control_files) |*expectation| {
+        if (expectation.component == component and
+            std.mem.eql(u8, expectation.path, relative_path))
+        {
+            if (found != null) return null;
+            found = expectation;
         }
     }
+    return found;
+}
+
+fn dormantControlKeyMatches(
+    component: DormantComponent,
+    relative_path: []const u8,
+) bool {
+    return switch (component) {
+        .candidate => std.mem.eql(u8, relative_path, dormant_candidate_key),
+        .generation => std.mem.eql(u8, relative_path, dormant_generation_key),
+        .lineage => std.mem.eql(u8, relative_path, dormant_lineage_key),
+        .receipt => std.mem.eql(u8, relative_path, dormant_receipt_key),
+    };
+}
+
+fn validateDormantRoots(config: *const DormantAuthorityConfig) !void {
+    try validateDormantControlRoot(config);
+    try validateDormantAuthorityRoot(config);
+    try validateDormantPayloadRoot(config);
+    try validateDormantSourceRoot(config);
+}
+
+fn validateDormantRoleDirectory(
+    config: *const DormantAuthorityConfig,
+    actual: []const u8,
+    expected: []const u8,
+    expected_mode: u16,
+    missing_is_partial: bool,
+) !void {
+    if (!std.mem.eql(u8, actual, expected)) return error.DormantUnsafeRoot;
+    const normalized = normalizedAbsolute(config.allocator, actual) catch
+        return error.DormantUnsafeRoot;
+    defer config.allocator.free(normalized);
+    if (!std.mem.eql(u8, normalized, actual)) return error.DormantUnsafeRoot;
+    const exists = validateAuthorityAncestry(config.allocator, config.io, actual) catch
+        return error.DormantUnsafeRoot;
+    if (!exists) {
+        if (missing_is_partial) return error.DormantDestinationPartial;
+        return error.DormantUnsafeRoot;
+    }
+    var directory = std.Io.Dir.openDirAbsolute(config.io, actual, .{
+        .follow_symlinks = false,
+    }) catch return error.DormantUnsafeRoot;
+    defer directory.close(config.io);
+    const stat = directory.stat(config.io) catch return error.DormantUnsafeRoot;
+    if (@as(u16, @intCast(stat.permissions.toMode() & 0o7777)) != expected_mode) {
+        return error.DormantUnsafeRoot;
+    }
+}
+
+fn validateDormantNonMainDisjoint(
+    policy: *const DormantRootPolicy,
+    path: []const u8,
+) !void {
+    for (policy.non_main_roots) |protected| {
+        if (pathsIntersect(path, protected)) return error.DormantUnsafeRoot;
+    }
+}
+
+fn validateDormantControlRoot(config: *const DormantAuthorityConfig) !void {
+    const policy = &config.root_policy;
+    try validateDormantRoleDirectory(
+        config,
+        config.control_root,
+        policy.control_root,
+        0o775,
+        false,
+    );
+    if (!pathContains(policy.main_root, config.control_root)) {
+        return error.DormantUnsafeRoot;
+    }
+    try validateDormantNonMainDisjoint(policy, config.control_root);
+    try validateControlGitObservation(policy.observed_control, policy.expected_control);
+}
+
+fn validateDormantAuthorityRoot(config: *const DormantAuthorityConfig) !void {
+    const policy = &config.root_policy;
+    try validateDormantRoleDirectory(
+        config,
+        config.authority_root,
+        policy.authority_root,
+        0o755,
+        false,
+    );
     if (!pathContains(config.control_root, config.authority_root) or
-        pathContains(config.control_root, config.payload_root) or
-        pathContains(config.payload_root, config.control_root) or
-        pathContains(config.source_root, config.control_root) or
-        pathContains(config.control_root, config.source_root) or
-        pathContains(config.source_root, config.payload_root) or
-        pathContains(config.payload_root, config.source_root))
+        !pathContains(policy.main_root, config.authority_root))
     {
         return error.DormantUnsafeRoot;
     }
+    try validateDormantNonMainDisjoint(policy, config.authority_root);
+}
+
+fn validateDormantPayloadRoot(config: *const DormantAuthorityConfig) !void {
+    const policy = &config.root_policy;
+    try validateDormantRoleDirectory(
+        config,
+        config.payload_root,
+        policy.payload_root,
+        0o755,
+        true,
+    );
+    if (!pathContains(policy.main_root, config.payload_root) or
+        pathsIntersect(config.payload_root, policy.supplemental_control_root) or
+        pathsIntersect(config.payload_root, config.control_root) or
+        pathsIntersect(config.payload_root, config.authority_root) or
+        pathsIntersect(config.payload_root, config.source_root))
+    {
+        return error.DormantUnsafeRoot;
+    }
+    try validateDormantNonMainDisjoint(policy, config.payload_root);
+}
+
+fn validateDormantSourceRoot(config: *const DormantAuthorityConfig) !void {
+    const policy = &config.root_policy;
+    try validateDormantRoleDirectory(
+        config,
+        config.source_root,
+        policy.source_root,
+        0o775,
+        false,
+    );
+    if (pathsIntersect(config.source_root, policy.main_root) or
+        pathsIntersect(config.source_root, policy.supplemental_control_root) or
+        pathsIntersect(config.source_root, config.control_root) or
+        pathsIntersect(config.source_root, config.authority_root) or
+        pathsIntersect(config.source_root, config.payload_root))
+    {
+        return error.DormantUnsafeRoot;
+    }
+    try validateDormantNonMainDisjoint(policy, config.source_root);
 }
 
 const DormantExpectedEntry = struct {
@@ -3847,9 +4655,11 @@ const DormantSyntheticFixture = struct {
     allocator: std.mem.Allocator,
     io: std.Io,
     root: []u8,
+    main_root: []u8,
     control_root: []u8,
     payload_root: []u8,
     source_root: []u8,
+    non_main_root: []u8,
     manifest: []u8,
     candidate: []u8,
     lineage: []u8,
@@ -3880,19 +4690,37 @@ const DormantSyntheticFixture = struct {
         );
         const root = try allocator.dupe(u8, dormant_test_root);
         errdefer allocator.free(root);
-        const control_root = try std.fs.path.join(allocator, &.{ root, "control" });
+        const main_root = try std.fs.path.join(allocator, &.{ root, "main" });
+        errdefer allocator.free(main_root);
+        const control_root = try std.fs.path.join(allocator, &.{ main_root, "control" });
         errdefer allocator.free(control_root);
-        const payload_root = try std.fs.path.join(allocator, &.{ root, "payload" });
+        const artifacts_root = try std.fs.path.join(allocator, &.{ main_root, "artifacts" });
+        defer allocator.free(artifacts_root);
+        const payload_root = try std.fs.path.join(
+            allocator,
+            &.{ artifacts_root, "zllvm-authority-v1" },
+        );
         errdefer allocator.free(payload_root);
-        const source_root = try std.fs.path.join(allocator, &.{ root, "source" });
+        const source_root = try std.fs.path.join(allocator, &.{ root, "external-source" });
         errdefer allocator.free(source_root);
+        const non_main_root = try std.fs.path.join(
+            allocator,
+            &.{ root, "non-main-registration" },
+        );
+        errdefer allocator.free(non_main_root);
+        try createAbsoluteDirectorySynced(io, main_root);
         try createAbsoluteDirectorySynced(io, control_root);
+        try createAbsoluteDirectorySynced(io, artifacts_root);
         try createAbsoluteDirectorySynced(io, payload_root);
         try createAbsoluteDirectorySynced(io, source_root);
+        try createAbsoluteDirectorySynced(io, non_main_root);
         try setDormantAbsoluteDirectoryMode(io, root, 0o755);
-        try setDormantAbsoluteDirectoryMode(io, control_root, 0o755);
+        try setDormantAbsoluteDirectoryMode(io, main_root, 0o755);
+        try setDormantAbsoluteDirectoryMode(io, control_root, 0o775);
+        try setDormantAbsoluteDirectoryMode(io, artifacts_root, 0o755);
         try setDormantAbsoluteDirectoryMode(io, payload_root, 0o755);
-        try setDormantAbsoluteDirectoryMode(io, source_root, 0o755);
+        try setDormantAbsoluteDirectoryMode(io, source_root, 0o775);
+        try setDormantAbsoluteDirectoryMode(io, non_main_root, 0o755);
 
         var control = try std.Io.Dir.openDirAbsolute(io, control_root, .{
             .access_sub_paths = true,
@@ -4083,9 +4911,11 @@ const DormantSyntheticFixture = struct {
             .allocator = allocator,
             .io = io,
             .root = root,
+            .main_root = main_root,
             .control_root = control_root,
             .payload_root = payload_root,
             .source_root = source_root,
+            .non_main_root = non_main_root,
             .manifest = manifest,
             .candidate = candidate,
             .lineage = lineage,
@@ -4109,9 +4939,11 @@ const DormantSyntheticFixture = struct {
         fixture.allocator.free(fixture.lineage);
         fixture.allocator.free(fixture.candidate);
         fixture.allocator.free(fixture.manifest);
+        fixture.allocator.free(fixture.non_main_root);
         fixture.allocator.free(fixture.source_root);
         fixture.allocator.free(fixture.payload_root);
         fixture.allocator.free(fixture.control_root);
+        fixture.allocator.free(fixture.main_root);
         fixture.allocator.free(fixture.root);
         fixture.* = undefined;
     }
@@ -4371,21 +5203,107 @@ fn expectDormantReceiptIdentityMismatch(
     try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
 }
 
+fn replaceDormantTestOwnedBytes(
+    allocator: std.mem.Allocator,
+    slot: *[]u8,
+    replacement: []const u8,
+) ![]u8 {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    const previous = slot.*;
+    slot.* = try allocator.dupe(u8, replacement);
+    return previous;
+}
+
+fn restoreDormantTestOwnedBytes(
+    allocator: std.mem.Allocator,
+    slot: *[]u8,
+    previous: []u8,
+) void {
+    if (!builtin.is_test) @panic("test-only dormant restoration");
+    allocator.free(slot.*);
+    slot.* = previous;
+}
+
 test "dormant authority candidate validates only closed synthetic state" {
     const allocator = std.testing.allocator;
     const io = std.testing.io;
+    _ = &DormantAuthorityConfig.initExactRealCandidate;
     var fixture = try DormantSyntheticFixture.init(allocator, io);
     var completed = false;
     defer if (!completed) std.debug.print(
         "INBOX-205A retain-on-failure synthetic_root={s}\n",
         .{dormant_test_root},
     );
-    var config = try DormantAuthorityConfig.init(
+    const candidate_sha = sha256Hex(fixture.candidate);
+    const generation_sha = sha256Hex(fixture.manifest);
+    const lineage_sha = sha256Hex(fixture.lineage);
+    const receipt_sha = sha256Hex(fixture.receipt);
+    const control_file_specs = [_]DormantControlFileExpectationSpec{
+        .{
+            .component = .candidate,
+            .path = dormant_candidate_key,
+            .sha256 = &candidate_sha,
+            .bytes = fixture.candidate.len,
+            .mode = 0o644,
+        },
+        .{
+            .component = .generation,
+            .path = dormant_generation_key,
+            .sha256 = &generation_sha,
+            .bytes = fixture.manifest.len,
+            .mode = 0o644,
+        },
+        .{
+            .component = .lineage,
+            .path = dormant_lineage_key,
+            .sha256 = &lineage_sha,
+            .bytes = fixture.lineage.len,
+            .mode = 0o644,
+        },
+        .{
+            .component = .receipt,
+            .path = dormant_receipt_key,
+            .sha256 = &receipt_sha,
+            .bytes = fixture.receipt.len,
+            .mode = 0o644,
+        },
+    };
+    var rejected_real_observation =
+        try ControlGitObservation.initSyntheticExpected(allocator);
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        DormantAuthorityConfig.initSynthetic(
+            allocator,
+            io,
+            main_repository,
+            dormant_real_control_root,
+            dormant_real_payload_root,
+            dormant_real_source_root,
+            dormant_real_control_root,
+            &.{fixture.non_main_root},
+            &rejected_real_observation,
+            &control_file_specs,
+            &fixture.source_manifest_sha256,
+            dormant_test_source_inventory_sha256,
+            dormant_test_source_file_ledger_sha256,
+            dormant_test_source_destination_ledger_sha256,
+            dormant_test_copy_evidence_path,
+            dormant_test_copy_evidence_sha256,
+        ),
+    );
+    rejected_real_observation.deinit();
+    var observed_control = try ControlGitObservation.initSyntheticExpected(allocator);
+    var config = try DormantAuthorityConfig.initSynthetic(
         allocator,
         io,
+        fixture.main_root,
         fixture.control_root,
         fixture.payload_root,
         fixture.source_root,
+        fixture.control_root,
+        &.{fixture.non_main_root},
+        &observed_control,
+        &control_file_specs,
         &fixture.source_manifest_sha256,
         dormant_test_source_inventory_sha256,
         dormant_test_source_file_ledger_sha256,
@@ -4404,6 +5322,198 @@ test "dormant authority candidate validates only closed synthetic state" {
     try std.testing.expectEqual(@as(u64, 2), positive.objects);
     try std.testing.expectEqual(@as(u64, 1), positive.snapshots);
     try std.testing.expectEqualStrings(&sha256Hex(fixture.manifest), &positive.manifest_sha256);
+
+    std.mem.swap([]u8, &config.payload_root, &config.source_root);
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    std.mem.swap([]u8, &config.payload_root, &config.source_root);
+
+    const previous_payload_root = try replaceDormantTestOwnedBytes(
+        allocator,
+        &config.payload_root,
+        fixture.root,
+    );
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    restoreDormantTestOwnedBytes(
+        allocator,
+        &config.payload_root,
+        previous_payload_root,
+    );
+
+    try setDormantAbsoluteDirectoryMode(io, fixture.control_root, 0o755);
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try setDormantAbsoluteDirectoryMode(io, fixture.control_root, 0o775);
+
+    try setDormantAbsoluteDirectoryMode(io, config.authority_root, 0o775);
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try setDormantAbsoluteDirectoryMode(io, config.authority_root, 0o755);
+
+    try setDormantAbsoluteDirectoryMode(io, fixture.payload_root, 0o775);
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try setDormantAbsoluteDirectoryMode(io, fixture.payload_root, 0o755);
+
+    try setDormantAbsoluteDirectoryMode(io, fixture.source_root, 0o755);
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try setDormantAbsoluteDirectoryMode(io, fixture.source_root, 0o775);
+
+    var fixture_root = try std.Io.Dir.openDirAbsolute(io, fixture.root, .{
+        .access_sub_paths = true,
+        .iterate = true,
+        .follow_symlinks = false,
+    });
+    try fixture_root.symLink(io, "external-source", "source-link", .{});
+    const source_link = try std.fs.path.join(allocator, &.{ fixture.root, "source-link" });
+    defer allocator.free(source_link);
+    const previous_config_source = try replaceDormantTestOwnedBytes(
+        allocator,
+        &config.source_root,
+        source_link,
+    );
+    const previous_policy_source = try replaceDormantTestOwnedBytes(
+        allocator,
+        &config.root_policy.source_root,
+        source_link,
+    );
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    restoreDormantTestOwnedBytes(
+        allocator,
+        &config.root_policy.source_root,
+        previous_policy_source,
+    );
+    restoreDormantTestOwnedBytes(
+        allocator,
+        &config.source_root,
+        previous_config_source,
+    );
+    try fixture_root.deleteFile(io, "source-link");
+    fixture_root.close(io);
+
+    try std.testing.expectError(
+        error.DormantCandidateUnsafe,
+        readDormantControlFile(
+            &config,
+            .candidate,
+            "authority/zllvm/v1/manifests/unlisted.tsv",
+        ),
+    );
+
+    const previous_non_main = try replaceDormantTestOwnedBytes(
+        allocator,
+        &config.root_policy.non_main_roots[0],
+        fixture.payload_root,
+    );
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    restoreDormantTestOwnedBytes(
+        allocator,
+        &config.root_policy.non_main_roots[0],
+        previous_non_main,
+    );
+
+    const previous_supplemental = try replaceDormantTestOwnedBytes(
+        allocator,
+        &config.root_policy.supplemental_control_root,
+        fixture.payload_root,
+    );
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    restoreDormantTestOwnedBytes(
+        allocator,
+        &config.root_policy.supplemental_control_root,
+        previous_supplemental,
+    );
+
+    config.root_policy.observed_control.commit[0] = 'c';
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    config.root_policy.observed_control.commit[0] = 'a';
+
+    config.root_policy.observed_control.tree[0] = 'c';
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    config.root_policy.observed_control.tree[0] = 'b';
+
+    config.root_policy.observed_control.branch[0] = 'x';
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    config.root_policy.observed_control.branch[0] = 'm';
+
+    const previous_status = try replaceDormantTestOwnedBytes(
+        allocator,
+        &config.root_policy.observed_control.status,
+        " M candidate.tsv\n",
+    );
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    restoreDormantTestOwnedBytes(
+        allocator,
+        &config.root_policy.observed_control.status,
+        previous_status,
+    );
+
+    const previous_remotes = try replaceDormantTestOwnedBytes(
+        allocator,
+        &config.root_policy.observed_control.remotes,
+        "origin\n",
+    );
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    restoreDormantTestOwnedBytes(
+        allocator,
+        &config.root_policy.observed_control.remotes,
+        previous_remotes,
+    );
+
+    config.root_policy.observed_control.entries[0].object_id[0] = '5';
+    try std.testing.expectError(
+        error.DormantUnsafeRoot,
+        validateDormantAuthorityCandidate(&config),
+    );
+    config.root_policy.observed_control.entries[0].object_id[0] = '1';
+
+    config.root_policy.kind = .exact_real;
+    config.root_policy.control_files[0].sha256[0] =
+        if (candidate_sha[0] == '0') '1' else '0';
+    try std.testing.expectError(
+        error.DormantCandidateMismatched,
+        validateDormantAuthorityCandidate(&config),
+    );
+    config.root_policy.control_files[0].sha256[0] = candidate_sha[0];
+    config.root_policy.kind = .synthetic_test;
 
     try fixture.deleteControl(dormant_candidate_key);
     try std.testing.expectError(

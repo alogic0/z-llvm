@@ -192,3 +192,123 @@ The source store remains authoritative, the destination remains
 non-authoritative, and the control candidate remains inert. No real
 candidate validation, activation, compatibility, v3 execution, compiler
 gate, performance run, cleanup, ratchet movement, or credit occurred.
+
+## INBOX-206D through INBOX-206G four-role remediation
+
+Status: complete. The private dormant authority validator now implements the
+accepted four-role design from INBOX-206C. The retained synthetic suite
+passed `9/9`; the final INBOX-206G structural guard passed status `0`.
+The candidate remains inert, the old source remains authoritative, and no
+real candidate validation occurred.
+
+### Closed role and observation model
+
+The validator admits roles in the fixed order `control -> authority ->
+payload -> source`:
+
+| Role | Exact real path | Required mode | Closed relationship |
+|---|---|---:|---|
+| control | `/home/oleg/prog/z_llvm/local-state/control` | `0775` | exact supplemental Git repository and four-key pre-open allowlist |
+| authority | `/home/oleg/prog/z_llvm/local-state/control/authority/zllvm/v1` | `0755` | narrow intentional containment in control and main |
+| payload | `/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1` | `0755` | narrow main-contained payload; disjoint from supplemental control and non-main registrations |
+| source | `/home/oleg/prog/z_llvm-artifacts` | `0775` | external identity-only source, disjoint from main, supplemental control, and every other role |
+
+The exact-real policy owns the paths, modes, relations, registration
+snapshot, four control-file identities, and expected control Git
+observation. Acquisition and validation are separate. Acquisition uses only
+frozen `/usr/bin/git` under a closed environment with exact `-C` control-root
+arguments and bounded output/status for:
+
+- `rev-parse --verify HEAD`
+- `rev-parse --verify HEAD^{tree}`
+- `symbolic-ref --short HEAD`
+- `status --porcelain=v1 --untracked-files=all`
+- `remote`
+- `ls-tree -rz --full-tree HEAD -- authority/zllvm/v1`
+
+Validation requires commit
+`9c55bda34088e1230b0b91a126d35795a3ac70b4`, tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e`, branch `main`, empty status and
+remotes, and exactly the four tracked `100644 blob` entries before any
+control-file open. Each open is then bound to its allowlisted component and
+exact hash, bytes, and mode. There is no directory-derived key, fallback,
+write, chmod, repair, or normalization.
+
+The synthetic policy is allocator-owned and `builtin.is_test`-closed. It
+injects owned observations into the same validation logic and rejects all
+real role paths. Its accepted negative matrix covers role swaps and escapes,
+each role-mode mismatch, symlinked ancestry, an unlisted fifth control key,
+non-main and supplemental-control intersections, and independent
+commit/tree/branch/status/remotes/tree-entry drift. The generic
+`RegistrationGuard`, payload verification, production entrypoints, public
+surface, CLI/environment, selector, build registration, statement order,
+and production call graph remain unchanged.
+
+### Executed gates and retained records
+
+No D/E/F/G command was retried. INBOX-206D completed format, compile-only,
+and the focused synthetic suite before its structural guard. The exact gate
+record identities are:
+
+| Gate | Command SHA-256 | Environment SHA-256 | stdout SHA-256 | stderr SHA-256 | Result |
+|---|---|---|---|---|---|
+| D format | `5847d2ba231f2108187b313edd95a6e7b38bd97cea9c1c51884e366f0a6ea38b` | `a4bc38f17c97e91d04330f8e6a74a8febec081cb977e029eb3b807c9b3f35f7e` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | status `0` |
+| D compile-only | `bc31e53d3d4f1bd672e0d37699e1755275bacc5ccc43d350721c2f8fa4e1670e` | `24c270d80f832d523d158892df872f021f7aa83eb18463d9fdaaa8b0d699917f` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | status `0` |
+| D focused suite | `2dad169fc0bf6f061d83471c0045a029d8afee7e38c488e64be7fc0ad8ce3b5a` | `d97651288416a4b2979f4ea4e65b572d66d53c77cbeb7e61a69f43a71544fa1f` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | `d8363bd8494e448903defaaaa817c866e554ada09b0397c75dfe8d94cc382811` | status `0`, `9/9` |
+
+The structural-guard continuation ledger is:
+
+| Attempt | Authorized correction | Command SHA-256 | Frozen diff SHA-256 | stdout SHA-256 | stderr SHA-256 | Result |
+|---|---|---|---|---|---|---|
+| D | initial complete four-role guard | `c7af50b100ed05c3c8f3e1b2f50facaff167c23cc71aa9d89c2140f83624b9d8` | n/a | empty | empty | status `1` |
+| E | three reviewed false-expectation corrections | `a94c5bb32ebc11ccbfc1d09de6694acf5515dc208fab687869bbf84211d363c2` | `43d6f5b9d85249438e699201c3054babc2fda798181fe2e72c411f92684a1271` | empty | empty | status `1` |
+| F | exact-line `rg -xF` match for `dormant_git_executable` | `80e367d39fb5d4ec1468a278fc2b8386c8c3bda17add67f51c5f403b8b2d0107` | `173beb614f61e8b7249cd800b954a4ee44d3f766e285f49853f845e751e737c7` | empty | `e4537dc3fa0b0442e943589bdc93e180575687444c31c25859e2587414e0dc3c` | status `1`, AWK delimiter syntax |
+| G | remove only the erroneous backslashes from the two multiline AWK string delimiters | `42308badefdadd7f5bc4d8c3ca049efe26803e92836f7b5bba6e3cfdb5c1537d` | `e70c02290052678262caad6191dbf33f9f3896a9ea611eba3860f732c7b92682` | `dc90330bbb644222f69b29e3c77b7788f71854f0f78aea2d95ffd43d8f62de04` | empty | status `0` |
+
+All successful status files have SHA-256
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`;
+the empty-file SHA-256 is
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+The G environment is
+`HOME=/home/oleg`, `PATH=/usr/local/bin:/usr/bin:/bin`, and
+`LC_ALL=C.UTF-8`; its retained environment record SHA-256 is
+`12c8e9d8439a95606ce22abf876b4ca4d3e692d54b3b17842e74dfa5bc8ee5b9`.
+Its exact invocation is:
+
+```text
+env -i HOME=/home/oleg PATH=/usr/local/bin:/usr/bin:/bin LC_ALL=C.UTF-8 /bin/bash /tmp/zllvm-inbox206d-root-role-remediation-validation/continuations/inbox206g/source_guard.command
+```
+
+The G guard independently reported:
+
+```text
+retained_206a_206b=exact
+registered_worktrees_control_stash_watcher_pins=exact
+generic_registration_guard=unchanged
+production_main_resolver_public_build=unchanged
+payload_verification_and_driver_order=unchanged
+private_role_order=control-authority-payload-source
+role_paths_modes_allowlist=closed
+control_git_acquisition=bounded-owned-closed
+synthetic_observation=owned-test-only-real-path-rejected
+negative_matrix=closed
+contract_change=uniform-paragraph-only
+ratchet=131
+source_guard=pass
+```
+
+The retained implementation and contract SHA-256 values at the successful
+guard are respectively
+`073bdddeeac4a0b99e39cd54e5b2ea7db403796d25416dcf5ac578ea7ff5ad14`
+and
+`eb112e86d0ea43dfae6fde3974fd77294eae7ee8c68b4cf0b4c293b80f4f4cc6`.
+Ratchet `131` is unchanged. No earlier guard, Zig gate, formatter, compile,
+test, validator, state guard, project command, or real-candidate validation
+was rerun in E, F, or G.
+
+### Terminal boundary
+
+This slice does not validate the real candidate and does not create a
+validation receipt. The candidate remains inert and the old source remains
+authoritative. Activation, compatibility, v3, compiler work, performance,
+cleanup, ratchet movement, and credit remain outside authority.
