@@ -220,11 +220,11 @@ frozen `/usr/bin/git` under a closed environment with exact `-C` control-root
 arguments and bounded output/status for:
 
 - `rev-parse --verify HEAD`
-- `rev-parse --verify HEAD^{tree}`
-- `symbolic-ref --short HEAD`
+- `rev-parse HEAD^{tree}`
+- `symbolic-ref --quiet --short HEAD`
 - `status --porcelain=v1 --untracked-files=all`
 - `remote`
-- `ls-tree -rz --full-tree HEAD -- authority/zllvm/v1`
+- `ls-tree -r -z --full-tree HEAD -- authority/zllvm/v1`
 
 Validation requires commit
 `9c55bda34088e1230b0b91a126d35795a3ac70b4`, tree
