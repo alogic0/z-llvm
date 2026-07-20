@@ -24,7 +24,70 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AZ fresh authority-boundary cardinality remediation — AUTHORIZED
+## INBOX-206BA pre-frozen three-process preconstruction remediation — AUTHORIZED
+
+INBOX-206AZ is accepted only as a compliant fail-closed absent-artifact continuation. Credit is limited to the exact canary, exact operating-document binding, read-only provenance, and correct stop behavior. Its thirteen un-prehashed post-binding probes receive no technical gate credit and are a process-compliance defect. Grant no protected/preconstruction gate completion, evidence construction, marker, D01, implementation, execution, validation, production, ratchet, D02, or downstream credit. Preserve AZ permanently absent; preserve AY/AV exact and AX/AW absent.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206AZ stopped fail-closed.
+
+- Canary passed with exact output.
+- Operating-document binding passed with exact output.
+- Combined protected-state/AV/AY preconstruction replay returned nonzero.
+- No AZ creation or mutation command was reached.
+- Per directive, I performed no inspection, diagnosis, retry, repair, cleanup, or later command.
+```
+
+Static Watcher review ran no project or Zig code. Main/source/index were clean at `4d46b265809a43bd9b93e7b2a0c85b3c195b8e16`, parent `f473db5eb40ff69d36f1723b32a8c42178316854`, tree `e843904f3d0197d000238226b497c599a25aaca2`, with sole commit path `docs/next_steps.md`. Documents remained exact at `6ffabd1b612bf72709065756d017a2945382817604b9cdf23f46ae82582270cb` / `c8eb68253e0f99965bd0f0ea3a46e4bea1f918e40bbd4b10862ffb2a62ceda98`. Main/control, stash, watcher, pins, bypass, tool, build, ratchet 131, AV, AY, and registration identities remained exact; AZ remained absent/non-symlink.
+
+The combined no-write gate’s first failed predicate is statically determined. It compared `stat -c %a` output `644` textually against expected token `0644`; the first AY row therefore compared `644 1209` with `0644 1209`. This is representation-only; every AY byte, semantic permission mode 0644, and aggregate is exact. The retained sequence also contains thirteen zero-status read-only probes after binding without prior retained wrapper/nested hashes. They changed nothing and entered no registered-worktree directory, but execution-time source logging does not satisfy the pre-execution freeze contract.
+
+Reviewer agreement is preserved verbatim:
+
+```text
+I accept INBOX-206AZ only as a compliant fail-closed absent-artifact continuation. Credit is limited to the exact canary, exact document binding, read-only provenance, and correct stop behavior. The thirteen un-prehashed probes receive no technical gate credit and are recorded as a process-compliance defect. Preserve AZ absent, AY/AV exact, and AX/AW absent.
+
+I authorize fresh evidence-only INBOX-206BA with these refinements:
+
+- Create one non-merge commit changing only tracked docs/next_steps.md, with parent exactly 4d46b265809a43bd9b93e7b2a0c85b3c195b8e16; update the ignored inbox separately.
+- After committing, include byte-for-byte in the authoritative dispatch the complete sources and hashes for:
+    1. unchanged transport canary;
+    2. fresh operating-document binding;
+    3. one complete no-write preconstruction wrapper and inner command.
+
+- Execution order is exactly acknowledgment → process 1 → process 2 → process 3. No tool, probe, documentation read, serializer discovery, or other call may intervene.
+- Process 3 must contain the already reviewed registration serializers, protected-state checks, complete AV/AY aggregate recipes, and all ten full AY file identities.
+- Compare stat -c %a output against serializer-native text 644; document its permission semantics as 0644. Do not compare textual 644 with 0644.
+- Give process 3 frozen, stable predicate checkpoints in its captured output so a failure boundary is observable without another command; emit its final success marker only after every assertion passes.
+
+- Before any later wrapper executes, its complete source and nested-command bytes/hashes must be frozen and independently verified. No unlisted or execution-time-only wrapper is permitted.
+- Process-3 success alone permits fresh continuations/inbox206ba creation and the unchanged six-copy/four-keyed construction, exact 19-line boundary and independently defined 20-line derivation gates, remaining evidence gates, and exclusive literal marker finalization.
+
+The first failure preserves BA absent or exactly partial and stops without inspection, diagnosis, repair, retry, or fix-forward. All source, project, Zig/build/install, validation, cache, registered-worktree access, ratchet, production-AWK, D02, credit, and downstream prohibitions remain exact.
+```
+
+Create one non-merge operating commit with parent exactly `4d46b265809a43bd9b93e7b2a0c85b3c195b8e16` and sole changed tracked path `docs/next_steps.md`; update only this ignored inbox separately. After committing, derive and freeze final HEAD/parent/tree/sole-path and both document identities.
+
+The authoritative dispatch must include byte-for-byte complete inner/outer sources and hashes for exactly three initial processes: unchanged literal transport canary, fresh read-only operating-document binding, and one complete no-write preconstruction gate. Execution order is exactly acknowledgment-only, process one, process two, process three. Before process three succeeds, prohibit every other tool, probe, documentation read, serializer discovery, source extraction, or call.
+
+Process three must use the already-reviewed exact registration serializers; verify main/control/stash/watcher/pins/bypass/tool/build identities; verify 43/33-8-2 registration metadata plus exact path/topology/non-main hashes without entering any registered-worktree directory; preserve AW/AX/AZ/BA absent; completely replay AV structure, every identity, aggregates, marker defect, and modes; completely replay AY’s exact ten files, absent marker, all three aggregate recipes, and full size/mode/hash table. Compare serializer-native mode text `644` to `644`, while documenting permission semantics as 0644. It must emit stable LF-terminated checkpoint markers only after each frozen predicate group succeeds, followed by `BA_PRECONSTRUCTION_REPLAY_OK` only after every assertion. Any nonzero status or output drift is terminal and diagnosable from the captured checkpoint prefix without another command.
+
+Process-three success alone authorizes fresh absent non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ba
+```
+
+Only after process three succeeds, freeze and independently verify every complete later wrapper source and nested-command bytes/hash before execution; no unlisted or execution-time-only wrapper is permitted. Recreate the unchanged approved six-copy/four-keyed split under BA identities. Define `authority_boundary.tsv` by exact header plus the 18 named unique ordered keys, 19 total lines, exact values, and no missing/duplicate/unexpected/reordered rows. Define `authority_derivation.tsv` independently with its exact schema, ordered content, expected bytes, and 20 lines. Independently replay every unchanged authority, token, selector, 48-environment, coverage, equivalence, type/mode, invocation-atomic, bijection, conflict, dependency, and audit-record gate.
+
+Preserve exclusive literal marker finalization: derive and freeze BA marker/finalizer bytes/hashes before BA construction; set and verify umask 0022; immediately verify marker absence/non-symlink; perform one complete exclusive no-clobber write; prohibit `apply_patch`, chmod, overwrite, append, rename, generated command, sourced table, or `eval`. Marker success permits only separately frozen read-only marker and terminal identity/clean-state closures. Marker remains audit-only with `implementation_ready=false` and `execution_authority=none`.
+
+The first missing/altered source/hash, unlisted call, status/output drift, identity/replay/gate/marker/closure failure preserves BA absent or exactly partial and stops without inspection, diagnosis, repair, retry, cleanup, normalization, mode change, fix-forward, or later command. No source/production change, implementation, Zig/build/install, project/validation execution, cache, registered-worktree-directory access, ratchet movement from 131, production credit/AWK, D02, or downstream action. Never access `.claude/settings.local.json`.
+
+
+## INBOX-206AZ fresh authority-boundary cardinality remediation — COMPLIANT ABSENT-ARTIFACT STOP; SUPERSEDED BY INBOX-206BA
 
 INBOX-206AY is accepted only as a compliant fail-closed partial evidence/design continuation. Credit is limited to the literal canary, operating-document binding, operating/protected-state gate, complete AV replay, frozen marker/finalizer identities, creation of six exact copies and four keyed files, and correct retention at the first independent keyed failure. Grant no keyed-gate completion, marker, final closure, D01, implementation, execution, validation, production, ratchet, D02, or downstream credit. Preserve AY byte-for-byte exact at its current ten-file partial state with no marker; preserve AV exact and AX/AW absent.
 
