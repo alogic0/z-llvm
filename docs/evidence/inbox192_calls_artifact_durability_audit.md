@@ -635,15 +635,18 @@ ustar_overhead_bytes=2669849
 snapshot_capacity_bound=2*ustar_bytes+1048576=6230928384
 existing_validation_reserve=49112001332
 manifest_and_metadata_bound=67108864
-incoming_object_temp_upper_bound=3112270055
-conservative_required_free=61634578690
-audit_time_headroom=36104038142
+conservative_required_free=58522308635
+audit_time_headroom=39216308197
+one_count_reconciliation=49112001332 + 3112270055 + 6230928384 + 67108864 = 58522308635
 ```
 
 The `2 * ustar + 1 MiB` snapshot bound deliberately does not assume compression
 and is larger than the expected zstd output. Content-addressed deduplication
 may reduce primary and snapshot bytes, but capacity approval must not depend on
-that reduction.
+that reduction. The reconciliation counts the validation reserve, eligible
+primary bytes, conservative snapshot bound, and manifest/journal bound exactly
+once. It does not count the same primary bytes again under a second
+“incoming-object” label.
 
 Before any future publication, recompute on the actual target filesystem:
 
@@ -651,7 +654,6 @@ Before any future publication, recompute on the actual target filesystem:
 required_free =
     existing_validation_reserve
   + all_new_unique_primary_bytes
-  + largest_incoming_object_temporary
   + exact_conservative_snapshot_output_bound
   + bounded_manifest_and_journal_overhead
   + any separately authorized compatibility-copy peak
@@ -664,6 +666,10 @@ publication. Registered worktrees contribute zero artifact bytes and may not
 be traversed to refine capacity. Do not migrate wholesale `tmp/`; admit only
 reviewed bounded logical groups. Compatibility materialization has its own
 capacity preflight and may not consume the validation reserve.
+
+The `97738616832` audit-time free-space value above is frozen evidence, not a
+current filesystem claim. A separately authorized future implementation must
+perform a fresh capacity preflight at its own start boundary.
 
 ## 11. Fail-closed publisher and compatibility resolver
 
