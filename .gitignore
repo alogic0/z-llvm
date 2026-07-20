@@ -28,3 +28,4 @@ docs/worker_inbox.md
 **/*.log
 
 /local-state/
+/.claude/settings.local.json
