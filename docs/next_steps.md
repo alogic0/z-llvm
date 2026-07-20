@@ -24,7 +24,136 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AH literal-validated mode-controlled design freeze — AUTHORIZED
+## INBOX-206AI AH terminal review and process-namespace closure — AUTHORIZED
+
+Accept INBOX-206AH only as a compliant fail-closed design draft and exact
+review candidate. It receives no completed-design, implementation, execution,
+ratchet, credit, or downstream acceptance. Preserve all 23 retained AH files
+permanently and do not repair, complete, rerun, copy, normalize, or modify
+them.
+
+The Worker final report is:
+
+```text
+INBOX-206AH stopped fail-closed at the freeze-snapshot gate with status 1.
+
+The AH root and all constructed records are retained unchanged. I performed no inspection, diagnosis, repair, retry, cleanup, later-stage command, completion creation, or commit.
+```
+
+Static review established that AH passed all seven isolated AE checks, the
+combined precreation gate, Stage 1, and all seven design gates that it claims
+as passing. AH contains exactly 23 top-level regular, non-symlink,
+non-executable files, all mode `0644`, and no `FINAL_COMPLETE`. Its 16-file
+design ledger and 19-file preliminary ledger replay exactly. Its 22-subject
+self-excluding snapshot recomputes exactly:
+
+```text
+paths_sha256=2644034580424e53d1d25acccf89f0c5d989a2380aed7dee0f91c7c0ab8cd932
+inventory_sha256=fc5dcdd06a1d19dbcc3f973ee4ee6268a56e820b5e4404e2df912b143f7c1738
+ledger_sha256=456ed5fcbf9f12d8651d2833e86268e13d14b8a1db7d51473a55343bb0144898
+```
+
+The retained `freeze_snapshot.tsv` has one header plus 18 unique two-field
+records. The final command incorrectly required `NR == 20`; the correct total
+is `NR == 19`. That blocking predicate failed before the completion-absence
+marker and before any completion record. AH therefore remains a truthful
+failed draft, not a completed package.
+
+The retained design also leaves a process-authority ambiguity. Its analyzer,
+process authority, and future gate G06 require exactly seven processes and no
+others, while its 68-field matrix names additional main-repository Git probes.
+Final design review requires two explicit, non-overlapping process namespaces:
+
+- `candidate_runtime`: exactly the six bounded control-repository Git
+  processes plus the one administrative main-repository
+  `git worktree list --porcelain`; no other process is reachable from the
+  private test or validator.
+- `execution_orchestration`: every external analyzer, Zig compiler/test, Git
+  probe, status probe, hash/stat/archive utility, shell/wrapper process, or
+  other process required by future prestate, guard, test, poststate, and
+  finalization sequencing.
+
+Create one non-merge operating commit changing only this file. The Watcher
+dispatch binds its exact commit, parent, tree, changed path, and final ignored
+inbox SHA-256.
+
+Preserve AH and every earlier retained root and record exactly. Create only
+fresh absent, non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ai
+```
+
+Before AI creation, run independently blocking read-only AH checks. Freeze
+the exact command bytes and labels for:
+
+```text
+ah_top_level_file_count=23
+ah_nonfiles=0
+ah_non_mode_0644=0
+ah_execute_bits=0
+ah_final_complete=absent
+ah_paths_sha256=addef2e6546736ac986c4a0e74f9a88c1dcb608400e5cfde3140c7ba084f1746
+ah_inventory_sha256=6e41f3d40da3b0959ae57a90bd64c254b8e6d7ed2c27ab76b6c836fe00c96b10
+ah_ledger_sha256=9551258d114fcefe2f5271191e561d169f5f2caa731c891d5f4ba4aa1190496b
+```
+
+The paths serializer is top-level `%P\n`, bytewise sorted. The inventory
+serializer is top-level `%P\t%y\t%m\t%s\t%l\n`, bytewise sorted. The ledger
+serializer is the NUL-path-sorted loop emitting
+`sha256\tbytes\tmode\trelative_path\n`. No serializer, scope, field order,
+separator, or result may substitute for another.
+
+Also independently replay the retained 16-file and 19-file ledgers and the
+exact 22-subject snapshot above. Validate `freeze_snapshot.tsv` as exactly 19
+total rows: one header and 18 unique two-field records with the exact named
+values. Any mismatch leaves AI absent and stops without diagnosis,
+construction, retry, cleanup, or later action.
+
+Only after all AH checks pass, construct an inert terminal-review companion.
+It must:
+
+1. bind the exact operating authority and every retained AH identity;
+2. record the corrected freeze-schema review without modifying or granting
+   completion credit to AH;
+3. enumerate both process namespaces in finite tabular authorities;
+4. give every orchestration process a fixed executable identity, exact argv,
+   closed environment, stage, output bounds, status/output rules, and
+   authority;
+5. reject dynamic shell commands, unbounded utilities, implicit subprocesses,
+   unspecified executable families, or namespace overlap;
+6. map every process-bearing row in the 68-field matrix to exactly one
+   process and namespace, and explicitly mark non-process rows as
+   descriptor-relative or in-process observations;
+7. prove that `candidate_runtime` is exactly the seven reviewed rows and that
+   no orchestration process is reachable from the private candidate;
+8. replay all 24 defect closures, 68 state fields, seven candidate processes,
+   nine call-resolution classes, eight wrapper stages, 13 future gates, 12
+   absence probes, both retained ledgers, the retained snapshot, and every
+   inert disposition; and
+9. produce a finite AI identity ledger and self-consistent review snapshot.
+
+Use the already accepted explicit-name, pre-first-gate mode-finalization
+discipline for each newly created AI batch: exactly one `chmod 0644` over only
+the named new regular files in that batch, never a glob, recursion, directory,
+prior root, already-gated file, post-gate change, or post-failure repair.
+
+`REVIEW_COMPLETE` may be the final content creation only after every
+independent AI identity, schema, cardinality, and process-closure gate exits
+zero. It means design-review closure only. It grants no completion credit to
+AH and no implementation, execution, validation, activation, or downstream
+authority. Any unresolved executable identity, process, namespace, schema,
+cardinality, or identity issue retains AI and stops without
+`REVIEW_COMPLETE`.
+
+No source/analyzer implementation, build registration, build/install,
+invocation, cache creation, validator, validation, registered-worktree
+directory access, broad discovery, protected-path change, receipt,
+activation, compatibility, validation-v3, ratchet, cleanup, wiring, credit,
+or downstream action is authorized. Do not access
+`.claude/settings.local.json`.
+
+## INBOX-206AH literal-validated mode-controlled design freeze — COMPLIANT FAIL-CLOSED DESIGN DRAFT; NO COMPLETION CREDIT
 
 Accept INBOX-206AG only as a compliant fail-closed precreation failure. It
 receives no design, package, execution, ratchet, credit, or downstream
