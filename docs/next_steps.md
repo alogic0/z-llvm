@@ -24,7 +24,56 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-194 dormant materialize-spec CLI and frozen calls-input specification — AUTHORIZED
+## INBOX-194A proposed-manifest field correction and authority-generic dormant publication — AUTHORIZED
+
+INBOX-194 at unchanged HEAD `f324a50c` is accepted only as a compliant
+retain-and-stop. Its sole orchestration stopped in the first unit phase with
+6/7 tests passing and status 1. No plan/publish CLI call ran; neither the
+INBOX-194 synthetic root nor real store was created. Preserve its six records,
+absent-root state, and retained dirty tool/spec/proposed composite exactly.
+
+Implementation acceptance remains withheld for two closed defects:
+
+- proposed-manifest rows 35 and 36 each have 18 fields rather than the
+  required 17 because of one surplus trailing `-`; and
+- production publication rejects every authority except the synthetic
+  constant, contradicting the frozen-CLI boundary required before a later
+  separately authorized real publication.
+
+Correct only the two surplus fields. Require exactly 17 fields on every
+non-header row, canonical parse/re-encode equality, and byte equality between
+the production-generated and tracked proposed fragments. Preserve every
+source-specification and reviewed artifact identity.
+
+Replace synthetic-path hardcoding with authority-generic store validation:
+canonical absolute path, no symlink/non-directory existing ancestry, no
+equality or containment in either direction with any registered worktree,
+registration revalidation immediately before first mutation, and
+registration revalidation after every successful or idempotent publication
+return. Keep source-read and store-write policies distinct; add no
+compatibility-write authority.
+
+Use only the initially absent, worktree-disjoint continuation root:
+
+`/home/oleg/prog/z_llvm-inbox194a-artifact-store-synthetic`.
+
+Keep the INBOX-194 root and `/home/oleg/prog/z_llvm-artifacts` absent. Run
+formatting/static/compile-only checks first, then exactly one fully recorded
+orchestration forced to INBOX-194A. Assert both forbidden roots absent before
+and after every phase. No component may be retried or substituted.
+
+Failure retains root/records/patch and stops without diagnosis, repair,
+cleanup, commit, or fix-forward. Complete success may remove only the
+reverified INBOX-194A root, preserves every earlier root/record, commits only
+the bounded tool, exact source specification, corrected proposed fragment,
+and one two-attempt evidence summary, then stops for review.
+
+No real publication, live rows, compatibility copies, pin/contract edits,
+current source mutation, protected-worktree access, cleanup, broad migration,
+v3 execution, production wiring, performance, Tier work, checkpoint or
+ratchet movement, or credit is authorized.
+
+## INBOX-194 dormant materialize-spec CLI and frozen calls-input specification — COMPLIANT RETAIN-AND-STOP; IMPLEMENTATION WITHHELD
 
 INBOX-193C is accepted at
 `7303b848ef35ff9547257e2318257c948444656d`: its sole retained suite passed
