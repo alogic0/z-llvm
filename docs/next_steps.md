@@ -24,7 +24,191 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AN corrected schema and invocation-atomic audit closure — AUTHORIZED
+## INBOX-206AO isolated environment-gate replay and invocation-atomic audit closure — AUTHORIZED
+
+INBOX-206AN is accepted only as a compliant fail-closed partial
+evidence/design stop. Its successful preconstruction gates and the static
+consistency of its seven retained files are accepted as evidence. It receives
+no environment-definition gate, invocation-atomic correction, D01,
+`AUDIT_COMPLETE`, implementation, execution, validation, ratchet, credit,
+or downstream acceptance. Preserve AN byte-for-byte; never repair, complete,
+reconstruct, or rerun it.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206AN stopped fail-closed at the first AN batch gate.
+
+Before construction, all required operating, AK structure, serializer, identity, snapshot, 18 schema, cardinality, namespace/environment, and relational gates passed.
+
+AN was then created with seven inert evidence/design files. The explicit-name `chmod 0644` completed, but the combined batch mode/environment-definition gate returned nonzero before any success marker. Per directive:
+
+- AN is retained exactly as reached.
+- `AUDIT_COMPLETE` remains absent.
+- No diagnosis, retry, repair, cleanup, mode change, fix-forward, or later work occurred.
+- No source, production, Zig, build, validation, ratchet, or downstream action occurred.
+```
+
+Watcher static review used no project or Zig execution. The retained command
+and status `1` show no later Worker command. The clean non-merge authority
+was `b5528a13ca9e801cadd757510d6ac68983332ac7`, parent
+`7d18bbc332d2ef4df0ff33f98647416beba14846`, tree
+`6a5d3567df495bde2af3038c5f10c8e9e27e2737`, sole changed path
+`docs/next_steps.md`, and ignored-inbox SHA-256
+`9cdf8e92cc820ff5fff9829b9c87e17aefbcf73947ae7f9a89121d9b0561beeb`.
+Main source/index and control were clean. Control remained
+`9c55bda34088e1230b0b91a126d35795a3ac70b4` / tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e` / `main` / no remote.
+Stash `7985c6d01040a6e47e4ce5b918866d0e89517ac7`; watcher
+HEAD/index/worktree blob
+`b64131cf60dd0ef638e815cd33db9ae8595a72cf`; pins
+`1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3`;
+bypass TSV
+`2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11`;
+tool
+`073bdddeeac4a0b99e39cd54e5b2ea7db403796d25416dcf5ac578ea7ff5ad14`;
+build
+`a0c923499cd4515326fb287d729c53ae6d68bb465a4b4a033a737a19466ce466`;
+retained ratchet evidence `131`; and worktree count/path/topology/non-main
+identities `43` / `f31d8542...` / `6c868e3b...` / `ebc30a37...`
+remained exact.
+
+AN is exactly seven top-level regular, non-symlink, non-executable
+mode-`0644` files with no marker. Freeze:
+
+```text
+paths serializer:     find . -mindepth 1 -maxdepth 1 -printf '%P\n' | LC_ALL=C sort | sha256sum
+paths_sha256:          2f3fd17af4e93b4ed5cf3e1f1242911f1980c89e2a7a514917ba6e8bf24f2176
+inventory serializer: find . -mindepth 1 -maxdepth 1 -printf '%P\t%y\t%m\t%s\t%l\n' | LC_ALL=C sort | sha256sum
+inventory_sha256:      345850df1b03135a3250a97e40b807088d0f987fa494e3b6c6f6dc9b6aaf14bf
+ledger serializer:    find . -mindepth 1 -maxdepth 1 -type f -printf '%P\0' | LC_ALL=C sort -z | xargs -0 -r sha256sum -- | sha256sum
+ledger_sha256:         3686e5c196333c1930dc16c559a063f000d06ee70979f781c472ba4bd5f6bbc7
+ak_replay.tsv:                   e752b99d0dc8307498b1eb0dd5519fe0274e14885cf7208cbb5cf202aa1f1d64
+authority_boundary.tsv:          ef9ca6a87d34e02f64a6f5c3918407f8bed660160c16e7913fb3fb9cb23920ce
+environment_equivalence.tsv:     a88066d60bb08efa4c84578c0b3b2fd00859fa58a7bf8cfc8a65a0de14b5b809
+environment_tokens.tsv:          4e9c9f331fcab38a19ae617eafd07d768bd7654980a1fd094890c7db73a339fc
+environment_variable_policy.tsv: c1922b99c76d1fafa1f3d09e060c7c7c309d16ff60ad6867b50fec0c71e437c6
+preconstruction_gates.tsv:       e386510bab75a06d78a2ecb96aebb011edabb26ac35c4f3703a94190f8e5acfd
+schema_authority.tsv:             89871f44879321bd2270afe8bae4011cc448fe5fcbf42b29addc9a89abb4036f
+```
+
+Static review found every intended retained-data predicate true: `18`
+unique schema files; `29` preconstruction data rows and `29` pass statuses;
+`12` unique environment definitions and tokens; `77` policy rows; exact
+per-token counts `7,7,4,24,4,4,4,7,4,4,4,4`; all twelve ordered-variable
+equalities; and all three exact equivalence rows.
+
+The first nonzero is harness control flow. Under `set -euo pipefail`, ET01's
+`listed` scan ended with a conditional nonmatch on final row ET12. That
+final status `1` propagated through the command substitution and assignment,
+and `errexit` stopped before the equality assertion. This is harness drift,
+not retained AN drift.
+
+Reviewer dialogue is preserved verbatim:
+
+```text
+I accept INBOX-206AN only as a compliant fail-closed partial evidence/design stop. Its preconstruction gates and static data consistency are accepted as evidence, but the environment gate and all downstream closure remain unaccepted. Preserve AN byte-for-byte and never rerun or repair it.
+
+I authorize fresh evidence-only INBOX-206AO with these refinements:
+
+- Commit only docs/next_steps.md as a non-merge operating commit; update the ignored inbox separately and bind both final hashes.
+- Before dispatch, freeze AN’s exact serializer commands, path/inventory/ledger hashes, and seven per-file hashes in the directive.
+- Replay AK and AN identities independently before AO creation.
+- Give every intended AN condition its own labeled, blocking gate and explicit successful scan status; no pipeline or command substitution may inherit a final-row nonmatch.
+- Do not claim all seven AO files are byte-identical to AN if an authority record contains operating identities. Freeze a per-path derivation table: byte-identical reusable files versus narrowly mechanical AO authority substitutions.
+
+- Only successful isolated gates permit the invocation-atomic matrix, counts, conflicts, dependencies, and bijection closure.
+- AUDIT_COMPLETE is written last, audit-only, with implementation_ready=false and execution_authority=none.
+
+Any failure retains AO and stops without diagnosis, retry, repair, or fix-forward. No source, Zig/build/install, execution, validation, worktree-directory access, ratchet, credit, or D02 authority is granted.
+```
+
+Create one non-merge operating commit changing only this file. Update only
+ignored `docs/worker_inbox.md`, freeze its final SHA-256, and bind the
+dispatch to the final commit, parent, tree, sole changed path, and inbox
+hash. The final INBOX-206AO ignored-inbox SHA-256 is
+`b2da4d9597898f5dff72621f7791898d4fdb116ee2f2eadf67e5ec12414780d9`.
+
+Before AO creation, preserve AK and AN byte-for-byte. Independently replay
+operating/protected state; all accepted AK structure, serializer, ledger,
+snapshot, schema, cardinality, namespace/environment, and relational gates;
+and AN structure, the exact three serializers above, and all seven exact
+per-file hashes. Every replay is separately labeled and independently
+blocking.
+
+Only after all identity replays pass, create fresh absent, non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ao
+```
+
+Freeze this per-path derivation table before construction:
+
+```text
+ak_replay.tsv                   byte-identical reuse from AN
+schema_authority.tsv            byte-identical reuse from AN
+environment_tokens.tsv         byte-identical reuse from AN
+environment_variable_policy.tsv byte-identical reuse from AN
+environment_equivalence.tsv    byte-identical reuse from AN
+authority_boundary.tsv          narrow mechanical AO/operating-identity substitutions only
+preconstruction_gates.tsv       narrow mechanical AO gate/identity additions only
+```
+
+The two mechanical rows enumerate every changed field with AN value, AO
+value, and authority. The other five have no content change. Write this
+seven-file batch by explicit name and apply explicit-name mode `0644`
+before its first gate.
+
+Give every intended AN condition its own labeled blocking command and
+explicit success marker: type, mode, non-executable state, absent marker,
+schema count/uniqueness, preconstruction row/status counts, definition/token
+counts and uniqueness, total policy rows, all twelve per-token counts, all
+twelve ordered-variable equalities, and all three equivalence rows. Every
+complete scan explicitly returns zero; no pipeline, command substitution,
+loop, conditional, or last-row nonmatch may implicitly supply success. Do
+not combine independently required conditions behind one marker.
+
+Only complete isolated-gate success permits the previously authorized
+evidence/design correction: split defects into invocation-atomic rows when
+any callsite, dimension, executable identity, environment authority, other
+authority, disposition, or resolution state differs; share only completely
+identical rows; map all 54 invocation instances and every lifecycle/root/
+child environment token exactly once; prove token-definition and invocation/
+dimension bijections; recompute resolved/unresolved totals, conflicts,
+dependencies, and summaries; and independently gate every schema, atomicity,
+count, conflict, dependency, coverage, and identity claim.
+
+Future unresolved implementation identities do not themselves block the
+audit-only marker. `AUDIT_COMPLETE` is the final content write and is
+allowed only after complete enumeration/schema/environment/atomicity/count/
+conflict/dependency/identity closure. It truthfully records the remaining
+future unresolved count and conflict set plus:
+
+```text
+enumeration_schema_environment_closure=passed
+implementation_ready=false
+execution_authority=none
+```
+
+All AO files are regular, non-symlink, non-executable mode `0644`. Any
+failure retains AO and stops without inspection, diagnosis, repair, retry,
+cleanup, mode change, fix-forward, or later work.
+
+No source/production/Zig implementation, build registration, build/install,
+materialization, invocation, cache creation, validation, registered-worktree
+directory access/traversal, broad discovery, protected-path change, receipt,
+activation, compatibility, validation-v3, cleanup, wiring, ratchet, credit,
+or downstream action is authorized. Production AWK is prohibited. D02 and
+the future private Zig 0.16 state-capture implementation remain unauthorized.
+Do not access `.claude/settings.local.json`.
+
+Stop after the first failed gate or after complete AO with
+`AUDIT_COMPLETE` written last. Report all identities, gates, derivations,
+coverage, corrected cardinalities, totals, conflicts, dependencies, marker,
+and protected-state preservation. Acknowledge INBOX-206AO and every stop
+condition before acting.
+
+## INBOX-206AN corrected schema and invocation-atomic audit closure — COMPLIANT FAIL-CLOSED PARTIAL EVIDENCE/DESIGN STOP; SUPERSEDED BY INBOX-206AO
 
 INBOX-206AM is accepted only as a compliant fail-closed preconstruction
 stop. Its successful operating, AK structure, three serializer, 16-row
