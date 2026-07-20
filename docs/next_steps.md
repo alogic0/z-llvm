@@ -24,7 +24,66 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206F final one-line static-guard correction — AUTHORIZED
+## INBOX-206G two-block AWK delimiter correction — AUTHORIZED
+
+Accept INBOX-206F only as a compliant one-shot guard failure. The retained
+implementation and contract remain technically unaccepted. F returned status
+`1`, empty stdout, and retained stderr:
+
+```text
+awk: 2: unexpected character '\'
+awk: line 2: runaway string constant "Dormant ad ...
+```
+
+F passed the corrected Git-executable assertion and produced byte-identical
+contract prefix/suffix pairs. It then reached two multiline AWK blocks whose
+single-quoted shell programs incorrectly use `\"` AWK string delimiters. The
+literal backslashes cause the syntax error. The retained contract is correct,
+and source inspection with ordinary `"` delimiters produces exactly one match
+for each clause.
+
+Preserve every D/E/F record and the exact retained tool/contract bytes.
+Preserve A/B records and caches, 43+1 repository identities, control, stash,
+watcher, pins, stores, paths, modes, candidate state, source authority, and
+ratchet `131`. Real-candidate validation remains withheld.
+
+After proving it absent and non-symlink, create records only beneath:
+
+```text
+/tmp/zllvm-inbox206d-root-role-remediation-validation/continuations/inbox206g
+```
+
+Derive the complete G guard from frozen F and freeze the F-to-G diff. Permit
+only:
+
+1. mechanical substitution of the new operating `HEAD`/parent;
+2. mechanical substitution of `RECORDS` and derived paths from F to G; and
+3. in each of the two exact multiline AWK blocks, replacement only of every
+   erroneous `\"` string-delimiter token with an ordinary `"` delimiter.
+
+Do not alter the clause text, AWK logic, assertions, or ordering. Every other
+substantive F assertion and its order stays byte-equivalent. Do not edit or
+format the tool/contract and do not separately trial either AWK fragment.
+
+Freeze and invoke the full G guard exactly once, retaining its complete
+command, closed environment, diff, identities, stdout, stderr, status, and
+derived records beneath G.
+
+Do not rerun any earlier preflight/guard, Zig, formatter, compile, test,
+validator, state guard, project command, ratchet recount outside G, or real
+candidate validation.
+
+Failure retains everything and stops without diagnosis, repair, retry,
+cleanup, evidence edit, staging, or commit. Status `0` alone authorizes an
+INBOX-206D/E/F/G append to
+`docs/evidence/zllvm_artifact_authority_dormant_v1.md` and one commit
+containing exactly the retained tool, retained contract, and evidence append.
+
+Stop clean before any real candidate harness/test/validation, state guard,
+receipt, activation, compatibility, v3, compiler work, performance, cleanup,
+ratchet movement, credit, or downstream authority work.
+
+## INBOX-206F final one-line static-guard correction — COMPLIANT ONE-SHOT GUARD FAILURE; INCORPORATED INTO INBOX-206G
 
 Accept INBOX-206E only as a compliant one-shot guard failure. The retained
 implementation and contract remain technically unaccepted. The E guard
