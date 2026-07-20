@@ -24,7 +24,236 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AM corrected environment and invocation-atomic audit closure — AUTHORIZED
+## INBOX-206AN corrected schema and invocation-atomic audit closure — AUTHORIZED
+
+INBOX-206AM is accepted only as a compliant fail-closed preconstruction
+stop. Its successful operating, AK structure, three serializer, 16-row
+identity-ledger, and 16-subject snapshot replays are accepted as evidence.
+It receives no schema/cardinality, D01, audit-closure, `AUDIT_COMPLETE`,
+implementation, execution, validation, ratchet, credit, or downstream
+acceptance. AM remains absent; never create, repair, reconstruct, or rerun
+it.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206AM stopped fail-closed at the AK schema/cardinality replay gate.
+
+Passed beforehand:
+
+- Operating/protected-state gate
+- AK structure gate
+- AK paths serializer
+- AK inventory serializer with final `%l`
+- AK ledger serializer
+- All 16 identity-ledger rows
+- All 16 snapshot subjects and identities
+
+The schema/cardinality command returned nonzero before its success marker. Per directive, I performed no inspection, diagnosis, retry, repair, cleanup, fix-forward, or later work. AM remains absent; `AUDIT_COMPLETE` was not created; no repository or retained-root bytes changed.
+```
+
+Watcher review used only Git/source text, retained TSVs and metadata, and
+the retained Worker JSONL. It ran no project or Zig code. The exact failed
+command is retained with status `1`. The clean non-merge authority was
+`7d18bbc332d2ef4df0ff33f98647416beba14846`, parent
+`4a0ccb372f616b406691518e8ea845ae3c0d6654`, tree
+`87e99e6b1ac28f97a0c0cec191b7d45982670ef9`, sole changed path
+`docs/next_steps.md`, and ignored-inbox SHA-256
+`3aea29223e880a6e6e3cdf37a76a5139503b7e167d1a06387227e5254306cd97`.
+Ordinary and exact-hermetic status, index, source, and supplemental control
+were clean. Control remained
+`9c55bda34088e1230b0b91a126d35795a3ac70b4` / tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e` / `main` / no remote.
+
+Stash `7985c6d01040a6e47e4ce5b918866d0e89517ac7`; watcher
+HEAD/index/worktree blob
+`b64131cf60dd0ef638e815cd33db9ae8595a72cf`; pins
+`1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3`;
+bypass TSV
+`2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11`;
+tool
+`073bdddeeac4a0b99e39cd54e5b2ea7db403796d25416dcf5ac578ea7ff5ad14`;
+build
+`a0c923499cd4515326fb287d729c53ae6d68bb465a4b4a033a737a19466ce466`;
+and retained ratchet evidence `131` remained exact. Read-only registration
+metadata replayed count `43`, distribution `33/8/2`, and path/topology/
+non-main identities
+`f31d8542baafc7b64cd5ee6fe8cc4194842ca696b97a7ffc8df06ce12d553d7e` /
+`6c868e3b6d436cfba92a1e2b21dbd616391763961f1cba9b6670b1ed4a6ebb62` /
+`ebc30a376b3db4c6fbf788f49ea85f4ce792471e539c0a89308068efdf96ebbe`
+without entering any registered-worktree directory.
+
+AM is absent. AK remains exactly 20 top-level regular, non-symlink,
+non-executable mode-`0644` files with no `AUDIT_COMPLETE`:
+
+```text
+ak_paths_sha256=5a3ecb77f8a3b4e49ace3b997f5d9885147f0eece263a5a3500097ebde28b0b0
+ak_inventory_sha256=3017c5c7041e6220b90a90d9136c5f83db8244cce10e1d3508d8bd85d0fef4ac
+ak_ledger_sha256=66381fec1e01d925b08cc6356a366c15f398d34c18321c183993c1602d8c871f
+ak_snapshot_subjects=16
+ak_snapshot_paths_sha256=220d91ce9ddd56085e798133c8dd20deb7d3d43686280e805dd4a27f7d490968
+ak_snapshot_inventory_sha256=41f48034450c97ea4554cf7f35841550e1a8beefc8d0bc1303592070a17fdae3
+ak_snapshot_ledger_sha256=008b8f5a4bbdc7e5f6812bb67518dff27fa6d5f58333ccf9d975bca09f449f3e
+```
+
+The Worker independently passed all three exact serializers, including the
+inventory's final `%l`, then every identity-ledger row and every snapshot
+subject and identity.
+
+The first false predicate in the retained schema/cardinality command required
+`atomic_summary.tsv` to have 11 data rows. Immutable AK has exactly 12 data
+rows, 13 total, including its exact `ratchet` row. Static review also finds
+a later latent bad literal in the same command: it required
+`audit_disposition.tsv` to have 12 data rows, while immutable AK has exactly
+16 data rows, 17 total, including `validation`, `ratchet`, `credit`, and
+`first_blocking_gate`. Every other declared schema data-row count matches
+its retained file, and every row has its declared literal tab-field count.
+This is verifier-command literal drift, not retained AK drift.
+
+Reviewer dialogue is preserved verbatim:
+
+```text
+I accept INBOX-206AM only as a compliant fail-closed preconstruction stop. Its serializer, ledger, and snapshot replays are accepted as evidence; no schema, D01, audit-closure, or downstream credit is granted. Preserve AM as absent.
+
+I authorize INBOX-206AN with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md; update only ignored docs/worker_inbox.md, freeze its hash, and bind the final HEAD.
+- Create only fresh continuations/inbox206an.
+- Independently replay the operating, AK structure, three serializer, ledger, and snapshot gates before schema validation.
+- Freeze the supplied 18-row canonical schema authority before running checks. Interpret each pair as exact field count and data-row count; total rows must equal data rows plus one header.
+- Validate each file with its own labeled, independently blocking command.
+- Count fields as literal tab bytes plus one, preserving leading, intermediate, and trailing empty TSV fields. Do not use whitespace-collapsing parsing.
+- Require the exact corrected values, including:
+    - atomic_summary: 2 fields, 12 data rows;
+    - audit_disposition: 2 fields, 16 data rows.
+
+- Only after all schema checks pass may separately labeled cardinality and relational gates run.
+- AN creation and the previously approved environment-authority/invocation-atomic correction require complete preconstruction success.
+- AUDIT_COMPLETE remains the final audit-only write and must state implementation_ready=false and execution_authority=none.
+
+Any failed gate leaves AN absent and stops without repair or later work. No implementation, Zig/build/install, invocation, cache, validation, ratchet, credit, or downstream action is authorized. D02 remains unauthorized.
+```
+
+Create one non-merge operating commit changing only this file. Update only
+ignored `docs/worker_inbox.md`, freeze its final SHA-256, and bind the
+Watcher dispatch to the final commit, parent, tree, and sole changed path.
+
+Before AN creation, preserve AK byte-for-byte and independently replay the
+operating/protected-state gate, AK structure gate, three separately labeled
+paths/inventory/ledger serializer gates, all 16 identity-ledger rows, and all
+16 snapshot subjects and identities. Use the already frozen exact serializer
+bytes, scopes, field orders, separators, results, and labels. No serializer
+or identity may substitute for another.
+
+Before running schema checks, freeze this canonical 18-row AK schema
+authority. Each row states `file`, exact literal tab-field count, and exact
+data-row count; total rows must equal data rows plus one exact header:
+
+```text
+ai_replay.tsv                    fields=4   data_rows=14
+atomic_defect_matrix.tsv         fields=7   data_rows=65
+atomic_summary.tsv               fields=2   data_rows=12
+audit_disposition.tsv            fields=2   data_rows=16
+audit_gate_results.tsv           fields=4   data_rows=15
+authority_boundary.tsv           fields=2   data_rows=11
+candidate_runtime_binding.tsv    fields=2   data_rows=10
+child_process_instances.tsv      fields=12  data_rows=46
+dependency_order.tsv             fields=5   data_rows=12
+git_environment_authority.tsv    fields=5   data_rows=26
+initial_gate_markers.tsv         fields=4   data_rows=7
+lifecycle_instances.tsv          fields=14  data_rows=8
+namespace_closure.tsv            fields=7   data_rows=3
+remaining_conflicts.tsv          fields=5   data_rows=8
+stage1_completion.tsv            fields=2   data_rows=12
+state_lifecycle_mapping.tsv      fields=9   data_rows=68
+watcher_identity_authority.tsv   fields=7   data_rows=3
+wrapper_stage_bijection.tsv      fields=7   data_rows=8
+```
+
+Require each exact existing header. Validate every file with its own labeled,
+independently blocking command. Count fields as literal tab bytes plus one,
+preserving leading, intermediate, and trailing empty TSV fields; do not use
+whitespace-collapsing parsing. A schema failure leaves AN absent and stops
+immediately without inspection, diagnosis, repair, retry, cleanup,
+fix-forward, or later work.
+
+Only after all 18 schema gates pass may separately labeled, independently
+blocking cardinality and relational gates run. Reconcile the exact eight
+lifecycle roots, 46 children, seven candidate-runtime instances, 54
+orchestration instances, 68 state fields, 65 atomic rows (`31`
+resolved-audit and `34` unresolved-blocking), 12 dependencies, eight
+conflicts, 15 pass gates, exact namespace rows, exact environment authority,
+and all required bijections. Any mismatch leaves AN absent and stops under
+the same no-fix-forward rule.
+
+Only after complete preconstruction success, create fresh absent,
+non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206an
+```
+
+AN is the evidence/design-only correction previously approved for AL. It
+must:
+
+1. Reproduce immutable AK authority and its accepted Stage-1 disposition.
+2. Enumerate every environment-authority token referenced by all 54
+   `execution_orchestration` invocation instances exactly once.
+3. Freeze for every token the ordered variables; each literal, unset,
+   presence-only, or reviewed-hash policy; executable resolution;
+   unknown-variable failure; and secret-safe handling. Never persist
+   arbitrary secret-bearing environment values.
+4. Explicitly equate `closed-hermetic-git` with the reviewed hermetic map
+   and fully define `closed-git` and `closed-minimal`, adding no process.
+5. Split defects into invocation-atomic rows whenever callsite, dimension,
+   identity, authority, or disposition differs. Share a row only when every
+   relevant field and resolution state is identical.
+6. Recompute counts, resolved/unresolved totals, conflicts, and dependency
+   mappings from the corrected matrix.
+7. Prove bijectively that every lifecycle/root/child environment token
+   resolves exactly once and every invocation/dimension is represented.
+
+Unknown tokens, unmapped invocation/dimensions, mixed rows, duplicate
+coverage, schema gaps, count conflicts, dependency gaps, and identity gaps
+are blocking. `AUDIT_COMPLETE` may be the final content write only after all
+independent enumeration, schema, environment, atomicity, count, conflict,
+dependency, and identity gates pass. It must truthfully record the remaining
+future unresolved count and conflict set plus exactly:
+
+```text
+enumeration_schema_environment_closure=passed
+implementation_ready=false
+execution_authority=none
+```
+
+Future unresolved implementation identities do not themselves block this
+audit-only marker. It grants no implementation, build/install,
+materialization, invocation, cache, validation, activation, ratchet, credit,
+or downstream authority.
+
+Use explicit-name pre-first-gate `chmod 0644` only on each new AN file batch.
+All AN files must be regular, non-symlink, non-executable mode `0644`.
+Completion is the final write. Any failure retains AN and stops without
+inspection, diagnosis, repair, retry, cleanup, mode change, fix-forward, or
+later work.
+
+No source, production, or Zig implementation; build registration;
+build/install; materialization; invocation; cache creation; validation;
+registered-worktree directory access or traversal; broad discovery;
+protected-path change; receipt; activation; compatibility; validation-v3;
+cleanup; wiring; ratchet; credit; or downstream action is authorized.
+Production AWK is prohibited. D02 and the future private Zig 0.16
+state-capture implementation remain unauthorized. Do not access
+`.claude/settings.local.json`.
+
+Stop after the first failed blocking gate or after a complete AN companion
+with `AUDIT_COMPLETE` written last. Report all AN identities, every gate,
+environment-token coverage, corrected atomic cardinalities, resolved and
+unresolved totals, conflicts, dependency order, marker presence, and exact
+protected-state preservation. Acknowledge INBOX-206AN and all stop
+conditions before acting.
+
+## INBOX-206AM corrected environment and invocation-atomic audit closure — COMPLIANT PRECONSTRUCTION STOP; SUPERSEDED BY INBOX-206AN
 
 INBOX-206AL is accepted only as a compliant fail-closed preconstruction
 stop. It receives no D01, audit-closure, `AUDIT_COMPLETE`, implementation,
