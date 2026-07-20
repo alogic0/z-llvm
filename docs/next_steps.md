@@ -24,51 +24,46 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-200 documentation-only local-state v3 path-model reconciliation — AUTHORIZED
+## INBOX-201 empty artifact-authority destination bootstrap — AUTHORIZED
 
-INBOX-199L is accepted at main commit `84a52011cc810d46c852d1226c254a05a3a5f4c4`
-and control commit `a41690a4c47cf1040afe3d4dd3679a77015263ea`.
-Its anchored ignore, independent protected control repository, 43+1 union
-inventory, reserved-path absence, and unchanged campaign state are accepted.
+INBOX-200 commit `b82bf29f05dd2a4a82eaa4e2ba1b9186523d2462`
+is accepted. Its exact paths, 19/27 mappings, union protection,
+control/payload separation, and ordered migration sequence are authoritative.
 
-Create only
-`docs/evidence/inbox200_local_state_v3_path_model.md`. Freeze exact absolute
-prospective paths by role beneath:
+Preflight every named path below `local-state/artifacts` as absent with
+no-follow checks. Create exactly once, parent-to-child, these seven real
+directories:
 
 ```text
 /home/oleg/prog/z_llvm/local-state/artifacts
-/home/oleg/prog/z_llvm/local-state/validations
-/home/oleg/prog/z_llvm/local-state/worktrees
-/home/oleg/prog/z_llvm/local-state/caches
-/home/oleg/prog/z_llvm/local-state/control
+/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1
+/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1/objects
+/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1/objects/sha256
+/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1/snapshots
+/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1/snapshots/sha256
+/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1/incoming
 ```
 
-Map all 19 active references and 27 future families to one exact role and
-prospective path. Artifact payloads belong only beneath `artifacts`;
-v3 outputs, records, compatibility targets, and publisher sources beneath
-`validations`; the separately protected canonical and coverage source
-repositories beneath `worktrees`; producer cache/install areas beneath
-`caches`; and small authoritative manifests, lineage records, and publication
-receipts beneath the protected control repository. Payload bytes never enter
-control.
+Each must have explicit mode `0755`, numeric UID/GID matching the invoking
+effective UID/GID, and no symlink ancestry. Verify the exact bounded shape:
+the authority root contains only `objects`, `snapshots`, and `incoming`;
+the first two contain only their `sha256` child; all three leaves are empty.
 
-Preserve the current tracked manifest and `/home/oleg/prog/z_llvm-artifacts`
-as authoritative until a separately accepted copy-and-verify migration and
-exact-path control commit. Define union protection across the 43 main
-registrations and every supplemental inventory. Reject registered worktrees,
-control payload access, cross-role/unknown descendants, symlinks, traversal,
-ambiguous targets, and implicit root authority.
+If any check fails, retain partial state and stop without cleanup, repair,
+mode/ownership change, retry, or commit. Do not inspect or hash the current
+sibling authority.
 
-Both previous v3 roots remain superseded, absent, and unauthorized. Preserve
-the later order: accept the path model; separately authorize exact reserved
-path creation; separately copy and verify; separately commit control metadata
-and amend manifest/tool/contract; re-review; only then consider v3 execution.
+On success, create and commit only
+`docs/evidence/inbox201_local_state_artifact_authority_bootstrap.md`, recording
+the exact identities, modes, ownership, bounded shape, anchored ignore,
+clean repositories, unchanged union/frozen identities, remaining absences,
+and unchanged current authority. The empty destination is not authoritative.
 
-Commit only the one evidence document and stop clean. Do not modify control,
-create paths/repositories, traverse or copy the store, operate on registered
-worktrees, edit source/tools/contracts/manifests/pins, materialize
-compatibility, execute validation/project commands, clean, wire production,
-run performance, move the ratchet, or claim credit.
+Do not create validation/cache/worktree/control descendants, payloads,
+repositories, markers, or compatibility paths. No copy/migration, control
+mutation, manifest/tool/contract/pin/source edit, worktree operation,
+project/artifact execution, validation, cleanup, wiring, performance, ratchet
+movement, or credit is authorized.
 
 ## INBOX-199 documentation-only authoritative INBOX-197 reconciliation amendment — WITHDRAWN BEFORE EDIT
 
