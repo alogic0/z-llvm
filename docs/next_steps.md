@@ -24,7 +24,40 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-202 non-destructive payload copy and verification — AUTHORIZED
+## INBOX-202A capacity correction and copy resume — AUTHORIZED
+
+INBOX-202 stopped compliantly at unchanged HEAD `2a1934bf...` during
+no-mutation preflight because GNU `df` rejects combining `-P` with
+`--output`. The record root remains absent, the destination leaves remain
+empty, no payload transaction began, and both repositories and all frozen
+identities remain exact. Copy acceptance is withheld.
+
+Do not invoke `df`. Replace only capacity observation with one
+closed-environment GNU `stat -f` command against the existing destination,
+emitting exactly:
+
+```text
+%S %a %d %c %T
+```
+
+Parse exactly five fields without a pipeline. Require the first four to be
+nonzero decimal integers, free inodes not greater than total inodes, and
+filesystem type exactly `ext2/ext3`. The pre-dispatch observation was
+`4096 23588859 56224064 60981248 ext2/ext3`; obtain a fresh observation.
+
+Compute `%S * %a` with explicit signed-overflow protection and require:
+
+```text
+available_bytes >= 84372425
+free_file_nodes >= 4136
+bytes = 67108864 + 9970364 + 7215373 + 19*4096
+inodes = 4096 + 20 + 1 + 19
+```
+
+No record-root or destination mutation may occur before capacity passes. A
+capacity failure stops with pane evidence only. On pass, record the exact
+command, environment, raw fields, parse, checked arithmetic, and result, then
+execute the unchanged INBOX-202 transaction below.
 
 INBOX-201 commit `5fff4d046c68d0144aea9572d4c17b14e7c70575`
 is accepted. Its exact empty destination skeleton and unchanged current
