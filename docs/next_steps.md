@@ -24,7 +24,50 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206G two-block AWK delimiter correction — AUTHORIZED
+## INBOX-206H exact control-Git argv evidence correction — AUTHORIZED
+
+Accept the INBOX-206D–206G technical implementation, retention contract,
+focused suite `9/9`, and passing one-shot G guard. Overall acceptance of
+commit `2be88328e4f62949a34bd92eee0eed1c77f271e3` remains withheld solely
+because three evidence bullets do not reproduce the exact implemented argv.
+
+Change only:
+
+```text
+docs/evidence/zllvm_artifact_authority_dormant_v1.md
+```
+
+Replace these three current bullets:
+
+```text
+- `rev-parse --verify HEAD^{tree}`
+- `symbolic-ref --short HEAD`
+- `ls-tree -rz --full-tree HEAD -- authority/zllvm/v1`
+```
+
+with the exact source argv:
+
+```text
+- `rev-parse HEAD^{tree}`
+- `symbolic-ref --quiet --short HEAD`
+- `ls-tree -r -z --full-tree HEAD -- authority/zllvm/v1`
+```
+
+Do not alter any other evidence text. Preserve the accepted tool, contract,
+build, production surfaces, every D/E/F/G and A/B record/cache byte, 43+1
+repository identities, control/store/candidate/source state, paths, modes,
+registrations, stash, watcher, pins, and ratchet `131`.
+
+Permit only read-only source, diff, hash, identity, and status checks plus
+`git diff --check`. Run no project command, Zig, formatter, compile, test,
+guard, validator, state guard, real validation, or ratchet recount.
+
+Commit exactly the corrected evidence file and stop with main and control
+clean. Real candidate validation, receipt, activation, compatibility, v3,
+compiler work, performance, cleanup, ratchet movement, credit, and all
+downstream authority work remain withheld.
+
+## INBOX-206G two-block AWK delimiter correction — TECHNICAL IMPLEMENTATION/GUARD ACCEPTED; EVIDENCE ACCURACY INCORPORATED INTO INBOX-206H
 
 Accept INBOX-206F only as a compliant one-shot guard failure. The retained
 implementation and contract remain technically unaccepted. F returned status
