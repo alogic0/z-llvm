@@ -24,7 +24,129 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AE corrected analyzer/state-authority design freeze — AUTHORIZED
+## INBOX-206AF mode-controlled analyzer/state-authority design freeze — AUTHORIZED
+
+Accept INBOX-206AE only as a compliant fail-closed Design-Stage-1 draft.
+It receives no Stage-1, design, package, execution, ratchet, credit, or
+downstream acceptance. Preserve its three files permanently at mode `0664`
+and never modify, normalize, repair, complete, or rerun AE.
+
+The retained AE identity is:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ae
+file_count=3
+nonfiles=0
+execute_bits=0
+mode_0664_files=3
+final_complete=absent
+paths_sha256=03c5376ce907439d79ee5613905ca90c7d939c208443811375c65a9103a88da5
+inventory_sha256=600590ec4cc35fb1def5ceff287834e35ff7d346e935c1509b11fdb1298cff44
+ledger_sha256=2d1ddc788260841c8335546f9362df7d21323b7b14df27d46277e7def616a86c
+ac_defect_ledger.tsv=99b6a87f22bd40233d0623eae4db7a1186bf4fc3915e22f31b81a4e0ff7ab2c
+ac_identity_serializers.sh.txt=3cee95d61fadb61d62cb0781d806b8bd07b7b5cb56ed72130119a0b9044c135f
+authority_boundary.tsv=63d9192e1a366b395aad53d6db5aa9f64b51f878dadd35ec08fb4162c97791d6
+```
+
+All three isolated AC serializers and the combined AE precreation gate
+passed. The retained defect ledger has 24 eight-field rows; every cited AC
+file/hash is exact. The serializer file contains the three exact commands
+and the expected AC ledger hash once. The failure occurred because
+`apply_patch` created all three AE files at mode `0664`, while the first
+Stage-1 gate required every file to be mode `0644`. The gate emitted no
+`DESIGN_STAGE1_VERIFIED`; no later command ran.
+
+Create one non-merge operating commit changing only this file. The Watcher
+dispatch binds its exact commit, parent, tree, changed path, and final
+ignored-inbox SHA-256.
+
+Preserve AE, absent AD, AC, AB, Y, every earlier retained root and record,
+and every protected identity exactly. Create only fresh absent, non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206af
+```
+
+Before AF creation, independently verify the exact retained AE count, type,
+mode, absence, path, inventory, ledger, and three file hashes above.
+Any mismatch stops with AF absent and without inspection, diagnosis, repair,
+regeneration, retry, cleanup, or construction.
+
+### A. Exact Stage-1 reproduction and mode finalization
+
+Reproduce these two reusable files byte-for-byte from AE:
+
+```text
+ac_defect_ledger.tsv
+ac_identity_serializers.sh.txt
+```
+
+Create `authority_boundary.tsv` with AF's exact operating commit, parent,
+tree, sole changed path, final inbox SHA-256, preserved-root identities, and
+no-implementation/no-execution boundary.
+
+For each newly created AF batch, exactly one construction-finalization
+command may set mode `0644` on only the explicit names of that batch's new
+regular files. The command must have this form:
+
+```sh
+chmod 0644 -- "$AF/exact-new-file-1" "$AF/exact-new-file-2"
+```
+
+List every file literally. No glob, recursion, directory operand, prior-root
+path, symlink, or already-gated file is permitted. Mode finalization occurs
+after the batch's content creation and before its first gate. It is part of
+initial construction, not repair. A failed creation, mode-finalization
+command, or gate retains AF and stops immediately. No `chmod` or other mode
+change is permitted after a failed gate.
+
+Stage 1 must raw-compare the two reusable AF files to AE, validate every
+fresh authority-boundary field, require exactly the expected regular files
+at mode `0644`, and prove all pass/completion markers absent. Only a
+successful Stage-1 gate permits later construction.
+
+### B. Carried inert evidence/design scope
+
+After Stage 1 succeeds, continue only with the exact inert evidence/design
+package previously authorized for AE:
+
+- the complete AC defect/authority ledger;
+- pinned Zig `0.16.0` AST analyzer and separately reviewed future
+  `zig build install` materialization design, with no implementation or
+  invocation and no syntax-as-semantics shortcut;
+- explicit reviewed resolution for every direct, method, builtin, aliased,
+  indirect, function-value, and comptime-selected call;
+- canonical direct-edge and transitive-closure schemas and independent raw
+  authority comparisons, with no automatic `std.*`, base-name, builtin, or
+  effect allowance;
+- exactly seven future processes: six exact read-only control Git commands
+  plus one metadata-only
+  `/usr/bin/git -C <main-root> worktree list --porcelain`, all with closed
+  argv/environment/status/output contracts and no other reachable process;
+- the complete 68-field actual-probe authority, AA-to-pre,
+  execution-pre-to-post, absence, cache, and failure-attribution matrix;
+- traversal-safe validation before access, descriptor-relative no-follow
+  verified bounded reads, actual named-absence probes, and distinct exact
+  ordinary and hermetic status probes;
+- complete wrapper stdout/stderr/status, one-shot sequencing, temporary
+  output, atomic replacement, completion marker, and final-sync contracts;
+  and
+- only regular non-executable mode-`0644` AF files, no pass/completion claim
+  before all independent gates succeed, and truthful final completion last.
+
+Apply the same exact-name, one-command, pre-first-gate mode-finalization rule
+to every later newly created AF batch. Any failure retains AF and stops
+without inspection, diagnosis, repair, regeneration, retry, cleanup, mode
+change, or later stage. Success stops at the inert evidence/design freeze.
+
+No harness copy, source edit, analyzer/capture/comparison implementation,
+build/install, invocation, cache creation, registered-worktree-directory
+access, broad discovery, `.claude/settings.local.json` access, Zig/project
+command, validator, validation, evidence edit outside AF,
+execution-package credit, receipt, activation, compatibility, validation-v3,
+ratchet, cleanup, wiring, credit, or downstream action is authorized.
+
+## INBOX-206AE corrected analyzer/state-authority design freeze — COMPLIANT DESIGN-STAGE-1 FAILURE; NO CREDIT
 
 Accept INBOX-206AD only as a compliant fail-closed precreation failure. It
 receives no design, package, execution, ratchet, credit, or downstream
