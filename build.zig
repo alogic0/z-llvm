@@ -85,6 +85,18 @@ pub fn build(b: *std.Build) void {
     addToolStepWithArgs(b, "distribution-all", "Run selected distribution gates, native-link proof/probe, and boundary gates", "tools/run_distribution_all_gates.zig");
     addToolStepWithArgs(b, "distribution-real-rows", "Run ranked real compiler-core rows through staged replacement gate", "tools/run_distribution_real_rows.zig");
     addToolStepWithArgs(b, "clean-tmp", "Report, dry-run, or explicitly delete retention-classified tmp entries", "tools/clean_tmp.zig");
+    const artifact_store_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/zllvm_artifact_store.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }),
+    });
+    const artifact_store_test_step = b.step(
+        "artifact-store-test",
+        "Run dormant synthetic artifact-store tests",
+    );
+    artifact_store_test_step.dependOn(&b.addRunArtifact(artifact_store_tests).step);
     addToolStepWithArgs(b, "stage2-pressure-diagnostic", "Write generic-CFG stage-two pressure diagnostics for one IR function", "src/stage2_pressure_diagnostic.zig");
     addToolStep(b, "distribution-no-llvm", "Run the selected no-LLVM-codegen distribution subset", "tools/run_distribution_no_llvm_codegen_subset.zig");
     addToolStep(b, "distribution-boundary", "Run conservative distribution boundary gates", "tools/run_distribution_boundary_gates.zig");
