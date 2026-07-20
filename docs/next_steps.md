@@ -24,60 +24,51 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-199L local-state boundary and independent control repository — AUTHORIZED
+## INBOX-200 documentation-only local-state v3 path-model reconciliation — AUTHORIZED
 
-The user and Reviewer withdrew INBOX-199 and the sibling operational-root
-model before any target edit. The target remains 759 lines at `3717cc34...`;
-the main tree is clean. `/home/oleg/prog/z_llvm-baseline-validation-v3`
-remains absent and abandoned.
+INBOX-199L is accepted at main commit `84a52011cc810d46c852d1226c254a05a3a5f4c4`
+and control commit `a41690a4c47cf1040afe3d4dd3679a77015263ea`.
+Its anchored ignore, independent protected control repository, 43+1 union
+inventory, reserved-path absence, and unchanged campaign state are accepted.
 
-Preflight exact absent `/home/oleg/prog/z_llvm/local-state` and preserve all
-frozen state. Add exactly `/local-state/` to main `.gitignore`, then create
-only:
+Create only
+`docs/evidence/inbox200_local_state_v3_path_model.md`. Freeze exact absolute
+prospective paths by role beneath:
 
 ```text
-/home/oleg/prog/z_llvm/local-state/
-/home/oleg/prog/z_llvm/local-state/control/
+/home/oleg/prog/z_llvm/local-state/artifacts
+/home/oleg/prog/z_llvm/local-state/validations
+/home/oleg/prog/z_llvm/local-state/worktrees
+/home/oleg/prog/z_llvm/local-state/caches
+/home/oleg/prog/z_llvm/local-state/control
 ```
 
-Reserve but do not create `artifacts/`, `validations/`, `worktrees/`, or
-`caches/`.
+Map all 19 active references and 27 future families to one exact role and
+prospective path. Artifact payloads belong only beneath `artifacts`;
+v3 outputs, records, compatibility targets, and publisher sources beneath
+`validations`; the separately protected canonical and coverage source
+repositories beneath `worktrees`; producer cache/install areas beneath
+`caches`; and small authoritative manifests, lineage records, and publication
+receipts beneath the protected control repository. Payload bytes never enter
+control.
 
-Initialize `local-state/control` as an independent Git repository on branch
-`main`, with no remote. Its initial commit contains only `.gitignore`,
-`README.md`, and `POLICY.md`. Restrict it to small operational manifests,
-policies, and receipts; prohibit secrets, payloads, caches, builds, generated
-artifacts, archives, binaries, and large files; require later exact-path
-authority for any supplemental repository. Use 1 MiB per-file and 16 MiB
-tracked-total limits unless later amended.
+Preserve the current tracked manifest and `/home/oleg/prog/z_llvm-artifacts`
+as authoritative until a separately accepted copy-and-verify migration and
+exact-path control commit. Define union protection across the 43 main
+registrations and every supplemental inventory. Reject registered worktrees,
+control payload access, cross-role/unknown descendants, symlinks, traversal,
+ambiguous targets, and implicit root authority.
 
-After the initial commit, protect `local-state/control` as a supplemental
-worktree. Future protection uses the union of the unchanged 43 main-repository
-registrations and the control repository's one registration. Every later
-control modification or mutating Git operation requires authority naming its
-exact path; read-only identity/status/inventory checks remain allowed.
+Both previous v3 roots remain superseded, absent, and unauthorized. Preserve
+the later order: accept the path model; separately authorize exact reserved
+path creation; separately copy and verify; separately commit control metadata
+and amend manifest/tool/contract; re-review; only then consider v3 execution.
 
-Create main evidence
-`docs/evidence/inbox199_local_state_boundary.md`. Record both repository
-roots, branches, tree/commit identities, clean status, control no-remote state,
-exact control file hashes/blobs/modes/sizes, anchored ignore proof, role and
-reserved paths, union inventory, permanent prohibitions on broad
-`git clean -x`/`-fdx` and cleanup traversal, explicit `git -C` root
-separation, the abandoned absent sibling validation root, and unchanged
-authoritative `/home/oleg/prog/z_llvm-artifacts`.
-
-The main evidence records the pre-commit main HEAD and staged tree because a
-commit cannot embed its own identity. Retain the resulting main commit in the
-Worker final report and Watcher review; do not add a self-referential commit.
-
-Commit the main repository with only `.gitignore` and the evidence document.
-Stop with both repositories clean.
-
-Use explicit `git -C` for every Git command and only exact Git/status/hash/
-mode/size/path checks. No broad discovery, `find`, clean, migration,
-tool/contract/design change, store/manifest mutation, compatibility,
-validation, source worktree, reserved sibling, additional repository,
-cleanup, wiring, performance, ratchet movement, or credit is authorized.
+Commit only the one evidence document and stop clean. Do not modify control,
+create paths/repositories, traverse or copy the store, operate on registered
+worktrees, edit source/tools/contracts/manifests/pins, materialize
+compatibility, execute validation/project commands, clean, wire production,
+run performance, move the ratchet, or claim credit.
 
 ## INBOX-199 documentation-only authoritative INBOX-197 reconciliation amendment — WITHDRAWN BEFORE EDIT
 
