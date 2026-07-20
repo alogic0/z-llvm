@@ -24,7 +24,139 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AX fresh literal-transport and final-marker remediation — AUTHORIZED
+## INBOX-206AY complete-dispatch bootstrap and final-marker remediation — AUTHORIZED
+
+INBOX-206AX is accepted only as a compliant fail-closed administrative
+bootstrap stop. Credit is limited to acknowledgment. Grant no canary,
+wrapper, nested invocation, operating gate, AV replay, AX artifact,
+evidence/design, finalizer, marker, D01, implementation, execution,
+validation, ratchet, production, or downstream credit. Preserve AX/AW absent
+and AV unchanged.
+
+The Worker final report is preserved verbatim:
+
+```text
+Blocked before the first process: the exact frozen outer JavaScript block is not present in the message, and reading it from disk would itself require a prior tool invocation, violating the “first process must be the canary” rule.
+
+No tool or process ran; AV/AW/AX remain untouched. Please paste the exact outer block or explicitly authorize one read-only documentation call before the canary.
+```
+
+Static review ran no project or Zig code. Main/source/index were clean at
+`47b783e4570be05e6eb7bb81c4a9071bad8d354e`, parent
+`9b4fb0da96768651b3765c64daac1ef8c86c0952`, tree
+`ffa2b4179d0f0a00e843f0d96119e99cf531e9c9`, sole path
+`docs/next_steps.md`, inbox SHA-256
+`fab57459dc8f5b14b42266979922c0298d44f754794fc49e53b3a6488089a93e`.
+Main/index/control and protected identities remained clean and exact. AX is
+absent/non-symlink and all 20 AV hashes/modes are unchanged. The retained AX
+turn has acknowledgment and final response but no custom tool call or output.
+
+Reviewer confirmation is preserved verbatim:
+
+```text
+Confirmed exactly:
+
+1. AX is accepted only as an acknowledgment-only administrative bootstrap stop.
+2. Fresh evidence-only AY is authorized as a non-merge child of 47b783e4570be05e6eb7bb81c4a9071bad8d354e, changing only tracked docs/next_steps.md.
+3. After that commit establishes final identities, derive and freeze the operating-document binding inner/outer sources and hashes, then include them byte-for-byte in the authoritative dispatch.
+
+4. That dispatch also contains the already-frozen canary source/hashes and every technical boundary; no pre-canary documentation read is permitted.
+5. Sequence: commentary acknowledgment only → exact canary first → exact binding second → unchanged AY gates.
+6. Every failure-stop, protection, no-retry, and downstream prohibition remains exact.
+```
+
+Create one non-merge operating commit whose parent is exactly
+`47b783e4570be05e6eb7bb81c4a9071bad8d354e` and whose sole changed tracked
+path is this file. Update only ignored `docs/worker_inbox.md`; its final
+SHA-256 is
+`f5838f11c010a83602191db36786162178fd072c1736d0b7149aa6cbc113a347`.
+Preserve AX/AW absent and AV exact. Create only fresh absent non-symlink after
+all authorized preconstruction gates:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ay
+```
+
+The tmux dispatch is complete and authoritative. It must include all final
+commit/document identities, every boundary here, and byte-for-byte both
+frozen process sources/hashes. The Worker acknowledges from the dispatch
+alone. Acknowledgment is commentary; no documentation read or tool may occur
+before the canary.
+
+First tool/process is the unchanged reviewed canary. Its AX-labelled literals
+are inert transport-version identifiers only. Exact inner bytes with final LF:
+
+<!-- AY_CANARY_INNER_BLOCK_BEGIN -->
+```sh
+set -euo pipefail
+sentinel=__ZLLVM_AX_LITERAL_SENTINEL__
+captured=prefix__ZLLVM_AX_LITERAL_SENTINEL__
+wt_porcelain=${captured%"$sentinel"}
+[ "$wt_porcelain" = prefix ]
+printf '%s\n' AX_LITERAL_TRANSPORT_CANARY_OK
+```
+<!-- AY_CANARY_INNER_BLOCK_END -->
+
+Inner SHA-256:
+`77627d7dd45559aee5a702a71675fe2d4ad05b32ecd64dc2bb38097190f16ea2`.
+Exact outer source bytes with final LF:
+
+<!-- AY_CANARY_OUTER_BLOCK_BEGIN -->
+```javascript
+const command = "set -euo pipefail\nsentinel=__ZLLVM_AX_LITERAL_SENTINEL__\ncaptured=prefix__ZLLVM_AX_LITERAL_SENTINEL__\nwt_porcelain=${captured%\"$sentinel\"}\n[ \"$wt_porcelain\" = prefix ]\nprintf '%s\\n' AX_LITERAL_TRANSPORT_CANARY_OK\n";
+const result = await tools.exec_command({cmd: command, workdir: "/home/oleg/prog/z_llvm", yield_time_ms: 10000, max_output_tokens: 1000});
+if (result.exit_code !== 0) throw new Error("AX_TRANSPORT_CANARY_NONZERO");
+if (result.output !== "AX_LITERAL_TRANSPORT_CANARY_OK\n") throw new Error("AX_TRANSPORT_CANARY_OUTPUT");
+text(result.output);
+```
+<!-- AY_CANARY_OUTER_BLOCK_END -->
+
+Outer SHA-256:
+`76370f6d55e871715e88c9a3ba12f0546ea7a4219649f5dbeaae0a60e8e2e916`.
+Require exact hashes, outer success, one nested invocation, status `0`, and
+sole exact marker plus LF.
+
+After this commit establishes final identities, derive and freeze the second
+read-only binding process's complete inner/outer bytes/hashes and include
+them byte-for-byte in the dispatch. Its inner command may read only final
+`HEAD`, parent, tree, sole path, SHA-256 of this file, and SHA-256 of ignored
+`docs/worker_inbox.md`; it writes nothing and emits only
+`AY_OPERATING_DOC_BIND_OK` plus LF. Its outer wrapper uses one ordinary quoted
+JavaScript string, one nested invocation, and exact status/output assertions.
+Prohibit backticks, templates, `String.raw`, JavaScript interpolation,
+concatenated/generated/sourced command, and `eval`.
+
+Canary success alone permits exactly the frozen binding process second.
+Binding success alone permits the unchanged operating/protected gate,
+complete AV replay, fresh AY creation, evidence gates, and finalization.
+Freeze each later wrapper source and nested-command hash before execution and
+encode every shell body only in an ordinary quoted JavaScript string.
+
+Before AY creation replay AV's 20-file structure, aggregates `40877472...` /
+`a7f4f45d...` / `d11c2d84...`, all hashes, marker bytes/hash, and sole `0664`
+defect. Preserve the six-copy/four-keyed split and independently replay all
+authority, token, selector, 48 environment, coverage, equivalence, type/mode,
+invocation-atomic, bijection, conflict, dependency, and audit-record gates.
+
+Preserve literal finalizer rules: derive/freeze AY-bound marker fields if
+needed; freeze marker/finalizer bytes/hashes; one exclusive no-clobber write
+in a closed shell after setting/verifying `umask 0022` and immediate
+absence/non-symlink check. No `apply_patch`, chmod, overwrite, append, rename,
+generated command, sourced table, or `eval`. Success permits only separate
+read-only marker `0644`/bytes/hash/schema and final identity/clean-state
+closures; no AY byte changes afterward. Marker remains audit-only with
+`implementation_ready=false` and `execution_authority=none`.
+
+Any missing/altered dispatched source/hash, pre-canary tool, tool exception,
+missing/multiple nested call, status/output mismatch, binding or later gate
+failure preserves AY absent/exact partial and stops without inspection,
+diagnosis, repair, retry, cleanup, regeneration, normalization, mode change,
+fix-forward, or later command. No source/production change, implementation,
+Zig/build/install, project/validation execution, cache, registered-worktree
+directory access, ratchet movement, production credit/AWK, D02, or downstream
+action. Never access `.claude/settings.local.json`.
+
+## INBOX-206AX fresh literal-transport and final-marker remediation — COMPLIANT ADMINISTRATIVE BOOTSTRAP STOP; SUPERSEDED BY INBOX-206AY
 
 INBOX-206AW is accepted only as a compliant fail-closed pre-execution
 transport stop. Credit is limited to acknowledgment and static reads. Grant
