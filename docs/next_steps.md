@@ -6,7 +6,49 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-192 calls-critical dependency and local durability audit — AUTHORIZED
+## Standing registered-worktree protection — USER AUTHORITY REQUIRED
+
+All 43 registered Git worktrees and their complete directory trees are
+read-only exclusions from artifact treatment, traversal, hashing, totals,
+publication, resolution, materialization, migration, cleanup, and retirement.
+The current distribution is 33 beneath repository `tmp/`, eight beneath
+`/tmp`, and two elsewhere. Full porcelain SHA-256 `473f97ce...` is the
+historical snapshot at `74226064`; authorized main-HEAD commits change that
+full hash. Stable path-list SHA-256 is `f31d8542...` and stable
+path-plus-registration-topology SHA-256 is `6c868e3b...`; every non-main
+HEAD and registration record must remain exact.
+
+No worktree or its directory may be modified, removed, pruned, repaired,
+relocated, normalized, cleaned, or materialized over without explicit user
+permission naming each path. Watcher/Reviewer agreement is insufficient.
+Read-only registration inventory is allowed. “Prune” means logical exclusion
+from traversal/calculation only, never `git worktree prune`.
+
+## INBOX-192A registered-worktree exclusion and durability recount — AUTHORIZED
+
+INBOX-192 at `74226064` is accepted only as a compliant read-only evidence
+stop. Final design acceptance is withheld because 21 registered worktrees
+were included in proposed artifact scope and arithmetic: 53,640 files,
+5,962,761,258 bytes, and 2,077 directories.
+
+Amend only the INBOX-192 audit document. Add the exact 43-path read-only
+registration inventory and standing protection. Recompute every affected
+root identity, count, total, capacity bound, logical group, gap, and v3 path
+mapping after fail-closed logical exclusion of every registered worktree
+directory. Worktree contents must not be entered, inspected, hashed,
+classified, copied, materialized, migrated, cleaned, retired, or modified.
+
+Future v3 canonical and coverage source worktrees are protected control paths,
+not artifacts. Once registered, modification or removal requires explicit
+user permission naming each exact path.
+
+Preserve the corrected local-only durability design and four retention classes
+only outside registered worktrees. Create no store, object, snapshot, archive,
+manifest implementation, resolver, copy, pin, worktree, or path. Run no
+project code or execution. Commit only the amended audit, preserve all
+worktrees/bytes/pins, dormant production, and ratchet 131, then stop.
+
+## INBOX-192 calls-critical dependency and local durability audit — COMPLIANT STOP; DESIGN WITHHELD at 74226064
 
 INBOX-191 at `b510d277` is accepted as documentation-only source-identity
 and v3-namespace closure. Validation-v3 remains unexecuted and is blocked
