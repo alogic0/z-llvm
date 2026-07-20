@@ -24,7 +24,173 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AW fresh final-marker mode remediation — AUTHORIZED
+## INBOX-206AX fresh literal-transport and final-marker remediation — AUTHORIZED
+
+INBOX-206AW is accepted only as a compliant fail-closed pre-execution
+transport stop. Credit is limited to acknowledgment and static reads. Grant
+no operating-gate, AV replay, AW artifact, evidence/design, finalizer, marker,
+D01, implementation, execution, validation, ratchet, production, or
+downstream credit. Preserve AW permanently absent and AV unchanged.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206AW stopped fail-closed before the operating gate executed. The wrapper construction failed in the tool layer due to unintended interpolation of a shell variable.
+
+No shell command ran, AW was not created, and AV remains untouched. I performed no inspection, diagnosis, retry, repair, cleanup, or later command. No project, Zig, validation, production, ratchet, D02, or downstream work occurred.
+```
+
+Static review ran no project or Zig code. Main/source/index were clean at
+`9b4fb0da96768651b3765c64daac1ef8c86c0952`, parent
+`3827b54fc9282c59025272f5d31e8b6424ed1ad7`, tree
+`0a9e13db0cf304f61b973cdb9d66278e583fc5b4`, sole path
+`docs/next_steps.md`, inbox SHA-256
+`d69af9a8c3d8c3565d4061e99fa72cfb3863bf20d9e8e0bc32ffe653d2d4d4e2`.
+Main/index/control and all protected identities remained clean and exact; no
+registered worktree directory was entered.
+
+AW is absent/non-symlink. AV remains exactly 20 regular non-symlink
+nonexecutables with all frozen hashes unchanged; nineteen are `0644` and
+`AUDIT_COMPLETE` alone remains `0664`, 446 bytes, SHA-256
+`ece7a6ecc311e0108ceb089cb07cb0b3a1d98cda67af19d06ccaedfa3df4df62`.
+The retained log shows a backtick JavaScript template literal containing
+shell `${captured%"$sentinel"}`. Outer JavaScript raised
+`ReferenceError: captured is not defined` before nested `tools.exec_command`
+invocation. The error is followed immediately by final report and
+`task_complete`; no shell or later command ran.
+
+Reviewer dialogue is preserved verbatim:
+
+```text
+I accept INBOX-206AW only as a compliant fail-closed pre-execution transport stop. Credit is limited to acknowledgment and static reads. No operating-gate, replay, artifact, finalizer, D01, or downstream credit is granted. Preserve AW permanently absent and AV unchanged.
+
+I authorize fresh evidence-only INBOX-206AX with these refinements:
+
+- Create one non-merge commit changing only docs/next_steps.md, with parent exactly 9b4fb0da96768651b3765c64daac1ef8c86c0952; update the ignored inbox separately and bind full HEAD/tree/inbox hashes.
+
+- Freeze both the complete outer JavaScript wrapper source and inner shell-command bytes/hashes for the transport canary.
+- Encode the inner command solely as an ordinary quoted JavaScript string. ECMAScript template literals, backticks, String.raw, concatenated/generated command source, and JavaScript interpolation are prohibited.
+
+- The shell expansion ${captured%"$sentinel"} must occur literally inside that ordinary string. Freeze fixed inputs, expected prefix, exact status, and sole success marker.
+- Require independent proof that the outer wrapper evaluated, the nested command was actually invoked once, its exit status was zero, and its output exactly matched the marker. Any tool-layer exception or missing invocation is failure.
+
+- Freeze every later wrapper’s JavaScript source and nested command hash before execution. Shell ${…} text is permitted only inside ordinary JavaScript string literals; it must never be interpreted by JavaScript.
+
+- After canary success, run the unchanged AW operating/protected and AV replay gates before creating only fresh continuations/inbox206ax.
+- Preserve all approved AV gate replay and finalizer rules. The marker remains a single exclusive no-clobber write under verified umask 0022, with no apply_patch, chmod, overwrite, append, rename, generated command, or eval.
+
+- Marker success permits only the separate read-only marker and final-identity closures; no AX byte may change afterward.
+
+The first failure preserves AX absent or exactly partial and stops without inspection, diagnosis, repair, retry, or fix-forward. All prior implementation, Zig/build/install, execution, validation, registered-worktree access, ratchet, production, credit, D02, and downstream prohibitions remain exact.
+```
+
+The Reviewer then explicitly confirmed:
+
+```text
+I explicitly authorize fresh evidence-only INBOX-206AX as proposed, with the refinements already stated:
+
+- One non-merge docs/next_steps.md commit parented by 9b4fb0da96768651b3765c64daac1ef8c86c0952; ignored inbox updated separately and final identities bound.
+- Preserve AW absent and AV unchanged; create only fresh continuations/inbox206ax.
+- Run the fixed, no-path, no-write transport canary first.
+- Freeze the outer JavaScript wrapper and inner shell-command bytes/hashes.
+- Use only ordinary quoted JavaScript strings—no backticks, template literals, String.raw, JavaScript interpolation, generated command text, or eval.
+- Require proof of successful outer evaluation, exactly one nested invocation, status zero, and exact marker output.
+- Only canary success permits the unchanged operating/protected, AV replay, evidence gates, and literal exclusive marker finalization.
+- First failure retains exact state and stops. All implementation, execution, Zig/build/install, validation, worktree-access, ratchet, D02, credit, and downstream prohibitions remain in force.
+```
+
+Create one non-merge operating commit whose parent is exactly
+`9b4fb0da96768651b3765c64daac1ef8c86c0952` and whose sole changed tracked
+path is this file. Update only ignored `docs/worker_inbox.md`; its final
+SHA-256 is
+`fab57459dc8f5b14b42266979922c0298d44f754794fc49e53b3a6488089a93e`.
+Bind dispatch to final full commit, parent, tree, sole path, and inbox
+identity. Preserve AW absent and AV exact. Create only fresh absent
+non-symlink after the canary, operating gate, and AV replay succeed:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ax
+```
+
+Run this fixed no-path, no-repository, no-write canary first. Exact evaluated
+inner command bytes, including final LF, are:
+
+<!-- AX_INNER_BLOCK_BEGIN -->
+```sh
+set -euo pipefail
+sentinel=__ZLLVM_AX_LITERAL_SENTINEL__
+captured=prefix__ZLLVM_AX_LITERAL_SENTINEL__
+wt_porcelain=${captured%"$sentinel"}
+[ "$wt_porcelain" = prefix ]
+printf '%s\n' AX_LITERAL_TRANSPORT_CANARY_OK
+```
+<!-- AX_INNER_BLOCK_END -->
+
+Inner SHA-256 is
+`77627d7dd45559aee5a702a71675fe2d4ad05b32ecd64dc2bb38097190f16ea2`.
+Expected status is `0`; sole nested output is
+`AX_LITERAL_TRANSPORT_CANARY_OK` plus LF.
+
+Send these exact complete outer JavaScript source bytes, including final LF,
+as one `functions.exec` call:
+
+<!-- AX_OUTER_BLOCK_BEGIN -->
+```javascript
+const command = "set -euo pipefail\nsentinel=__ZLLVM_AX_LITERAL_SENTINEL__\ncaptured=prefix__ZLLVM_AX_LITERAL_SENTINEL__\nwt_porcelain=${captured%\"$sentinel\"}\n[ \"$wt_porcelain\" = prefix ]\nprintf '%s\\n' AX_LITERAL_TRANSPORT_CANARY_OK\n";
+const result = await tools.exec_command({cmd: command, workdir: "/home/oleg/prog/z_llvm", yield_time_ms: 10000, max_output_tokens: 1000});
+if (result.exit_code !== 0) throw new Error("AX_TRANSPORT_CANARY_NONZERO");
+if (result.output !== "AX_LITERAL_TRANSPORT_CANARY_OK\n") throw new Error("AX_TRANSPORT_CANARY_OUTPUT");
+text(result.output);
+```
+<!-- AX_OUTER_BLOCK_END -->
+
+Outer SHA-256 is
+`76370f6d55e871715e88c9a3ba12f0546ea7a4219649f5dbeaae0a60e8e2e916`.
+Success requires exact wrapper/inner hashes, successful outer evaluation,
+exactly one logged nested invocation, nested status `0`, exact sole marker
+output, and successful outer completion. Any drift, tool exception, missing
+or multiple invocation, absent/nonzero status, or output mismatch is failure.
+
+Before every later execution, freeze its exact JavaScript source and nested
+command SHA-256 in the retained record. Encode every shell body as one
+ordinary quoted JavaScript string. Prohibit backticks, template literals,
+`String.raw`, JavaScript interpolation, concatenated/generated or sourced
+command text, and `eval`. Shell `${...}` may occur only literally inside an
+ordinary string and must never be interpreted by JavaScript.
+
+Only canary success permits the exact AW operating/protected-state gate and
+complete AV replay. Before AX creation replay AV's 20-file structure, its
+three aggregates (`40877472...`, `a7f4f45d...`, `d11c2d84...`), all frozen
+file identities, marker bytes/hash, and sole `0664` defect. Preserve the
+six-copy/four-keyed-derivation split and independently replay every AV
+authority, token, selector, 48 environment, coverage, equivalence, type/mode,
+invocation-atomic, bijection, conflict, dependency, and audit-record gate.
+Environment closure remains mandatory before invocation-atomic work.
+
+Preserve the approved finalizer boundary. Prove whether the marker contains
+operating-bound fields and derive/freeze AX fields if necessary. Freeze exact
+marker bytes/hash and literal finalizer source/hash before AX construction.
+Create the marker once using an exclusive no-clobber complete write in a
+closed shell after setting/verifying `umask 0022` and immediately rechecking
+absence/non-symlink. No `apply_patch`, chmod, overwrite, append, rename,
+generated command, sourced table, or `eval` may create or alter it. Marker
+success permits only separate read-only marker type/mode `0644`/bytes/hash/
+schema and final 20-file identities/clean-state closures. No AX byte may
+change after marker creation. Marker remains audit-only with
+`implementation_ready=false` and `execution_authority=none`.
+
+The first technical, identity, wrapper, transport, or tool failure preserves
+AX absent or exactly partial and stops without inspection, diagnosis, repair,
+retry, cleanup, regeneration, normalization, mode change, fix-forward, or
+later command. No source/production change, implementation,
+Zig/build/install, project or validation execution, cache,
+registered-worktree-directory access, ratchet movement, production credit,
+production AWK, D02, or downstream action. Never access
+`.claude/settings.local.json`. Require one concise acknowledgment, then
+proceed directly; delayed byte-identical acknowledgment is administrative and
+does not consume authority.
+
+## INBOX-206AW fresh final-marker mode remediation — COMPLIANT PRE-EXECUTION TRANSPORT STOP; SUPERSEDED BY INBOX-206AX
 
 INBOX-206AV is accepted only as a compliant fail-closed partial
 evidence/design closure. Credit extends through every independently logged
