@@ -24,6 +24,43 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-193B snapshot-proof ownership correction and one logged synthetic continuation — AUTHORIZED
+
+INBOX-193A at unchanged HEAD `d81618f7` is accepted only as a compliant
+retain-and-stop. Implementation acceptance is withheld. Its sole full suite
+passed 5/6 tests and crashed because `verifySnapshotArchive` explicitly
+closed its snapshot-proof directory and then closed it again through an
+unconditional defer. Preserve the dirty composite, both prior synthetic
+roots, original INBOX-193 log SHA-256 `fc8c550d...`, and Worker pane evidence
+exactly. Record honestly that no standalone INBOX-193A suite log exists.
+
+Correct only the bounded handle-ownership class. Give every file/directory
+handle one scoped owner and one close on success and error paths; use no
+invalid-handle sentinel. Audit all close/deinit/defer/errdefer pairings and
+add private focused success plus early-error coverage for snapshot-proof
+ownership. A different semantic defect stops the task without fixing forward.
+Preserve every accepted INBOX-193A contract correction and test.
+
+Use only the initially absent and worktree-disjoint root:
+
+`/home/oleg/prog/z_llvm-inbox193b-artifact-store-synthetic`.
+
+Run formatting/static/compile-only checks first. Then run exactly one full
+suite forced to that root, retaining exact command, environment, separate
+stdout/stderr, and numeric status beneath
+`tmp/inbox193b_o2_artifact_store_dormant/validation/`. Unexpected failure
+retains the complete root, logs, and dirty patch and stops without retry,
+repair, cleanup, or commit. Complete success may remove only the reverified
+exact INBOX-193B root; both prior roots remain permanently preserved for this
+slice.
+
+On success, commit only the bounded tool, template/schema, minimal build
+wiring, focused tests, and one evidence summary containing all three attempt
+ledgers. Create no real store; access no current artifact or protected
+worktree content; change no live row, pin, contract, cleanup integration, v3
+path, validation, production wiring, performance boundary, Tier state,
+checkpoint, or ratchet.
+
 ## INBOX-193A retention-tool contract remediation and one synthetic continuation — AUTHORIZED
 
 INBOX-193 at unchanged HEAD `d53a1fe5` is accepted only as a compliant
