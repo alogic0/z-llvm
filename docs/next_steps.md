@@ -24,7 +24,168 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AB fresh inert Phase-3 execution-package construction — AUTHORIZED
+## INBOX-206AC source-derived guard and complete state-contract freeze — AUTHORIZED
+
+Accept INBOX-206AB only for compliant inert construction mechanics, exact
+harness construction, and faithful stop. Withhold execution-package
+completeness, structural-guard acceptance, state-model acceptance, Phase-3
+validation, receipt, activation, ratchet, credit, and downstream acceptance.
+
+Preserve AB permanently at this exact inert identity:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ab
+file_count=46
+immutable_inert=31
+future_capture=15
+nonfiles=0
+execute_bits=0
+inventory_sha256=19fe2c0cbafafec34b6a1c36188db5e42e7984a08e389e60a062eaee5db61027
+ledger_sha256=136ff220756b9a16ef612194d85b43dad6c63de54d2eee541d71e8c66eccb388
+top_level_paths_sha256=3e79c3429dbb28b5574850bb1ff985ed3002b52d931146e635687f8b584be330
+harness_sha256=647750257621eea42eaac8a11dc7c48287712f4d25115a7399f2185a057c1b40
+harness_suffix_sha256=ed826520a6d07a5a4636d3f212157857f3a17b437f5a1b2af6577d4b71aba977
+```
+
+The exact accepted tool is the first 266895 harness bytes at SHA-256
+`073bdddeeac4a0b99e39cd54e5b2ea7db403796d25416dcf5ac578ea7ff5ad14`.
+The only suffix is 788 bytes and adds exactly one uniquely named test,
+one `DormantAuthorityConfig.initExactRealCandidate` call, its immediate
+`defer config.deinit()`, one `validateDormantAuthorityCandidate` call,
+`std.testing.allocator`, and `std.testing.io`. All 15 future captures remain
+empty and all future cache roots remain absent.
+
+AB's structural specification is not accepted because it does not extract
+or parse reachable tool function bodies or derive its asserted call closure
+from source. Its forbidden-mutator check trusts hand-authored effect labels
+and scans only the appended suffix, so it cannot establish completeness or
+absence of a reachable mutator. AB's state model is not accepted because it
+freezes no prestate/poststate capture bodies, closed environments, argv,
+schemas, atomic completion markers, or invocation specifications.
+
+Create one non-merge operating commit changing only this file. The Watcher
+dispatch binds its full commit, parent, tree, changed path, and final ignored
+inbox hash. Preserve AB, Y, every earlier retained root and record, and every
+protected identity exactly.
+
+Create only fresh absent, non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ac
+```
+
+Exact named reads of AB, the accepted tool, retained AA authority records,
+and operating documents are permitted. Do not run a worktree listing,
+traverse a registered-worktree directory, perform broad discovery, access
+`.claude/settings.local.json`, or modify main source, control, either store,
+artifacts, manifests, receipts, pins, scripts, compatibility paths, or
+protected state.
+
+### A. Preserve and independently bind the accepted harness
+
+Copy the exact accepted AB harness and suffix into AC. Independently verify
+and freeze the accepted-tool prefix, suffix, full harness, unique test,
+constructor/validator calls, owned configuration lifecycle, allocator, and
+I/O identities. Add no caller, symbol, build registration, configuration
+seam, production/public reachability, or other Zig byte. Do not format,
+compile, test, or invoke Zig.
+
+### B. Source-derived structural reachability
+
+Freeze, but do not invoke, a corrected complete structural guard and every
+body/environment/argv/specification it requires. It must:
+
+- uniquely extract the complete brace-balanced body of every reachable
+  exact-tool and harness function;
+- derive direct call edges from those extracted bodies and compute their
+  transitive closure;
+- raw-compare the derived closure with a separately fixed reviewed authority;
+- fail structurally on every unresolved indirect, aliased,
+  comptime-selected, function-pointer, or otherwise unprovable call;
+- verify the exact six read-only control Git argv and four named no-follow
+  control-file paths;
+- use call-aware mutator checks over all extracted reachable bodies, not
+  broad substring scans or hand-authored effect labels;
+- permit allocator-owned deinitialization only at its reviewed callsites and
+  process execution only for the exact six read-only Git argv; and
+- cover the appended test, exact-real constructor and validator, root
+  admission, registration capture, control parsing, manifest parsing, named
+  destination ancestors/files, and exact payload verification.
+
+Reject every other reachable create, write, truncate, rename, link, chmod,
+delete, remove, publication, extraction, proof-workspace, cleanup, mutation,
+process execution, broad traversal, or unresolved route. Freeze the exact
+source identities, extraction rules, derived-edge/closure schemas, fixed
+authority, callsite allowlist, predicate order/counts, and independent
+literal/schema/identity/count gates. The guard must not trust an effect label
+as proof.
+
+### C. Complete fresh prestate/poststate capture contracts
+
+Freeze, but do not invoke, complete bounded prestate and poststate capture
+bodies, closed environments, exact argv, invocation specifications,
+identical schemas, field classifications, deterministic order, and final
+atomic completion markers.
+
+The captures must bind:
+
+- the exact six control Git observations and four control-file observations;
+- source-root identity-only access;
+- only manifest-enumerated destination files and ancestors;
+- candidate, publication-receipt, activation, terminal, live-selection, and
+  later-metadata state;
+- registration metadata without registered-worktree-directory traversal;
+- prior retained-root identities and records;
+- accepted source/build, pins, stash, watcher, bypass, and ratchet `131`;
+- operating authority and exact main commit/parent/tree/path/inbox state; and
+- the exact isolated cache scope.
+
+Separate comparisons correctly. AA-to-future-prestate may vary only for the
+separately authorized operating HEAD/inbox and initially absent isolated
+cache paths. Future execution prestate-to-poststate must keep HEAD and inbox
+byte-identical. Only the exact isolated cache scope may change during the Zig
+invocation; every other field must compare byte-for-byte. The candidate must
+remain `candidate`, `/home/oleg/prog/z_llvm-artifacts` must remain
+authoritative, the local-state destination must remain non-authoritative, the
+accepted payload-copy receipt must remain exact, and
+validation/activation/terminal/live/later metadata must remain absent.
+
+Freeze, but do not invoke, the complete comparison guard against these exact
+schemas and atomic markers. Predeclare every future stdout, stderr, status,
+checkpoint, results, prestate, poststate, and comparison capture as empty.
+Record isolated cache roots only as future absent paths; create or populate
+no cache in AC.
+
+### D. Frozen future sequence and direct-child boundary
+
+Freeze this future order:
+
+1. fresh immediate prestate capture;
+2. source-derived structural guard;
+3. one uniquely and exactly filtered Zig `0.16.0` test with an exactly-`1/1`
+   expectation;
+4. poststate capture only after Zig success; and
+5. state comparison.
+
+Any future execution requires separate Watcher/Reviewer review and a
+non-merge direct-child operating commit whose parent is AC's construction
+HEAD and whose sole changed path is `docs/next_steps.md`.
+
+### E. Blocking construction and stop
+
+Use independently blocking construction stages and independent
+source-closure/schema/literal/identity/count/inventory gates. Any failure
+retains fresh AC and stops immediately without inspection, diagnosis, repair,
+regeneration, retry, cleanup, or a later stage.
+
+Complete success stops at the inert package boundary with every capture
+empty and every cache root absent. Run no structural guard, state capture,
+Zig/project command, formatter, compilation, test, validator, state
+comparison, evidence edit, receipt, activation, compatibility,
+validation-v3, compiler/performance work, ratchet recount or movement,
+cleanup, wiring, credit, or downstream action.
+
+## INBOX-206AB fresh inert Phase-3 execution-package construction — INERT MECHANICS ACCEPTED; EXECUTION PACKAGE WITHHELD
 
 Accept INBOX-206AA fully as completed exact-real diagnostic/prestate evidence
 only. It grants no structural-guard, Zig-test, state-guard, Phase-3
