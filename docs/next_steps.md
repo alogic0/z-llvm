@@ -24,7 +24,79 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-205C guard-only acceptance completion — AUTHORIZED
+## INBOX-205D final guard-only AWK portability correction — AUTHORIZED
+
+INBOX-205C is accepted only as a compliant failed guard attempt. Technical
+acceptance remains withheld. Its guard passed every source, production,
+dormant-reachability, retained-ledger, fresh-root, control, registration,
+stash, and watcher check before the final ratchet recount.
+
+The recount used `index` as an AWK loop variable. Because `index` is a
+built-in function name in the installed AWK, parsing returned status `2`,
+emitted five syntax diagnostics, and left the recount output empty. This is
+only a guard portability defect.
+
+Preserve every INBOX-205/205A/205B/205C root, record, cache, command, log,
+dirty source, and document byte-for-byte. Before the gate make no source,
+contract, evidence, build, mirror, control, store, manifest, test, authority,
+or operating behavior change. Run no formatting, compilation, suite, prior
+guard, project command, or Zig command.
+
+Frozen INBOX-205C identities include:
+
+```text
+guard command:
+b5d37db50a46d9574c1178fba6f9717a4db9732a03c8f4eb39cf518aa2c9b709
+guard stderr:
+c07748fd61c2e3c439414dc1990ce85b7df659c7323a6f093eeebb9aa8315a5c
+guard status:
+2
+tree inventory:
+d602312d3417da6500decad1e6b97489d36b2e94d5919e925eacb1dee3d4e50a
+file count / ledger:
+19 / 5f21a89bba26e1901e1e335bdc637007670ee6c7e3c524f0f39ab4a7ac53a4cb
+tool:
+306b3b21c182ae5031d71d82a38744c05161f0519ea80ff2cc20784e21a21f15
+```
+
+Create only fresh records beneath
+`tmp/inbox205d_o2_authority_dormant/validation/`.
+
+Derive the D guard byte-for-byte from the exact C guard except for replacing
+exactly four ratchet-loop uses of reserved `index` with `site_index`: its
+initialization, comparison, increment, and `sites` subscript. No other
+assertion, byte, ordering, or behavior may change.
+
+Add exact preservation checks for the complete C inventory/ledger, C guard
+command/status/stderr, and every earlier identity. Keep the ratchet check
+bounded to the exact
+`docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv` at
+SHA-256
+`2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11`,
+under `LC_ALL=C.UTF-8`, requiring exactly:
+
+```text
+direct_occurrence_recount=131
+```
+
+Freeze and retain the D guard command, environment, identity, stdout,
+stderr, and numeric status. Do not trial the corrected AWK separately.
+Invoke the D guard exactly once. Any failure retains D and stops without
+retry, diagnosis, repair, cleanup, evidence edit, or commit.
+
+Only after success update
+`docs/evidence/zllvm_artifact_authority_dormant_v1.md` with all attempts,
+the accepted 9/9 suite, both guard defects/corrections, retained provenance,
+ratchet 131, and stale diagnostic-label debt. Do not edit the tool or
+contract after the guard.
+
+Run only read-only identity/status and `git diff --check`, then commit
+exactly the already-approved tool, retention contract, and evidence files.
+Leave main/control clean and stop before real candidate validation,
+activation, v3, compatibility, compiler work, performance, cleanup, ratchet
+movement, or credit.
+
+## INBOX-205C guard-only acceptance completion — COMPLIANT FAILED GUARD; INCORPORATED INTO INBOX-205D
 
 INBOX-205B is accepted only as a compliant failed-gate attempt. Its one-shot
 focused suite result is accepted: 3/3 build steps and 9/9 tests passed.
