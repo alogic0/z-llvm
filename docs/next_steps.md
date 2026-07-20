@@ -24,6 +24,61 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-206K corrected freeze and observable diagnostic pre-state — AUTHORIZED
+
+Accept INBOX-206J only as a compliant pre-invocation construction failure.
+It receives no diagnostic or Phase-3 credit, and its diagnostic must never
+be invoked. The failure was a closed filename mismatch: the prepared-record
+freeze requested absent `construction.audit.tsv`, while the authorized audit
+exists as `inbox206i_chronology.audit.tsv`.
+
+Preserve all I/J bytes. Freeze J exactly:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206j
+file_count=39
+inventory_sha256=d7c2195bc8e20c2e6004593f765a93237b1f700f845c7de626e192045382cbac
+ledger_sha256=3ae2c7acec262e1dc587b7dd6217c3766eb6a4010f362cbff41b3b2438db0512
+```
+
+After exact absence, no-follow, protected-identity, and bidirectional
+disjointness checks, create records only beneath fresh:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206k
+```
+
+Derive K from J using only mechanical operating `HEAD`/parent and J-to-K path
+substitutions plus this single semantic correction: wherever the failed J
+preparation requested `construction.audit.tsv`, reference the existing
+renamed K `inbox206i_chronology.audit.tsv`. Preserve diagnostic assertions,
+order, and observability logic exactly.
+
+Before either invocation, predeclare and retain every preparation and
+diagnostic command, environment, invocation, stdout/stderr/status capture,
+checkpoint, result, and original `pre.*` result record. Retain a complete
+preparation command rather than using an unrecorded inline fragment.
+
+Invoke preparation exactly once. It must create
+`prepared.inventory.tsv` and `prepared.ledger.tsv` over every previously
+prepared K path, identify immutable records and mutable capture/result
+records that are empty at freeze time, and create `prepared.freeze.tsv`
+hashing the two snapshot records. Preparation failure retains K and stops
+without diagnosis, repair, retry, file construction, or diagnostic
+invocation.
+
+Preparation success alone permits exactly one invocation of the already
+frozen diagnostic in the same closed environment. After it returns, only
+predeclared captures, checkpoints, results, and original `pre.*` records may
+have changed. Construct no record and perform no diagnosis or retry.
+
+Diagnostic failure retains K and stops at the last checkpoint. Diagnostic
+success records every observation and also stops. No harness, Zig command,
+compilation, test, validator, structural/state guard, real-candidate
+validation, evidence edit, main commit, ratchet recount, receipt, activation,
+compatibility, v3, compiler/performance work, cleanup, wiring, credit, or
+downstream work is authorized.
+
 ## INBOX-206J observable diagnostic pre-state only — AUTHORIZED
 
 INBOX-206I is incomplete and noncompliant and receives no Phase-3 or
