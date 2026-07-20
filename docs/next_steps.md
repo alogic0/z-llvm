@@ -24,7 +24,93 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206P observable preterminal-closure diagnosis — AUTHORIZED
+## INBOX-206Q observable fresh construction and terminal freeze — AUTHORIZED
+
+Accept INBOX-206P fully as a successful one-shot non-reproduction. It proves
+that all 177 O preterminal predicates currently pass, but grants no O
+terminal-freeze, Phase-3, validation, ratchet, or downstream credit.
+Preserve P exactly:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206p
+file_count=43
+preinvoke_inventory_sha256=6eb572978ea48f80da84c3bd89fbb261c9c4df1233e3475c77382eac6754cd2e
+preinvoke_ledger_sha256=8c60b5037b0914c4d62a0a1eccede0704f02483d16c9250485467643950f52b9
+retained_inventory_sha256=0c24814311924d6e940ecdbbb41d6b5c58262189d4cbe379dc4c38a60e640847
+retained_ledger_sha256=c4809231029ffd3f446f05b27b2806e8dda6f2a3cd7aae5cb7d628d62b9e8ffb
+top_level_paths_sha256=f348ce716465abd6fb54a0fb2fa37a87ecb2783b0824a7eb5cc359f5d56d19a5
+diagnostic_status=0
+ordered_predicates=177/177
+last_checkpoint=P0177 control-no-remote
+stdout_stderr=empty
+terminal_records=absent
+```
+
+Preserve I–P and every protected identity exactly. Require the exact
+operating `HEAD` named in the Watcher dispatch, direct parent
+`509065abe557b3a070a6be02eb42183e9f5f33eb`, grandparent
+`286e2aea24080fae9e57a0be9018f69fc96de2ca`, and great-grandparent
+`72945284e603e5ed0940a7f23b4a1565d6e47815`. Require ordinary and
+exact-L-hermetic main status empty and control exact/main/clean/no-remote.
+
+After proving it fresh, absent, and non-symlink, create records only beneath:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206q
+```
+
+Before Q creation, use exactly one sentinel-preserved, status-propagating
+read-only `git -C /home/oleg/prog/z_llvm worktree list --porcelain` call
+through the exact INBOX-206O wrapper. Require count `43`, exact
+path/topology/non-main hashes `f31d8542...` / `6c868e3b...` /
+`ebc30a37...`, and bidirectional lexical disjointness of Q and control
+from every registration. Failure consumes the sole listing and stops before
+Q creation. Never enter, stat, hash, or inspect a registered-worktree
+directory; no other worktree command is authorized.
+
+Construct the complete diagnostic only as inert non-executable records.
+Starting from O, permit only Q-path, exact operating-HEAD, and direct-parent
+substitutions. Freeze a reverse transform that reproduces O exactly and
+prove identical substantive predicates, order, observability, captures,
+and stops. Predeclare every future diagnostic capture and `pre.*` record
+empty.
+
+Before static closure, predeclare and freeze every diagnostic record,
+future mutable capture, static-closure command/environment/invocation,
+closure checkpoint, append-only closure results, closure status, terminal
+generation command, classification, identity, and mutation allowlist.
+Neither frozen command may be trialed or syntax-executed.
+
+Invoke the frozen static closure exactly once. Reproduce O's construction
+checks in exact order, amended only for exact Q identities plus a stable
+checkpoint immediately before and an append-only pass result immediately
+after each predicate. The original bounded main/control Git status and
+identity observations are permitted. No other traversal or mutation is
+allowed. Failure retains the observable Q state, creates no terminal
+record, and stops without retry, diagnosis, or repair.
+
+Static-closure success alone permits exactly one invocation of the
+predeclared frozen terminal-generation step. Define its snapshots
+non-circularly:
+
+- `terminal.inventory.tsv` and `terminal.ledger.tsv` cover the complete
+  final Q state except those two records and `terminal.freeze.tsv`;
+- the covered state includes closure checkpoint, results, status, and every
+  empty future diagnostic capture; and
+- `terminal.freeze.tsv` records the exact inventory and ledger identities,
+  counts, exclusions, and success result.
+
+Terminal-generation failure retains any partial state and stops without
+retry, diagnosis, repair, or cleanup. Complete success makes no further Q
+byte change.
+
+No diagnostic/preparation invocation, project/Zig command, compilation,
+test, validator, repository/control/source/evidence/protected-file/store/
+artifact change, registered-directory access, validation, ratchet, wiring,
+cleanup, credit, or downstream work is authorized. Stop main and control
+clean.
+
+## INBOX-206P observable preterminal-closure diagnosis — ACCEPTED; CLOSED
 
 Accept INBOX-206O only as a compliant one-list construction with a
 fail-closed final-static failure. It receives no terminal-freeze,
