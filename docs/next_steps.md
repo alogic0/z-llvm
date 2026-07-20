@@ -24,7 +24,78 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206O sentinel-preserved preflight and inert freeze — AUTHORIZED
+## INBOX-206P observable preterminal-closure diagnosis — AUTHORIZED
+
+Accept INBOX-206O only as a compliant one-list construction with a
+fail-closed final-static failure. It receives no terminal-freeze,
+diagnostic, Phase-3, validation, ratchet, or downstream credit. Never rerun,
+complete, or modify O in place. Preserve its exact retained state:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206o
+file_count=40
+inventory_sha256=742165bd1f3644031d09862025bc08c5576059236ec5a483d386f4329f149b7f
+ledger_sha256=5731404518924dddc481f188fa20a66037d82a782acec44be9fb840170723621
+top_level_paths_sha256=8187047531b6f291cfdd58cfd8b2400771380104478270ecb23befcb031a9339
+mutable_predeclared_empty=22
+execute_bits=0
+terminal_snapshots=absent
+```
+
+Preserve all earlier continuations and every protected identity. Require the
+exact current operating `HEAD` named in the Watcher dispatch, direct parent
+`286e2aea24080fae9e57a0be9018f69fc96de2ca`, grandparent
+`72945284e603e5ed0940a7f23b4a1565d6e47815`, and great-grandparent
+`380ad13223649947891b1929cd9500a26783ba72`. Require ordinary and
+exact-L-hermetic main status empty and control exact/main/clean/no-remote.
+
+After proving it fresh, absent, and non-symlink, create records only beneath:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206p
+```
+
+Before P creation, use exactly one sentinel-preserved, status-propagating
+read-only `git -C /home/oleg/prog/z_llvm worktree list --porcelain` call.
+Use the exact INBOX-206O sentinel wrapper and preserved-byte handling.
+Require count `43`, path hash `f31d8542...`, topology hash
+`6c868e3b...`, non-main hash `ebc30a37...`, and bidirectional lexical
+disjointness of P and control from every registration. A failure consumes
+the sole listing and stops before P creation. Do not enter, stat, hash, or
+inspect any registered-worktree directory and perform no other worktree
+command.
+
+Within P, predeclare and freeze every diagnostic command, environment,
+checkpoint, append-only result, stdout/stderr capture, status capture,
+invocation specification, classification, and immutable identity before
+invocation. All command/specification text must be inert and non-executable;
+only the frozen automatic capture mechanism may invoke it.
+
+Reproduce the exact O final command's preterminal predicates and order,
+adding only:
+
+1. a stable checkpoint immediately before each original predicate; and
+2. an append-only passed result immediately after that predicate succeeds.
+
+Remove every terminal-snapshot write and every mutation path. The
+diagnostic may read only frozen O and L plus the original closure's exact
+bounded Git status/identity observations against main and control. It may
+not read `.claude/settings.local.json` or separately traverse the
+filesystem or any registered worktree.
+
+Invoke the frozen read-only diagnostic exactly once. After it returns, only
+the predeclared captures, checkpoint, append-only results, and status may
+have changed. Failure retains the first observable predicate and stops.
+Success records non-reproduction and also stops. In either case, do not
+retry, diagnose after invocation, repair, create terminal snapshots, or
+construct a next phase.
+
+No project/Zig command, preparation, harness, compilation, test, validator,
+repository/control/source/evidence/protected-file/store/artifact change,
+registered-directory access, validation, ratchet, wiring, cleanup, credit,
+or downstream work is authorized. Stop main and control clean.
+
+## INBOX-206O sentinel-preserved preflight and inert freeze — ACCEPTED FAIL-CLOSED; CLOSED
 
 Accept INBOX-206N only as a compliant consumed precreation failure. It
 receives no construction, diagnostic, Phase-3, validation, ratchet, or
