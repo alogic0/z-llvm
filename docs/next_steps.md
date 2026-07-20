@@ -24,86 +24,67 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206W isolated inert-normalizer correction — AUTHORIZED
+## INBOX-206X frozen closure/terminal execution — AUTHORIZED
 
-Accept INBOX-206V only as a compliant fail-closed Stage-1 construction
-failure. Its anchored-control preflight passed, fresh V was created, and
-Stage 1 stopped status `1` at the raw normalized comparison. Preserve its
-exact one-file state permanently:
+Accept INBOX-206W as the complete inert 61-file construction freeze, with
+construction credit only. Preserve I–W and every protected identity exactly.
+W's frozen identities are:
 
 ```text
-root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206v
-file_count=1
-inventory_sha256=ac6542ac287c850e3d182c23062e801cdcd5d030095aa556a7bb986cb1e214ea
-ledger_sha256=7625abb76bbb572924846b49435bd7181f6106fea6b705125fc53326aefb6b9e
-top_level_paths_sha256=6b6655134eeadb89a95007aaad4af0289cbdf4e118dfe9a2d3cc95e1abcd7942
-diagnostic_body_sha256=6df5cc59dfca87ffee9d1e0c89ab88420f3d234abb0e09901fdfbebd843865bd
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206w
+file_count=61
+eventual_terminal_file_count=64
+inventory_sha256=91ce440affecde9c4af052e48f25a893c81262af4319553fc41ed69911cbde2b
+ledger_sha256=4585385e0f575ffe1f48fd571ba1ffcecb846ad2ba8777e8219404087e98fa7f
+top_level_paths_sha256=f4ee65dbb43e8a63d82b34eed8dde1b2565b471ac3deae4202354fdf3a556569
 execute_bits=0
+terminal_snapshots=absent
 ```
 
-Never rerun, inspect for repair, edit, complete, or repair V. It receives
-no construction or downstream credit.
+The INBOX-206X operating commit must be a non-merge direct child of
+`073faa2e6c7106e730a0286d659d80ebf59092ad`, change only
+`docs/next_steps.md`, pass `git diff --check`, and leave ordinary and
+exact-L-hermetic main status clean. Bind its full hash after commit. Any
+amend, merge, intervening commit, extra changed path, ancestry mismatch, or
+dirty status invalidates W and stops before execution.
 
-Preserve I–V and every protected identity exactly. Require the exact
-operating `HEAD` and direct parent named in the Watcher dispatch. Require
-ordinary and exact-L-hermetic main status empty and control
-exact/main/clean/no-remote.
+After exact frozen preflight, invoke no diagnostic body, administrative
+worktree listing/check, preparation, project/Zig code, validator, or
+unrecorded command.
 
-After proving it fresh, absent, and non-symlink, create records only beneath:
+Invoke the frozen W static closure exactly once through one frozen
+wrapper/process, using its exact recorded environment, argv, and body. That
+same invocation alone may populate only the predeclared
+`static_closure.stdout`, `static_closure.stderr`, `static_closure.status`,
+checkpoint, and results records. Any nonzero closure status stops
+immediately. It permits no subsequent command, inspection, diagnosis,
+repair, postprocessing, retry, cleanup, or terminal invocation.
 
-```text
-/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206w
-```
+Closure status `0` alone authorizes exactly one frozen terminal-generator
+invocation through one process, using its exact recorded environment, argv,
+and body. That invocation alone may populate only its predeclared stdout,
+stderr, and status captures and atomically create the three previously absent
+terminal inventory, ledger, and freeze records. No external postprocessing is
+authorized.
 
-Repeat the accepted V anchored-control preflight exactly once for W:
-exactly one sentinel-preserved administrative listing, exactly one bounded
-lexical `git check-ignore -v --no-index -- local-state/control`, exact
-43-worktree identities, main as control's sole registered ancestor,
-control disjoint from all 42 non-main registrations, W disjoint from all
-43 registrations and control, and zero registered-directory access.
+Any terminal failure stops immediately with no subsequent command,
+inspection, diagnosis, repair, retry, cleanup, or later action. Terminal
+success also permits no further command: stop immediately for Watcher review
+of the expected exact 64-file terminal state.
 
-Use exactly three independently blocking postcreation construction stages.
+No additional listing/check, repository/control/source/evidence/store/
+artifact/protected-file change, registered-directory access, validation,
+ratchet, wiring, cleanup, credit, or downstream action is authorized. Stop
+main and control clean.
 
-1. Write only the fixed quoted-literal W diagnostic body. It must remain
-   byte-for-byte the V/S authority except authorized W path substitutions
-   and the delimited direct-child execution-identity block.
+## INBOX-206W isolated inert-normalizer correction — CONSTRUCTION ACCEPTED; CLOSED
 
-   Correct only the inert normalizer. Its reverse replacement must emit the
-   exact four S old-HEAD lines, including a lone final backslash and no
-   quote on each of the two assertion lines. Emit each final backslash
-   through a separately concatenated AWK string; never reuse V's failed
-   nested escape form.
-
-   Before full normalization, require an isolated raw byte-for-byte
-   comparison proving that those four emitted lines equal the exact four S
-   lines. Only after that passes may the inert stream reverse authorized W
-   path and delimited direct-child substitutions and require full raw
-   byte-for-byte `cmp` equality with S.
-
-   Neither comparison transformer may write an active body. Either
-   comparison failure immediately retains only the fixed W diagnostic body
-   and stops.
-2. Only after complete Stage-1 success, run the unchanged fixed-literal
-   closure/terminal construction and raw-equivalence/schema gates agreed
-   for V.
-3. Only after Stage-2 success, create the unchanged remaining 58 records
-   and freeze exact `61`/`64` authority, W construction `HEAD`,
-   direct-child commands/parsing, exact S-to-W changed-path set, immutable
-   identities, inventory, ledger, and paths.
-
-All prior normalization limits, fixed-body rules, direct-child execution
-model, terminal schema, counts, identities, and fail-closed stops remain
-unchanged. Any preflight or construction failure stops immediately without
-inspection, diagnosis, rewriting, identity regeneration, fix-forward,
-retry, cleanup, or later construction.
-
-On complete success, freeze the inert 61-file W state and stop. Invoke no
-frozen diagnostic, closure, terminal, preparation, project, or Zig stage.
-
-No project/Zig command, compilation, test, validator, repository/control/
-source/evidence/protected-file/store/artifact change, registered-directory
-access, validation, ratchet, wiring, cleanup, credit, or downstream work is
-authorized. Stop main and control clean.
+INBOX-206W passed its anchored-control preflight, all three independently
+blocking construction stages, isolated four-line and full raw comparisons,
+literal/schema gates, exact 61/64 count model, changed-path gate, and frozen
+identity checks. It stopped before every frozen diagnostic, closure, terminal,
+preparation, project, or Zig invocation. Preserve its exact 61-file state
+until the authorized direct-child INBOX-206X execution.
 
 ## INBOX-206V anchored-control staged literal construction — COMPLIANT STAGE-1 FAILURE; CLOSED
 
