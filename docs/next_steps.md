@@ -24,7 +24,57 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206 Phase-3 real-candidate read-only validation — AUTHORIZED
+## INBOX-206A corrected candidate-state preflight and Phase-3 continuation — AUTHORIZED
+
+INBOX-206 is accepted only as a compliant preflight stop. The external root
+was never created; no harness, cache, command record, Zig invocation, state
+guard, evidence edit, source/control/store/worktree mutation, or technical
+commit occurred. Phase-3 acceptance remains withheld.
+
+The retained fail-fast command shows every preflight assertion passed until
+its final candidate-state check. That check searched for a key/value row
+beginning `state`, but the canonical candidate document is a three-line
+row-oriented TSV whose header and value are field 14. Preserve operating
+`c9aedb47`, accepted technical `b71d2d50`, all frozen identities, and the
+absent exact external root.
+
+Freeze a complete corrected preflight derived from the retained INBOX-206
+command. The only permitted changes are:
+
+1. mechanical substitution of the new operating `HEAD`; and
+2. replacement of the final candidate-state parser.
+
+All other assertions, paths, identities, commands, and ordering remain
+unchanged. Do not separately trial the parser. The replacement must require:
+
+```text
+exactly three LF-terminated lines and no CR
+line 1 = zllvm-authority-candidate-v1
+line 2 = exactly 14 fields; field 14 = state
+line 3 = exactly 14 fields; field 14 = candidate
+```
+
+Run the complete corrected preflight exactly once. Failure must leave
+`/tmp/zllvm-inbox206-authority-validation-evidence` absent and stop without
+retry, diagnosis, creation, evidence edit, commit, or downstream action.
+
+After success only, create that exact external root, retain the executed
+preflight command/result there, and continue INBOX-206 unchanged: the
+pre-compilation reachable-call-graph read-only structural gate; no control/
+store mutation or proof workspace; all harness/cache/records under the
+external root; frozen copied-tool prefix and sole appended test; pinned Zig
+`0.16.0`, isolated caches, exact unique filter, one Zig invocation and exactly
+one executed test; no synthetic-suite rerun; success-only one-shot state
+guard; candidate inert and old source authoritative.
+
+Any later failure retains the external root and stops without retry, repair,
+evidence edit, or commit. Complete test and guard success alone permits the
+single `docs/evidence/zllvm_artifact_authority_validation_v1.md` commit. That
+evidence must include both the failed INBOX-206 preflight and corrected
+INBOX-206A result. Stop before receipts, activation, compatibility, v3,
+compiler work, performance, cleanup, ratchet movement, or credit.
+
+## INBOX-206 Phase-3 real-candidate read-only validation — COMPLIANT PREFLIGHT STOP; INCORPORATED INTO INBOX-206A
 
 Watcher and Reviewer accept `b71d2d50`, tree `146da386`, and the complete
 INBOX-205 through INBOX-205D composite as the finished Phase-2 dormant
