@@ -1525,6 +1525,723 @@ fn prepareStoreRoot(
     }
 }
 
+const dormant_candidate_key = "authority/zllvm/v1/manifests/candidate.tsv";
+const dormant_generation_key = "authority/zllvm/v1/manifests/generation-00000001.tsv";
+const dormant_lineage_key = "authority/zllvm/v1/lineage/generation-00000001.tsv";
+const dormant_receipt_key =
+    "authority/zllvm/v1/receipts/publication/generation-00000001-payload-copy.tsv";
+const dormant_candidate_magic = "zllvm-authority-candidate-v1";
+const dormant_candidate_header =
+    "authority_id\tgeneration\tpayload_root\tgeneration_manifest_key\tgeneration_manifest_sha256\tgeneration_manifest_bytes\tgeneration_manifest_mode\tlineage_key\tlineage_sha256\tpayload_copy_receipt_key\tpayload_copy_receipt_sha256\tsource_authority_root\tsource_generation_manifest_sha256\tstate";
+const dormant_lineage_magic = "zllvm-artifact-lineage-v1";
+const dormant_lineage_header =
+    "generation\tparent_generation\tparent_manifest_sha256\tgeneration_manifest_sha256\tsource_authority_root\tsource_generation_manifest_sha256\ttransition";
+const dormant_receipt_magic = "zllvm-payload-copy-receipt-v1";
+const dormant_receipt_header =
+    "receipt_id\tgeneration\tsource_root\tdestination_root\tsource_inventory_sha256\tsource_file_ledger_sha256\tsource_destination_ledger_sha256\tpayload_files\tpayload_bytes\tobjects\tsnapshots\tdestination_modes\tcopy_evidence_path\tcopy_evidence_sha256\tresult";
+
+const DormantComponent = enum {
+    candidate,
+    generation,
+    lineage,
+    receipt,
+
+    fn missing(component: DormantComponent) anyerror {
+        return switch (component) {
+            .candidate => error.DormantCandidateMissing,
+            .generation => error.DormantGenerationMissing,
+            .lineage => error.DormantLineageMissing,
+            .receipt => error.DormantReceiptMissing,
+        };
+    }
+
+    fn malformed(component: DormantComponent) anyerror {
+        return switch (component) {
+            .candidate => error.DormantCandidateMalformed,
+            .generation => error.DormantGenerationMalformed,
+            .lineage => error.DormantLineageMalformed,
+            .receipt => error.DormantReceiptMalformed,
+        };
+    }
+
+    fn mismatched(component: DormantComponent) anyerror {
+        return switch (component) {
+            .candidate => error.DormantCandidateMismatched,
+            .generation => error.DormantGenerationMismatched,
+            .lineage => error.DormantLineageMismatched,
+            .receipt => error.DormantReceiptMismatched,
+        };
+    }
+
+    fn unsafe(component: DormantComponent) anyerror {
+        return switch (component) {
+            .candidate => error.DormantCandidateUnsafe,
+            .generation => error.DormantGenerationUnsafe,
+            .lineage => error.DormantLineageUnsafe,
+            .receipt => error.DormantReceiptUnsafe,
+        };
+    }
+};
+
+const DormantOwnedRow = struct {
+    storage: []u8,
+    fields: [][]const u8,
+
+    fn deinit(row: *DormantOwnedRow, allocator: std.mem.Allocator) void {
+        allocator.free(row.fields);
+        allocator.free(row.storage);
+        row.* = undefined;
+    }
+};
+
+const DormantAuthorityConfig = struct {
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    guard: RegistrationGuard,
+    control_root: []u8,
+    authority_root: []u8,
+    payload_root: []u8,
+    source_root: []u8,
+    source_manifest_sha256: [64]u8,
+    expected_source_inventory_sha256: [64]u8,
+    expected_source_file_ledger_sha256: [64]u8,
+    expected_source_destination_ledger_sha256: [64]u8,
+    expected_copy_evidence_path: []u8,
+    expected_copy_evidence_sha256: [64]u8,
+    expected_registration_full_hash: [64]u8,
+    expected_registration_path_hash: [64]u8,
+    expected_registration_topology_hash: [64]u8,
+    expected_registration_non_main_hash: [64]u8,
+
+    fn init(
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        control_root: []const u8,
+        payload_root: []const u8,
+        source_root: []const u8,
+        source_manifest_sha256: []const u8,
+        source_inventory_sha256: []const u8,
+        source_file_ledger_sha256: []const u8,
+        source_destination_ledger_sha256: []const u8,
+        copy_evidence_path: []const u8,
+        copy_evidence_sha256: []const u8,
+    ) !DormantAuthorityConfig {
+        try validateSha(source_manifest_sha256);
+        try validateSha(source_inventory_sha256);
+        try validateSha(source_file_ledger_sha256);
+        try validateSha(source_destination_ledger_sha256);
+        try validateRelativeKey(copy_evidence_path);
+        try validateSha(copy_evidence_sha256);
+        var guard = try RegistrationGuard.init(allocator, io);
+        errdefer guard.deinit();
+        const owned_control = try allocator.dupe(u8, control_root);
+        errdefer allocator.free(owned_control);
+        const owned_authority = try std.fs.path.join(
+            allocator,
+            &.{ control_root, "authority", "zllvm", "v1" },
+        );
+        errdefer allocator.free(owned_authority);
+        const owned_payload = try allocator.dupe(u8, payload_root);
+        errdefer allocator.free(owned_payload);
+        const owned_source = try allocator.dupe(u8, source_root);
+        errdefer allocator.free(owned_source);
+        const owned_copy_evidence_path = try allocator.dupe(u8, copy_evidence_path);
+        errdefer allocator.free(owned_copy_evidence_path);
+        return .{
+            .allocator = allocator,
+            .io = io,
+            .guard = guard,
+            .control_root = owned_control,
+            .authority_root = owned_authority,
+            .payload_root = owned_payload,
+            .source_root = owned_source,
+            .source_manifest_sha256 = source_manifest_sha256[0..64].*,
+            .expected_source_inventory_sha256 = source_inventory_sha256[0..64].*,
+            .expected_source_file_ledger_sha256 = source_file_ledger_sha256[0..64].*,
+            .expected_source_destination_ledger_sha256 = source_destination_ledger_sha256[0..64].*,
+            .expected_copy_evidence_path = owned_copy_evidence_path,
+            .expected_copy_evidence_sha256 = copy_evidence_sha256[0..64].*,
+            .expected_registration_full_hash = guard.frozen.full_hash,
+            .expected_registration_path_hash = guard.frozen.path_hash,
+            .expected_registration_topology_hash = guard.frozen.topology_hash,
+            .expected_registration_non_main_hash = guard.frozen.non_main_hash,
+        };
+    }
+
+    fn deinit(config: *DormantAuthorityConfig) void {
+        config.guard.deinit();
+        config.allocator.free(config.expected_copy_evidence_path);
+        config.allocator.free(config.source_root);
+        config.allocator.free(config.payload_root);
+        config.allocator.free(config.authority_root);
+        config.allocator.free(config.control_root);
+        config.* = undefined;
+    }
+
+    fn validateRegistration(config: *const DormantAuthorityConfig) !void {
+        if (!std.mem.eql(
+            u8,
+            &config.expected_registration_full_hash,
+            &config.guard.frozen.full_hash,
+        ) or
+            !std.mem.eql(
+                u8,
+                &config.expected_registration_path_hash,
+                &config.guard.frozen.path_hash,
+            ) or
+            !std.mem.eql(
+                u8,
+                &config.expected_registration_topology_hash,
+                &config.guard.frozen.topology_hash,
+            ) or
+            !std.mem.eql(
+                u8,
+                &config.expected_registration_non_main_hash,
+                &config.guard.frozen.non_main_hash,
+            ))
+        {
+            return error.DormantRegistrationStale;
+        }
+        config.guard.assertCurrent() catch return error.DormantRegistrationStale;
+    }
+};
+
+const DormantAuthorityValidation = struct {
+    manifest_sha256: [64]u8,
+    payload_files: u64,
+    payload_bytes: u64,
+    objects: u64,
+    snapshots: u64,
+};
+
+fn parseDormantOwnedRow(
+    allocator: std.mem.Allocator,
+    input: []const u8,
+    magic: []const u8,
+    header: []const u8,
+    field_count: usize,
+) !DormantOwnedRow {
+    if (!std.mem.endsWith(u8, input, "\n") or std.mem.indexOfScalar(u8, input, '\r') != null) {
+        return error.NonCanonicalDormantRecord;
+    }
+    const storage = try allocator.dupe(u8, input);
+    errdefer allocator.free(storage);
+    var lines = std.mem.splitScalar(u8, storage, '\n');
+    if (!std.mem.eql(u8, lines.next() orelse return error.MissingDormantMagic, magic) or
+        !std.mem.eql(u8, lines.next() orelse return error.MissingDormantHeader, header))
+    {
+        return error.UnknownDormantSchema;
+    }
+    const data = lines.next() orelse return error.MissingDormantRow;
+    if (data.len == 0 or
+        !std.mem.eql(u8, lines.next() orelse return error.NonCanonicalDormantRecord, "") or
+        lines.next() != null)
+    {
+        return error.NonCanonicalDormantRecord;
+    }
+    const fields = try allocator.alloc([]const u8, field_count);
+    errdefer allocator.free(fields);
+    var field_it = std.mem.splitScalar(u8, data, '\t');
+    for (fields) |*field| {
+        field.* = field_it.next() orelse return error.MissingDormantField;
+        try validateCanonicalField(allocator, field.*);
+    }
+    if (field_it.next() != null) return error.UnknownDormantField;
+
+    var encoded: std.ArrayList(u8) = .empty;
+    defer encoded.deinit(allocator);
+    try encoded.appendSlice(allocator, magic);
+    try encoded.append(allocator, '\n');
+    try encoded.appendSlice(allocator, header);
+    try encoded.append(allocator, '\n');
+    for (fields, 0..) |field, index| {
+        if (index != 0) try encoded.append(allocator, '\t');
+        try encoded.appendSlice(allocator, field);
+    }
+    try encoded.append(allocator, '\n');
+    if (!std.mem.eql(u8, encoded.items, input)) return error.NonCanonicalDormantRecord;
+    return .{ .storage = storage, .fields = fields };
+}
+
+fn readDormantControlFile(
+    config: *const DormantAuthorityConfig,
+    component: DormantComponent,
+    relative_path: []const u8,
+) ![]u8 {
+    validateRelativeKey(relative_path) catch return component.unsafe();
+    var control = std.Io.Dir.openDirAbsolute(config.io, config.control_root, .{
+        .access_sub_paths = true,
+        .iterate = true,
+        .follow_symlinks = false,
+    }) catch |err| return switch (err) {
+        error.FileNotFound => component.missing(),
+        error.SymLinkLoop, error.NotDir => component.unsafe(),
+        else => component.malformed(),
+    };
+    defer control.close(config.io);
+    const control_stat = control.stat(config.io) catch return component.unsafe();
+    if (@as(u16, @intCast(control_stat.permissions.toMode() & 0o7777)) != 0o755) {
+        return component.mismatched();
+    }
+    const parent_path = std.fs.path.dirname(relative_path) orelse ".";
+    const basename = std.fs.path.basename(relative_path);
+    var current = control;
+    var current_owned = false;
+    errdefer if (current_owned) current.close(config.io);
+    var segments = std.mem.splitScalar(u8, parent_path, '/');
+    while (segments.next()) |segment| {
+        const next = openExistingDir(config.io, current, segment) catch |err|
+            return switch (err) {
+                error.FileNotFound => component.missing(),
+                error.SymLinkLoop, error.NotDir => component.unsafe(),
+                else => component.malformed(),
+            };
+        if (current_owned) current.close(config.io);
+        current = next;
+        current_owned = true;
+        const directory_stat = current.stat(config.io) catch return component.unsafe();
+        if (@as(u16, @intCast(directory_stat.permissions.toMode() & 0o7777)) != 0o755) {
+            return component.mismatched();
+        }
+    }
+    var parent = current;
+    defer parent.close(config.io);
+    current_owned = false;
+    var file = parent.openFile(config.io, basename, .{
+        .allow_directory = false,
+        .follow_symlinks = false,
+    }) catch |err| return switch (err) {
+        error.FileNotFound => component.missing(),
+        error.SymLinkLoop, error.NotDir => component.unsafe(),
+        else => component.malformed(),
+    };
+    defer file.close(config.io);
+    const stat = file.stat(config.io) catch return component.malformed();
+    if (stat.kind != .file) return component.unsafe();
+    if (@as(u16, @intCast(stat.permissions.toMode() & 0o7777)) != 0o644) {
+        return component.mismatched();
+    }
+    const size = std.math.cast(usize, stat.size) orelse return component.malformed();
+    if (size > 4 * 1024 * 1024) return component.malformed();
+    const bytes = try config.allocator.alloc(u8, size);
+    errdefer config.allocator.free(bytes);
+    var offset: usize = 0;
+    while (offset < bytes.len) {
+        const count = file.readPositional(
+            config.io,
+            &.{bytes[offset..]},
+            offset,
+        ) catch return component.malformed();
+        if (count == 0) return component.malformed();
+        offset += count;
+    }
+    var extra: [1]u8 = undefined;
+    const extra_count = file.readPositional(
+        config.io,
+        &.{&extra},
+        bytes.len,
+    ) catch return component.malformed();
+    if (extra_count != 0) return component.malformed();
+    return bytes;
+}
+
+fn validateDormantRoots(config: *const DormantAuthorityConfig) !void {
+    const roots = [_][]const u8{
+        config.control_root,
+        config.authority_root,
+        config.payload_root,
+        config.source_root,
+    };
+    for (roots) |root| {
+        const normalized = normalizedAbsolute(config.allocator, root) catch
+            return error.DormantUnsafeRoot;
+        defer config.allocator.free(normalized);
+        if (!std.mem.eql(u8, normalized, root)) return error.DormantUnsafeRoot;
+        config.guard.assertStoreRoot(root) catch return error.DormantUnsafeRoot;
+        const exists = validateAuthorityAncestry(config.allocator, config.io, root) catch
+            return error.DormantUnsafeRoot;
+        if (!exists) return error.DormantDestinationPartial;
+        var directory = std.Io.Dir.openDirAbsolute(config.io, root, .{
+            .iterate = true,
+            .follow_symlinks = false,
+        }) catch return error.DormantUnsafeRoot;
+        defer directory.close(config.io);
+        const stat = directory.stat(config.io) catch return error.DormantUnsafeRoot;
+        if (@as(u16, @intCast(stat.permissions.toMode() & 0o7777)) != 0o755) {
+            return error.DormantUnsafeRoot;
+        }
+    }
+    if (!pathContains(config.control_root, config.authority_root) or
+        pathContains(config.control_root, config.payload_root) or
+        pathContains(config.payload_root, config.control_root) or
+        pathContains(config.source_root, config.control_root) or
+        pathContains(config.control_root, config.source_root) or
+        pathContains(config.source_root, config.payload_root) or
+        pathContains(config.payload_root, config.source_root))
+    {
+        return error.DormantUnsafeRoot;
+    }
+}
+
+const DormantExpectedEntry = struct {
+    path: []u8,
+    kind: std.Io.File.Kind,
+};
+
+fn appendDormantExpected(
+    allocator: std.mem.Allocator,
+    entries: *std.ArrayList(DormantExpectedEntry),
+    path: []const u8,
+    kind: std.Io.File.Kind,
+) !void {
+    for (entries.items) |entry| {
+        if (std.mem.eql(u8, entry.path, path)) {
+            if (entry.kind != kind) return error.DormantDestinationMismatched;
+            return;
+        }
+    }
+    try entries.append(allocator, .{
+        .path = try allocator.dupe(u8, path),
+        .kind = kind,
+    });
+}
+
+fn freeDormantExpected(
+    allocator: std.mem.Allocator,
+    entries: *std.ArrayList(DormantExpectedEntry),
+) void {
+    for (entries.items) |entry| allocator.free(entry.path);
+    entries.deinit(allocator);
+}
+
+fn findDormantExpected(
+    entries: []const DormantExpectedEntry,
+    path: []const u8,
+    kind: std.Io.File.Kind,
+) bool {
+    for (entries) |entry| {
+        if (entry.kind == kind and std.mem.eql(u8, entry.path, path)) return true;
+    }
+    return false;
+}
+
+fn inspectDormantTree(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    dir: std.Io.Dir,
+    prefix: []const u8,
+    expected: []const DormantExpectedEntry,
+    actual_count: *usize,
+) !void {
+    var iterator = dir.iterate();
+    while (try iterator.next(io)) |entry| {
+        const relative = if (prefix.len == 0)
+            try allocator.dupe(u8, entry.name)
+        else
+            try std.fs.path.join(allocator, &.{ prefix, entry.name });
+        defer allocator.free(relative);
+        switch (entry.kind) {
+            .directory => {
+                if (!findDormantExpected(expected, relative, .directory)) {
+                    return error.DormantDestinationExtra;
+                }
+                var child = dir.openDir(io, entry.name, .{
+                    .access_sub_paths = true,
+                    .iterate = true,
+                    .follow_symlinks = false,
+                }) catch return error.DormantDestinationUnsafe;
+                defer child.close(io);
+                const stat = child.stat(io) catch return error.DormantDestinationUnsafe;
+                if (@as(u16, @intCast(stat.permissions.toMode() & 0o7777)) != 0o755) {
+                    return error.DormantDestinationMismatched;
+                }
+                actual_count.* += 1;
+                try inspectDormantTree(
+                    allocator,
+                    io,
+                    child,
+                    relative,
+                    expected,
+                    actual_count,
+                );
+            },
+            .file => {
+                if (!findDormantExpected(expected, relative, .file)) {
+                    return error.DormantDestinationExtra;
+                }
+                actual_count.* += 1;
+            },
+            else => return error.DormantDestinationUnsafe,
+        }
+    }
+}
+
+fn verifyDormantDestination(
+    config: *const DormantAuthorityConfig,
+    manifest: Manifest,
+) !DormantAuthorityValidation {
+    var expected: std.ArrayList(DormantExpectedEntry) = .empty;
+    defer freeDormantExpected(config.allocator, &expected);
+    try appendDormantExpected(config.allocator, &expected, "incoming", .directory);
+    try appendDormantExpected(config.allocator, &expected, "objects", .directory);
+    try appendDormantExpected(config.allocator, &expected, "objects/sha256", .directory);
+    try appendDormantExpected(config.allocator, &expected, "snapshots", .directory);
+    try appendDormantExpected(config.allocator, &expected, "snapshots/sha256", .directory);
+
+    var payload_files: u64 = 0;
+    var payload_bytes: u64 = 0;
+    var objects: u64 = 0;
+    var snapshots: u64 = 0;
+    for (manifest.rows) |row| {
+        if (row.kind != .object and row.kind != .snapshot) continue;
+        const split = if (row.kind == .object)
+            splitObjectKey(row.key)
+        else
+            splitSnapshotKey(row.key);
+        const key_split = split orelse return error.DormantDestinationMismatched;
+        if (!std.mem.eql(u8, key_split.prefix, row.sha256[0..2])) {
+            return error.DormantDestinationMismatched;
+        }
+        const prefix_path = if (row.kind == .object)
+            try std.fmt.allocPrint(
+                config.allocator,
+                "objects/sha256/{s}",
+                .{key_split.prefix},
+            )
+        else
+            try std.fmt.allocPrint(
+                config.allocator,
+                "snapshots/sha256/{s}",
+                .{key_split.prefix},
+            );
+        defer config.allocator.free(prefix_path);
+        try appendDormantExpected(config.allocator, &expected, prefix_path, .directory);
+        try appendDormantExpected(config.allocator, &expected, row.key, .file);
+        payload_files += 1;
+        payload_bytes = std.math.add(u64, payload_bytes, row.bytes) catch
+            return error.DormantDestinationMismatched;
+        if (row.kind == .object) objects += 1 else snapshots += 1;
+    }
+
+    var root = std.Io.Dir.openDirAbsolute(config.io, config.payload_root, .{
+        .access_sub_paths = true,
+        .iterate = true,
+        .follow_symlinks = false,
+    }) catch |err| return switch (err) {
+        error.FileNotFound => error.DormantDestinationPartial,
+        error.SymLinkLoop, error.NotDir => error.DormantDestinationUnsafe,
+        else => error.DormantDestinationMismatched,
+    };
+    defer root.close(config.io);
+    const root_stat = root.stat(config.io) catch return error.DormantDestinationUnsafe;
+    if (@as(u16, @intCast(root_stat.permissions.toMode() & 0o7777)) != 0o755) {
+        return error.DormantDestinationMismatched;
+    }
+    var actual_count: usize = 0;
+    try inspectDormantTree(
+        config.allocator,
+        config.io,
+        root,
+        "",
+        expected.items,
+        &actual_count,
+    );
+    if (actual_count != expected.items.len) return error.DormantDestinationPartial;
+
+    for (manifest.rows) |row| {
+        if (row.kind != .object and row.kind != .snapshot) continue;
+        const parent_path = std.fs.path.dirname(row.key) orelse
+            return error.DormantDestinationMismatched;
+        const basename = std.fs.path.basename(row.key);
+        var parent = openPathNoFollow(config.io, root, parent_path, false) catch |err|
+            return switch (err) {
+                error.FileNotFound => error.DormantDestinationPartial,
+                error.SymLinkLoop, error.NotDir => error.DormantDestinationUnsafe,
+                else => error.DormantDestinationMismatched,
+            };
+        defer parent.close(config.io);
+        var identity = verifyRelativeFile(
+            config.allocator,
+            config.io,
+            parent,
+            basename,
+            0o444,
+        ) catch |err| return switch (err) {
+            error.FileNotFound => error.DormantDestinationPartial,
+            error.SymLinkLoop, error.NotDir, error.NotRegularFile => error.DormantDestinationUnsafe,
+            else => error.DormantDestinationMismatched,
+        };
+        defer identity.deinit(config.allocator);
+        if (!std.mem.eql(u8, &identity.sha256, row.sha256) or identity.bytes != row.bytes) {
+            return error.DormantDestinationMismatched;
+        }
+    }
+    return .{
+        .manifest_sha256 = undefined,
+        .payload_files = payload_files,
+        .payload_bytes = payload_bytes,
+        .objects = objects,
+        .snapshots = snapshots,
+    };
+}
+
+fn validateDormantAuthorityCandidate(
+    config: *const DormantAuthorityConfig,
+) !DormantAuthorityValidation {
+    try config.validateRegistration();
+    try validateDormantRoots(config);
+
+    const candidate_bytes = try readDormantControlFile(
+        config,
+        .candidate,
+        dormant_candidate_key,
+    );
+    defer config.allocator.free(candidate_bytes);
+    var candidate = parseDormantOwnedRow(
+        config.allocator,
+        candidate_bytes,
+        dormant_candidate_magic,
+        dormant_candidate_header,
+        14,
+    ) catch return error.DormantCandidateMalformed;
+    defer candidate.deinit(config.allocator);
+    const c = candidate.fields;
+    validateRelativeKey(c[3]) catch return error.DormantCandidateUnsafe;
+    validateRelativeKey(c[7]) catch return error.DormantCandidateUnsafe;
+    validateRelativeKey(c[9]) catch return error.DormantCandidateUnsafe;
+    validateSha(c[4]) catch return error.DormantCandidateMalformed;
+    validateSha(c[8]) catch return error.DormantCandidateMalformed;
+    validateSha(c[10]) catch return error.DormantCandidateMalformed;
+    validateSha(c[12]) catch return error.DormantCandidateMalformed;
+    const declared_manifest_bytes = std.fmt.parseInt(u64, c[5], 10) catch
+        return error.DormantCandidateMalformed;
+    const declared_manifest_mode = std.fmt.parseInt(u16, c[6], 8) catch
+        return error.DormantCandidateMalformed;
+    if (!std.mem.eql(u8, c[0], "zllvm-local-state-v1") or
+        !std.mem.eql(u8, c[1], "00000001") or
+        !std.mem.eql(u8, c[2], config.payload_root) or
+        !std.mem.eql(u8, c[3], dormant_generation_key) or
+        declared_manifest_mode != 0o644 or
+        !std.mem.eql(u8, c[7], dormant_lineage_key) or
+        !std.mem.eql(u8, c[9], dormant_receipt_key) or
+        !std.mem.eql(u8, c[11], config.source_root) or
+        !std.mem.eql(u8, c[12], &config.source_manifest_sha256) or
+        !std.mem.eql(u8, c[13], "candidate"))
+    {
+        return error.DormantCandidateMismatched;
+    }
+
+    const generation_bytes = try readDormantControlFile(
+        config,
+        .generation,
+        dormant_generation_key,
+    );
+    defer config.allocator.free(generation_bytes);
+    if (!std.mem.eql(u8, &sha256Hex(generation_bytes), c[4]) or
+        generation_bytes.len != declared_manifest_bytes)
+    {
+        return error.DormantGenerationMismatched;
+    }
+    var manifest = parseManifest(config.allocator, generation_bytes) catch
+        return error.DormantGenerationMalformed;
+    defer manifest.deinit(config.allocator);
+    const reencoded_manifest = encodeManifest(config.allocator, manifest) catch
+        return error.DormantGenerationMalformed;
+    defer config.allocator.free(reencoded_manifest);
+    if (!std.mem.eql(u8, reencoded_manifest, generation_bytes)) {
+        return error.DormantGenerationMalformed;
+    }
+
+    const lineage_bytes = try readDormantControlFile(
+        config,
+        .lineage,
+        dormant_lineage_key,
+    );
+    defer config.allocator.free(lineage_bytes);
+    if (!std.mem.eql(u8, &sha256Hex(lineage_bytes), c[8])) {
+        return error.DormantLineageMismatched;
+    }
+    var lineage = parseDormantOwnedRow(
+        config.allocator,
+        lineage_bytes,
+        dormant_lineage_magic,
+        dormant_lineage_header,
+        7,
+    ) catch return error.DormantLineageMalformed;
+    defer lineage.deinit(config.allocator);
+    const l = lineage.fields;
+    validateSha(l[3]) catch return error.DormantLineageMalformed;
+    validateSha(l[5]) catch return error.DormantLineageMalformed;
+    if (!std.mem.eql(u8, l[0], "00000001") or
+        !std.mem.eql(u8, l[1], "-") or
+        !std.mem.eql(u8, l[2], "-") or
+        !std.mem.eql(u8, l[3], c[4]) or
+        !std.mem.eql(u8, l[4], config.source_root) or
+        !std.mem.eql(u8, l[5], &config.source_manifest_sha256) or
+        !std.mem.eql(u8, l[6], "non_destructive_verified_copy"))
+    {
+        return error.DormantLineageMismatched;
+    }
+
+    const receipt_bytes = try readDormantControlFile(
+        config,
+        .receipt,
+        dormant_receipt_key,
+    );
+    defer config.allocator.free(receipt_bytes);
+    if (!std.mem.eql(u8, &sha256Hex(receipt_bytes), c[10])) {
+        return error.DormantReceiptMismatched;
+    }
+    var receipt = parseDormantOwnedRow(
+        config.allocator,
+        receipt_bytes,
+        dormant_receipt_magic,
+        dormant_receipt_header,
+        15,
+    ) catch return error.DormantReceiptMalformed;
+    defer receipt.deinit(config.allocator);
+    const r = receipt.fields;
+    validateSha(r[4]) catch return error.DormantReceiptMalformed;
+    validateSha(r[5]) catch return error.DormantReceiptMalformed;
+    validateSha(r[6]) catch return error.DormantReceiptMalformed;
+    validateRelativeKey(r[12]) catch return error.DormantReceiptUnsafe;
+    validateSha(r[13]) catch return error.DormantReceiptMalformed;
+    const receipt_files = std.fmt.parseInt(u64, r[7], 10) catch
+        return error.DormantReceiptMalformed;
+    const receipt_bytes_count = std.fmt.parseInt(u64, r[8], 10) catch
+        return error.DormantReceiptMalformed;
+    const receipt_objects = std.fmt.parseInt(u64, r[9], 10) catch
+        return error.DormantReceiptMalformed;
+    const receipt_snapshots = std.fmt.parseInt(u64, r[10], 10) catch
+        return error.DormantReceiptMalformed;
+    if (!std.mem.eql(u8, r[0], "zllvm-generation-00000001-payload-copy") or
+        !std.mem.eql(u8, r[1], "00000001") or
+        !std.mem.eql(u8, r[2], config.source_root) or
+        !std.mem.eql(u8, r[3], config.payload_root) or
+        !std.mem.eql(u8, r[4], &config.expected_source_inventory_sha256) or
+        !std.mem.eql(u8, r[5], &config.expected_source_file_ledger_sha256) or
+        !std.mem.eql(u8, r[6], &config.expected_source_destination_ledger_sha256) or
+        !std.mem.eql(u8, r[11], "0444") or
+        !std.mem.eql(u8, r[12], config.expected_copy_evidence_path) or
+        !std.mem.eql(u8, r[13], &config.expected_copy_evidence_sha256) or
+        !std.mem.eql(u8, r[14], "verified_non_authoritative_copy"))
+    {
+        return error.DormantReceiptMismatched;
+    }
+
+    var validation = try verifyDormantDestination(config, manifest);
+    if (validation.payload_files != receipt_files or
+        validation.payload_bytes != receipt_bytes_count or
+        validation.objects != receipt_objects or
+        validation.snapshots != receipt_snapshots)
+    {
+        return error.DormantReceiptMismatched;
+    }
+    validation.manifest_sha256 = sha256Hex(generation_bytes);
+    try config.validateRegistration();
+    return validation;
+}
+
 fn validateAuthorityAncestry(
     allocator: std.mem.Allocator,
     io: std.Io,
@@ -2942,13 +3659,13 @@ fn assertRetainedMaterializeBoundaries(io: std.Io) !void {
         error.FileNotFound => {},
         else => return err,
     }
-    if (std.Io.Dir.cwd().statFile(io, default_store, .{
+    const real_store_stat = try std.Io.Dir.cwd().statFile(io, default_store, .{
         .follow_symlinks = false,
-    })) |_| {
-        return error.RealStoreMustRemainAbsent;
-    } else |err| switch (err) {
-        error.FileNotFound => {},
-        else => return err,
+    });
+    if (real_store_stat.kind != .directory or
+        @as(u16, @intCast(real_store_stat.permissions.toMode() & 0o7777)) != 0o775)
+    {
+        return error.RealStoreRootChanged;
     }
 
     const root_stat = try std.Io.Dir.cwd().statFile(
@@ -3113,6 +3830,882 @@ fn mutateGeneratedMembers(
         .mode => manifest.rows[first_index].mode = 0o400,
     }
     return encodeManifest(allocator, manifest);
+}
+
+const dormant_test_root = "/tmp/zllvm-inbox205b-authority-dormant-synthetic";
+const dormant_test_source_inventory_sha256 =
+    "1111111111111111111111111111111111111111111111111111111111111111";
+const dormant_test_source_file_ledger_sha256 =
+    "2222222222222222222222222222222222222222222222222222222222222222";
+const dormant_test_source_destination_ledger_sha256 =
+    "3333333333333333333333333333333333333333333333333333333333333333";
+const dormant_test_copy_evidence_path = "docs/evidence/synthetic-copy-proof.md";
+const dormant_test_copy_evidence_sha256 =
+    "4444444444444444444444444444444444444444444444444444444444444444";
+
+const DormantSyntheticFixture = struct {
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    root: []u8,
+    control_root: []u8,
+    payload_root: []u8,
+    source_root: []u8,
+    manifest: []u8,
+    candidate: []u8,
+    lineage: []u8,
+    receipt: []u8,
+    payload: []const u8,
+    constituent: []const u8,
+    snapshot: []const u8,
+    payload_key: []u8,
+    constituent_key: []u8,
+    snapshot_key: []u8,
+    source_manifest_sha256: [64]u8,
+
+    fn init(allocator: std.mem.Allocator, io: std.Io) !DormantSyntheticFixture {
+        if (!builtin.is_test) return error.TestOnlyOperation;
+        if (std.Io.Dir.openDirAbsolute(io, dormant_test_root, .{
+            .follow_symlinks = false,
+        })) |existing| {
+            existing.close(io);
+            return error.DormantSyntheticRootPreexisted;
+        } else |err| switch (err) {
+            error.FileNotFound => {},
+            else => return err,
+        }
+        try createAbsoluteDirectorySynced(io, dormant_test_root);
+        errdefer std.debug.print(
+            "INBOX-205A retain-on-failure synthetic_root={s}\n",
+            .{dormant_test_root},
+        );
+        const root = try allocator.dupe(u8, dormant_test_root);
+        errdefer allocator.free(root);
+        const control_root = try std.fs.path.join(allocator, &.{ root, "control" });
+        errdefer allocator.free(control_root);
+        const payload_root = try std.fs.path.join(allocator, &.{ root, "payload" });
+        errdefer allocator.free(payload_root);
+        const source_root = try std.fs.path.join(allocator, &.{ root, "source" });
+        errdefer allocator.free(source_root);
+        try createAbsoluteDirectorySynced(io, control_root);
+        try createAbsoluteDirectorySynced(io, payload_root);
+        try createAbsoluteDirectorySynced(io, source_root);
+        try setDormantAbsoluteDirectoryMode(io, root, 0o755);
+        try setDormantAbsoluteDirectoryMode(io, control_root, 0o755);
+        try setDormantAbsoluteDirectoryMode(io, payload_root, 0o755);
+        try setDormantAbsoluteDirectoryMode(io, source_root, 0o755);
+
+        var control = try std.Io.Dir.openDirAbsolute(io, control_root, .{
+            .access_sub_paths = true,
+            .iterate = true,
+            .follow_symlinks = false,
+        });
+        defer control.close(io);
+        const control_dirs = [_][]const u8{
+            "authority/zllvm/v1/manifests",
+            "authority/zllvm/v1/lineage",
+            "authority/zllvm/v1/receipts/publication",
+        };
+        for (control_dirs) |path| {
+            var created = try openPathNoFollow(io, control, path, true);
+            created.close(io);
+            try setDormantRelativeDirectoryModes(io, control, path, 0o755);
+        }
+
+        var payload_dir = try std.Io.Dir.openDirAbsolute(io, payload_root, .{
+            .access_sub_paths = true,
+            .iterate = true,
+            .follow_symlinks = false,
+        });
+        defer payload_dir.close(io);
+        const payload_dirs = [_][]const u8{
+            "incoming",
+            "objects/sha256",
+            "snapshots/sha256",
+        };
+        for (payload_dirs) |path| {
+            var created = try openPathNoFollow(io, payload_dir, path, true);
+            created.close(io);
+            try setDormantRelativeDirectoryModes(io, payload_dir, path, 0o755);
+        }
+
+        const payload = "synthetic dormant authority payload\n";
+        const constituent = "synthetic dormant constituent\n";
+        const snapshot = "synthetic dormant snapshot archive\n";
+        const payload_sha = sha256Hex(payload);
+        const constituent_sha = sha256Hex(constituent);
+        const snapshot_sha = sha256Hex(snapshot);
+        const payload_key = try objectKey(allocator, &payload_sha);
+        errdefer allocator.free(payload_key);
+        const constituent_key = try objectKey(allocator, &constituent_sha);
+        errdefer allocator.free(constituent_key);
+        const owned_snapshot_key = try snapshotKey(allocator, &snapshot_sha);
+        errdefer allocator.free(owned_snapshot_key);
+
+        try writeDormantFixtureRelative(io, payload_dir, payload_key, payload, 0o444);
+        try writeDormantFixtureRelative(
+            io,
+            payload_dir,
+            constituent_key,
+            constituent,
+            0o444,
+        );
+        try writeDormantFixtureRelative(
+            io,
+            payload_dir,
+            owned_snapshot_key,
+            snapshot,
+            0o444,
+        );
+        try setDormantRelativeDirectoryModes(
+            io,
+            payload_dir,
+            std.fs.path.dirname(payload_key).?,
+            0o755,
+        );
+        try setDormantRelativeDirectoryModes(
+            io,
+            payload_dir,
+            std.fs.path.dirname(constituent_key).?,
+            0o755,
+        );
+        try setDormantRelativeDirectoryModes(
+            io,
+            payload_dir,
+            std.fs.path.dirname(owned_snapshot_key).?,
+            0o755,
+        );
+
+        const manifest = try std.fmt.allocPrint(
+            allocator,
+            schema_magic ++ "\n" ++ schema_header ++ "\n" ++
+                "object\tobject.synthetic.payload\t{s}\t{}\t444\tapplication/octet-stream\tsynthetic\tunavailable\tcanonical-input\tactive\t{s}\t-\t-\t-\t-\t-\t-\n" ++
+                "object\tobject.synthetic.constituent\t{s}\t{}\t444\ttext/tab-separated-values\tsynthetic\tunavailable\treproducible-cache\tactive\t{s}\t-\t-\t-\t-\t-\t-\n" ++
+                "snapshot\tsnapshot.synthetic\t{s}\t{}\t444\tapplication/zstd+tar\tsynthetic\tunavailable\tirreplaceable-acceptance-evidence\tactive\t{s}\t-\t-\t-\t{s}\t{s}\t{s}\n" ++
+                "snapshot-member\tsnapshot.synthetic.member.payload\t{s}\t{}\t444\tapplication/octet-stream\tsynthetic\tunavailable\tcanonical-input\tactive\t{s}\tobject.synthetic.payload\tsnapshot.synthetic\t{s}\t-\t-\t-\n",
+            .{
+                payload_sha,
+                payload.len,
+                payload_key,
+                constituent_sha,
+                constituent.len,
+                constituent_key,
+                snapshot_sha,
+                snapshot.len,
+                owned_snapshot_key,
+                snapshot_format,
+                snapshot_recipe_sha,
+                constituent_sha,
+                payload_sha,
+                payload.len,
+                payload_key,
+                payload_key,
+            },
+        );
+        errdefer allocator.free(manifest);
+        var parsed_manifest = try parseManifest(allocator, manifest);
+        parsed_manifest.deinit(allocator);
+        const manifest_sha = sha256Hex(manifest);
+        const source_manifest_sha256 =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".*;
+
+        const lineage = try std.fmt.allocPrint(
+            allocator,
+            dormant_lineage_magic ++ "\n" ++ dormant_lineage_header ++ "\n" ++
+                "00000001\t-\t-\t{s}\t{s}\t{s}\tnon_destructive_verified_copy\n",
+            .{ manifest_sha, source_root, source_manifest_sha256 },
+        );
+        errdefer allocator.free(lineage);
+        const lineage_sha = sha256Hex(lineage);
+        const receipt = try std.fmt.allocPrint(
+            allocator,
+            dormant_receipt_magic ++ "\n" ++ dormant_receipt_header ++ "\n" ++
+                "zllvm-generation-00000001-payload-copy\t00000001\t{s}\t{s}\t{s}\t{s}\t{s}\t3\t{}\t2\t1\t0444\t{s}\t{s}\tverified_non_authoritative_copy\n",
+            .{
+                source_root,
+                payload_root,
+                dormant_test_source_inventory_sha256,
+                dormant_test_source_file_ledger_sha256,
+                dormant_test_source_destination_ledger_sha256,
+                payload.len + constituent.len + snapshot.len,
+                dormant_test_copy_evidence_path,
+                dormant_test_copy_evidence_sha256,
+            },
+        );
+        errdefer allocator.free(receipt);
+        const receipt_sha = sha256Hex(receipt);
+        const candidate = try std.fmt.allocPrint(
+            allocator,
+            dormant_candidate_magic ++ "\n" ++ dormant_candidate_header ++ "\n" ++
+                "zllvm-local-state-v1\t00000001\t{s}\t{s}\t{s}\t{}\t0644\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\tcandidate\n",
+            .{
+                payload_root,
+                dormant_generation_key,
+                manifest_sha,
+                manifest.len,
+                dormant_lineage_key,
+                lineage_sha,
+                dormant_receipt_key,
+                receipt_sha,
+                source_root,
+                source_manifest_sha256,
+            },
+        );
+        errdefer allocator.free(candidate);
+        try writeDormantFixtureRelative(
+            io,
+            control,
+            dormant_generation_key,
+            manifest,
+            0o644,
+        );
+        try writeDormantFixtureRelative(
+            io,
+            control,
+            dormant_lineage_key,
+            lineage,
+            0o644,
+        );
+        try writeDormantFixtureRelative(
+            io,
+            control,
+            dormant_receipt_key,
+            receipt,
+            0o644,
+        );
+        try writeDormantFixtureRelative(
+            io,
+            control,
+            dormant_candidate_key,
+            candidate,
+            0o644,
+        );
+        return .{
+            .allocator = allocator,
+            .io = io,
+            .root = root,
+            .control_root = control_root,
+            .payload_root = payload_root,
+            .source_root = source_root,
+            .manifest = manifest,
+            .candidate = candidate,
+            .lineage = lineage,
+            .receipt = receipt,
+            .payload = payload,
+            .constituent = constituent,
+            .snapshot = snapshot,
+            .payload_key = payload_key,
+            .constituent_key = constituent_key,
+            .snapshot_key = owned_snapshot_key,
+            .source_manifest_sha256 = source_manifest_sha256,
+        };
+    }
+
+    fn deinitAfterSuccess(fixture: *DormantSyntheticFixture) !void {
+        try removeAbsoluteDirectorySynced(fixture.io, fixture.root);
+        fixture.allocator.free(fixture.snapshot_key);
+        fixture.allocator.free(fixture.constituent_key);
+        fixture.allocator.free(fixture.payload_key);
+        fixture.allocator.free(fixture.receipt);
+        fixture.allocator.free(fixture.lineage);
+        fixture.allocator.free(fixture.candidate);
+        fixture.allocator.free(fixture.manifest);
+        fixture.allocator.free(fixture.source_root);
+        fixture.allocator.free(fixture.payload_root);
+        fixture.allocator.free(fixture.control_root);
+        fixture.allocator.free(fixture.root);
+        fixture.* = undefined;
+    }
+
+    fn replaceControl(
+        fixture: *DormantSyntheticFixture,
+        relative_path: []const u8,
+        bytes: []const u8,
+    ) !void {
+        var control = try std.Io.Dir.openDirAbsolute(fixture.io, fixture.control_root, .{
+            .access_sub_paths = true,
+            .iterate = true,
+            .follow_symlinks = false,
+        });
+        defer control.close(fixture.io);
+        try replaceDormantFixtureRelative(
+            fixture.io,
+            control,
+            relative_path,
+            bytes,
+            0o644,
+        );
+    }
+
+    fn deleteControl(
+        fixture: *DormantSyntheticFixture,
+        relative_path: []const u8,
+    ) !void {
+        var control = try std.Io.Dir.openDirAbsolute(fixture.io, fixture.control_root, .{
+            .access_sub_paths = true,
+            .iterate = true,
+            .follow_symlinks = false,
+        });
+        defer control.close(fixture.io);
+        try deleteDormantFixtureRelative(fixture.io, control, relative_path);
+    }
+
+    fn replacePayload(
+        fixture: *DormantSyntheticFixture,
+        relative_path: []const u8,
+        bytes: []const u8,
+    ) !void {
+        var payload_dir = try std.Io.Dir.openDirAbsolute(fixture.io, fixture.payload_root, .{
+            .access_sub_paths = true,
+            .iterate = true,
+            .follow_symlinks = false,
+        });
+        defer payload_dir.close(fixture.io);
+        try replaceDormantFixtureRelative(
+            fixture.io,
+            payload_dir,
+            relative_path,
+            bytes,
+            0o444,
+        );
+    }
+
+    fn deletePayload(
+        fixture: *DormantSyntheticFixture,
+        relative_path: []const u8,
+    ) !void {
+        var payload_dir = try std.Io.Dir.openDirAbsolute(fixture.io, fixture.payload_root, .{
+            .access_sub_paths = true,
+            .iterate = true,
+            .follow_symlinks = false,
+        });
+        defer payload_dir.close(fixture.io);
+        try deleteDormantFixtureRelative(fixture.io, payload_dir, relative_path);
+    }
+
+    fn candidateFor(
+        fixture: *const DormantSyntheticFixture,
+        allocator: std.mem.Allocator,
+        generation: []const u8,
+        lineage: []const u8,
+        receipt: []const u8,
+        state: []const u8,
+    ) ![]u8 {
+        const generation_sha = sha256Hex(generation);
+        const lineage_sha = sha256Hex(lineage);
+        const receipt_sha = sha256Hex(receipt);
+        return std.fmt.allocPrint(
+            allocator,
+            dormant_candidate_magic ++ "\n" ++ dormant_candidate_header ++ "\n" ++
+                "zllvm-local-state-v1\t00000001\t{s}\t{s}\t{s}\t{}\t0644\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\n",
+            .{
+                fixture.payload_root,
+                dormant_generation_key,
+                generation_sha,
+                generation.len,
+                dormant_lineage_key,
+                lineage_sha,
+                dormant_receipt_key,
+                receipt_sha,
+                fixture.source_root,
+                fixture.source_manifest_sha256,
+                state,
+            },
+        );
+    }
+
+    fn receiptFor(
+        fixture: *const DormantSyntheticFixture,
+        allocator: std.mem.Allocator,
+        source_inventory_sha256: []const u8,
+        source_file_ledger_sha256: []const u8,
+        source_destination_ledger_sha256: []const u8,
+        copy_evidence_path: []const u8,
+        copy_evidence_sha256: []const u8,
+    ) ![]u8 {
+        return std.fmt.allocPrint(
+            allocator,
+            dormant_receipt_magic ++ "\n" ++ dormant_receipt_header ++ "\n" ++
+                "zllvm-generation-00000001-payload-copy\t00000001\t{s}\t{s}\t{s}\t{s}\t{s}\t3\t{}\t2\t1\t0444\t{s}\t{s}\tverified_non_authoritative_copy\n",
+            .{
+                fixture.source_root,
+                fixture.payload_root,
+                source_inventory_sha256,
+                source_file_ledger_sha256,
+                source_destination_ledger_sha256,
+                fixture.payload.len + fixture.constituent.len + fixture.snapshot.len,
+                copy_evidence_path,
+                copy_evidence_sha256,
+            },
+        );
+    }
+
+    fn symlinkControl(
+        fixture: *DormantSyntheticFixture,
+        relative_path: []const u8,
+        target: []const u8,
+    ) !void {
+        var control = try std.Io.Dir.openDirAbsolute(fixture.io, fixture.control_root, .{
+            .access_sub_paths = true,
+            .iterate = true,
+            .follow_symlinks = false,
+        });
+        defer control.close(fixture.io);
+        const parent_path = std.fs.path.dirname(relative_path) orelse ".";
+        const basename = std.fs.path.basename(relative_path);
+        var parent = try openPathNoFollow(fixture.io, control, parent_path, false);
+        defer parent.close(fixture.io);
+        try parent.symLink(fixture.io, target, basename, .{});
+    }
+
+    fn symlinkPayload(
+        fixture: *DormantSyntheticFixture,
+        relative_path: []const u8,
+        target: []const u8,
+    ) !void {
+        var payload_dir = try std.Io.Dir.openDirAbsolute(fixture.io, fixture.payload_root, .{
+            .access_sub_paths = true,
+            .iterate = true,
+            .follow_symlinks = false,
+        });
+        defer payload_dir.close(fixture.io);
+        const parent_path = std.fs.path.dirname(relative_path) orelse ".";
+        const basename = std.fs.path.basename(relative_path);
+        var parent = try openPathNoFollow(fixture.io, payload_dir, parent_path, false);
+        defer parent.close(fixture.io);
+        try parent.symLink(fixture.io, target, basename, .{});
+    }
+};
+
+fn writeDormantFixtureRelative(
+    io: std.Io,
+    root: std.Io.Dir,
+    relative_path: []const u8,
+    bytes: []const u8,
+    mode: u16,
+) !void {
+    const parent_path = std.fs.path.dirname(relative_path) orelse ".";
+    const basename = std.fs.path.basename(relative_path);
+    var parent = try openPathNoFollow(io, root, parent_path, true);
+    defer parent.close(io);
+    try writeExclusive(io, parent, basename, bytes, mode);
+}
+
+fn setDormantAbsoluteDirectoryMode(io: std.Io, path: []const u8, mode: u16) !void {
+    var directory = try std.Io.Dir.openDirAbsolute(io, path, .{
+        .iterate = true,
+        .follow_symlinks = false,
+    });
+    defer directory.close(io);
+    try directory.setPermissions(io, .fromMode(mode));
+    try syncDirectory(directory);
+}
+
+fn setDormantRelativeDirectoryModes(
+    io: std.Io,
+    root: std.Io.Dir,
+    relative_path: []const u8,
+    mode: u16,
+) !void {
+    var current = root;
+    var current_owned = false;
+    defer if (current_owned) current.close(io);
+    var segments = std.mem.splitScalar(u8, relative_path, '/');
+    while (segments.next()) |segment| {
+        const next = try openExistingDir(io, current, segment);
+        if (current_owned) current.close(io);
+        current = next;
+        current_owned = true;
+        try current.setPermissions(io, .fromMode(mode));
+        try syncDirectory(current);
+    }
+}
+
+fn deleteDormantFixtureRelative(
+    io: std.Io,
+    root: std.Io.Dir,
+    relative_path: []const u8,
+) !void {
+    const parent_path = std.fs.path.dirname(relative_path) orelse ".";
+    const basename = std.fs.path.basename(relative_path);
+    var parent = try openPathNoFollow(io, root, parent_path, false);
+    defer parent.close(io);
+    try parent.deleteFile(io, basename);
+    try syncDirectory(parent);
+}
+
+fn replaceDormantFixtureRelative(
+    io: std.Io,
+    root: std.Io.Dir,
+    relative_path: []const u8,
+    bytes: []const u8,
+    mode: u16,
+) !void {
+    deleteDormantFixtureRelative(io, root, relative_path) catch |err| switch (err) {
+        error.FileNotFound => {},
+        else => return err,
+    };
+    try writeDormantFixtureRelative(io, root, relative_path, bytes, mode);
+}
+
+fn expectDormantReceiptIdentityMismatch(
+    fixture: *DormantSyntheticFixture,
+    config: *const DormantAuthorityConfig,
+    receipt: []const u8,
+) !void {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    const candidate = try fixture.candidateFor(
+        fixture.allocator,
+        fixture.manifest,
+        fixture.lineage,
+        receipt,
+        "candidate",
+    );
+    defer fixture.allocator.free(candidate);
+    try fixture.replaceControl(dormant_receipt_key, receipt);
+    try fixture.replaceControl(dormant_candidate_key, candidate);
+    try std.testing.expectError(
+        error.DormantReceiptMismatched,
+        validateDormantAuthorityCandidate(config),
+    );
+    try fixture.replaceControl(dormant_receipt_key, fixture.receipt);
+    try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
+}
+
+test "dormant authority candidate validates only closed synthetic state" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var fixture = try DormantSyntheticFixture.init(allocator, io);
+    var completed = false;
+    defer if (!completed) std.debug.print(
+        "INBOX-205A retain-on-failure synthetic_root={s}\n",
+        .{dormant_test_root},
+    );
+    var config = try DormantAuthorityConfig.init(
+        allocator,
+        io,
+        fixture.control_root,
+        fixture.payload_root,
+        fixture.source_root,
+        &fixture.source_manifest_sha256,
+        dormant_test_source_inventory_sha256,
+        dormant_test_source_file_ledger_sha256,
+        dormant_test_source_destination_ledger_sha256,
+        dormant_test_copy_evidence_path,
+        dormant_test_copy_evidence_sha256,
+    );
+    defer config.deinit();
+
+    const positive = try validateDormantAuthorityCandidate(&config);
+    try std.testing.expectEqual(@as(u64, 3), positive.payload_files);
+    try std.testing.expectEqual(
+        @as(u64, fixture.payload.len + fixture.constituent.len + fixture.snapshot.len),
+        positive.payload_bytes,
+    );
+    try std.testing.expectEqual(@as(u64, 2), positive.objects);
+    try std.testing.expectEqual(@as(u64, 1), positive.snapshots);
+    try std.testing.expectEqualStrings(&sha256Hex(fixture.manifest), &positive.manifest_sha256);
+
+    try fixture.deleteControl(dormant_candidate_key);
+    try std.testing.expectError(
+        error.DormantCandidateMissing,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
+
+    const mismatched_candidate = try fixture.candidateFor(
+        allocator,
+        fixture.manifest,
+        fixture.lineage,
+        fixture.receipt,
+        "active",
+    );
+    defer allocator.free(mismatched_candidate);
+    try fixture.replaceControl(dormant_candidate_key, mismatched_candidate);
+    try std.testing.expectError(
+        error.DormantCandidateMismatched,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
+
+    try fixture.deleteControl(dormant_generation_key);
+    try std.testing.expectError(
+        error.DormantGenerationMissing,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replaceControl(dormant_generation_key, fixture.manifest);
+
+    const bad_generation = "not-a-manifest\n";
+    try fixture.replaceControl(dormant_generation_key, bad_generation);
+    try std.testing.expectError(
+        error.DormantGenerationMismatched,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replaceControl(dormant_generation_key, fixture.manifest);
+
+    const bad_generation_candidate = try fixture.candidateFor(
+        allocator,
+        bad_generation,
+        fixture.lineage,
+        fixture.receipt,
+        "candidate",
+    );
+    defer allocator.free(bad_generation_candidate);
+    try fixture.replaceControl(dormant_generation_key, bad_generation);
+    try fixture.replaceControl(dormant_candidate_key, bad_generation_candidate);
+    try std.testing.expectError(
+        error.DormantGenerationMalformed,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replaceControl(dormant_generation_key, fixture.manifest);
+    try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
+
+    try fixture.deleteControl(dormant_generation_key);
+    try fixture.symlinkControl(dormant_generation_key, "candidate.tsv");
+    try std.testing.expectError(
+        error.DormantGenerationUnsafe,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.deleteControl(dormant_generation_key);
+    try fixture.replaceControl(dormant_generation_key, fixture.manifest);
+
+    const malformed_candidate = dormant_candidate_magic ++ "\nwrong-header\nrow\n";
+    try fixture.replaceControl(dormant_candidate_key, malformed_candidate);
+    try std.testing.expectError(
+        error.DormantCandidateMalformed,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
+
+    try fixture.deleteControl(dormant_lineage_key);
+    try std.testing.expectError(
+        error.DormantLineageMissing,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replaceControl(dormant_lineage_key, fixture.lineage);
+
+    const wrong_lineage = fixture.lineage[0 .. fixture.lineage.len - 1];
+    try fixture.replaceControl(dormant_lineage_key, wrong_lineage);
+    try std.testing.expectError(
+        error.DormantLineageMismatched,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replaceControl(dormant_lineage_key, fixture.lineage);
+
+    const bad_lineage = dormant_lineage_magic ++ "\nwrong-header\nrow\n";
+    const bad_lineage_candidate = try fixture.candidateFor(
+        allocator,
+        fixture.manifest,
+        bad_lineage,
+        fixture.receipt,
+        "candidate",
+    );
+    defer allocator.free(bad_lineage_candidate);
+    try fixture.replaceControl(dormant_lineage_key, bad_lineage);
+    try fixture.replaceControl(dormant_candidate_key, bad_lineage_candidate);
+    try std.testing.expectError(
+        error.DormantLineageMalformed,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replaceControl(dormant_lineage_key, fixture.lineage);
+    try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
+
+    try fixture.deleteControl(dormant_lineage_key);
+    try fixture.symlinkControl(dormant_lineage_key, "../manifests/candidate.tsv");
+    try std.testing.expectError(
+        error.DormantLineageUnsafe,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.deleteControl(dormant_lineage_key);
+    try fixture.replaceControl(dormant_lineage_key, fixture.lineage);
+
+    try fixture.deleteControl(dormant_receipt_key);
+    try std.testing.expectError(
+        error.DormantReceiptMissing,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replaceControl(dormant_receipt_key, fixture.receipt);
+
+    const wrong_receipt = fixture.receipt[0 .. fixture.receipt.len - 1];
+    try fixture.replaceControl(dormant_receipt_key, wrong_receipt);
+    try std.testing.expectError(
+        error.DormantReceiptMismatched,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replaceControl(dormant_receipt_key, fixture.receipt);
+
+    const receipt_mismatch_sha =
+        "5555555555555555555555555555555555555555555555555555555555555555";
+    const receipt_source_inventory_mismatch = try fixture.receiptFor(
+        allocator,
+        receipt_mismatch_sha,
+        dormant_test_source_file_ledger_sha256,
+        dormant_test_source_destination_ledger_sha256,
+        dormant_test_copy_evidence_path,
+        dormant_test_copy_evidence_sha256,
+    );
+    defer allocator.free(receipt_source_inventory_mismatch);
+    try expectDormantReceiptIdentityMismatch(
+        &fixture,
+        &config,
+        receipt_source_inventory_mismatch,
+    );
+
+    const receipt_source_file_ledger_mismatch = try fixture.receiptFor(
+        allocator,
+        dormant_test_source_inventory_sha256,
+        receipt_mismatch_sha,
+        dormant_test_source_destination_ledger_sha256,
+        dormant_test_copy_evidence_path,
+        dormant_test_copy_evidence_sha256,
+    );
+    defer allocator.free(receipt_source_file_ledger_mismatch);
+    try expectDormantReceiptIdentityMismatch(
+        &fixture,
+        &config,
+        receipt_source_file_ledger_mismatch,
+    );
+
+    const receipt_source_destination_ledger_mismatch = try fixture.receiptFor(
+        allocator,
+        dormant_test_source_inventory_sha256,
+        dormant_test_source_file_ledger_sha256,
+        receipt_mismatch_sha,
+        dormant_test_copy_evidence_path,
+        dormant_test_copy_evidence_sha256,
+    );
+    defer allocator.free(receipt_source_destination_ledger_mismatch);
+    try expectDormantReceiptIdentityMismatch(
+        &fixture,
+        &config,
+        receipt_source_destination_ledger_mismatch,
+    );
+
+    const receipt_copy_evidence_path_mismatch = try fixture.receiptFor(
+        allocator,
+        dormant_test_source_inventory_sha256,
+        dormant_test_source_file_ledger_sha256,
+        dormant_test_source_destination_ledger_sha256,
+        "docs/evidence/other-synthetic-copy-proof.md",
+        dormant_test_copy_evidence_sha256,
+    );
+    defer allocator.free(receipt_copy_evidence_path_mismatch);
+    try expectDormantReceiptIdentityMismatch(
+        &fixture,
+        &config,
+        receipt_copy_evidence_path_mismatch,
+    );
+
+    const receipt_copy_evidence_sha_mismatch = try fixture.receiptFor(
+        allocator,
+        dormant_test_source_inventory_sha256,
+        dormant_test_source_file_ledger_sha256,
+        dormant_test_source_destination_ledger_sha256,
+        dormant_test_copy_evidence_path,
+        receipt_mismatch_sha,
+    );
+    defer allocator.free(receipt_copy_evidence_sha_mismatch);
+    try expectDormantReceiptIdentityMismatch(
+        &fixture,
+        &config,
+        receipt_copy_evidence_sha_mismatch,
+    );
+
+    const bad_receipt = dormant_receipt_magic ++ "\nwrong-header\nrow\n";
+    const bad_receipt_candidate = try fixture.candidateFor(
+        allocator,
+        fixture.manifest,
+        fixture.lineage,
+        bad_receipt,
+        "candidate",
+    );
+    defer allocator.free(bad_receipt_candidate);
+    try fixture.replaceControl(dormant_receipt_key, bad_receipt);
+    try fixture.replaceControl(dormant_candidate_key, bad_receipt_candidate);
+    try std.testing.expectError(
+        error.DormantReceiptMalformed,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replaceControl(dormant_receipt_key, fixture.receipt);
+    try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
+
+    try fixture.deleteControl(dormant_receipt_key);
+    try fixture.symlinkControl(dormant_receipt_key, "../../manifests/candidate.tsv");
+    try std.testing.expectError(
+        error.DormantReceiptUnsafe,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.deleteControl(dormant_receipt_key);
+    try fixture.replaceControl(dormant_receipt_key, fixture.receipt);
+
+    config.expected_registration_path_hash[0] =
+        if (config.expected_registration_path_hash[0] == '0') '1' else '0';
+    try std.testing.expectError(
+        error.DormantRegistrationStale,
+        validateDormantAuthorityCandidate(&config),
+    );
+    config.expected_registration_path_hash = config.guard.frozen.path_hash;
+
+    try fixture.deletePayload(fixture.payload_key);
+    try std.testing.expectError(
+        error.DormantDestinationPartial,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replacePayload(fixture.payload_key, fixture.payload);
+
+    try fixture.replacePayload(fixture.payload_key, "wrong payload\n");
+    try std.testing.expectError(
+        error.DormantDestinationMismatched,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.replacePayload(fixture.payload_key, fixture.payload);
+
+    try fixture.deletePayload(fixture.payload_key);
+    try fixture.symlinkPayload(fixture.payload_key, "/dev/null");
+    try std.testing.expectError(
+        error.DormantDestinationUnsafe,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try fixture.deletePayload(fixture.payload_key);
+    try fixture.replacePayload(fixture.payload_key, fixture.payload);
+
+    var payload_dir = try std.Io.Dir.openDirAbsolute(io, fixture.payload_root, .{
+        .access_sub_paths = true,
+        .iterate = true,
+        .follow_symlinks = false,
+    });
+    try writeDormantFixtureRelative(io, payload_dir, "unexpected", "extra\n", 0o444);
+    try std.testing.expectError(
+        error.DormantDestinationExtra,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try deleteDormantFixtureRelative(io, payload_dir, "unexpected");
+
+    try fixture.deleteControl(dormant_candidate_key);
+    var control_dir = try std.Io.Dir.openDirAbsolute(io, fixture.control_root, .{
+        .access_sub_paths = true,
+        .iterate = true,
+        .follow_symlinks = false,
+    });
+    var manifests = try openPathNoFollow(
+        io,
+        control_dir,
+        "authority/zllvm/v1/manifests",
+        false,
+    );
+    try manifests.symLink(io, "generation-00000001.tsv", "candidate.tsv", .{});
+    try std.testing.expectError(
+        error.DormantCandidateUnsafe,
+        validateDormantAuthorityCandidate(&config),
+    );
+    try manifests.deleteFile(io, "candidate.tsv");
+    manifests.close(io);
+    control_dir.close(io);
+    try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
+    payload_dir.close(io);
+
+    _ = try validateDormantAuthorityCandidate(&config);
+    try fixture.deinitAfterSuccess();
+    completed = true;
 }
 
 test "authority resolution is closed and default remains read only" {
