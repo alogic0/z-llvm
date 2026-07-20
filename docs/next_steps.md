@@ -24,87 +24,81 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-202A capacity correction and copy resume — AUTHORIZED
+## INBOX-202B corrected no-follow copy resume — AUTHORIZED
 
-INBOX-202 stopped compliantly at unchanged HEAD `2a1934bf...` during
-no-mutation preflight because GNU `df` rejects combining `-P` with
-`--output`. The record root remains absent, the destination leaves remain
-empty, no payload transaction began, and both repositories and all frozen
-identities remain exact. Copy acceptance is withheld.
+INBOX-202A is accepted only as a compliant post-prefix, pre-payload
+fail-stop at unchanged HEAD `e3cf3f58...`. Capacity passed, but the sole
+driver attempt exited status `1` because GNU `dd` conversion `excl` was
+incorrectly supplied as `oflag=excl`. The failure occurred on row one before
+an incoming or final payload. Copy/migration acceptance and authority
+transition remain withheld.
 
-Do not invoke `df`. Replace only capacity observation with one
-closed-environment GNU `stat -f` command against the existing destination,
-emitting exactly:
+Preserve `/tmp/zllvm-inbox202-local-state-copy-verify-evidence`, its failed
+driver, and all nine current records byte-for-byte. Preserve the 17 object
+and two snapshot prefix directories exactly as present: mode `0755`,
+UID/GID `1000/1000`, all empty. `incoming/` is empty and there are zero
+destination payloads. Do not recreate, chmod, chown, repair, remove, append
+to, retry, or clean any preserved state.
 
-```text
-%S %a %d %c %T
-```
-
-Parse exactly five fields without a pipeline. Require the first four to be
-nonzero decimal integers, free inodes not greater than total inodes, and
-filesystem type exactly `ext2/ext3`. The pre-dispatch observation was
-`4096 23588859 56224064 60981248 ext2/ext3`; obtain a fresh observation.
-
-Compute `%S * %a` with explicit signed-overflow protection and require:
+Use a fresh retained root exactly:
 
 ```text
-available_bytes >= 84372425
-free_file_nodes >= 4136
-bytes = 67108864 + 9970364 + 7215373 + 19*4096
-inodes = 4096 + 20 + 1 + 19
+/tmp/zllvm-inbox202b-local-state-copy-verify-evidence
 ```
 
-No record-root or destination mutation may occur before capacity passes. A
-capacity failure stops with pane evidence only. On pass, record the exact
-command, environment, raw fields, parse, checked arithmetic, and result, then
-execute the unchanged INBOX-202 transaction below.
+Before creating it or mutating the destination, require its exact no-follow
+absence and bidirectional disjointness, clean main/control repositories,
+frozen 43+1 identities, source/tracked equality and source identity, the
+exact empty-prefix destination shape, fresh accepted `stat -f` capacity of at
+least 84,372,425 bytes and 4,136 inodes, and the frozen installed GNU `dd`:
 
-INBOX-201 commit `5fff4d046c68d0144aea9572d4c17b14e7c70575`
-is accepted. Its exact empty destination skeleton and unchanged current
-authority are accepted.
+```text
+path=/usr/bin/dd
+sha256=dd07a1b0f236f221f71fac70103765286d1ccf29b747cbb24345d0c57a0311b6
+version=dd (coreutils) 9.4
+help_sha256=803ccdec96d19e3721989e1a31497684d7188cf9c6ed9b4587bd006a9a4c3457
+```
 
-Use the tracked manifest and exact source generation manifest as the sole
-finite specification. Freeze a 20-row source/destination table: 18 objects
-plus two snapshots, exactly 9,970,364 bytes. Reproduce the source shape only
-through exact bounded manifest-derived listings. Require source inventory
-`3234fb50...`, file ledger `a06c48e1...`, and byte equality between the
-source generation manifest and tracked manifest.
+Require advertised `fullblock`, input/output `nofollow`, and
+`conv=excl,fsync`; stop rather than weaken the command. Any preflight failure
+stops before new-root creation.
 
-Create and retain only
-`/tmp/zllvm-inbox202-local-state-copy-verify-evidence` for the closed
-pipeline-free driver records. It must be absent and disjoint from all
-registrations, repositories, stores, and superseded roots before creation.
-Its exact command/environment/stdout/stderr/status, table, capacity,
-transaction, snapshot, and inventory records are mode `0644`; root mode is
-`0755`; all UID/GID are `1000/1000`. Traverse no other `/tmp` path.
+The pipeline-free one-shot transaction remains the same frozen 20 rows,
+original order and relationships, exactly 9,970,364 bytes. Its only semantic
+change is:
 
-Preflight conservative byte/inode capacity and system primitives providing
-atomic no-overwrite publication and file/directory durability. If unavailable
-or insufficient, stop before payload mutation.
+```text
+/usr/bin/dd \
+  if="$source_path" \
+  of="$incoming" \
+  bs=1048576 \
+  iflag=fullblock,nofollow \
+  oflag=nofollow \
+  conv=excl,fsync \
+  status=none
+```
 
-Create only the 17 manifest-derived object prefixes and two snapshot
-prefixes. For each finite payload, copy once through a unique no-clobber
-incoming file; verify source/incoming identity; set `0444`; fsync; publish
-atomically without replacement; fsync the parent; remove only that incoming
-name and fsync `incoming`; then verify final type, link count, mode, bytes,
-hash, key, and relationships.
+After each copy, retain the accepted incoming/source verification, `0444`
+transition, durability sync, hard-link no-replace publication, parent and
+incoming directory fsync, exact incoming-name removal, and final
+type/link/mode/bytes/hash/key verification. Revalidate all sources, stream
+verify both snapshots and constituent hashes without extraction, and require
+the exact 20-file/9,970,364-byte final inventory, valid relationships, no
+unexpected entry or destination manifest, and empty `incoming/`.
 
-Verify snapshot members and constituent hashes by exact read-only streaming
-without an extraction workspace. Revalidate all source files and the 43+1
-union. Require exactly 20 destination files/9,970,364 bytes, exact shape and
-relationships, empty incoming, and no destination generation manifest.
+Retain the exact new command/environment/stdout/stderr/status, capacity,
+table, transaction, snapshot, and final-inventory records. Any later failure
+retains both evidence roots and all partial destination state without
+diagnosis, retry, repair, cleanup, authority change, or commit.
 
-Any failure retains all partial destination and record state without retry,
-repair, cleanup, overwrite, authority change, or commit. Complete success
-commits only
-`docs/evidence/inbox202_local_state_artifact_copy_verify.md`, preserves both
-stores and all retained records, and stops clean.
-
-The sibling source store and tracked manifest remain authoritative. No
-authority transition, control/manifest/tool/contract/pin/source edit,
-compatibility, reserved validation/cache/worktree creation, project
-execution, old-store mutation, cleanup, wiring, performance, ratchet movement,
-or credit is authorized.
+Full success commits only
+`docs/evidence/inbox202_local_state_artifact_copy_verify.md`, documenting
+both compliant failed attempts and the successful transaction, then stops
+clean. The source store and tracked manifest remain authoritative. No
+authority switch, control/manifest/tool/contract/pin/source edit,
+compatibility, reserved validation/cache/worktree creation, worktree
+operation, project execution, old-store mutation, cleanup, wiring,
+performance, ratchet movement, or credit is authorized.
 
 ## INBOX-199 documentation-only authoritative INBOX-197 reconciliation amendment — WITHDRAWN BEFORE EDIT
 
