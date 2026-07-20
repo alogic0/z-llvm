@@ -55,7 +55,7 @@ source_generation_manifest_sha256=61b7426bd52a3a139999f17f36d91ecaab954e6132fe36
 source_store_inventory_sha256=3234fb508d370878efe082cf1accb5af3b488372bf3f1ee7e9e87408a37a2d7c
 source_store_file_ledger_sha256=a06c48e1549d16b9f924cc2b5f0404e60d7755a785bf3a4a23311c2383279a65
 source_destination_ledger_sha256=4c29709b9ef9242dd799ab52d346cdf302f5728d35e37e0d78063e892a6cf9e8
-accepted_INBOX_202_evidence_sha256=4b532daac81ff8d418c9534dc646c1eb3efba95259f604934473203b0885452e
+accepted_INBOX_202_evidence_sha256=4b532daabe33e7c6eaca7f0ab412d9c271b55b6b1de8235dd3d4f65d7ab6f7a6
 artifact_tool_sha256=94dfc1fc27ffe1268eb02453bcac1a3634aa11af38d0c94fbaa3b43decd25859
 v3_contract_sha256=d445f6a45f039415052cb0fb1efc71b1975f2ea68d28e3637aede503145fc387
 durability_audit_sha256=5a7e019eb107e5b66947490a65fdf47444154fc4f1483ca30ab0fc6e381f33e6
@@ -75,6 +75,49 @@ The protected local paths `.claude/`, `.claude/settings.local.json`, and
 `/home/oleg/.config/git/ignore` were not inspected, statted, read, hashed,
 traversed, or modified.
 
+### 1.2 INBOX-203A correction provenance
+
+INBOX-203 commit
+`8f04b147a6012c0a3df00fbc0827bc854889938c` was accepted only as a
+scope-compliant documentation stop. This exact correction starts from
+operating-document commit
+`61e94d6c6de7483f5d0a340cf51b405a5a135603`, whose parent is that INBOX-203
+commit.
+
+The current file and the committed `e35cfaa6505e26f3c13a2a54a339f247817febdd`
+blob of `docs/evidence/inbox202_local_state_artifact_copy_verify.md` were
+independently hashed. Both equal:
+
+```text
+4b532daabe33e7c6eaca7f0ab412d9c271b55b6b1de8235dd3d4f65d7ab6f7a6
+```
+
+Exactly the two incorrect INBOX-202 bindings in this document were replaced.
+All prospective schema headers, paths, fields, the acyclic sequence,
+candidate/active separation, validation matrix, and rollback model are
+unchanged.
+
+The correction-time read-only audit also reproduced:
+
+```text
+worktree_path_list_sha256=f31d8542baafc7b64cd5ee6fe8cc4194842ca696b97a7ffc8df06ce12d553d7e
+worktree_topology_sha256=6c868e3b6d436cfba92a1e2b21dbd616391763961f1cba9b6670b1ed4a6ebb62
+non_main_worktree_records_sha256=ebc30a376b3db4c6fbf788f49ea85f4ce792471e539c0a89308068efdf96ebbe
+registration_distribution=43/33/8/2
+control_head=a41690a4c47cf1040afe3d4dd3679a77015263ea
+control_tree=67582eb6f4de0b3ab3a2ef2e7c3635c79349d00e
+tracked_and_source_generation_manifest_sha256=61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d
+artifact_tool_sha256=94dfc1fc27ffe1268eb02453bcac1a3634aa11af38d0c94fbaa3b43decd25859
+v3_contract_sha256=d445f6a45f039415052cb0fb1efc71b1975f2ea68d28e3637aede503145fc387
+durability_audit_sha256=5a7e019eb107e5b66947490a65fdf47444154fc4f1483ca30ab0fc6e381f33e6
+pins_sha256=1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3
+bypass_tsv_sha256=2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11
+watcher_blob=b64131cf60dd0ef638e815cd33db9ae8595a72cf
+stash_object=7985c6d01040a6e47e4ce5b918866d0e89517ac7
+both_v3_roots=absent
+ratchet=131
+```
+
 ## 2. Finite current-authority inventory
 
 The inventory used only tracked-file lookup and exact named control paths. It
@@ -83,12 +126,25 @@ store, or ignored tree.
 
 ### 2.1 Active consumers and declarations
 
+Every `tools/zllvm_artifact_store.zig` source anchor in the following table is
+bound to exact source SHA-256
+`94dfc1fc27ffe1268eb02453bcac1a3634aa11af38d0c94fbaa3b43decd25859`.
+Symbols, not mutable line numbers, are the stable anchors.
+
 | Tracked path | Symbol or anchor | Present behavior | Current authority role | Candidate behavior | Activation behavior | Fail-closed obligation |
 |---|---|---|---|---|---|---|
-| `tools/zllvm_artifact_store.zig` | `default_store` | Hard-codes `/home/oleg/prog/z_llvm-artifacts`. | Production default payload root. | Remains byte-identical in the control-candidate phase; dormant implementation may add private validation but must keep this production result. | A separately reviewed main activation changes the production selection to the exact accepted control `live.tsv` and local-state payload root. | Missing or mismatched live declaration, generation manifest, payload identity, registration, or override stops; never try the old store. |
-| `tools/zllvm_artifact_store.zig` | `resolveAuthority` | A normalized absolute `ZLLVM_ARTIFACT_STORE` value wins; otherwise derives the sibling `<main-name>-artifacts` path from the main Git common directory. It does not consult a manifest. | Path selection only; it does not itself prove semantic authority. | Generic Q/path behavior remains frozen until a dormant authority-binding implementation is reviewed. Candidate metadata cannot select production. | Unset selects the exact active declaration. Set is accepted only when its normalized value equals the active declaration’s payload root and every declaration/manifest/content check passes. | Relative, noncanonical, old, alternate, missing, ambiguous, stale, or advanced values fail without fallback. |
-| `tools/zllvm_artifact_store.zig` | `main` / `resolve-authority` | Reads optional `ZLLVM_ARTIFACT_STORE`, calls `resolveAuthority`, and prints only the path. | Current path-reporting CLI. | Must remain current-authority-only until dormant implementation acceptance. | Must report a root only after exact control declaration, generation manifest, payload, and registration validation. | A path alone can never be returned as authority after activation. |
-| `tools/zllvm_artifact_store.zig` | `main` / `materialize-spec publish` | Requires `ZLLVM_ARTIFACT_STORE`, resolves it, publishes payload and `$store/manifests/generation-00000001.tsv`. | Accepted one-time source-store publication surface; not an authority-transition surface. | No invocation or semantic reuse in the transition. | Remains outside activation; future output publication uses a separately reviewed surface. | It must not create or replace control metadata, destination authority metadata, or activation receipts. |
+| `tools/zllvm_artifact_store.zig` | `default_store` | Hard-codes `/home/oleg/prog/z_llvm-artifacts`, but exact uses are only `assertRetainedMaterializeBoundaries` and the `resolveAuthority` fallback test expectation. | Test/retained-boundary constant only; it is not the production default-selection input. | Remains byte-identical in the control-candidate phase. | It must not be promoted into a production fallback. | Any proposed production use is a new reviewed change; absence of the new authority never falls back through this constant. |
+| `tools/zllvm_artifact_store.zig` | `main_git_common_dir` | Exact `/home/oleg/prog/z_llvm/.git`; passed by both production `main` resolver constructions and used by `captureRegistration` as `/usr/bin/git --git-dir=...`. | Production default derivation and registration-capture anchor. | Remains the production source-root derivation input while the candidate is inactive. | Remains the main-repository identity input, but active payload selection comes from the exact control declaration. | Invalid Git-common-dir shape, registration capture failure, or changed registration stops. |
+| `tools/zllvm_artifact_store.zig` | `resolveAuthority` | A normalized absolute `ZLLVM_ARTIFACT_STORE` value wins; otherwise derives `/home/oleg/prog/z_llvm-artifacts` from `main_git_common_dir` by parent plus `<repository-basename>-artifacts`. It does not read `default_store` and does not consult a manifest. | Actual production path-selection function; path selection alone does not prove semantic authority. | Generic path behavior remains frozen until a dormant authority-binding implementation is reviewed. Candidate metadata cannot select production. | Unset selects the exact active declaration. Set is accepted only when its normalized value equals the active declaration’s payload root and every declaration/manifest/content check passes. | Relative, noncanonical, old, alternate, missing, ambiguous, stale, or advanced values fail without fallback. |
+| `tools/zllvm_artifact_store.zig` | `main` / `resolve-authority` -> `resolveAuthority(allocator, environment_value, main_git_common_dir)` | Reads optional `ZLLVM_ARTIFACT_STORE`, constructs the production resolver with exact `main_git_common_dir`, and prints only the resolved path. | First production resolver consumer; it presently performs no `RegistrationGuard` or store-content validation. | Must remain current-authority-only until dormant implementation acceptance. | Must report a root only after exact control declaration, generation manifest, payload, and registration validation. | A path alone can never be returned as authority after activation. |
+| `tools/zllvm_artifact_store.zig` | `main` / `materialize-spec publish` -> `resolveAuthority(allocator, environment_value, main_git_common_dir)` -> `publishCanonicalSourceSpec` | Requires `ZLLVM_ARTIFACT_STORE`, constructs the second production resolver, then passes its result into guarded publication. | Second production resolver consumer; accepted one-time source-store publication surface, not an authority-transition surface. | No invocation or semantic reuse in the transition. | Remains outside activation; future output publication uses a separately reviewed surface. | It must not create or replace control metadata, destination authority metadata, or activation receipts. |
+| `tools/zllvm_artifact_store.zig` | `expected_path_hash`, `expected_topology_hash`, `expected_non_main_hash` -> `validateExpectedRegistration` | Freezes the exact 43-registration path, topology, and non-main identities; also requires count/distribution `43`, `33/8/2`. | Production registration admission boundary. | Exact values remain frozen. | Active resolution must continue to require these facts until a separately reviewed registration update. | Any count, distribution, path, topology, or non-main mismatch returns `UnexpectedRegistrationInventory`. |
+| `tools/zllvm_artifact_store.zig` | `RegistrationGuard.init` -> `captureRegistration` -> `validateExpectedRegistration` | Captures `/usr/bin/git --git-dir=/home/oleg/prog/z_llvm/.git worktree list --porcelain`, owns the snapshot, and validates the expected registration boundary. | Production plan/publication and store-access guard construction. | Remains the sole existing registration-capture authority. | The active resolver must construct the same guard before store access. | Capture, parse, expected-identity, allocation, or command failure propagates; no Boolean fallback. |
+| `tools/zllvm_artifact_store.zig` | `RegistrationGuard.assertCurrent` | Recaptures registration and requires exact frozen/current `full_hash`, path, topology, and non-main equality. | Mutation/access checkpoint used before and after store operations. | Remains unchanged. | Required before store access and again before successful authority resolution. | Drift returns `RegisteredWorktreeDrift`. |
+| `tools/zllvm_artifact_store.zig` | `RegistrationGuard.assertStoreRoot` -> `assertDisjointFromEveryRegistration` | Requires normalized absolute root and bidirectional disjointness from every frozen registration. | Store-root admission check. | Applies to any dormant candidate verification without activating it. | Applies to the declared local-state payload root before any access. | Relative, noncanonical, equal, ancestor, or descendant overlap fails closed. |
+| `tools/zllvm_artifact_store.zig` | `planCanonicalSourceSpec` -> `RegistrationGuard.init` / `verifyCanonicalSources` / `assertCurrent` | The `materialize-spec plan` production path freezes registration around bounded source verification, but opens no store. | Production non-mutating registration consumer. | Frozen; not an authority selector. | Remains outside activation. | Registration/source mismatch propagates. |
+| `tools/zllvm_artifact_store.zig` | `publishCanonicalSourceSpec` -> `RegistrationGuard.init` / `assertStoreRoot` / `prepareStoreRoot` / `Store.open` / final `assertCurrent` | The publish production path validates registration and root before preparation, opens the root no-follow, and revalidates before success. | Production mutating store-access consumer. | Not used for candidate activation. | Remains outside authority activation. | Every root, ancestry, registration, capacity, publication, read-back, or final-current failure propagates. |
+| `tools/zllvm_artifact_store.zig` | `Store.open` and `Store` methods | `Store.open` requires `assertCurrent` and `assertStoreRoot`, opens the exact absolute root with subpath access and `follow_symlinks=false`, and owns a duplicated root path; capacity, publish, manifest, snapshot, compatibility, and verification methods repeatedly call `assertCurrent`. | Existing guarded store access boundary. | Candidate verification may reuse only after separate dormant review. | Active read-only resolution must retain the same no-follow and current-registration boundary. | No unguarded open, borrowed root identity, symlink-following access, or post-drift success. |
 | `tools/zllvm_artifact_store.zig` | `Store.publishManifest` | Publishes a read-only payload-store generation manifest. | The accepted source copy is currently byte-equal to the tracked manifest. | No destination manifest is created. | Any future payload-store copy is a non-authoritative mirror only. | A mirror cannot select authority or repair missing control metadata. |
 | `docs/evidence/artifact_manifest_v1.tsv` | complete `zllvm-artifact-manifest-v1` document | Contains the accepted active 19 logical references, 18 objects, two snapshots, and 16 members; byte-equal to the source-store generation manifest. | Joint current main-tree side of the accepted source authority proof. | Frozen throughout candidate, dormant, and validation phases. | Becomes an immutable historical/source-generation mirror after main activation; runtime no longer treats it as live authority. | It cannot silently follow, replace, or supersede the control generation manifest. |
 | `/home/oleg/prog/z_llvm-artifacts/manifests/generation-00000001.tsv` | exact named external file | Accepted source-store generation manifest, SHA-256 `61b7426b…`. | Current payload-side generation authority paired with the tracked manifest. | Frozen and retained. | Preserved as the source generation; not read as the new active generation. | Never rewrite, delete, normalize, or treat as a fallback. |
@@ -326,7 +382,7 @@ objects=18
 snapshots=2
 destination_modes=0444
 copy_evidence_path=docs/evidence/inbox202_local_state_artifact_copy_verify.md
-copy_evidence_sha256=4b532daac81ff8d418c9534dc646c1eb3efba95259f604934473203b0885452e
+copy_evidence_sha256=4b532daabe33e7c6eaca7f0ab412d9c271b55b6b1de8235dd3d4f65d7ab6f7a6
 result=verified_non_authoritative_copy
 ```
 
