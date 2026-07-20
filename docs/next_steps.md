@@ -24,7 +24,197 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AL environment and invocation-atomic audit closure — AUTHORIZED
+## INBOX-206AM corrected environment and invocation-atomic audit closure — AUTHORIZED
+
+INBOX-206AL is accepted only as a compliant fail-closed preconstruction
+stop. It receives no D01, audit-closure, `AUDIT_COMPLETE`, implementation,
+execution, validation, ratchet, credit, or downstream acceptance. AL remains
+absent; never create, repair, reconstruct, or rerun it.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206AL stopped fail-closed during the first read-only operating/AK preconstruction gate.
+
+The gate returned nonzero before any success marker. Per directive, I performed no diagnosis, retry, repair, cleanup, AL creation, implementation, or later work. The command was read-only, so no repository or retained-root bytes were changed. `AUDIT_COMPLETE` was not created.
+```
+
+Watcher review used only Git/source text, retained TSVs and metadata, and
+the retained Worker JSONL. It ran no project or Zig code. The exact failed
+command is retained with status `1`. The clean non-merge authority was
+`4a0ccb372f616b406691518e8ea845ae3c0d6654`, parent
+`7606ed7c1817bd1860cd473f9a01856a85192194`, tree
+`7fd017a9e49a78ebea428d761ce9e1edd2c3efcb`, sole changed path
+`docs/next_steps.md`, and ignored-inbox SHA-256
+`07822dde360d8ba40ef289df6d8bb74194b08f5b64baed24d1dd44625a3f8ac8`.
+Ordinary and exact-hermetic status, index, source, and supplemental control
+were clean. Control remained
+`9c55bda34088e1230b0b91a126d35795a3ac70b4` / tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e` / `main` / no remote.
+
+Stash `7985c6d01040a6e47e4ce5b918866d0e89517ac7`; watcher
+HEAD/index/worktree blob
+`b64131cf60dd0ef638e815cd33db9ae8595a72cf`; pins
+`1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3`;
+bypass TSV
+`2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11`;
+tool
+`073bdddeeac4a0b99e39cd54e5b2ea7db403796d25416dcf5ac578ea7ff5ad14`;
+build
+`a0c923499cd4515326fb287d729c53ae6d68bb465a4b4a033a737a19466ce466`;
+and retained ratchet evidence `131` remained exact. Read-only registration
+metadata replayed count `43`, distribution `33/8/2`, and path/topology/
+non-main identities
+`f31d8542baafc7b64cd5ee6fe8cc4194842ca696b97a7ffc8df06ce12d553d7e` /
+`6c868e3b6d436cfba92a1e2b21dbd616391763961f1cba9b6670b1ed4a6ebb62` /
+`ebc30a376b3db4c6fbf788f49ea85f4ce792471e539c0a89308068efdf96ebbe`
+without entering any registered-worktree directory.
+
+AL is absent. AK remains exactly 20 top-level regular, non-symlink,
+non-executable mode-`0644` files with no `AUDIT_COMPLETE`:
+
+```text
+ak_paths_sha256=5a3ecb77f8a3b4e49ace3b997f5d9885147f0eece263a5a3500097ebde28b0b0
+ak_inventory_sha256=3017c5c7041e6220b90a90d9136c5f83db8244cce10e1d3508d8bd85d0fef4ac
+ak_ledger_sha256=66381fec1e01d925b08cc6356a366c15f398d34c18321c183993c1602d8c871f
+ak_snapshot_subjects=16
+ak_snapshot_paths_sha256=220d91ce9ddd56085e798133c8dd20deb7d3d43686280e805dd4a27f7d490968
+ak_snapshot_inventory_sha256=41f48034450c97ea4554cf7f35841550e1a8beefc8d0bc1303592070a17fdae3
+ak_snapshot_ledger_sha256=008b8f5a4bbdc7e5f6812bb67518dff27fa6d5f58333ccf9d975bca09f449f3e
+```
+
+Every AK identity-ledger and snapshot row replayed exactly. Static TSV
+review confirms eight lifecycle roots, 46 children, seven candidate-runtime
+instances, 54 orchestration instances, 68 state fields, 65 atomic rows
+(`31` resolved-audit and `34` unresolved-blocking), 12 dependency steps,
+eight conflicts, and 15 truthful pass gates.
+
+The failed Worker command used the AK inventory serialization
+`%P\t%y\t%m\t%s\n`, omitting the frozen final symlink-target field. That
+substitution produced SHA-256
+`1b28467d426fd941ba683366c5630f7181587932c6e4f09b6bfd9eb1a4b4942c`
+instead of the exact
+`3017c5c7041e6220b90a90d9136c5f83db8244cce10e1d3508d8bd85d0fef4ac`.
+The authorized inventory serializer
+`%P\t%y\t%m\t%s\t%l\n` still replays exactly. No retained byte drift
+occurred.
+
+Reviewer dialogue is preserved verbatim:
+
+```text
+I accept INBOX-206AL only as a compliant fail-closed preconstruction stop. It receives no D01, audit-closure, implementation, or execution credit; preserve AL as absent.
+
+I authorize INBOX-206AM with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md; update only ignored docs/worker_inbox.md, freeze its hash, and bind the final HEAD.
+- Create only fresh continuations/inbox206am.
+- Before AM creation, run separately labeled, independently blocking AK checks:
+    - paths: %P\n;
+    - inventory: %P\t%y\t%m\t%s\t%l\n;
+    - ledger: the exact frozen NUL-sorted serializer.
+
+- Freeze exact command bytes and expected identities. No serializer may substitute for another.
+- Replay every AK ledger, snapshot, schema, and cardinality row before construction.
+- Only complete preconstruction success permits the previously approved AL environment-authority and invocation-atomic corrections.
+- AUDIT_COMPLETE remains the final write and must explicitly state implementation_ready=false and execution_authority=none.
+- Any enumeration, schema, environment, atomicity, count, conflict, dependency, or identity gap leaves the marker absent and stops immediately.
+
+No source/production change, Zig/build/install, invocation, cache, validation, worktree traversal, ratchet, credit, or downstream action is authorized. D02 remains unauthorized.
+```
+
+Create one non-merge operating commit changing only this file. Update only
+ignored `docs/worker_inbox.md`, freeze its final SHA-256, and bind the
+Watcher dispatch to the final commit, parent, tree, and sole changed path.
+
+Before AM creation, preserve AK byte-for-byte and run separately labeled,
+independently blocking checks. Freeze the exact command bytes, scope, field
+order, separators, expected identities, and labels:
+
+1. Paths: top-level `%P\n`, bytewise sorted, SHA-256
+   `5a3ecb77f8a3b4e49ace3b997f5d9885147f0eece263a5a3500097ebde28b0b0`.
+2. Inventory: top-level `%P\t%y\t%m\t%s\t%l\n`, bytewise sorted,
+   SHA-256
+   `3017c5c7041e6220b90a90d9136c5f83db8244cce10e1d3508d8bd85d0fef4ac`.
+3. Ledger: the exact NUL-path-sorted loop emitting
+   `sha256\tbytes\tmode\trelative_path\n`, SHA-256
+   `66381fec1e01d925b08cc6356a366c15f398d34c18321c183993c1602d8c871f`.
+
+No serializer, scope, field, separator, label, or result may substitute for
+another. Separately replay all 16 rows of `ak_identity_ledger.tsv`, all 16
+snapshot subjects, and every AK schema and cardinality row. Require exactly
+20 top-level regular non-symlink nonexecutables, all mode `0644`, and absent
+`AUDIT_COMPLETE`. Any mismatch leaves AM absent and stops immediately
+without inspection, diagnosis, repair, retry, cleanup, fix-forward, or later
+work.
+
+Only after every preconstruction gate passes, create fresh absent,
+non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206am
+```
+
+AM is the evidence/design-only correction previously approved for AL. It
+must:
+
+1. Reproduce immutable AK authority and its accepted Stage-1 disposition.
+2. Enumerate every environment-authority token referenced by all 54
+   `execution_orchestration` invocation instances exactly once.
+3. Freeze for every token the ordered variables; each literal, unset,
+   presence-only, or reviewed-hash policy; executable resolution;
+   unknown-variable failure; and secret-safe handling. Never persist
+   arbitrary secret-bearing environment values.
+4. Explicitly equate `closed-hermetic-git` with the reviewed hermetic map
+   and fully define `closed-git` and `closed-minimal`, adding no process.
+5. Split defects into invocation-atomic rows whenever callsite, dimension,
+   identity, authority, or disposition differs. Share a row only when every
+   relevant field and resolution state is identical.
+6. Recompute counts, resolved/unresolved totals, conflicts, and dependency
+   mappings from the corrected matrix.
+7. Prove bijectively that every lifecycle/root/child environment token
+   resolves exactly once and every invocation/dimension is represented.
+
+Unknown tokens, unmapped invocation/dimensions, mixed rows, duplicate
+coverage, schema gaps, count conflicts, dependency gaps, and identity gaps
+are blocking. `AUDIT_COMPLETE` may be the final content write only after all
+independent enumeration, schema, environment, atomicity, count, conflict,
+dependency, and identity gates pass. It must truthfully record the remaining
+future unresolved count and conflict set plus exactly:
+
+```text
+enumeration_schema_environment_closure=passed
+implementation_ready=false
+execution_authority=none
+```
+
+Future unresolved implementation identities do not themselves block this
+audit-only marker. It grants no implementation, build/install,
+materialization, invocation, cache, validation, activation, ratchet, credit,
+or downstream authority.
+
+Use explicit-name pre-first-gate `chmod 0644` only on each new AM file batch.
+All AM files must be regular, non-symlink, non-executable mode `0644`.
+Completion is the final write. Any failure retains AM and stops without
+inspection, diagnosis, repair, retry, cleanup, mode change, fix-forward, or
+later work.
+
+No source, production, or Zig implementation; build registration;
+build/install; materialization; invocation; cache creation; validation;
+registered-worktree directory access or traversal; broad discovery;
+protected-path change; receipt; activation; compatibility; validation-v3;
+cleanup; wiring; ratchet; credit; or downstream action is authorized.
+Production AWK is prohibited. D02 and the future private Zig 0.16
+state-capture implementation remain unauthorized. Do not access
+`.claude/settings.local.json`.
+
+Stop after the first failed blocking gate or after a complete AM companion
+with `AUDIT_COMPLETE` written last. Report all AM identities, every gate,
+environment-token coverage, corrected atomic cardinalities, resolved and
+unresolved totals, conflicts, dependency order, marker presence, and exact
+protected-state preservation. Acknowledge INBOX-206AM and all stop
+conditions before acting.
+
+## INBOX-206AL environment and invocation-atomic audit closure — COMPLIANT PRECONSTRUCTION STOP; SUPERSEDED BY INBOX-206AM
 
 INBOX-206AK's corrected Stage 1 and invocation-instance enumeration are
 accepted as evidence. D01 audit closure, `AUDIT_COMPLETE`, implementation
