@@ -24,7 +24,31 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-192A registered-worktree exclusion and durability recount — AUTHORIZED
+## INBOX-192B capacity-arithmetic correction — AUTHORIZED
+
+INBOX-192A at `b309fc26` is accepted as a compliant one-document
+protected-scope correction stop. Final INBOX-192 durability-design acceptance
+remains withheld because the committed capacity sum and derived headroom are
+arithmetically false.
+
+Amend only
+`docs/evidence/inbox192_calls_artifact_durability_audit.md`. Set
+`conservative_required_free` to `58522308635` and
+`audit_time_headroom` to `39216308197`. Add the explicit reconciliation
+`49112001332 + 3112270055 + 6230928384 + 67108864 = 58522308635`, counting
+each displayed capacity summand once. Preserve the frozen audit-time
+free-space observation `97738616832`; do not replace it with a later
+filesystem reading. Statically check the capacity section for any other stale
+derived current total.
+
+Preserve every INBOX-192A registered-worktree exclusion and identity, every
+path/byte/pin, the local-only design, absent store and v3 namespace, dormant
+production, calls sequence, post-calls checkpoint, and ratchet 131. Traverse
+no protected worktree. Run no project code and perform no store, copy, archive,
+implementation, contract, validation, cleanup, wiring, or credit action.
+Commit only the amended audit and stop clean for review.
+
+## INBOX-192A registered-worktree exclusion and durability recount — COMPLIANT CORRECTION STOP; DESIGN WITHHELD at b309fc26
 
 INBOX-192 at `74226064` is accepted only as a compliant read-only evidence
 stop. Final design acceptance is withheld because 21 registered worktrees
