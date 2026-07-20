@@ -6,27 +6,42 @@ discussion may rank or describe work, but they do not authorize it. An Active
 worker-inbox directive controls until it is acknowledged here or in its commit;
 after that, this entry controls until another explicit directive replaces it.
 
-## INBOX-191 v3 source-commit identity and namespace closure — AUTHORIZED
+## INBOX-192 calls-critical dependency and local durability audit — AUTHORIZED
 
-INBOX-190 at `49bbb9d0` is accepted as a compliant fail-closed stop only.
-Validation is incomplete and v2 is exhausted. Preserve the entire v2
-namespace and registered detached worktree as immutable evidence.
+INBOX-191 at `b510d277` is accepted as documentation-only source-identity
+and v3-namespace closure. Validation-v3 remains unexecuted and is blocked
+on durable artifact retention.
 
-Amend only the accepted contract document. Record the exact INBOX-190/v2
-ledger, move every future generated path to fresh `baseline_validation_v3`,
-and prohibit every executable v1/v2 reference.
+Create one evidence document only. Inventory every acceptance-critical
+active `tmp/` dependency and hard-coded v3 producer/consumer path. Cover
+the unpinned accepted cohort, compiler-rt v1 input/reproduction, validation
+bundle and v1/v2 records, every v3 path, and accepted Tier-3/performance
+evidence. Record exact identities, consumers, pin coverage, provenance,
+reconstruction, logical grouping, and one of the four closed retention
+classes.
 
-Bind full baseline commit
-`43de59b06ca3a687368bfaf0595c5759c8ab3a57` once as a validated
-40-lowercase-hex constant in each complete executable stream. Use that bound
-identity for every future source creation, comparison, restoration, and
-provenance operation; pass it explicitly to child commands and update the
-argument ledger. No executable short-SHA equality may remain.
+The controlling model is local-only: proposed authority
+`/home/oleg/prog/z_llvm-artifacts`; primary content-addressed object plus a
+deterministic sealed `tar.zst` snapshot as two logical same-disk copies;
+disk failure explicitly outside the guarantee. Define a traversal-safe,
+versioned logical-ID manifest; separate snapshot identities and deterministic
+recipe; common-Git-directory/default plus `ZLLVM_ARTIFACT_STORE` resolution;
+capacity requirements; and a fail-closed design for atomic verified `tmp/`
+compatibility copies.
 
-Run static/read-only checks only. Change no source, bundle, input, identity,
-pin, tool, threshold, calls sequence, or checkpoint. Commit only the amended
-contract, preserve dormant production and ratchet 131, and stop before v3
-execution.
+This slice creates no store, object, snapshot, archive, manifest
+implementation, resolver, copy, or pin. It changes no contract, current
+path/byte, source, tool, identity, protocol, threshold, calls sequence, or
+checkpoint and runs no project code. Commit only the audit document,
+preserve all bytes/pins, dormant production, and ratchet 131, then stop.
+
+## INBOX-191 v3 source-commit identity and namespace closure — ACCEPTED at b510d277
+
+The contract now records the exact immutable v2 stop ledger, uses fresh v3
+generated paths, binds full source commit
+`43de59b06ca3a687368bfaf0595c5759c8ab3a57` once per complete future
+stream, and passes both static stream audits. It grants no validation,
+execution, identity, wiring, performance, or ratchet credit.
 
 ## INBOX-190 baseline-validation v2 execution — COMPLIANT STOP at 49bbb9d0
 
