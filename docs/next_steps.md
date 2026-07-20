@@ -24,7 +24,67 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206C real-candidate four-root safety diagnosis — AUTHORIZED
+## INBOX-206D private four-root admission remediation and synthetic proof — AUTHORIZED
+
+Accept INBOX-206C and commit `db67fb147b6ebf9c8e19e082aa19e0cd7204d0f8`
+in full. Its four-role diagnosis controls. Real-candidate validation remains
+withheld.
+
+Preserve every retained INBOX-206A/B byte and cache. Change only:
+
+```text
+tools/zllvm_artifact_store.zig
+docs/zllvm_artifact_retention_contract.md
+docs/evidence/zllvm_artifact_authority_dormant_v1.md
+```
+
+Implement private role-specific dormant admission while leaving generic
+`RegistrationGuard`, production/public/build/selector behavior, payload
+verification, source authority, and ratchet `131` unchanged.
+
+Separate owned control-Git observation acquisition from validation. Real
+acquisition must use frozen `/usr/bin/git`, a closed environment, exact
+`-C /home/oleg/prog/z_llvm/local-state/control`, fixed bounded commands for
+HEAD/tree/branch/status/remotes and NUL-delimited recursive `ls-tree` limited
+to `authority/zllvm/v1`, bounded output, and exact statuses. Prove the exact
+four tracked control entries before any no-follow file open. Synthetic tests
+inject owned observations into the same logic, are `builtin.is_test`-closed,
+and cannot select or read real paths.
+
+Replace the uniform dormant root loop with fixed private control, authority,
+payload, and source validators:
+
+- control/source exact paths and mode `0775`;
+- authority/payload exact reviewed paths and mode `0755`;
+- only the exact authority/payload main-containment allowances;
+- non-main and supplemental-control disjointness as defined by INBOX-206C;
+- four-key allowlist before control-file open;
+- source root identity only; and
+- no discovery, fallback, write, chmod, repair, or normalization.
+
+Update only the retention contract's rejected uniform root paragraph. Append
+INBOX-206D provenance to the dormant evidence document.
+
+Use fresh external records only at:
+
+```text
+/tmp/zllvm-inbox206d-root-role-remediation-validation
+```
+
+Freeze and run one complete preflight while that root is absent. After
+success, create the root and run one each, in order: format/check,
+compile-only, focused synthetic suite, then static source/contract guard.
+Use isolated caches. The final guard must prove the private boundary, exact
+Git commands/ownership, four-role policies and negatives, frozen production
+surfaces and `RegistrationGuard`, exact retained evidence, and ratchet `131`.
+
+Any gate failure retains state and stops without retry, diagnosis, repair,
+cleanup, evidence edit, or commit. Complete success may commit only the
+three authorized files. Stop before any real candidate test, state guard,
+validation evidence/receipt, activation, compatibility, v3, compiler,
+performance, cleanup, ratchet movement, or credit.
+
+## INBOX-206C real-candidate four-root safety diagnosis — ACCEPTED; INCORPORATED INTO INBOX-206D
 
 Accept INBOX-206B's structural gate as passed and the complete attempt only as
 a compliant one-shot validation failure. Phase-3 candidate acceptance remains
