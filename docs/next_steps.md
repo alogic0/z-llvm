@@ -27,10 +27,16 @@ from traversal/calculation only, never `git worktree prune`.
 ## INBOX-194C source-mode versus immutable-object-mode correction and one logged continuation — AUTHORIZED
 
 INBOX-194B at unchanged HEAD `f97e2ee2` is accepted only as a compliant
-retain-and-stop. Neither implementation nor protocol acceptance is granted:
-the first publish exposed an incorrect mode model, the CLI did not complete,
-and the required separate stdout/stderr records are absent. Do not synthesize
-those missing records.
+retain-and-stop, with protocol acceptance. Implementation acceptance remains
+withheld: the first publish exposed an incorrect mode model and the CLI did not
+complete. Separate stdout/stderr records exist and are frozen below.
+
+The first INBOX-194C dispatch stopped before edits because its operating
+boundary incorrectly claimed those ignored log files were absent and did not
+define the root-inventory serialization. That pre-edit stop is compliant. It
+changed no source, root, record, or dirty-file identity. This corrected
+boundary supersedes only those false infrastructure facts; the technical
+INBOX-194C scope is unchanged.
 
 Preserve the complete partial INBOX-194B store and every INBOX-194/194A/194B
 record exactly. The retained INBOX-194B root is mode 0775 and contains only
@@ -96,11 +102,16 @@ inbox194_root=absent
 inbox194a_root=retained_mode_0775_exact_symlink_authority-symlink_to_dot
 inbox194b_root=retained_mode_0775_one_mode_0444_object_d8da86ca
 inbox194b_inventory_sha256=afc512463fb1763f812f943ff1d48535d858369ae724ec82a49af7f0eab39710
-inbox194b_record_ledger_sha256=9f7396d0799ca08d12601e88176df55aa62cef436a04b1f8a09c5a1ac5fb0a4c
+inbox194b_inventory_serialization=find_-P_ROOT_-printf_%yTAB%mTAB%PTAB%lLF_|_LC_ALL=C_sort
+inbox194b_record_ledger_sha256=5b030639065528952e446281b8ba0167a65b387b10de34aa12fe79baa03e1080
+inbox194b_record_serialization=sha256TABbytesTABmodeTABbasenameLF_in_bytewise_basename_order
+inbox194b_record_count=14
 inbox194b_command_sha256=8747f428021eedc92d8fff006111db7cdc0890c4d362dbe72910684ad455eef2
 inbox194b_environment_sha256=bbf2299a100f0e4e78176a14cef88989c7542c6cec0266a8372a0f90e5e83a2a
-inbox194b_stdout=absent_protocol_failure_do_not_synthesize
-inbox194b_stderr=absent_protocol_failure_do_not_synthesize
+inbox194b_stdout_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+inbox194b_stdout_bytes=0
+inbox194b_stderr_sha256=106a6636d6d1d4d674c785c51bb68fd38835cafd7021db4b17a64dbc790ba5bb
+inbox194b_stderr_bytes=219
 inbox194b_status_sha256=4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865
 registration_before_sha256=02828c20624bb8e8df094d88eeac152cc08c2bcb671506bf350f68bdb09147b3
 real_store=absent
@@ -113,7 +124,11 @@ mandatory post-calls checkpoint, and ratchet 131 remain unchanged. No real
 publication, live rows, compatibility copies, v3 work, cleanup, wiring,
 performance, Tier work, ratchet movement, or credit is authorized.
 
-## INBOX-194B pinned no-follow diagnostic correction and one logged continuation — COMPLIANT RETAIN-AND-STOP; IMPLEMENTATION AND PROTOCOL WITHHELD
+Ignore-sensitive discovery such as `rg --files` is not authoritative for
+retained evidence. Every future retained-file inventory must use `find -P` or
+another explicitly frozen ignore-independent method.
+
+## INBOX-194B pinned no-follow diagnostic correction and one logged continuation — COMPLIANT RETAIN-AND-STOP; PROTOCOL ACCEPTED; IMPLEMENTATION WITHHELD
 
 INBOX-194A at unchanged HEAD `aefdae5d` is accepted only as a compliant
 retain-and-stop. Its sole continuation orchestration stopped in the first unit
