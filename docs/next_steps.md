@@ -24,46 +24,54 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-201 empty artifact-authority destination bootstrap — AUTHORIZED
+## INBOX-202 non-destructive payload copy and verification — AUTHORIZED
 
-INBOX-200 commit `b82bf29f05dd2a4a82eaa4e2ba1b9186523d2462`
-is accepted. Its exact paths, 19/27 mappings, union protection,
-control/payload separation, and ordered migration sequence are authoritative.
+INBOX-201 commit `5fff4d046c68d0144aea9572d4c17b14e7c70575`
+is accepted. Its exact empty destination skeleton and unchanged current
+authority are accepted.
 
-Preflight every named path below `local-state/artifacts` as absent with
-no-follow checks. Create exactly once, parent-to-child, these seven real
-directories:
+Use the tracked manifest and exact source generation manifest as the sole
+finite specification. Freeze a 20-row source/destination table: 18 objects
+plus two snapshots, exactly 9,970,364 bytes. Reproduce the source shape only
+through exact bounded manifest-derived listings. Require source inventory
+`3234fb50...`, file ledger `a06c48e1...`, and byte equality between the
+source generation manifest and tracked manifest.
 
-```text
-/home/oleg/prog/z_llvm/local-state/artifacts
-/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1
-/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1/objects
-/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1/objects/sha256
-/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1/snapshots
-/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1/snapshots/sha256
-/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1/incoming
-```
+Create and retain only
+`/tmp/zllvm-inbox202-local-state-copy-verify-evidence` for the closed
+pipeline-free driver records. It must be absent and disjoint from all
+registrations, repositories, stores, and superseded roots before creation.
+Its exact command/environment/stdout/stderr/status, table, capacity,
+transaction, snapshot, and inventory records are mode `0644`; root mode is
+`0755`; all UID/GID are `1000/1000`. Traverse no other `/tmp` path.
 
-Each must have explicit mode `0755`, numeric UID/GID matching the invoking
-effective UID/GID, and no symlink ancestry. Verify the exact bounded shape:
-the authority root contains only `objects`, `snapshots`, and `incoming`;
-the first two contain only their `sha256` child; all three leaves are empty.
+Preflight conservative byte/inode capacity and system primitives providing
+atomic no-overwrite publication and file/directory durability. If unavailable
+or insufficient, stop before payload mutation.
 
-If any check fails, retain partial state and stop without cleanup, repair,
-mode/ownership change, retry, or commit. Do not inspect or hash the current
-sibling authority.
+Create only the 17 manifest-derived object prefixes and two snapshot
+prefixes. For each finite payload, copy once through a unique no-clobber
+incoming file; verify source/incoming identity; set `0444`; fsync; publish
+atomically without replacement; fsync the parent; remove only that incoming
+name and fsync `incoming`; then verify final type, link count, mode, bytes,
+hash, key, and relationships.
 
-On success, create and commit only
-`docs/evidence/inbox201_local_state_artifact_authority_bootstrap.md`, recording
-the exact identities, modes, ownership, bounded shape, anchored ignore,
-clean repositories, unchanged union/frozen identities, remaining absences,
-and unchanged current authority. The empty destination is not authoritative.
+Verify snapshot members and constituent hashes by exact read-only streaming
+without an extraction workspace. Revalidate all source files and the 43+1
+union. Require exactly 20 destination files/9,970,364 bytes, exact shape and
+relationships, empty incoming, and no destination generation manifest.
 
-Do not create validation/cache/worktree/control descendants, payloads,
-repositories, markers, or compatibility paths. No copy/migration, control
-mutation, manifest/tool/contract/pin/source edit, worktree operation,
-project/artifact execution, validation, cleanup, wiring, performance, ratchet
-movement, or credit is authorized.
+Any failure retains all partial destination and record state without retry,
+repair, cleanup, overwrite, authority change, or commit. Complete success
+commits only
+`docs/evidence/inbox202_local_state_artifact_copy_verify.md`, preserves both
+stores and all retained records, and stops clean.
+
+The sibling source store and tracked manifest remain authoritative. No
+authority transition, control/manifest/tool/contract/pin/source edit,
+compatibility, reserved validation/cache/worktree creation, project
+execution, old-store mutation, cleanup, wiring, performance, ratchet movement,
+or credit is authorized.
 
 ## INBOX-199 documentation-only authoritative INBOX-197 reconciliation amendment — WITHDRAWN BEFORE EDIT
 
