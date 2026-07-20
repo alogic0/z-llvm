@@ -24,7 +24,71 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-202F corrected read-only post-publication verification — AUTHORIZED
+## INBOX-202G no-rerun canonical record-mode remediation — AUTHORIZED
+
+INBOX-202F is accepted only as a compliant verifier-pass,
+postflight-record-mode stop at operating HEAD `9c415993...`. Its substantive
+read-only verification results are accepted; consolidated copy acceptance
+remains withheld until a canonical all-`0644` record set is proven.
+
+F contains exactly 25 real regular UID/GID `1000/1000` records. Exactly
+`driver.stdout`, `driver.stderr`, and `driver.status` are mode `0664`; the
+other 22 are `0644`. Freeze the complete F ledger SHA-256 `5d9379b3...` and
+the three exact result hashes/bytes in the newest worker-inbox directive.
+Preserve A/C/D/E/F and every source/destination byte, mode, link, and inode.
+
+Authorize only:
+
+```text
+/tmp/zllvm-inbox202g-local-state-record-mode-remediation-evidence
+```
+
+Require exact no-follow absence/disjointness and all frozen read-only
+preflights before creating G. Require exactly the three named `0664`
+exceptions—no more or fewer—and all substantive F verifier records exact.
+
+Under one closed shell with `umask 0022`, copy only those three F files to
+same-basename G paths using the accepted GNU `dd` no-follow/no-clobber
+primitive:
+
+```text
+/usr/bin/dd if="$source" of="$destination" bs=1048576 \
+  iflag=fullblock,nofollow oflag=nofollow conv=excl,fsync status=none
+```
+
+Require each new destination real regular mode `0644`, UID/GID `1000/1000`,
+and byte/hash-identical to its F source.
+
+G may contain only the three copies plus:
+
+```text
+mode-remediation.tsv
+f-record-ledger.tsv
+canonical-record-set.tsv
+postflight-summary.tsv
+```
+
+All seven files must be real regular mode `0644`, UID/GID `1000/1000`.
+Define the canonical set as exactly the 22 F records already `0644` plus the
+three G copies: 25 unique roles, each resolving once with exact path, type,
+ownership, mode, bytes, and SHA-256. F remains immutable and records the
+original launcher-mode defect.
+
+Do not rerun the verifier, archive stream, transaction, publication, ratchet,
+project, or Zig. Any failure retains G and stops without retry, repair,
+cleanup, or commit.
+
+Full success commits only
+`docs/evidence/inbox202_local_state_artifact_copy_verify.md`, documenting
+INBOX-202 through INBOX-202G and the split-root canonical set, then stops.
+The source store remains authoritative and the destination remains
+non-authoritative.
+
+No authority transition, control/manifest/tool/contract/pin/source/worktree
+edit, compatibility, validation, wiring, performance, ratchet movement,
+cleanup, or credit is authorized.
+
+## INBOX-202F corrected read-only post-publication verification — ACCEPTED VERIFIER PASS; INCORPORATED INTO INBOX-202G
 
 INBOX-202E commit `47e267d61dfbe03203279f9e4542dea766bfb556` is
 accepted as a compliant and complete diagnosis. Its status-zero harness
