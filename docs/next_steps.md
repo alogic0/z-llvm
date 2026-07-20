@@ -24,7 +24,144 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AS independent two-digit environment gates and invocation-atomic audit closure — AUTHORIZED
+## INBOX-206AT header-excluded environment authority and independent invocation-atomic audit closure — AUTHORIZED
+
+INBOX-206AS is accepted only as a compliant fail-closed partial
+evidence/design stop. Credit is limited to the AR replay, exact ten-file
+partial root, five copy gates, both keyed derivations, and exact literal ET
+authority creation/mode finalization. No environment schema/key or downstream
+credit is granted. Preserve AS byte-for-byte and never rerun or repair it.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206AS stopped fail-closed at the independent environment-authority schema/key gate.
+
+Passed beforehand:
+
+- Operating/protected-state gate
+- Complete AR structure, paths, inventory, compact-ledger, and nine-file replay
+- Fresh AS root and nine-file batch
+- Five independent byte-identical-copy gates
+- Keyed authority derivation
+- Keyed preconstruction derivation
+- Literal ET01–ET12 authority record creation and mode finalization
+
+The authority schema/key process returned status 1 before its success marker. AS is retained exactly partial with ten files and no `AUDIT_COMPLETE`. I performed no inspection, diagnosis, retry, repair, cleanup, regeneration, mode change, fix-forward, environment continuation, invocation-atomic work, or later command. No repository or protected-state bytes changed.
+```
+
+Static review ran no project/Zig code. Clean authority was
+`9543519829c53fc125d374af29478b5d4dc6e15c`, parent
+`ace8c7bd449a7b4a70e2be9e7327d57a1af601c4`, tree
+`5e19e8ad874391cc8f2d370155038f0685fcf35f`, sole
+`docs/next_steps.md`, and inbox
+`a2ee4b3d291cfbf2dfc074302b06a7e214ad95b2cd275851ab9a015c5379e7c1`.
+Source/index/control and protected state remained clean and exact. Retained
+logs contain the failed command/status, final report, completion, and no later
+Worker command.
+
+AS is ten regular non-symlink nonexecutables, all mode `0644`, with no marker:
+
+```text
+paths_sha256=5e626a7985d104cf641a28f715c989295f379cae6dd47b6a5438c1bbf6976117
+inventory_sha256=e00c2be42e94b6f9abbd4b98620af11f2a5a4cecce5fcc5ac058918c7e7aa0d2
+compact_ledger_sha256=bb634e2270cac23690bf3721680dc36acfa6ad22fdfc55181dde2dcaf5b35c9f
+ak_replay.tsv=e752b99d0dc8307498b1eb0dd5519fe0274e14885cf7208cbb5cf202aa1f1d64
+authority_boundary.tsv=5ca3abe047fea48ee7118ac2e6ab21486503553d13033f7bdaa53a5f48a0b688
+authority_derivation.tsv=b985208499494e1216131e53c2e539336ebd930d49cc887c6c873dd453912415
+environment_authority.tsv=d274594a7f676cacf95bbb49fc025937db781ef7aee690a68452587caa6f026d
+environment_equivalence.tsv=a88066d60bb08efa4c84578c0b3b2fd00859fa58a7bf8cfc8a65a0de14b5b809
+environment_tokens.tsv=4e9c9f331fcab38a19ae617eafd07d768bd7654980a1fd094890c7db73a339fc
+environment_variable_policy.tsv=c1922b99c76d1fafa1f3d09e060c7c7c309d16ff60ad6867b50fec0c71e437c6
+preconstruction_derivation.tsv=8e3553ebb57891e6a5c8b8525ab69ab2e916ca7b4bd1efdc841ea3a88e21dd43
+preconstruction_gates.tsv=24a63c666a352a5741ce0a925508cddd77c5a34fc2699414e2110f0ca57c1fe6
+schema_authority.tsv=89871f44879321bd2270afe8bae4011cc448fe5fcbf42b29addc9a89abb4036f
+```
+
+The failed process validated the header separately but then applied its ET
+data-row regular expression to the whole file, so `definition_id` necessarily
+failed. The twelve retained rows are exact; this is verifier row-scope drift,
+but the failed gate and every later environment gate receive no credit.
+
+Reviewer dialogue is preserved verbatim:
+
+```text
+I accept INBOX-206AS only as a compliant fail-closed partial evidence/design stop. Credit is limited to the AR replay, exact ten-file partial root, five copy gates, both keyed derivations, and literal ET authority creation/mode finalization. No environment-schema or downstream credit is granted. Preserve AS unchanged.
+
+I authorize fresh evidence-only INBOX-206AT with these refinements:
+
+- Create one non-merge commit changing only docs/next_steps.md, with parent exactly 9543519829c53fc125d374af29478b5d4dc6e15c; update the ignored inbox separately and bind full HEAD/tree/inbox hashes.
+
+- Freeze and independently replay all three AS aggregate identities and all ten complete per-file hashes.
+- Copy exactly these six operating-independent files byte-for-byte:
+    - ak_replay.tsv
+    - environment_authority.tsv
+    - environment_equivalence.tsv
+    - environment_tokens.tsv
+    - environment_variable_policy.tsv
+    - schema_authority.tsv
+
+- Derive only these four operating-bound files through explicit keyed field/row tables:
+    - authority_boundary.tsv
+    - authority_derivation.tsv
+    - preconstruction_derivation.tsv
+    - preconstruction_gates.tsv
+
+- Independently validate the authority header, total/data-row count, ordered ET01–ET12 IDs, ID uniqueness, token uniqueness, five-field data shape, ID domain, count domain, and ordinal syntax.
+
+- Every data-row validator must operate on an explicitly header-excluded byte stream. No validator may accidentally apply a data-row predicate to the header.
+- Give token schema, every per-token count/order/literal-ordinal/uniqueness check, total coverage, each equivalence row, type/mode checks, and marker absence separate processes and success markers.
+
+- No shared loop, composite gate, pipeline-final-row status dependency, or borrowed marker/status is permitted.
+- Only all environment gates passing may permit the previously approved invocation-atomic closure.
+
+The first failure preserves AT absent or exactly partial and stops without inspection, diagnosis, repair, retry, or fix-forward. AUDIT_COMPLETE remains final and audit-only with implementation_ready=false and execution_authority=none. All source, Zig/build/install, project execution, validation, registered-worktree access, ratchet, credit, production-AWK, D02, and downstream prohibitions remain exact.
+```
+
+Create one non-merge commit changing only this file, parent exactly
+`9543519829c53fc125d374af29478b5d4dc6e15c`. Update only ignored
+`docs/worker_inbox.md`; its final SHA-256 is
+`8a3821ad50b541944162b0628ba678dd5b1275e733bcb46ea85d75c8dd94aa10`.
+Bind dispatch to final full commit, parent, tree, sole path, and inbox
+identity. Preserve AK/AN/AO/AR/AS byte-for-byte, AP/AQ absent, and all
+protected state. Create only fresh absent non-symlink
+`continuations/inbox206at`.
+
+Before construction, independently replay AS structure, exact paths,
+inventory, compact ledger, and all ten full per-file hashes. Copy exactly
+`ak_replay.tsv`, `environment_authority.tsv`,
+`environment_equivalence.tsv`, `environment_tokens.tsv`,
+`environment_variable_policy.tsv`, and `schema_authority.tsv` byte-for-byte.
+Derive only `authority_boundary.tsv`, `authority_derivation.tsv`,
+`preconstruction_derivation.tsv`, and `preconstruction_gates.tsv` through
+explicit keyed source/expected/disposition tables. No chained/global
+replacement and no cross-boundary authority.
+
+Independently validate the copied authority file's exact header; total and
+data-row count; ordered ET01–ET12 IDs; unique IDs; unique tokens; five-field
+data shape; ID domain; count domain; and literal two-digit ordinal syntax.
+Every data validator consumes a fixed explicitly header-excluded byte stream;
+no data predicate consumes the header and no combined schema process spans
+header/data.
+
+Then independently gate token schema, every per-token count/order/literal-
+ordinal/uniqueness assertion, total coverage, each of six equivalence rows,
+every final type/mode check, and marker absence. Each is a separately labeled
+blocking process with its own success marker. No shared loop, composite gate,
+pipeline-final-row dependency, or borrowed status/marker.
+
+Only all environment gates passing permits the exact previously approved
+invocation-atomic closure. `AUDIT_COMPLETE` is final-write/audit-only and
+states `implementation_ready=false` and `execution_authority=none`.
+
+First failure leaves AT absent or exact partial and stops without inspection,
+diagnosis, repair, retry, cleanup, regeneration, mode change, fix-forward, or
+later command. No implementation/source/production change, Zig/build/install,
+project execution, validation, cache, registered-worktree access, ratchet,
+production credit, production AWK, D02, or downstream authority. Do not access
+`.claude/settings.local.json`. Acknowledge every boundary and stop condition.
+
+## INBOX-206AS independent two-digit environment gates and invocation-atomic audit closure — COMPLIANT FAIL-CLOSED PARTIAL EVIDENCE/DESIGN STOP; SUPERSEDED BY INBOX-206AT
 
 INBOX-206AR is accepted only as a compliant fail-closed partial
 evidence/design stop. Credit is limited to the complete canonical serializer
