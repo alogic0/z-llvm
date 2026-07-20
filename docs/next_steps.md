@@ -24,6 +24,70 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-206N post-remediation diagnostic text freeze — AUTHORIZED
+
+Accept INBOX-206M fully as hygiene-only remediation, with no diagnostic,
+Phase-3, validation, ratchet, or downstream credit. Preserve I/J/K/L and
+exact M commit `9142c8141fcf331cdfc6eda26c76d9509eddbbb8`.
+
+Create only fresh absent, non-symlink, protected-disjoint:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206n
+```
+
+Before creation require main at the operating commit with exact M parent,
+ordinary and exact-L-hermetic status empty, control exact/main/clean/no
+remote, and L exact at:
+
+```text
+file_count=62
+inventory_sha256=71789c4e0adc59206f74e8a396c32fc7fc8a3bc2f4c8d182bd4ca38391794ab8
+ledger_sha256=a307fd0c6636c57f46efd43a4850f977d2135ca704f106b8852fa55521301ff5
+```
+
+Run exactly one read-only
+`git -C /home/oleg/prog/z_llvm worktree list --porcelain` solely to verify
+the frozen 43 registration identities and N-path disjointness from Git
+administrative metadata. Do not enter, stat, hash, or inspect a registered
+worktree directory. No mutation or other worktree command is authorized.
+
+Do not open, read, hash, modify, stage, relocate, or touch
+`.claude/settings.local.json`.
+
+Derive the complete diagnostic body from L using only L-to-N path,
+operating `HEAD`, and exact M-parent substitutions. Keep `P0003` and every
+substantive assertion, predicate order, observability rule, capture rule,
+and stop behavior unchanged.
+
+Store the diagnostic body, exact environment, intended argv, and invocation
+specification only as non-executable inert text/TSV. Do not create any
+executable launcher/script/binary, preparation command, preparation
+launcher, or runnable wrapper. Predeclare every future capture/checkpoint/
+result and original `pre.*` result as an existing empty file. Explicitly
+classify every path.
+
+Freeze the mechanical and reverse-substitution equivalence diffs, immutable
+identities/bytes/modes, classifications, and unchanged assertion/order
+proof using static checks only. Do not run or syntax-execute the diagnostic
+body or any fragment.
+
+Create terminal recursive include-root inventory and recursive NUL-sorted
+raw-absolute-path ledger snapshots over every prior N path, excluding the
+two snapshots and terminal freeze record. The freeze record hashes those
+two snapshots and records counts/exclusions/result without self-reference.
+After terminal creation change no N byte.
+
+Stop main/control clean and report final N identities, empty equivalence,
+mutable-empty list, non-executable proof, exactly one administrative
+worktree listing, and zero invocations.
+
+No diagnostic/preparation process, harness, Zig/project command,
+compilation, test, validator, project execution, repository/control/source/
+evidence/protected-file change, artifact/store change, worktree access or
+mutation beyond the exact listing, validation, ratchet, wiring, cleanup,
+credit, or downstream work is authorized.
+
 ## INBOX-206M anchored local-settings ignore remediation — AUTHORIZED
 
 Accept INBOX-206L as a compliant one-preparation/one-diagnostic execution
