@@ -24,6 +24,72 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-206O sentinel-preserved preflight and inert freeze — AUTHORIZED
+
+Accept INBOX-206N only as a compliant consumed precreation failure. It
+receives no construction, diagnostic, Phase-3, validation, ratchet, or
+downstream credit and must never be rerun.
+
+Preserve I/J/K/L, exact M, absent N, and every protected identity. Create
+only fresh absent/non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206o
+```
+
+Use exactly one new read-only `git worktree list --porcelain` through this
+literal frozen wrapper:
+
+```bash
+sentinel=__ZLLVM_INBOX206O_WORKTREE_PORCELAIN_END__
+wt_with_sentinel=$(
+    git -C /home/oleg/prog/z_llvm worktree list --porcelain || exit $?
+    printf '%s' "$sentinel"
+)
+case "$wt_with_sentinel" in
+    *"$sentinel") ;;
+    *) exit 51 ;;
+esac
+wt_porcelain=${wt_with_sentinel%"$sentinel"}
+```
+
+The wrapper must propagate a nonzero Git status before sentinel printing.
+Require the exact suffix, remove only that final suffix, and feed preserved
+porcelain bytes only through `printf '%s' "$wt_porcelain"` with no added
+newline.
+
+Before O creation require count `43`, path hash `f31d8542...`, topology
+hash `6c868e3b...`, non-main hash `ebc30a37...`, and lexical
+bidirectional disjointness from every registration and control. Do not
+enter, stat, hash, or inspect a registered-worktree directory. Any mismatch
+consumes the listing and stops without retry or construction.
+
+On success, create only O and store the exact wrapper as inert
+non-executable text. Retain every INBOX-206N construction term with O
+substituted for N: only mechanical L-to-O path and operating HEAD/exact-M
+parent substitutions; unchanged `P0003`, substantive assertions/order/
+observability/captures/stops; inert non-executable diagnostic/environment/
+argv/invocation text; all future results and `pre.*` records predeclared
+empty; explicit classifications; no runnable wrapper or executable file.
+
+Freeze the mechanical and empty reverse-substitution equivalence diffs,
+immutable identities/bytes/modes, unchanged assertions/order, and exact
+wrapper identity using static checks only. Do not run or syntax-execute any
+body, wrapper, specification, or fragment.
+
+Create self-excluding terminal recursive include-root inventory,
+NUL-sorted raw-absolute-path ledger, and freeze records. Change no O byte
+after terminal creation.
+
+Stop main/control clean and report complete O identities, non-executable
+and mutable-empty proofs, one listing, and zero invocations.
+
+No diagnostic/preparation process, harness, Zig/project command,
+compilation, test, validator, project execution, repository/control/source/
+evidence/protected-file change, artifact/store change, other worktree
+access/operation, validation, ratchet, wiring, cleanup, credit, or
+downstream work is authorized.
+
 ## INBOX-206N post-remediation diagnostic text freeze — AUTHORIZED
 
 Accept INBOX-206M fully as hygiene-only remediation, with no diagnostic,
