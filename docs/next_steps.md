@@ -24,6 +24,68 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-206J observable diagnostic pre-state only — AUTHORIZED
+
+INBOX-206I is incomplete and noncompliant and receives no Phase-3 or
+technical credit. Its pre-state returned status `1`, but work continued
+after that mandatory stop: the harness, harness identity, and uninvoked
+structural-guard records were created later. Freeze those as historical,
+unaccepted artifacts. Never invoke or reuse them.
+
+Preserve all `17` I files byte-for-byte:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206i
+inventory_sha256=33e99e258d7d8ebcf3474e5064915a32e8d979e8823a72c033fe533bd769af31
+ledger_sha256=666ca48e1a1dfae0367d65c3687897c70ab7f2e818b1af4d24ce9a2bcc770010
+```
+
+The retained I pre-state command SHA-256 is `333486c2...`, environment
+`d64944d7...`, invocation `30ff9bed...`, stdout/stderr are empty, and status
+is `1`. No `pre.main.tsv` exists, so the exact initial failing predicate is
+unrecoverable. Do not rerun I.
+
+After proving it absent, non-symlink, and bidirectionally disjoint from all
+43 registered worktrees and supplemental control, create records only at:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206j
+```
+
+Preserve all accepted source, contract, evidence, build, control, store,
+candidate, publication-receipt, registration, stash, watcher, pin, ratchet
+`131`, and prior-record identities. Do not modify or traverse a registered
+worktree. No main/control/store/source/document edit is authorized.
+
+Before invocation, construct and freeze every J command, environment,
+launcher, checkpoint/result file, stdout/stderr capture, and status-capture
+mechanism. Include a static retained audit of the I timestamps, stop
+violation, empty output, missing `pre.main.tsv`, and unrecoverable predicate.
+
+Derive the complete diagnostic pre-state from I. It may differ only by:
+
+1. mechanical operating `HEAD`/parent and I-to-J record-path substitutions;
+2. immediately before each original predicate, writing a stable predicate
+   ID to the checkpoint record; and
+3. only after that predicate succeeds, writing its ID and observed identity
+   to the result record.
+
+Preserve the original predicate order and every substantive read-only check.
+Do not separately trial a predicate or fragment. Freeze the complete command
+and wrapper before execution, then invoke the diagnostic pre-state exactly
+once in the same closed environment. The preconstructed wrapper may capture
+status/stdout/stderr automatically. No command, record, diagnosis, or next
+phase may be constructed after invocation.
+
+Failure retains J with the last checkpoint and stops. Success records every
+completed observation and also stops. In either case, do not retry, diagnose,
+repair, edit evidence, stage, or commit.
+
+No harness, Zig command, compilation, test, structural guard, validator,
+state guard, real-candidate validation, evidence edit, main commit, ratchet
+recount, receipt, activation, compatibility, v3, compiler/performance work,
+cleanup, wiring, credit, or downstream work is authorized.
+
 ## INBOX-206I Phase-3 exact-real candidate read-only validation — AUTHORIZED
 
 Accept INBOX-206H commit
