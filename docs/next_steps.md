@@ -24,7 +24,88 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206V anchored-control staged literal construction — AUTHORIZED
+## INBOX-206W isolated inert-normalizer correction — AUTHORIZED
+
+Accept INBOX-206V only as a compliant fail-closed Stage-1 construction
+failure. Its anchored-control preflight passed, fresh V was created, and
+Stage 1 stopped status `1` at the raw normalized comparison. Preserve its
+exact one-file state permanently:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206v
+file_count=1
+inventory_sha256=ac6542ac287c850e3d182c23062e801cdcd5d030095aa556a7bb986cb1e214ea
+ledger_sha256=7625abb76bbb572924846b49435bd7181f6106fea6b705125fc53326aefb6b9e
+top_level_paths_sha256=6b6655134eeadb89a95007aaad4af0289cbdf4e118dfe9a2d3cc95e1abcd7942
+diagnostic_body_sha256=6df5cc59dfca87ffee9d1e0c89ab88420f3d234abb0e09901fdfbebd843865bd
+execute_bits=0
+```
+
+Never rerun, inspect for repair, edit, complete, or repair V. It receives
+no construction or downstream credit.
+
+Preserve I–V and every protected identity exactly. Require the exact
+operating `HEAD` and direct parent named in the Watcher dispatch. Require
+ordinary and exact-L-hermetic main status empty and control
+exact/main/clean/no-remote.
+
+After proving it fresh, absent, and non-symlink, create records only beneath:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206w
+```
+
+Repeat the accepted V anchored-control preflight exactly once for W:
+exactly one sentinel-preserved administrative listing, exactly one bounded
+lexical `git check-ignore -v --no-index -- local-state/control`, exact
+43-worktree identities, main as control's sole registered ancestor,
+control disjoint from all 42 non-main registrations, W disjoint from all
+43 registrations and control, and zero registered-directory access.
+
+Use exactly three independently blocking postcreation construction stages.
+
+1. Write only the fixed quoted-literal W diagnostic body. It must remain
+   byte-for-byte the V/S authority except authorized W path substitutions
+   and the delimited direct-child execution-identity block.
+
+   Correct only the inert normalizer. Its reverse replacement must emit the
+   exact four S old-HEAD lines, including a lone final backslash and no
+   quote on each of the two assertion lines. Emit each final backslash
+   through a separately concatenated AWK string; never reuse V's failed
+   nested escape form.
+
+   Before full normalization, require an isolated raw byte-for-byte
+   comparison proving that those four emitted lines equal the exact four S
+   lines. Only after that passes may the inert stream reverse authorized W
+   path and delimited direct-child substitutions and require full raw
+   byte-for-byte `cmp` equality with S.
+
+   Neither comparison transformer may write an active body. Either
+   comparison failure immediately retains only the fixed W diagnostic body
+   and stops.
+2. Only after complete Stage-1 success, run the unchanged fixed-literal
+   closure/terminal construction and raw-equivalence/schema gates agreed
+   for V.
+3. Only after Stage-2 success, create the unchanged remaining 58 records
+   and freeze exact `61`/`64` authority, W construction `HEAD`,
+   direct-child commands/parsing, exact S-to-W changed-path set, immutable
+   identities, inventory, ledger, and paths.
+
+All prior normalization limits, fixed-body rules, direct-child execution
+model, terminal schema, counts, identities, and fail-closed stops remain
+unchanged. Any preflight or construction failure stops immediately without
+inspection, diagnosis, rewriting, identity regeneration, fix-forward,
+retry, cleanup, or later construction.
+
+On complete success, freeze the inert 61-file W state and stop. Invoke no
+frozen diagnostic, closure, terminal, preparation, project, or Zig stage.
+
+No project/Zig command, compilation, test, validator, repository/control/
+source/evidence/protected-file/store/artifact change, registered-directory
+access, validation, ratchet, wiring, cleanup, credit, or downstream work is
+authorized. Stop main and control clean.
+
+## INBOX-206V anchored-control staged literal construction — COMPLIANT STAGE-1 FAILURE; CLOSED
 
 Accept INBOX-206U only as a compliant fail-closed precreation failure. Its
 sole administrative listing passed every exact identity but exited `54`
