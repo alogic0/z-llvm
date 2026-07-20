@@ -24,7 +24,84 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AY complete-dispatch bootstrap and final-marker remediation — AUTHORIZED
+## INBOX-206AZ fresh authority-boundary cardinality remediation — AUTHORIZED
+
+INBOX-206AY is accepted only as a compliant fail-closed partial evidence/design continuation. Credit is limited to the literal canary, operating-document binding, operating/protected-state gate, complete AV replay, frozen marker/finalizer identities, creation of six exact copies and four keyed files, and correct retention at the first independent keyed failure. Grant no keyed-gate completion, marker, final closure, D01, implementation, execution, validation, production, ratchet, D02, or downstream credit. Preserve AY byte-for-byte exact at its current ten-file partial state with no marker; preserve AV exact and AX/AW absent.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206AY stopped fail-closed at the independent keyed `authority_boundary.tsv` gate.
+
+Completed beforehand:
+
+- Literal transport canary passed.
+- Operating-document binding passed.
+- Operating/protected-state gate passed.
+- Complete AV structure, aggregate, and 20-file identity replay passed.
+- AY marker and finalizer bytes/hashes were frozen.
+- Fresh AY root, six byte-identical copies, and four keyed files were created.
+
+The authority-boundary assertion failed before its success marker. AY is retained exactly partial with no marker creation. I performed no inspection, diagnosis, retry, repair, cleanup, mode change, fix-forward, or later command. AV remains untouched; no project, Zig, validation, production, ratchet, D02, or downstream work ran.
+```
+
+Static Watcher review ran no project or Zig code. Main/source/index were clean at `f473db5eb40ff69d36f1723b32a8c42178316854`, parent `47b783e4570be05e6eb7bb81c4a9071bad8d354e`, tree `6d10ffdf9b3817ae77052719c67a7a2c7cef4dda`, with sole commit path `docs/next_steps.md`. The tracked document SHA-256 was `25acf28e28d20109f77aadbe9bc2cda8455b744458ad4a62d07b61d5d698bd6d`; ignored inbox SHA-256 was `f5838f11c010a83602191db36786162178fd072c1736d0b7149aa6cbc113a347`. Control, stash, watcher, pins, bypass, tool, build, ratchet 131, and all registered-worktree identities remained exact. The retained call sequence ends immediately after `AY_KEYED_AUTHORITY_BOUNDARY`; no later command ran.
+
+The failure is a bounded assertion-contract error. AY `authority_boundary.tsv` contains the complete intended two-column table: one header plus 18 data rows, 19 lines total. All six exact identity rows preceding the cardinality assertion are present once. AV `authority_boundary.tsv` is also 19 lines. The frozen independent gate incorrectly required 20, which is instead the independently correct `authority_derivation.tsv` line count.
+
+Freeze AY at this exact absent-marker ten-file identity:
+
+```text
+0644 1209 e752b99d0dc8307498b1eb0dd5519fe0274e14885cf7208cbb5cf202aa1f1d64 ak_replay.tsv
+0644 709 16307cb8d6a63e6972d114e8d286e0d3e1b2ed584f802f13b29c7425b9c0ceb3 authority_boundary.tsv
+0644 3437 cd2039a62e3b7e0b20ddef19fa52ab95474823fa899780e5f6cf60d0e3a75d1e authority_derivation.tsv
+0644 1770 d274594a7f676cacf95bbb49fc025937db781ef7aee690a68452587caa6f026d environment_authority.tsv
+0644 482 a88066d60bb08efa4c84578c0b3b2fd00859fa58a7bf8cfc8a65a0de14b5b809 environment_equivalence.tsv
+0644 3443 4e9c9f331fcab38a19ae617eafd07d768bd7654980a1fd094890c7db73a339fc environment_tokens.tsv
+0644 4666 c1922b99c76d1fafa1f3d09e060c7c7c309d16ff60ad6867b50fec0c71e437c6 environment_variable_policy.tsv
+0644 26538 d94148d447a39b6dbc5d17eafabd0d3793b34e93b00a39936f315d9615670d41 preconstruction_derivation.tsv
+0644 8006 6f3440cc7ce59fd9a3f53825a44c8ca9c64cc8e5d7596807feec88265258fb49 preconstruction_gates.tsv
+0644 703 89871f44879321bd2270afe8bae4011cc448fe5fcbf42b29addc9a89abb4036f schema_authority.tsv
+```
+
+The exact AY aggregate contracts are:
+
+- paths serializer: `find -P "$AY" -mindepth 1 -maxdepth 1 -printf '%P\n' | LC_ALL=C sort`; SHA-256 `5e626a7985d104cf641a28f715c989295f379cae6dd47b6a5438c1bbf6976117`;
+- inventory serializer: `find -P "$AY" -mindepth 1 -maxdepth 1 -printf '%P\t%y\t%m\t%s\t%l\n' | LC_ALL=C sort`; SHA-256 `27d6ccc0940950b695567306ad60ab65da18f6688fca1aa024423e05e09ccbd5`;
+- ledger serializer: NUL path sort from `find -P "$AY" -mindepth 1 -maxdepth 1 -type f -printf '%P\0' | LC_ALL=C sort -z`, then one LF-terminated row per path formatted `sha256<TAB>bytes<TAB>mode<TAB>path`; SHA-256 `8535aa624a5c378cb36139f85520b1738a66626f091d6dc40a32da83358d5b28`.
+
+Reviewer agreement is preserved verbatim:
+
+```text
+I accept INBOX-206AY only as a compliant fail-closed partial evidence/design continuation. Credit is limited to the canary, document binding, protected-state gate, complete AV replay, frozen marker/finalizer identities, six copies, four keyed files, and correct stop behavior. No keyed-gate, marker, D01, or downstream credit is granted. Preserve AY unchanged, AV exact, and AX/AW absent.
+
+I authorize fresh evidence-only INBOX-206AZ with these refinements:
+
+- Create one non-merge commit changing only tracked docs/next_steps.md, with parent exactly f473db5eb40ff69d36f1723b32a8c42178316854; update the ignored inbox separately.
+- After committing, derive and freeze the full HEAD/tree/document/inbox identities and all wrapper/inner sources and hashes. Include them byte-for-byte in the authoritative dispatch.
+- Before dispatch, freeze AY’s complete ten-file hashes and exact aggregate serializers/hashes—no abbreviated identities.
+```
+
+Create one non-merge operating commit with parent exactly `f473db5eb40ff69d36f1723b32a8c42178316854` and sole changed tracked path `docs/next_steps.md`. Update only this ignored inbox separately. After committing, derive and freeze final HEAD, parent, tree, sole path, both document SHA-256 identities, and the complete inner/outer sources and hashes for the read-only operating-document binding. Include every identity and all frozen source blocks byte-for-byte in the authoritative tmux dispatch.
+
+Preserve the already-reviewed literal canary inner/outer bytes and hashes `77627d7dd45559aee5a702a71675fe2d4ad05b32ecd64dc2bb38097190f16ea2` / `76370f6d55e871715e88c9a3ba12f0546ea7a4219649f5dbeaae0a60e8e2e916`. The Worker acknowledges solely from the complete dispatch; acknowledgment is commentary. No documentation read or tool may precede the exact canary. Canary success alone permits the exact frozen read-only binding as process two; binding success alone permits later gates.
+
+Create only fresh absent non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206az
+```
+
+Before AZ creation, pass the unchanged operating/protected-state gate, complete AV replay, and exact AY partial replay using all ten identities and all three aggregate serializers/hashes above. Freeze every later ordinary-string wrapper source and nested command hash before execution.
+
+Derive the AZ authority-boundary contract explicitly as exactly the header plus these 18 unique ordered keys: `slice`, `kind`, `operating_commit`, `operating_parent`, `operating_tree`, `operating_changed_path`, `ignored_inbox_sha256`, `ak_root`, `ak_disposition`, `al_state`, `am_state`, `implementation`, `execution`, `validation`, `production_awk`, `D02`, `ratchet`, `credit`. Require 19 total lines and reject any missing, duplicate, unexpected, reordered, or wrong-valued row. Independently require the derivation table’s 20-line contract.
+
+Recreate the same six-copy/four-keyed evidence under AZ naming and independently run every unchanged authority, token, selector, 48-environment, coverage, equivalence, type/mode, invocation-atomic, bijection, conflict, dependency, and audit-record gate. Preserve the already-approved marker derivation and exclusive literal finalizer: freeze exact marker/finalizer bytes/hashes; set and verify umask 0022; immediately verify marker absence/non-symlink; perform one complete exclusive no-clobber write; prohibit `apply_patch`, chmod, overwrite, append, rename, generated command, sourced table, or `eval`. Marker success permits only separate read-only marker and terminal identity/clean-state closures. Marker remains audit-only with `implementation_ready=false` and `execution_authority=none`.
+
+First pre-canary action, identity drift, missing/altered wrapper/hash, call/status/output mismatch, gate failure, or marker/closure failure preserves AZ absent or exactly partial and stops immediately with no inspection, diagnosis, retry, repair, cleanup, regeneration, normalization, mode change, fix-forward, or later command. No source/production change, implementation, Zig/build/install, project/validation execution, cache action, registered-worktree-directory access, ratchet movement from 131, production credit/AWK, D02, or downstream action. Never access `.claude/settings.local.json`.
+
+
+## INBOX-206AY complete-dispatch bootstrap and final-marker remediation — COMPLIANT PARTIAL; SUPERSEDED BY INBOX-206AZ
 
 INBOX-206AX is accepted only as a compliant fail-closed administrative
 bootstrap stop. Credit is limited to acknowledgment. Grant no canary,
