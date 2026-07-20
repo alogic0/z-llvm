@@ -24,7 +24,92 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206T corrected inert freeze and direct-child execution identity — AUTHORIZED
+## INBOX-206U staged raw-byte literal construction — AUTHORIZED
+
+Accept INBOX-206T only as a compliant fail-closed construction failure. Its
+second postcreation command returned status `1` at the normalized diagnostic
+comparison because the literal T body reflowed numerous unchanged S lines.
+Never rerun, inspect for repair, edit, complete, or repair T. Preserve its
+exact partial state:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206t
+file_count=61
+inventory_sha256=ed40469532c0a15d6f99bafe8d2f354e87b8d921aea0ff10ca782de27afe4279
+ledger_sha256=6737472f02f30a2f6a471a3caafdafbf0ef25073abf84df02380a4b6b097b613
+top_level_paths_sha256=f4ee65dbb43e8a63d82b34eed8dde1b2565b471ac3deae4202354fdf3a556569
+execute_bits=0
+terminal_snapshots=absent
+```
+
+T receives no construction, closure, terminal, diagnostic, Phase-3,
+validation, ratchet, credit, or downstream acceptance.
+
+Preserve I–T and every protected identity exactly. Require the exact
+operating `HEAD` and direct parent named in the Watcher dispatch. Require
+ordinary and exact-L-hermetic main status empty and control
+exact/main/clean/no-remote.
+
+After proving it fresh, absent, and non-symlink, create records only beneath:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206u
+```
+
+Before U creation, permit exactly one sentinel-preserved,
+status-propagating administrative `git worktree list --porcelain` through
+the accepted wrapper. Require count `43`, exact path/topology/non-main
+hashes `f31d8542...` / `6c868e3b...` / `ebc30a37...`, and bidirectional
+lexical disjointness of U and control from every registration. Failure
+consumes the listing and stops before U creation. Never enter, stat, hash,
+or inspect a registered-worktree directory; no other worktree command is
+authorized.
+
+Use exactly three independently blocking postcreation construction stages.
+
+1. Write only the fixed quoted-literal U diagnostic body and its
+   predeclared in-scope command records. It must be byte-for-byte the S body
+   except U path substitutions and one clearly delimited direct-child
+   execution-identity block replacing only S's exact two old-HEAD
+   assertions. Immediately prove and freeze raw normalized U-to-S equality.
+   Failure retains only those records and stops.
+2. Only after stage 1 success, write the fixed quoted-literal U closure and
+   terminal bodies. Preserve every unchanged S byte exactly; permit only U
+   paths/IDs, the added eventual-final predicate, semantic `61`/`64`
+   assertions, and direct-child predicates. Immediately prove exact raw
+   closure equivalence outside the enumerated changes and validate the
+   terminal body's nine ordered real-tab rows. Failure stops before
+   metadata derivation.
+3. Only after both body gates pass, create the remaining 58 records and
+   freeze exact `61`/`64` authority, U construction `HEAD`, direct-child
+   commands/parsing, S-to-U changed-path set excluding only its own record
+   and `immutable_identities.tsv`, immutable identities, inventory, ledger,
+   and paths.
+
+For body equivalence, normalization may reverse only authorized path,
+operating-identity, count, and direct-child-block substitutions. It must not
+normalize whitespace, indentation, wrapping, quoting, or program layout.
+After reversing only those substitutions in inert comparison streams,
+require raw byte-for-byte `cmp` equality with S. A comparison transformer
+may not write either active body. All active bodies remain fixed
+quoted-literal bytes; no source transformer is authorized.
+
+Preserve the bounded direct-child execution model. Any intervening commit,
+merge, extra path, or amended ancestry invalidates U and cannot be repaired
+during execution.
+
+Any construction-stage failure stops immediately without inspection,
+diagnosis, rewriting, identity regeneration, fix-forward, retry, or later
+construction. On complete success, freeze the inert 61-file U state and
+stop. Invoke no frozen stage.
+
+No diagnostic/preparation invocation, project/Zig command, compilation,
+test, validator, repository/control/source/evidence/protected-file/store/
+artifact change, registered-directory access, validation, ratchet, wiring,
+cleanup, credit, or downstream work is authorized. Stop main and control
+clean.
+
+## INBOX-206T corrected inert freeze and direct-child execution identity — COMPLIANT FAILURE; CLOSED
 
 INBOX-206S fails construction-freeze acceptance. Its immutable
 `static_freeze.audit.tsv` contradicts the authorized `61`/`64` counts, its
