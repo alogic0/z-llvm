@@ -24,7 +24,54 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206B corrected static call-graph guard and Phase-3 continuation — AUTHORIZED
+## INBOX-206C real-candidate four-root safety diagnosis — AUTHORIZED
+
+Accept INBOX-206B's structural gate as passed and the complete attempt only as
+a compliant one-shot validation failure. Phase-3 candidate acceptance remains
+withheld. The single filtered Zig test failed `DormantUnsafeRoot` at
+`RegistrationGuard.assertDisjointFromEveryRegistration`; the success-only
+state guard was not run.
+
+Preserve all frozen INBOX-206A/B records and all 824 B cache files
+byte-for-byte. Do not rerun any preflight, structural guard, Zig command,
+test, validator, state guard, project command, or ratchet recount.
+
+Create and commit only:
+
+```text
+docs/evidence/inbox206c_real_candidate_root_safety_diagnosis.md
+```
+
+Using source, existing documents, and retained logs only, produce a closed
+four-root matrix for `control_root`, `authority_root`, `payload_root`, and
+`source_root`. Cover each exact accepted path/mode, semantic role, Git
+containment/protection union, permitted no-follow reads, forbidden
+traversal/mutation, registration/ancestry/mode policy, private call ownership,
+errors, and fail-closed negatives.
+
+Define role-specific prospective admission:
+
+- exact four-file, no-follow control admission with frozen supplemental-repo
+  identity and no recursive traversal;
+- narrowly pinned authority/payload paths beneath anchored `/local-state/`,
+  allowed beneath only the main registration while disjoint from every
+  non-main registration and the protected control repository as appropriate;
+- exact external legacy source disjoint from every registration;
+- accepted modes `0775` for control/source and `0755` for
+  authority/payload, without chmod or normalization.
+
+Map only the smallest prospective private-validator and retention-contract
+changes. Preserve production authority selection and prohibit public or
+production reachability. Record unresolved conflicts as blockers rather than
+broadening an exception.
+
+No source, contract, prior evidence, build, control, store, manifest, path,
+mode, registration, worktree, pin, stash, watcher, external record, test,
+validation, receipt, activation, compatibility, v3, compiler, performance,
+cleanup, ratchet, or credit change is authorized. Stop after the one evidence
+commit with main and control clean.
+
+## INBOX-206B corrected static call-graph guard and Phase-3 continuation — STRUCTURAL GATE PASSED; COMPLIANT ONE-SHOT VALIDATION FAILURE; INCORPORATED INTO INBOX-206C
 
 Accept INBOX-206A's corrected preflight as passed and the overall slice only
 as a compliant failed structural-gate attempt. Phase-3 remains withheld. No
