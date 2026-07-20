@@ -24,7 +24,65 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-202E read-only snapshot-verifier diagnosis — AUTHORIZED
+## INBOX-202F corrected read-only post-publication verification — AUTHORIZED
+
+INBOX-202E commit `47e267d61dfbe03203279f9e4542dea766bfb556` is
+accepted as a compliant and complete diagnosis. Its status-zero harness
+evaluated 157 assertions: 155 passed, while both snapshots independently
+failed only their constituent-hash assertion. The root cause is accepted:
+retained D omitted the canonical
+`key<TAB>sha256<TAB>bytes<TAB>mode<LF>` row after the accepted version line.
+
+Preserve all four A/C/D/E evidence roots and every source/destination byte,
+mode, link, and inode. Do not rerun the ratchet or copy/publication
+transaction.
+
+Authorize only a fresh verifier evidence root:
+
+```text
+/tmp/zllvm-inbox202f-local-state-copy-verification-evidence
+```
+
+Require exact no-follow absence/disjointness and all frozen read-only
+preflights before creating it.
+
+Freeze a verifier-only driver/environment derived from retained D snapshot
+and final-verification semantics. Its sole semantic correction is canonical
+constituent initialization with the accepted version line, exact column
+header, and finite rows in canonical bytewise-key order. Prove no other
+snapshot-verifier semantic change.
+
+Before full invocation, generate both corrected constituent serializations
+read-only and require exact byte/hash equality with their accepted objects.
+Any mismatch stops before invocation.
+
+Statically prove there is no copy, link, rename, remove, chmod/chown, mkdir,
+truncation, source/destination write, or write redirection outside F. Every
+created record must remain beneath F.
+
+Run exactly one read-only attempt using only the frozen 20-row table, two
+manifest snapshots, and finite member lists. Use the accepted pipeline-free,
+no-extraction GNU tar/zstd streaming method. Revalidate every source and
+destination payload, snapshot/member/constituent relationship, exact
+20-file/9,970,364-byte closed destination inventory, empty `incoming/`, no
+destination manifest, source/tracked equality, and unchanged 43+1/frozen
+identities.
+
+Retain the complete command/environment/static/serialization proof,
+stdout/stderr/status, corrected snapshot ledger, source/destination equality
+ledger, final inventory, and D transaction-ledger identity.
+
+Any failure retains F and all prior state and stops without retry, repair,
+cleanup, or commit. Full success commits only
+`docs/evidence/inbox202_local_state_artifact_copy_verify.md`, documenting all
+INBOX-202 through INBOX-202F attempts, then stops for review. The source store
+remains authoritative and the destination remains non-authoritative.
+
+No authority transition, control/manifest/tool/contract/pin/source/worktree
+edit, compatibility, project/Zig execution, validation, wiring, performance,
+ratchet recount/movement, or credit is authorized.
+
+## INBOX-202E read-only snapshot-verifier diagnosis — ACCEPTED; INCORPORATED INTO INBOX-202F
 
 INBOX-202D is accepted only as a compliant fail-closed post-publication,
 pre-snapshot-verification stop at operating HEAD `edf97754...`.
