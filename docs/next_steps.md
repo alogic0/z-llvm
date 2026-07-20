@@ -24,7 +24,93 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-205A retained-state dormant validator remediation — AUTHORIZED
+## INBOX-205B test-only retained-boundary correction — AUTHORIZED
+
+INBOX-205A is accepted only as a compliant failed remediation; technical
+acceptance is withheld. Format and compile-only passed. The sole focused
+suite returned `1` with eight passed and one failed test, and the source
+guard correctly did not run.
+
+The dormant validator test itself passed and removed its fresh root. The
+only failure was the pre-existing test-only
+`assertRetainedMaterializeBoundaries`, whose old
+`RealStoreMustRemainAbsent` assertion predates accepted source-store
+materialization. `/home/oleg/prog/z_llvm-artifacts` is now intentionally a
+no-follow real directory of mode `0775`.
+
+Preserve byte-for-byte all INBOX-205 and INBOX-205A roots, records, caches,
+and the current dirty composite. Frozen retained identities are:
+
+```text
+INBOX-205 root inventory:
+0cfdd1af3582b269e7aa54eef5287933c277771158c799f505b2c3b3000d8227
+INBOX-205 records:
+7936e0122e1468d97beaf66c07acff6d595436af3214b5bf12f2c7ade8f6e81b
+INBOX-205A tree inventory:
+9415fb8f370e9937d8ad44aefb39da1dbc34b8c850bb5c96a35ca2e4bf9955fb
+INBOX-205A file count / ledger:
+848 / 24e4ce7f3a35727a2734333d2e7bf415629ca99ae03c97ae909b0ee01a7d0ec6
+INBOX-205A final stderr:
+361201ac0c9eca6d4ae810991d0a7976a9095d27b891f08277704727e9a1610b
+```
+
+Continue within and on success commit only:
+
+```text
+tools/zllvm_artifact_store.zig
+docs/zllvm_artifact_retention_contract.md
+docs/evidence/zllvm_artifact_authority_dormant_v1.md
+```
+
+`build.zig` remains unchanged and the optional mirror remains absent. Defer
+evidence-result edits until both blocking gates succeed.
+
+In test-only `assertRetainedMaterializeBoundaries`, replace only the stale
+real-store absence assertion. Examine the exact real-store root only with
+no-follow `lstat`, requiring a real directory of mode `0775`. Do not open,
+enumerate, traverse, hash, or modify it. Keep every other prior-root
+boundary unchanged.
+
+Keep `default_store` test-only, with references limited to its constant, the
+retained-boundary check, and the fallback-resolution test. Do not change any
+production entrypoint, CLI/environment behavior, resolver, public surface,
+call graph, build registration, control/manifest/authority behavior, or
+dormant validator semantics.
+
+Use fresh initially absent, normalized, registration-disjoint roots:
+
+```text
+/tmp/zllvm-inbox205b-authority-dormant-synthetic
+/home/oleg/prog/z_llvm-inbox194d-artifact-store-synthetic
+```
+
+Write all new records and isolated caches only beneath
+`tmp/inbox205b_o2_authority_dormant/validation/`. Freeze all identities and
+commands. Run format and compile-only, then exactly one focused suite with
+the same isolated
+`ZLLVM_ARTIFACT_STORE=/home/oleg/prog/z_llvm-inbox194d-artifact-store-synthetic`
+environment. Only after suite success, run the strengthened source guard
+exactly once.
+
+Either blocking failure retains all new state and stops without retry,
+diagnosis, repair, cleanup, alternate suite, evidence edit, or commit. The
+guard must prove unchanged production surfaces and build; test-only dormant
+validator, receipt-binding, replacement, and mismatch-helper reachability;
+exactly limited `default_store` references; lstat-only real-store treatment;
+optional-mirror absence; and all prior retained identities.
+
+Successful cleanup may remove only fresh INBOX-205B roots created by that
+successful lifecycle. Complete success updates evidence with both failures
+and the correction provenance, commits only the three authorized files,
+leaves main and control clean, and stops before real candidate validation,
+activation, v3, compatibility, project compiler gates, benchmarks, ratchet
+movement, or credit.
+
+Control remains exact at `9c55bda3...`; ratchet remains 131. All worktree,
+stash, watcher, store, control, candidate, and protected-path identities
+remain exact.
+
+## INBOX-205A retained-state dormant validator remediation — COMPLIANT FAILED REMEDIATION; INCORPORATED INTO INBOX-205B
 
 INBOX-205 is accepted only as a compliant failed attempt; technical
 acceptance is withheld. Formatting and compile-only checks passed, the sole
