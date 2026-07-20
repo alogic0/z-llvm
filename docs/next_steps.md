@@ -24,6 +24,58 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-206M anchored local-settings ignore remediation — AUTHORIZED
+
+Accept INBOX-206L as a compliant one-preparation/one-diagnostic execution
+with an observable failure at `P0003`. It receives no completed-diagnostic,
+Phase-3, validation, ratchet, or downstream credit.
+
+Preserve every I/J/K/L byte. Freeze L exactly:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206l
+file_count=62
+inventory_sha256=71789c4e0adc59206f74e8a396c32fc7fc8a3bc2f4c8d182bd4ca38391794ab8
+ledger_sha256=a307fd0c6636c57f46efd43a4850f977d2135ca704f106b8852fa55521301ff5
+prepare_status=0
+diagnostic_status=1
+checkpoint=P0003 test -z ?? .claude/settings.local.json
+```
+
+The failure is an ignore-environment mismatch: ordinary Git status honors
+the user-wide `**/.claude/settings.local.json` ignore, while the exact
+hermetic L environment disables user configuration and reports that one
+untracked path.
+
+Do not read, hash, modify, stage, relocate, remove, or otherwise touch
+`.claude/settings.local.json`. Preserve all other protected state. Require
+main at the operating commit with no tracked/staged change and ordinary
+status clean. The pre-edit exact-L-hermetic status may contain only:
+
+```text
+?? .claude/settings.local.json
+```
+
+Edit only root `.gitignore`, adding exactly one literal anchored line with
+no hidden character:
+
+```gitignore
+/.claude/settings.local.json
+```
+
+Do not alter another line. Before commit, require the only tracked change
+to be `.gitignore`, the diff to be exactly that one added line, ordinary
+status to have no other entry, and exact-L-hermetic status to be empty.
+Commit only `.gitignore`.
+
+After commit, require both ordinary and exact-L-hermetic status empty and
+control unchanged/main/clean/no-remote. Stop and report the commit, parent,
+tree, one-line diff, and both clean results.
+
+No continuation, diagnostic, harness, Zig/project command, evidence edit,
+worktree operation, artifact/control/store/source change, validation,
+ratchet, wiring, cleanup, credit, or downstream work is authorized.
+
 ## INBOX-206L corrected preparation algorithms and observable diagnostic — AUTHORIZED
 
 Accept INBOX-206K only as a compliant one-shot preparation failure. It
