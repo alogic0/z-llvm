@@ -24,7 +24,51 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-204 inert protected-control candidate generation-1 metadata commit — AUTHORIZED
+## INBOX-204A explicit closed-umask resumption of unchanged inert control candidate commit — AUTHORIZED
+
+INBOX-204 is accepted only as a compliant pre-mutation stop. Ambient umask
+was `0002`; no `authority` path, control change, or commit was created.
+
+Preserve every INBOX-204 target, byte, schema, value, receipt ID, ordering,
+construction sequence, check, authority state, prohibition, and stop.
+
+Record ambient `0002` as an observation. Before any mutation, enter one
+closed creation shell, execute `umask 0022`, and immediately require that
+shell to report exactly `0022`.
+
+Within that same shell only:
+
+1. create the exact authorized parent directories;
+2. copy/finalize generation, lineage, and the exact
+   `generation-00000001-payload-copy.tsv` receipt;
+3. hash those finalized three files;
+4. construct `candidate.tsv` from their exact hashes.
+
+Require every created directory mode `0755` and every regular file mode
+`0644`. Any mismatch stops; do not chmod, chown, recreate, replace, or use
+another shell to repair it.
+
+The four authorized files, exact receipt ID
+`zllvm-generation-00000001-payload-copy`, accepted manifest bytes, schemas,
+cross-hashes, candidate state, canonical/read-back/policy/tree checks, and
+source-authority/destination-non-authority boundary remain unchanged from
+INBOX-204. Create no fifth file or live/validation/activation/terminal/
+fallback metadata.
+
+Only after every check passes may Git staging and the four-file control commit
+occur in the normal environment. No content creation or repair may occur
+there. No main evidence commit is authorized.
+
+All project/Zig, main/source/tool/manifest/contract/pin/build/script,
+activation, validation, compatibility, v3, payload-publication, cleanup,
+ratchet, and credit prohibitions remain unchanged.
+
+Failure retains exact partial control state and stops without retry, repair,
+cleanup, alternate action, or commit. Success commits only the same four
+control files, leaves both repositories clean, and stops for candidate
+review.
+
+## INBOX-204 inert protected-control candidate generation-1 metadata commit — COMPLIANT PRE-MUTATION STOP; INCORPORATED INTO INBOX-204A
 
 INBOX-203A commit
 `5ba4d60c5096c172b72bbd740cf22e7d1e5fed3b` and the corrected
