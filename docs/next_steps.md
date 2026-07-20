@@ -24,7 +24,53 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-198 documentation-only v3 operational-root and private test-seam reconciliation — AUTHORIZED
+## INBOX-199 documentation-only authoritative INBOX-197 reconciliation amendment — AUTHORIZED
+
+INBOX-198 commit
+`3d2a747d16657624bbb0d6309b69366efb126972` is accepted as a compliant
+reconciliation evidence stop. Its absent external operational root,
+prohibited old root, protected source paths, 19/27 mappings, exact-target
+roles, private shared-driver direction, and v2 blocker are accepted. Final CLI
+design and implementation remain withheld.
+
+Amend only
+`docs/evidence/inbox197_v3_artifact_cli_surface_design.md`. Preserve the
+existing INBOX-197 document byte-for-byte as the prefix and append an
+authoritative INBOX-199 reconciliation.
+
+Reconcile all four CLI contracts with exact operational root
+`/home/oleg/prog/z_llvm-baseline-validation-v3`, the prohibited absent old
+repository-local root, the two exact protected future source children, all 19
+compatibility targets, all 27 operational families, and exact-target guards.
+
+Compile production runtime tracked-control access to exactly
+`docs/evidence/artifact_manifest_v1.tsv`. The other nine named main-worktree
+files are static-review inputs only and must not appear in `AuthorityConfig` or
+production read capabilities.
+
+Keep production and synthetic constructors separate and private. Synthetic
+authority is never selectable through production. Both execute one shared
+post-configuration command driver. Replace cross-mode byte-equality with a
+field-aware oracle: common semantic/error fields satisfy canonical
+expectations; authority/registration/path fields match the selected owned
+configuration.
+
+Freeze owned configuration/driver lifetimes, visibility, explicit errors, and
+single-owner cleanup. Define build/install descendants as producer-owned and
+non-discoverable; only enumerated final regular files may become publisher
+sources.
+
+Restate or explicitly map every argv, I/O, error, authority, mutation,
+rollback, receipt, generation, and evidence-DAG rule under the new path model.
+Preserve all v2, missing-surface, no-write verifier, and executable-identity
+blockers.
+
+Static/read-only checks only. Commit only the amended design and stop for
+final design review. No implementation, path/worktree operation, project or
+artifact execution, store/manifest/contract mutation, compatibility, v3,
+cleanup, wiring, performance, ratchet movement, or credit is authorized.
+
+## INBOX-198 documentation-only v3 operational-root and private test-seam reconciliation — EVIDENCE ACCEPTED
 
 INBOX-197 commit
 `6ee7bda862ed1f43fcdb96f7d23b99870cd790e7` is accepted as a
