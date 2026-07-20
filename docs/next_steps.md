@@ -24,6 +24,74 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-196 documentation-only v3 durable-authority amendment — AUTHORIZED
+
+INBOX-195C commit `a22f027081cf491969c7448ad80dae4d6e54c67e`
+and the authoritative calls-input publication are fully accepted. Accepted
+identities include manifest `61b7426b...`, real-store inventory/file ledger
+`3234fb50...` / `a06c48e1...`, INBOX-195C 75-record ledger `e80b6a5f...`,
+tool `94dfc1fc...`, audit `5a7e019e...`, contract `448482a9...`, pins
+`1ef9803c...`, watcher `b64131cf...`, stash `7985c6d0...`, 43 protected
+worktrees, absent v3, and ratchet 131.
+
+Amend only
+`docs/evidence/inbox187_o2_compiler_rt_v1_baseline_validation_execution_contract.md`.
+Append an INBOX-196 durability-authority section while preserving all
+exhausted-v1/v2 evidence and every existing future-v3 source identity,
+namespace, canonical/coverage, producer/consumer, observation, gate,
+comparison, counter, status, and acceptance semantic.
+
+The tracked/live and authoritative generation manifests are the sole artifact
+authority. No existing `tmp/` path remains authoritative. Resolve the store
+only through an exact absolute `ZLLVM_ARTIFACT_STORE` or the accepted main-Git-
+common-directory default.
+
+Enumerate every future-v3 input, bundle, parent/root, canonical, coverage,
+preflight, driver, record, build, artifact, accepted subset, manifest,
+comparison, channel, and finalizer path. Each path must state logical ID,
+authority, retention class, access mode, producer, consumers, compatibility
+status, worktree intersection, and later permission requirement. No
+non-source path may remain implicitly authoritative.
+
+`$ROOT/canonical/source` and `$ROOT/coverage/source` remain protected Git
+control paths outside all artifact rows, publishers, resolvers, and
+compatibility operations. Their creation and every later modification or
+removal require separate explicit authorization naming each exact path.
+
+Existing equal regular compatibility inputs are usable only after manifest
+resolution and exact byte/mode verification. Define fail-closed atomic
+no-overwrite behavior for mismatches, symlinks, directories, unsafe traversal,
+ambiguity, absent authority, registration changes, and protected-worktree
+intersection. Durability commands are explicit pre/post wrappers and may not
+alter producer environments, outputs, statuses, counters, channel
+exclusivity, comparisons, or equality rules.
+
+Map the 19 current active logical references and two snapshots. Future output
+families from accepted audit section 12 are definitions only and remain
+`future-required`; create no row or path and grant no publication authority.
+Define a finite acyclic producer/publication DAG. Producer groups exclude
+their own publication commands, receipts, logs, and verification results.
+Supply a non-recursive terminal-evidence rule; failure to close the graph
+withholds contract acceptance.
+
+Use only commands and CLI surfaces actually present in frozen tool
+`94dfc1fc...`. Any missing resolver, compatibility materializer,
+future-output publisher, or verifier capability is a structural blocker to
+record exactly; do not invent syntax or implement it. Every later store
+mutation or compatibility write requires fresh capacity, frozen registration,
+no-follow/path-safety checks, path-specific authorization, and a later
+directive.
+
+Perform static/read-only contract checks only: complete mapping; no executable
+v1/v2 path; exact source-worktree exclusions; single authority; finite DAG;
+present CLI surface; and Bash syntax for amended streams. Commit only the
+contract and stop for re-review.
+
+No project code or artifact-tool execution, store/manifest/path/pin/source/tool
+mutation, compatibility creation, worktree operation, v3 execution, cleanup,
+wiring, performance, Tier work, mandatory-checkpoint action, ratchet movement,
+or credit is authorized.
+
 ## INBOX-195C exact-HEAD binding and read-only store reverification — AUTHORIZED
 
 INBOX-195B at actual operating HEAD
