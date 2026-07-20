@@ -24,7 +24,64 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-202I sanitized Git-clean predicate correction and unchanged remediation resumption — AUTHORIZED
+## INBOX-203 documentation-only exact authority-transition composite design — AUTHORIZED
+
+INBOX-202I and commit
+`e35cfaa6505e26f3c13a2a54a339f247817febdd` are accepted. The exact
+seven-file G root and 25-role split-root canonical record set complete the
+non-destructive copy-and-verify migration. The source store
+`/home/oleg/prog/z_llvm-artifacts` remains the sole authority; the verified
+local-state payload destination remains non-authoritative. Ratchet 131 is
+unchanged.
+
+Create and commit only:
+
+```text
+docs/evidence/inbox203_local_state_authority_transition_design.md
+```
+
+This is a documentation-only design checkpoint. Using finite tracked-file
+lists, exact existing control paths, read-only Git/path checks, and finite
+textual search only:
+
+1. Inventory every active/current authority declaration, default,
+   `ZLLVM_ARTIFACT_STORE` behavior, resolver, manifest, contract, tool,
+   validation-v3 consumer, and hard-coded old-authority path. Classify
+   immutable historical evidence separately; do not rewrite it.
+2. Freeze exact prospective protected-control paths beneath
+   `authority/zllvm/v1/` for candidate/live declaration, generation
+   manifest, lineage, payload-copy/publication receipt, validation receipt,
+   activation receipt, and terminal receipt, with exact schemas and
+   deterministic identities.
+3. Resolve generation-manifest semantic authority versus any
+   non-authoritative payload-store mirror. Keep publication/terminal
+   receipts outside recursive authority chains.
+4. Specify the acyclic sequence: control candidate commit; dormant main
+   implementation referencing it; separate validation/acceptance; control
+   activation commit; main activation commit referencing it; optional later
+   terminal evidence. No circular or self-referential commit binding.
+5. Define every intermediate state. Old main uses only old authority;
+   candidate metadata is never active; active main requires accepted exact
+   metadata and payload bytes; missing/mismatched/partial/stale state fails
+   closed without silent fallback.
+6. Name every exact later main/control file and freeze a validation matrix
+   for baseline, candidate, dormant, validated, activation intermediates,
+   fully active, override, mismatch/failure, and rollback states. Rollback
+   uses new commits/configuration only and preserves both stores.
+
+Respect the control repository's small-metadata-only policy. Preserve both
+stores, all manifests/tools/contracts/control bytes, all retained evidence
+roots, protected local configuration, pins, stash, ratchet 131, both absent
+v3 roots, and all 43+1 protected worktrees.
+
+Do not inspect protected `.claude` or global-ignore paths. Do not commit in
+control; edit source/tool/manifest/contract/pin/script/build files; switch
+authority; create compatibility; execute validation or project/Zig
+commands; publish; wire; benchmark; clean up; move the ratchet; or claim
+credit. Any ambiguity or boundary mismatch stops without fix-forward.
+Success commits only the INBOX-203 evidence document and stops for review.
+
+## INBOX-202I sanitized Git-clean predicate correction and unchanged remediation resumption — ACCEPTED; INCORPORATED INTO INBOX-203
 
 INBOX-202H is accepted as a compliant sanitized-cleanliness preflight stop at
 operating HEAD `a3de1a90...`; remediation remains incomplete. Its shell exited
