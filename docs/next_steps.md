@@ -24,7 +24,115 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AF mode-controlled analyzer/state-authority design freeze — AUTHORIZED
+## INBOX-206AG serializer-separated mode-controlled design freeze — AUTHORIZED
+
+Accept INBOX-206AF only as a compliant fail-closed precreation failure. It
+receives no design, package, execution, ratchet, credit, or downstream
+acceptance. Preserve AF absent and never rerun its ambiguous identity check.
+
+The retained AF check passed AE directory/type/count/execute/mode,
+`FINAL_COMPLETE` absence, and top-level path predicates. It then compared
+the top-level filename/type/mode/size serialization to the root-inclusive
+recursive inventory hash and stopped without creating AF. Exact
+recomputation establishes:
+
+```text
+ae_paths_top_level=03c5376ce907439d79ee5613905ca90c7d939c208443811375c65a9103a88da5
+ae_inventory_top_level=627019e8e7c9c692eb83d651b4e30c76c1aedbeeb7371579cfcdc979471b9909
+ae_inventory_root_recursive=600590ec4cc35fb1def5ceff287834e35ff7d346e935c1509b11fdb1298cff44
+ae_ledger_top_level_files=2d1ddc788260841c8335546f9362df7d21323b7b14df27d46277e7def616a86c
+```
+
+Create one non-merge operating commit changing only this file. The Watcher
+dispatch binds its exact commit, parent, tree, changed path, and final
+ignored-inbox SHA-256.
+
+Preserve absent AF and AD; preserve AE, AC, AB, Y, every earlier retained
+root/record, and every protected identity exactly. Create only fresh absent,
+non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ag
+```
+
+Before any combined preflight or AG creation, run four independently
+blocking read-only AE identity checks. Freeze these exact command bytes,
+labels, field orders, separators, depth scopes, root inclusion, and results:
+
+```sh
+# ae_paths_top_level
+find -P "$AE" -mindepth 1 -maxdepth 1 -printf '%P\n' |
+  LC_ALL=C sort | sha256sum | awk '{print $1}'
+# 03c5376ce907439d79ee5613905ca90c7d939c208443811375c65a9103a88da5
+
+# ae_inventory_top_level
+find -P "$AE" -mindepth 1 -maxdepth 1 \
+  -printf '%f\t%y\t%m\t%s\n' |
+  LC_ALL=C sort | sha256sum | awk '{print $1}'
+# 627019e8e7c9c692eb83d651b4e30c76c1aedbeeb7371579cfcdc979471b9909
+
+# ae_inventory_root_recursive
+find -P "$AE" -printf '%y\t%m\t%s\t%P\t%l\n' |
+  LC_ALL=C sort | sha256sum | awk '{print $1}'
+# 600590ec4cc35fb1def5ceff287834e35ff7d346e935c1509b11fdb1298cff44
+
+# ae_ledger_top_level_files
+find -P "$AE" -type f -printf '%P\0' |
+  LC_ALL=C sort -z |
+  while IFS= read -r -d '' rel; do
+    sha=$(sha256sum "$AE/$rel" | awk '{print $1}')
+    bytes=$(stat -c '%s' "$AE/$rel")
+    mode=$(stat -c '%a' "$AE/$rel")
+    printf '%s\t%s\t%s\t%s\n' "$sha" "$bytes" "$mode" "$rel"
+  done |
+  sha256sum | awk '{print $1}'
+# 2d1ddc788260841c8335546f9362df7d21323b7b14df27d46277e7def616a86c
+```
+
+The ledger label is frozen for continuity; its command is authoritative and
+selects every regular file under the exact single-level AE root. Also verify
+the three exact per-file hashes:
+
+```text
+ac_defect_ledger.tsv=99b6a87f22bd40233d0623eae4db7a1186bf4fc3915e22f31b81a4e0ff7ab2c
+ac_identity_serializers.sh.txt=3cee95d61fadb61d62cb0781d806b8bd07b7b5cb56ed72130119a0b9044c135f
+authority_boundary.tsv=63d9192e1a366b395aad53d6db5aa9f64b51f878dadd35ec08fb4162c97791d6
+```
+
+No identity, label, serializer, or result may substitute for another.
+Any isolated mismatch leaves AG absent and stops without a combined
+preflight, inspection, diagnosis, repair, regeneration, retry, cleanup, or
+construction.
+
+If and only if all isolated checks pass, run the combined precreation gate
+and carry forward the accepted AF construction unchanged:
+
+- reproduce `ac_defect_ledger.tsv` and
+  `ac_identity_serializers.sh.txt` byte-for-byte from AE;
+- create `authority_boundary.tsv` with exact AG operating identities;
+- for each newly created AG batch, use exactly one explicit-name
+  pre-first-gate `chmod 0644` over only that batch's new regular files;
+- use no glob, recursion, directory, prior-root path, symlink, already-gated
+  file, post-gate mode change, or post-failure repair;
+- require raw equality, exact authority validation, mode `0644`, and absent
+  completion markers before Stage 1 passes; and
+- only after Stage 1 passes, continue under the complete previously accepted
+  inert seven-process, pinned-Zig-AST, every-call-resolution, canonical
+  edge/closure, 68-field, descriptor-safe, wrapper, atomic, mode, and
+  truthful-finalization design scope.
+
+Any creation, mode-finalization, or gate failure retains AG and stops
+without inspection, diagnosis, repair, regeneration, retry, cleanup, mode
+change, or later stage. Success stops at the inert evidence/design freeze.
+
+No harness copy, source edit, analyzer/capture/comparison implementation,
+build/install, invocation, cache creation, registered-worktree-directory
+access, broad discovery, `.claude/settings.local.json` access, Zig/project
+command, validator, validation, evidence edit outside AG,
+execution-package credit, receipt, activation, compatibility, validation-v3,
+ratchet, cleanup, wiring, credit, or downstream action is authorized.
+
+## INBOX-206AF mode-controlled analyzer/state-authority design freeze — COMPLIANT PRECREATION FAILURE; NO CREDIT
 
 Accept INBOX-206AE only as a compliant fail-closed Design-Stage-1 draft.
 It receives no Stage-1, design, package, execution, ratchet, credit, or
