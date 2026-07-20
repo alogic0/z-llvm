@@ -24,7 +24,79 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206R fresh fail-closed construction correction — AUTHORIZED
+## INBOX-206S fixed-literal inert construction freeze — AUTHORIZED
+
+Accept INBOX-206R only as a compliant fail-closed construction failure. It
+receives no construction, closure, terminal, diagnostic, Phase-3,
+validation, ratchet, credit, or downstream acceptance. Never rerun, edit,
+complete, or repair R. Preserve its exact partial state:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206r
+file_count=62
+inventory_sha256=cd7886cf70c5d2da5a314bb448f8981b59b254431583d19c118e28535a47cab7
+ledger_sha256=13a0ddcbbb51101c4786c5bc2b8c4acf7c97de186feeb9be98890810643a83c9
+top_level_paths_sha256=e3412ff5d5c137b7165b44ba4cca0ef7b98ed9337bbe79ec961a34ba6fb1bccf
+execute_bits=0
+extra_partial_path=static_closure.body.txt.tmp
+terminal_snapshots=absent
+```
+
+Preserve I–R and every protected identity exactly. Require the exact
+operating `HEAD` and direct parent named in the Watcher dispatch. Require
+ordinary and exact-L-hermetic main status empty and control
+exact/main/clean/no-remote.
+
+After proving it fresh, absent, and non-symlink, create records only beneath:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206s
+```
+
+Before S creation, permit exactly one sentinel-preserved,
+status-propagating administrative `git worktree list --porcelain` through
+the accepted wrapper. Require count `43`, exact path/topology/non-main
+hashes `f31d8542...` / `6c868e3b...` / `ebc30a37...`, and bidirectional
+lexical disjointness of S and control from every registration. Failure
+consumes the listing and stops before S creation. Never enter, stat, hash,
+or inspect a registered-worktree directory; no other worktree command is
+authorized.
+
+Derive S only from Q's frozen 61 nonterminal paths. Freeze the preclosure
+count `61` and eventual-final count `64` from the outset; all three terminal
+snapshot paths remain absent in S. Reset only S's closure, terminal-stage,
+and future-diagnostic mutable records. Permit only the S path, exact new
+operating-HEAD/direct-parent bindings, the closed count/schema corrections,
+and explicitly enumerated Q-to-S differences.
+
+Every active diagnostic, closure, and terminal body must be written as
+fixed, reviewed literal bytes. Use quoted literal here-documents. Do not
+use AWK, Perl, Python, Zig, `sed`, or another transformer to generate,
+rewrite, or mutate executable shell/program source. `sed` is permitted
+only to produce an inert temporary comparison stream for reverse-equivalence
+checking and may not write or replace an active body.
+
+Write the terminal-generation body through a quoted literal here-document
+with an explicit nine-key array order and
+`printf '%s\t%s\n'`. Freeze the exact key order and two-field schema.
+Enumerate every Q-to-S difference explicitly and freeze the empty
+reverse-equivalence diff/status.
+
+Every command after S creation is independently blocking. Any nonzero
+result stops immediately with no inspection, diagnosis, rewriting,
+identity regeneration, retry, or later command. On complete construction
+success, freeze S inventory, ledger, top-level paths, classifications,
+schemas, identities, allowlists, and inert commands, then stop. Do not
+invoke closure or terminal generation in S even after success. A later
+separately reviewed directive may authorize the frozen stages.
+
+No diagnostic/preparation invocation, project/Zig command, compilation,
+test, validator, repository/control/source/evidence/protected-file/store/
+artifact change, registered-directory access, validation, ratchet, wiring,
+cleanup, credit, or downstream work is authorized. Stop main and control
+clean.
+
+## INBOX-206R fresh fail-closed construction correction — COMPLIANT FAILURE; CLOSED
 
 INBOX-206Q is not accepted. Its retained source and logs prove that an
 initial construction command returned nonzero and was followed by diagnosis,
