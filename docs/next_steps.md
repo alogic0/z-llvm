@@ -24,7 +24,64 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206D private four-root admission remediation and synthetic proof — AUTHORIZED
+## INBOX-206E corrected one-shot static guard — AUTHORIZED
+
+Accept INBOX-206D only as a compliant final-guard failure. Its sole
+format/check and compile-only gates passed, and its sole focused synthetic
+suite passed all `9/9` tests. The retained implementation and contract remain
+technically unaccepted because the sole final static guard returned status
+`1` with empty stdout/stderr.
+
+Preserve every existing INBOX-206D record and current byte of:
+
+```text
+tools/zllvm_artifact_store.zig
+docs/zllvm_artifact_retention_contract.md
+```
+
+Do not rerun formatting, compilation, tests, any prior preflight/guard,
+validator, state guard, Zig, project code, or ratchet recount outside the
+corrected static guard. Preserve all A/B records and caches, 43+1 repository
+identities, control, stash, watcher, pins, stores, paths, modes, candidate
+state, source authority, and ratchet `131`. Real-candidate validation remains
+withheld.
+
+After proving it absent and non-symlink, create only:
+
+```text
+/tmp/zllvm-inbox206d-root-role-remediation-validation/continuations/inbox206e
+```
+
+Derive a complete corrected guard from the frozen D guard and freeze its
+D-to-E diff. Only these changes are permitted:
+
+1. mechanical substitution of the new operating `HEAD`/parent;
+2. mechanical substitution of `RECORDS` and derived paths to the E
+   continuation;
+3. exact declaration checks for one frozen `default_store` and one private
+   `dormant_real_source_root`, plus exactly two total
+   `"/home/oleg/prog/z_llvm-artifacts";` literals; and
+4. exact multiline-aware literal checks, or narrowly bounded
+   whitespace-normalized extractions, for the two retained wrapped contract
+   clauses about `control, authority, payload, then source` and no generic
+   main-descendant exception.
+
+No broad semantic regex is permitted. Every other substantive D assertion and
+its order stays byte-equivalent. Freeze and invoke the corrected full guard
+exactly once, retaining command, environment, diff, stdout, stderr, status,
+and derived records beneath E. Do not trial fragments.
+
+Failure retains everything and stops without diagnosis, repair, retry,
+cleanup, evidence edit, staging, or commit. Status `0` alone authorizes an
+INBOX-206D/206E append to
+`docs/evidence/zllvm_artifact_authority_dormant_v1.md` and one commit
+containing exactly the retained tool, retained contract, and evidence append.
+
+Stop clean before any real candidate harness/test/validation, state guard,
+receipt, activation, compatibility, v3, compiler work, performance, cleanup,
+ratchet movement, or credit.
+
+## INBOX-206D private four-root admission remediation and synthetic proof — COMPLIANT FINAL-GUARD FAILURE; INCORPORATED INTO INBOX-206E
 
 Accept INBOX-206C and commit `db67fb147b6ebf9c8e19e082aa19e0cd7204d0f8`
 in full. Its four-role diagnosis controls. Real-candidate validation remains
