@@ -24,7 +24,110 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AD exact analyzer and state-authority remediation design — AUTHORIZED
+## INBOX-206AE corrected analyzer/state-authority design freeze — AUTHORIZED
+
+Accept INBOX-206AD only as a compliant fail-closed precreation failure. It
+receives no design, package, execution, ratchet, credit, or downstream
+acceptance. Preserve its destination as absent and never rerun its failed
+preflight.
+
+Static review of the retained command transcript establishes the exact
+failure. The authoritative AC path/type/mode/bytes inventory uses the
+top-level serialization `%f\t%y\t%m\t%s\n` and still hashes to
+`48402e7d2446d38e9cddb6e6a3a227eca3531efcc0184fa2b11029379ecc2ad8`.
+The failed AD preflight instead used the root-inclusive all-depth
+serialization `%y\t%m\t%s\t%P\t%l\n`, which hashes to
+`1485ec6afc2427833c641b73db2ea38ffe403a2a34223d254452653d4471b8be`.
+All earlier checks passed, no `PRECREATION_OK` marker was emitted, no AD
+root was created, and the Worker issued no later construction command.
+
+Create one non-merge operating commit changing only this file. The Watcher
+dispatch binds its exact commit, parent, tree, changed path, and final
+ignored-inbox SHA-256.
+
+Preserve AD absent and preserve AC, AB, Y, every earlier retained root and
+record, and every protected identity exactly. Create only fresh absent,
+non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206ae
+```
+
+Before any combined preflight or AE creation, run three independently
+blocking read-only AC identity checks. Their exact authoritative command
+bytes and expected results are:
+
+```sh
+find -P "$AC" -mindepth 1 -maxdepth 1 -printf '%P\n' |
+  LC_ALL=C sort | sha256sum | awk '{print $1}'
+# 0eb02c6880d3815af72ef3b0fcbaf687aa8c8986a26b8876f573bbea3fbd9b9f
+
+find -P "$AC" -mindepth 1 -maxdepth 1 \
+  -printf '%f\t%y\t%m\t%s\n' |
+  LC_ALL=C sort | sha256sum | awk '{print $1}'
+# 48402e7d2446d38e9cddb6e6a3a227eca3531efcc0184fa2b11029379ecc2ad8
+
+find -P "$AC" -type f -printf '%P\0' |
+  LC_ALL=C sort -z |
+  while IFS= read -r -d '' rel; do
+    sha=$(sha256sum "$AC/$rel" | awk '{print $1}')
+    bytes=$(stat -c '%s' "$AC/$rel")
+    mode=$(stat -c '%a' "$AC/$rel")
+    printf '%s\t%s\t%s\t%s\n' "$sha" "$bytes" "$mode" "$rel"
+  done |
+  sha256sum | awk '{print $1}'
+# 0147a51ec3f8ea1b1d85203602cc19fcfe0a77a5214b8d6798049303996d1664
+```
+
+Freeze these exact commands, field orders, separators, depth scopes, and
+self-inclusion rules in AE. Do not substitute an AB/Y root-inclusive
+serializer for any AC identity. Any isolated mismatch stops with AE absent;
+do not run the combined preflight, inspect, diagnose, repair, regenerate,
+retry, clean up, or proceed.
+
+If and only if all three isolated checks pass, run the combined precreation
+gate and construct in AE the exact inert evidence/design package previously
+authorized for AD:
+
+- the complete AC defect and authority ledger;
+- pinned Zig `0.16.0` AST analyzer and separately reviewed future
+  `zig build install` materialization design, with syntax never treated as
+  automatic semantic resolution;
+- explicit reviewed resolution for every direct, method, builtin, aliased,
+  indirect, function-value, and comptime-selected call;
+- canonical direct-edge and transitive-closure schemas and independent raw
+  authority comparisons, with no automatic `std.*`, base-name, builtin, or
+  effect allowance;
+- exactly seven future processes: six exact read-only control Git commands
+  plus one metadata-only
+  `/usr/bin/git -C <main-root> worktree list --porcelain`, all with closed
+  argv/environment/status/output contracts and no other reachable process;
+- the complete 68-field actual-probe authority, AA-to-pre,
+  execution-pre-to-post, absence, cache, and failure-attribution matrix;
+- traversal-safe validation before access, descriptor-relative no-follow
+  verified bounded reads, actual named-absence probes, and distinct exact
+  ordinary and hermetic status probes;
+- complete wrapper stdout/stderr/status, one-shot sequencing, temporary
+  output, atomic replacement, completion marker, and final-sync contracts;
+  and
+- only regular non-executable mode-`0644` AE files, with no pass/completion
+  claim before every independent gate succeeds and the truthful completion
+  record written last.
+
+Every prior AD evidence/design requirement remains binding except the
+corrected destination and serializer boundary above. Success stops at the
+inert evidence/design freeze. Any construction failure retains fresh AE and
+stops without inspection, diagnosis, repair, regeneration, retry, cleanup,
+or later stage.
+
+No harness copy, source edit, analyzer/capture/comparison implementation,
+build/install, invocation, cache creation, worktree-directory access, broad
+discovery, `.claude/settings.local.json` access, Zig/project command,
+validator, validation, evidence edit outside AE, execution-package credit,
+receipt, activation, compatibility, validation-v3, ratchet, cleanup, wiring,
+credit, or downstream action is authorized.
+
+## INBOX-206AD exact analyzer and state-authority remediation design — COMPLIANT PRECREATION FAILURE; NO CREDIT
 
 Accept INBOX-206AC only as a compliant fail-closed inert draft. It receives
 no Stage-2 or Stage-3 semantic acceptance, complete-package identity,
