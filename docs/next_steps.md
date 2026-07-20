@@ -24,7 +24,73 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-205 dormant private authority reader/validator with synthetic-only testing — AUTHORIZED
+## INBOX-205A retained-state dormant validator remediation — AUTHORIZED
+
+INBOX-205 is accepted only as a compliant failed attempt; technical
+acceptance is withheld. Formatting and compile-only checks passed, the sole
+focused suite failed status 1, the source guard correctly did not run, and
+no retry, repair, cleanup, alternate suite, or commit occurred. Preserve
+byte-for-byte its dirty implementation, retained
+`/tmp/zllvm-inbox205-authority-dormant-synthetic` root, and every record
+beneath `tmp/inbox205_o2_authority_dormant/validation/`.
+
+Continue from the dirty composite and modify/commit exactly:
+
+```text
+tools/zllvm_artifact_store.zig
+docs/zllvm_artifact_retention_contract.md
+docs/evidence/zllvm_artifact_authority_dormant_v1.md
+```
+
+`build.zig` remains unchanged and the optional manifest mirror remains
+absent.
+
+In the test-private replacement helper only, ignore only
+`error.FileNotFound` from its replacement-delete step; propagate every other
+deletion error and keep explicit deletion strict. Add private owned expected
+values and exact comparisons for the receipt's source inventory, source file
+ledger, source destination ledger, copy evidence path, and copy evidence
+SHA-256 fields. Add one independently attributable synthetic mismatch
+negative per field.
+
+The additions remain synthetic, private, and dormant. They do not read real
+control or either real store, add production configuration or environment
+dependence, or change production authority behavior, CLI, selectors, APIs,
+commands, callsites, or reachability.
+
+Require initially absent, normalized, registration-disjoint fresh roots:
+
+```text
+/tmp/zllvm-inbox205a-authority-dormant-synthetic
+/home/oleg/prog/z_llvm-inbox194d-artifact-store-synthetic
+```
+
+Write new records only beneath
+`tmp/inbox205a_o2_authority_dormant/validation/`; never overwrite INBOX-205
+records. Freeze Zig/cache/environment/command identities. Run formatting and
+compile-only checks, then exactly one focused suite with
+`ZLLVM_ARTIFACT_STORE=/home/oleg/prog/z_llvm-inbox194d-artifact-store-synthetic`.
+That setting restores only the established synthetic-suite environment.
+
+Failure retains all new state and stops without retry, diagnosis, repair,
+cleanup, alternate suite, or commit. Only after suite success run the frozen
+source guard exactly once. It must prove the five bindings and tolerant
+helper remain test-private/dormant and preserve every original
+non-reachability and unchanged-production-surface check. Guard failure has
+the same retained-state stop.
+
+Successful test cleanup may remove only fresh INBOX-205A roots created by
+that suite. Complete success updates evidence with original failure and
+remediation provenance, commits only the three authorized files, leaves main
+and control clean, and stops before real candidate validation, activation,
+v3, compatibility, project compiler gates, benchmarks, ratchet movement, or
+credit.
+
+Control remains exact at `9c55bda3...`; ratchet remains 131. All registered
+worktree, stash, watcher, store, control, candidate, protected-path, and
+INBOX-205 authority/prohibition boundaries remain exact.
+
+## INBOX-205 dormant private authority reader/validator with synthetic-only testing — COMPLIANT FAILED STOP; INCORPORATED INTO INBOX-205A
 
 INBOX-204A and inert control candidate commit
 `9c55bda34088e1230b0b91a126d35795a3ac70b4`, tree
