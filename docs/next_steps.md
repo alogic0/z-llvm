@@ -24,78 +24,75 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206Y fresh predicate-order remediation construction — AUTHORIZED
+## INBOX-206Z frozen Y closure/terminal execution — AUTHORIZED
 
-Accept INBOX-206X only as a compliant fail-closed closure failure. Preserve
-W permanently at its exact postfailure state; never rerun, reset, truncate,
-repair, or modify it:
+Accept INBOX-206YA for inert construction credit only. Preserve Y exactly at
+this 61-file identity:
 
 ```text
-root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206w
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206y
 file_count=61
-inventory_sha256=a7d38c061612fce1a990d6a14c81c0eeb0a8570f1df990a3d04845431c545281
-ledger_sha256=4e30d3bc4ba989a99dab5588638118b16cdf688663f24e7ac7f13f8e99f4ec64
+eventual_terminal_file_count=64
+inventory_sha256=e698615e7f8b62fe8adba8941c8f3c461aaa1d4657b5426d051fa24fd52ac559
+ledger_sha256=0094e2cf9a5482803f258939998afa4853e2b87fa8f63d91ebb4bceca41ed19d
 top_level_paths_sha256=f4ee65dbb43e8a63d82b34eed8dde1b2565b471ac3deae4202354fdf3a556569
-closure_status=1
-closure_pass_rows=163
-closure_checkpoint=S0164 identity-sha256:classifications.tsv
-terminal_invocations=0
+predicate_order_sha256=2f8d8c05996d822325515338fca24a44ab9dab221ae985054863823961717b93
+predicate_order_rows=270
+immutable_identity_rows=30
+execute_bits=0
+terminal_snapshots=absent
+frozen_stage_invocations=0
 ```
 
-X receives no closure, terminal, validation, ratchet, credit, or downstream
-acceptance.
+Y receives no closure, terminal, validation, ratchet, credit, or downstream
+acceptance yet.
 
-The INBOX-206Y operating commit must be non-merge, change only
+The INBOX-206Z operating commit must be a non-merge direct child of
+`1b862a9335b5a52edb186b9c9e946f61469181cc`, change only
 `docs/next_steps.md`, pass `git diff --check`, and leave ordinary and
-exact-L-hermetic main status clean. It becomes Y's construction-authority
-HEAD. Preserve I–W and every protected identity exactly.
+exact-L-hermetic main status clean. Bind its full hash after commit. If
+`docs/worker_inbox.md` is updated for dispatch, bind its final SHA-256 and
+make no later edit. Any amend, merge, intervening commit, extra changed path,
+ancestry mismatch, dirty state, inbox mismatch, Y mismatch, or protected
+identity mismatch stops before execution.
 
-Create records only beneath fresh absent non-symlink:
+Run exactly one read-only frozen preflight process. It must create or modify
+no record and must run no worktree listing/check. Require the exact Z
+commit/parent/path/diff/clean identities, exact final inbox hash, exact Y
+61-file freeze, and every protected identity. Any preflight failure stops
+immediately without inspection, diagnosis, repair, retry, cleanup, or later
+action.
 
-```text
-/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206y
-```
+Preflight success alone permits exactly one frozen Y static-closure process
+through its exact recorded environment, argv, and body. That process alone
+may populate only the predeclared closure stdout, stderr, status, checkpoint,
+and results records. A nonzero closure status stops immediately with no
+subsequent command, inspection, diagnosis, repair, postprocessing, retry,
+cleanup, terminal invocation, or later action.
 
-Build Y only from W's immutable source records. Never copy W's populated
-checkpoint, results, status, stdout, or stderr. Keep every Y diagnostic,
-closure, and terminal capture empty and all terminal snapshots absent.
+Closure status `0` alone permits exactly one frozen terminal-generator
+process through its exact recorded environment, argv, and body. That process
+alone may populate only terminal stdout, stderr, and status and atomically
+create `terminal.inventory.tsv`, `terminal.ledger.tsv`, and
+`terminal.freeze.tsv`. Any terminal failure stops immediately with no
+subsequent command or inspection. Terminal success also permits no further
+command: stop immediately for Watcher review of the expected 64-file state.
 
-Keep diagnostic, closure, and terminal active bodies as fixed quoted-literal
-authority. Prove raw normalized byte equality to W outside only authorized Y
-path and new construction/future-direct-child identity substitutions.
+Do not invoke the diagnostic body, preparation, project/Zig code, validator,
+worktree listing/check, validation, ratchet, wiring, cleanup, credit, or
+downstream action. No repository/control/source/store/artifact/protected-state
+change beyond this operating commit is authorized. Do not access any
+registered-worktree directory or `.claude/settings.local.json`.
 
-Correct exactly the static predicate-order contract:
+## INBOX-206YA exact-serialization Y construction continuation — CONSTRUCTION ACCEPTED; CLOSED
 
-- the active predicate-order file is fixed literal authority; no generator
-  may write it;
-- its classification block follows `classifications.tsv` loop order;
-- its identity block follows exact `immutable_identities.tsv` row order,
-  excluding header and `self_exclusion`, with SHA/bytes/mode labels in that
-  order;
-- its fixed prefix and tail remain exact;
-- it contains exactly 270 coherent rows `S0001`–`S0270`;
-- required anchors are `S0158 administrative_worktree.audit.tsv`,
-  `S0161 ancestry.audit.tsv`, `S0164 classifications.tsv`, and fixed tail
-  beginning `S0248 wrapper-identity`.
-
-Independently derive an inert expected order from the frozen body loop
-semantics and metadata, then require raw byte equality with the fixed active
-order. Update and independently verify every affected immutable identity,
-changed-path record, and exact 61/64 construction freeze.
-
-Use independently blocking construction stages. Any failure retains fresh Y
-and stops immediately without inspection, diagnosis, repair, regeneration,
-retry, cleanup, or later stage.
-
-Complete success stops at the inert 61-file boundary. Future execution
-requires a separately reviewed non-merge direct child of Y's construction
-HEAD.
-
-No diagnostic, closure, terminal, preparation, project/Zig execution,
-validator, validation, ratchet, wiring, cleanup, credit, downstream work,
-registered-directory access, or repository/control/source/store/artifact/
-protected-state change beyond the operating-document commit is authorized.
-Stop main and control clean.
+The corrected no-listing preflight passed. All three independently blocking
+construction stages passed. Y stopped at its exact inert 61-file freeze
+before every diagnostic, closure, terminal, preparation, project/Zig,
+validator, validation, ratchet, wiring, cleanup, credit, or downstream
+action. Its independently derived 270-row order raw-compares equal to the
+fixed active order, all 30 immutable identities are exact, all captures are
+empty, and all terminal snapshots are absent.
 
 ## INBOX-206X frozen closure/terminal execution — COMPLIANT CLOSURE FAILURE; CLOSED
 
