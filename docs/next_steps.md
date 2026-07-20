@@ -24,7 +24,63 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-193C remove production fault hook; scoped proof-workspace owner; one logged continuation — AUTHORIZED
+## INBOX-194 dormant materialize-spec CLI and frozen calls-input specification — AUTHORIZED
+
+INBOX-193C is accepted at
+`7303b848ef35ff9547257e2318257c948444656d`: its sole retained suite passed
+6/6, the private scoped proof-workspace owner satisfies the authorized
+success/error lifetime correction, production fault hooks and invalid-handle
+sentinels are absent, only the 193C root was removed, all three earlier roots
+and records remain frozen, the worktree is clean, stash is untouched, and
+the real store/v3 namespace remain absent.
+
+Add the smallest closed production `materialize-spec` command while retaining
+`resolve-authority`. Freeze one exact tracked canonical-source specification
+for only:
+
+- AC285 at `tmp/inbox63_accepted_cohort.ll`;
+- compiler-rt v1 raw input plus `adoption_manifest.tsv` and
+  `adoption_final.sha256`; and
+- the accepted 15-file validation-v3 coverage bundle.
+
+Use the exact identities, logical IDs, group/snapshot mappings, modes, bytes,
+and hashes frozen in INBOX-194 and the accepted INBOX-192 audit. Enumerate
+every member explicitly in bytewise order. Permit no glob, implicit directory
+membership, alternate source, regeneration, or path substitution.
+
+Implement a side-effect-free real-spec planning/verification mode that reads
+only those exact audited source files, proves each is outside every non-main
+registered worktree, verifies every identity, and deterministically emits a
+tracked proposed live-manifest fragment. It must not create or mutate
+`/home/oleg/prog/z_llvm-artifacts`, publish a live row, or create a
+compatibility copy.
+
+Exercise the exact production CLI end to end only against the initially
+absent, worktree-disjoint synthetic root
+`/home/oleg/prog/z_llvm-inbox194-artifact-store-synthetic`, forced through
+`ZLLVM_ARTIFACT_STORE`. Prove capacity, streaming verified object
+publication, deterministic sorted multi-object snapshots, full member and
+read-back proof, proposed rows, registration stability, and idempotent equal
+publication.
+
+Run formatting/static/compile-only checks first, then one frozen full gate
+orchestration exactly once. It may sequence the full unit suite,
+side-effect-free real-spec verification, and production-CLI synthetic phases;
+no component may be retried. Failure retains root/logs/patch and stops
+without repair, cleanup, commit, or substitution. Success may remove only
+the reverified synthetic root, commits only bounded tool/build/spec/proposed
+manifest/template/evidence files, leaves the real store absent, and stops for
+review.
+
+Do not modify any source artifact, registered worktree, retained root, pin,
+contract, compatibility path, validation-v3 namespace, production selector
+path, calls sequence, post-calls checkpoint, or ratchet 131. No real
+publication, broad migration, cleanup integration, validation-v3 execution,
+wiring, performance, Tier work, or credit is authorized. A separate reviewed
+INBOX-195 may later authorize one-shot real publication using the accepted,
+byte-frozen CLI and specification without implementation changes.
+
+## INBOX-193C remove production fault hook; scoped proof-workspace owner; one logged continuation — ACCEPTED at 7303b848
 
 INBOX-193B at unchanged HEAD `46a3f68a` is accepted only as a compliant
 retain-and-stop. Its sole suite returned status 1 with 5/6 tests passing. The
