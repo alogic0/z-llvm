@@ -24,7 +24,180 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AI AH terminal review and process-namespace closure — AUTHORIZED
+## INBOX-206AJ orchestration invocation-instance closure audit — AUTHORIZED
+
+Accept INBOX-206AI as a compliant fail-closed terminal-review companion. Its
+exact AH replay and exact seven-process `candidate_runtime` closure are
+accepted as evidence only. It receives no `REVIEW_COMPLETE`,
+completed-design, implementation, execution, validation, ratchet, credit, or
+downstream acceptance. Preserve all 14 retained AI files permanently and do
+not repair, complete, rerun, copy, normalize, or modify them.
+
+The Worker final report is:
+
+```text
+INBOX-206AI stopped fail-closed at the process-namespace closure gate.
+
+- AI retained files: 14
+- Paths SHA-256: 6e54682bbd57ca6efd97894339195fe2111c8243d749e1a9c0149ab1261e3e3d
+- Inventory SHA-256: de416d0b184bc1f6038b92c8db290dba9d07bf626113e88425c25ddaa114f9eb
+- Ledger SHA-256: 9d950c301ed38877b75adf8ebe50504132b969a4d4ff3c503d4dc71084b9b2c5
+- candidate_runtime: 7 processes, closed
+- execution_orchestration: 30 rows, not closed
+- REVIEW_COMPLETE: absent
+- Ratchet: 131, unchanged
+
+Passed gates included the operating boundary, exact AH structure and identities, both retained ledgers, 22-subject snapshot, corrected 19-row schema, cardinality replay, 68-row process mapping, and AI identity/snapshot replay.
+
+Blocking unresolved items:
+
+1. State-capture executable and invocation identity.
+2. Installed structural-analyzer identity.
+3. Exact raw-comparison paths.
+4. Exact Zig test/filter/cache invocation.
+5. State-comparator identity.
+6. Final-guard identity.
+7. Finalization utility paths and producer/consumer bindings.
+
+AH and all prior roots remain unchanged. Main/control and protected identities were confirmed exact immediately before the failed gate. No implementation, invocation, cache, validation, cleanup, completion marker, or commit followed.
+```
+
+Static review replayed the full retained AI identities above and established
+exactly 14 top-level regular, non-symlink, non-executable mode-`0644` files
+and absent `REVIEW_COMPLETE`. The 10-subject self-excluding snapshot also
+replays exactly:
+
+```text
+paths_sha256=7022fcb0057b525a17ab144b958dc9989a81e0f510c979606db49a25cd474247
+inventory_sha256=42d4c521165fb788d61cbb0bce89ecf8b33ac3173581879291ad41a5de4f54e5
+ledger_sha256=d17dd8259683dcf5f2e97e64040fcad1624a2fe9d85111607abdcc376e1d2422
+```
+
+The retained AI ledger replays exactly. Its tables contain seven unique
+candidate rows, 30 unique orchestration rows comprising 18 `resolved` and 12
+`blocking` rows, seven unique grouped unresolved items, and 68 unique state
+mappings comprising 18 process and 50 non-process rows. All mapped process
+IDs resolve bijectively. Every named installed executable hash is exact.
+
+AI's seven grouped blockers are truthful, but its orchestration audit is not
+complete:
+
+1. EO08 marks ordinary status resolved under a purported closed environment,
+   while its environment omits `HOME`, `XDG_CONFIG_HOME`, and
+   `GIT_CONFIG_NOSYSTEM` and AH defines ordinary status as an inherited
+   environment observation distinct from hermetic status.
+2. EO02–EO19 are all staged `prestate`; EO24 names a poststate capture
+   wrapper, but no distinct poststate child Git callsites are enumerated even
+   though the authority is exact-callsite based and W05 requires an
+   independent poststate capture.
+3. AH state field 19 requires both Git blob identity and named-file blob
+   identity, but EO12 enumerates only `git hash-object` of the worktree file.
+   The index-blob observation is absent, and a distinct HEAD-blob observation
+   must also be classified if required by the 68-field schema.
+
+Create one non-merge operating commit changing only this file. The Watcher
+dispatch binds its exact commit, parent, tree, changed path, and final ignored
+inbox SHA-256.
+
+Preserve AI, AH, and every earlier retained root and record exactly. Preserve
+the seven-process candidate-runtime namespace unchanged. Create only fresh
+absent, non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206aj
+```
+
+Before AJ creation, run independently blocking read-only AI checks. Freeze
+the exact command bytes, labels, serializers, and expected results:
+
+```text
+ai_top_level_file_count=14
+ai_nonfiles=0
+ai_non_mode_0644=0
+ai_execute_bits=0
+ai_review_complete=absent
+ai_paths_sha256=6e54682bbd57ca6efd97894339195fe2111c8243d749e1a9c0149ab1261e3e3d
+ai_inventory_sha256=de416d0b184bc1f6038b92c8db290dba9d07bf626113e88425c25ddaa114f9eb
+ai_ledger_sha256=9d950c301ed38877b75adf8ebe50504132b969a4d4ff3c503d4dc71084b9b2c5
+```
+
+The paths serializer is top-level `%P\n`, bytewise sorted. The inventory
+serializer is top-level `%P\t%y\t%m\t%s\t%l\n`, bytewise sorted. The ledger
+serializer is the NUL-path-sorted loop emitting
+`sha256\tbytes\tmode\trelative_path\n`. Independently replay AI's 10-file
+identity ledger and its exact 10-subject snapshot above. No serializer,
+scope, field order, separator, or result may substitute for another. Any
+mismatch leaves AJ absent and stops without diagnosis, construction, retry,
+cleanup, or later action.
+
+Only after all AI checks pass, construct a fresh inert audit companion that:
+
+1. binds the exact operating authority and all retained AI identities;
+2. enumerates W01–W08 by invocation instance, not executable type;
+3. gives every prestate, analysis, comparison, Zig-test, poststate, guard,
+   and finalization process callsite a distinct ID, exact multiplicity,
+   producer, consumer, executable authority state, argv authority state,
+   environment authority state, input paths, output paths, status rule, and
+   bounded stdout/stderr rule;
+4. enumerates prestate and poststate child callsites separately even when
+   executable and argv shapes are equal;
+5. maps every process-bearing 68-field observation and every wrapper stage
+   bijectively to the lifecycle callsite authority, while explicitly
+   classifying descriptor-relative and in-process observations;
+6. proves no lifecycle callsite is candidate-runtime reachable and preserves
+   the exact seven candidate-runtime rows unchanged;
+7. expands every grouped unresolved item into atomic executable, argv,
+   environment, input path, output path, callsite, multiplicity, producer,
+   and consumer defects, with no unresolved category hiding multiple
+   authorities; and
+8. produces a dependency-ordered implementation, installation,
+   materialization, and execution-package plan without implementing,
+   installing, materializing, or invoking anything.
+
+Ordinary Git status remains an inherited-environment semantic observation,
+distinct from the fully closed hermetic probe. Do not record arbitrary
+environment bytes or secrets. Define a finite reviewed Git-influence policy
+that:
+
+- enumerates every Git-affecting environment name relevant to the exact
+  ordinary command;
+- records only non-sensitive safe values, presence/absence, or reviewed
+  hashes as appropriate;
+- fails on every unreviewed `GIT_*` influence;
+- makes the inherited environment provenance and capture point explicit; and
+- cannot silently reinterpret ordinary status as hermetic.
+
+The watcher identity audit must separately account for:
+
+- the worktree-file hash observation;
+- the index-blob identity observation; and
+- a HEAD-blob identity observation if the 68-field schema requires it.
+
+It must state explicitly whether index and HEAD identities are equal or
+different authorities; one process or observation may not silently stand for
+another.
+
+Use exactly one explicit-name, pre-first-gate `chmod 0644` over only each
+newly created AJ regular-file batch. Use no glob, recursion, directory, prior
+root, already-gated file, post-gate mode change, or post-failure repair.
+
+`AUDIT_COMPLETE` may be the final content creation only after exhaustive,
+independently gated invocation, environment, watcher-identity, mapping,
+atomic-defect, dependency, and identity closure. It means audit enumeration
+closure only. It is not `REVIEW_COMPLETE` and grants no completed-design,
+implementation, build/install, materialization, execution, validation,
+activation, ratchet, credit, or downstream authority. Any missing callsite,
+unsafe environment dependency, hidden grouped defect, schema conflict, or
+identity mismatch retains AJ and stops without `AUDIT_COMPLETE`.
+
+No source/analyzer implementation, build registration, build/install,
+materialization, invocation, cache creation, validator, validation,
+registered-worktree directory access, worktree traversal, broad discovery,
+protected-path change, receipt, activation, compatibility, validation-v3,
+ratchet, cleanup, wiring, credit, or downstream action is authorized. Do not
+access `.claude/settings.local.json`.
+
+## INBOX-206AI AH terminal review and process-namespace closure — COMPLIANT FAIL-CLOSED COMPANION; CANDIDATE EVIDENCE ACCEPTED; NO REVIEW COMPLETION
 
 Accept INBOX-206AH only as a compliant fail-closed design draft and exact
 review candidate. It receives no completed-design, implementation, execution,
