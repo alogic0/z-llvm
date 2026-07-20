@@ -24,7 +24,48 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-202B corrected no-follow copy resume — AUTHORIZED
+## INBOX-202C bounded ratchet-preflight correction and copy resume — AUTHORIZED
+
+INBOX-202B is accepted only as a compliant no-mutation preflight stop at
+unchanged HEAD `ec54a643...`. Its supplemental ratchet-reference check named
+the nonexistent top-level `tests` path and exited before creating
+`/tmp/zllvm-inbox202b-local-state-copy-verify-evidence`. It made no
+destination or retained-state mutation and consumed no payload transaction.
+
+Remove only that supplemental project source/test scan. Do not name, inspect,
+search, hash, or traverse `tests`, `test`, `src/tests`, `src`, or another
+project-code tree for this check.
+
+Verify ratchet 131 solely through exact no-follow type, mode `0664`, 5,188
+bytes, and SHA-256
+`2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11`
+of
+`docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv`, followed
+by one exact pipeline-free, single-file `LC_ALL=C.UTF-8` AWK recount:
+
+```text
+/usr/bin/env -i PATH=/usr/bin:/bin LC_ALL=C.UTF-8 /usr/bin/awk 'NR > 1 { s=$0; while (match(s, /×[0-9]+/)) { token=substr(s,RSTART,RLENGTH); sub(/^×/,"",token); total+=token; s=substr(s,RSTART+RLENGTH) } } END { printf "direct_occurrence_recount=%d\n", total; exit(total == 131 ? 0 : 1) }' /home/oleg/prog/z_llvm/docs/evidence/inbox81_o2_resolution_materialization_bypasses.tsv
+```
+
+Require stdout exactly `direct_occurrence_recount=131`, empty stderr, and
+status `0`. Freeze its exact command/environment/stdout/stderr/status during
+the no-mutation preflight. If all pre-root checks pass, write the
+already-observed values into the new evidence namespace without rerunning the
+check.
+
+Keep the still-absent record root exactly
+`/tmp/zllvm-inbox202b-local-state-copy-verify-evidence`. Preserve all
+INBOX-202B state and requirements below. Complete every pre-root check before
+creating it, then make the still-unspent sole 20-file/9,970,364-byte
+transaction attempt. Any failure remains fail-closed.
+
+Full success commits only
+`docs/evidence/inbox202_local_state_artifact_copy_verify.md`, documenting the
+INBOX-202, INBOX-202A, and INBOX-202B compliant stops plus the successful
+transaction, and stops clean. Source authority and ratchet 131 remain
+unchanged.
+
+## INBOX-202B corrected no-follow copy resume — INCORPORATED INTO INBOX-202C; PAYLOAD TRANSACTION UNCONSUMED
 
 INBOX-202A is accepted only as a compliant post-prefix, pre-payload
 fail-stop at unchanged HEAD `e3cf3f58...`. Capacity passed, but the sole
