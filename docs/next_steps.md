@@ -24,7 +24,100 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206U staged raw-byte literal construction — AUTHORIZED
+## INBOX-206V anchored-control staged literal construction — AUTHORIZED
+
+Accept INBOX-206U only as a compliant fail-closed precreation failure. Its
+sole administrative listing passed every exact identity but exited `54`
+because the universal control-disjointness predicate rejected the
+user-authorized relationship in which the independent control repository
+is intentionally nested under the main registered worktree. U was never
+created and receives no construction or downstream credit. Preserve its
+absence and retained transcript; never rerun U.
+
+Preserve I–T and every protected identity exactly. Require the exact
+operating `HEAD` and direct parent named in the Watcher dispatch. Require
+ordinary and exact-L-hermetic main status empty and control
+exact/main/clean/no-remote.
+
+After proving it fresh, absent, and non-symlink, create records only beneath:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206v
+```
+
+Before V creation, permit exactly one sentinel-preserved,
+status-propagating administrative `git worktree list --porcelain` through
+the accepted wrapper. Require count `43`, exact path/topology/non-main
+hashes `f31d8542...` / `6c868e3b...` / `ebc30a37...`.
+
+Use this exact anchored-control path model:
+
+- main is exactly `/home/oleg/prog/z_llvm`;
+- control is exactly
+  `/home/oleg/prog/z_llvm/local-state/control`, a proper lexical
+  descendant of main through `local-state/control`;
+- main is control's sole ancestor among the 43 registrations;
+- control is bidirectionally disjoint from all 42 non-main
+  registrations, and no registration is beneath control;
+- fresh V is bidirectionally disjoint from all 43 registrations and
+  control.
+
+Permit exactly one bounded command from main:
+
+```text
+git check-ignore -v --no-index -- local-state/control
+```
+
+Require success attributed to the anchored `/local-state/` rule in main
+`.gitignore`. This lexical check grants no authority to stat, enter,
+enumerate, or traverse control. Inspect only listing metadata; never access
+a registered-worktree directory. Any mismatch consumes the listing or
+check, as applicable, and stops before V creation.
+
+Use exactly three independently blocking postcreation construction stages.
+
+1. Write only the fixed quoted-literal V diagnostic body and its
+   predeclared in-scope command records. It must be byte-for-byte the S body
+   except V path substitutions and one clearly delimited direct-child
+   execution-identity block replacing only S's exact two old-HEAD
+   assertions. Immediately reverse only authorized substitutions in an
+   inert comparison stream and require raw byte-for-byte equality with S.
+2. Only after stage 1 success, write fixed quoted-literal V closure and
+   terminal bodies. Preserve every unchanged S byte exactly; permit only V
+   paths/IDs, the added eventual-final predicate, semantic `61`/`64`
+   assertions, and direct-child predicates. Immediately prove raw closure
+   equivalence outside those enumerated changes and validate the terminal
+   body's nine ordered real-tab rows.
+3. Only after both body gates pass, create the remaining 58 records and
+   freeze exact `61`/`64` authority, V construction `HEAD`, direct-child
+   commands/parsing, actual S-to-V changed-path set excluding only its own
+   record and `immutable_identities.tsv`, immutable identities, inventory,
+   ledger, and paths.
+
+Normalization may reverse only authorized path, operating-identity, count,
+and direct-child-block substitutions. It must not normalize whitespace,
+indentation, wrapping, quoting, or program layout. After reversing only
+those substitutions in inert comparison streams, require raw
+byte-for-byte `cmp` equality with S. A comparison transformer may not write
+either active body. All active bodies remain fixed quoted-literal bytes;
+no source transformer is authorized.
+
+Preserve the bounded direct-child execution model. Any intervening commit,
+merge, extra path, or amended ancestry invalidates V and cannot be repaired
+during execution.
+
+Any preflight or construction-stage failure stops immediately without
+inspection, diagnosis, rewriting, identity regeneration, fix-forward,
+retry, or later construction. On complete success, freeze the inert
+61-file V state and stop. Invoke no frozen stage.
+
+No diagnostic/preparation invocation, project/Zig command, compilation,
+test, validator, repository/control/source/evidence/protected-file/store/
+artifact change, registered-directory access, validation, ratchet, wiring,
+cleanup, credit, or downstream work is authorized. Stop main and control
+clean.
+
+## INBOX-206U staged raw-byte literal construction — COMPLIANT PRECREATION FAILURE; CLOSED
 
 Accept INBOX-206T only as a compliant fail-closed construction failure. Its
 second postcreation command returned status `1` at the normalized diagnostic
