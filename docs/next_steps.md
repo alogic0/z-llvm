@@ -30,8 +30,12 @@ Accept INBOX-206N only as a compliant consumed precreation failure. It
 receives no construction, diagnostic, Phase-3, validation, ratchet, or
 downstream credit and must never be rerun.
 
-Preserve I/J/K/L, exact M, absent N, and every protected identity. Create
-only fresh absent/non-symlink:
+Preserve I/J/K/L, exact M, absent N, and every protected identity. Require
+the exact current operating `HEAD` named in the Watcher dispatch, direct
+parent `72945284e603e5ed0940a7f23b4a1565d6e47815`, grandparent
+`380ad13223649947891b1929cd9500a26783ba72`, and preserved M hygiene
+ancestor `9142c8141fcf331cdfc6eda26c76d9509eddbbb8`. Create only fresh
+absent/non-symlink:
 
 ```text
 /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206o
@@ -66,11 +70,14 @@ consumes the listing and stops without retry or construction.
 
 On success, create only O and store the exact wrapper as inert
 non-executable text. Retain every INBOX-206N construction term with O
-substituted for N: only mechanical L-to-O path and operating HEAD/exact-M
-parent substitutions; unchanged `P0003`, substantive assertions/order/
-observability/captures/stops; inert non-executable diagnostic/environment/
-argv/invocation text; all future results and `pre.*` records predeclared
-empty; explicit classifications; no runnable wrapper or executable file.
+substituted for N: only mechanical L-to-O path, exact current operating
+`HEAD`, and direct-parent `72945284e603e5ed0940a7f23b4a1565d6e47815`
+substitutions. Preserve `380ad132...` and M as additional exact ancestors,
+not O's direct parent. Keep `P0003`, substantive assertions/order/
+observability/captures/stops unchanged; use inert non-executable
+diagnostic/environment/argv/invocation text; predeclare all future results
+and `pre.*` records empty; classify every path; create no runnable wrapper
+or executable file.
 
 Freeze the mechanical and empty reverse-substitution equivalence diffs,
 immutable identities/bytes/modes, unchanged assertions/order, and exact
