@@ -24,12 +24,49 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-192B capacity-arithmetic correction — AUTHORIZED
+## INBOX-193 fail-closed retention tooling and synthetic validation — AUTHORIZED
+
+INBOX-192B at `45558ac7` and audit SHA-256 `5a7e019e...` are accepted as
+the final local-only durability design. Validation-v3 remains blocked until
+the separately implemented retention system is reviewed, authoritative
+artifacts are materialized and reviewed, and the v3 contract is amended and
+re-reviewed.
+
+Implement the dormant native Zig store/manifest/publisher/snapshot/verifier/
+resolver tooling and a versioned manifest schema/template. Exercise it only
+against the initially absent synthetic store
+`/home/oleg/prog/z_llvm-inbox193-artifact-store-synthetic`, forced through
+`ZLLVM_ARTIFACT_STORE`. Prove before creation that this path is neither equal
+to, inside, nor an ancestor of any registered worktree. Test default authority
+resolution without creating `/home/oleg/prog/z_llvm-artifacts`.
+
+Freeze the 43-worktree path/topology identities before and after the suite.
+All registration-drift tests must use injected synthetic metadata; invoke no
+worktree mutation and traverse no protected worktree. Implement and test the
+closed manifest, no-follow content-addressed publication, capacity preflight,
+deterministic tar/zstd snapshot with constituent proof, atomic manifest
+generation, fail-closed verification, and atomic no-replace compatibility
+resolution required by the accepted audit.
+
+Run formatting, focused tool/schema tests, and only the smallest authoritative
+build step needed for changed wiring. On complete success, remove only the
+tool-owned synthetic root. On unexpected failure, retain it and stop without
+repair or retry.
+
+Do not create the real store, access current audited artifact roots, publish
+live rows or authoritative objects/snapshots, integrate cleanup, change pins
+or contracts, create compatibility copies at current paths, or run selector
+validation, production gates, performance, or Tier work. Preserve all current
+paths/bytes, every registered worktree, absent v3, dormant production, the
+post-calls checkpoint, and ratchet 131. Commit only the bounded tool, minimal
+build wiring if needed, schema/template, focused tests, and evidence summary;
+then stop clean for review.
+
+## INBOX-192B capacity-arithmetic correction — ACCEPTED at 45558ac7
 
 INBOX-192A at `b309fc26` is accepted as a compliant one-document
 protected-scope correction stop. Final INBOX-192 durability-design acceptance
-remains withheld because the committed capacity sum and derived headroom are
-arithmetically false.
+was withheld until INBOX-192B corrected its capacity sum and derived headroom.
 
 Amend only
 `docs/evidence/inbox192_calls_artifact_durability_audit.md`. Set
