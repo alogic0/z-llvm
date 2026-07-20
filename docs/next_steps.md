@@ -24,7 +24,151 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AR exact-serializer-bound keyed derivation and invocation-atomic audit closure — AUTHORIZED
+## INBOX-206AS independent two-digit environment gates and invocation-atomic audit closure — AUTHORIZED
+
+INBOX-206AR is accepted only as a compliant fail-closed partial
+evidence/design stop. Credit is limited to the complete canonical serializer
+binding validation; operating/protected-state replay; complete AK, AN, and AO
+replay; the fresh nine-file AR batch; five byte-identical copies; and both
+keyed derivations. No environment, invocation-atomic, D01, marker,
+implementation, execution, validation, ratchet, production credit, or
+downstream acceptance is granted. Preserve AR byte-for-byte; never rerun or
+repair it.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206AR stopped fail-closed at the first environment-policy gate.
+
+Passed beforehand:
+
+- Canonical 12-row serializer-binding validation and all command-byte hashes
+- Operating/protected-state gate
+- Complete AK replay, including field-rich ledger, snapshots, and all identity rows
+- Complete AN and AO serializer/per-file replay
+- Fresh AR nine-file mode-0644 derivation batch
+- Five byte-identical copies
+- Authority derivation: exact five changes and fourteen unchanged entries
+- Preconstruction derivation: all 40 mappings and eleven additions
+- Environment-token schema/key gate
+
+The next gate returned status 1 before its success marker. AR is retained exactly partial with nine files and no `AUDIT_COMPLETE`. I performed no inspection, diagnosis, retry, repair, cleanup, regeneration, mode change, fix-forward, or later command. No repository or protected-state bytes changed.
+```
+
+Static review ran no project/Zig code. Clean authority was
+`ace8c7bd449a7b4a70e2be9e7327d57a1af601c4`, parent
+`b6d6d52fb65af22bfa2edd50c24e0f0a8f8930a4`, tree
+`d34a1a7927c22667e0e8023c1f0c5b0ee7da380f`, sole
+`docs/next_steps.md`, and inbox
+`141e6dbef26a39eb8ba90b71e12b28684728d0ed3740375c214e5affe51d3bc8`.
+Source/index/control and protected state were exact and clean; AP/AQ were
+absent; retained logs contain status `1`, the final report, completion, and
+no later Worker command.
+
+AR has nine regular non-symlink non-executable mode-`0644` files and no
+marker. Freeze its complete aggregate and per-file identities:
+
+```text
+paths_sha256=8c6ea306a2f52958c1e72c1bca8e4646efd1121e2941aec4f5e82874a2d210f2
+inventory_sha256=48aeca7d92be5588886dcb2205676963944711f038165aae8fa7596dabde2f89
+compact_ledger_sha256=6bb2011be690432b60413ef50c589a72d85f9928d17e9238ff950391500de0ae
+ak_replay.tsv=e752b99d0dc8307498b1eb0dd5519fe0274e14885cf7208cbb5cf202aa1f1d64
+authority_boundary.tsv=2b1295cbdc781e97954104f5e64aa2dcb0407ee667a71ab4991ef7248f338a12
+authority_derivation.tsv=d01b55df4feb870bd0b774472537164c20d2005ca985b3f9bd9725cbdeb3b626
+environment_equivalence.tsv=a88066d60bb08efa4c84578c0b3b2fd00859fa58a7bf8cfc8a65a0de14b5b809
+environment_tokens.tsv=4e9c9f331fcab38a19ae617eafd07d768bd7654980a1fd094890c7db73a339fc
+environment_variable_policy.tsv=c1922b99c76d1fafa1f3d09e060c7c7c309d16ff60ad6867b50fec0c71e437c6
+preconstruction_derivation.tsv=8c615855f5837c3a001d7ceee3165c44ba6e42a92c05f3cdc07f7d228fc0a481
+preconstruction_gates.tsv=1d87cb77f17108566abcb33b2c346d4be8f3d85cd44050b9e43a51a459c7510d
+schema_authority.tsv=89871f44879321bd2270afe8bae4011cc448fe5fcbf42b29addc9a89abb4036f
+```
+
+The failure was verifier formatting: `seq -w 1 7` produced one-digit
+ordinals while retained authority correctly uses two digits. Static checks
+with literal two-digit expectations passed all twelve definitions and six
+equivalence rows, but the combined validation process grants none of those
+gates independent credit.
+
+Reviewer dialogue is preserved verbatim:
+
+```text
+I accept INBOX-206AR only as a compliant fail-closed partial evidence/design stop. Credit is limited to the complete serializer/replay work, exact nine-file batch, five byte-identical copies, and both keyed derivations. No environment, invocation-atomic, D01, marker, or downstream credit is granted. Preserve AR byte-for-byte and never rerun or repair it.
+
+I authorize fresh evidence-only INBOX-206AS with these refinements:
+
+- Commit only docs/next_steps.md as a non-merge child of ace8c7bd…; update the ignored inbox separately and bind the final full HEAD/tree/inbox hashes.
+- Freeze all nine complete AR per-file hashes plus its three aggregate identities—no abbreviated literals.
+- Independently replay AR’s structure, serializers, aggregates, and every file before AS creation.
+- Use a per-path derivation table: copy operating-independent files byte-for-byte; mechanically derive operating-bound records using explicit keyed field/row substitutions. Do not describe all nine as identical.
+
+- Freeze and independently validate an ET01–ET12 authority table containing each token, expected count, literal ordered-variable list, and literal comma-separated two-digit ordinal list. Ordinals must remain 01…07, 01…24, etc.; no seq width inference.
+
+- Give token schema its own process and status. For every ET definition, run count, ordered-list, ordinal-list, and uniqueness checks as separate labeled processes.
+- Run complete ET01–ET12 coverage, each of the six equivalence rows, final file type/mode checks, and completion-marker absence as separate blocking processes.
+- No shared validation loop, combined shell gate, pipeline-final-row dependency, or marker from one gate may confer credit on another.
+- Only all environment gates passing may permit the previously approved invocation-atomic matrix/count/conflict/dependency/bijection closure.
+- AUDIT_COMPLETE remains the final audit-only write, with implementation_ready=false and execution_authority=none.
+
+The first failure preserves AS absent or exactly partial and stops without diagnosis, retry, repair, or fix-forward. All source, Zig/build/install, execution, validation, registered-worktree access, ratchet, credit, production-AWK, D02, and downstream prohibitions remain exact.
+```
+
+Create one non-merge commit changing only this file, parent exactly
+`ace8c7bd449a7b4a70e2be9e7327d57a1af601c4`. Update only ignored
+`docs/worker_inbox.md`; its final SHA-256 is
+`a2ee4b3d291cfbf2dfc074302b06a7e214ad95b2cd275851ab9a015c5379e7c1`.
+Bind dispatch to the final full commit, parent, tree, sole path, and inbox
+identity. Preserve AK/AN/AO/AR byte-for-byte, AP/AQ absent, and every protected
+identity. Create only fresh absent non-symlink `continuations/inbox206as`.
+
+Before construction, independently replay AR structure, exact paths,
+inventory, compact ledger, and every full per-file hash. Copy
+`ak_replay.tsv`, `schema_authority.tsv`, `environment_tokens.tsv`,
+`environment_variable_policy.tsv`, and `environment_equivalence.tsv`
+byte-for-byte. Mechanically derive `authority_boundary.tsv`,
+`authority_derivation.tsv`, `preconstruction_derivation.tsv`, and
+`preconstruction_gates.tsv` using explicit keyed field/row tables containing
+source value, expected AS value, and disposition. No chained/global
+replacement; do not describe all nine as identical.
+
+Freeze and independently validate this literal authority table:
+
+```text
+ET01|closed-git|7|PATH,LC_ALL,HOME,XDG_CONFIG_HOME,GIT_CONFIG_NOSYSTEM,GIT_OPTIONAL_LOCKS,GIT_TERMINAL_PROMPT|01,02,03,04,05,06,07
+ET02|closed-hermetic-git|7|PATH,LC_ALL,HOME,XDG_CONFIG_HOME,GIT_CONFIG_NOSYSTEM,GIT_OPTIONAL_LOCKS,GIT_TERMINAL_PROMPT|01,02,03,04,05,06,07
+ET03|closed-minimal|4|PATH,LC_ALL,HOME,XDG_CONFIG_HOME|01,02,03,04
+ET04|reviewed-inherited-git-environment|24|PATH,LC_ALL,HOME,XDG_CONFIG_HOME,GIT_DIR,GIT_WORK_TREE,GIT_COMMON_DIR,GIT_INDEX_FILE,GIT_OBJECT_DIRECTORY,GIT_ALTERNATE_OBJECT_DIRECTORIES,GIT_CEILING_DIRECTORIES,GIT_DISCOVERY_ACROSS_FILESYSTEM,GIT_CONFIG_GLOBAL,GIT_CONFIG_SYSTEM,GIT_CONFIG_NOSYSTEM,GIT_CONFIG_COUNT,GIT_CONFIG_PARAMETERS,GIT_OPTIONAL_LOCKS,GIT_PAGER,GIT_EXTERNAL_DIFF,GIT_DIFF_OPTS,GIT_ATTR_NOSYSTEM,GIT_CONFIG_KEY_<n>,GIT_CONFIG_VALUE_<n>|01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24
+ET05|atomic-unresolved-prestate-closed-environment|4|PATH,LC_ALL,HOME,XDG_CONFIG_HOME|01,02,03,04
+ET06|atomic-unresolved-AA-closed-environment|4|PATH,LC_ALL,HOME,XDG_CONFIG_HOME|01,02,03,04
+ET07|atomic-unresolved-analyzer-closed-environment|4|PATH,LC_ALL,HOME,XDG_CONFIG_HOME|01,02,03,04
+ET08|atomic-unresolved-isolated-cache-environment|7|PATH,LC_ALL,HOME,XDG_CONFIG_HOME,ZIG_GLOBAL_CACHE_DIR,ZIG_LOCAL_CACHE_DIR,TMPDIR|01,02,03,04,05,06,07
+ET09|atomic-unresolved-poststate-closed-environment|4|PATH,LC_ALL,HOME,XDG_CONFIG_HOME|01,02,03,04
+ET10|atomic-unresolved-prepost-closed-environment|4|PATH,LC_ALL,HOME,XDG_CONFIG_HOME|01,02,03,04
+ET11|atomic-unresolved-final-guard-closed-environment|4|PATH,LC_ALL,HOME,XDG_CONFIG_HOME|01,02,03,04
+ET12|atomic-unresolved-finalizer-closed-environment|4|PATH,LC_ALL,HOME,XDG_CONFIG_HOME|01,02,03,04
+```
+
+Run authority-table schema/keys and token schema as distinct processes. For
+every ET definition run count, ordered-list, literal two-digit ordinal-list,
+and uniqueness as four separate labeled blocking processes. Never infer
+ordinal width with `seq`. Run total ET coverage, each of six equivalence rows,
+each final type/mode assertion, and marker absence as separate blocking
+processes. Every process explicitly returns zero and emits only its own marker
+after success; no shared loop, combined shell gate, pipeline-final-row
+dependency, or borrowed status/marker grants credit.
+
+Only all environment gates passing permits the exact previously approved
+invocation-atomic matrix/count/conflict/dependency/bijection closure, still
+with every claim independent. `AUDIT_COMPLETE` is final-write/audit-only and
+states `implementation_ready=false` and `execution_authority=none`.
+
+First failure leaves AS absent or exact partial and stops without inspection,
+diagnosis, retry, repair, cleanup, regeneration, mode change, fix-forward, or
+later command. No implementation/source/production change, Zig/build/install,
+project execution, validation, cache, registered-worktree access, ratchet,
+production credit, production AWK, D02, or downstream authority. Do not access
+`.claude/settings.local.json`. Acknowledge every boundary and stop condition.
+
+## INBOX-206AR exact-serializer-bound keyed derivation and invocation-atomic audit closure — COMPLIANT FAIL-CLOSED PARTIAL EVIDENCE/DESIGN STOP; SUPERSEDED BY INBOX-206AS
 
 INBOX-206AQ is accepted only as a compliant fail-closed preconstruction
 stop. Credit is limited to its 50 independent SHA-256 syntax gates and its
