@@ -5,10 +5,20 @@ const Sha256 = std.crypto.hash.sha2.Sha256;
 const original_failed_store = "/home/oleg/prog/z_llvm-inbox193-artifact-store-synthetic";
 const prior_first_continuation_store = "/home/oleg/prog/z_llvm-inbox193a-artifact-store-synthetic";
 const prior_second_continuation_store = "/home/oleg/prog/z_llvm-inbox193b-artifact-store-synthetic";
-const synthetic_store = "/home/oleg/prog/z_llvm-inbox193c-artifact-store-synthetic";
+const prior_failed_materialize_store = "/home/oleg/prog/z_llvm-inbox194-artifact-store-synthetic";
+const prior_failed_materialize_continuation_store =
+    "/home/oleg/prog/z_llvm-inbox194a-artifact-store-synthetic";
+const prior_failed_materialize_second_continuation_store =
+    "/home/oleg/prog/z_llvm-inbox194b-artifact-store-synthetic";
+const prior_failed_materialize_third_continuation_store =
+    "/home/oleg/prog/z_llvm-inbox194c-artifact-store-synthetic";
+const synthetic_store = "/home/oleg/prog/z_llvm-inbox194d-artifact-store-synthetic";
 const default_store = "/home/oleg/prog/z_llvm-artifacts";
 const main_repository = "/home/oleg/prog/z_llvm";
 const main_git_common_dir = "/home/oleg/prog/z_llvm/.git";
+const canonical_source_spec_path = "docs/evidence/inbox194_calls_canonical_source_spec_v1.tsv";
+const canonical_source_spec_sha = "0dd908eed246b09fbea8fd87241ce899b100823b8d83c7223d4e48928e7c599b";
+const proposed_live_manifest_path = "docs/evidence/inbox194_calls_proposed_live_manifest_v1.tsv";
 const expected_path_hash = "f31d8542baafc7b64cd5ee6fe8cc4194842ca696b97a7ffc8df06ce12d553d7e";
 const expected_topology_hash = "6c868e3b6d436cfba92a1e2b21dbd616391763961f1cba9b6670b1ed4a6ebb62";
 const expected_non_main_hash = "ebc30a376b3db4c6fbf788f49ea85f4ce792471e539c0a89308068efdf96ebbe";
@@ -21,6 +31,19 @@ const snapshot_recipe =
     "tar-1.35:--format=ustar,--sort=name,--mtime=@0,--owner=0,--group=0,--numeric-owner,--mode=0444,--no-acls,--no-xattrs,--no-selinux,--no-recursion,--null,--files-from;zstd-1.5.5:-T1,-19,--check,--no-progress,-c";
 const snapshot_recipe_sha = "cb9f999404a7dd9eb991d73d18078b20d99e82399d1d415eb1afa3398e97113a";
 const max_snapshot_members = 1024;
+const source_spec_magic = "zllvm-calls-canonical-source-spec-v1";
+const source_spec_header =
+    "logical_id\tsource_set_id\tsource_path\tsha256\tbytes\tsource_mode\tmedia_type\tretention_class\tobject_key\tmember_path\tgroup_id\tsnapshot_id\tsnapshot_format\trecipe_sha256\tconstituent_sha256\tgroup_manifest_sha256";
+const source_set_ac285 = "calls/input/accepted-cohort-ac285/v1";
+const source_set_compiler_rt = "calls/input/compiler-rt-v1/raw/v1";
+const source_set_coverage = "calls/input/validation-v3/coverage-bundle/v1";
+const group_calls_inputs = "calls-inputs";
+const group_calls_validation_inputs = "calls-validation-inputs";
+const snapshot_calls_inputs = "snapshot/calls-inputs/v1";
+const snapshot_calls_validation_inputs = "snapshot/calls-validation-inputs/v1";
+const retained_materialize_object_sha =
+    "d8da86cae494d7d4a58053ab24b1e8be944859263072b85ffa164880b0110cd4";
+const retained_materialize_object_bytes = 7_215_373;
 
 pub const RowKind = enum {
     object,
@@ -73,6 +96,47 @@ pub const Manifest = struct {
         allocator.free(manifest.storage);
         manifest.* = undefined;
     }
+};
+
+const SourceSpecRow = struct {
+    logical_id: []const u8,
+    source_set_id: []const u8,
+    source_path: []const u8,
+    sha256: []const u8,
+    bytes: u64,
+    source_mode: u16,
+    media_type: []const u8,
+    retention_class: RetentionClass,
+    object_key: []const u8,
+    member_path: []const u8,
+    group_id: []const u8,
+    snapshot_id: []const u8,
+    snapshot_format: []const u8,
+    recipe_sha256: []const u8,
+    constituent_sha256: []const u8,
+    group_manifest_sha256: []const u8,
+};
+
+const SourceSpec = struct {
+    storage: []u8,
+    rows: []SourceSpecRow,
+
+    fn deinit(spec: *SourceSpec, allocator: std.mem.Allocator) void {
+        allocator.free(spec.rows);
+        allocator.free(spec.storage);
+        spec.* = undefined;
+    }
+};
+
+const PublishedObject = struct {
+    identity: FileIdentity,
+    source_row_index: usize,
+};
+
+const PublishedSnapshot = struct {
+    group_id: []const u8,
+    snapshot_id: []const u8,
+    identity: SnapshotIdentity,
 };
 
 pub const RegistrationSnapshot = struct {
@@ -919,23 +983,801 @@ pub fn main(init: std.process.Init) !void {
     defer args.deinit();
     _ = args.skip();
     const command = args.next() orelse return error.MissingCommand;
-    if (!std.mem.eql(u8, command, "resolve-authority") or args.next() != null) {
-        return error.UnsupportedCommand;
+    if (std.mem.eql(u8, command, "resolve-authority")) {
+        if (args.next() != null) return error.UnknownOption;
+        const environment_value = init.minimal.environ.getAlloc(
+            allocator,
+            "ZLLVM_ARTIFACT_STORE",
+        ) catch |err| switch (err) {
+            error.EnvironmentVariableMissing => null,
+            else => return err,
+        };
+        defer if (environment_value) |value| allocator.free(value);
+        const resolved = try resolveAuthority(allocator, environment_value, main_git_common_dir);
+        defer allocator.free(resolved);
+        try writeStdoutLine(io, resolved);
+        return;
     }
-    const environment_value = init.minimal.environ.getAlloc(
-        allocator,
-        "ZLLVM_ARTIFACT_STORE",
-    ) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => return err,
-    };
-    defer if (environment_value) |value| allocator.free(value);
-    const resolved = try resolveAuthority(allocator, environment_value, main_git_common_dir);
-    defer allocator.free(resolved);
+    if (!std.mem.eql(u8, command, "materialize-spec")) return error.UnsupportedCommand;
+    const mode = args.next() orelse return error.MissingMaterializeMode;
+    const spec_path = args.next() orelse return error.MissingSourceSpecification;
+    if (args.next() != null) return error.UnknownOption;
+    if (!std.mem.eql(u8, spec_path, canonical_source_spec_path)) {
+        return error.UnexpectedSourceSpecification;
+    }
+    if (std.mem.eql(u8, mode, "plan")) {
+        const proposed = try planCanonicalSourceSpec(allocator, io, spec_path);
+        defer allocator.free(proposed);
+        try writeStdout(io, proposed);
+        return;
+    }
+    if (!std.mem.eql(u8, mode, "publish")) return error.UnknownMaterializeMode;
+    const environment_value = try init.minimal.environ.getAlloc(allocator, "ZLLVM_ARTIFACT_STORE");
+    defer allocator.free(environment_value);
+    const root = try resolveAuthority(allocator, environment_value, main_git_common_dir);
+    defer allocator.free(root);
+    const manifest = try publishCanonicalSourceSpec(allocator, io, spec_path, root);
+    defer allocator.free(manifest);
+    try writeStdout(io, manifest);
+}
+
+fn writeStdout(io: std.Io, text: []const u8) !void {
     var buffer: [1024]u8 = undefined;
     var writer = std.Io.File.stdout().writer(io, &buffer);
-    try writer.interface.print("{s}\n", .{resolved});
+    try writer.interface.writeAll(text);
     try writer.interface.flush();
+}
+
+fn writeStdoutLine(io: std.Io, text: []const u8) !void {
+    var buffer: [1024]u8 = undefined;
+    var writer = std.Io.File.stdout().writer(io, &buffer);
+    try writer.interface.print("{s}\n", .{text});
+    try writer.interface.flush();
+}
+
+fn loadCanonicalSourceSpec(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    spec_path: []const u8,
+) !SourceSpec {
+    if (!std.mem.eql(u8, spec_path, canonical_source_spec_path)) {
+        return error.UnexpectedSourceSpecification;
+    }
+    const text = try std.Io.Dir.cwd().readFileAlloc(
+        io,
+        spec_path,
+        allocator,
+        .limited(256 * 1024),
+    );
+    errdefer allocator.free(text);
+    if (!std.mem.eql(u8, &sha256Hex(text), canonical_source_spec_sha)) {
+        return error.SourceSpecificationHashMismatch;
+    }
+    return parseSourceSpecOwned(allocator, text);
+}
+
+fn parseSourceSpecOwned(allocator: std.mem.Allocator, storage: []u8) !SourceSpec {
+    errdefer allocator.free(storage);
+    if (storage.len == 0 or storage[storage.len - 1] != '\n') {
+        return error.NonCanonicalSourceSpecification;
+    }
+    var lines = std.mem.splitScalar(u8, storage, '\n');
+    if (!std.mem.eql(u8, lines.next() orelse return error.MissingSourceSpecMagic, source_spec_magic)) {
+        return error.UnknownSourceSpecVersion;
+    }
+    if (!std.mem.eql(u8, lines.next() orelse return error.MissingSourceSpecHeader, source_spec_header)) {
+        return error.UnknownOrReorderedSourceSpecField;
+    }
+    var rows: std.ArrayList(SourceSpecRow) = .empty;
+    errdefer rows.deinit(allocator);
+    while (lines.next()) |line| {
+        if (line.len == 0) {
+            if (lines.peek() == null) break;
+            return error.EmptySourceSpecRow;
+        }
+        var fields: [16][]const u8 = undefined;
+        var field_it = std.mem.splitScalar(u8, line, '\t');
+        for (&fields) |*field| field.* = field_it.next() orelse
+            return error.MissingSourceSpecField;
+        if (field_it.next() != null) return error.UnknownSourceSpecField;
+        for (fields) |field| try validateCanonicalField(allocator, field);
+        const row: SourceSpecRow = .{
+            .logical_id = fields[0],
+            .source_set_id = fields[1],
+            .source_path = fields[2],
+            .sha256 = fields[3],
+            .bytes = std.fmt.parseInt(u64, fields[4], 10) catch
+                return error.InvalidByteCount,
+            .source_mode = std.fmt.parseInt(u16, fields[5], 8) catch return error.InvalidMode,
+            .media_type = fields[6],
+            .retention_class = parseEnum(RetentionClass, fields[7]) orelse
+                return error.UnknownRetentionClass,
+            .object_key = fields[8],
+            .member_path = fields[9],
+            .group_id = fields[10],
+            .snapshot_id = fields[11],
+            .snapshot_format = fields[12],
+            .recipe_sha256 = fields[13],
+            .constituent_sha256 = fields[14],
+            .group_manifest_sha256 = fields[15],
+        };
+        try validateSourceSpecRow(allocator, row);
+        if (rows.items.len != 0 and
+            std.mem.order(u8, rows.items[rows.items.len - 1].logical_id, row.logical_id) != .lt)
+        {
+            return error.NonCanonicalSourceSpecOrder;
+        }
+        for (rows.items) |prior| {
+            if (std.mem.eql(u8, prior.logical_id, row.logical_id)) {
+                return error.DuplicateLogicalId;
+            }
+            if (std.mem.eql(u8, prior.source_path, row.source_path)) {
+                return error.DuplicateSourcePath;
+            }
+        }
+        try rows.append(allocator, row);
+    }
+    const owned = try rows.toOwnedSlice(allocator);
+    errdefer allocator.free(owned);
+    const spec: SourceSpec = .{ .storage = storage, .rows = owned };
+    try validateSourceSpecRelationships(allocator, spec);
+    return spec;
+}
+
+fn validateSourceSpecRow(allocator: std.mem.Allocator, row: SourceSpecRow) !void {
+    try validateLogicalId(row.logical_id);
+    try validateLogicalId(row.source_set_id);
+    try validateRelativeKey(row.source_path);
+    try validateSha(row.sha256);
+    if (row.bytes == 0 or row.source_mode > 0o7777) return error.InvalidSourceIdentity;
+    if (row.retention_class != .canonical_input) return error.InvalidSourceRetentionClass;
+    try validateRelativeKey(row.object_key);
+    try validateRelativeKey(row.member_path);
+    try validateLogicalId(row.group_id);
+    try validateLogicalId(row.snapshot_id);
+    try validateSha(row.recipe_sha256);
+    try validateSha(row.constituent_sha256);
+    try validateSha(row.group_manifest_sha256);
+    if (!std.mem.eql(u8, row.snapshot_format, snapshot_format) or
+        !std.mem.eql(u8, row.recipe_sha256, snapshot_recipe_sha) or
+        !std.mem.eql(u8, row.object_key, row.member_path))
+    {
+        return error.SourceSnapshotContractMismatch;
+    }
+    const expected_key = try objectKey(allocator, row.sha256);
+    defer allocator.free(expected_key);
+    if (!std.mem.eql(u8, row.object_key, expected_key)) return error.ObjectKeyShaMismatch;
+}
+
+fn validateSourceSpecRelationships(allocator: std.mem.Allocator, spec: SourceSpec) !void {
+    if (spec.rows.len != 19) return error.SourceSpecRowCountMismatch;
+    var ac_count: usize = 0;
+    var compiler_count: usize = 0;
+    var coverage_count: usize = 0;
+    for (spec.rows) |row| {
+        if (std.mem.eql(u8, row.source_set_id, source_set_ac285)) {
+            ac_count += 1;
+            if (!std.mem.eql(u8, row.group_id, group_calls_inputs) or
+                !std.mem.eql(u8, row.snapshot_id, snapshot_calls_inputs))
+            {
+                return error.SourceSetGroupMismatch;
+            }
+        } else if (std.mem.eql(u8, row.source_set_id, source_set_compiler_rt)) {
+            compiler_count += 1;
+            if (!std.mem.eql(u8, row.group_id, group_calls_inputs) or
+                !std.mem.eql(u8, row.snapshot_id, snapshot_calls_inputs))
+            {
+                return error.SourceSetGroupMismatch;
+            }
+        } else if (std.mem.eql(u8, row.source_set_id, source_set_coverage)) {
+            coverage_count += 1;
+            if (!std.mem.eql(u8, row.group_id, group_calls_validation_inputs) or
+                !std.mem.eql(u8, row.snapshot_id, snapshot_calls_validation_inputs))
+            {
+                return error.SourceSetGroupMismatch;
+            }
+        } else return error.UnknownSourceSet;
+        for (spec.rows) |other| {
+            if (std.mem.eql(u8, row.sha256, other.sha256) and
+                (row.bytes != other.bytes or row.source_mode != other.source_mode or
+                    !std.mem.eql(u8, row.object_key, other.object_key)))
+            {
+                return error.ConflictingSourceIdentity;
+            }
+        }
+    }
+    if (ac_count != 1 or compiler_count != 3 or coverage_count != 15) {
+        return error.SourceSetCountMismatch;
+    }
+    try validateDeclaredConstituent(allocator, spec, group_calls_inputs);
+    try validateDeclaredConstituent(allocator, spec, group_calls_validation_inputs);
+}
+
+fn validateDeclaredConstituent(
+    allocator: std.mem.Allocator,
+    spec: SourceSpec,
+    group_id: []const u8,
+) !void {
+    var objects: std.ArrayList(FileIdentity) = .empty;
+    defer objects.deinit(allocator);
+    for (spec.rows) |row| {
+        if (!std.mem.eql(u8, row.group_id, group_id)) continue;
+        var duplicate = false;
+        for (objects.items) |object| {
+            if (std.mem.eql(u8, object.key, row.object_key)) duplicate = true;
+        }
+        if (!duplicate) try objects.append(allocator, .{
+            .sha256 = row.sha256[0..64].*,
+            .bytes = row.bytes,
+            .mode = 0o444,
+            .key = @constCast(row.object_key),
+        });
+    }
+    const sorted = try sortedObjectGroup(allocator, objects.items);
+    defer allocator.free(sorted);
+    const text = try encodeConstituentManifest(allocator, sorted);
+    defer allocator.free(text);
+    const actual = sha256Hex(text);
+    for (spec.rows) |row| {
+        if (std.mem.eql(u8, row.group_id, group_id) and
+            !std.mem.eql(u8, &actual, row.constituent_sha256))
+        {
+            return error.ConstituentMismatch;
+        }
+    }
+}
+
+fn planCanonicalSourceSpec(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    spec_path: []const u8,
+) ![]u8 {
+    var spec = try loadCanonicalSourceSpec(allocator, io, spec_path);
+    defer spec.deinit(allocator);
+    var guard = try RegistrationGuard.init(allocator, io);
+    defer guard.deinit();
+    try verifyCanonicalSources(allocator, io, &guard, spec);
+    const manifest = try proposedManifestForSourceSpec(allocator, spec);
+    errdefer allocator.free(manifest);
+    try validateProposedManifestFieldCounts(manifest);
+    var parsed = try parseManifest(allocator, manifest);
+    defer parsed.deinit(allocator);
+    const encoded = try encodeManifest(allocator, parsed);
+    defer allocator.free(encoded);
+    if (!std.mem.eql(u8, encoded, manifest)) return error.NonCanonicalManifest;
+    const tracked = try std.Io.Dir.cwd().readFileAlloc(
+        io,
+        proposed_live_manifest_path,
+        allocator,
+        .limited(256 * 1024),
+    );
+    defer allocator.free(tracked);
+    try validateProposedManifestFieldCounts(tracked);
+    if (!std.mem.eql(u8, manifest, tracked)) return error.ProposedManifestByteMismatch;
+    try guard.assertCurrent();
+    return manifest;
+}
+
+fn validateProposedManifestFieldCounts(text: []const u8) !void {
+    if (text.len == 0 or text[text.len - 1] != '\n') {
+        return error.NonCanonicalManifest;
+    }
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    _ = lines.next() orelse return error.MissingSchemaMagic;
+    _ = lines.next() orelse return error.MissingSchemaHeader;
+    while (lines.next()) |line| {
+        if (line.len == 0) {
+            if (lines.peek() == null) break;
+            return error.EmptyManifestRow;
+        }
+        var field_count: usize = 1;
+        for (line) |byte| {
+            if (byte == '\t') field_count += 1;
+        }
+        if (field_count != 17) return error.ProposedManifestFieldCountMismatch;
+    }
+}
+
+fn verifyCanonicalSources(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    guard: *const RegistrationGuard,
+    spec: SourceSpec,
+) !void {
+    var ac_virtual: std.ArrayList(u8) = .empty;
+    defer ac_virtual.deinit(allocator);
+    var compiler_virtual: std.ArrayList(u8) = .empty;
+    defer compiler_virtual.deinit(allocator);
+    var coverage_virtual: std.ArrayList(u8) = .empty;
+    defer coverage_virtual.deinit(allocator);
+    const coverage_prefix =
+        "tmp/o2_calls_perf/compiler_rt_v1/inbox187_baseline_validation_contract_bundle/";
+
+    for (spec.rows) |row| {
+        const absolute = try std.fs.path.join(allocator, &.{ main_repository, row.source_path });
+        defer allocator.free(absolute);
+        try guard.assertReadSource(absolute, absolute);
+        var file = try std.Io.Dir.openFileAbsolute(io, absolute, .{
+            .allow_directory = false,
+            .follow_symlinks = false,
+        });
+        defer file.close(io);
+        var actual = try identityOfOpenFileAnyMode(allocator, io, file);
+        defer actual.deinit(allocator);
+        if (!std.mem.eql(u8, &actual.sha256, row.sha256) or
+            actual.bytes != row.bytes or actual.mode != row.source_mode)
+        {
+            return error.CanonicalSourceIdentityMismatch;
+        }
+        const output = if (std.mem.eql(u8, row.source_set_id, source_set_ac285))
+            &ac_virtual
+        else if (std.mem.eql(u8, row.source_set_id, source_set_compiler_rt))
+            &compiler_virtual
+        else
+            &coverage_virtual;
+        const label = if (std.mem.eql(u8, row.source_set_id, source_set_coverage))
+            if (std.mem.startsWith(u8, row.source_path, coverage_prefix))
+                row.source_path[coverage_prefix.len..]
+            else
+                return error.CoverageSourcePrefixMismatch
+        else
+            row.source_path;
+        try output.print(allocator, "F\t{s}\t{}\t{o}\t{s}\n", .{
+            label,
+            actual.bytes,
+            actual.mode,
+            &actual.sha256,
+        });
+    }
+    try validateVirtualManifest(spec, source_set_ac285, ac_virtual.items);
+    try validateVirtualManifest(spec, source_set_compiler_rt, compiler_virtual.items);
+    try validateVirtualManifest(spec, source_set_coverage, coverage_virtual.items);
+    try guard.assertCurrent();
+}
+
+fn validateVirtualManifest(
+    spec: SourceSpec,
+    source_set_id: []const u8,
+    text: []const u8,
+) !void {
+    const actual = sha256Hex(text);
+    for (spec.rows) |row| {
+        if (std.mem.eql(u8, row.source_set_id, source_set_id)) {
+            if (!std.mem.eql(u8, &actual, row.group_manifest_sha256)) {
+                return error.SourceSetManifestMismatch;
+            }
+            return;
+        }
+    }
+    return error.UnknownSourceSet;
+}
+
+fn proposedManifestForSourceSpec(
+    allocator: std.mem.Allocator,
+    spec: SourceSpec,
+) ![]u8 {
+    var output: std.ArrayList(u8) = .empty;
+    errdefer output.deinit(allocator);
+    try appendManifestPreamble(allocator, &output);
+    for (spec.rows, 0..) |row, index| {
+        var first = true;
+        for (spec.rows[0..index]) |prior| {
+            if (std.mem.eql(u8, prior.sha256, row.sha256)) first = false;
+        }
+        if (!first) continue;
+        const object_id = try std.fmt.allocPrint(allocator, "object/sha256/{s}", .{row.sha256});
+        defer allocator.free(object_id);
+        try appendManifestRowText(allocator, &output, .{
+            .kind = .object,
+            .logical_id = object_id,
+            .sha256 = row.sha256,
+            .bytes = row.bytes,
+            .mode = 0o444,
+            .media_type = row.media_type,
+            .provenance = "inbox194-source-spec",
+            .reconstruction = "exact-source-publication",
+            .retention_class = .canonical_input,
+            .status = .future_required,
+            .key = row.object_key,
+            .target_id = "-",
+            .snapshot_id = "-",
+            .member_path = "-",
+            .snapshot_format = "-",
+            .recipe_sha256 = "-",
+            .constituent_sha256 = "-",
+        });
+    }
+    for (spec.rows) |row| {
+        const object_id = try std.fmt.allocPrint(allocator, "object/sha256/{s}", .{row.sha256});
+        defer allocator.free(object_id);
+        const planned_key = try std.fmt.allocPrint(allocator, "planned/{s}", .{row.logical_id});
+        defer allocator.free(planned_key);
+        try appendManifestRowText(allocator, &output, .{
+            .kind = .logical_ref,
+            .logical_id = row.logical_id,
+            .sha256 = row.sha256,
+            .bytes = row.bytes,
+            .mode = row.source_mode,
+            .media_type = row.media_type,
+            .provenance = "inbox194-source-spec",
+            .reconstruction = "materialize-spec-publish",
+            .retention_class = .canonical_input,
+            .status = .future_required,
+            .key = planned_key,
+            .target_id = object_id,
+            .snapshot_id = "-",
+            .member_path = "-",
+            .snapshot_format = "-",
+            .recipe_sha256 = "-",
+            .constituent_sha256 = "-",
+        });
+    }
+    return output.toOwnedSlice(allocator);
+}
+
+fn publishCanonicalSourceSpec(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    spec_path: []const u8,
+    root_path: []const u8,
+) ![]u8 {
+    var spec = try loadCanonicalSourceSpec(allocator, io, spec_path);
+    defer spec.deinit(allocator);
+    var guard = try RegistrationGuard.init(allocator, io);
+    defer guard.deinit();
+    try guard.assertStoreRoot(root_path);
+    try verifyCanonicalSources(allocator, io, &guard, spec);
+    try prepareStoreRoot(allocator, io, &guard, root_path);
+
+    var store = try Store.open(allocator, io, &guard, root_path);
+    defer store.deinit();
+    var required_bytes: u64 = 0;
+    for (spec.rows, 0..) |row, index| {
+        var first = true;
+        for (spec.rows[0..index]) |prior| {
+            if (std.mem.eql(u8, prior.sha256, row.sha256)) first = false;
+        }
+        if (first) required_bytes = std.math.add(u64, required_bytes, row.bytes) catch
+            return error.Overflow;
+    }
+    _ = try store.preflightCapacity(.{
+        .validation_reserve = 0,
+        .primary_bytes = required_bytes,
+        .snapshot_bound = required_bytes * 2,
+        .manifest_bound = 1024 * 1024,
+        .required_inodes = spec.rows.len * 4 + 64,
+    });
+
+    var objects: std.ArrayList(FileIdentity) = .empty;
+    defer {
+        for (objects.items) |*object| object.deinit(allocator);
+        objects.deinit(allocator);
+    }
+    var object_rows: std.ArrayList(usize) = .empty;
+    defer object_rows.deinit(allocator);
+    for (spec.rows, 0..) |row, index| {
+        var duplicate = false;
+        for (objects.items) |object| {
+            if (std.mem.eql(u8, &object.sha256, row.sha256)) duplicate = true;
+        }
+        if (duplicate) continue;
+        const absolute = try std.fs.path.join(allocator, &.{ main_repository, row.source_path });
+        defer allocator.free(absolute);
+        var object = try store.publishFile(absolute, absolute);
+        errdefer object.deinit(allocator);
+        if (!std.mem.eql(u8, &object.sha256, row.sha256) or
+            object.bytes != row.bytes or object.mode != 0o444 or
+            !std.mem.eql(u8, object.key, row.object_key))
+        {
+            return error.PublishedSourceIdentityMismatch;
+        }
+        try objects.append(allocator, object);
+        try object_rows.append(allocator, index);
+    }
+
+    var call_objects: std.ArrayList(FileIdentity) = .empty;
+    defer call_objects.deinit(allocator);
+    var validation_objects: std.ArrayList(FileIdentity) = .empty;
+    defer validation_objects.deinit(allocator);
+    for (objects.items, object_rows.items) |object, row_index| {
+        if (std.mem.eql(u8, spec.rows[row_index].group_id, group_calls_inputs)) {
+            try call_objects.append(allocator, object);
+        } else {
+            try validation_objects.append(allocator, object);
+        }
+    }
+    var calls_snapshot = try store.publishSnapshot(call_objects.items);
+    defer calls_snapshot.deinit(allocator);
+    var validation_snapshot = try store.publishSnapshot(validation_objects.items);
+    defer validation_snapshot.deinit(allocator);
+    try store.verifySnapshot(calls_snapshot, call_objects.items);
+    try store.verifySnapshot(validation_snapshot, validation_objects.items);
+
+    const manifest = try publishedManifestForSourceSpec(
+        allocator,
+        spec,
+        objects.items,
+        object_rows.items,
+        calls_snapshot,
+        validation_snapshot,
+    );
+    errdefer allocator.free(manifest);
+    const manifest_key = try store.publishManifest(1, manifest);
+    defer allocator.free(manifest_key);
+    try store.verifyNoPartialObjects();
+    try guard.assertCurrent();
+    return manifest;
+}
+
+fn prepareStoreRoot(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    guard: *const RegistrationGuard,
+    root_path: []const u8,
+) !void {
+    try guard.assertStoreRoot(root_path);
+    const exists = try validateAuthorityAncestry(allocator, io, root_path);
+    try guard.assertCurrent();
+    if (!exists) try createAbsoluteDirectorySynced(io, root_path);
+    try guard.assertCurrent();
+    if (!try validateAuthorityAncestry(allocator, io, root_path)) {
+        return error.AuthorityRootMissingAfterPreparation;
+    }
+}
+
+fn validateAuthorityAncestry(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    root_path: []const u8,
+) !bool {
+    if (!std.fs.path.isAbsolute(root_path)) return error.PathNotAbsolute;
+    const normalized = try normalizedAbsolute(allocator, root_path);
+    defer allocator.free(normalized);
+    if (!std.mem.eql(u8, normalized, root_path)) return error.PathNotNormalized;
+
+    var components = std.fs.path.componentIterator(root_path);
+    while (components.next()) |component| {
+        var directory = std.Io.Dir.openDirAbsolute(io, component.path, .{
+            .iterate = true,
+            .follow_symlinks = false,
+        }) catch |err| switch (err) {
+            error.FileNotFound => return false,
+            error.SymLinkLoop => return error.AuthoritySymlinkComponent,
+            error.NotDir => return error.AuthorityNonDirectoryComponent,
+            else => return err,
+        };
+        directory.close(io);
+    }
+    return true;
+}
+
+fn publishedManifestForSourceSpec(
+    allocator: std.mem.Allocator,
+    spec: SourceSpec,
+    objects: []const FileIdentity,
+    object_rows: []const usize,
+    calls_snapshot: SnapshotIdentity,
+    validation_snapshot: SnapshotIdentity,
+) ![]u8 {
+    var output: std.ArrayList(u8) = .empty;
+    errdefer output.deinit(allocator);
+    try appendManifestPreamble(allocator, &output);
+    for (objects, object_rows) |object, row_index| {
+        const row = spec.rows[row_index];
+        const object_id = try std.fmt.allocPrint(allocator, "object/sha256/{s}", .{&object.sha256});
+        defer allocator.free(object_id);
+        try appendManifestRowText(allocator, &output, .{
+            .kind = .object,
+            .logical_id = object_id,
+            .sha256 = &object.sha256,
+            .bytes = object.bytes,
+            .mode = object.mode,
+            .media_type = row.media_type,
+            .provenance = "inbox194-source-spec",
+            .reconstruction = "exact-source-publication",
+            .retention_class = .canonical_input,
+            .status = .active,
+            .key = object.key,
+            .target_id = "-",
+            .snapshot_id = "-",
+            .member_path = "-",
+            .snapshot_format = "-",
+            .recipe_sha256 = "-",
+            .constituent_sha256 = "-",
+        });
+    }
+    try appendPublishedConstituentObject(allocator, &output, calls_snapshot.constituent);
+    try appendPublishedConstituentObject(allocator, &output, validation_snapshot.constituent);
+    for (spec.rows) |row| {
+        const object_id = try std.fmt.allocPrint(allocator, "object/sha256/{s}", .{row.sha256});
+        defer allocator.free(object_id);
+        const planned_key = try std.fmt.allocPrint(allocator, "planned/{s}", .{row.logical_id});
+        defer allocator.free(planned_key);
+        try appendManifestRowText(allocator, &output, .{
+            .kind = .logical_ref,
+            .logical_id = row.logical_id,
+            .sha256 = row.sha256,
+            .bytes = row.bytes,
+            .mode = row.source_mode,
+            .media_type = row.media_type,
+            .provenance = "inbox194-source-spec",
+            .reconstruction = "materialize-spec-publish",
+            .retention_class = .canonical_input,
+            .status = .active,
+            .key = planned_key,
+            .target_id = object_id,
+            .snapshot_id = "-",
+            .member_path = "-",
+            .snapshot_format = "-",
+            .recipe_sha256 = "-",
+            .constituent_sha256 = "-",
+        });
+    }
+    try appendPublishedSnapshot(
+        allocator,
+        &output,
+        snapshot_calls_inputs,
+        calls_snapshot,
+        objects,
+        object_rows,
+        spec,
+        group_calls_inputs,
+    );
+    try appendPublishedSnapshot(
+        allocator,
+        &output,
+        snapshot_calls_validation_inputs,
+        validation_snapshot,
+        objects,
+        object_rows,
+        spec,
+        group_calls_validation_inputs,
+    );
+    const canonical = try output.toOwnedSlice(allocator);
+    errdefer allocator.free(canonical);
+    var parsed = try parseManifest(allocator, canonical);
+    defer parsed.deinit(allocator);
+    const encoded = try encodeManifest(allocator, parsed);
+    defer allocator.free(encoded);
+    if (!std.mem.eql(u8, encoded, canonical)) return error.NonCanonicalManifest;
+    return canonical;
+}
+
+fn appendPublishedConstituentObject(
+    allocator: std.mem.Allocator,
+    output: *std.ArrayList(u8),
+    object: FileIdentity,
+) !void {
+    const object_id = try std.fmt.allocPrint(allocator, "object/sha256/{s}", .{&object.sha256});
+    defer allocator.free(object_id);
+    try appendManifestRowText(allocator, output, .{
+        .kind = .object,
+        .logical_id = object_id,
+        .sha256 = &object.sha256,
+        .bytes = object.bytes,
+        .mode = object.mode,
+        .media_type = "text/tab-separated-values",
+        .provenance = "inbox194-snapshot-constituents",
+        .reconstruction = snapshot_recipe,
+        .retention_class = .canonical_input,
+        .status = .active,
+        .key = object.key,
+        .target_id = "-",
+        .snapshot_id = "-",
+        .member_path = "-",
+        .snapshot_format = "-",
+        .recipe_sha256 = "-",
+        .constituent_sha256 = "-",
+    });
+}
+
+fn appendPublishedSnapshot(
+    allocator: std.mem.Allocator,
+    output: *std.ArrayList(u8),
+    snapshot_id: []const u8,
+    snapshot: SnapshotIdentity,
+    objects: []const FileIdentity,
+    object_rows: []const usize,
+    spec: SourceSpec,
+    group_id: []const u8,
+) !void {
+    try appendManifestRowText(allocator, output, .{
+        .kind = .snapshot,
+        .logical_id = snapshot_id,
+        .sha256 = &snapshot.archive.sha256,
+        .bytes = snapshot.archive.bytes,
+        .mode = snapshot.archive.mode,
+        .media_type = "application/zstd",
+        .provenance = "inbox194-source-spec",
+        .reconstruction = snapshot_recipe,
+        .retention_class = .canonical_input,
+        .status = .active,
+        .key = snapshot.archive.key,
+        .target_id = "-",
+        .snapshot_id = "-",
+        .member_path = "-",
+        .snapshot_format = snapshot_format,
+        .recipe_sha256 = snapshot_recipe_sha,
+        .constituent_sha256 = &snapshot.constituent.sha256,
+    });
+    var members: std.ArrayList(FileIdentity) = .empty;
+    defer members.deinit(allocator);
+    for (objects, object_rows) |object, row_index| {
+        if (std.mem.eql(u8, spec.rows[row_index].group_id, group_id)) {
+            try members.append(allocator, object);
+        }
+    }
+    const sorted = try sortedObjectGroup(allocator, members.items);
+    defer allocator.free(sorted);
+    for (sorted) |object| {
+        const object_id = try std.fmt.allocPrint(allocator, "object/sha256/{s}", .{&object.sha256});
+        defer allocator.free(object_id);
+        const member_id = try std.fmt.allocPrint(
+            allocator,
+            "{s}/member/{s}",
+            .{ snapshot_id, &object.sha256 },
+        );
+        defer allocator.free(member_id);
+        try appendManifestRowText(allocator, output, .{
+            .kind = .snapshot_member,
+            .logical_id = member_id,
+            .sha256 = &object.sha256,
+            .bytes = object.bytes,
+            .mode = object.mode,
+            .media_type = "application/octet-stream",
+            .provenance = "inbox194-source-spec",
+            .reconstruction = snapshot_recipe,
+            .retention_class = .canonical_input,
+            .status = .active,
+            .key = object.key,
+            .target_id = object_id,
+            .snapshot_id = snapshot_id,
+            .member_path = object.key,
+            .snapshot_format = "-",
+            .recipe_sha256 = "-",
+            .constituent_sha256 = "-",
+        });
+    }
+}
+
+fn appendManifestPreamble(
+    allocator: std.mem.Allocator,
+    output: *std.ArrayList(u8),
+) !void {
+    try output.appendSlice(allocator, schema_magic);
+    try output.append(allocator, '\n');
+    try output.appendSlice(allocator, schema_header);
+    try output.append(allocator, '\n');
+}
+
+fn appendManifestRowText(
+    allocator: std.mem.Allocator,
+    output: *std.ArrayList(u8),
+    row: Row,
+) !void {
+    try output.print(
+        allocator,
+        "{s}\t{s}\t{s}\t{}\t{o}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\n",
+        .{
+            externalEnumName(row.kind),
+            row.logical_id,
+            row.sha256,
+            row.bytes,
+            row.mode,
+            row.media_type,
+            row.provenance,
+            row.reconstruction,
+            externalEnumName(row.retention_class),
+            externalEnumName(row.status),
+            row.key,
+            row.target_id,
+            row.snapshot_id,
+            row.member_path,
+            row.snapshot_format,
+            row.recipe_sha256,
+            row.constituent_sha256,
+        },
+    );
 }
 
 pub fn resolveAuthority(
@@ -1152,7 +1994,8 @@ fn validateRowShape(row: Row) !void {
     switch (row.kind) {
         .object => {
             const split = splitObjectKey(row.key) orelse return error.InvalidObjectRow;
-            if (row.target_id.len != 1 or row.target_id[0] != '-' or
+            if (row.mode != 0o444 or
+                row.target_id.len != 1 or row.target_id[0] != '-' or
                 row.snapshot_id.len != 1 or row.snapshot_id[0] != '-' or
                 row.member_path.len != 1 or row.member_path[0] != '-' or
                 !isDash(row.snapshot_format) or
@@ -1177,7 +2020,8 @@ fn validateRowShape(row: Row) !void {
         },
         .snapshot => {
             const split = splitSnapshotKey(row.key) orelse return error.InvalidSnapshotRow;
-            if (row.target_id.len != 1 or row.target_id[0] != '-' or
+            if (row.mode != 0o444 or
+                row.target_id.len != 1 or row.target_id[0] != '-' or
                 row.snapshot_id.len != 1 or row.snapshot_id[0] != '-' or
                 row.member_path.len != 1 or row.member_path[0] != '-' or
                 !std.mem.eql(u8, row.snapshot_format, snapshot_format) or
@@ -1193,7 +2037,8 @@ fn validateRowShape(row: Row) !void {
             try validateLogicalId(row.target_id);
             try validateLogicalId(row.snapshot_id);
             try validateRelativeKey(row.member_path);
-            if (!isDash(row.snapshot_format) or
+            if (row.mode != 0o444 or
+                !isDash(row.snapshot_format) or
                 !isDash(row.recipe_sha256) or
                 !isDash(row.constituent_sha256))
             {
@@ -1227,7 +2072,9 @@ fn validateRelationships(manifest: Manifest) !void {
             .object => {},
             .logical_ref => {
                 const target = findRow(manifest, row.target_id) orelse return error.MissingTargetObject;
-                if (target.kind != .object or !sameIdentity(row, target)) return error.LogicalRefMismatch;
+                if (target.kind != .object or !logicalRefMatchesTarget(row, target)) {
+                    return error.LogicalRefMismatch;
+                }
             },
             .snapshot => {
                 var constituent_matches: usize = 0;
@@ -1279,6 +2126,12 @@ fn findRow(manifest: Manifest, logical_id: []const u8) ?Row {
 
 fn sameIdentity(a: Row, b: Row) bool {
     return std.mem.eql(u8, a.sha256, b.sha256) and a.bytes == b.bytes and a.mode == b.mode;
+}
+
+fn logicalRefMatchesTarget(logical_ref: Row, target: Row) bool {
+    return std.mem.eql(u8, logical_ref.sha256, target.sha256) and
+        logical_ref.bytes == target.bytes and
+        std.mem.eql(u8, logical_ref.media_type, target.media_type);
 }
 
 fn sortedObjectGroup(
@@ -2079,6 +2932,189 @@ fn manifestForSynthetic(
     return output.toOwnedSlice(allocator);
 }
 
+fn assertRetainedMaterializeBoundaries(io: std.Io) !void {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    if (std.Io.Dir.cwd().statFile(io, prior_failed_materialize_store, .{
+        .follow_symlinks = false,
+    })) |_| {
+        return error.PriorMaterializeStoreMustRemainAbsent;
+    } else |err| switch (err) {
+        error.FileNotFound => {},
+        else => return err,
+    }
+    if (std.Io.Dir.cwd().statFile(io, default_store, .{
+        .follow_symlinks = false,
+    })) |_| {
+        return error.RealStoreMustRemainAbsent;
+    } else |err| switch (err) {
+        error.FileNotFound => {},
+        else => return err,
+    }
+
+    const root_stat = try std.Io.Dir.cwd().statFile(
+        io,
+        prior_failed_materialize_continuation_store,
+        .{ .follow_symlinks = false },
+    );
+    if (root_stat.kind != .directory or
+        @as(u16, @intCast(root_stat.permissions.toMode() & 0o7777)) != 0o775)
+    {
+        return error.PriorMaterializeContinuationStoreChanged;
+    }
+    const retained_link =
+        prior_failed_materialize_continuation_store ++ "/authority-symlink";
+    const link_stat = try std.Io.Dir.cwd().statFile(io, retained_link, .{
+        .follow_symlinks = false,
+    });
+    if (link_stat.kind != .sym_link) return error.PriorMaterializeSymlinkChanged;
+    var target_buffer: [16]u8 = undefined;
+    const target_len = try std.Io.Dir.readLinkAbsolute(io, retained_link, &target_buffer);
+    if (!std.mem.eql(u8, target_buffer[0..target_len], ".")) {
+        return error.PriorMaterializeSymlinkChanged;
+    }
+
+    var retained_root = try std.Io.Dir.openDirAbsolute(
+        io,
+        prior_failed_materialize_second_continuation_store,
+        .{ .iterate = true, .follow_symlinks = false },
+    );
+    defer retained_root.close(io);
+    const retained_root_stat = try retained_root.stat(io);
+    if (@as(u16, @intCast(retained_root_stat.permissions.toMode() & 0o7777)) != 0o775) {
+        return error.PriorSecondMaterializeContinuationStoreChanged;
+    }
+    var root_entries = retained_root.iterate();
+    const objects_entry = (try root_entries.next(io)) orelse
+        return error.PriorSecondMaterializeContinuationStoreChanged;
+    if (!std.mem.eql(u8, objects_entry.name, "objects") or objects_entry.kind != .directory or
+        try root_entries.next(io) != null)
+    {
+        return error.PriorSecondMaterializeContinuationStoreChanged;
+    }
+    var objects = try retained_root.openDir(io, "objects", .{
+        .iterate = true,
+        .follow_symlinks = false,
+    });
+    defer objects.close(io);
+    var objects_entries = objects.iterate();
+    const sha_entry = (try objects_entries.next(io)) orelse
+        return error.PriorSecondMaterializeContinuationStoreChanged;
+    if (!std.mem.eql(u8, sha_entry.name, "sha256") or sha_entry.kind != .directory or
+        try objects_entries.next(io) != null)
+    {
+        return error.PriorSecondMaterializeContinuationStoreChanged;
+    }
+    var sha_dir = try objects.openDir(io, "sha256", .{
+        .iterate = true,
+        .follow_symlinks = false,
+    });
+    defer sha_dir.close(io);
+    var sha_entries = sha_dir.iterate();
+    const prefix_entry = (try sha_entries.next(io)) orelse
+        return error.PriorSecondMaterializeContinuationStoreChanged;
+    if (!std.mem.eql(u8, prefix_entry.name, "d8") or prefix_entry.kind != .directory or
+        try sha_entries.next(io) != null)
+    {
+        return error.PriorSecondMaterializeContinuationStoreChanged;
+    }
+    var prefix_dir = try sha_dir.openDir(io, "d8", .{
+        .iterate = true,
+        .follow_symlinks = false,
+    });
+    defer prefix_dir.close(io);
+    var prefix_entries = prefix_dir.iterate();
+    const object_entry = (try prefix_entries.next(io)) orelse
+        return error.PriorSecondMaterializeContinuationStoreChanged;
+    if (!std.mem.eql(u8, object_entry.name, retained_materialize_object_sha[2..]) or
+        object_entry.kind != .file or try prefix_entries.next(io) != null)
+    {
+        return error.PriorSecondMaterializeContinuationStoreChanged;
+    }
+    var retained_object = try prefix_dir.openFile(io, retained_materialize_object_sha[2..], .{
+        .allow_directory = false,
+        .follow_symlinks = false,
+    });
+    defer retained_object.close(io);
+    var retained_identity = try identityOfOpenFileAnyMode(
+        std.testing.allocator,
+        io,
+        retained_object,
+    );
+    defer retained_identity.deinit(std.testing.allocator);
+    if (!std.mem.eql(u8, &retained_identity.sha256, retained_materialize_object_sha) or
+        retained_identity.bytes != retained_materialize_object_bytes or
+        retained_identity.mode != 0o444)
+    {
+        return error.PriorSecondMaterializeContinuationStoreChanged;
+    }
+}
+
+fn generatorTestSourceSpecRow(group_id: []const u8) SourceSpecRow {
+    if (!builtin.is_test) @panic("test-only helper");
+    return .{
+        .logical_id = "test/source",
+        .source_set_id = "test/source-set",
+        .source_path = "test/source",
+        .sha256 = "0000000000000000000000000000000000000000000000000000000000000000",
+        .bytes = 1,
+        .source_mode = 0o444,
+        .media_type = "application/octet-stream",
+        .retention_class = .canonical_input,
+        .object_key = "objects/sha256/00/00000000000000000000000000000000000000000000000000000000000000",
+        .member_path = "objects/sha256/00/00000000000000000000000000000000000000000000000000000000000000",
+        .group_id = group_id,
+        .snapshot_id = "snapshot/test/v1",
+        .snapshot_format = snapshot_format,
+        .recipe_sha256 = snapshot_recipe_sha,
+        .constituent_sha256 = "2222222222222222222222222222222222222222222222222222222222222222",
+        .group_manifest_sha256 = "3333333333333333333333333333333333333333333333333333333333333333",
+    };
+}
+
+const GeneratedMemberMutation = enum {
+    dash_keys,
+    other_object_key,
+    hash,
+    bytes,
+    mode,
+};
+
+fn mutateGeneratedMembers(
+    allocator: std.mem.Allocator,
+    canonical: []const u8,
+    mutation: GeneratedMemberMutation,
+) ![]u8 {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    var manifest = try parseManifest(allocator, canonical);
+    defer manifest.deinit(allocator);
+    var member_indices: [2]usize = undefined;
+    var member_count: usize = 0;
+    for (manifest.rows, 0..) |row, index| {
+        if (row.kind != .snapshot_member) continue;
+        if (member_count == member_indices.len) return error.UnexpectedGeneratedMemberCount;
+        member_indices[member_count] = index;
+        member_count += 1;
+    }
+    if (member_count != member_indices.len) return error.UnexpectedGeneratedMemberCount;
+    const first_index = member_indices[0];
+    const second_index = member_indices[1];
+    const second_target = findRow(
+        manifest,
+        manifest.rows[second_index].target_id,
+    ) orelse return error.MissingTargetObject;
+    switch (mutation) {
+        .dash_keys => {
+            manifest.rows[first_index].key = "-";
+            manifest.rows[second_index].key = "-";
+        },
+        .other_object_key => manifest.rows[first_index].key = second_target.key,
+        .hash => manifest.rows[first_index].sha256 = second_target.sha256,
+        .bytes => manifest.rows[first_index].bytes += 1,
+        .mode => manifest.rows[first_index].mode = 0o400,
+    }
+    return encodeManifest(allocator, manifest);
+}
+
 test "authority resolution is closed and default remains read only" {
     const allocator = std.testing.allocator;
     const forced = try resolveAuthority(allocator, synthetic_store, "/home/oleg/prog/z_llvm/.git");
@@ -2200,6 +3236,95 @@ test "manifest schema round trips and rejects unsafe or unknown input" {
     defer allocator.free(missing_target);
     try std.testing.expectError(error.MissingTargetObject, parseManifest(allocator, missing_target));
 
+    const logical_mode_split = try std.fmt.allocPrint(
+        allocator,
+        schema_magic ++ "\n" ++ schema_header ++ "\n" ++
+            "object\tobject.one\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tobjects/sha256/00/{s}\t-\t-\t-\t-\t-\t-\n" ++
+            "logical-ref\tref.one\t{s}\t1\t664\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tcompatibility/object.one\tobject.one\t-\t-\t-\t-\t-\n",
+        .{ zero_sha, zero_sha[2..], zero_sha },
+    );
+    defer allocator.free(logical_mode_split);
+    var split_manifest = try parseManifest(allocator, logical_mode_split);
+    defer split_manifest.deinit(allocator);
+    const split_ref = findRow(split_manifest, "ref.one") orelse return error.MissingLogicalReference;
+    const split_target = findRow(split_manifest, "object.one") orelse return error.MissingTargetObject;
+    try std.testing.expectEqual(@as(u16, 0o664), split_ref.mode);
+    try std.testing.expectEqual(@as(u16, 0o444), split_target.mode);
+    try std.testing.expect(logicalRefMatchesTarget(split_ref, split_target));
+
+    const logical_hash_mismatch = try std.mem.replaceOwned(
+        u8,
+        allocator,
+        logical_mode_split,
+        "logical-ref\tref.one\t0000000000000000000000000000000000000000000000000000000000000000",
+        "logical-ref\tref.one\t1111111111111111111111111111111111111111111111111111111111111111",
+    );
+    defer allocator.free(logical_hash_mismatch);
+    try std.testing.expectError(
+        error.LogicalRefMismatch,
+        parseManifest(allocator, logical_hash_mismatch),
+    );
+    const logical_byte_mismatch = try std.mem.replaceOwned(
+        u8,
+        allocator,
+        logical_mode_split,
+        "logical-ref\tref.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t664",
+        "logical-ref\tref.one\t0000000000000000000000000000000000000000000000000000000000000000\t2\t664",
+    );
+    defer allocator.free(logical_byte_mismatch);
+    try std.testing.expectError(
+        error.LogicalRefMismatch,
+        parseManifest(allocator, logical_byte_mismatch),
+    );
+    const logical_media_mismatch = try std.mem.replaceOwned(
+        u8,
+        allocator,
+        logical_mode_split,
+        "logical-ref\tref.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t664\tapplication/octet-stream",
+        "logical-ref\tref.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t664\ttext/plain",
+    );
+    defer allocator.free(logical_media_mismatch);
+    try std.testing.expectError(
+        error.LogicalRefMismatch,
+        parseManifest(allocator, logical_media_mismatch),
+    );
+    const logical_target_mismatch = try std.mem.replaceOwned(
+        u8,
+        allocator,
+        logical_mode_split,
+        "\tobject.one\t-\t-\t-\t-\t-\n",
+        "\tobject.missing\t-\t-\t-\t-\t-\n",
+    );
+    defer allocator.free(logical_target_mismatch);
+    try std.testing.expectError(
+        error.MissingTargetObject,
+        parseManifest(allocator, logical_target_mismatch),
+    );
+    const logical_target_key_mismatch = try std.mem.replaceOwned(
+        u8,
+        allocator,
+        logical_mode_split,
+        "objects/sha256/00/00000000000000000000000000000000000000000000000000000000000000",
+        "objects/sha256/00/00000000000000000000000000000000000000000000000000000000000001",
+    );
+    defer allocator.free(logical_target_key_mismatch);
+    try std.testing.expectError(
+        error.InvalidObjectRow,
+        parseManifest(allocator, logical_target_key_mismatch),
+    );
+    const non_immutable_object = try std.mem.replaceOwned(
+        u8,
+        allocator,
+        logical_mode_split,
+        "object\tobject.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t444",
+        "object\tobject.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t400",
+    );
+    defer allocator.free(non_immutable_object);
+    try std.testing.expectError(
+        error.InvalidObjectRow,
+        parseManifest(allocator, non_immutable_object),
+    );
+
     const incomplete_snapshot = try std.mem.replaceOwned(
         u8,
         allocator,
@@ -2209,6 +3334,31 @@ test "manifest schema round trips and rejects unsafe or unknown input" {
     );
     defer allocator.free(incomplete_snapshot);
     try std.testing.expectError(error.InvalidSnapshotRow, parseManifest(allocator, incomplete_snapshot));
+
+    const non_immutable_snapshot = try std.mem.replaceOwned(
+        u8,
+        allocator,
+        text,
+        "snapshot\tsnapshot.one\t1111111111111111111111111111111111111111111111111111111111111111\t2\t444",
+        "snapshot\tsnapshot.one\t1111111111111111111111111111111111111111111111111111111111111111\t2\t400",
+    );
+    defer allocator.free(non_immutable_snapshot);
+    try std.testing.expectError(
+        error.InvalidSnapshotRow,
+        parseManifest(allocator, non_immutable_snapshot),
+    );
+    const non_immutable_snapshot_member = try std.mem.replaceOwned(
+        u8,
+        allocator,
+        text,
+        "snapshot-member\tmember.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t444",
+        "snapshot-member\tmember.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t400",
+    );
+    defer allocator.free(non_immutable_snapshot_member);
+    try std.testing.expectError(
+        error.InvalidSnapshotMemberRow,
+        parseManifest(allocator, non_immutable_snapshot_member),
+    );
 
     const key_mismatch = try std.fmt.allocPrint(
         allocator,
@@ -2230,6 +3380,158 @@ test "manifest schema round trips and rejects unsafe or unknown input" {
     );
     defer allocator.free(conflicting_key);
     try std.testing.expectError(error.ConflictingManifestKey, parseManifest(allocator, conflicting_key));
+}
+
+test "published snapshot generator binds every member to its exact object key" {
+    const allocator = std.testing.allocator;
+    const sha_a = "0000000000000000000000000000000000000000000000000000000000000000";
+    const sha_b = "1111111111111111111111111111111111111111111111111111111111111111";
+    const constituent_sha =
+        "2222222222222222222222222222222222222222222222222222222222222222";
+    const archive_sha =
+        "3333333333333333333333333333333333333333333333333333333333333333";
+    const key_a =
+        "objects/sha256/00/00000000000000000000000000000000000000000000000000000000000000";
+    const key_b =
+        "objects/sha256/11/11111111111111111111111111111111111111111111111111111111111111";
+    const constituent_key =
+        "objects/sha256/22/22222222222222222222222222222222222222222222222222222222222222";
+    const archive_key =
+        "snapshots/sha256/33/33333333333333333333333333333333333333333333333333333333333333.tar.zst";
+    const group_id = "test-generated-snapshot";
+    const snapshot_id = "snapshot/test-generated/v1";
+    const objects = [_]FileIdentity{
+        .{
+            .sha256 = sha_a.*,
+            .bytes = 7,
+            .mode = 0o444,
+            .key = @constCast(key_a),
+        },
+        .{
+            .sha256 = sha_b.*,
+            .bytes = 11,
+            .mode = 0o444,
+            .key = @constCast(key_b),
+        },
+    };
+    const object_rows = [_]usize{ 0, 1 };
+    var source_rows = [_]SourceSpecRow{
+        generatorTestSourceSpecRow(group_id),
+        generatorTestSourceSpecRow(group_id),
+    };
+    var empty_storage: [0]u8 = .{};
+    const spec: SourceSpec = .{
+        .storage = &empty_storage,
+        .rows = &source_rows,
+    };
+    var empty_member_keys: [0][]u8 = .{};
+    const snapshot: SnapshotIdentity = .{
+        .archive = .{
+            .sha256 = archive_sha.*,
+            .bytes = 17,
+            .mode = 0o444,
+            .key = @constCast(archive_key),
+        },
+        .constituent = .{
+            .sha256 = constituent_sha.*,
+            .bytes = 19,
+            .mode = 0o444,
+            .key = @constCast(constituent_key),
+        },
+        .member_keys = &empty_member_keys,
+    };
+
+    var output: std.ArrayList(u8) = .empty;
+    defer output.deinit(allocator);
+    try appendManifestPreamble(allocator, &output);
+    for (objects) |object| {
+        const object_id = try std.fmt.allocPrint(
+            allocator,
+            "object/sha256/{s}",
+            .{&object.sha256},
+        );
+        defer allocator.free(object_id);
+        try appendManifestRowText(allocator, &output, .{
+            .kind = .object,
+            .logical_id = object_id,
+            .sha256 = &object.sha256,
+            .bytes = object.bytes,
+            .mode = object.mode,
+            .media_type = "application/octet-stream",
+            .provenance = "generator-test",
+            .reconstruction = "generator-test",
+            .retention_class = .canonical_input,
+            .status = .active,
+            .key = object.key,
+            .target_id = "-",
+            .snapshot_id = "-",
+            .member_path = "-",
+            .snapshot_format = "-",
+            .recipe_sha256 = "-",
+            .constituent_sha256 = "-",
+        });
+    }
+    try appendPublishedConstituentObject(allocator, &output, snapshot.constituent);
+    try appendPublishedSnapshot(
+        allocator,
+        &output,
+        snapshot_id,
+        snapshot,
+        &objects,
+        &object_rows,
+        spec,
+        group_id,
+    );
+    const canonical = try output.toOwnedSlice(allocator);
+    defer allocator.free(canonical);
+    var manifest = try parseManifest(allocator, canonical);
+    defer manifest.deinit(allocator);
+    const reencoded = try encodeManifest(allocator, manifest);
+    defer allocator.free(reencoded);
+    try std.testing.expectEqualStrings(canonical, reencoded);
+
+    var generated_member_count: usize = 0;
+    for (manifest.rows) |row| {
+        if (row.kind != .snapshot_member) continue;
+        const target = findRow(manifest, row.target_id) orelse return error.MissingTargetObject;
+        try std.testing.expectEqual(RowKind.object, target.kind);
+        try std.testing.expectEqualStrings(target.key, row.key);
+        try std.testing.expectEqualStrings(target.key, row.member_path);
+        try std.testing.expect(sameIdentity(row, target));
+        generated_member_count += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 2), generated_member_count);
+
+    const dash_keys = try mutateGeneratedMembers(allocator, canonical, .dash_keys);
+    defer allocator.free(dash_keys);
+    try std.testing.expectError(
+        error.ConflictingManifestKey,
+        parseManifest(allocator, dash_keys),
+    );
+    const other_object_key = try mutateGeneratedMembers(allocator, canonical, .other_object_key);
+    defer allocator.free(other_object_key);
+    try std.testing.expectError(
+        error.ConflictingManifestKey,
+        parseManifest(allocator, other_object_key),
+    );
+    const mismatched_hash = try mutateGeneratedMembers(allocator, canonical, .hash);
+    defer allocator.free(mismatched_hash);
+    try std.testing.expectError(
+        error.ConflictingManifestKey,
+        parseManifest(allocator, mismatched_hash),
+    );
+    const mismatched_bytes = try mutateGeneratedMembers(allocator, canonical, .bytes);
+    defer allocator.free(mismatched_bytes);
+    try std.testing.expectError(
+        error.ConflictingManifestKey,
+        parseManifest(allocator, mismatched_bytes),
+    );
+    const mismatched_mode = try mutateGeneratedMembers(allocator, canonical, .mode);
+    defer allocator.free(mismatched_mode);
+    try std.testing.expectError(
+        error.InvalidSnapshotMemberRow,
+        parseManifest(allocator, mismatched_mode),
+    );
 }
 
 test "snapshot listing validation is closed to sorted regular members" {
@@ -2345,6 +3647,93 @@ test "registration drift is modeled without mutating git" {
     try std.testing.expect(!actual.eql(drift));
 }
 
+test "canonical calls source specification is closed and produces canonical proposed rows" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    const canonical = try std.Io.Dir.cwd().readFileAlloc(
+        io,
+        canonical_source_spec_path,
+        allocator,
+        .limited(256 * 1024),
+    );
+    defer allocator.free(canonical);
+    try std.testing.expectEqualStrings(canonical_source_spec_sha, &sha256Hex(canonical));
+
+    var spec = try parseSourceSpecOwned(allocator, try allocator.dupe(u8, canonical));
+    defer spec.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 19), spec.rows.len);
+    try std.testing.expectEqual(@as(u16, 0o664), spec.rows[0].source_mode);
+    const proposed = try proposedManifestForSourceSpec(allocator, spec);
+    defer allocator.free(proposed);
+    const tracked_proposed = try std.Io.Dir.cwd().readFileAlloc(
+        io,
+        proposed_live_manifest_path,
+        allocator,
+        .limited(256 * 1024),
+    );
+    defer allocator.free(tracked_proposed);
+    try validateProposedManifestFieldCounts(tracked_proposed);
+    try std.testing.expectEqualStrings(tracked_proposed, proposed);
+    var manifest = try parseManifest(allocator, proposed);
+    defer manifest.deinit(allocator);
+    const ac_ref = findRow(manifest, "calls/input/accepted-cohort-ac285/v1") orelse
+        return error.MissingLogicalReference;
+    const ac_object = findRow(
+        manifest,
+        "object/sha256/d8da86cae494d7d4a58053ab24b1e8be944859263072b85ffa164880b0110cd4",
+    ) orelse return error.MissingTargetObject;
+    try std.testing.expectEqual(@as(u16, 0o664), ac_ref.mode);
+    try std.testing.expectEqual(@as(u16, 0o444), ac_object.mode);
+    try std.testing.expect(logicalRefMatchesTarget(ac_ref, ac_object));
+    const reencoded = try encodeManifest(allocator, manifest);
+    defer allocator.free(reencoded);
+    try std.testing.expectEqualStrings(proposed, reencoded);
+
+    const too_many_fields =
+        schema_magic ++ "\n" ++ schema_header ++ "\n" ++
+        "logical-ref\tcalls/input/test/v1\t0000000000000000000000000000000000000000000000000000000000000000\t1\t444\ttext/plain\ttest\ttest\tcanonical-input\tfuture-required\tplanned/test\tobject/test\t-\t-\t-\t-\t-\t-\n";
+    try std.testing.expectError(
+        error.ProposedManifestFieldCountMismatch,
+        validateProposedManifestFieldCounts(too_many_fields),
+    );
+
+    const bad_magic = try std.mem.replaceOwned(
+        u8,
+        allocator,
+        canonical,
+        source_spec_magic,
+        "zllvm-calls-canonical-source-spec-v2",
+    );
+    try std.testing.expectError(
+        error.UnknownSourceSpecVersion,
+        parseSourceSpecOwned(allocator, bad_magic),
+    );
+
+    const bad_key = try std.mem.replaceOwned(
+        u8,
+        allocator,
+        canonical,
+        "objects/sha256/d8/da86cae494d7d4a58053ab24b1e8be944859263072b85ffa164880b0110cd4",
+        "objects/sha256/d8/da86cae494d7d4a58053ab24b1e8be944859263072b85ffa164880b0110cd5",
+    );
+    try std.testing.expectError(
+        error.ObjectKeyShaMismatch,
+        parseSourceSpecOwned(allocator, bad_key),
+    );
+
+    const bad_group = try std.mem.replaceOwned(
+        u8,
+        allocator,
+        canonical,
+        "\tcalls-validation-inputs\tsnapshot/calls-validation-inputs/v1\t",
+        "\tcalls-inputs\tsnapshot/calls-validation-inputs/v1\t",
+    );
+    try std.testing.expectError(
+        error.SourceSetGroupMismatch,
+        parseSourceSpecOwned(allocator, bad_group),
+    );
+}
+
 test "synthetic store publishes verifies snapshots and resolves without overwrite" {
     const allocator = std.testing.allocator;
     const io = std.testing.io;
@@ -2373,14 +3762,14 @@ test "synthetic store publishes verifies snapshots and resolves without overwrit
         guard.assertStoreRoot(protected_ancestor),
     );
     try guard.assertReadSource(
-        "/home/oleg/prog/z_llvm/docs/evidence",
-        "/home/oleg/prog/z_llvm/docs/evidence/zllvm_artifact_manifest_v1.template.tsv",
+        "/home/oleg/prog/z_llvm/tmp/inbox63_accepted_cohort.ll",
+        "/home/oleg/prog/z_llvm/tmp/inbox63_accepted_cohort.ll",
     );
     try std.testing.expectError(
         error.RegisteredWorktreeOverlap,
         guard.assertReadSource(
             main_repository,
-            "/home/oleg/prog/z_llvm/docs/evidence/zllvm_artifact_manifest_v1.template.tsv",
+            "/home/oleg/prog/z_llvm/tmp/inbox63_accepted_cohort.ll",
         ),
     );
     try verifyToolchain(allocator, io);
@@ -2430,21 +3819,67 @@ test "synthetic store publishes verifies snapshots and resolves without overwrit
         error.FileNotFound => {},
         else => return err,
     }
-    if (std.Io.Dir.openDirAbsolute(io, default_store, .{ .follow_symlinks = false })) |existing| {
-        existing.close(io);
-        return error.RealStoreMustRemainAbsent;
-    } else |err| switch (err) {
-        error.FileNotFound => {},
-        else => return err,
-    }
+    try assertRetainedMaterializeBoundaries(io);
 
     const sync_before_root = test_directory_sync_count;
-    try createAbsoluteDirectorySynced(io, synthetic_store);
+    try prepareStoreRoot(allocator, io, &guard, synthetic_store);
     try std.testing.expect(test_directory_sync_count >= sync_before_root + 2);
     errdefer std.debug.print(
-        "INBOX-193C retain-on-failure synthetic_root={s}\n",
+        "INBOX-194D retain-on-failure synthetic_root={s}\n",
         .{synthetic_store},
     );
+
+    try std.testing.expectError(
+        error.PathNotNormalized,
+        validateAuthorityAncestry(
+            allocator,
+            io,
+            synthetic_store ++ "/../z_llvm-inbox194d-artifact-store-synthetic",
+        ),
+    );
+    const generic_authority = try std.fs.path.join(
+        allocator,
+        &.{ synthetic_store, "authority-generic-child" },
+    );
+    defer allocator.free(generic_authority);
+    try prepareStoreRoot(allocator, io, &guard, generic_authority);
+    try std.testing.expect(try validateAuthorityAncestry(allocator, io, generic_authority));
+    try removeAbsoluteDirectorySynced(io, generic_authority);
+
+    {
+        var authority_root = try std.Io.Dir.openDirAbsolute(io, synthetic_store, .{
+            .access_sub_paths = true,
+            .iterate = true,
+            .follow_symlinks = false,
+        });
+        defer authority_root.close(io);
+        try authority_root.symLink(io, ".", "authority-symlink", .{});
+        const symlink_authority = try std.fs.path.join(
+            allocator,
+            &.{ synthetic_store, "authority-symlink", "child" },
+        );
+        defer allocator.free(symlink_authority);
+        if (validateAuthorityAncestry(allocator, io, symlink_authority)) |_| {
+            return error.SymlinkAuthorityWasAccepted;
+        } else |err| switch (err) {
+            error.AuthoritySymlinkComponent,
+            error.AuthorityNonDirectoryComponent,
+            => {},
+            else => return err,
+        }
+        try authority_root.deleteFile(io, "authority-symlink");
+        try writeExclusive(io, authority_root, "authority-file", "not a directory\n", 0o444);
+        const file_authority = try std.fs.path.join(
+            allocator,
+            &.{ synthetic_store, "authority-file", "child" },
+        );
+        defer allocator.free(file_authority);
+        try std.testing.expectError(
+            error.AuthorityNonDirectoryComponent,
+            validateAuthorityAncestry(allocator, io, file_authority),
+        );
+        try authority_root.deleteFile(io, "authority-file");
+    }
 
     var store = try Store.open(allocator, io, &guard, synthetic_store);
     var store_open = true;
@@ -2461,16 +3896,11 @@ test "synthetic store publishes verifies snapshots and resolves without overwrit
     try std.testing.expect(observed.free_inodes > 0);
 
     var streamed_object = try store.publishFile(
-        "/home/oleg/prog/z_llvm/docs/evidence",
-        "/home/oleg/prog/z_llvm/docs/evidence/zllvm_artifact_manifest_v1.template.tsv",
+        "/home/oleg/prog/z_llvm/tmp/inbox63_accepted_cohort.ll",
+        "/home/oleg/prog/z_llvm/tmp/inbox63_accepted_cohort.ll",
     );
     defer streamed_object.deinit(allocator);
     try store.verifyObject(streamed_object);
-    if (store.publishFile("/home/oleg/prog/z_llvm/docs", "/home/oleg/prog/z_llvm/docs")) |unexpected| {
-        var mutable = unexpected;
-        mutable.deinit(allocator);
-        return error.NonRegularReadSourceWasAccepted;
-    } else |_| {}
 
     const rejected_before = "prepublication corruption must never become final\n";
     const rejected_before_sha = sha256Hex(rejected_before);
@@ -2796,13 +4226,7 @@ test "synthetic store publishes verifies snapshots and resolves without overwrit
         error.FileNotFound => {},
         else => return err,
     }
-    if (std.Io.Dir.openDirAbsolute(io, default_store, .{ .follow_symlinks = false })) |unexpected| {
-        unexpected.close(io);
-        return error.RealStoreWasCreated;
-    } else |err| switch (err) {
-        error.FileNotFound => {},
-        else => return err,
-    }
+    try assertRetainedMaterializeBoundaries(io);
     var original_after = try std.Io.Dir.openDirAbsolute(io, original_failed_store, .{
         .iterate = true,
         .follow_symlinks = false,
