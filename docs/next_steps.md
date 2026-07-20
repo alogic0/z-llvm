@@ -24,7 +24,79 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-194A proposed-manifest field correction and authority-generic dormant publication — AUTHORIZED
+## INBOX-194B pinned no-follow diagnostic correction and one logged continuation — AUTHORIZED
+
+INBOX-194A at unchanged HEAD `aefdae5d` is accepted only as a compliant
+retain-and-stop. Its sole continuation orchestration stopped in the first unit
+phase with 6/7 tests passing and status 1, before any plan or publish CLI
+command. The new root is retained at
+`/home/oleg/prog/z_llvm-inbox194a-artifact-store-synthetic`, mode 0775, with
+exactly `authority-symlink -> .`; the INBOX-194 root and real store remain
+absent. Preserve that root, symlink, every INBOX-194/194A record, and the
+retained dirty composite exactly.
+
+Implementation acceptance remains withheld because the full CLI path is
+unexecuted. Static and retained-log review closes the immediate failure: the
+test expected `AuthoritySymlinkComponent` for an intermediate symlink, while
+the pinned Zig/Linux no-follow directory API reports `NotDir`, which production
+correctly maps to `AuthorityNonDirectoryComponent`. Both representations reject
+unsafe ancestry fail-closed.
+
+Preserve production authority validation unchanged. Change only the focused
+symlink-negative assertion so success and every error other than exactly
+`AuthoritySymlinkComponent` or `AuthorityNonDirectoryComponent` fail. Keep the
+ordinary-file ancestry negative pinned exactly to
+`AuthorityNonDirectoryComponent`. Add no error translation, fallback filesystem
+probing, weaker success path, or broader error set.
+
+Use only the initially absent, canonical, worktree-disjoint continuation root:
+
+`/home/oleg/prog/z_llvm-inbox194b-artifact-store-synthetic`.
+
+Use a fresh record namespace beneath
+`tmp/inbox194b_o2_artifact_store_cli_dormant/validation/`. Repoint only the
+synthetic test root to INBOX-194B. Before and after every phase, verify with
+no-follow/readlink-style inspection that the INBOX-194 root is absent, the
+complete INBOX-194A root and exact symlink remain retained, and
+`/home/oleg/prog/z_llvm-artifacts` remains absent.
+
+Run formatting/static/compile-only checks first, then exactly one fully
+recorded orchestration. No component may be retried or substituted. Failure
+retains the complete INBOX-194B root, records, and patch and stops without
+diagnosis, repair, cleanup, commit, alternate command, or fix-forward. Complete
+success alone may remove only the reverified INBOX-194B root; preserve INBOX-194A
+and all earlier state, record all three attempt ledgers, commit only the bounded
+tool, exact specification, corrected proposed fragment, and evidence, and stop
+for review.
+
+The retained dispatch ledger is:
+
+```text
+HEAD=aefdae5dbddf3df9c69d1b7ee58fed92d3aa7b1a
+tools/zllvm_artifact_store.zig=modified,3784_lines,sha256:1738479441e3b94891908be5689cfe9ad69004bed2543ba0cf5dda9370641e21
+docs/evidence/inbox194_calls_canonical_source_spec_v1.tsv=untracked,21_lines,sha256:0cccda72e172c09cdb8baade7269c23727b17533f517505829528d15076b5e3d
+docs/evidence/inbox194_calls_proposed_live_manifest_v1.tsv=untracked,37_lines,sha256:9634b973f452c86e5575e721ca1b09c6151363f29bb95f803c07db8ae638a54a
+proposed_data_rows=35_all_exactly_17_fields
+inbox194_root=absent
+inbox194a_root=retained_mode_0775_exact_symlink_authority-symlink_to_dot
+real_store=absent
+suite=6_pass,1_fail,status:1
+command_sha256=583c6a3a2b6621bbee7d2cdf3287c141c19b4de2324b6e54dcaacd0c9b476ab5
+environment_sha256=6684a95c4cec87f0001802eb5e0a39a3e0bcdef6b2594efede5b4c23835a8a43
+stdout_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+stderr_sha256=622ed4d97d69cbf3c9d7c419731d398d75b96871a355cb853bcd754f0946ab47
+status_sha256=4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865
+original_record_ledger_sha256=19517ec589e2aadeb2a93199a233c12b09072354e71c01a8ad80fa96201a0610
+registration_before_sha256=9dc4584b04abfab4e1b95c85ad4f2c0b2065f4007cf34a34730d56540809a675
+```
+
+All existing infrastructure identities, protected-worktree rules, pins,
+contracts, calls sequence, mandatory post-calls checkpoint, and ratchet 131
+remain unchanged. No real publication, live rows, compatibility copies,
+pin/contract edits, v3 work, cleanup, wiring, performance, Tier work, ratchet
+movement, or credit is authorized.
+
+## INBOX-194A proposed-manifest field correction and authority-generic dormant publication — COMPLIANT RETAIN-AND-STOP; IMPLEMENTATION WITHHELD
 
 INBOX-194 at unchanged HEAD `f324a50c` is accepted only as a compliant
 retain-and-stop. Its sole orchestration stopped in the first unit phase with
