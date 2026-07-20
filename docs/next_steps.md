@@ -24,7 +24,64 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-202H corrected preflight and no-rerun record-mode remediation resumption — AUTHORIZED
+## INBOX-202I sanitized Git-clean predicate correction and unchanged remediation resumption — AUTHORIZED
+
+INBOX-202H is accepted as a compliant sanitized-cleanliness preflight stop at
+operating HEAD `a3de1a90...`; remediation remains incomplete. Its shell exited
+before `mkdir`, so G remains absent and no record or `dd` copy was created.
+
+The sole mismatch was environmental: sanitized `env -i` had no `HOME` and
+therefore could not load the normal default global ignore that excludes the
+pre-existing `.claude/settings.local.json`. Unqualified sanitized status
+reported `?? .claude/`; normal explicit all-untracked status and sanitized
+tracked-only status are empty.
+
+Treat `.claude/`, `.claude/settings.local.json`, and
+`/home/oleg/.config/git/ignore` as protected, pre-existing, and outside all
+artifact/evidence scope. Record only this explanation and the literal paths.
+Do not read, copy, hash, stat, traverse, normalize, stage, edit, remove, or
+modify them. Do not inject `HOME`, XDG configuration, or global Git
+configuration into the sanitized shell.
+
+Before the sanitized shell, require normal:
+
+```text
+git status --porcelain=v1 --untracked-files=all
+```
+
+to be empty. Inside the sanitized shell, change only the main-clean check to:
+
+```text
+git status --porcelain=v1 --untracked-files=no
+```
+
+Preserve every INBOX-202H frozen identity, protection, scope limit, and
+prohibition. G remains exact absent at:
+
+```text
+/tmp/zllvm-inbox202g-local-state-record-mode-remediation-evidence
+```
+
+Repeat all finite named preflights. Keep their passed results within an
+already authorized metadata ledger so G remains exactly seven files.
+
+Only after every preflight passes, perform the otherwise unchanged three
+GNU `dd` copies under sanitized closed `umask 0022`, then prove the exact
+seven-file G shape and 25-role split-root canonical set: 22 existing F
+`0644` records plus three G copies, each role resolved once. Never alter F.
+
+Do not rerun the verifier, archive stream, transaction/publication driver,
+ratchet, project, or Zig. Any failure retains and stops without retry,
+diagnosis, repair, cleanup, evidence edit, or commit. Full success commits
+only `docs/evidence/inbox202_local_state_artifact_copy_verify.md`, documents
+INBOX-202 through INBOX-202I, leaves source authoritative and destination
+non-authoritative, preserves ratchet 131, and stops clean.
+
+No authority transition, control/manifest/tool/contract/pin/source/worktree
+or protected-path edit, compatibility, validation, wiring, performance,
+cleanup, or credit is authorized.
+
+## INBOX-202H corrected preflight and no-rerun record-mode remediation resumption — ACCEPTED SANITIZED-CLEANLINESS STOP; INCORPORATED INTO INBOX-202I
 
 INBOX-202G is accepted as a compliant read-only-preflight stop at operating
 HEAD `66cdf658...`; remediation remains incomplete. G was never created and no
