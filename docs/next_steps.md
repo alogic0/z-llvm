@@ -24,7 +24,65 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-202D numeric static-verifier correction and copy resume — AUTHORIZED
+## INBOX-202E read-only snapshot-verifier diagnosis — AUTHORIZED
+
+INBOX-202D is accepted only as a compliant fail-closed post-publication,
+pre-snapshot-verification stop at operating HEAD `edf97754...`.
+Copy/migration acceptance, authority transition, and all downstream work
+remain withheld.
+
+All preflight and static gates passed. The retained transaction ledger has
+exactly 20 pass rows: 18 objects plus two snapshots totaling `9,970,364`
+bytes. A finite table-driven read-only audit verified every destination key,
+hash, byte count, immutable mode `0444`, UID/GID `1000/1000`, and link count
+one; `incoming/` is empty. The D driver exited status `1` with empty
+stdout/stderr after publication and before the first snapshot-member row or
+`final-inventory.tsv`.
+
+Preserve every source/destination byte and inode and all three evidence
+roots. Freeze the retained D-driver SHA-256 `ccd1c83a...` and all nine D
+record hashes from the newest worker-inbox directive.
+
+Authorize only a read-only diagnosis rooted exactly at:
+
+```text
+/tmp/zllvm-inbox202e-local-state-snapshot-diagnosis-evidence
+```
+
+Require exact no-follow absence/disjointness and all frozen read-only
+preflights before creating it. Do not rerun the ratchet AWK or transaction.
+
+Map the retained driver's snapshot-verification logic to stable assertion
+IDs rather than line numbers. Cover, in original order, snapshot selection
+and count; archive identity and format; finite member selection/order;
+archive listing command and equality; streamed-member command and count;
+constituent serialization/hash/object identity; each streamed member hash;
+and each member destination identity.
+
+Use only the two manifest-declared snapshots and their finite member lists.
+Freeze exact GNU tar/zstd paths, versions, executable hashes, and closed
+read-only commands. Use no pipeline, broad discovery, or extraction to
+files. Stream each member independently through a no-file mechanism such as
+GNU tar `--to-command`; if that is not safely possible with installed tools,
+stop before diagnosis.
+
+Evaluate every subject assertion separately and record stable ID,
+dependencies, pass/fail/blocked, expected/observed values, and command status.
+Identify the first false assertion and label downstream cascades. A nonzero
+diagnostic-harness status is diagnosis failure and permits no commit; a
+complete status-zero harness may report false subject assertions.
+
+Implement nothing. On complete diagnosis, commit only
+`docs/evidence/inbox202e_local_state_snapshot_verifier_diagnosis.md`, naming
+the smallest prospective correction, then stop clean. Any failure retains
+the new root and all prior state without retry, repair, cleanup, or commit.
+
+Source authority and ratchet 131 remain unchanged. No transaction retry,
+copy/publication, chmod/chown, authority change, project/Zig execution,
+ratchet recount, source/control/manifest/tool/contract/pin/worktree edit,
+compatibility, validation, wiring, performance, or credit is authorized.
+
+## INBOX-202D numeric static-verifier correction and copy resume — ACCEPTED FAIL-STOP; INCORPORATED INTO INBOX-202E
 
 INBOX-202C is accepted only as a compliant post-root, pre-transaction
 static-verification stop at unchanged HEAD `15d12eba...`. All pre-root checks
