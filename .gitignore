@@ -27,3 +27,4 @@ docs/worker_inbox.md
 # log files
 **/*.log
 
+/local-state/
