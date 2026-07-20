@@ -24,7 +24,75 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-203A documentation-only exact hash and production-consumer inventory correction — AUTHORIZED
+## INBOX-204 inert protected-control candidate generation-1 metadata commit — AUTHORIZED
+
+INBOX-203A commit
+`5ba4d60c5096c172b72bbd740cf22e7d1e5fed3b` and the corrected
+authority-transition design are accepted in full.
+
+This is explicit permission to modify only:
+
+```text
+/home/oleg/prog/z_llvm/local-state/control
+```
+
+and add only these four real regular mode-`0644` files:
+
+```text
+authority/zllvm/v1/manifests/candidate.tsv
+authority/zllvm/v1/manifests/generation-00000001.tsv
+authority/zllvm/v1/lineage/generation-00000001.tsv
+authority/zllvm/v1/receipts/publication/generation-00000001-payload-copy.tsv
+```
+
+Require clean control at `a41690a4c47cf1040afe3d4dd3679a77015263ea`,
+tree `67582eb6f4de0b3ab3a2ef2e7c3635c79349d00e`, branch `main`, no
+remote, and exact no-follow absence of `authority` and every target/parent.
+
+Copy the accepted main manifest byte-for-byte, without regeneration, as the
+control generation manifest:
+
+```text
+sha256=61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d
+bytes=27823
+mode=0644
+```
+
+Create exact canonical lineage and payload-copy receipt bytes from the
+accepted INBOX-203 schemas and values. The exact receipt ID is:
+
+```text
+zllvm-generation-00000001-payload-copy
+```
+
+The receipt binds source/destination inventory hashes
+`3234fb50...` / `a06c48e1...` / `4c29709b...`, payload facts
+`20/9970364/18/2/0444`, and INBOX-202 evidence hash
+`4b532daabe33e7c6eaca7f0ab412d9c271b55b6b1de8235dd3d4f65d7ab6f7a6`.
+
+Finalize and hash generation, lineage, and receipt first. Then construct the
+single-row candidate declaration with authority ID `zllvm-local-state-v1`,
+generation `00000001`, exact local-state payload root, exact relative keys
+and read-back hashes, manifest bytes/mode `27823/0644`, source root/hash, and
+state `candidate`.
+
+Require exact magic/header/field count/closed values/order/LF, parse-reencode
+and read-back equality, exactly four new files, policy size compliance, no
+other control change, clean main, and absence of live/validation/activation/
+terminal metadata. Commit only the four files in control and record its
+commit/tree and file identities in the retained final report. Do not create
+a main evidence commit.
+
+The candidate is inert. Source remains authoritative; destination remains
+non-authoritative; current main ignores control candidate metadata.
+
+No main/source/tool/manifest/contract/pin/build/script change, project or Zig
+execution, authority activation, validation, compatibility, v3, payload
+publication, cleanup, ratchet movement, or credit is authorized. Failure
+retains partial control state and stops without retry/repair/cleanup/commit.
+Success leaves both repositories clean and stops for candidate review.
+
+## INBOX-203A documentation-only exact hash and production-consumer inventory correction — ACCEPTED; INCORPORATED INTO INBOX-204
 
 INBOX-203 commit
 `8f04b147a6012c0a3df00fbc0827bc854889938c` is accepted only as a
