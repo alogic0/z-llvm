@@ -24,7 +24,76 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BB inert Phase-3 wrapper-package specification — AUTHORIZED
+## INBOX-206BC partial assertion-authority freeze P002–P015 — AUTHORIZED
+
+INBOX-206BB is accepted only as a compliant fail-closed uncommitted-draft stop. Grant provisional design evidence credit for its finite P001–P140 DAG, schemas, write boundaries, future materialization boundary, and correct blocker/no-execution behavior. Grant no closed package, materializable source, commit, construction, marker, D01, implementation, execution, validation, production, ratchet, D02, or downstream credit.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BB stopped with an uncommitted draft.
+
+Blocker: the repeated gate templates still contain `@@LITERAL_ASSERTION@@`, an executable-logic placeholder without frozen exact bytes, byte count, SHA-256, and closed occurrence manifest. That violates the no-generated-logic and complete-source-authority requirements, so the package is not mechanically materializable.
+
+No commit was created. No wrapper, continuation, marker, project, Zig, build, or validation process ran.
+```
+
+Static Watcher review ran no project or Zig code. HEAD remains `7cf4b88a39980cdcf27d649ee760d14842c1e8d9`; tracked and staged diffs are empty. The sole dirty path is the authorized untracked draft `docs/evidence/inbox206bb_phase3_wrapper_package_specification.md`, mode 0664, 22,532 bytes, 535 lines, SHA-256 `250bbf8c243a5602fde7bfb6503763b3b0672200087a8f5b644d5bbdbf43fdb8`. All protected identities and ratchet 131 remain exact. The retained turn contains no commit, wrapper/assertion execution, continuation/marker creation, project/Zig/build/validation command, registered-directory access, or action after the blocker stop.
+
+Static review confirms that the reported blocker is real and that the typed-token table, per-template occurrence manifests, and repeated-gate source authority are also incomplete.
+
+Reviewer agreement is preserved verbatim:
+
+```text
+I accept INBOX-206BB only as a compliant fail-closed uncommitted-draft stop. The finite DAG, schemas, write boundaries, and blocker discovery receive provisional design evidence credit only. No closed package, materializable source, commit, D01, or downstream credit is granted.
+
+I authorize INBOX-206BC with these refinements:
+
+- First create one non-merge operating commit changing only docs/next_steps.md, parented exactly by 7cf4b88a39980cdcf27d649ee760d14842c1e8d9. Keep the untracked draft unstaged and byte-identical during that commit; update the ignored inbox separately.
+
+- BC may edit only docs/evidence/inbox206bb_phase3_wrapper_package_specification.md. No second file or continuation root is authorized.
+- Set umask 0022 before editing and permit one exact-name chmod 0644 on the draft as pre-gate construction finalization—not post-failure repair.
+- State prominently: package_status=incomplete, implementation_ready=false, execution_authority=none, D01=unaccepted.
+- Replace every closed-manifest claim with an exact inventory of:
+    - every placeholder actually present;
+    - every declared-but-unused token;
+    - per-template occurrence counts;
+    - ordered zero-based UTF-8 byte offsets with half-open spans;
+    - each token’s type and future materialization authority.
+
+- Add the complete P-ID/input/assertion-requirement matrix, including predicates, schemas, counts/order/mode/hash rules, allowed commands and reads, producer dependencies, and no-write proof.
+
+- Partition the remaining work into bounded assertion-freeze families. Only P002–P015 may advance in BC.
+- For each P002–P015 process, freeze separately:
+    - the complete literal assertion block;
+    - exact bytes, byte count, and SHA-256;
+    - input basename and producer;
+    - allowed reads/commands and no-write proof;
+    - exact expected output/status;
+    - the complete inner template after assertion insertion;
+    - every still-unmaterialized typed identity token and its exact occurrence manifest.
+
+- No P002–P015 template may retain @@LITERAL_ASSERTION@@ or any undeclared token. Do not construct outer wrappers or materialize ROOT, slice, commit, tree, inbox, or other future-bound values.
+
+- Static streaming hash/syntax checks are permitted; no assertion block or wrapper may be invoked.
+- Keep all later families explicitly incomplete and enumerated as blockers. Do not claim package completion or execution readiness.
+- If every BC gate passes, commit only the partial specification file and stop for review. Any failure leaves it uncommitted and stops without diagnosis, retry, repair, or fix-forward.
+
+All source, project, Zig/build/install, validation, cache, registered-worktree access, ratchet, production-AWK, D01/D02, credit, and downstream prohibitions remain exact.
+```
+
+Create one non-merge operating commit parented exactly by `7cf4b88a39980cdcf27d649ee760d14842c1e8d9`, changing only tracked `docs/next_steps.md`; update only the ignored inbox separately. Preserve the retained draft unstaged and byte-identical during that commit. No other dirty path is permitted.
+
+BC may edit only `docs/evidence/inbox206bb_phase3_wrapper_package_specification.md`. Before editing, set and verify umask 0022 and perform one exact-name `chmod 0644` as pre-gate construction finalization. Create no second file or continuation root.
+
+The partial specification must prominently state `package_status=incomplete`, `implementation_ready=false`, `execution_authority=none`, and `D01=unaccepted`. Replace closed claims with a complete actual/unused placeholder inventory and exact per-template occurrence manifests using ordered zero-based UTF-8 half-open byte spans. Add the complete P-ID/input/assertion-requirement matrix and explicitly partition all remaining families.
+
+Only P002–P015 may advance in BC. Freeze each complete assertion block separately with its bytes, byte count, SHA-256, input/producer, allowed reads/commands, no-write proof, expected output/status, complete inner template after insertion, and exact remaining-token occurrence manifest. No P002–P015 template may retain `@@LITERAL_ASSERTION@@` or an undeclared token. Do not build outer wrappers or materialize any future-bound identity.
+
+Static streaming hash/syntax verification is permitted, but no assertion or wrapper may execute. On full BC success, commit only the partial specification file and stop with main/control clean. Any failure retains it uncommitted and stops without retry or fix-forward. Preserve every root/protected identity and ratchet 131. No source/project/Zig/build/install/validation/cache/worktree/production-AWK/D01/D02/credit/downstream authority is granted. Never access `.claude/settings.local.json`.
+
+
+## INBOX-206BB inert Phase-3 wrapper-package specification — COMPLIANT UNCOMMITTED-DRAFT STOP; SUPERSEDED BY INBOX-206BC
 
 INBOX-206BA is accepted as a compliant fail-closed absent-artifact continuation. Credit is limited to its exact literal canary, exact operating-document binding, complete six-checkpoint preconstruction replay, read-only provenance, and correct terminal stop. The missing post-preconstruction wrapper package is an authorization-package defect, not a Worker defect. Grant no construction, keyed-gate, marker, D01, implementation, execution, validation, production, ratchet, D02, or downstream credit. Preserve BA absent/non-symlink; preserve AY/AV exact and AZ/AX/AW absent.
 
