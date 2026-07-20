@@ -24,7 +24,90 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206S fixed-literal inert construction freeze — AUTHORIZED
+## INBOX-206T corrected inert freeze and direct-child execution identity — AUTHORIZED
+
+INBOX-206S fails construction-freeze acceptance. Its immutable
+`static_freeze.audit.tsv` contradicts the authorized `61`/`64` counts, its
+purported exact difference enumeration lists one unchanged path, and its
+old-exact-HEAD closure predicate cannot survive the mandatory later
+operating-document authorization commit. Never invoke, rerun, edit, or
+repair S. Preserve its exact failed state:
+
+```text
+root=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206s
+file_count=61
+inventory_sha256=7ee1f7acf9ca98aa95b300eb468d3fc9b7a46bd6c41514c98f9522c5dd0371f5
+ledger_sha256=120cd54703287b7bfb2008c2cafb91ffe68f2cb855b865876b72bc463bfa474b
+top_level_paths_sha256=f4ee65dbb43e8a63d82b34eed8dde1b2565b471ac3deae4202354fdf3a556569
+execute_bits=0
+terminal_snapshots=absent
+```
+
+S receives no construction, closure, terminal, diagnostic, Phase-3,
+validation, ratchet, credit, or downstream acceptance.
+
+Preserve I–S and every protected identity exactly. Require the exact
+operating `HEAD` and direct parent named in the Watcher dispatch. Require
+ordinary and exact-L-hermetic main status empty and control
+exact/main/clean/no-remote.
+
+After proving it fresh, absent, and non-symlink, create records only beneath:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206t
+```
+
+Before T creation, permit exactly one sentinel-preserved,
+status-propagating administrative `git worktree list --porcelain` through
+the accepted wrapper. Require count `43`, exact path/topology/non-main
+hashes `f31d8542...` / `6c868e3b...` / `ebc30a37...`, and bidirectional
+lexical disjointness of T and control from every registration. Failure
+consumes the listing and stops before T creation. Never enter, stat, hash,
+or inspect a registered-worktree directory; no other worktree command is
+authorized.
+
+Derive T from S's exact 61 nonterminal paths. Author all active diagnostic,
+closure, and terminal bodies as fixed reviewed quoted-literal bytes; use no
+source transformer. Freeze and semantically assert:
+
+```text
+preclosure_file_count=61
+final_file_count_on_success=64
+```
+
+The S-to-T difference record must equal the actual changed-path set,
+explicitly excluding only itself and `immutable_identities.tsv`. It may
+list no unchanged path. Freeze exact classifications, schema, identities,
+allowlists, commands, reverse equivalence, and differences.
+
+Record the exact T construction-authority `HEAD`. Freeze a later
+execution-authority relationship requiring all of:
+
+- the execution commit has exactly one parent;
+- that parent is the recorded T construction `HEAD`;
+- its sole changed tracked path is `docs/next_steps.md`;
+- `git diff --check` passes; and
+- ordinary and exact-L-hermetic status are clean.
+
+Freeze the exact Git commands and output parsing used to prove that
+relationship. Any intervening commit, merge, additional changed path, or
+amended ancestry invalidates T and requires a newly reviewed construction;
+it cannot be repaired during execution. This identity amendment grants no
+broader repository authority.
+
+Every postcreation construction command remains independently blocking.
+Any failure stops immediately without inspection, diagnosis, rewriting,
+identity regeneration, fix-forward, retry, or later command. On complete
+success, freeze the inert 61-file T state and stop. Do not invoke closure
+or terminal generation.
+
+No diagnostic/preparation invocation, project/Zig command, compilation,
+test, validator, repository/control/source/evidence/protected-file/store/
+artifact change, registered-directory access, validation, ratchet, wiring,
+cleanup, credit, or downstream work is authorized. Stop main and control
+clean.
+
+## INBOX-206S fixed-literal inert construction freeze — FAILED ACCEPTANCE; CLOSED
 
 Accept INBOX-206R only as a compliant fail-closed construction failure. It
 receives no construction, closure, terminal, diagnostic, Phase-3,
