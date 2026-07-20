@@ -24,7 +24,60 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-197 documentation-only v3 artifact CLI surface design — AUTHORIZED
+## INBOX-198 documentation-only v3 operational-root and private test-seam reconciliation — AUTHORIZED
+
+INBOX-197 commit
+`6ee7bda862ed1f43fcdb96f7d23b99870cd790e7` is accepted as a
+compliant evidence/design stop. Its four capabilities, schemas, closed errors,
+no-write verifier, finite DAG, v2 lineage blocker, reuse analysis, and
+implementation order are accepted as evidence. Final design acceptance and
+all implementation remain withheld.
+
+Create only
+`docs/evidence/inbox198_v3_operational_root_and_test_seam_design.md`.
+Reconcile two blockers:
+
+1. the old future-v3 root, publisher sources, and compatibility targets are
+   under the registered main worktree despite the artifact-treatment
+   exclusion; and
+2. the production CLI is fixed to the real authority while required synthetic
+   proofs have no private configuration/test seam.
+
+Select and freeze one exact absent local sibling operational root derived from
+the main Git common directory. It is an execution workspace, not artifact
+authority. Map all 27 future families and all producer, consumer, record,
+cache, output, publisher-source, and compatibility paths beneath it. Preserve
+every workload, phase, identity, gate, observation, comparison, counter,
+status, and acceptance semantic.
+
+Name exact future `canonical/source` and `coverage/source` children as
+separately registered protected worktrees. Creation, modification, or removal
+requires later explicit user authorization naming each path. All other
+outputs and artifact paths are siblings outside those protected subtrees.
+Exact path guards must not reject the whole operational root because it
+contains protected children.
+
+Keep the old repository-local v3 root absent and unauthorized. A later
+contract amendment must replace it comprehensively, with no mixed old/new
+executable paths.
+
+Allow only exact, no-follow, read-only access to explicitly named tracked
+control files in the main worktree. No recursive discovery or artifact
+treatment is authorized.
+
+Define one concrete private `AuthorityConfig` plus shared internal command
+driver. Production constructs only the real configuration; tests inject a
+synthetic configuration. Expose no new production argv, environment override,
+public API, or capability. Both paths must share parsing, errors, schemas,
+authority checks, transactions, rollback, output, and registration guards.
+
+Preserve the generation-v2 lineage blocker and name every remaining ambiguity.
+Commit only the new reconciliation document and stop. No path creation,
+worktree operation, contract edit, implementation, store/manifest mutation,
+compatibility materialization, v3 execution, cleanup, wiring, performance,
+ratchet movement, or credit is authorized.
+
+## INBOX-197 documentation-only v3 artifact CLI surface design — EVIDENCE ACCEPTED; FINAL DESIGN WITHHELD
 
 INBOX-196 commit
 `df907d336ffb13e84ecf2b0bc1966d1fb847c834` is accepted as a compliant
