@@ -24,7 +24,40 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-193 fail-closed retention tooling and synthetic validation — AUTHORIZED
+## INBOX-193A retention-tool contract remediation and one synthetic continuation — AUTHORIZED
+
+INBOX-193 at unchanged HEAD `d53a1fe5` is accepted only as a compliant
+retain-and-stop. Implementation acceptance is withheld. Its sole suite ran
+once, passed 5/6 tests, and stopped before publication on
+`InvalidCapacityObservation`. Preserve its dirty implementation composite,
+empty synthetic root, and failure log SHA-256 `fc8c550d...` exactly.
+
+Remediate the six blocking source-contract defects identified by
+Watcher/Reviewer: descriptor-based capacity observation without rendered
+headers; exact hyphenated external manifest vocabulary and complete
+snapshot/constituent schema; content-key/hash binding and duplicate conflict
+rejection; distinct store/read-source/write-destination registration policies;
+streaming file publication with prepublication verification; genuine atomic
+no-replace durability; finite sorted multi-object snapshots; and complete
+registration/directory synchronization.
+
+Use only the initially absent and worktree-disjoint continuation root:
+
+`/home/oleg/prog/z_llvm-inbox193a-artifact-store-synthetic`.
+
+All INBOX-193A writes, including compatibility tests, stay inside that root.
+Compile and format first, then run exactly one full synthetic continuation
+suite. Unexpected failure retains the complete continuation root and stops
+without retry or repair. Complete success removes only that continuation root,
+records both INBOX-193 and INBOX-193A ledgers, commits only the bounded tool,
+schema/template, focused tests, minimal build wiring, and evidence, then stops
+clean for review.
+
+Create no real store and access no current artifact root. Traverse no
+registered worktree. Change no live row, pin, contract, cleanup integration,
+v3 path, production routing, checkpoint, or ratchet.
+
+## INBOX-193 fail-closed retention tooling and synthetic validation — COMPLIANT RETAIN-AND-STOP; IMPLEMENTATION WITHHELD
 
 INBOX-192B at `45558ac7` and audit SHA-256 `5a7e019e...` are accepted as
 the final local-only durability design. Validation-v3 remains blocked until
