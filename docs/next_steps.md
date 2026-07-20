@@ -24,7 +24,67 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206A corrected candidate-state preflight and Phase-3 continuation — AUTHORIZED
+## INBOX-206B corrected static call-graph guard and Phase-3 continuation — AUTHORIZED
+
+Accept INBOX-206A's corrected preflight as passed and the overall slice only
+as a compliant failed structural-gate attempt. Phase-3 remains withheld. No
+Zig compilation/test, state guard, evidence edit, technical commit, or
+protected-path mutation occurred.
+
+Preserve all 28 files beneath the retained external evidence root
+byte-for-byte:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence
+inventory=787512bf3cfc9f203f03b143a29efc39cbdef29107a99540d1c7823667d80cbd
+file_count=28
+absolute_path_ledger=8d5440bca5c1408a47eb797ab64cb646aae6fd04b4e61e22c5c5450604cd5ef8
+```
+
+The accepted corrected preflight is command `901faaf6…`, status `0`, stdout
+`d4a1d1e…`. The failed A structural guard is command `fce8dc37…`,
+environment `c77bf0e6…`, invocation `1a5ce75a…`, status `1`, empty
+stdout/stderr. Do not rerun either.
+
+Create all new guard, extracted-function, identity, harness, cache,
+invocation, test, and later state-guard records only under:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206b
+```
+
+Revalidate the complete A inventory/ledger and every protected identity
+before adding B. Derive the B structural guard from frozen A. Allow only
+mechanical B paths/preservation checks and these three semantic corrections:
+
+1. require exactly one matching function declaration, an observed opening
+   brace, and completion only when that opened function's brace depth returns
+   to zero; absent, duplicate, unterminated, or signature-only extraction
+   fails;
+2. require exact validator key counts candidate `1`, generation `2`, lineage
+   `2`, receipt `2`;
+3. replace broad substring mutation matching with closed call/token-aware
+   checks that reject actual filesystem/workspace mutators without matching
+   `link` inside safe `follow_symlinks`.
+
+Preserve every other A assertion and order. Freeze the complete B command,
+environment, identity, and invocation, then run it exactly once without
+trialing corrected fragments. Structural failure retains B and stops before
+harness creation, Zig, state guard, evidence edit, or commit.
+
+After structural success only, resume unchanged: exact-prefix same-file
+harness and all subsequent records under B; isolated pinned Zig `0.16.0`
+caches; one uniquely filtered invocation and exactly one test; no synthetic
+suite; one success-only state guard. Any later failure retains B without
+evidence edit or commit.
+
+Complete success alone permits the single
+`docs/evidence/zllvm_artifact_authority_validation_v1.md` commit, recording
+INBOX-206/206A/206B provenance. Candidate remains inert and old source
+authoritative. Stop before receipts, activation, compatibility, v3, compiler
+work, performance, cleanup, ratchet movement, or credit.
+
+## INBOX-206A corrected candidate-state preflight and Phase-3 continuation — PREFLIGHT PASSED; COMPLIANT FAILED STRUCTURAL GATE; INCORPORATED INTO INBOX-206B
 
 INBOX-206 is accepted only as a compliant preflight stop. The external root
 was never created; no harness, cache, command record, Zig invocation, state
