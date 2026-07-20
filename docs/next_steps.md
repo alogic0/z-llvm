@@ -24,7 +24,61 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-202G no-rerun canonical record-mode remediation — AUTHORIZED
+## INBOX-202H corrected preflight and no-rerun record-mode remediation resumption — AUTHORIZED
+
+INBOX-202G is accepted as a compliant read-only-preflight stop at operating
+HEAD `66cdf658...`; remediation remains incomplete. G was never created and no
+copy or prohibited command ran. The retained transcript proves every preflight
+predicate passed until the final check incorrectly expected eight lines in
+F's `verification-summary.tsv`. The accepted file correctly has nine lines:
+one header plus eight facts.
+
+Preserve every INBOX-202G frozen identity, protection, scope limit, and
+prohibition. F remains immutable at exact 25-file ledger SHA-256
+`5d9379b3...`, with 22 mode-`0644` records and exactly the three named
+mode-`0664` launcher results. G remains exact no-follow absent at:
+
+```text
+/tmp/zllvm-inbox202g-local-state-record-mode-remediation-evidence
+```
+
+Repeat the complete read-only preflight, changing only the expected
+`verification-summary.tsv` line count from `8` to `9`. Emit finite named
+assertion results and carry them inside one of the four already authorized
+metadata ledgers; G must remain exactly seven files, not eight.
+
+Only after every preflight passes, perform the unchanged approved three-copy
+transaction under closed `umask 0022` using GNU `dd` with
+`iflag=fullblock,nofollow`, `oflag=nofollow`, and `conv=excl,fsync`.
+Require the three new records real regular `0644`, UID/GID `1000/1000`, and
+byte/hash-identical to F.
+
+G remains limited to the three copied driver records plus:
+
+```text
+mode-remediation.tsv
+f-record-ledger.tsv
+canonical-record-set.tsv
+postflight-summary.tsv
+```
+
+Prove exactly 22 existing F `0644` records plus the three G copies form 25
+unique canonical roles, each resolving once at exact path, type, ownership,
+mode, bytes, and SHA-256. Never alter F.
+
+Do not rerun the verifier, archive stream, transaction/publication driver,
+ratchet, project, or Zig. Any failure retains and stops without retry,
+repair, cleanup, evidence edit, or commit. Full success commits only
+`docs/evidence/inbox202_local_state_artifact_copy_verify.md`, documents
+INBOX-202 through INBOX-202H and the exact seven-file/split-root result, and
+stops clean. The source remains authoritative, the destination remains
+non-authoritative, and ratchet 131 remains unchanged.
+
+No authority transition, control/manifest/tool/contract/pin/source/worktree
+edit, compatibility, validation, wiring, performance, cleanup, or credit is
+authorized.
+
+## INBOX-202G no-rerun canonical record-mode remediation — ACCEPTED PREFLIGHT STOP; INCORPORATED INTO INBOX-202H
 
 INBOX-202F is accepted only as a compliant verifier-pass,
 postflight-record-mode stop at operating HEAD `9c415993...`. Its substantive
