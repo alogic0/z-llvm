@@ -24,10 +24,93 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-205D final guard-only AWK portability correction — AUTHORIZED
+## INBOX-206 Phase-3 real-candidate read-only validation — AUTHORIZED
 
-INBOX-205C is accepted only as a compliant failed guard attempt. Technical
-acceptance remains withheld. Its guard passed every source, production,
+Watcher and Reviewer accept `b71d2d50`, tree `146da386`, and the complete
+INBOX-205 through INBOX-205D composite as the finished Phase-2 dormant
+private validator. The accepted synthetic suite is `9/9`; the sole corrected
+guard passed status `0`; ratchet remains `131`. This acceptance grants no
+production reachability or activation.
+
+Preserve the exact accepted tool `306b3b21…`, build `a0c92349…`, retention
+contract `3ea11020…`, dormant evidence `754e1971…`, control
+`9c55bda3`/tree `756369ad`, both real stores, four control files, all prior
+records/caches, 43+1 repository identities, stash `7985c6d0`, watcher
+`b64131cf`, pins, contracts, and ratchet. No registered worktree or its
+directory may be modified. Do not alter the production tool, build, contract,
+control, either store, manifests, receipts, pins, scripts, compatibility, or
+v3. Do not create live/validation/activation/terminal metadata. No activation,
+compiler gate, performance, cleanup, wiring, ratchet movement, or credit.
+
+Use only the fresh external evidence root:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence
+```
+
+Require it absent, non-symlink, and bidirectionally disjoint from all 43 main
+registrations and the supplemental control repository before creation. Put
+the copied harness, appended suffix, local/global Zig caches, commands,
+environment, identities, logs, statuses, inventories, and guard records
+entirely there. Retain the complete root on success or failure.
+
+Before compilation, statically prove the exact real-validation call graph is
+read-only: no create/write/truncate/rename/link/chmod/delete, workspace,
+snapshot extraction, publication, or cleanup beneath control or either
+store. Stop structurally if any mutation or store-local workspace is
+reachable. Reads are limited to the exact four control files and ancestors,
+the exact roots for no-follow identity checks, manifest-enumerated destination
+files and ancestors, closed destination-schema entry inspection needed to
+reject partial/extra/unsafe state, and exact registration metadata. No broad
+filesystem/source-store/registered-worktree traversal.
+
+Byte-copy the accepted tool into the external root and append exactly one
+uniquely named test-only real-candidate test. Prove the prefix equals tool
+SHA `306b3b21…`; freeze suffix and full-harness hashes; prove it is the sole
+additional private-validator caller and adds no production/public reachability.
+Invoke the existing private validator with:
+
+```text
+control=/home/oleg/prog/z_llvm/local-state/control
+payload=/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1
+source=/home/oleg/prog/z_llvm-artifacts
+generation=61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d
+source_inventory=3234fb508d370878efe082cf1accb5af3b488372bf3f1ee7e9e87408a37a2d7c
+source_ledger=a06c48e1549d16b9f924cc2b5f0404e60d7755a785bf3a4a23311c2383279a65
+source_destination_ledger=4c29709b9ef9242dd799ab52d346cdf302f5728d35e37e0d78063e892a6cf9e8
+copy_evidence=docs/evidence/inbox202_local_state_artifact_copy_verify.md
+copy_evidence_sha=4b532daabe33e7c6eaca7f0ab412d9c271b55b6b1de8235dd3d4f65d7ab6f7a6
+```
+
+Require exactly `20` files, `9970364` bytes, `18` objects, `2` snapshots,
+and generation SHA `61b7426b…`. This proves candidate consistency only.
+
+Freeze the local Zig `0.16.0` identity, clean environment, isolated external
+caches, exact command and invocation. Execute the temporary harness exactly
+once with an exact filter and require exactly one test. Do not rerun the
+accepted synthetic suite. Failure retains evidence and stops without retry,
+diagnosis, repair, guard, evidence edit, or commit.
+
+After test success only, freeze and run one read-only state/source guard. It
+must prove the accepted source/production/doc identities, both repositories,
+all control and manifest-enumerated payload bytes/modes, candidate state,
+absence of live and later receipts, production unreachability, 43+1/stash/
+watcher/pins/ratchet, and all prior retained identities are unchanged before
+and after execution. Guard failure retains evidence and stops without retry
+or commit.
+
+On complete success add and commit only
+`docs/evidence/zllvm_artifact_authority_validation_v1.md`, recording prior
+synthetic coverage, the sole real positive, applicable INBOX-203 candidate/
+dormant matrix closure, exact retained identities, pre/post equality, and
+explicit no-activation meaning. Leave main/control clean and stop before a
+control validation receipt or any activation/downstream work.
+
+## INBOX-205D final guard-only AWK portability correction — ACCEPTED; INCORPORATED INTO INBOX-206
+
+INBOX-205C remains a compliant failed guard attempt. Technical acceptance
+was withheld until INBOX-205D passed; the completed composite is now accepted.
+The INBOX-205C guard passed every source, production,
 dormant-reachability, retained-ledger, fresh-root, control, registration,
 stash, and watcher check before the final ratchet recount.
 
