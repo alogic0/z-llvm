@@ -24,7 +24,62 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-199 documentation-only authoritative INBOX-197 reconciliation amendment — AUTHORIZED
+## INBOX-199L local-state boundary and independent control repository — AUTHORIZED
+
+The user and Reviewer withdrew INBOX-199 and the sibling operational-root
+model before any target edit. The target remains 759 lines at `3717cc34...`;
+the main tree is clean. `/home/oleg/prog/z_llvm-baseline-validation-v3`
+remains absent and abandoned.
+
+Preflight exact absent `/home/oleg/prog/z_llvm/local-state` and preserve all
+frozen state. Add exactly `/local-state/` to main `.gitignore`, then create
+only:
+
+```text
+/home/oleg/prog/z_llvm/local-state/
+/home/oleg/prog/z_llvm/local-state/control/
+```
+
+Reserve but do not create `artifacts/`, `validations/`, `worktrees/`, or
+`caches/`.
+
+Initialize `local-state/control` as an independent Git repository on branch
+`main`, with no remote. Its initial commit contains only `.gitignore`,
+`README.md`, and `POLICY.md`. Restrict it to small operational manifests,
+policies, and receipts; prohibit secrets, payloads, caches, builds, generated
+artifacts, archives, binaries, and large files; require later exact-path
+authority for any supplemental repository. Use 1 MiB per-file and 16 MiB
+tracked-total limits unless later amended.
+
+After the initial commit, protect `local-state/control` as a supplemental
+worktree. Future protection uses the union of the unchanged 43 main-repository
+registrations and the control repository's one registration. Every later
+control modification or mutating Git operation requires authority naming its
+exact path; read-only identity/status/inventory checks remain allowed.
+
+Create main evidence
+`docs/evidence/inbox199_local_state_boundary.md`. Record both repository
+roots, branches, tree/commit identities, clean status, control no-remote state,
+exact control file hashes/blobs/modes/sizes, anchored ignore proof, role and
+reserved paths, union inventory, permanent prohibitions on broad
+`git clean -x`/`-fdx` and cleanup traversal, explicit `git -C` root
+separation, the abandoned absent sibling validation root, and unchanged
+authoritative `/home/oleg/prog/z_llvm-artifacts`.
+
+The main evidence records the pre-commit main HEAD and staged tree because a
+commit cannot embed its own identity. Retain the resulting main commit in the
+Worker final report and Watcher review; do not add a self-referential commit.
+
+Commit the main repository with only `.gitignore` and the evidence document.
+Stop with both repositories clean.
+
+Use explicit `git -C` for every Git command and only exact Git/status/hash/
+mode/size/path checks. No broad discovery, `find`, clean, migration,
+tool/contract/design change, store/manifest mutation, compatibility,
+validation, source worktree, reserved sibling, additional repository,
+cleanup, wiring, performance, ratchet movement, or credit is authorized.
+
+## INBOX-199 documentation-only authoritative INBOX-197 reconciliation amendment — WITHDRAWN BEFORE EDIT
 
 INBOX-198 commit
 `3d2a747d16657624bbb0d6309b69366efb126972` is accepted as a compliant
