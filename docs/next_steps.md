@@ -24,7 +24,161 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AU exact-field selector authority and independent environment/invocation closure — AUTHORIZED
+## INBOX-206AV fresh exact-field environment/invocation closure restart — AUTHORIZED
+
+INBOX-206AU is accepted only as a compliant administrative stop. The Worker
+fully acknowledged AU and passed exactly one operating/protected-state gate;
+a delayed byte-equivalent Watcher acknowledgment request then arrived, the
+Worker answered it, and the turn task-completed. AU remained absent. Credit is
+limited to ephemeral process evidence that the operating/protected gate
+passed. No substantive AU construction, AT replay, evidence/design gate,
+environment, invocation-atomic, D01, marker, implementation, execution,
+validation, ratchet, production credit, or downstream acceptance is granted.
+There was no technical failure. Preserve AU permanently absent and AT
+byte-for-byte.
+
+The Worker final response is preserved verbatim:
+
+```text
+I explicitly acknowledge every remaining INBOX-206AU boundary:
+
+1. AT is permanently frozen byte-for-byte and will never be rerun, repaired, completed, reconstructed, normalized, or modified. Its three aggregate identities and ten complete per-file hashes must be independently replayed before AU creation.
+
+2. The exact six-copy/four-keyed-derivation split is preserved. After AU construction, all nine authority validations and the token-schema gate must be replayed independently.
+
+3. The selector-authority table contains, for each ET01–ET12 entry: source file, explicit header-exclusion rule, exact field indices, expected count, expected ordered values, literal two-digit ordinals, and uniqueness rule. Its schema, exact ordered ET01–ET12 coverage, unique IDs, legal field indices, and every per-token binding must be independently validated.
+
+4. Selectors consume only complete extracted TSV fields. Fixed matching is allowed only as `grep -x -F` after complete-field extraction. Anchors, regex syntax, and substring patterns are prohibited in fixed-string mode.
+
+5. Every extractor and scanner must explicitly return zero after a valid complete scan, independently of its final row or whether a row matched. Only a separate assertion process and status determine gate success.
+
+6. All 48 per-token count/order/literal-ordinal/uniqueness checks are separate processes with separate markers. They are followed by separately gated total coverage, six individual equivalence rows, each type/mode assertion, and marker absence.
+
+7. Full environment closure is mandatory before any invocation-atomic matrix, count, conflict, dependency, or bijection work.
+
+8. `AUDIT_COMPLETE` is audit-only and may be written last only after total closure, with `implementation_ready=false` and `execution_authority=none`.
+
+9. Main and control repositories, stash, watcher, pins, bypass inventory, ratchet 131, AK/AN/AO/AR/AS/AT, AP/AQ absence, protected bytes, and all registered worktrees remain preserved. I will never access `.claude/settings.local.json`.
+
+10. No shared validation loop, generated executable command, `eval`, composite gate, substring selector, pipeline-final-row dependency, or borrowed status/marker is permitted. No implementation, source/production change, Zig, build/install, project execution, validation, cache, registered-worktree-directory access, ratchet movement, credit, production AWK, D02, or downstream action is authorized.
+
+11. The first failure leaves AU absent or exactly partial and requires immediate stop without inspection, diagnosis, retry, repair, cleanup, regeneration, mode change, fix-forward, or any later command.
+```
+
+Static review ran no project or Zig code. Main/source/index were clean at
+`1755f5e31bc5e9d92947b2fc448c85030ed5d1f7`, parent
+`a1efe9a8926ce92c0f9e143ed98c28f97aef0c6f`, tree
+`10c5af7698388fafc2311bb24256367da881299f`, and sole changed path
+`docs/next_steps.md`; the AU inbox SHA-256 was
+`5354a737a255a67a2c022f59f2491f8cf38c3fd2f39a9f030f20acc628c8d5cc`.
+Control, stash, watcher, pins, bypass, tool, build, retained ratchet `131`, and
+read-only worktree identities `43` / `33-8-2` / paths `f31d8542...` /
+topology `6c868e3b...` / non-main `ebc30a37...` remained exact. No registered
+directory was entered.
+
+The retained Worker JSONL records, in order: directive read; complete initial
+acknowledgment; exactly one successful `AU_OPERATING_PROTECTED_GATE_OK`
+command; the delayed acknowledgment request; the quoted final response; and
+`task_complete`. There was no AU construction, AT replay, later command,
+failure, modification, or project execution. AU is absent/non-symlink; AP/AQ
+remain absent.
+
+Reviewer dialogue is preserved verbatim:
+
+```text
+I accept INBOX-206AU only as a compliant administrative stop. Credit is limited to ephemeral evidence that the operating/protected gate passed. AU remains absent; no substantive AU construction or design credit is granted, and no technical failure occurred.
+
+I authorize fresh evidence-only INBOX-206AV exactly as proposed, with these refinements:
+
+- Create one non-merge commit changing only docs/next_steps.md, with parent exactly 1755f5e31bc5e9d92947b2fc448c85030ed5d1f7; update the ignored inbox separately and bind full HEAD/tree/inbox hashes.
+
+- Preserve AU permanently absent and AT byte-for-byte.
+- Freeze all complete AT aggregate and ten per-file hashes in the directive; independently replay them before creating only fresh continuations/inbox206av.
+- Preserve the six-copy/four-keyed-derivation boundary and all independently isolated authority, token, selector, 48 per-token, coverage, equivalence, type/mode, and marker-absence gates exactly as approved for AU.
+
+- Require complete environment closure before invocation-atomic work.
+- Require one concise acknowledgment, followed directly by the bounded gate sequence. A delayed byte-equivalent acknowledgment request is administrative only: it does not replace or consume AV authority and must not cause another task-complete stop. Any substantively changed instruction still requires immediate reevaluation.
+
+- AUDIT_COMPLETE remains the final audit-only write with implementation_ready=false and execution_authority=none.
+
+The first technical or identity failure preserves AV absent or exactly partial and stops without inspection, diagnosis, repair, retry, or fix-forward. All prior source, Zig/build/install, execution, validation, registered-worktree access, ratchet, credit, production-AWK, D02, and downstream prohibitions remain exact.
+```
+
+Create one non-merge operating commit whose parent is exactly
+`1755f5e31bc5e9d92947b2fc448c85030ed5d1f7` and whose sole changed tracked
+path is this file. Update only ignored `docs/worker_inbox.md`; its final
+SHA-256 is
+`13973e630edda471d808c98432582cd8575e3f32413fc19b33c96010d4b6b1f3`.
+Bind dispatch to final full commit,
+parent, tree, sole path, and inbox identity. Preserve AU permanently absent,
+AK/AN/AO/AR/AS/AT exact, AP/AQ absent, and all protected state. Create only
+fresh absent non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206av
+```
+
+Before AV creation independently replay AT structure and every identity:
+
+```text
+paths_sha256=5e626a7985d104cf641a28f715c989295f379cae6dd47b6a5438c1bbf6976117
+inventory_sha256=7e036087e02c8f17740de09516bf90b8e6565afb2212af07dda26d5b1086708e
+compact_ledger_sha256=1bd520712374fa43972ed65d4f29c1863eba8e12aefb02c2312acf888915d432
+ak_replay.tsv=e752b99d0dc8307498b1eb0dd5519fe0274e14885cf7208cbb5cf202aa1f1d64
+authority_boundary.tsv=e685ab186f9ee01a1fabb9d21a7d342db067c8370ce51cacfc52d4a10975f7c9
+authority_derivation.tsv=d88d8c1427f66f041f7eb1c581eeaebebaf92af3a6e098f06989ac1d8024b34c
+environment_authority.tsv=d274594a7f676cacf95bbb49fc025937db781ef7aee690a68452587caa6f026d
+environment_equivalence.tsv=a88066d60bb08efa4c84578c0b3b2fd00859fa58a7bf8cfc8a65a0de14b5b809
+environment_tokens.tsv=4e9c9f331fcab38a19ae617eafd07d768bd7654980a1fd094890c7db73a339fc
+environment_variable_policy.tsv=c1922b99c76d1fafa1f3d09e060c7c7c309d16ff60ad6867b50fec0c71e437c6
+preconstruction_derivation.tsv=911c6fbf374ed4c7f6fac6c115690ff40328a1c97778fa429881118f0eb8d479
+preconstruction_gates.tsv=7ef31e11f6124641cdebdbaa13317eeb1ecd9f3df5c0e032ad9a32327d98cbdc
+schema_authority.tsv=89871f44879321bd2270afe8bae4011cc448fe5fcbf42b29addc9a89abb4036f
+```
+
+Preserve the exact split:
+
+```text
+byte_identical_copy=ak_replay.tsv,environment_authority.tsv,environment_equivalence.tsv,environment_tokens.tsv,environment_variable_policy.tsv,schema_authority.tsv
+explicit_keyed_field_or_row_derivation=authority_boundary.tsv,authority_derivation.tsv,preconstruction_derivation.tsv,preconstruction_gates.tsv
+```
+
+After construction replay the nine authority validations and token-schema
+gate independently. Freeze a non-executable ET01–ET12 selector table with
+source file, explicit header exclusion, exact field indices, expected count,
+ordered values, literal ordinals, and uniqueness rule. Independently validate
+table schema, complete ordered coverage, unique IDs, legal indices, and every
+binding. Select only complete fields from header-excluded TSV data. Fixed
+matching is only `grep -x -F` after extraction; never pass anchors, regex, or
+substrings to fixed mode. Every extractor/scanner explicitly returns zero
+after a valid complete scan; a separate assertion process alone determines
+success. Never generate or execute commands from the table.
+
+ET01 independently proves seven exact policy first-field rows and one exact
+authority first/third-field `ET01<TAB>7` row. Freeze corresponding literals
+for ET02–ET12. Keep all 48 count/order/literal-ordinal/uniqueness gates as
+separate processes/markers, then separately gate coverage, six equivalence
+rows, type/mode, and marker absence. No shared validation loop, generated
+executable command, `eval`, composite gate, substring selection,
+pipeline-final-row dependency, or borrowed status/marker.
+
+Complete environment closure is required before invocation-atomic work.
+`AUDIT_COMPLETE` is final-write/audit-only with
+`implementation_ready=false` and `execution_authority=none`. Give one concise
+acknowledgment, then proceed directly through the bounded gates. A delayed
+byte-equivalent acknowledgment request is administrative: it neither replaces
+nor consumes AV authority and must not cause a task-complete stop. A
+substantively changed instruction requires immediate reevaluation.
+
+The first technical or identity failure leaves AV absent or exactly partial
+and stops without inspection, diagnosis, repair, retry, cleanup,
+regeneration, mode change, fix-forward, or later command. No source or
+production change, Zig/build/install, project execution, validation, cache,
+registered-worktree directory access, ratchet movement, production credit,
+production AWK, D02, or downstream action. Do not access
+`.claude/settings.local.json`.
+
+## INBOX-206AU exact-field selector authority and independent environment/invocation closure — COMPLIANT ADMINISTRATIVE STOP; SUPERSEDED BY INBOX-206AV
 
 INBOX-206AT is accepted only as a compliant fail-closed partial
 evidence/design stop. Credit is limited to complete AS replay, the exact
