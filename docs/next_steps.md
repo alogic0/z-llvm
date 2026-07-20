@@ -24,6 +24,95 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-195 one-shot authoritative calls-input publication — AUTHORIZED
+
+INBOX-194D is fully accepted at
+`aca1cfffc307f835f153b4dc18f591efa6f5ff97`. The dormant CLI passed its
+single closed-environment 8/8 orchestration, generated two byte-identical
+synthetic live manifests, and proved exact object/snapshot/member bindings.
+Only the authorized INBOX-194D root was removed. INBOX-194A/194B/194C and
+every retained record remain exact; the worktree is clean; the real store and
+validation-v3 namespace remain absent; and ratchet remains 131.
+
+Authorize one real publication only. Freeze these accepted inputs:
+
+```text
+HEAD=aca1cfffc307f835f153b4dc18f591efa6f5ff97
+tools/zllvm_artifact_store.zig=sha256:94dfc1fc27ffe1268eb02453bcac1a3634aa11af38d0c94fbaa3b43decd25859
+docs/evidence/zllvm_artifact_manifest_v1.template.tsv=sha256:32ec98e06916ec885435187f263ee3408fce001d6275f6ee3a8e7c1330b5784f
+docs/evidence/inbox194_calls_canonical_source_spec_v1.tsv=sha256:0dd908eed246b09fbea8fd87241ce899b100823b8d83c7223d4e48928e7c599b
+docs/evidence/inbox194_calls_proposed_live_manifest_v1.tsv=sha256:ced7f4e13e1ce646e114460805162aa27fcd8c20c75c4d325c6bd762ce0b6263
+accepted_synthetic_live_manifest=sha256:61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d
+real_authority=/home/oleg/prog/z_llvm-artifacts
+real_authority_initial_state=absent
+tracked_live_manifest=docs/evidence/artifact_manifest_v1.tsv
+tracked_live_manifest_initial_state=absent
+validation_namespace=tmp/inbox195_calls_real_store_publication/validation
+validation_namespace_initial_state=absent
+```
+
+Make no tool, schema, specification, proposed-fragment, contract, pin, or
+source change. Compile only the accepted tool source into the fresh ignored
+validation namespace. Before any mutation, revalidate every frozen source,
+retained root/record ledger, infrastructure identity, and registration
+identity. Prove with no-follow checks that the real authority and tracked
+manifest destination are absent. Check the authority path and every existing
+ancestor without following symlinks. Prove the authority is canonical,
+absolute, and neither equal to, inside, nor an ancestor of any registered
+worktree.
+
+Run the side-effect-free `materialize-spec plan` first. It must leave the real
+authority absent and equal the frozen tracked proposed fragment byte-for-byte
+at `ced7f4e1...`; every canonical source and registration identity must remain
+exact. Then use exactly one pipeline-free, closed-environment
+`materialize-spec publish` invocation forced through `ZLLVM_ARTIFACT_STORE` to
+the real authority. Do not perform an idempotence rerun, alternate invocation,
+component substitution, alternate authority, normalization, retry, repair, or
+cleanup. Freeze the exact command, environment, and launcher before execution
+and retain separate stdout, separate stderr, and numeric status.
+
+The proposed plan and live manifest are intentionally different. The plan has
+35 future-required object/logical-reference rows. Publication must preserve
+all 35 identities, change their statuses exactly to `active`, and add exactly
+two constituent objects, two snapshots, and 16 correctly bound
+snapshot-member rows. Require byte equality among:
+
+- the sole publication stdout;
+- `/home/oleg/prog/z_llvm-artifacts/manifests/generation-00000001.tsv`; and
+- the initially absent tracked copy
+  `docs/evidence/artifact_manifest_v1.tsv`.
+
+All three must have the accepted deterministic SHA-256
+`61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d`.
+
+Freeze store inventory before dispatch as exactly:
+
+```sh
+find -P ROOT -printf '%y\t%m\t%P\t%l\n' | LC_ALL=C sort
+```
+
+Hash that LF-terminated serialization. Separately enumerate regular files
+with `find -P`, sort relative paths bytewise, and write LF-terminated
+`sha256<TAB>bytes<TAB>mode<TAB>relative-path` rows. Do not use `rg --files`.
+On success verify the complete no-follow inventory and file ledger, fresh
+capacity evidence, 18 immutable objects, two immutable snapshots, one
+immutable generation manifest, exact constituent/member relationships, no
+partial incoming files, unchanged source bytes, and unchanged registration.
+
+Any publication or post-publication discrepancy retains the complete partial
+real store, tracked-copy state if produced, and all validation records, then
+stops without diagnosis, retry, repair, cleanup, alternate action, commit, or
+semantic change. Complete success preserves the authoritative real store and
+ignored validation records, commits only the exact tracked live-manifest copy
+and one INBOX-195 evidence summary, and stops for publication review.
+
+Create no compatibility copy and modify no historical path, pin, contract,
+tool, specification, proposed fragment, registered worktree, retained failed
+root, or v3 namespace. No v3 execution, production wiring, cleanup
+integration, performance, Tier work, checkpoint change, ratchet movement, or
+credit is authorized. Validation-v3 remains blocked pending acceptance of the
+real publication and a later separate v3 contract amendment and re-review.
+
 ## INBOX-194D generated snapshot-member key correction and one logged continuation — AUTHORIZED
 
 INBOX-194C at unchanged HEAD `53b0e1cd` is accepted as a compliant
