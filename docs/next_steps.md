@@ -24,6 +24,83 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-195B AWK correction and read-only store reverification — AUTHORIZED
+
+INBOX-195A at unchanged operating HEAD
+`11b7447e54548fbb961060af4cd155b61161ffd4` is accepted as a compliant
+fail-closed verification stop only. Publication acceptance remains withheld.
+The sole frozen full verifier `748dbb13...`, launched by `7245b18a...`,
+returned status 2 with empty stdout and retained AWK parser errors. The Worker
+performed no retry, diagnosis, repair, cleanup, alternate verification,
+commit, or semantic change.
+
+Static review closes the defect: the worktree-distribution AWK attempted to
+use the built-in function name `system` as an accumulator in `system += 1`
+and `system != 8`. This verifier-source parse failure occurred after exact
+worktree path/topology/non-main checks and before store recomputation.
+
+Preserve exactly:
+
+```text
+dispatch_head=11b7447e54548fbb961060af4cd155b61161ffd4
+real_store=/home/oleg/prog/z_llvm-artifacts
+real_store_inventory_sha256=3234fb508d370878efe082cf1accb5af3b488372bf3f1ee7e9e87408a37a2d7c
+real_store_file_count=21
+real_store_file_ledger_sha256=a06c48e1549d16b9f924cc2b5f0404e60d7755a785bf3a4a23311c2383279a65
+real_store_shape=18_objects_2_snapshots_1_manifest_all_mode_0444
+live_manifest_sha256=61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d
+tracked_manifest=docs/evidence/artifact_manifest_v1.tsv
+tracked_manifest_state=untracked_mode_0644_exact_live_bytes
+inbox195_record_count=23
+inbox195_record_ledger_sha256=39064e35bfd7551642228417219fc8f4cfe8cf5b46c1ee3481fa47a538caaa13
+inbox195a_record_count=18
+inbox195a_record_ledger_sha256=5cb920300139255a06bf9d812947ac681f9ca17d78b7daa475916339ac4e930c
+new_validation_namespace=tmp/inbox195b_calls_real_store_verification/validation
+new_validation_namespace_initial_state=absent
+worktree_path_topology_non_main=f31d8542.../6c868e3b.../ebc30a37...
+worktree_distribution=33_repository_tmp_8_system_tmp_2_elsewhere
+watcher_blob=b64131cf60dd0ef638e815cd33db9ae8595a72cf
+stash_object=7985c6d01040a6e47e4ce5b918866d0e89517ac7
+pins_sha256=1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3
+audit_sha256=5a7e019eb107e5b66947490a65fdf47444154fc4f1483ca30ab0fc6e381f33e6
+ratchet=131
+validation_v3=absent_and_blocked
+```
+
+Use only the fresh INBOX-195B namespace. Preserve every retained namespace,
+store byte, manifest byte, source, root, pin, historical path, registered
+worktree, compatibility path, contract, and v3 path.
+
+Carry the frozen INBOX-195A verifier semantics unchanged. Apart from the
+mechanical bindings required for the fresh namespace, new operating-document
+HEAD/parent, and added frozen INBOX-195A record ledger, make exactly three
+consistent identifier renames in the worktree-distribution AWK:
+`repository` to `repository_count`, `system` to `system_count`, and `other`
+to `other_count`. Preserve the exact 33/8/2 logic and every other verifier
+condition and logical check, including the accepted snapshot suffix and
+member-media corrections.
+
+Before the full verifier, run only static shell/pipeline checks and one frozen
+closed-environment syntax/semantic check of the corrected AWK fragment against
+the retained INBOX-195A registration input. Retain exact command/environment,
+separate stdout/stderr, and numeric status. Require status 0, empty stderr,
+and exact 33/8/2 success; otherwise retain and stop before full verification.
+
+Then freeze and invoke exactly one pipeline-free closed-environment read-only
+full verifier with separate stdout, stderr, and numeric status. It must run
+from its first invariant and recheck the complete retained boundary. Run no
+artifact tool or project command.
+
+Any precheck or full-verifier failure retains all state and records and stops
+without diagnosis, retry, repair, cleanup, alternate verification, commit, or
+semantic change. Complete success writes one INBOX-195B evidence summary,
+commits only the existing exact manifest plus that summary, preserves the
+store and ignored records, and stops for publication acceptance.
+
+No compatibility, contract, pin, cleanup, wiring, performance, Tier,
+mandatory-checkpoint, ratchet, or credit action is authorized. Validation-v3
+remains blocked.
+
 ## INBOX-195A read-only authoritative-store verification continuation — AUTHORIZED
 
 INBOX-195 at unchanged HEAD
