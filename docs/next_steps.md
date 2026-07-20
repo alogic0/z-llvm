@@ -24,7 +24,155 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206AV fresh exact-field environment/invocation closure restart — AUTHORIZED
+## INBOX-206AW fresh final-marker mode remediation — AUTHORIZED
+
+INBOX-206AV is accepted only as a compliant fail-closed partial
+evidence/design closure. Credit extends through every independently logged
+premarker gate: complete environment closure and all 48 per-token gates; the
+128-row invocation-atomic enumeration (`69` resolved, `59` unresolved); exact
+54-instance bijection; eight execution-only conflicts; the 12-step
+nonexecuting dependency plan; schemas; and the 19-file premarker closure.
+Withhold `AUDIT_COMPLETE`, the final 20-file identity report, D01,
+implementation, execution, ratchet, production, and downstream credit.
+Preserve AV byte-for-byte; never chmod, repair, rerun, complete, reconstruct,
+normalize, or modify it.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206AV stopped fail-closed at the final read-only closure command, which returned nonzero before emitting its identity report.
+
+Before that stop:
+
+- Environment closure passed, including all 48 per-token gates.
+- Invocation-atomic closure reached 128 rows: 69 resolved, 59 unresolved.
+- All 54 invocation instances mapped exactly once.
+- Eight execution-only conflicts remain.
+- `AUDIT_COMPLETE` was written with `implementation_ready=false` and `execution_authority=none`.
+
+AV is retained exactly as reached at `/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206av`. I performed no subsequent inspection, diagnosis, retry, repair, cleanup, or command. No project, Zig, validation, ratchet, production, or downstream work ran.
+```
+
+Static review ran no project or Zig code. The accepted operating commit was
+`3827b54fc9282c59025272f5d31e8b6424ed1ad7`, parent
+`1755f5e31bc5e9d92947b2fc448c85030ed5d1f7`, tree
+`f9d08d3f620659f82e9c83ef09c561285a8dd602`, sole path
+`docs/next_steps.md`, inbox SHA-256
+`13973e630edda471d808c98432582cd8575e3f32413fc19b33c96010d4b6b1f3`.
+Main/source/index/control and all protected identities remained clean and
+exact; no registered worktree directory was entered.
+
+AV has exactly 20 regular non-symlink nonexecutables. Nineteen are `0644`;
+`AUDIT_COMPLETE` alone is `0664`, 446 bytes, SHA-256
+`ece7a6ecc311e0108ceb089cb07cb0b3a1d98cda67af19d06ccaedfa3df4df62`.
+Its 16 literal rows are otherwise exact. Retained logs show every premarker
+gate exactly once, marker creation, and one final command. Its first two
+predicates passed; its third rejected the marker mode, emitted nothing, and
+returned nonzero. There was no later Worker command. This is final-marker
+creation-mode drift from the `apply_patch` write, not evidence drift.
+
+Reviewer dialogue is preserved verbatim:
+
+```text
+I accept INBOX-206AV only as a compliant fail-closed partial evidence/design closure. Credit extends through all independently passed premarker gates, complete environment closure, the 128-row invocation-atomic enumeration, exact 54-instance bijection, eight execution-only conflicts, dependency plan, schemas, and 19-file premarker closure. AUDIT_COMPLETE, the final identity report, D01, and all downstream credit remain withheld. Preserve AV unchanged.
+
+I authorize fresh evidence-only INBOX-206AW with these refinements:
+
+- Create one non-merge commit changing only docs/next_steps.md, with parent exactly 3827b54fc9282c59025272f5d31e8b6424ed1ad7; update the ignored inbox separately and bind full HEAD/tree/inbox hashes.
+
+- Freeze and independently replay AV’s full 20-file identities, aggregates, exact marker bytes/hash, and sole mode-0664 defect before AW creation.
+- Preserve the initial six-copy/four-keyed-derivation boundary and independently replay every AV gate under the fresh operating authority.
+- Before treating the marker as byte-identical, prove it contains no AV root, commit, tree, or inbox binding. If any operating-bound field exists, derive the AW marker field-by-field and freeze its exact bytes/hash instead.
+
+- Freeze a literal, non-generated finalizer body and its hash. It must use a closed shell, explicitly set and verify umask 0022, recheck marker absence/non-symlink immediately before creation, enable exclusive no-clobber creation, and write the complete frozen marker bytes once.
+
+- No apply_patch, chmod, overwrite, append, rename, generated command, sourced table, or eval may create or alter the marker.
+- A failed marker write retains its exact partial state and stops. A successful write permits only separately authorized read-only checks for marker type, mode 0644, bytes/hash/schema, then the final 20-file paths/inventory/ledger and clean-state report.
+
+- No AW byte may change after marker creation.
+
+The first failure preserves AW absent or exactly partial and stops without inspection, diagnosis, repair, retry, or fix-forward. All implementation, source, Zig/build/install, execution, validation, registered-worktree access, ratchet, production, credit, D02, and downstream prohibitions remain exact.
+```
+
+Create one non-merge operating commit whose parent is exactly
+`3827b54fc9282c59025272f5d31e8b6424ed1ad7` and whose sole changed tracked
+path is this file. Update only ignored `docs/worker_inbox.md`; its final
+SHA-256 is
+`d69af9a8c3d8c3565d4061e99fa72cfb3863bf20d9e8e0bc32ffe653d2d4d4e2`.
+Bind dispatch to final full commit, parent,
+tree, sole path, and inbox identity. Preserve AV exact and create only fresh
+absent non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206aw
+```
+
+Before AW creation independently replay AV's exact 20-file structure, sole
+mode-`0664` defect, and all frozen identities:
+
+```text
+paths_sha256=40877472f52d08d4f24c28c664a41769119ef6db41bba714e8a255b8711fd562
+inventory_sha256=a7f4f45dec7706e73253e8167ea65f54cf2f7f4dbcfca452dae9dc067eca9b28
+compact_ledger_sha256=d11c2d8443cc65b830e87a8d8d5ae676564f6a8f38cc9c89e51b8f50e7c227dd
+AUDIT_COMPLETE=ece7a6ecc311e0108ceb089cb07cb0b3a1d98cda67af19d06ccaedfa3df4df62
+ak_replay.tsv=e752b99d0dc8307498b1eb0dd5519fe0274e14885cf7208cbb5cf202aa1f1d64
+artifact_identities.tsv=e7677de383a6e807bd7416a6efd6811c7a6fab88e87e467338c54a8b48f36d5c
+atomic_summary.tsv=2d4d0a949a0df6290580ef7145e52d6c46d74d0aa70227db3a4fb96449c57d47
+audit_disposition.tsv=0b4d47b5623b640d5597b129790cecfaa4856a05d28df47152f1560c2ed0d49b
+audit_gate_results.tsv=191908c272b627025914a65805285d83a2fd63033b983bee8f0700395afb058d
+authority_boundary.tsv=1f3436937dc4298aac121bb273fc2a75a8764536c7937dbeeb78f60bd66b5729
+authority_derivation.tsv=d5e65215218f133daf78de7b6ea467f08805016dbd99d690d8c1bf365b3db579
+dependency_order.tsv=c27d4c1ec480661fe0c5bb963c8ca0e4307ffd589e2a2cb28d42b15c13afd552
+environment_authority.tsv=d274594a7f676cacf95bbb49fc025937db781ef7aee690a68452587caa6f026d
+environment_equivalence.tsv=a88066d60bb08efa4c84578c0b3b2fd00859fa58a7bf8cfc8a65a0de14b5b809
+environment_tokens.tsv=4e9c9f331fcab38a19ae617eafd07d768bd7654980a1fd094890c7db73a339fc
+environment_variable_policy.tsv=c1922b99c76d1fafa1f3d09e060c7c7c309d16ff60ad6867b50fec0c71e437c6
+invocation_atomic_matrix.tsv=c31b8d8e3f61c4d7b8033e81071127b056e6f3c00f920221127a3d2abadc5c7c
+invocation_bijection.tsv=d58849f8e1d5dc75b79734f7f956fe746ac3fcf9686d8a5ffde7106ef586dca6
+preconstruction_derivation.tsv=324a5ab3fb10c76d2e7b7cfcfc98b2501ffa97435f9f355861cfb77d4e9480c9
+preconstruction_gates.tsv=5c0b41fb6cd508dfe1d1ba208399e8526a054f1f277175569fd16e6667c68874
+remaining_conflicts.tsv=4581a74790cb8a0c65d19dded20332b22fb3c0227b9108e4392bb239bcac2ea8
+schema_authority.tsv=89871f44879321bd2270afe8bae4011cc448fe5fcbf42b29addc9a89abb4036f
+selector_authority.tsv=d3d33049aa72f68309852044f9de163d303be7d6e7b8d2ea45b103d8e11d8851
+```
+
+Preserve the initial six-copy/four-keyed-derivation boundary and independently
+replay every AV authority, token, selector, 48 environment, coverage,
+equivalence, type/mode, invocation-atomic, bijection, conflict, dependency,
+and audit-record gate under fresh AW authority. Preserve the same schemas,
+exact-field selectors, isolated processes/statuses/markers, and all AV
+constraints. Full environment closure is mandatory before invocation-atomic
+work.
+
+Before treating the marker as byte-identical, prove it contains no AV root,
+operating commit, tree, or inbox binding. If any operating-bound field exists,
+derive the AW marker field-by-field and freeze its exact bytes/hash instead.
+Freeze a literal non-generated finalizer body and its SHA-256 before AW
+construction. It must use a closed shell, explicitly set and verify
+`umask 0022`, recheck marker absence/non-symlink immediately before creation,
+enable exclusive no-clobber creation, and write the complete frozen bytes once.
+Independently validate finalizer bytes/hash/syntax and absence/no-follow
+assumptions before the write; never execute table text or a generated command.
+
+No `apply_patch`, chmod, overwrite, append, rename, generated command, sourced
+table, or `eval` may create or alter the marker. A failed marker write retains
+its exact partial state and stops. After a successful write, authorize only
+separate read-only checks of marker type, mode `0644`, bytes/hash/schema, then
+the final 20-file paths/inventory/ledger and clean-state report. No AW byte may
+change after marker creation. `AUDIT_COMPLETE` remains audit-only with
+`implementation_ready=false` and `execution_authority=none`.
+
+The first technical or identity failure preserves AW absent or exactly
+partial and stops with no inspection, diagnosis, repair, retry, cleanup,
+regeneration, normalization, mode change, fix-forward, or later command. No
+source/production change, implementation, Zig/build/install, project or
+validation execution, cache, registered-worktree-directory access, ratchet
+movement, production credit, production AWK, D02, or downstream action. Never
+access `.claude/settings.local.json`. Require one concise acknowledgment, then
+proceed directly through the bounded gates; a delayed byte-identical
+acknowledgment request is administrative and does not consume authority.
+
+## INBOX-206AV fresh exact-field environment/invocation closure restart — COMPLIANT FAIL-CLOSED PARTIAL; SUPERSEDED BY INBOX-206AW
 
 INBOX-206AU is accepted only as a compliant administrative stop. The Worker
 fully acknowledged AU and passed exactly one operating/protected-state gate;
