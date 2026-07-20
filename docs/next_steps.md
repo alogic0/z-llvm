@@ -24,7 +24,67 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-204A explicit closed-umask resumption of unchanged inert control candidate commit — AUTHORIZED
+## INBOX-205 dormant private authority reader/validator with synthetic-only testing — AUTHORIZED
+
+INBOX-204A and inert control candidate commit
+`9c55bda34088e1230b0b91a126d35795a3ac70b4`, tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e`, are accepted. Source remains
+authoritative, destination remains non-authoritative, the candidate is never
+selected, and ratchet remains 131.
+
+Implement only the dormant Phase-2 private authority reader/validator.
+Modify and commit only the actual required subset of:
+
+```text
+tools/zllvm_artifact_store.zig
+build.zig
+docs/evidence/zllvm_artifact_manifest_v1.tsv
+docs/zllvm_artifact_retention_contract.md
+docs/evidence/zllvm_artifact_authority_dormant_v1.md
+```
+
+Use a private owned configuration object. Add closed canonical parsing,
+referential validation, exact no-follow/type/mode/hash/size/tree/
+registration checks, and stable first-attributed fail-closed errors for the
+candidate, generation, lineage, payload-copy receipt, and destination.
+
+Production `resolveAuthority`, argv, environment, commands, selector,
+authority derivation, call graph, and callsites remain behaviorally
+unchanged. Add no CLI verb, environment variable, selector, public/generic
+API, undocumented path, or production consumer. No production path may
+reach the dormant validator or read the mirror, retention document, real
+control candidate, or local-state destination.
+
+Synthetic tests use synthetic control/authority/store roots only. Do not run
+the validator against real control or either real store. Read-only preflight
+may hash only the four exact real control files. Cover positive validation
+and stable missing/malformed/mismatched/stale/partial/extra/unsafe failures.
+
+The optional manifest mirror, if needed, must be a mode-`0644`
+byte-identical test-only copy at SHA-256 `61b7426b...`, 27,823 bytes, never
+embedded in or readable by production. Omit it if in-memory fixtures suffice.
+`build.zig` changes only if the existing focused registration cannot exercise
+the private path.
+
+Freeze the exact local Zig identity and gate commands before execution. Run
+only formatting/compile checks, one recorded focused `artifact-store-test`
+synthetic suite, and a narrow source guard proving production
+non-reachability and unchanged command/authority surfaces. A failed final
+suite stops without retry, rerun, repair, alternate suite, or fix-forward
+commit.
+
+Control remains exact at `9c55bda3...`. Do not mutate either store, control,
+candidate, source/compiler paths, unlisted contracts/pins/scripts,
+registered worktrees, or protected configuration. No activation,
+real-candidate validation, v3 or v3-contract amendment, compatibility,
+payload publication, project compiler gate, benchmark, cleanup, deletion,
+relocation, repair, ratchet movement, or credit.
+
+Any wider API/path/build/callsite/control/store need is a structural stop.
+Success makes one main commit limited to the actual subset of the five paths,
+leaves both repositories clean, and stops before real candidate validation.
+
+## INBOX-204A explicit closed-umask resumption of unchanged inert control candidate commit — ACCEPTED; INCORPORATED INTO INBOX-205
 
 INBOX-204 is accepted only as a compliant pre-mutation stop. Ambient umask
 was `0002`; no `authority` path, control change, or commit was created.
