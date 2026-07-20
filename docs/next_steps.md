@@ -24,6 +24,50 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-193C remove production fault hook; scoped proof-workspace owner; one logged continuation — AUTHORIZED
+
+INBOX-193B at unchanged HEAD `46a3f68a` is accepted only as a compliant
+retain-and-stop. Its sole suite returned status 1 with 5/6 tests passing. The
+failing direct helper received an unsorted object group and was rejected by
+archive listing validation before proof-workspace acquisition. Production
+sorting is correct and unchanged. The normal proof success path cleaned its
+workspace; the early-error path remains unexecuted.
+
+Implementation acceptance is withheld because the early-error assertion did
+not execute and INBOX-193B added a production fault-injection parameter
+despite the no-production-test-hook boundary. Preserve the retained dirty
+patch, all three prior roots, original log, five INBOX-193B records, and pane
+evidence exactly.
+
+Remove `SnapshotProofFault`, `verifySnapshotArchiveWithFault`, and every
+associated production trace. Preserve archive sorting and verification
+semantics. Put proof-root/workspace handles under one private scoped owner
+with fallible success cleanup, deferred best-effort error cleanup, explicit
+ownership state, no double close/delete, and no invalid-handle sentinel.
+
+Exercise deliberate early-error unwinding only through a test-private helper
+that acquires the same resource. Add no verifier injection, production
+callback, public API, production test hook, or archive-validation change.
+Assert the intended error and empty proof parent; keep normal-success cleanup
+coverage. Any other semantic issue stops without fixing forward.
+
+Use only the initially absent, worktree-disjoint root:
+
+`/home/oleg/prog/z_llvm-inbox193c-artifact-store-synthetic`.
+
+Run formatting/static/compile-only checks first, then exactly one full suite
+forced to that root, retaining exact command, environment, separate
+stdout/stderr, and status beneath
+`tmp/inbox193c_o2_artifact_store_dormant/validation/`. Failure retains all
+state without retry, repair, cleanup, or commit. Complete success may remove
+only the reverified INBOX-193C root; preserve all three earlier roots.
+
+On success, commit only the bounded tool, template/schema, minimal build
+wiring, focused tests, and one four-attempt evidence summary. Create no real
+store; access no current artifact or protected-worktree content; change no
+live row, pin, contract, cleanup integration, v3/selector validation,
+production wiring, performance boundary, Tier state, checkpoint, or ratchet.
+
 ## INBOX-193B snapshot-proof ownership correction and one logged synthetic continuation — AUTHORIZED
 
 INBOX-193A at unchanged HEAD `d81618f7` is accepted only as a compliant
