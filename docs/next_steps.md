@@ -24,6 +24,59 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-195C exact-HEAD binding and read-only store reverification — AUTHORIZED
+
+INBOX-195B at actual operating HEAD
+`84324dfbd68836a9c772bc6c8b05666531c24d52` is accepted as a compliant
+fail-closed stop. Its isolated corrected AWK precheck is accepted at status 0,
+empty stderr, and exact 33/8/2 output. Do not rerun it.
+
+The full verifier's status 1 carries no technical signal. The Watcher
+dispatched an incorrect expanded commit identity
+`84324dfbd8fe6bcd0dc0c416292875812845c6c1` instead of actual
+`84324dfbd68836a9c772bc6c8b05666531c24d52`. The verifier therefore
+stopped at its first exact-HEAD test with empty stdout/stderr before any later
+check. No retry, diagnosis, mutation, cleanup, commit, or semantic change
+occurred.
+
+Preserve the real-store inventory/file-ledger identities `3234fb50...` /
+`a06c48e...`, three-way manifest `61b7426b...`, INBOX-195/195A ledgers
+`39064e35...` / `5cb92030...`, and the exact 20-file INBOX-195B ledger
+`0e9dfc88c623e4ca1a5c70db24eeec0c47e977f15fc2422d7bd3e13f94dc87f0`.
+Preserve all store bytes, sources, roots, prior namespaces, registrations,
+watcher, stash, pins, audit, calls boundaries, ratchet 131, and absent v3.
+
+Use only fresh
+`tmp/inbox195c_calls_real_store_verification/validation/`, initially absent.
+The Watcher must supply the new operating-document commit as the exact
+40-character output of `git rev-parse HEAD`. Before creating the namespace or
+invoking anything, compare it byte-for-byte with local full HEAD and require
+its parent to equal
+`84324dfbd68836a9c772bc6c8b05666531c24d52`. Any mismatch stops without
+namespace creation.
+
+Carry the frozen INBOX-195B full verifier into the fresh namespace. Change
+only its mechanical fresh-namespace, exact operating HEAD/parent, and added
+INBOX-195B-ledger bindings. Every substantive condition remains
+byte-identical, including the three accepted AWK accumulator corrections and
+both accepted snapshot corrections.
+
+Freeze exactly one pipeline-free closed-environment read-only full verifier
+with separate stdout, stderr, and numeric status, then invoke it once from its
+first invariant. Run no artifact tool or project code. Mutate no store,
+manifest, source, root, retained namespace, pin, historical/compatibility
+path, registered worktree, contract, or v3 path.
+
+Failure retains and stops without diagnosis, retry, repair, cleanup, alternate
+verification, commit, or semantic change. Complete success writes one
+INBOX-195C evidence summary, commits only the pre-existing exact manifest plus
+that summary, preserves store and records, and stops for publication
+acceptance.
+
+No compatibility, contract, pin, cleanup, wiring, performance, Tier,
+mandatory-checkpoint, ratchet, or credit action is authorized. Validation-v3
+remains blocked.
+
 ## INBOX-195B AWK correction and read-only store reverification — AUTHORIZED
 
 INBOX-195A at unchanged operating HEAD
