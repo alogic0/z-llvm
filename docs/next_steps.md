@@ -24,7 +24,156 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BT pure-Zig corrected-source gate and commit closure — AUTHORIZED
+## INBOX-206BU pure-Zig trusted-root descriptor acquisition — AUTHORIZED
+
+INBOX-206BT is accepted fully within its bounded scope. The one-component
+validator/acquisition primitive and its focused runtime evidence are accepted;
+descriptor status remains `conditionally_supported` and the ratchet remains
+131.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BT completed successfully.
+
+- Commit: `fdaf6277e25b9358151d5a9ce7cecd0157115e5b`
+- Tree: `e8c11eef804093e0cae9b5a3afb84e4837e52b3f`
+- Sole committed file: `tools/zllvm_inbox206_materialize.zig`
+- Contextual BR reconstruction passed.
+- Both Zig gates passed exactly once.
+- Main and control are clean.
+- BP, BR, and BT caches are retained; BS caches remain absent.
+- Status remains `conditionally_supported`; ratchet remains 131.
+```
+
+Static Watcher review ran no project code. Commit
+`fdaf6277e25b9358151d5a9ce7cecd0157115e5b` is non-merge, has parent
+`eeb27781fea44db6037753a24d8ddfe1f07d067a` and tree
+`e8c11eef804093e0cae9b5a3afb84e4837e52b3f`, and changes only mode-0644
+`tools/zllvm_inbox206_materialize.zig` by 173 insertions. The committed file
+has SHA-256
+`4362cb2d71d8e6d8cf0f4c92c60500fc98a676b11110ef0559725385a5a99f96`
+and blob `e3bf332c23f53c6ba4ae49c3d2a12b1dbf1ee087`.
+
+Retained Worker turn `019f82aa-1299-7f02-955f-3bf8d42f3715` shows only
+skill/operating-document reads, the exact location-independent contextual
+reconstruction, the exact ordered one-shot gates, read-only closure, sole-file
+commit, and final checks. Each reconstruction, gate, closure, commit, and
+final-verification call exited zero; `task_complete` follows with no edit,
+installed-source read, extra project command, retry, cleanup, worktree access,
+or prohibited action. Main/index/control are clean; build/watcher identities,
+stash `7985c6d...`, watcher PID 3206208, all 43 registered worktrees,
+BP/BR/BT retained roots, absent BS roots, BI/continuation absence, D01/D02,
+and ratchet 131 remain exact. The stale unsent Worker acknowledgment fragment
+is explicitly superseded and grants no authority.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept fdaf6277e25b9358151d5a9ce7cecd0157115e5b fully within BT. The one-component validator/acquisition primitive and focused runtime evidence are accepted; status remains
+conditionally_supported.
+
+The stale unsent acknowledgment is explicitly superseded and grants no authority.
+
+I authorize Zig-only INBOX-206BU with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by fdaf6277e25b9358151d5a9ce7cecd0157115e5b; update the ignored inbox separately.
+- Modify only tools/zllvm_inbox206_materialize.zig, retaining mode 0644, existing APIs, behavior, tests, and build wiring.
+- Add a private zero-path-parameter acquireTrustedRoot primitive. Its only path source must be the exact source literal "/".
+- Call std.Io.Dir.openDirAbsolute with exactly:
+    - access_sub_paths = true
+    - iterate = false
+    - follow_symlinks = false
+
+- Treat / as the root of the process’s current mount namespace; grant no host-global or cross-namespace identity claim.
+- Use ownership-safe errdefer if descriptor observation fails. Return the existing owned directory-plus-four-field-identity value; caller alone closes it.
+- Add focused tests proving:
+    - two independently acquired root descriptors have equal identities;
+    - each identity remains stable while its descriptor is held;
+    - closing one descriptor is caller-controlled and yields the accepted closed-descriptor error when observed through a saved handle;
+    - the other descriptor remains valid and stable afterward;
+    - both descriptors are closed exactly once.
+
+- The new function and tests may open only /. Existing previously accepted temporary-directory tests remain unchanged.
+- Add no caller path, cwd use, canonicalization, realPath, component open, child traversal, longer absolute path, subprocess, or shell operation.
+- Keep every new symbol private and test-root-only.
+- Require initially absent/non-symlink caches:
+    - /home/oleg/.cache/zllvm-inbox206bu-local
+    - /home/oleg/.cache/zllvm-inbox206bu-global
+
+  Retain them after success or failure.
+
+- Run exactly once, in order:
+    1. zig fmt --check tools/zllvm_inbox206_materialize.zig
+    2. existing zig build test-inbox206-descriptor-identity using the BU caches.
+
+- Success permits only read-only scope/diff/status checks, then commits only the Zig file and stops.
+- First failure stops uncommitted without later command, diagnosis, retry, repair, cleanup, or fix-forward.
+
+Component walking, real authority paths, second-chain comparison, publication, materialization, installation, evidence generation, production reachability, D01/D02, ratchet movement,
+credit, and downstream authority remain withheld.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`fdaf6277e25b9358151d5a9ce7cecd0157115e5b`; update the ignored inbox
+separately.
+
+Modify only mode-0644 `tools/zllvm_inbox206_materialize.zig`, retaining all
+existing APIs, behavior, tests, and build wiring. Add a private,
+zero-path-parameter `acquireTrustedRoot` primitive whose only path source is
+the exact source literal `"/"`. It must call
+`std.Io.Dir.openDirAbsolute` with exactly `access_sub_paths = true`,
+`iterate = false`, and `follow_symlinks = false`. Treat `/` only as the root
+of the process's current mount namespace; make no host-global or
+cross-namespace identity claim. On observation failure, close with
+ownership-safe `errdefer`; return the existing owned directory-plus-four-field
+identity value, and leave closing solely to the caller.
+
+Add focused tests proving two independently acquired root descriptors have
+equal identities; each identity stays stable while held; closing one is
+caller-controlled and subsequent observation through a saved handle yields
+the already accepted closed-descriptor error; the other stays valid and
+stable afterward; and both are closed exactly once. The new function/tests
+may open only `/`; all accepted temporary-directory tests stay unchanged.
+Add no caller path, cwd use, canonicalization, `realPath`, component open,
+child traversal, longer absolute path, subprocess, or shell operation. Keep
+all new symbols private and reachable only from the dedicated test root.
+
+Require fresh initially absent/non-symlink caches and retain them after
+success or failure:
+
+```text
+ZIG_LOCAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206bu-local
+ZIG_GLOBAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206bu-global
+```
+
+Run exactly once, in order:
+
+1. `zig fmt --check tools/zllvm_inbox206_materialize.zig`;
+2. the existing `zig build test-inbox206-descriptor-identity` with BU caches.
+
+Success permits only read-only exact scope/diff/status closure, commits only
+the Zig file, verifies clean main/control, and stops. First failure stops
+uncommitted without any later command, diagnosis, retry, repair, cleanup, or
+fix-forward.
+
+The project-language boundary is absolute: all substantive implementation,
+generators, validators, codecs, hashing, harnesses, workflow, and artifact
+tooling must be Zig. Bash is limited to tiny transparent fixed-command/cache
+orchestration. No JavaScript, ECMAScript, TypeScript, Python, Perl, AWK,
+other-language project solution, or internal-agent project algorithm is
+authorized.
+
+No component walking, home/oleg/prog/z_llvm/docs/evidence access, real
+authority path, second-chain comparison, publication, materialization,
+installation, evidence generation, production reachability or wiring, API,
+BI/continuation, D01/D02, ratchet movement, credit, registered-worktree
+access/modification, cleanup, or downstream authority is granted. Status
+remains `conditionally_supported`; ratchet remains 131.
+
+
+## INBOX-206BT pure-Zig corrected-source gate and commit closure — ACCEPTED; SUPERSEDED BY INBOX-206BU
 
 INBOX-206BS is accepted only as a compliant fail-closed post-edit/pre-gate
 stop. Its one-token correction receives provisional exact-content credit; no
