@@ -261,6 +261,211 @@ fn expectAcquisitionError(
     }
 }
 
+const snapshot_internal_ceiling: u64 = 64 * 1024;
+
+const SnapshotTokenState = enum {
+    unused,
+    in_progress,
+    consumed,
+};
+
+const SnapshotToken = struct {
+    state: SnapshotTokenState = .unused,
+};
+
+const SnapshotExpectation = struct {
+    exact_length: u64,
+    supplied_maximum: u64,
+    expected_digest: [std.crypto.hash.sha2.Sha256.digest_length]u8,
+};
+
+const SnapshotReadNextResult = union(enum) {
+    bytes: usize,
+    eof,
+};
+
+const SnapshotReadNextFn = *const fn (
+    context: *anyopaque,
+    destination: []u8,
+) anyerror!SnapshotReadNextResult;
+
+const SnapshotError = error{
+    SnapshotTokenUnavailable,
+    SnapshotLengthInvalid,
+    SnapshotMaximumTooSmall,
+    SnapshotInternalCeilingExceeded,
+    SnapshotLengthOverflow,
+    SnapshotReadFailed,
+    SnapshotZeroProgress,
+    SnapshotPartial,
+    SnapshotTrailing,
+    SnapshotDigestMismatch,
+};
+
+const VerifiedSnapshot = struct {
+    allocator: std.mem.Allocator,
+    bytes: []u8,
+
+    fn deinit(self: *VerifiedSnapshot) void {
+        self.allocator.free(self.bytes);
+        self.* = undefined;
+    }
+};
+
+fn observeVerifiedSnapshot(snapshot: *const VerifiedSnapshot) []const u8 {
+    return snapshot.bytes;
+}
+
+/// Consumes one caller-owned token and one bounded synchronous byte supply.
+/// Returned bytes are allocator-owned and are observable only through the
+/// verified snapshot type after length, EOF, and digest checks all succeed.
+fn acquireVerifiedSnapshot(
+    allocator: std.mem.Allocator,
+    expectation: SnapshotExpectation,
+    token: *SnapshotToken,
+    context: *anyopaque,
+    read_next: SnapshotReadNextFn,
+) (SnapshotError || std.mem.Allocator.Error)!VerifiedSnapshot {
+    if (token.state != .unused) return error.SnapshotTokenUnavailable;
+    token.state = .in_progress;
+    defer token.state = .consumed;
+
+    if (expectation.exact_length == 0) return error.SnapshotLengthInvalid;
+    if (expectation.exact_length > expectation.supplied_maximum) {
+        return error.SnapshotMaximumTooSmall;
+    }
+    if (expectation.exact_length > snapshot_internal_ceiling) {
+        return error.SnapshotInternalCeilingExceeded;
+    }
+    const exact_length = std.math.cast(usize, expectation.exact_length) orelse
+        return error.SnapshotLengthInvalid;
+    const length_with_probe = @addWithOverflow(exact_length, @as(usize, 1));
+    if (length_with_probe[1] != 0) return error.SnapshotLengthOverflow;
+    _ = length_with_probe[0];
+
+    const owned = try allocator.alloc(u8, exact_length);
+    errdefer allocator.free(owned);
+
+    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    var filled: usize = 0;
+    while (filled < exact_length) {
+        const result = read_next(context, owned[filled..]) catch
+            return error.SnapshotReadFailed;
+        switch (result) {
+            .eof => return error.SnapshotPartial,
+            .bytes => |count| {
+                if (count == 0) return error.SnapshotZeroProgress;
+                if (count > exact_length - filled) return error.SnapshotReadFailed;
+                const next = @addWithOverflow(filled, count);
+                if (next[1] != 0) return error.SnapshotLengthOverflow;
+                hasher.update(owned[filled..next[0]]);
+                filled = next[0];
+            },
+        }
+    }
+
+    var trailing_probe: [1]u8 = undefined;
+    const trailing_result = read_next(context, &trailing_probe) catch
+        return error.SnapshotReadFailed;
+    switch (trailing_result) {
+        .eof => {},
+        .bytes => |count| {
+            if (count == 0) return error.SnapshotZeroProgress;
+            if (count > trailing_probe.len) return error.SnapshotReadFailed;
+            return error.SnapshotTrailing;
+        },
+    }
+
+    var actual_digest: [std.crypto.hash.sha2.Sha256.digest_length]u8 = undefined;
+    hasher.final(&actual_digest);
+    if (!std.mem.eql(u8, &actual_digest, &expectation.expected_digest)) {
+        return error.SnapshotDigestMismatch;
+    }
+
+    return .{
+        .allocator = allocator,
+        .bytes = owned,
+    };
+}
+
+const SyntheticSnapshotReader = struct {
+    input: []const u8,
+    offset: usize = 0,
+    chunk_size: usize = std.math.maxInt(usize),
+    call_count: usize = 0,
+    zero_progress_on_call: ?usize = null,
+    fail_on_call: ?usize = null,
+
+    fn readNext(
+        raw_context: *anyopaque,
+        destination: []u8,
+    ) anyerror!SnapshotReadNextResult {
+        const self: *SyntheticSnapshotReader = @ptrCast(@alignCast(raw_context));
+        const call_index = self.call_count;
+        self.call_count += 1;
+        if (self.fail_on_call) |failure_index| {
+            if (failure_index == call_index) return error.SyntheticSnapshotReadFailure;
+        }
+        if (self.zero_progress_on_call) |zero_index| {
+            if (zero_index == call_index) return .{ .bytes = 0 };
+        }
+        if (self.offset == self.input.len) return .eof;
+
+        const remaining = self.input.len - self.offset;
+        const count = @min(destination.len, @min(self.chunk_size, remaining));
+        @memcpy(destination[0..count], self.input[self.offset..][0..count]);
+        self.offset += count;
+        return .{ .bytes = count };
+    }
+};
+
+const RecursiveSnapshotReader = struct {
+    delegate: *SyntheticSnapshotReader,
+    allocator: std.mem.Allocator,
+    expectation: SnapshotExpectation,
+    token: *SnapshotToken,
+    recursive_error: ?anyerror = null,
+
+    fn readNext(
+        raw_context: *anyopaque,
+        destination: []u8,
+    ) anyerror!SnapshotReadNextResult {
+        const self: *RecursiveSnapshotReader = @ptrCast(@alignCast(raw_context));
+        if (self.recursive_error == null) {
+            if (acquireVerifiedSnapshot(
+                self.allocator,
+                self.expectation,
+                self.token,
+                self.delegate,
+                SyntheticSnapshotReader.readNext,
+            )) |value| {
+                var unexpected = value;
+                unexpected.deinit();
+                return error.SyntheticRecursiveCallUnexpectedlySucceeded;
+            } else |actual_error| {
+                self.recursive_error = actual_error;
+            }
+        }
+        return SyntheticSnapshotReader.readNext(self.delegate, destination);
+    }
+};
+
+fn fillSyntheticSnapshot(bytes: []u8) void {
+    for (bytes, 0..) |*byte, index| {
+        byte.* = @intCast((index * 131 + 17) % 251);
+    }
+}
+
+fn syntheticExpectation(bytes: []const u8, supplied_maximum: u64) SnapshotExpectation {
+    var digest: [std.crypto.hash.sha2.Sha256.digest_length]u8 = undefined;
+    std.crypto.hash.sha2.Sha256.hash(bytes, &digest, .{});
+    return .{
+        .exact_length = @intCast(bytes.len),
+        .supplied_maximum = supplied_maximum,
+        .expected_digest = digest,
+    };
+}
+
 test "compile-time ABI and essential mask closure" {
     comptime assertNativeAbi();
     const mask_bits: u32 = @bitCast(requiredMask());
@@ -674,4 +879,303 @@ test "trusted root-to-home-to-oleg-to-prog chain identity and caller close order
         error.DescriptorIdentityBadDescriptor,
         observeDescriptor(root_handle, .directory),
     );
+}
+
+test "verified snapshot accepts exact generated bytes and admits only verified observation" {
+    const synthetic_length = 29_834;
+    var input: [synthetic_length]u8 = undefined;
+    fillSyntheticSnapshot(&input);
+    const expectation = syntheticExpectation(&input, synthetic_length);
+    var token = SnapshotToken{};
+    const chunk_size = 4093;
+    var reader = SyntheticSnapshotReader{
+        .input = &input,
+        .chunk_size = chunk_size,
+    };
+
+    var snapshot = try acquireVerifiedSnapshot(
+        std.testing.allocator,
+        expectation,
+        &token,
+        &reader,
+        SyntheticSnapshotReader.readNext,
+    );
+    defer snapshot.deinit();
+
+    const observed = observeVerifiedSnapshot(&snapshot);
+    try std.testing.expectEqualSlices(u8, &input, observed);
+    try std.testing.expectEqual(SnapshotTokenState.consumed, token.state);
+    const data_call_count = (synthetic_length + chunk_size - 1) / chunk_size;
+    try std.testing.expectEqual(data_call_count + 1, reader.call_count);
+}
+
+test "verified snapshot rejects invalid exact maximum and ceiling sizes before reading" {
+    const empty = [_]u8{};
+    var digest: [std.crypto.hash.sha2.Sha256.digest_length]u8 = undefined;
+    std.crypto.hash.sha2.Sha256.hash(&empty, &digest, .{});
+
+    const cases = [_]struct {
+        expectation: SnapshotExpectation,
+        expected_error: anyerror,
+    }{
+        .{
+            .expectation = .{
+                .exact_length = 0,
+                .supplied_maximum = 0,
+                .expected_digest = digest,
+            },
+            .expected_error = error.SnapshotLengthInvalid,
+        },
+        .{
+            .expectation = .{
+                .exact_length = 2,
+                .supplied_maximum = 1,
+                .expected_digest = digest,
+            },
+            .expected_error = error.SnapshotMaximumTooSmall,
+        },
+        .{
+            .expectation = .{
+                .exact_length = snapshot_internal_ceiling + 1,
+                .supplied_maximum = snapshot_internal_ceiling + 1,
+                .expected_digest = digest,
+            },
+            .expected_error = error.SnapshotInternalCeilingExceeded,
+        },
+    };
+
+    for (cases) |case| {
+        var token = SnapshotToken{};
+        var reader = SyntheticSnapshotReader{ .input = &empty };
+        try std.testing.expectError(
+            case.expected_error,
+            acquireVerifiedSnapshot(
+                std.testing.allocator,
+                case.expectation,
+                &token,
+                &reader,
+                SyntheticSnapshotReader.readNext,
+            ),
+        );
+        try std.testing.expectEqual(SnapshotTokenState.consumed, token.state);
+        try std.testing.expectEqual(@as(usize, 0), reader.call_count);
+    }
+}
+
+test "verified snapshot rejects boundary partial and trailing supplies" {
+    const expected = [_]u8{ 3, 5, 8, 13 };
+    const expectation = syntheticExpectation(&expected, expected.len);
+    const partial_inputs = [_][]const u8{
+        &[_]u8{},
+        expected[0 .. expected.len - 1],
+    };
+    for (partial_inputs) |partial| {
+        var token = SnapshotToken{};
+        var reader = SyntheticSnapshotReader{ .input = partial };
+        try std.testing.expectError(
+            error.SnapshotPartial,
+            acquireVerifiedSnapshot(
+                std.testing.allocator,
+                expectation,
+                &token,
+                &reader,
+                SyntheticSnapshotReader.readNext,
+            ),
+        );
+    }
+
+    const trailing_inputs = [_][]const u8{
+        &[_]u8{ 3, 5, 8, 13, 21 },
+        &[_]u8{ 3, 5, 8, 13, 21, 34 },
+    };
+    for (trailing_inputs) |trailing| {
+        var token = SnapshotToken{};
+        var reader = SyntheticSnapshotReader{ .input = trailing };
+        try std.testing.expectError(
+            error.SnapshotTrailing,
+            acquireVerifiedSnapshot(
+                std.testing.allocator,
+                expectation,
+                &token,
+                &reader,
+                SyntheticSnapshotReader.readNext,
+            ),
+        );
+        try std.testing.expectEqual(@as(usize, 2), reader.call_count);
+    }
+}
+
+test "verified snapshot closes zero-progress and callback failure" {
+    const input = [_]u8{ 1, 2, 3 };
+    const expectation = syntheticExpectation(&input, input.len);
+
+    var zero_token = SnapshotToken{};
+    var zero_reader = SyntheticSnapshotReader{
+        .input = &input,
+        .zero_progress_on_call = 0,
+    };
+    try std.testing.expectError(
+        error.SnapshotZeroProgress,
+        acquireVerifiedSnapshot(
+            std.testing.allocator,
+            expectation,
+            &zero_token,
+            &zero_reader,
+            SyntheticSnapshotReader.readNext,
+        ),
+    );
+
+    var failure_token = SnapshotToken{};
+    var failure_reader = SyntheticSnapshotReader{
+        .input = &input,
+        .fail_on_call = 0,
+    };
+    try std.testing.expectError(
+        error.SnapshotReadFailed,
+        acquireVerifiedSnapshot(
+            std.testing.allocator,
+            expectation,
+            &failure_token,
+            &failure_reader,
+            SyntheticSnapshotReader.readNext,
+        ),
+    );
+}
+
+test "verified snapshot rejects first middle and last digest mutations" {
+    const synthetic_length = 29_834;
+    var original: [synthetic_length]u8 = undefined;
+    fillSyntheticSnapshot(&original);
+    const expectation = syntheticExpectation(&original, synthetic_length);
+    const mutation_positions = [_]usize{ 0, synthetic_length / 2, synthetic_length - 1 };
+
+    for (mutation_positions) |position| {
+        var mutated = original;
+        mutated[position] ^= 1;
+        var token = SnapshotToken{};
+        var reader = SyntheticSnapshotReader{ .input = &mutated };
+        try std.testing.expectError(
+            error.SnapshotDigestMismatch,
+            acquireVerifiedSnapshot(
+                std.testing.allocator,
+                expectation,
+                &token,
+                &reader,
+                SyntheticSnapshotReader.readNext,
+            ),
+        );
+    }
+}
+
+test "verified snapshot rejects recursive concurrent second and retry use" {
+    const input = [_]u8{ 2, 7, 1, 8 };
+    const expectation = syntheticExpectation(&input, input.len);
+
+    var recursive_token = SnapshotToken{};
+    var delegate = SyntheticSnapshotReader{ .input = &input };
+    var recursive_reader = RecursiveSnapshotReader{
+        .delegate = &delegate,
+        .allocator = std.testing.allocator,
+        .expectation = expectation,
+        .token = &recursive_token,
+    };
+    var recursive_snapshot = try acquireVerifiedSnapshot(
+        std.testing.allocator,
+        expectation,
+        &recursive_token,
+        &recursive_reader,
+        RecursiveSnapshotReader.readNext,
+    );
+    defer recursive_snapshot.deinit();
+    try std.testing.expect(recursive_reader.recursive_error.? == error.SnapshotTokenUnavailable);
+
+    var concurrent_token = SnapshotToken{ .state = .in_progress };
+    var concurrent_reader = SyntheticSnapshotReader{ .input = &input };
+    try std.testing.expectError(
+        error.SnapshotTokenUnavailable,
+        acquireVerifiedSnapshot(
+            std.testing.allocator,
+            expectation,
+            &concurrent_token,
+            &concurrent_reader,
+            SyntheticSnapshotReader.readNext,
+        ),
+    );
+
+    var second_reader = SyntheticSnapshotReader{ .input = &input };
+    try std.testing.expectError(
+        error.SnapshotTokenUnavailable,
+        acquireVerifiedSnapshot(
+            std.testing.allocator,
+            expectation,
+            &recursive_token,
+            &second_reader,
+            SyntheticSnapshotReader.readNext,
+        ),
+    );
+
+    var retry_token = SnapshotToken{};
+    var failing_reader = SyntheticSnapshotReader{
+        .input = &input,
+        .fail_on_call = 0,
+    };
+    try std.testing.expectError(
+        error.SnapshotReadFailed,
+        acquireVerifiedSnapshot(
+            std.testing.allocator,
+            expectation,
+            &retry_token,
+            &failing_reader,
+            SyntheticSnapshotReader.readNext,
+        ),
+    );
+    var retry_reader = SyntheticSnapshotReader{ .input = &input };
+    try std.testing.expectError(
+        error.SnapshotTokenUnavailable,
+        acquireVerifiedSnapshot(
+            std.testing.allocator,
+            expectation,
+            &retry_token,
+            &retry_reader,
+            SyntheticSnapshotReader.readNext,
+        ),
+    );
+}
+
+test "verified snapshot preserves allocation cleanup ownership and post-return bytes" {
+    const input = [_]u8{ 4, 2 };
+    const expectation = syntheticExpectation(&input, input.len);
+
+    var no_storage: [0]u8 = .{};
+    var fixed = std.heap.FixedBufferAllocator.init(&no_storage);
+    var allocation_token = SnapshotToken{};
+    var allocation_reader = SyntheticSnapshotReader{ .input = &input };
+    try std.testing.expectError(
+        error.OutOfMemory,
+        acquireVerifiedSnapshot(
+            fixed.allocator(),
+            expectation,
+            &allocation_token,
+            &allocation_reader,
+            SyntheticSnapshotReader.readNext,
+        ),
+    );
+    try std.testing.expectEqual(SnapshotTokenState.consumed, allocation_token.state);
+    try std.testing.expectEqual(@as(usize, 0), allocation_reader.call_count);
+
+    var mutable_input = input;
+    var ownership_token = SnapshotToken{};
+    var ownership_reader = SyntheticSnapshotReader{ .input = &mutable_input };
+    var snapshot = try acquireVerifiedSnapshot(
+        std.testing.allocator,
+        expectation,
+        &ownership_token,
+        &ownership_reader,
+        SyntheticSnapshotReader.readNext,
+    );
+    defer snapshot.deinit();
+    const saved_first = observeVerifiedSnapshot(&snapshot)[0];
+    mutable_input[0] ^= 0xff;
+    try std.testing.expectEqual(saved_first, observeVerifiedSnapshot(&snapshot)[0]);
+    try std.testing.expectEqualSlices(u8, &input, observeVerifiedSnapshot(&snapshot));
 }
