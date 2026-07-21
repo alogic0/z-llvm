@@ -10,6 +10,7 @@ pub const accepted_maximum_storage_bytes: u64 = 14_321_451_008;
 pub const accepted_storage_reserve_bytes: u64 = 2_858_418_176;
 pub const canonical_repetition_count: usize = 3;
 pub const successful_function_count: u16 = 285;
+pub const accepted_process_capture_bytes: u64 = 4 * mebibyte_bytes;
 
 pub const IdentityKind = enum {
     sha256,
@@ -97,6 +98,7 @@ pub const ContractError = error{
     AggregateExclusionMismatch,
     MinimumHeadroomSubstitution,
     InsufficientAvailableStorage,
+    EnforcementEvidenceIncomplete,
 };
 
 pub fn validateIdentities(observed: []const IdentityDescriptor) ContractError!void {
@@ -170,6 +172,7 @@ fn isSupersededV3(path: []const u8) bool {
 pub const ExecutionReadiness = enum {
     not_ready_insufficient_capacity,
     not_ready_storage_enforcement_absent,
+    ready,
 };
 
 pub fn executionReadiness(available_bytes: u64) ExecutionReadiness {
@@ -181,6 +184,58 @@ pub fn executionReadiness(available_bytes: u64) ExecutionReadiness {
 pub fn requireMinimumCapacity(available_bytes: u64) ContractError!void {
     if (available_bytes < minimum_available_bytes) return error.InsufficientCapacity;
 }
+
+pub const EnforcementPrerequisite = enum(u8) {
+    canonical_absolute_inputs,
+    closed_bounded_processes,
+    registered_worktree_prefix_exclusion,
+    v3_layout,
+    exact_identity_and_key_set,
+    file_and_root_caps,
+    family_caps,
+    aggregate_exclusions,
+    repetitions_and_counters,
+    phase_and_first_failure,
+    restoration_and_semantic_equality,
+    atomic_publication_and_readback,
+};
+
+pub const required_enforcement_prerequisites = [_]EnforcementPrerequisite{
+    .canonical_absolute_inputs,
+    .closed_bounded_processes,
+    .registered_worktree_prefix_exclusion,
+    .v3_layout,
+    .exact_identity_and_key_set,
+    .file_and_root_caps,
+    .family_caps,
+    .aggregate_exclusions,
+    .repetitions_and_counters,
+    .phase_and_first_failure,
+    .restoration_and_semantic_equality,
+    .atomic_publication_and_readback,
+};
+
+pub const EnforcedStorageFamily = struct {
+    family: StorageFamily,
+    maximum_bytes: u64,
+    retention: StorageRetentionClass,
+    enforcement: StorageEnforcementPrimitive,
+    aggregate_exclusions: u32,
+};
+
+pub const CompleteEnforcementEvidence = struct {
+    prerequisites: []const EnforcementPrerequisite,
+    storage_families: []const EnforcedStorageFamily,
+    available_bytes: u64,
+    identity_count: usize,
+    compatibility_key_count: usize,
+    v3_path_count: usize,
+    repetition_count: usize,
+    successful_functions: u16,
+    phase_count: usize,
+    stdout_capture_bytes: u64,
+    stderr_capture_bytes: u64,
+};
 
 pub const StorageFamily = enum(u8) {
     external_preflight_driver_records = 1,
@@ -558,6 +613,70 @@ pub fn acceptedStorageReserve() ContractError!u64 {
         minimum_available_bytes,
         accepted_maximum_storage_bytes,
     ) catch return error.StorageReserveUnderflow;
+}
+
+pub fn acceptedEnforcedStorageFamilies() ContractError![storage_families.len]EnforcedStorageFamily {
+    try validateAcceptedStoragePolicy();
+    var enforced: [storage_families.len]EnforcedStorageFamily = undefined;
+    for (
+        &enforced,
+        accepted_storage_policy,
+        accepted_storage_cap_mib,
+    ) |*row, policy, cap_mib| {
+        row.* = .{
+            .family = policy.family,
+            .maximum_bytes = try storageMibToBytes(cap_mib),
+            .retention = policy.retention,
+            .enforcement = policy.enforcement,
+            .aggregate_exclusions = policy.aggregate_exclusions,
+        };
+    }
+    return enforced;
+}
+
+pub fn validateCompleteEnforcementEvidence(
+    evidence: CompleteEnforcementEvidence,
+) ContractError!void {
+    try requireMinimumCapacity(evidence.available_bytes);
+    _ = try acceptedStorageBudgetTotals(evidence.available_bytes);
+
+    if (!std.mem.eql(
+        EnforcementPrerequisite,
+        &required_enforcement_prerequisites,
+        evidence.prerequisites,
+    )) return error.EnforcementEvidenceIncomplete;
+
+    const expected_families = try acceptedEnforcedStorageFamilies();
+    if (evidence.storage_families.len != expected_families.len)
+        return error.EnforcementEvidenceIncomplete;
+    for (expected_families, evidence.storage_families) |expected, actual| {
+        if (!std.meta.eql(expected, actual)) return error.EnforcementEvidenceIncomplete;
+    }
+
+    if (evidence.identity_count != closed_identities.len or
+        evidence.compatibility_key_count != compatibility_keys.len or
+        evidence.v3_path_count != @typeInfo(V3Path).@"enum".fields.len or
+        evidence.repetition_count != canonical_repetition_count or
+        evidence.successful_functions != successful_function_count or
+        evidence.phase_count != @typeInfo(Phase).@"enum".fields.len or
+        evidence.stdout_capture_bytes != accepted_process_capture_bytes or
+        evidence.stderr_capture_bytes != accepted_process_capture_bytes)
+    {
+        return error.EnforcementEvidenceIncomplete;
+    }
+}
+
+pub fn executionReadinessWithEvidence(
+    evidence: CompleteEnforcementEvidence,
+) ContractError!ExecutionReadiness {
+    if (evidence.available_bytes < minimum_available_bytes)
+        return .not_ready_insufficient_capacity;
+    validateCompleteEnforcementEvidence(evidence) catch |failure| switch (failure) {
+        error.EnforcementEvidenceIncomplete => return .not_ready_storage_enforcement_absent,
+        error.InsufficientCapacity => return .not_ready_insufficient_capacity,
+        else => return failure,
+    };
+    return .ready;
 }
 
 pub const Phase = enum(u8) {
@@ -1122,6 +1241,69 @@ test "baseline validation accepted caps do not imply storage enforcement readine
         executionReadiness(minimum_available_bytes),
     );
     try std.testing.expect(accepted_maximum_storage_bytes < minimum_available_bytes);
+}
+
+test "baseline validation complete typed enforcement evidence alone admits readiness" {
+    const families = try acceptedEnforcedStorageFamilies();
+    const evidence = CompleteEnforcementEvidence{
+        .prerequisites = &required_enforcement_prerequisites,
+        .storage_families = &families,
+        .available_bytes = minimum_available_bytes,
+        .identity_count = closed_identities.len,
+        .compatibility_key_count = compatibility_keys.len,
+        .v3_path_count = @typeInfo(V3Path).@"enum".fields.len,
+        .repetition_count = canonical_repetition_count,
+        .successful_functions = successful_function_count,
+        .phase_count = @typeInfo(Phase).@"enum".fields.len,
+        .stdout_capture_bytes = accepted_process_capture_bytes,
+        .stderr_capture_bytes = accepted_process_capture_bytes,
+    };
+    try validateCompleteEnforcementEvidence(evidence);
+    try std.testing.expectEqual(
+        ExecutionReadiness.ready,
+        try executionReadinessWithEvidence(evidence),
+    );
+}
+
+test "baseline validation typed enforcement evidence rejects omission drift and capacity" {
+    var families = try acceptedEnforcedStorageFamilies();
+    var evidence = CompleteEnforcementEvidence{
+        .prerequisites = &required_enforcement_prerequisites,
+        .storage_families = &families,
+        .available_bytes = minimum_available_bytes,
+        .identity_count = closed_identities.len,
+        .compatibility_key_count = compatibility_keys.len,
+        .v3_path_count = @typeInfo(V3Path).@"enum".fields.len,
+        .repetition_count = canonical_repetition_count,
+        .successful_functions = successful_function_count,
+        .phase_count = @typeInfo(Phase).@"enum".fields.len,
+        .stdout_capture_bytes = accepted_process_capture_bytes,
+        .stderr_capture_bytes = accepted_process_capture_bytes,
+    };
+
+    evidence.prerequisites = required_enforcement_prerequisites[1..];
+    try std.testing.expectError(
+        error.EnforcementEvidenceIncomplete,
+        validateCompleteEnforcementEvidence(evidence),
+    );
+    evidence.prerequisites = &required_enforcement_prerequisites;
+    families[0].maximum_bytes -= 1;
+    try std.testing.expectError(
+        error.EnforcementEvidenceIncomplete,
+        validateCompleteEnforcementEvidence(evidence),
+    );
+    families = try acceptedEnforcedStorageFamilies();
+    evidence.available_bytes = minimum_available_bytes - 1;
+    try std.testing.expectEqual(
+        ExecutionReadiness.not_ready_insufficient_capacity,
+        try executionReadinessWithEvidence(evidence),
+    );
+    evidence.available_bytes = minimum_available_bytes;
+    evidence.phase_count -= 1;
+    try std.testing.expectEqual(
+        ExecutionReadiness.not_ready_storage_enforcement_absent,
+        try executionReadinessWithEvidence(evidence),
+    );
 }
 
 test "baseline validation rejects identity and compatibility-key drift" {
