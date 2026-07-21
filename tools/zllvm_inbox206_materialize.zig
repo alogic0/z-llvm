@@ -806,6 +806,188 @@ fn expectSealedMaskRejection(seals: usize) !void {
     );
 }
 
+const provenance = @import("zllvm_inbox206/provenance.zig");
+const GitSha1Identity = provenance.GitSha1Identity;
+const RawSha256Identity = provenance.RawSha256Identity;
+const ProducerIdentity = provenance.ProducerIdentity;
+const ProtocolIdentity = provenance.ProtocolIdentity;
+const CanonicalRepositoryPath = provenance.CanonicalRepositoryPath;
+const CanonicalProvenanceTuple = provenance.CanonicalProvenanceTuple;
+const ProvenanceAuthorityOrigin = provenance.ProvenanceAuthorityOrigin;
+const TrustedProducerAuthority = provenance.TrustedProducerAuthority;
+const TrustedProtocolAuthority = provenance.TrustedProtocolAuthority;
+const TrustedProvenanceAuthority = provenance.TrustedProvenanceAuthority;
+const ProvenanceError = provenance.ProvenanceError;
+const canonical_git_sha1_algorithm = provenance.canonical_git_sha1_algorithm;
+const canonical_provenance_protocol_version = provenance.canonical_provenance_protocol_version;
+const fixedIdentity = provenance.fixedIdentity;
+const validateCanonicalRepositoryPath = provenance.validateCanonicalRepositoryPath;
+const canonicalRepositoryPath = provenance.canonicalRepositoryPath;
+const equalGitIdentity = provenance.equalGitIdentity;
+const equalRawIdentity = provenance.equalRawIdentity;
+const equalProducerIdentity = provenance.equalProducerIdentity;
+const equalProtocolIdentity = provenance.equalProtocolIdentity;
+const equalCanonicalPath = provenance.equalCanonicalPath;
+const validateProvenanceAuthority = provenance.validateProvenanceAuthority;
+const syntheticCanonicalProvenance = provenance.syntheticCanonicalProvenance;
+const independentProvenanceAuthority = provenance.independentProvenanceAuthority;
+
+const VerifiedProvenanceSnapshot = struct {
+    snapshot: VerifiedSnapshot,
+    provenance: CanonicalProvenanceTuple,
+
+    fn deinit(self: *VerifiedProvenanceSnapshot) void {
+        self.snapshot.deinit();
+        self.* = undefined;
+    }
+};
+
+const ProvenanceReceiverCounters = struct {
+    descriptor_handoffs: usize = 0,
+    sealed: SealedReceiverCounters = .{},
+};
+
+fn acquireVerifiedProvenanceSnapshot(
+    allocator: std.mem.Allocator,
+    claimed: CanonicalProvenanceTuple,
+    supplied_authority: ?*const TrustedProvenanceAuthority,
+    token: *SnapshotToken,
+    creator_owned: *OwnedSyntheticSealedDescriptor,
+    counters: *ProvenanceReceiverCounters,
+) (ProvenanceError || SealedDescriptorError || SnapshotError || std.mem.Allocator.Error)!VerifiedProvenanceSnapshot {
+    try validateProvenanceAuthority(&claimed, supplied_authority);
+
+    counters.descriptor_handoffs += 1;
+    var snapshot = try acquireVerifiedSealedSnapshot(
+        allocator,
+        .{
+            .exact_length = claimed.exact_raw_length,
+            .supplied_maximum = snapshot_internal_ceiling,
+            .expected_digest = claimed.raw_sha256.bytes,
+        },
+        token,
+        creator_owned,
+        &counters.sealed,
+    );
+    errdefer snapshot.deinit();
+    return .{
+        .snapshot = snapshot,
+        .provenance = claimed,
+    };
+}
+
+fn observeVerifiedProvenanceSnapshot(snapshot: *const VerifiedProvenanceSnapshot) []const u8 {
+    return observeVerifiedSnapshot(&snapshot.snapshot);
+}
+
+fn expectProvenancePreDescriptorRejection(
+    expected_error: anyerror,
+    bytes: []const u8,
+    claimed: CanonicalProvenanceTuple,
+    authority: ?*const TrustedProvenanceAuthority,
+) !void {
+    var close_count: usize = 0;
+    var creator_owned = try createSyntheticFullySealedDescriptor(bytes, &close_count);
+    defer creator_owned.close();
+    var token = SnapshotToken{};
+    var counters = ProvenanceReceiverCounters{};
+    var no_storage: [0]u8 = .{};
+    var allocation_must_not_run = std.heap.FixedBufferAllocator.init(&no_storage);
+
+    try std.testing.expectError(
+        expected_error,
+        acquireVerifiedProvenanceSnapshot(
+            allocation_must_not_run.allocator(),
+            claimed,
+            authority,
+            &token,
+            &creator_owned,
+            &counters,
+        ),
+    );
+    try std.testing.expect(creator_owned.owned);
+    try std.testing.expectEqual(@as(usize, 0), close_count);
+    try std.testing.expectEqual(@as(usize, 0), counters.descriptor_handoffs);
+    try std.testing.expectEqual(@as(usize, 0), counters.sealed.size_observations);
+    try std.testing.expectEqual(@as(usize, 0), counters.sealed.callback_calls);
+    try std.testing.expectEqual(SnapshotTokenState.unused, token.state.load(.acquire));
+}
+
+const receipt_module = @import("zllvm_inbox206/receipt.zig");
+const receipt_schema_version = receipt_module.receipt_schema_version;
+const receipt_capability_version = receipt_module.receipt_capability_version;
+const receipt_max_bytes = receipt_module.receipt_max_bytes;
+const receipt_toolchain_identity_max = receipt_module.receipt_toolchain_identity_max;
+const receipt_scope = receipt_module.receipt_scope;
+const receipt_selected_variant = receipt_module.receipt_selected_variant;
+const receipt_git_hash_algorithm = receipt_module.receipt_git_hash_algorithm;
+const receipt_gate_ids = receipt_module.receipt_gate_ids;
+const receipt_semantic_tuple_admission = receipt_module.receipt_semantic_tuple_admission;
+const receipt_semantic_synthetic_authority_binding = receipt_module.receipt_semantic_synthetic_authority_binding;
+const receipt_semantic_pre_descriptor_rejection = receipt_module.receipt_semantic_pre_descriptor_rejection;
+const receipt_semantic_post_seal_length_sha = receipt_module.receipt_semantic_post_seal_length_sha;
+const receipt_semantic_fresh_owned_replay = receipt_module.receipt_semantic_fresh_owned_replay;
+const receipt_semantic_consumed_handoff_rejection = receipt_module.receipt_semantic_consumed_handoff_rejection;
+const receipt_semantic_ownership_exactly_once_close = receipt_module.receipt_semantic_ownership_exactly_once_close;
+const receipt_required_semantic_bits = receipt_module.receipt_required_semantic_bits;
+const receipt_field_names = receipt_module.receipt_field_names;
+const ReceiptCompletionState = receipt_module.ReceiptCompletionState;
+const CanonicalReceiptToken = receipt_module.CanonicalReceiptToken;
+const CanonicalAcceptanceReceipt = receipt_module.CanonicalAcceptanceReceipt;
+const CanonicalReceiptBytes = receipt_module.CanonicalReceiptBytes;
+const ReceiptError = receipt_module.ReceiptError;
+const PublicationResult = receipt_module.PublicationResult;
+const canonicalReceiptToken = receipt_module.canonicalReceiptToken;
+const validateCanonicalReceiptToken = receipt_module.validateCanonicalReceiptToken;
+const validateCanonicalReceipt = receipt_module.validateCanonicalReceipt;
+const appendReceiptBytes = receipt_module.appendReceiptBytes;
+const appendReceiptField = receipt_module.appendReceiptField;
+const lowerHexNibble = receipt_module.lowerHexNibble;
+const encodeLowerHex = receipt_module.encodeLowerHex;
+const encodeSemanticBits = receipt_module.encodeSemanticBits;
+const encodeCanonicalReceipt = receipt_module.encodeCanonicalReceipt;
+const receiptFieldIndex = receipt_module.receiptFieldIndex;
+const decodeDecimalCanonical = receipt_module.decodeDecimalCanonical;
+const decodeLowerHexNibble = receipt_module.decodeLowerHexNibble;
+const decodeLowerHex = receipt_module.decodeLowerHex;
+const decodeSemanticBits = receipt_module.decodeSemanticBits;
+const decodeCanonicalReceipt = receipt_module.decodeCanonicalReceipt;
+const syntheticAcceptanceReceipt = receipt_module.syntheticAcceptanceReceipt;
+const syncBorrowedDirectory = receipt_module.syncBorrowedDirectory;
+const deleteReceiptPathIfPresent = receipt_module.deleteReceiptPathIfPresent;
+fn observeReceiptRegularFile(descriptor: std.posix.fd_t) !void {
+    _ = try observeDescriptor(descriptor, .regular_file);
+}
+
+fn publishCanonicalReceipt(
+    validation_directory: std.Io.Dir,
+    io: std.Io,
+    canonical_receipt: *const CanonicalAcceptanceReceipt,
+    temporary_name: []const u8,
+    final_name: []const u8,
+) !PublicationResult {
+    return receipt_module.publishCanonicalReceipt(
+        observeReceiptRegularFile,
+        validation_directory,
+        io,
+        canonical_receipt,
+        temporary_name,
+        final_name,
+    );
+}
+const mutateReceiptFieldValue = receipt_module.mutateReceiptFieldValue;
+const openCnValidationDirectory = receipt_module.openCnValidationDirectory;
+const expectReceiptPathMissing = receipt_module.expectReceiptPathMissing;
+
+const acceptance_driver = @import("zllvm_inbox206/acceptance_driver.zig");
+const acceptance_driver_test = @import("zllvm_inbox206/acceptance_driver_test.zig");
+
+comptime {
+    _ = acceptance_driver_test;
+}
+
+pub const main = acceptance_driver.main;
+
 test "compile-time ABI and essential mask closure" {
     comptime assertNativeAbi();
     const mask_bits: u32 = @bitCast(requiredMask());
@@ -1675,4 +1857,520 @@ test "sealed descriptor rejects missing grow before snapshot admission" {
 
 test "sealed descriptor rejects missing shrink before snapshot admission" {
     try expectSealedMaskRejection(linux.F.SEAL_WRITE | linux.F.SEAL_GROW);
+}
+
+test "authorized canonical provenance binds only after sealed snapshot verification" {
+    var bytes: [257]u8 = undefined;
+    fillSyntheticSnapshot(&bytes);
+    const claimed = try syntheticCanonicalProvenance(
+        &bytes,
+        "docs/evidence/synthetic-provenance-input",
+    );
+    const authority = independentProvenanceAuthority(claimed);
+    var close_count: usize = 0;
+    var creator_owned = try createSyntheticFullySealedDescriptor(&bytes, &close_count);
+    defer creator_owned.close();
+    var token = SnapshotToken{};
+    var counters = ProvenanceReceiverCounters{};
+
+    var verified = try acquireVerifiedProvenanceSnapshot(
+        std.testing.allocator,
+        claimed,
+        &authority,
+        &token,
+        &creator_owned,
+        &counters,
+    );
+    defer verified.deinit();
+
+    try std.testing.expectEqualSlices(
+        u8,
+        &bytes,
+        observeVerifiedProvenanceSnapshot(&verified),
+    );
+    try std.testing.expectEqual(claimed.exact_raw_length, verified.provenance.exact_raw_length);
+    try std.testing.expect(!creator_owned.owned);
+    try std.testing.expectEqual(@as(usize, 1), close_count);
+    try std.testing.expectEqual(@as(usize, 1), counters.descriptor_handoffs);
+    try std.testing.expectEqual(@as(usize, 1), counters.sealed.size_observations);
+    try std.testing.expectEqual(@as(usize, 2), counters.sealed.callback_calls);
+    try std.testing.expectEqual(SnapshotTokenState.consumed, token.state.load(.acquire));
+}
+
+test "every canonical provenance claim is independently bound before descriptor access" {
+    var bytes: [113]u8 = undefined;
+    fillSyntheticSnapshot(&bytes);
+    const claimed = try syntheticCanonicalProvenance(&bytes, "synthetic/input");
+    const authority = independentProvenanceAuthority(claimed);
+
+    var changed = claimed;
+    changed.commit.bytes[0] ^= 1;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceCommitMismatch,
+        &bytes,
+        changed,
+        &authority,
+    );
+
+    changed = claimed;
+    changed.tree.bytes[0] ^= 1;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceTreeMismatch,
+        &bytes,
+        changed,
+        &authority,
+    );
+
+    changed = claimed;
+    changed.repository_relative_path = try canonicalRepositoryPath("synthetic/other");
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenancePathMismatch,
+        &bytes,
+        changed,
+        &authority,
+    );
+
+    changed = claimed;
+    changed.git_object_id.bytes[0] ^= 1;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceGitObjectMismatch,
+        &bytes,
+        changed,
+        &authority,
+    );
+
+    changed = claimed;
+    changed.git_object_hash_algorithm += 1;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceGitObjectHashAlgorithmMismatch,
+        &bytes,
+        changed,
+        &authority,
+    );
+
+    changed = claimed;
+    changed.raw_sha256.bytes[0] ^= 1;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceRawSha256Mismatch,
+        &bytes,
+        changed,
+        &authority,
+    );
+
+    changed = claimed;
+    changed.exact_raw_length += 1;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceRawLengthMismatch,
+        &bytes,
+        changed,
+        &authority,
+    );
+
+    changed = claimed;
+    changed.producer_identity.bytes[0] ^= 1;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceProducerIdentityMismatch,
+        &bytes,
+        changed,
+        &authority,
+    );
+
+    changed = claimed;
+    changed.protocol_identity.bytes[0] ^= 1;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceProtocolIdentityMismatch,
+        &bytes,
+        changed,
+        &authority,
+    );
+
+    changed = claimed;
+    changed.protocol_version += 1;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceProtocolVersionMismatch,
+        &bytes,
+        changed,
+        &authority,
+    );
+}
+
+test "producer and protocol authority is independent complete and noncircular" {
+    var bytes: [89]u8 = undefined;
+    fillSyntheticSnapshot(&bytes);
+    const claimed = try syntheticCanonicalProvenance(&bytes, "synthetic/input");
+    const authority = independentProvenanceAuthority(claimed);
+
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceAuthorityMissing,
+        &bytes,
+        claimed,
+        null,
+    );
+
+    var changed_authority = authority;
+    changed_authority.producer = null;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceProducerAuthorityMissing,
+        &bytes,
+        claimed,
+        &changed_authority,
+    );
+
+    changed_authority = authority;
+    changed_authority.protocol = null;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceProtocolAuthorityMissing,
+        &bytes,
+        claimed,
+        &changed_authority,
+    );
+
+    changed_authority = authority;
+    var wrong_producer = changed_authority.producer.?;
+    wrong_producer.identity.bytes[0] ^= 1;
+    changed_authority.producer = wrong_producer;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceProducerIdentityMismatch,
+        &bytes,
+        claimed,
+        &changed_authority,
+    );
+
+    changed_authority = authority;
+    var wrong_protocol = changed_authority.protocol.?;
+    wrong_protocol.identity.bytes[0] ^= 1;
+    changed_authority.protocol = wrong_protocol;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceProtocolIdentityMismatch,
+        &bytes,
+        claimed,
+        &changed_authority,
+    );
+
+    changed_authority = authority;
+    changed_authority.binding_origin = .tuple_self_asserted;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceCircularAuthority,
+        &bytes,
+        claimed,
+        &changed_authority,
+    );
+
+    changed_authority = authority;
+    var circular_producer = changed_authority.producer.?;
+    circular_producer.origin = .tuple_self_asserted;
+    changed_authority.producer = circular_producer;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceCircularAuthority,
+        &bytes,
+        claimed,
+        &changed_authority,
+    );
+}
+
+test "canonical provenance rejects malformed paths algorithms and versions before access" {
+    var bytes: [71]u8 = undefined;
+    fillSyntheticSnapshot(&bytes);
+    const claimed = try syntheticCanonicalProvenance(&bytes, "synthetic/input");
+    const authority = independentProvenanceAuthority(claimed);
+
+    var changed = claimed;
+    changed.repository_relative_path.length = 0;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenancePathMalformed,
+        &bytes,
+        changed,
+        &authority,
+    );
+
+    changed = claimed;
+    changed.repository_relative_path.bytes[0] = '/';
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenancePathMalformed,
+        &bytes,
+        changed,
+        &authority,
+    );
+
+    changed = claimed;
+    changed.repository_relative_path.bytes[changed.repository_relative_path.length] = 1;
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenancePathMalformed,
+        &bytes,
+        changed,
+        &authority,
+    );
+
+    changed = claimed;
+    changed.git_object_hash_algorithm += 1;
+    var changed_authority = independentProvenanceAuthority(changed);
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceGitObjectHashAlgorithmUnsupported,
+        &bytes,
+        changed,
+        &changed_authority,
+    );
+
+    changed = claimed;
+    changed.protocol_version += 1;
+    changed_authority = independentProvenanceAuthority(changed);
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceProtocolVersionUnsupported,
+        &bytes,
+        changed,
+        &changed_authority,
+    );
+}
+
+test "conflicting tuple fails against one trusted binding before descriptor access" {
+    var bytes: [67]u8 = undefined;
+    fillSyntheticSnapshot(&bytes);
+    const accepted = try syntheticCanonicalProvenance(&bytes, "synthetic/input");
+    const authority = independentProvenanceAuthority(accepted);
+    var conflicting = accepted;
+    conflicting.commit.bytes[7] ^= 0x80;
+
+    try expectProvenancePreDescriptorRejection(
+        error.ProvenanceCommitMismatch,
+        &bytes,
+        conflicting,
+        &authority,
+    );
+}
+
+test "identical provenance replay requires fresh ownership and consumed reuse fails" {
+    var bytes: [127]u8 = undefined;
+    fillSyntheticSnapshot(&bytes);
+    const claimed = try syntheticCanonicalProvenance(&bytes, "synthetic/input");
+    const authority = independentProvenanceAuthority(claimed);
+
+    var first_close_count: usize = 0;
+    var first_owned = try createSyntheticFullySealedDescriptor(&bytes, &first_close_count);
+    defer first_owned.close();
+    var first_token = SnapshotToken{};
+    var first_counters = ProvenanceReceiverCounters{};
+    var first = try acquireVerifiedProvenanceSnapshot(
+        std.testing.allocator,
+        claimed,
+        &authority,
+        &first_token,
+        &first_owned,
+        &first_counters,
+    );
+    defer first.deinit();
+
+    var second_close_count: usize = 0;
+    var second_owned = try createSyntheticFullySealedDescriptor(&bytes, &second_close_count);
+    defer second_owned.close();
+    var second_token = SnapshotToken{};
+    var second_counters = ProvenanceReceiverCounters{};
+    var second = try acquireVerifiedProvenanceSnapshot(
+        std.testing.allocator,
+        claimed,
+        &authority,
+        &second_token,
+        &second_owned,
+        &second_counters,
+    );
+    defer second.deinit();
+
+    try std.testing.expectEqualSlices(
+        u8,
+        observeVerifiedProvenanceSnapshot(&first),
+        observeVerifiedProvenanceSnapshot(&second),
+    );
+    try std.testing.expectEqual(@as(usize, 1), first_close_count);
+    try std.testing.expectEqual(@as(usize, 1), second_close_count);
+
+    var reuse_token = SnapshotToken{};
+    var reuse_counters = ProvenanceReceiverCounters{};
+    var no_storage: [0]u8 = .{};
+    var allocation_must_not_run = std.heap.FixedBufferAllocator.init(&no_storage);
+    try std.testing.expectError(
+        error.SealedDescriptorOwnershipUnavailable,
+        acquireVerifiedProvenanceSnapshot(
+            allocation_must_not_run.allocator(),
+            claimed,
+            &authority,
+            &reuse_token,
+            &first_owned,
+            &reuse_counters,
+        ),
+    );
+    try std.testing.expectEqual(@as(usize, 1), first_close_count);
+    try std.testing.expectEqual(SnapshotTokenState.unused, reuse_token.state.load(.acquire));
+}
+
+test "post-seal content length and digest mismatches retain CK CF attribution" {
+    var bytes: [101]u8 = undefined;
+    fillSyntheticSnapshot(&bytes);
+    const accepted = try syntheticCanonicalProvenance(&bytes, "synthetic/input");
+
+    var length_claim = accepted;
+    length_claim.exact_raw_length -= 1;
+    const length_authority = independentProvenanceAuthority(length_claim);
+    var length_close_count: usize = 0;
+    var length_owned = try createSyntheticFullySealedDescriptor(&bytes, &length_close_count);
+    defer length_owned.close();
+    var length_token = SnapshotToken{};
+    var length_counters = ProvenanceReceiverCounters{};
+    try std.testing.expectError(
+        error.SealedDescriptorSizeMismatch,
+        acquireVerifiedProvenanceSnapshot(
+            std.testing.allocator,
+            length_claim,
+            &length_authority,
+            &length_token,
+            &length_owned,
+            &length_counters,
+        ),
+    );
+    try std.testing.expectEqual(@as(usize, 1), length_close_count);
+    try std.testing.expectEqual(@as(usize, 1), length_counters.descriptor_handoffs);
+    try std.testing.expectEqual(@as(usize, 1), length_counters.sealed.size_observations);
+    try std.testing.expectEqual(@as(usize, 0), length_counters.sealed.callback_calls);
+    try std.testing.expectEqual(SnapshotTokenState.unused, length_token.state.load(.acquire));
+
+    var digest_claim = accepted;
+    digest_claim.raw_sha256.bytes[0] ^= 1;
+    const digest_authority = independentProvenanceAuthority(digest_claim);
+    var digest_close_count: usize = 0;
+    var digest_owned = try createSyntheticFullySealedDescriptor(&bytes, &digest_close_count);
+    defer digest_owned.close();
+    var digest_token = SnapshotToken{};
+    var digest_counters = ProvenanceReceiverCounters{};
+    try std.testing.expectError(
+        error.SnapshotDigestMismatch,
+        acquireVerifiedProvenanceSnapshot(
+            std.testing.allocator,
+            digest_claim,
+            &digest_authority,
+            &digest_token,
+            &digest_owned,
+            &digest_counters,
+        ),
+    );
+    try std.testing.expectEqual(@as(usize, 1), digest_close_count);
+    try std.testing.expectEqual(@as(usize, 1), digest_counters.descriptor_handoffs);
+    try std.testing.expectEqual(@as(usize, 1), digest_counters.sealed.size_observations);
+    try std.testing.expectEqual(@as(usize, 2), digest_counters.sealed.callback_calls);
+    try std.testing.expectEqual(SnapshotTokenState.consumed, digest_token.state.load(.acquire));
+}
+test "receipt publication returns final readback identity after atomic no-replace" {
+    const io = std.testing.io;
+    const directory = try openCnValidationDirectory(io);
+    defer directory.close(io);
+    const temporary_name = "receipt-success.tmp";
+    const final_name = "receipt-success.final";
+    try deleteReceiptPathIfPresent(directory, io, temporary_name);
+    try deleteReceiptPathIfPresent(directory, io, final_name);
+    defer deleteReceiptPathIfPresent(directory, io, temporary_name) catch {};
+    defer deleteReceiptPathIfPresent(directory, io, final_name) catch {};
+
+    const receipt = try syntheticAcceptanceReceipt();
+    const encoded = try encodeCanonicalReceipt(&receipt);
+    const publication = try publishCanonicalReceipt(
+        directory,
+        io,
+        &receipt,
+        temporary_name,
+        final_name,
+    );
+    var expected_digest: [std.crypto.hash.sha2.Sha256.digest_length]u8 = undefined;
+    std.crypto.hash.sha2.Sha256.hash(encoded.slice(), &expected_digest, .{});
+    try std.testing.expectEqualSlices(
+        u8,
+        &expected_digest,
+        &publication.final_sha256.bytes,
+    );
+    try std.testing.expectEqual(@as(u64, encoded.length), publication.exact_length);
+    try std.testing.expectEqual(ReceiptCompletionState.complete, publication.completion_status);
+    try expectReceiptPathMissing(directory, io, temporary_name);
+}
+
+test "receipt publication rejects exclusive temp and preexisting final collisions with cleanup" {
+    const io = std.testing.io;
+    const directory = try openCnValidationDirectory(io);
+    defer directory.close(io);
+    const receipt = try syntheticAcceptanceReceipt();
+
+    const colliding_temp = "receipt-temp-collision.tmp";
+    const colliding_temp_final = "receipt-temp-collision.final";
+    try deleteReceiptPathIfPresent(directory, io, colliding_temp);
+    try deleteReceiptPathIfPresent(directory, io, colliding_temp_final);
+    defer deleteReceiptPathIfPresent(directory, io, colliding_temp) catch {};
+    defer deleteReceiptPathIfPresent(directory, io, colliding_temp_final) catch {};
+    const occupied_temp = try directory.createFile(io, colliding_temp, .{ .exclusive = true });
+    occupied_temp.close(io);
+    try std.testing.expectError(
+        error.PathAlreadyExists,
+        publishCanonicalReceipt(
+            directory,
+            io,
+            &receipt,
+            colliding_temp,
+            colliding_temp_final,
+        ),
+    );
+    try expectReceiptPathMissing(directory, io, colliding_temp_final);
+
+    const clean_temp = "receipt-final-collision.tmp";
+    const occupied_final_name = "receipt-final-collision.final";
+    try deleteReceiptPathIfPresent(directory, io, clean_temp);
+    try deleteReceiptPathIfPresent(directory, io, occupied_final_name);
+    defer deleteReceiptPathIfPresent(directory, io, clean_temp) catch {};
+    defer deleteReceiptPathIfPresent(directory, io, occupied_final_name) catch {};
+    const occupied_final = try directory.createFile(io, occupied_final_name, .{
+        .exclusive = true,
+    });
+    occupied_final.close(io);
+    try std.testing.expectError(
+        error.PathAlreadyExists,
+        publishCanonicalReceipt(
+            directory,
+            io,
+            &receipt,
+            clean_temp,
+            occupied_final_name,
+        ),
+    );
+    try expectReceiptPathMissing(directory, io, clean_temp);
+}
+
+test "receipt publication rejects symlink finals and identical names without artifacts" {
+    const io = std.testing.io;
+    const directory = try openCnValidationDirectory(io);
+    defer directory.close(io);
+    const receipt = try syntheticAcceptanceReceipt();
+
+    const temporary_name = "receipt-symlink.tmp";
+    const symlink_name = "receipt-symlink.final";
+    try deleteReceiptPathIfPresent(directory, io, temporary_name);
+    try deleteReceiptPathIfPresent(directory, io, symlink_name);
+    defer deleteReceiptPathIfPresent(directory, io, temporary_name) catch {};
+    defer deleteReceiptPathIfPresent(directory, io, symlink_name) catch {};
+    try directory.symLink(io, "missing-synthetic-target", symlink_name, .{});
+    try std.testing.expectError(
+        error.PathAlreadyExists,
+        publishCanonicalReceipt(
+            directory,
+            io,
+            &receipt,
+            temporary_name,
+            symlink_name,
+        ),
+    );
+    try expectReceiptPathMissing(directory, io, temporary_name);
+
+    try std.testing.expectError(
+        error.ReceiptPublicationNameCollision,
+        publishCanonicalReceipt(
+            directory,
+            io,
+            &receipt,
+            "receipt-same-name",
+            "receipt-same-name",
+        ),
+    );
+    try expectReceiptPathMissing(directory, io, "receipt-same-name");
 }

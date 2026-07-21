@@ -69,6 +69,62 @@ pub fn build(b: *std.Build) void {
     addToolStep(b, "check-zig-stage4-emitter", "Check the authoritative Zig stage4 emitter", "tools/check_zig_stage4_emitter.zig");
     addToolStep(b, "focused-codegen-canaries", "Run procedural fma and __multi3 codegen canaries (non-gating)", "tools/run_focused_codegen_canaries.zig");
     addToolStepWithArgs(b, "real-candidates-v2", "Build the mode-stable real-row candidate denominator", "tools/build_real_candidates_v2.zig");
+    const derive_real_candidate_definition_run = b.addSystemCommand(&.{
+        b.graph.zig_exe,
+        "run",
+        "tools/derive_real_candidate_definition.zig",
+        "--",
+    });
+    if (b.args) |args| derive_real_candidate_definition_run.addArgs(args);
+    const derive_real_candidate_definition_step = b.step(
+        "derive-real-candidate-definition",
+        "Derive the pinned rank-2 definition mapping sidecar",
+    );
+    derive_real_candidate_definition_step.dependOn(&derive_real_candidate_definition_run.step);
+    const real_candidate_definition_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/derive_real_candidate_definition.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }),
+    });
+    const real_candidate_definition_test_step = b.step(
+        "test-real-candidate-definition-mapper",
+        "Run the pure-Zig rank-2 definition mapper tests",
+    );
+    real_candidate_definition_test_step.dependOn(&b.addRunArtifact(real_candidate_definition_tests).step);
+    const inbox206_cn_acceptance_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/zllvm_inbox206/cn_acceptance.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }),
+    });
+    const inbox206_cn_acceptance_test_step = b.step(
+        "test-inbox206-cn-acceptance-runner",
+        "Run the private combined CN acceptance-runner synthetic tests",
+    );
+    inbox206_cn_acceptance_test_step.dependOn(&b.addRunArtifact(inbox206_cn_acceptance_tests).step);
+    const inbox206_cn_acceptance = b.addExecutable(.{
+        .name = "zllvm-inbox206-cn-acceptance",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/zllvm_inbox206/cn_acceptance.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }),
+    });
+    const inbox206_cn_acceptance_step = b.step(
+        "inbox206-cn-acceptance",
+        "Run the non-default combined CN acceptance runner",
+    );
+    const inbox206_cn_acceptance_run = b.addRunArtifact(inbox206_cn_acceptance);
+    if (b.args) |args| inbox206_cn_acceptance_run.addArgs(args);
+    inbox206_cn_acceptance_step.dependOn(&inbox206_cn_acceptance_run.step);
+    const inbox206_cn_acceptance_check_step = b.step(
+        "check-inbox206-cn-acceptance-runner",
+        "Compile the combined CN acceptance runner without executing it",
+    );
+    inbox206_cn_acceptance_check_step.dependOn(&inbox206_cn_acceptance.step);
     addToolStep(b, "readiness", "Run the full readiness gate", "tools/run_readiness_checks.zig");
     addToolStep(b, "handoff", "Run optimizer/codegen handoff validation", "tools/run_handoff_validation.zig");
     addToolStepWithArgs(b, "distribution-object", "Run selected ReleaseFast object gate", "tools/run_distribution_object_m1.zig");
@@ -108,7 +164,24 @@ pub fn build(b: *std.Build) void {
         "test-inbox206-descriptor-identity",
         "Run the private INBOX-206 descriptor identity tests",
     );
-    inbox206_descriptor_identity_test_step.dependOn(&b.addRunArtifact(inbox206_descriptor_identity_tests).step);
+    const inbox206_descriptor_identity_test_run = b.addRunArtifact(inbox206_descriptor_identity_tests);
+    inbox206_descriptor_identity_test_step.dependOn(&inbox206_descriptor_identity_test_run.step);
+    const inbox206_path_b_child = b.addExecutable(.{
+        .name = "zllvm-inbox206-path-b-synthetic-child",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/zllvm_inbox206_materialize.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }),
+    });
+    const inbox206_path_b_run = b.addRunArtifact(inbox206_path_b_child);
+    inbox206_path_b_run.addArg("--path-b-self-test");
+    const inbox206_path_b_step = b.step(
+        "test-inbox206-path-b-real-process",
+        "Run private INBOX-206 tests and the Path-B standard-process synthetic receipt slice",
+    );
+    inbox206_path_b_step.dependOn(&inbox206_descriptor_identity_test_run.step);
+    inbox206_path_b_step.dependOn(&inbox206_path_b_run.step);
     addToolStepWithArgs(b, "stage2-pressure-diagnostic", "Write generic-CFG stage-two pressure diagnostics for one IR function", "src/stage2_pressure_diagnostic.zig");
     addToolStep(b, "distribution-no-llvm", "Run the selected no-LLVM-codegen distribution subset", "tools/run_distribution_no_llvm_codegen_subset.zig");
     addToolStep(b, "distribution-boundary", "Run conservative distribution boundary gates", "tools/run_distribution_boundary_gates.zig");
