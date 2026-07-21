@@ -24,7 +24,171 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BH exact complete-heading locator remediation — AUTHORIZED
+## INBOX-206BI Phase-3 wrapper materialization-readiness checkpoint — AUTHORIZED
+
+INBOX-206BH is accepted only as the successful committed inert static
+specification and canonical-region proof. No materialized package, readiness,
+execution, D01/D02, ratchet, production, credit, or downstream acceptance is
+granted.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BH completed successfully.
+
+- Commit: `ec62c4069bcc1f3ada5edf4ac5dbedc44cc8c4b1`
+- Parent: `4de9768fc7f476e81e190967ed73217d885f9779`
+- Tree: `1ad22e4b921aebb0aa17f21af6d6a7bfca58e409`
+- Sole committed file: [inbox206bb_phase3_wrapper_package_specification.md](/home/oleg/prog/z_llvm/docs/evidence/inbox206bb_phase3_wrapper_package_specification.md)
+- File: 82,425 bytes, 1,406 lines
+- SHA-256: `4b851b4a3650e6c55cd53f72b9f3e3e91146433523ccf2bbc6c4ad6dc1065eb3`
+- Frozen closure: 9,385 bytes, SHA-256 `8f2ccbbc8540aa17949e6b183ea40e77054de41972b29db6f1ba65a5f931c8a5`
+- Closure result: `BG_STATIC_CLOSURE_OK`
+- Main and control repositories: clean
+- Control remains `9c55bda3` / tree `756369ad`
+- Protected state and ratchet 131 remain unchanged.
+```
+
+Static Watcher review ran no project or Zig code. Commit
+`ec62c4069bcc1f3ada5edf4ac5dbedc44cc8c4b1` is non-merge, has parent
+`4de9768fc7f476e81e190967ed73217d885f9779` and tree
+`1ad22e4b921aebb0aa17f21af6d6a7bfca58e409`, and adds only regular mode-0644
+`docs/evidence/inbox206bb_phase3_wrapper_package_specification.md`: 82,425
+bytes, 1,406 lines, SHA-256
+`4b851b4a3650e6c55cd53f72b9f3e3e91146433523ccf2bbc6c4ad6dc1065eb3`.
+The source diff is empty and `git diff --check` passes. The committed document
+has 39 canonical BEGIN markers and 39 canonical END markers and truthfully
+retains `package_status=incomplete`, `implementation_ready=false`,
+`execution_authority=none`, `D01=unaccepted`, `ratchet=131`,
+`continuation_root_created=false`, and `wrapper_execution=false`.
+
+Retained turn `019f8227-4c82-7ba0-876e-572b737f40c5` has exactly four tool
+calls: operating-document reads; one complete byte-replay/construction call
+which reports `BG_CODEC_AND_REPLAY_OK`, applies the sole representation patch,
+and reports frozen closure identity; exactly one invocation of that 9,385-byte
+inert closure, whose sole output is `BG_STATIC_CLOSURE_OK`; and one commit/final
+state call. The last call stages only the evidence document, passes the cached
+diff check, commits it, and verifies clean main and control repositories. The
+final report and task completion follow without a later command. No assertion,
+package wrapper, generated member, project command, Zig, production AWK,
+marker, validation, D01, or D02 action ran. Main and control are clean; control
+remains `9c55bda34088e1230b0b91a126d35795a3ac70b4` / tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e`, branch `main`, no remote. Stash
+`7985c6d01040a6e47e4ce5b918866d0e89517ac7`, watcher blob
+`b64131cf60dd0ef638e815cd33db9ae8595a72cf`, retained roots, registrations,
+protected identities, and ratchet 131 remain exact. No registered-worktree
+directory or prohibited settings file was accessed.
+
+Reviewer agreement is preserved verbatim:
+
+```text
+I accept commit ec62c4069bcc1f3ada5edf4ac5dbedc44cc8c4b1 only as the successful inert static specification and canonical-region proof. No materialized package, readiness, execution, D01/D02, ratchet, production, credit, or downstream acceptance is granted.
+
+I authorize evidence/design-only INBOX-206BI with these refinements:
+
+- First create one non-merge operating commit changing only docs/next_steps.md, parented exactly by ec62c4069bcc1f3ada5edf4ac5dbedc44cc8c4b1; update the ignored inbox separately.
+- Freeze but do not create /tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206bi.
+- Add and commit exactly one new file: docs/evidence/inbox206bi_phase3_wrapper_materialization_readiness.md.
+- Cover P001–P140 exactly once and record, per process:
+    - canonical template and region identity;
+    - every token’s type, occurrence count, ordered UTF-8 byte spans, provenance, validation rule, and escaping rule;
+    - inputs, outputs, status/stdout contract, checkpoints, producer/consumer edges, and permitted writes;
+    - complete nonoverlapping byte/token and process/DAG coverage.
+
+- Distinguish identities that are knowable now from future operating-bound values. Do not claim future materialized hashes for HEAD/tree/inbox or other not-yet-existent values.
+- For future-bound templates, freeze the deterministic materialization recipe and an inert canonical-fixture rendering with exact inner/outer hashes and equality proofs. Label fixture hashes as non-executable and non-authoritative.
+
+- Require every placeholder to resolve through exactly one typed authority; reject undeclared, unused, overlapping, ambiguous, or cyclic substitutions.
+- State execution_authority=none, D01=withheld, D02=unauthorized, and ratchet=131.
+- Create no continuation path, package, wrapper, marker, cache, or other artifact. Invoke no assertion, wrapper, project/Zig command, or production AWK.
+- Success commits only the new evidence document and stops for review; failure leaves it uncommitted and stops without repair or retry.
+```
+
+Create one non-merge operating commit parented exactly by
+`ec62c4069bcc1f3ada5edf4ac5dbedc44cc8c4b1`, changing only tracked
+`docs/next_steps.md`; update only the ignored inbox separately. No other dirty
+path is permitted. Freeze but do not create this exact prospective continuation
+path:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206bi
+```
+
+BI is evidence/design only. Add and commit exactly one new regular mode-0644
+file:
+
+```text
+docs/evidence/inbox206bi_phase3_wrapper_materialization_readiness.md
+```
+
+Use committed specification
+`docs/evidence/inbox206bb_phase3_wrapper_package_specification.md`, exact
+SHA-256 `4b851b4a3650e6c55cd53f72b9f3e3e91146433523ccf2bbc6c4ad6dc1065eb3`,
+as the sole template authority. Cover P001 through P140 exactly once. For each
+process, record:
+
+- canonical template name, canonical region kind, byte count, and SHA-256;
+- every placeholder's declared type, exact occurrence count, ordered zero-based
+  half-open UTF-8 byte spans, sole provenance authority, validation rule, and
+  escaping/encoding rule;
+- exact inputs, prospective outputs, sole expected stdout plus LF, numeric
+  status, checkpoint ordering, producer/consumer edges, and permitted writes;
+- complete, non-overlapping token-byte coverage and complete process/DAG
+  coverage.
+
+Partition values into identities knowable at BI and future operating-bound
+values. Never claim authoritative materialized hashes for a future HEAD,
+parent, tree, ignored-inbox identity, path-bound value, or other value that does
+not yet exist. For every future-bound template, freeze a deterministic typed
+materialization recipe and an inert canonical-fixture rendering with exact
+inner bytes/count/hash, raw reverse-substitution equality to the invariant
+template, ordinary-string outer bytes/count/hash, decoded outer-command raw
+equality to the fixture inner bytes, and exact expected stdout/status. Label
+every fixture hash prominently as non-executable and non-authoritative for any
+future operating binding.
+
+Every placeholder must resolve through exactly one typed authority. Reject any
+undeclared token, unused declaration, missing or duplicate occurrence,
+overlapping span, ambiguous authority, chained/global/cascading substitution,
+cyclic dependency, altered invariant byte, invalid canonical value, escaping
+mismatch, coverage gap, or hash/equality mismatch. Tables may record and verify
+inert source bytes but may neither generate executable commands nor execute
+members.
+
+The result must prominently state:
+
+```text
+package_kind=materialization_readiness_evidence
+package_status=incomplete
+implementation_ready=false
+execution_authority=none
+D01=withheld
+D02=unauthorized
+ratchet=131
+continuation_root_created=false
+wrapper_execution=false
+fixture_hash_authority=non-executable-non-authoritative
+```
+
+Do not create the prospective continuation path, package, wrapper, marker,
+cache, executable, compatibility copy, or any other artifact. Do not invoke an
+assertion, wrapper, generated member, project command, Zig/build/install,
+validation, cache, source worktree, production AWK, D01/D02, ratchet, credit,
+or downstream action. Do not access any registered-worktree directory or
+`.claude/settings.local.json`. Preserve all retained roots byte-for-byte and
+preserve the 43-worktree standing protection, stash, watcher, control identity,
+and every protected identity.
+
+On full success, commit only
+`docs/evidence/inbox206bi_phase3_wrapper_materialization_readiness.md` in one
+non-merge commit and stop with main/control clean. On first failure, leave the
+document uncommitted and stop immediately without inspection, diagnosis,
+retry, repair, cleanup, normalization, mode change, fix-forward, or later
+command. Give one concise acknowledgment of the complete scope, identity,
+coverage, fixture-authority, prohibited-action, success, and failure-stop
+boundary before acting.
+
+## INBOX-206BH exact complete-heading locator remediation — SUCCESSFUL INERT STATIC SPECIFICATION; SUPERSEDED BY INBOX-206BI
 
 INBOX-206BG is accepted only as a compliant fail-closed no-edit stop. Credit
 includes its exact operating binding, strict codecs and fixtures, full-draft
