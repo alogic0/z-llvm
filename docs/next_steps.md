@@ -24,7 +24,150 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CD pure-Zig private verified-snapshot primitive — AUTHORIZED SOLE CURRENT ACTION
+## INBOX-206CE pure-Zig atomic one-shot token remediation — AUTHORIZED SOLE CURRENT ACTION
+
+INBOX-206CD is accepted provisionally for every verified non-concurrency
+requirement. Full acceptance is withheld because its plain-enum token permits
+a data race and cannot enforce single concurrent admission. The Worker final
+report is preserved verbatim:
+
+```text
+INBOX-206CD completed successfully.
+
+- Commit: d81cdf248b7f2a9ce7d19913e632ceffcf82c908
+- Parent: 2d2476dc6b93130472e1f4dd9b0acb76eb995cde
+- Tree: 4c683717e0c519b3b754cd7a3d71747ad5f7b2c2
+- File: tools/zllvm_inbox206_materialize.zig
+- Mode: 100644
+- Blob: 1862e426496ea1ea8dc1ff291545b09cebf86771
+- SHA-256: 7cbfb830bbde770ac44da7f19262c20a1c86bca957a6a626ddc24e7ad18d4b61
+
+Both one-shot gates passed:
+
+- zig fmt --check
+- zig build test-inbox206-descriptor-identity
+
+The Zig 0.16 implementation uses explicit ownership, fail-closed errors, standard-library SHA-256, and private synthetic tests. Both CD cache roots are retained. Main and control are clean.
+
+Status remains conditionally_supported; execution authority remains synthetic-focused-test-only; D01 withheld, D02 unauthorized, ratchet 131.
+```
+
+Static Watcher review ran no project code. Commit
+`d81cdf248b7f2a9ce7d19913e632ceffcf82c908` is non-merge, parent
+`2d2476dc6b93130472e1f4dd9b0acb76eb995cde`, tree
+`4c683717e0c519b3b754cd7a3d71747ad5f7b2c2`, and changes only mode-100644
+`tools/zllvm_inbox206_materialize.zig` by 504 insertions/zero deletions. Final
+identity: blob `1862e426496ea1ea8dc1ff291545b09cebf86771`, raw SHA-256
+`7cbfb830bbde770ac44da7f19262c20a1c86bca957a6a626ddc24e7ad18d4b61`,
+41,063 bytes/1,181 lines; binary-diff SHA-256
+`4d426c247d652e82f9074a4b25454055283c75210bd1629c5fd865af64c6feed`.
+Diff-check passes. Pre-CD bytes remain unchanged outside the two insertion
+boundaries; no BK path/digest or public Snapshot symbol appears.
+
+Retained Worker turn `019f8305-e0c1-7df1-81a8-d41f311d50f4` proves the exact
+single-edit, one-shot gate, sole-file commit sequence with no retry, formatter
+rewrite, other project command, cleanup, real-byte access, Git-object
+extraction, worktree traversal, or later tool. All non-concurrency CD
+requirements pass static review.
+
+The remaining failure is exact: the CD token state is a plain enum and the
+acquisition performs a non-atomic read/write pair. Its concurrency test only
+preloads `.in_progress` sequentially. Two actual callers may race from
+`.unused`, so the required fail-closed concurrent admission is not present.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept INBOX-206CD provisionally for every verified non-concurrency requirement, but withhold full CD acceptance because the plain-enum token permits a data race and cannot enforce single concurrent admission.
+
+I authorize Zig-only INBOX-206CE as proposed, with these exact refinements:
+
+- Use std.atomic.Value(SnapshotTokenState) and receive the token by pointer. Treat uniqueness as the identity of that single token object; copying or moving it while usable/in progress is outside the contract.
+
+- Claim with exactly one cmpxchgStrong(.unused, .in_progress, .acq_rel, .acquire). Install a defer immediately after successful admission that stores .consumed with .release, covering validation, allocation, callback, and verification failures.
+
+- CAS rejection performs no store, allocation, or callback. Final-state observations use .acquire; other test synchronization state must also be atomic.
+- The two-thread test must use explicit acquire/release barriers with no sleep or timing assumption. The loser should use a first-allocation-failing or counting allocator so SnapshotTokenUnavailable, zero callback calls, and zero allocation are independently demonstrated.
+
+- Join the claimant before reading its result; require successful snapshot ownership/deinit and final .consumed. Preserve recursive, initially-in-progress, second-use, and retry-after-failure cases.
+
+- Modify only the CD token implementation and CD-added concurrency tests. All pre-CD bytes and unrelated CD behavior/tests remain unchanged.
+
+The operating commit, sole Zig-file scope, fresh retained CE caches, exactly-once fmt/focused-build gates, immediate failure stop, and all real-byte, production, publication, D01/D02, ratchet, worktree, and non-Zig prohibitions remain exact.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`d81cdf248b7f2a9ce7d19913e632ceffcf82c908`; update the ignored inbox
+separately.
+
+Modify only mode-0644 `tools/zllvm_inbox206_materialize.zig` from the exact CD
+identity above. Change only the CD token implementation and CD-added
+token/concurrency tests. Preserve all pre-CD bytes and every unrelated CD
+behavior/test unchanged. Do not modify `build.zig` or another path.
+
+Use `std.atomic.Value(SnapshotTokenState)` and receive the token by pointer.
+Treat the single token object's identity as the uniqueness boundary; copying
+or moving it while usable or in progress is outside the contract.
+
+Claim with exactly one
+`cmpxchgStrong(.unused, .in_progress, .acq_rel, .acquire)`. Immediately after
+successful admission, install a defer storing `.consumed` with `.release`,
+covering all validation, allocation, callback, verification, and success
+exits. CAS rejection performs no store, allocation, or callback. Final-state
+observations use `.acquire`; all other synchronization state in tests is
+atomic.
+
+Add a deterministic actual two-thread synthetic test using only Zig
+`std.Thread` and atomic acquire/release barriers. Hold the successful claimant
+inside its callback after publishing entry; attempt the identical token from
+the other thread/caller and require `SnapshotTokenUnavailable`. Use a
+first-allocation-failing or counting allocator and counting callback for the
+loser to prove independently that it performs zero allocation and zero
+callback. Release and join the claimant before reading its result; require a
+successful owned snapshot, one deinit, and final `.consumed`. No sleeps,
+timing assumptions, filesystem, real bytes, paths, descriptors, Git, process,
+worktree, or project artifact.
+
+Preserve recursive, initially-in-progress, second-use, and retry-after-failure
+coverage, using atomic loads/stores. Preserve every other CD implementation
+and test unchanged.
+
+Require both cache roots initially absent and non-symlink:
+
+```text
+ZIG_LOCAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206ce-local
+ZIG_GLOBAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206ce-global
+```
+
+Create them only immediately before the gates and retain them afterward. Run
+exactly once, in order:
+
+1. `zig fmt --check tools/zllvm_inbox206_materialize.zig`;
+2. `zig build test-inbox206-descriptor-identity` with both exact CE cache
+   variables.
+
+Run no other project command. Success permits only read-only closure,
+sole-Zig-file commit, clean main/control verification, and stop. First failure
+stops uncommitted immediately without diagnosis, retry, repair, cleanup,
+formatting rewrite, or fix-forward.
+
+The pure-Zig boundary is absolute: all substantive project logic,
+synchronization tests, generators, validators, codecs, hashing, harnesses,
+workflow, and tooling must be Zig. Bash remains tiny transparent fixed
+orchestration only. No JavaScript, ECMAScript, TypeScript, Python, Perl, AWK,
+other-language solution, or project algorithm in internal-agent transport is
+authorized.
+
+No real-byte provenance, immutability, provisioning, during-read mutation,
+Variant-3 selection, Git-object extraction, registered-worktree traversal,
+publication, materialization, installation, production, evidence generation,
+BI/continuation creation, D01/D02, ratchet movement, credit, or downstream
+authority is granted. Status remains `conditionally_supported`; execution
+authority remains the named synthetic focused test only; D01 withheld, D02
+unauthorized, ratchet 131.
+
+## INBOX-206CD pure-Zig private verified-snapshot primitive — PROVISIONAL; SUPERSEDED BY INBOX-206CE
 
 INBOX-206CC is accepted fully within its evidence/design-only scope. The
 Worker final report is preserved verbatim:
