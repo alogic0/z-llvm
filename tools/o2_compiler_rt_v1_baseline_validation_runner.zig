@@ -232,7 +232,6 @@ const InputSet = struct {
     retention_pins: FileIdentity,
     retention_policy: FileIdentity,
     cleanup_source: FileIdentity,
-    watcher: FileIdentity,
     bypass_inventory: FileIdentity,
     facade_manifest: FileIdentity,
     facade_source: FileIdentity,
@@ -257,7 +256,6 @@ const Cli = struct {
     retention_pins: []const u8,
     retention_policy: []const u8,
     cleanup_source: []const u8,
-    watcher: []const u8,
     bypass_inventory: []const u8,
     facade_manifest: []const u8,
     facade_source: []const u8,
@@ -1074,7 +1072,6 @@ fn parseBaselineCli(
         .retention_pins = try nextArgument(args),
         .retention_policy = try nextArgument(args),
         .cleanup_source = try nextArgument(args),
-        .watcher = try nextArgument(args),
         .bypass_inventory = try nextArgument(args),
         .facade_manifest = try nextArgument(args),
         .facade_source = try nextArgument(args),
@@ -2271,10 +2268,6 @@ fn authenticateInputs(
         .cleanup_source = try authenticateFile(io, cli.cleanup_source, .{
             .bytes = 50_100,
             .sha256_hex = "8e0c54ad6fed9e46326049dbe64bff743daddcc2527c1dc4d5e02be15fba2d5e",
-        }, maximum_input_bytes, cli.registered_worktrees),
-        .watcher = try authenticateFile(io, cli.watcher, .{
-            .bytes = 10_850,
-            .sha256_hex = "1221b00a6aacd7deaae9aab50bd2600be33a13b0ed645428f9475a2cb81a893d",
         }, maximum_input_bytes, cli.registered_worktrees),
         .bypass_inventory = try authenticateFile(io, cli.bypass_inventory, .{
             .bytes = 5_188,
@@ -4043,7 +4036,6 @@ fn validateCliPathSet(io: std.Io, cli: Cli) !void {
         .{ "retention_pins", cli.retention_pins, PathKind.file },
         .{ "retention_policy", cli.retention_policy, PathKind.file },
         .{ "cleanup_source", cli.cleanup_source, PathKind.file },
-        .{ "watcher", cli.watcher, PathKind.file },
         .{ "bypass_inventory", cli.bypass_inventory, PathKind.file },
         .{ "facade_manifest", cli.facade_manifest, PathKind.file },
         .{ "facade_source", cli.facade_source, PathKind.file },

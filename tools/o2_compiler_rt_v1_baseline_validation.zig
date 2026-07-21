@@ -38,7 +38,6 @@ pub const closed_identities = [_]IdentityDescriptor{
     .{ .label = "retention_pins", .kind = .sha256, .digest = "1ef9803cab9c4f7cd7fb3a2fa352844457f0efb655b5b8ced51d7232434888d3", .bytes = 3_051 },
     .{ .label = "retention_policy", .kind = .sha256, .digest = "a31e3fbf7aa03c8544fc5f9921e350c25e4e470cc3c779dfb356136634e052dd", .bytes = 10_622 },
     .{ .label = "cleanup_source", .kind = .sha256, .digest = "8e0c54ad6fed9e46326049dbe64bff743daddcc2527c1dc4d5e02be15fba2d5e", .bytes = 50_100 },
-    .{ .label = "watcher", .kind = .git_blob, .digest = "b64131cf60dd0ef638e815cd33db9ae8595a72cf", .bytes = 10_850 },
     .{ .label = "bypass_inventory", .kind = .sha256, .digest = "2d6c8c8819c4b0dff10b9d803a62125d7c46155c04a2c2cf2006f2aecffd8b11", .bytes = 5_188 },
     .{ .label = "facade_manifest", .kind = .sha256, .digest = "2adcd99ee3bfbe0e9f09673f1df02ab305b5ddb2c1b461023152d5d03a079c26", .bytes = 2_686 },
     .{ .label = "facade_source", .kind = .sha256, .digest = "4f5887e9d2bce0943df26c1e08e8360053440da64eefd19ddfd9d53225dddd7a", .bytes = 103 },
