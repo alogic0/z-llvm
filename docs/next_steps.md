@@ -24,7 +24,148 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CE pure-Zig atomic one-shot token remediation — AUTHORIZED SOLE CURRENT ACTION
+## INBOX-206CF pure-Zig atomic one-shot token continuation — AUTHORIZED SOLE CURRENT ACTION
+
+INBOX-206CE is accepted only as a compliant no-change stop. It earns preflight
+credit but no implementation, test, or cache credit. The Worker final report
+is preserved verbatim:
+
+```text
+INBOX-206CE stopped at the first failed read-only source/API inspection command.
+
+- No project file was edited.
+- No CE cache was created.
+- Neither Zig gate was invoked.
+- Nothing was staged or committed.
+- No diagnosis, retry, repair, cleanup, or later command was performed.
+```
+
+Static Watcher review ran no project code. Retained Worker turn
+`019f8314-2e94-7211-9de6-f52e6d5bc348` proves the pre-edit identity gate
+passed at `c5a112a7a996403f922dad3145554e450315262f`, then the sole following
+combined read command failed. The exact procedural cause is that its stdlib
+query named nonexistent `/home/oleg/.zig/0.16.0/files/lib/std/Thread` in
+addition to existing `Thread.zig`; it also queried atomic functions as
+`pub fn` although the installed declarations are `pub inline fn`. The final
+`rg` returned nonzero and the Worker honored the first-failure rule
+immediately. This is not a source/API or implementation failure.
+
+Independent static verification confirms existing
+`/home/oleg/.zig/0.16.0/files/lib/std/atomic.zig` defines
+`Value.init/load/store/cmpxchgStrong` with the required orders, and existing
+`Thread.zig` defines `spawn` and `join`. No project command was executed.
+
+Boundary verification: HEAD
+`c5a112a7a996403f922dad3145554e450315262f`; source mode 0644, 41,063
+bytes/1,181 lines, blob `1862e426496ea1ea8dc1ff291545b09cebf86771`,
+SHA-256 `7cbfb830bbde770ac44da7f19262c20a1c86bca957a6a626ddc24e7ad18d4b61`;
+no source/index diff; main/control clean. CE caches remain absent/non-symlink;
+CD caches remain retained directories. Build SHA-256
+`3ab852ee10a670fa076d478ab1b45f9c63dd585950597b6dcb13f2e01cea4a38`;
+watcher SHA-256
+`1221b00a6aacd7deaae9aab50bd2600be33a13b0ed645428f9475a2cb81a893d`
+and PID 3206208 alive; stash
+`7985c6d01040a6e47e4ce5b918866d0e89517ac7` untouched; BI evidence and
+continuation absent; worktrees remain exactly 43/33/8/2. Status remains
+`conditionally_supported`; D01 withheld, D02 unauthorized, ratchet 131.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept INBOX-206CE only as a compliant no-change stop. It earns preflight credit but no implementation, test, or cache credit.
+
+I authorize Zig-only INBOX-206CF as proposed, with these refinements:
+
+- Define SnapshotTokenState as enum(u8) and initialize the token with std.atomic.Value(SnapshotTokenState).init(.unused).
+- Use exactly one CAS with success order .acq_rel and failure order .acquire; install the .consumed release-store defer immediately after successful admission.
+- Use acquire loads for final observations. All cross-thread barriers, counters, and result-ready state must be atomic or read only after join.
+- Prove the loser’s zero-allocation path with a separate first-allocation-failing or counting allocator and require SnapshotTokenUnavailable; independently require zero loser callback calls.
+
+- The claimant must be inside its callback before the loser proceeds. Release it only after loser assertions, then join before inspecting/deinitializing its snapshot.
+- Omit optional API rereads unless necessary; if used, restrict them exactly to existing atomic.zig and Thread.zig with patterns covering pub inline fn.
+
+The non-merge operating commit atop c5a112a7a996403f922dad3145554e450315262f, sole Zig-file scope, fresh retained CF caches, exactly-once gates, immediate failure stop, and every CE prohibition remain exact.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`c5a112a7a996403f922dad3145554e450315262f`; update the ignored inbox
+separately.
+
+Modify only mode-0644 `tools/zllvm_inbox206_materialize.zig`, starting from
+the exact unchanged blob/SHA/size/line identity above. Change only the
+CD-added token implementation and CD-added token/concurrency tests. Preserve
+every pre-CD byte and every unrelated CD behavior/test unchanged. Do not
+modify `build.zig` or another path.
+
+Define `SnapshotTokenState` as `enum(u8)`. Initialize the caller-owned token
+with `std.atomic.Value(SnapshotTokenState).init(.unused)` and continue passing
+the token by pointer. The identity of that one token object is the uniqueness
+boundary; copying or moving it while usable or in progress is outside the
+contract.
+
+Claim admission with exactly one
+`cmpxchgStrong(.unused, .in_progress, .acq_rel, .acquire)`. Immediately after
+successful admission, install a defer storing `.consumed` with `.release` on
+every validation, allocation, callback, EOF, digest, and success exit. CAS
+rejection performs no store, allocation, or callback. Use `.acquire` loads
+for final observations. All cross-thread barriers, counters, and result-ready
+state must be atomic or read only after join.
+
+Add the deterministic actual two-thread synthetic proof using only Zig
+`std.Thread` and atomic acquire/release entry/release barriers. No sleep,
+timeout, or timing assumption is allowed. The claimant must publish that it
+is inside its callback before the loser proceeds. The loser uses the identical
+token and a separate first-allocation-failing or counting allocator; require
+`SnapshotTokenUnavailable`, zero loser allocation, and independently zero
+loser callback calls. Release the claimant only after the loser assertions,
+then join it before inspecting its result, deinitializing its successfully
+owned snapshot once, and observing final `.consumed`.
+
+Preserve recursive, initially-in-progress, second-use, and retry-after-failure
+coverage using atomic state operations. Preserve every length, callback,
+SHA-256, EOF, ownership, and observer behavior unchanged.
+
+Omit optional API rereads unless necessary. If necessary, restrict reads
+exactly to the existing installed `atomic.zig` and `Thread.zig`, with source
+ranges or patterns covering `pub inline fn`; do not name nonexistent
+`std/Thread` or perform a broad search. Any read failure stops immediately.
+
+Require both cache roots initially absent and non-symlink:
+
+```text
+ZIG_LOCAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206cf-local
+ZIG_GLOBAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206cf-global
+```
+
+Create them only immediately before the gates and retain them afterward. Run
+exactly once, in order:
+
+1. `zig fmt --check tools/zllvm_inbox206_materialize.zig`;
+2. `zig build test-inbox206-descriptor-identity` with both exact CF cache
+   variables.
+
+Run no other project command. Success permits only read-only closure,
+sole-Zig-file commit, clean main/control verification, report, and stop. The
+first failed command stops uncommitted immediately without diagnosis, retry,
+repair, cleanup, formatting rewrite, or fix-forward.
+
+The pure-Zig boundary is absolute: all substantive project logic,
+synchronization tests, generators, validators, codecs, hashing, harnesses,
+workflow, and tooling must be Zig. Bash remains tiny transparent fixed-command
+orchestration only. No JavaScript, ECMAScript, TypeScript, Python, Perl, AWK,
+other-language solution, or project algorithm in internal-agent transport is
+authorized.
+
+No real-byte provenance, immutability, provisioning, during-read mutation,
+Variant-3 selection, Git-object extraction, registered-worktree traversal,
+publication, materialization, installation, production, evidence generation,
+BI/continuation creation, D01/D02, ratchet movement, cleanup, credit, or
+downstream authority is granted. Status remains `conditionally_supported`;
+execution authority remains the named synthetic focused test only; D01
+withheld, D02 unauthorized, ratchet 131.
+
+## INBOX-206CE pure-Zig atomic one-shot token remediation — COMPLIANT NO-CHANGE STOP; SUPERSEDED BY INBOX-206CF
 
 INBOX-206CD is accepted provisionally for every verified non-concurrency
 requirement. Full acceptance is withheld because its plain-enum token permits
