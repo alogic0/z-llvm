@@ -24,7 +24,142 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BQ check-only exhaustive-mask commit closure — AUTHORIZED
+## INBOX-206BR pure-Zig single-component directory acquisition — AUTHORIZED
+
+INBOX-206BQ commit
+`eed3423ad51748e84a837c5a56a03d36bd1a3798` is accepted fully within its
+check-only closure. BP's exhaustive essential-mask test and prior focused-test
+evidence are accepted; descriptor status remains `conditionally_supported`.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BQ completed successfully.
+
+- Commit: eed3423ad51748e84a837c5a56a03d36bd1a3798
+- Tree: 4546a8fd84f6b1bffccb276e5be3a5b5a008dcaa
+- Sole file: tools/zllvm_inbox206_materialize.zig
+- Mode: 0644
+- SHA-256: b1c5793dff8ff4cf3970492903c9a6de2eb352a38928199fb1d1e3cbe21d0a62
+
+Main and control are clean. Both BP cache roots remain retained. Status remains conditionally_supported; ratchet remains 131.
+```
+
+Static Watcher review ran no project code. BQ is a non-merge commit parented
+exactly by `57aea89061c7ba1f9c218622f946010f7d4c9a41`, with tree
+`4546a8fd84f6b1bffccb276e5be3a5b5a008dcaa`. Its sole path is the mode-0644,
+8,107-byte, 225-line Zig root with SHA-256
+`b1c5793dff8ff4cf3970492903c9a6de2eb352a38928199fb1d1e3cbe21d0a62` and
+Git blob `7db30e059b50ffe849ece343c9fc2d94bda9f4ff`.
+
+Retained Worker turn `019f828e-bf18-7a60-9858-005766b326de` shows only the
+operating-document read, fixed check-only identity closure, staging/sole-file
+commit, and final clean checks. It shows no project content edit,
+installed-source read, formatter, compiler, build, test, executable, cache
+traversal, or prohibited action.
+
+Main/control, caches, stash, watcher SHA/blob/PID, all 43 worktrees and
+protected identities, BI/continuation absence, D01/D02, and ratchet 131 remain
+exact.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept eed3423ad51748e84a837c5a56a03d36bd1a3798 fully within BQ’s check-only closure. BP’s exhaustive essential-mask test and prior focused-test evidence are now accepted, while
+descriptor status remains conditionally_supported.
+
+I authorize Zig-only INBOX-206BR with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by eed3423ad51748e84a837c5a56a03d36bd1a3798; update the ignored inbox separately.
+- Modify only tools/zllvm_inbox206_materialize.zig, retaining mode 0644 and all existing behavior/tests.
+- Keep all new symbols private and reachable only from the existing dedicated test root.
+- The component validator must validate both candidate and expected byte slices before access:
+    - reject empty, exact . and .., any slash, and any NUL;
+    - require complete byte equality;
+    - return independently attributable lexical versus mismatch errors.
+
+- Prove validation precedes filesystem access by running every lexical/mismatch negative against a deliberately closed parent descriptor and requiring the validation error rather than a
+  descriptor error.
+
+- The acquisition primitive must:
+    - borrow, never close, the held parent directory;
+    - open exactly one validated component relative to that parent;
+    - use exactly access_sub_paths=true, iterate=false, and follow_symlinks=false;
+    - observe the returned held descriptor as a directory through the accepted identity primitive;
+    - use errdefer or equivalent ownership-safe cleanup if identity/role validation fails;
+    - return an owned child directory plus its four-field identity;
+    - make caller close responsibility and identity lifetime explicit.
+
+- Tests must additionally prove:
+    - parent remains usable after child acquisition and after child close;
+    - child close is caller-controlled;
+    - nested-directory success and stable held identity;
+    - every lexical and mismatch rejection occurs before access;
+    - regular-file rejection;
+    - symlink rejection without returning or leaking a descriptor.
+
+- Use only Zig temporary directories/files/symlinks. No trusted-root acquisition, multi-component traversal, real authority path, or second-chain behavior is authorized.
+- Require initially absent/non-symlink caches:
+    - /home/oleg/.cache/zllvm-inbox206br-local
+    - /home/oleg/.cache/zllvm-inbox206br-global
+
+  Retain them after success or failure.
+
+- Run exactly once, in order:
+    1. zig fmt --check tools/zllvm_inbox206_materialize.zig
+    2. the existing zig build test-inbox206-descriptor-identity step using those caches.
+
+- Success permits only read-only scope/diff/status checks, then commits only the Zig file. First failure stops uncommitted without diagnosis, retry, repair, cleanup, or fix-forward.
+
+Traversal beyond one component, publication, materialization, installation, production reachability, evidence generation, D01/D02, ratchet movement, credit, and downstream authority remain
+withheld.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`eed3423ad51748e84a837c5a56a03d36bd1a3798`; update only the ignored inbox
+separately.
+
+Modify only `tools/zllvm_inbox206_materialize.zig`, retaining mode 0644 and
+all existing behavior/tests. Keep all new symbols private and reachable only
+from the existing dedicated test root. Implement the exact validator,
+one-component ownership-safe acquisition primitive, and focused synthetic
+tests in the Reviewer agreement above.
+
+Require fresh initially absent/non-symlink caches:
+
+```text
+ZIG_LOCAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206br-local
+ZIG_GLOBAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206br-global
+```
+
+Create them immediately before and retain them after the one-shot gates:
+
+1. `zig fmt --check tools/zllvm_inbox206_materialize.zig`;
+2. existing `zig build test-inbox206-descriptor-identity` with both exact
+   cache variables.
+
+Run no other project command. Success commits only the Zig file and stops;
+first failure stops uncommitted without any later command or fix-forward.
+
+The project-language boundary remains absolute: substantive implementation,
+generators, validators, codecs, hashing, harnesses, workflow, and artifact
+tooling must be Zig. Bash is limited to tiny transparent fixed-command/cache
+orchestration. No other-language project solution or internal-agent project
+algorithm is authorized.
+
+Trusted-root acquisition, traversal beyond one component, second-chain
+comparison, rename/replacement/mount injection, publication, materialization,
+parser/renderer work, real authority paths, evidence generation, installation,
+production reachability, BI/continuation, D01/D02, ratchet movement, credit,
+registered-worktree access/modification, and downstream authority remain
+withheld. Status remains `conditionally_supported`; ratchet remains 131.
+Before acting, acknowledge the sole-file private Zig scope, validation
+precedence, ownership contract, exact tests/caches/gates, prohibited actions,
+success condition, and first-failure stop.
+
+
+## INBOX-206BQ check-only exhaustive-mask commit closure — ACCEPTED; SUPERSEDED BY INBOX-206BR
 
 INBOX-206BP is accepted only as a compliant fail-closed post-test/pre-commit
 stop. Its exact Zig bytes and passed one-shot formatter/focused-test results
