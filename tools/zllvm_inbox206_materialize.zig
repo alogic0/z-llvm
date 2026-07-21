@@ -44,6 +44,13 @@ const TrustedHomeChain = struct {
     home: AcquiredDirectory,
 };
 
+const TrustedOlegChain = struct {
+    /// The caller owns all values and must close oleg, then home, then root.
+    root: AcquiredDirectory,
+    home: AcquiredDirectory,
+    oleg: AcquiredDirectory,
+};
+
 fn assertNativeAbi() void {
     if (builtin.os.tag != .linux) {
         @compileError("INBOX-206 descriptor identity requires native Linux");
@@ -198,6 +205,20 @@ fn acquireTrustedHomeChain(io: std.Io) !TrustedHomeChain {
     return .{
         .root = root,
         .home = home,
+    };
+}
+
+/// Transfers all three held descriptors to the caller, which must close them
+/// in oleg-before-home-before-root order.
+fn acquireTrustedOlegChain(io: std.Io) !TrustedOlegChain {
+    const home_chain = try acquireTrustedHomeChain(io);
+    errdefer home_chain.root.directory.close(io);
+    errdefer home_chain.home.directory.close(io);
+    const oleg = try acquireOneDirectoryComponent(home_chain.home.directory, io, "oleg", "oleg");
+    return .{
+        .root = home_chain.root,
+        .home = home_chain.home,
+        .oleg = oleg,
     };
 }
 
@@ -480,6 +501,61 @@ test "trusted root-to-home chain identity and caller close order" {
     try std.testing.expect(std.meta.eql(chain.root.identity, root_stable));
     const home_stable = try observeDescriptor(chain.home.directory.handle, .directory);
     try std.testing.expect(std.meta.eql(chain.home.identity, home_stable));
+
+    const home_handle = chain.home.directory.handle;
+    chain.home.directory.close(io);
+    home_open = false;
+    try std.testing.expectError(
+        error.DescriptorIdentityBadDescriptor,
+        observeDescriptor(home_handle, .directory),
+    );
+
+    const root_after_home_close = try observeDescriptor(chain.root.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(chain.root.identity, root_after_home_close));
+    const root_handle = chain.root.directory.handle;
+    chain.root.directory.close(io);
+    root_open = false;
+    try std.testing.expectError(
+        error.DescriptorIdentityBadDescriptor,
+        observeDescriptor(root_handle, .directory),
+    );
+}
+
+test "trusted root-to-home-to-oleg chain identity and caller close order" {
+    const io = std.testing.io;
+    const chain = try acquireTrustedOlegChain(io);
+    var root_open = true;
+    defer {
+        if (root_open) chain.root.directory.close(io);
+    }
+    var home_open = true;
+    defer {
+        if (home_open) chain.home.directory.close(io);
+    }
+    var oleg_open = true;
+    defer {
+        if (oleg_open) chain.oleg.directory.close(io);
+    }
+
+    const root_stable = try observeDescriptor(chain.root.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(chain.root.identity, root_stable));
+    const home_stable = try observeDescriptor(chain.home.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(chain.home.identity, home_stable));
+    const oleg_stable = try observeDescriptor(chain.oleg.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(chain.oleg.identity, oleg_stable));
+
+    const oleg_handle = chain.oleg.directory.handle;
+    chain.oleg.directory.close(io);
+    oleg_open = false;
+    try std.testing.expectError(
+        error.DescriptorIdentityBadDescriptor,
+        observeDescriptor(oleg_handle, .directory),
+    );
+
+    const home_after_oleg_close = try observeDescriptor(chain.home.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(chain.home.identity, home_after_oleg_close));
+    const root_after_oleg_close = try observeDescriptor(chain.root.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(chain.root.identity, root_after_oleg_close));
 
     const home_handle = chain.home.directory.handle;
     chain.home.directory.close(io);
