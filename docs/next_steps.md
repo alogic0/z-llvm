@@ -24,7 +24,134 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CM CL transport-safe preflight recovery — AUTHORIZED EVIDENCE-ONLY SOLE CURRENT ACTION
+## Standing capability workflow — PROCESS RESET
+
+INBOX-206CK commit `223cf7667fdcbdf056b9f3a4872151a55dc37ffd`
+is the accepted capability baseline. INBOX-206CL and INBOX-206CM are
+withdrawn and must not resume. Do not create
+`docs/evidence/inbox206cl_trusted_producer_provenance_boundary.md`.
+Commits `ebf10b7d842c2e239e52a3bc4166abbf6f8b8dc3` and
+`e9f6aed0373d59ee3ff93818f9d039728fd5fd50` remain superseded operating
+history only.
+
+Every capability has two modes:
+
+- **DEVELOPMENT** is iterative inside an exact Zig-file, command, and safety
+  scope. In-scope diagnostics, edits, formatting, tests, diagnosis, and reruns
+  continue until green without new inbox numbers, Reviewer handoffs, or
+  tracked remediation commits. Agreement is required only for file/security/
+  acceptance/external-state scope change or destructive authority.
+- **ACCEPTANCE** starts only after green development. It freezes staged
+  security-critical source/input/output identities, runs one deterministic
+  clean sequence, emits concise machine-readable results through reusable
+  checked-in Zig logic, and permits the one capability commit only on success.
+  An in-scope acceptance failure returns to DEVELOPMENT under the same
+  capability authority. One-shot fail-closed applies to final acceptance and
+  production-facing security boundaries, not ordinary development.
+
+An in-scope mode transition changes only the ignored inbox/current runtime
+instruction and creates no tracked operating commit. Hashes are authoritative
+only for security-critical source/input/output bytes, staged trees, and
+byte-identity artifacts. Prose, commands, transcripts, Markdown sizes,
+temporary inventories, and development attempts are not acceptance authority.
+
+Authoritative local state belongs beneath ignored project-local
+`local-state/`; `/tmp` and sibling paths are not authoritative. Records are
+bounded and replaceable, never immutable per-attempt roots, inventories,
+hashes, or retained failure ledgers. `local-state/control` and every registered
+worktree remain protected and untouched.
+
+All substantive implementation, generators, validators, codecs, hashing,
+harnesses, workflow, provenance, acceptance verifier/receipt emission, and
+artifact tooling must be Zig. Bash is tiny transparent fixed-command
+orchestration only. No JavaScript/ECMAScript, TypeScript, Python, Perl, AWK,
+other-language project solution, or project algorithm in agent transport is
+authorized.
+
+Each capability has a maximum of one tracked operating-policy/current-action
+commit and one eventual implementation/tests capability commit. No tracked
+commit is allowed for retries, typos, formatting, diagnostics, transport,
+serializer correction, failed development gates, mode transition, or an
+evidence-only remediation chain.
+
+## INBOX-206CN iterative pure-Zig provenance handoff — AUTHORIZED DEVELOPMENT SOLE CURRENT ACTION
+
+The Worker's superseded CM stop is accepted as compliant after a delivery
+race. Its final report is preserved verbatim:
+
+```text
+Stopped INBOX-206CM. The preflight had already completed successfully before this checkpoint arrived; no evidence file, edit, or commit was created afterward.
+
+CL/CM will not resume. CK commit 223cf7667fdcbdf056b9f3a4872151a55dc37ffd and clean state remain preserved.
+```
+
+The read-only preflight was the sole CM action. It produced no evidence, edit,
+commit, capability, or credit. Main/control and protected state remained clean
+and the forbidden CL evidence stayed absent.
+
+Before creating CN local state, verify the main anchored ignore rule is
+exactly `/local-state/`; otherwise stop for scope agreement. Create/use only
+bounded replaceable `local-state/caches/inbox206cn/` and
+`local-state/validations/inbox206cn/` state. Do not modify
+`local-state/control`, create a supplemental repository, or create immutable
+per-attempt roots, inventories, hashes, or failure ledgers.
+
+Modify only mode-0644 `tools/zllvm_inbox206_materialize.zig`. Keep all new
+types, helpers, and tests private, native-Linux-test-only, and adjacent to the
+accepted CK sealed-descriptor boundary. Do not modify `build.zig` or another
+tracked path.
+
+Add a versioned canonical provenance tuple containing commit, tree,
+repository-relative path, Git object ID and hash algorithm, raw SHA-256,
+exact raw length, producer identity, and protocol identity/version. Use typed
+fixed identities where appropriate and checked bounded path handling. Model
+independently supplied trusted producer/protocol authority separately from
+tuple claims.
+
+Missing, wrong, unsupported, self-asserted, circular, malformed, or
+claim-versus-authority tuple failures must occur before descriptor access,
+size observation, allocation, callback, or content read. Actual descriptor
+content length/SHA mismatch is checked only after accepted CK role/seal
+admission through the existing post-seal verification path.
+
+Preserve one owned descriptor move and exactly-once close on every exit.
+Identical immutable replay is policy-valid only with a fresh owned handoff;
+reuse of a consumed handoff is forbidden. Reject conflicting tuples against
+one independently supplied trusted authority binding without inventing a
+global registry, nonce, or freshness requirement.
+
+Add deterministic synthetic Zig tests for the accepted handoff; every tuple
+field mismatch; missing/wrong producer and protocol authority; circular
+self-attestation; malformed paths, algorithms, and versions; conflicting
+tuple; identical replay with fresh ownership; consumed reuse; rejection before
+descriptor access/read; post-seal length/SHA mismatch; and ownership/close.
+
+DEVELOPMENT may iteratively inspect the sole source, relevant existing build
+definition, local Zig 0.16 standard library, and compiler/test diagnostics;
+edit the sole Zig file; run `zig fmt` and `zig fmt --check` on that file; and
+run `zig build test-inbox206-descriptor-identity` with caches only beneath
+`local-state/caches/inbox206cn/`. Diagnose, edit, and rerun in-scope failures
+until green without another inbox, Reviewer handoff, or tracked commit.
+
+CN creates no Markdown evidence, stages nothing, and commits nothing in
+DEVELOPMENT. At green, report the complete source diff, tests, bounded
+local-state disposition, and exact acceptance-receipt needs, then stop. If
+scope must expand, stop for agreement.
+
+No real bytes, Git CLI/plumbing/object read, registered-worktree access,
+pathname reopening, store/provisioner access, public API, production wiring,
+materialization, validation-v3, D01/D02, ratchet movement, performance,
+credit, cleanup, or downstream authority is granted. The real Git-object
+supply boundary remains explicit and unauthorized.
+
+ACCEPTANCE is not authorized by this dispatch. Its later in-scope transition
+uses only ignored inbox/runtime authority. Its concise machine-readable
+receipt must be produced by reusable checked-in Zig logic beneath
+`local-state/validations/inbox206cn/` and bind only security-critical
+source/input/output identities. Bespoke Bash/JavaScript/AWK serialization and
+authoritative prose are prohibited.
+
+## INBOX-206CM CL transport-safe preflight recovery — WITHDRAWN; SUPERSEDED BY INBOX-206CN PROCESS RESET
 
 INBOX-206CL stopped compliantly before preflight and receives no preflight,
 evidence, deliverable, downstream, or other credit. The Worker final report is
