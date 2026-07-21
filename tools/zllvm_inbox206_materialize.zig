@@ -118,26 +118,30 @@ test "compile-time ABI and essential mask closure" {
 }
 
 test "required mask accepts extras and rejects every essential omission" {
+    const MaskInt = std.meta.Int(.unsigned, @bitSizeOf(linux.STATX));
     const exact = requiredMask();
+    const required_mask: MaskInt = @bitCast(exact);
     try requireMask(exact);
 
-    var with_extra = exact;
-    with_extra.BTIME = true;
+    const frozen_non_required_bit: MaskInt = @as(MaskInt, 1) << @bitOffsetOf(linux.STATX, "BTIME");
+    try std.testing.expectEqual(@as(MaskInt, 0), required_mask & frozen_non_required_bit);
+    const with_extra: linux.STATX = @bitCast(required_mask | frozen_non_required_bit);
     try requireMask(with_extra);
 
-    var missing_unique = exact;
-    missing_unique.MNT_ID_UNIQUE = false;
-    try std.testing.expectError(
-        error.DescriptorIdentityMaskIncomplete,
-        requireMask(missing_unique),
-    );
-
-    var missing_basic = exact;
-    missing_basic.TYPE = false;
-    try std.testing.expectError(
-        error.DescriptorIdentityMaskIncomplete,
-        requireMask(missing_basic),
-    );
+    var omission_count: usize = 0;
+    var bit_index: usize = 0;
+    while (bit_index < @bitSizeOf(MaskInt)) : (bit_index += 1) {
+        const bit: MaskInt = @as(MaskInt, 1) << @intCast(bit_index);
+        if (required_mask & bit == 0) continue;
+        const missing_mask: linux.STATX = @bitCast(required_mask & ~bit);
+        try std.testing.expectError(
+            error.DescriptorIdentityMaskIncomplete,
+            requireMask(missing_mask),
+        );
+        omission_count += 1;
+    }
+    const required_count: usize = @popCount(required_mask);
+    try std.testing.expectEqual(required_count, omission_count);
 }
 
 test "errno mapping preserves fail-closed attribution and E.INVAL precedence" {
