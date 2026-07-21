@@ -24,7 +24,145 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BO pure-Zig descriptor-identity primitive and focused test — AUTHORIZED
+## INBOX-206BP pure-Zig exhaustive required-mask negative closure — AUTHORIZED
+
+INBOX-206BO commit
+`f1d8c116824aa79e6e7db4d94145b1cdbbc56181` is accepted within BO's bounded
+private implementation/build scope. The descriptor primitive and focused
+runtime evidence are accepted provisionally, but exhaustive essential-mask
+negative coverage is not accepted.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BO completed successfully.
+
+- Commit: f1d8c116824aa79e6e7db4d94145b1cdbbc56181
+- Tree: 06de1b1955bd2cd5c6a67887984939ea547c4f0d
+- build.zig: mode 0664, SHA-256 3ab852ee10a670fa076d478ab1b45f9c63dd585950597b6dcb13f2e01cea4a38
+- New Zig test root: mode 0644, SHA-256 c573667bfd6e28316c5f034002936fea09049d6453b765e88bdb106292d1fb41
+- zig fmt --check: passed once
+- Focused Zig build/test: passed once
+
+Both isolated cache roots are retained. Main and control are clean. Status remains conditionally_supported; ratchet remains 131.
+```
+
+Static Watcher review ran no project code. BO is a non-merge commit parented
+exactly by `f62d5f63ec343bd15811117f19e18a0ad82c0606`, with tree
+`06de1b1955bd2cd5c6a67887984939ea547c4f0d`. Its exact two-path change is
+mode-0664 `build.zig`, 36,924 bytes, SHA-256
+`3ab852ee10a670fa076d478ab1b45f9c63dd585950597b6dcb13f2e01cea4a38`, and
+new mode-0644 `tools/zllvm_inbox206_materialize.zig`, 7,531 bytes, 221 lines,
+SHA-256
+`c573667bfd6e28316c5f034002936fea09049d6453b765e88bdb106292d1fb41`.
+
+Retained Worker turn `019f8276-e085-79d0-9f0b-e1dfda8ad1ad` shows the
+authorized source/API reads and edits, one formatter gate, one focused test
+gate with the exact fresh retained caches, read-only closure, and the exact
+two-file commit. It shows no retry, cleanup, broader project execution, real
+authority path, registered-worktree access, or foreign-language project
+solution. Both BO cache roots remain retained.
+
+The private root has no `main`, `src` reachability, install wiring, or default
+dependency. It uses the audited Zig 0.16 Linux API and the accepted fail-closed
+identity contract. All requested cases are present except that the test named
+`required mask accepts extras and rejects every essential omission` clears
+only `MNT_ID_UNIQUE` and `TYPE`; its stronger exhaustive claim is not proved.
+
+Main and control are clean. Control, stash, watcher SHA/blob/PID, all 43
+registered worktrees and directories, protected identities, BI
+evidence/continuation absence, D01/D02 restrictions, and ratchet 131 remain
+exact.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept f1d8c116824aa79e6e7db4d94145b1cdbbc56181 within BO’s bounded private implementation/build scope. The descriptor primitive and focused runtime evidence are accepted provisionally,
+but the claimed exhaustive essential-mask negative coverage is not.
+
+I authorize Zig-only INBOX-206BP with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by f1d8c116824aa79e6e7db4d94145b1cdbbc56181; update the ignored inbox separately.
+- Modify only tools/zllvm_inbox206_materialize.zig, retaining mode 0644. Do not change build.zig, APIs, runtime behavior, or wiring.
+- Replace only the sampled essential-mask negative test.
+- Define the tested required mask from the same production constant used by the validator.
+- Iterate over every bit position in the mask’s integer type. For every set required bit, clear only that bit and require DescriptorIdentityMaskIncomplete.
+- Record and assert that the number of exercised omissions equals @popCount(required_mask).
+- Retain independent positives for the exact required mask and required mask plus a frozen non-required bit.
+- Preserve every existing live descriptor, role, errno, and no-skip mount-ID test unchanged.
+- Require both cache roots to be initially absent/non-symlink:
+    - /home/oleg/.cache/zllvm-inbox206bp-local
+    - /home/oleg/.cache/zllvm-inbox206bp-global
+
+  Retain them after either success or failure; do not clean them.
+
+- Run exactly once, in order:
+    1. zig fmt --check tools/zllvm_inbox206_materialize.zig
+    2. zig build test-inbox206-descriptor-identity using those exact isolated caches.
+
+- Success permits only read-only diff, scope, identity, and status checks, then a commit containing only the Zig file.
+- First failure stops uncommitted without diagnosis, retry, repair, formatting rewrite, cleanup, or fix-forward.
+
+Status remains conditionally_supported; traversal, publication, materialization, installation, production reachability, evidence generation, BI/continuation creation, D01/D02, ratchet
+movement, credit, and downstream work remain withheld.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`f1d8c116824aa79e6e7db4d94145b1cdbbc56181`; update only the ignored inbox
+separately.
+
+Modify only `tools/zllvm_inbox206_materialize.zig`, retaining mode 0644. Do
+not change `build.zig`, any API, runtime behavior, or wiring. Replace only the
+sampled essential-mask negative test. Define the tested required mask from
+the same production constant used by the validator. Iterate in Zig over every
+bit position in the mask's integer type. For every set required bit, clear
+only that bit and require `DescriptorIdentityMaskIncomplete`. Record and
+assert that exercised omissions equal `@popCount(required_mask)`. Retain
+independent positives for the exact required mask and that mask plus one
+frozen non-required bit. Preserve every existing live descriptor, role,
+errno, and no-skip mount-ID test unchanged.
+
+Require both cache roots initially absent and not symlinks:
+
+```text
+ZIG_LOCAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206bp-local
+ZIG_GLOBAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206bp-global
+```
+
+Create them only immediately before the gates. Retain them after success or
+failure; do not clean them. Run exactly once, in order:
+
+1. `zig fmt --check tools/zllvm_inbox206_materialize.zig`;
+2. `zig build test-inbox206-descriptor-identity` with both exact isolated
+   cache environment variables above.
+
+Run no other compiler, formatter, build, test, install, executable, project
+command, runtime probe, generator, validator, wrapper, artifact workflow, BI
+action, or continuation action. Success permits only read-only diff, scope,
+identity, and status checks, then commits only
+`tools/zllvm_inbox206_materialize.zig` and stops clean. First failure stops
+uncommitted without diagnosis, retry, repair, formatting rewrite, cleanup,
+or fix-forward.
+
+The project-language boundary is absolute: every substantive implementation,
+generator, validator, codec, hashing operation, test harness, workflow, and
+artifact tool must be Zig. Bash is permitted only for tiny transparent
+orchestration invoking the exact fixed Zig/Git commands or setting the cache
+variables. No JavaScript, ECMAScript, TypeScript, Python, Perl, AWK,
+other-language project solution, or internal-agent project algorithm is
+authorized.
+
+No path acquisition, traversal, publication, materialization, installation,
+production reachability, evidence generation, BI/continuation creation,
+D01/D02 action, ratchet movement, credit, or downstream work is authorized.
+Status remains `conditionally_supported`; ratchet remains 131. Before acting,
+acknowledge the pure-Zig sole-file boundary, exact mask-test change, exact
+cache/gate sequence, prohibited actions, success condition, and first-failure
+stop condition.
+
+
+## INBOX-206BO pure-Zig descriptor-identity primitive and focused test — ACCEPTED WITH EXHAUSTIVE-MASK CLAIM OPEN; SUPERSEDED BY INBOX-206BP
 
 INBOX-206BN commit
 `f6d824077ecbd0a60f09562a20a832c21fe69192` is accepted fully within its
