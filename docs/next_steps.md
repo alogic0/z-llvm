@@ -24,7 +24,126 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CJ Variant-2 sealed-descriptor API audit — AUTHORIZED SOLE CURRENT ACTION
+## INBOX-206CK private Zig sealed-descriptor synthetic runtime proof — AUTHORIZED SOLE CURRENT ACTION
+
+INBOX-206CJ is fully accepted within its evidence/API-audit scope. The Worker
+final report is preserved verbatim:
+
+```text
+INBOX-206CJ completed successfully.
+
+- Commit: cd69487f0b7daebceaa2b0d32e4137ca2b419c2e
+- Tree: 000b266ba01f83806f181113dfd50a422215de75
+- File: docs/evidence/inbox206cj_variant2_sealed_descriptor_api_audit.md
+- Mode: 100644
+- Blob: a6c928a091c60750a7f5a28fc0202d3a76848d3f
+- SHA-256: 5abd896338e785c71f5faeae119d4c43c2d304e9f676c6b3e964a7b527a46fcf
+- Size: 18,875 bytes / 188 lines
+
+Verdict remains conditionally_supported; selected_variant=none. Main/control are clean. No project command, syscall probe, real-byte access, or worktree traversal occurred.
+```
+
+Static Watcher and retained-log review ran no project code and verifies exact
+non-merge ancestry, sole-path identity, complete CJ contracts, clean state,
+the authorized command sequence, and immediate stop. Source remains mode
+0644, 46,232 bytes, blob `77809d948ef6ee630f17c721cb071f7353feb3a8`,
+SHA-256
+`f7adf9f37bf7b64b80ef4fe1077562a0a32390e2c07e4db9ddb6f55e4f7cbcef`.
+All build/watcher/PID/stash/pin/cache/BI/control/worktree/D01/D02/ratchet-131
+boundaries remain exact.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I fully accept INBOX-206CJ within its evidence/API-audit scope. Its conditionally_supported and selected_variant=none conclusions remain correct.
+
+I authorize Zig-only INBOX-206CK as proposed, with these refinements:
+
+- The receiver must verify regular-file role and the complete required seal mask before size observation, allocation, callback invocation, or any content read.
+- Use checked positional writes in the creator and checked positional reads in the receiver; never depend on or mutate the shared file offset.
+- The existing CF post-fill callback at exact_length must be the sole EOF probe. Do not add a redundant pre-read or second EOF probe.
+- Test missing F_SEAL_GROW and missing F_SEAL_SHRINK independently, in addition to the future-write-without-write rejection. Each rejection must occur before snapshot admission/read.
+- Treat F_SEAL_SEAL only as an explicitly documented protocol choice; do not silently add it to the event-freedom mask or claim it prevents seal removal.
+- Model transfer as a single ownership move, not an implicit duplicate: creator relinquishes its close guard only when receiver ownership is established; receiver closes exactly once on every exit.
+
+- Any received descriptor with ambiguous role, unsupported F_GET_SEALS, missing bits, inconsistent post-seal size, or positional-I/O failure must be rejected fail-closed.
+- Keep every new helper and test private and Linux-native-test-only; no production or build-graph expansion is authorized.
+
+The operating parent cd69487f0b7daebceaa2b0d32e4137ca2b419c2e, sole Zig-file scope, fresh retained CK caches, exactly-once gates, immediate failure stop, and all real-byte, provenance, worktree, D01/D02, ratchet, and pure-Zig restrictions remain exact.
+```
+
+Modify only mode-0644 `tools/zllvm_inbox206_materialize.zig` from the exact
+source identity above. Add only private native-Linux-test-only helpers and
+synthetic tests adjacent to the CF snapshot consumer. Do not change
+`build.zig`, main behavior, public API, production wiring, or another path.
+
+Use pinned Zig 0.16 standard-library/raw `std.os.linux` APIs only. Generate
+fixed non-BK bytes in Zig. The creator calls raw `memfd_create` with exactly
+`MFD_CLOEXEC | MFD_ALLOW_SEALING`, uses complete overflow-checked positional
+writes, retains no writable shared mapping, adds and observes
+`F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK`, and classifies every errno
+fail-closed. `F_SEAL_SEAL` is at most an explicit protocol-closure choice; it
+is not event-freedom and does not prevent seal removal. Transfer is one
+ownership move; the creator relinquishes its close guard only when receiver
+ownership is established.
+
+Before any size observation, allocation, callback, or content read, the
+receiver verifies regular-file role and the complete required seal mask and
+describes the object only as a seal-capable descriptor. It then verifies
+exact post-seal size without pathname reopening and reads with a private
+overflow-checked positional offset. Feed those reads into the existing CF
+snapshot callback. The existing post-fill callback at `exact_length` is the
+sole EOF probe; do not add a pre-read or second probe. Never depend on or
+mutate the shared file offset. Close the descriptor exactly once on every
+exit and deinitialize a returned snapshot exactly once.
+
+Add deterministic private tests for the accepted full-mask path and three
+independent pre-admission/read rejections: future-write without write, missing
+grow, and missing shrink. Exercise single ownership transfer, final close,
+and no reuse. No sleep, timeout, pathname reopen, real byte, Git object, or
+timing assumption is allowed.
+
+Runtime absence or unsupported memfd/seal/size-query/bit behavior must be an
+explicit failing unsupported/error result. Never skip, infer support, weaken
+the mask, or substitute future-write. Ambiguous role, unsupported
+`F_GET_SEALS`, missing bit, inconsistent size, positional-I/O failure,
+overflow, partial/extra byte, ownership defect, or gate failure stops
+fail-closed and retains `selected_variant=none`.
+
+Require fresh, initially absent/non-symlink CK caches:
+
+```text
+ZIG_LOCAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206ck-local
+ZIG_GLOBAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206ck-global
+```
+
+Create them only immediately before the gates and retain them afterward. Run
+exactly once in order:
+
+1. `zig fmt --check tools/zllvm_inbox206_materialize.zig`;
+2. `zig build test-inbox206-descriptor-identity` with both exact CK cache
+   variables.
+
+Run no other project command. Success permits one read-only closure, a commit
+containing only the Zig file, clean main/control and protected-identity
+verification, exact runtime/test disposition, report, and stop. The first
+failure stops uncommitted immediately without diagnosis, retry, repair,
+cleanup, formatting rewrite, or fix-forward.
+
+CK supplies synthetic runtime API/event-freedom evidence only. It grants no
+BK/real-byte supply, trusted producer or receiver-origin provenance, Git
+identity binding, Variant-2 selection, public/dormant production API,
+materialization, publication, installation, validation-v3, registered-
+worktree/store access, D01/D02, ratchet movement, cleanup, performance,
+credit, or downstream authority.
+
+All substantive project implementation, generators, validators, codecs,
+hashing, harnesses, workflows, and artifact tooling must be Zig. Bash is tiny
+transparent fixed-command orchestration only. No JavaScript, ECMAScript,
+TypeScript, Python, Perl, AWK, other-language project solution, or project
+algorithm in internal-agent transport is authorized.
+
+## INBOX-206CJ Variant-2 sealed-descriptor API audit — ACCEPTED; SUPERSEDED BY INBOX-206CK
 
 INBOX-206CI and committed CG are fully accepted. The Worker report is
 preserved verbatim:
