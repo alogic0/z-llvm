@@ -24,7 +24,116 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BM Zig descriptor-identity audit correction — AUTHORIZED
+## INBOX-206BN Zig descriptor-identity audit check-only closure — AUTHORIZED
+
+INBOX-206BM is accepted only as a compliant fail-closed textual-gate stop.
+The corrected draft bytes receive provisional documentation credit, but final
+closure and commit remain withheld.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BM stopped at the first failed textual-scope gate.
+
+The corrected mode-0644 BL audit remains uncommitted. No diagnosis, retry, repair, cleanup, staging, commit, or later command was performed. Protected state and ratchet 131 remain unchanged.
+```
+
+Static Watcher review ran no project code. Main remains at operating commit
+`f0ece97072e918f41bae658b401c08be251e2b19`, parent
+`5b3007a502be13a3b6673b6cb47244592c2e09e8`, tree
+`a7deb4db60e33cec44c86544e7bf28f1b8bbe86e`; the index and tracked diff are
+empty. The sole untracked path is the corrected mode-0644 BL audit,
+`docs/evidence/inbox206bl_zig_descriptor_identity_api_audit.md`, 20,588
+bytes, 373 lines, SHA-256
+`3b22e11c887b0f39c256f6e1c94edff057acb212916ae61bf47b1c9703ca7c64`.
+It contains exactly two correct BK hashes and no old BK hash. Its
+`descriptor_identity_status=conditionally_supported`, authority-none, D01,
+D02, and ratchet lines remain exact.
+
+Retained Worker turn `019f8267-4a62-7be1-a5bb-7dc83df98359` proves that the
+sole content patch changed only the two BK hashes, trusted-anchor acquisition
+wording, and per-callsite `E.INVAL` precedence authorized by INBOX-206BM. The
+first textual gate then evaluated an empty `rg -c` result as an integer when
+the forbidden old hash correctly had zero matches. Bash reported `integer
+expression expected`; no later predicate, staging, commit, or command ran.
+This is a gate defect, not contrary audit content.
+
+Control remains clean at
+`9c55bda34088e1230b0b91a126d35795a3ac70b4` / tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e`, branch `main`, no remote.
+Stash `7985c6d01040a6e47e4ce5b918866d0e89517ac7`, watcher SHA-256
+`1221b00a6aacd7deaae9aab50bd2600be33a13b0ed645428f9475a2cb81a893d`,
+watcher blob `058c659544fd13cc88ff79f62e196f1b9644f9e0`, watcher PID 3206208,
+all 43 registered worktrees and directories, protected identities, BI
+evidence/continuation absence, and ratchet 131 remain exact.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept INBOX-206BM only as a compliant fail-closed textual-gate stop. The corrected draft bytes receive provisional documentation credit, but final closure and commit remain withheld.
+
+I authorize check-only INBOX-206BN:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by f0ece97072e918f41bae658b401c08be251e2b19; preserve the untracked audit byte-identical and unstaged during that commit, and update the ignored inbox separately.
+
+- Preserve the audit exactly at mode 0644, 20,588 bytes, 373 lines, SHA-256 3b22e11c887b0f39c256f6e1c94edff057acb212916ae61bf47b1c9703ca7c64.
+- Edit no audit content and reread no installed Zig source.
+- Replace only the gate logic. Use an exact fixed-string presence check that distinguishes:
+    - status 0: forbidden old hash exists → fail;
+    - status 1: no match → pass;
+    - any other status: checker failure → fail.
+
+  Do not convert empty output to an integer or use a count-based assertion.
+
+- Run only the previously authorized identity, text, mode, and Git checks.
+- Success stages and commits only the BL audit and stops clean. First failure stops uncommitted without diagnosis, retry, cleanup, or fix-forward.
+
+All pure-Zig, protected-state, BI-absence, authority-none, D01/D02, ratchet, and downstream boundaries remain exact.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`f0ece97072e918f41bae658b401c08be251e2b19`; update only the ignored inbox
+separately. During that commit preserve the audit unstaged, mode-0644,
+20,588 bytes, 373 lines, and byte-identical at SHA-256
+`3b22e11c887b0f39c256f6e1c94edff057acb212916ae61bf47b1c9703ca7c64`.
+
+Then run a check-only closure. Edit no audit content and no other path. Reread
+no installed Zig source. Replace only the faulty gate logic in the transient,
+fixed verification command. For the forbidden old BK hash, use an exact
+fixed-string presence check and handle its status explicitly:
+
+- status 0 means the forbidden old hash exists and must fail;
+- status 1 means no match and must pass;
+- any other status means checker failure and must fail.
+
+Do not convert empty output to an integer and do not use a count-based
+assertion for the forbidden value. Run only the previously authorized fixed
+identity, exact-text, mode, and Git checks.
+
+The project-language boundary is absolute: all substantive implementations,
+generators, validators, codecs, hashing, test harnesses, workflow logic, and
+artifact tooling must be Zig. Bash is permitted only for tiny transparent
+orchestration that invokes fixed commands or sets environment variables. No
+JavaScript, ECMAScript, TypeScript, Python, Perl, AWK, other-language project
+solution, or internal-agent project algorithm is authorized.
+
+Run no compiler, formatter, build, test, install, executable, runtime probe,
+project command, generator, validator, wrapper, artifact workflow, BI action,
+or continuation action. Access no registered-worktree directory or protected
+path. Preserve `descriptor_identity_status=conditionally_supported`, every
+authority-none line, D01 withheld, D02 unauthorized, ratchet 131, watcher and
+PID, stash, control, retained roots, registrations, and protected identities.
+
+On full success, stage and commit only the corrected mode-0644 BL audit in one
+non-merge commit and stop with main/control clean. On first failure, leave it
+uncommitted and stop immediately without diagnosis, retry, repair, cleanup,
+normalization, fix-forward, or later command. Before acting, acknowledge the
+byte-identity/no-content-edit boundary, tri-state no-match gate, pure-Zig and
+prohibited-action boundaries, success condition, and failure-stop condition.
+
+
+## INBOX-206BM Zig descriptor-identity audit correction — COMPLIANT FAILED TEXTUAL GATE; SUPERSEDED BY INBOX-206BN
 
 INBOX-206BL is accepted only as a compliant fail-closed, uncommitted-audit
 stop. Its frozen standard-library/source evidence and
