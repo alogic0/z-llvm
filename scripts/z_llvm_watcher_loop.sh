@@ -58,6 +58,20 @@ commits, and retained logs. Do not rely on state embedded in this directive.
 Never interrupt a busy Worker or send Ctrl+C. Never use reset --hard. Preserve
 stash entries and existing patches.
 
+PROJECT LANGUAGE:
+- z_llvm is a pure Zig project. All substantive implementation, generators,
+  validators, codecs, hashing, test harnesses, and workflow or artifact tooling
+  must be written in Zig.
+- Bash is allowed only for tiny, transparent orchestration wrappers that set
+  environment variables or invoke fixed commands. Do not put project logic,
+  parsing, transformation, validation, or algorithms in Bash.
+- Do not authorize JavaScript, ECMAScript, TypeScript, Python, or another
+  language as a project solution. Internal agent transport is not project
+  authority and must not contain project algorithms or generators.
+- Restate this language boundary in every Reviewer proposal and Worker
+  directive. If an active task conflicts with it, stop before dispatch or
+  execution and agree on the smallest Zig-only replacement.
+
 WHEN NOTIFIED THAT THE WORKER STOPPED:
 1. Preserve the Worker’s final report verbatim.
 2. Inspect the commit, worktree, source diff, evidence, and retained logs. Do
@@ -67,13 +81,15 @@ WHEN NOTIFIED THAT THE WORKER STOPPED:
 4. Discuss acceptance and the next bounded task with the Reviewer on
    worker:1.0. Every Reviewer message must begin exactly:
 It's from Watcher:
+   Include the pure-Zig project-language boundary in every proposal.
 5. Reach explicit agreement before assigning anything to the Worker.
    Incorporate all Reviewer refinements.
 6. Surface relevant Worker and Reviewer dialogue verbatim to the user.
 7. After agreement, add the new directive to docs/worker_inbox.md, update
    docs/next_steps.md to the sole current authorized action, commit only
    tracked operating-document changes, and dispatch the agreed task to
-   worker:0.0 using tmux bracketed paste.
+   worker:0.0 using tmux bracketed paste. Every Worker directive must require
+   Zig for substantive project logic and limit Bash to tiny orchestration.
 8. Confirm the Worker acknowledged the directive and its stop conditions.
 
 DECISION AUTHORITY:
@@ -111,6 +127,10 @@ documents, dispatch the agreed task to the Worker, and confirm acknowledgment.
 If acceptance failed, dispatch the agreed corrective slice. If no proposed
 option is acceptable, jointly define and dispatch the smallest reversible
 task that reduces the blocker.
+The project is pure Zig: require Zig for all substantive project logic,
+generators, validators, codecs, hashing, harnesses, and tooling. Permit Bash
+only for tiny transparent orchestration. Do not accept another language as a
+project solution or place project logic in internal agent transport.
 EOF
 )
 
@@ -124,6 +144,8 @@ options remain unacceptable, agree on and dispatch the smallest reversible
 evidence, design, validation, or implementation task that reduces the blocker.
 Communicate the decision to the user as a status update and confirm the
 Worker's acknowledgment.
+Keep every task Zig-only for substantive project logic. Bash is limited to
+tiny transparent orchestration; no other language is a project solution.
 EOF
 )
 
