@@ -24,7 +24,247 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BJ pure-ECMAScript generator and SHA-256 remediation — AUTHORIZED
+## INBOX-206BK Zig-only materialization-readiness architecture checkpoint — AUTHORIZED
+
+User authority permanently withdraws INBOX-206BJ before dispatch. Commit
+`e75f2ddddf6a4b4095eaf3376b7f613d73e771a7` is retained only as superseded
+operating history. No JavaScript/ECMAScript generator, codec, hash
+implementation, project artifact, solution, adaptation, resumption, or
+execution is authorized.
+
+The binding user directive is preserved verbatim:
+
+```text
+USER DIRECTIVE: Zig-only project solutions. Do not dispatch, execute, or resume INBOX-206BJ or any ECMAScript generator remediation. Treat commit e75f2ddd only as superseded operating history. No JavaScript/ECMAScript generator, codec, hash implementation, project artifact, or solution is authorized. Discuss and replace the active task with a Zig-only approach; internal agent transport is not project authority. Preserve the clean tree and absent BI file/continuation until replacement authority is agreed.
+```
+
+The user-authorized infrastructure boundary is preserved verbatim:
+
+```text
+USER-AUTHORIZED INFRASTRUCTURE EDIT: preserve the current scripts/z_llvm_watcher_loop.sh; do not restore or overwrite it as drift. It adds the standing pure-Zig rule, limits Bash to tiny transparent orchestration, and forbids other languages as project solutions. Current SHA-256 is 1221b00a6aacd7deaae9aab50bd2600be33a13b0ed645428f9475a2cb81a893d; diff is 23 insertions/1 deletion; bash -n, diff --check, and <=110-column checks pass. The restarted loop is PID 3206208 in worker:3.0. Account for this user-authorized change explicitly in the Zig-only replacement handoff before requiring a clean main tree.
+```
+
+That exact script is committed, without modification, as dedicated non-merge
+infrastructure commit `dba5894f1f6a9467e669671859e2ac60ea6d7495`,
+parent `e75f2ddddf6a4b4095eaf3376b7f613d73e771a7`, tree
+`f04b31d5f71696c837371b3116bfbfd2f309c300`, sole changed path
+`scripts/z_llvm_watcher_loop.sh`, Git blob
+`058c659544fd13cc88ff79f62e196f1b9644f9e0`, SHA-256
+`1221b00a6aacd7deaae9aab50bd2600be33a13b0ed645428f9475a2cb81a893d`.
+Watcher loop PID 3206208 remains running and must not be signaled, restarted,
+replaced, or disturbed. The infrastructure commit earns no BK design,
+implementation, execution, D01/D02, ratchet, or downstream credit.
+
+The standing project-language boundary is pure Zig. Project implementations,
+parsers, codecs, hashing, generators, validators, and materializers must be
+Zig. Bash is limited to small transparent orchestration. JavaScript,
+ECMAScript, Python, Perl, AWK, or any other language cannot constitute a
+project solution. Internal agent transport grants no project authority.
+
+The Worker acknowledgment is preserved verbatim:
+
+```text
+Acknowledged. INBOX-206BJ and all ECMAScript remediation are superseded and will not be dispatched, executed, or resumed. Commit e75f2ddd is operating history only.
+
+The tree, absent BI evidence file, and absent BI continuation remain untouched. No tools or mutations were performed.
+
+A replacement authorization can specify a Zig-only, one-shot approach that:
+
+- Uses pinned Zig 0.16 only.
+- Parses the committed specification as bytes.
+- Uses std.crypto.hash.sha2.Sha256.
+- Validates UTF-8 byte spans, P001–P140 coverage, DAG closure, and typed-token rules.
+- Produces only inert evidence through an exclusive, explicitly authorized output.
+- Executes no wrapper, assertion, project build, validation, or artifact workflow.
+- Stops fail-closed without retry or cleanup.
+
+I will wait for the replacement operating authority before creating or executing any Zig source.
+```
+
+At supersession, main is clean at
+`e75f2ddddf6a4b4095eaf3376b7f613d73e771a7`; that non-merge operating commit
+is parented by `78501fe748f441929f1734aa01b65eba93933451`, has tree
+`b7428631daa323fd070d124285daeefc61577a08`, and changes only
+`docs/next_steps.md`. The BI evidence file and continuation are absent and
+non-symlink. Control is clean at
+`9c55bda34088e1230b0b91a126d35795a3ac70b4` / tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e`, branch `main`, no remote. Stash
+`7985c6d01040a6e47e4ce5b918866d0e89517ac7`, watcher blob
+`b64131cf60dd0ef638e815cd33db9ae8595a72cf`, retained roots, all 43
+registrations, protected identities, and ratchet 131 remain unchanged. No BJ
+directive was dispatched and no Worker tool or mutation followed the user
+supersession.
+
+Reviewer agreement is preserved verbatim:
+
+```text
+I accept the supersession boundary and Worker acknowledgment. INBOX-206BJ is permanently withdrawn; e75f2ddddf6a4b4095eaf3376b7f613d73e771a7 is history only. BI’s evidence file and continuation remain absent.
+
+I do not authorize the proposed BK implementation, build.zig edit, compilation, tests, or install. That skips the documentation-only checkpoint already required.
+
+I authorize INBOX-206BK only as a Zig architecture/contract checkpoint:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented by e75f2ddddf6a4b4095eaf3376b7f613d73e771a7; update the ignored inbox separately.
+- Add and commit exactly one document: docs/evidence/inbox206bk_zig_materialization_readiness_design.md.
+- Permit exact named, read-only inspection of the accepted specification, build.zig, nearby Zig patterns, and installed Zig 0.16 standard-library source. Run no compiler, build, test, install, or project command.
+
+- Specify the prospective private tool and minimal build-owned test/install wiring without implementing either.
+- Bind these design requirements:
+    - raw-byte parsing and byte offsets;
+    - Zig standard-library SHA-256 and UTF-8 facilities only;
+    - no handwritten codec or hash implementation;
+    - exact 39-region and P001–P140 coverage;
+    - typed-token provenance, escaping, occurrence, and overlap rules;
+    - DAG/I/O/status/write closure;
+    - deterministic inert fixture rendering;
+    - no wrapper, assertion, subprocess, shell, AWK, or production reachability;
+    - exact input specification path/hash/size;
+    - exact allowlisted future evidence path;
+    - continuation path remains absent;
+    - fail-closed ownership, allocator, and error behavior;
+    - an exact Zig 0.16 exclusive-publication design, or an explicit blocker if the required no-follow/no-replace/atomic guarantees cannot be established from local APIs.
+
+- State implementation_authority=none, execution_authority=none, D01=withheld, D02=unauthorized, and ratchet=131.
+- Success commits only the design document and stops for review. Failure stops uncommitted without retry or fix-forward.
+
+A later, separately reviewed slice may authorize the two-file Zig implementation. A still later slice may authorize focused Zig gates. Evidence generation remains a separate final authorization.
+```
+
+The Reviewer's clean-composite confirmation is preserved verbatim:
+
+```text
+Confirmed exactly:
+
+1. Commit only scripts/z_llvm_watcher_loop.sh in a dedicated non-merge infrastructure commit parented by e75f2ddddf6a4b4095eaf3376b7f613d73e771a7, preserving SHA-256 1221b00a… and blob 058c6595….
+2. Do not disturb watcher PID 3206208.
+3. Commit only docs/next_steps.md as the non-merge BK operating child of that infrastructure commit.
+4. Update and retain the ignored inbox separately.
+5. Dispatch only the agreed documentation-only Zig architecture checkpoint.
+```
+
+Create one non-merge operating commit parented exactly by
+`dba5894f1f6a9467e669671859e2ac60ea6d7495`, changing only tracked
+`docs/next_steps.md`; update only the ignored inbox separately. No other dirty
+path is permitted. BK is documentation-only. Add and commit exactly one regular
+mode-0644 document:
+
+```text
+docs/evidence/inbox206bk_zig_materialization_readiness_design.md
+```
+
+The design may use exact named, read-only inspection of only these authorities:
+
+```text
+docs/evidence/inbox206bb_phase3_wrapper_package_specification.md
+build.zig
+tools/zllvm_artifact_store.zig
+tools/release_source_object_bundle.zig
+/home/oleg/.zig/0.16.0/files/lib/std/Build.zig
+/home/oleg/.zig/0.16.0/files/lib/std/unicode.zig
+/home/oleg/.zig/0.16.0/files/lib/std/crypto.zig
+/home/oleg/.zig/0.16.0/files/lib/std/crypto/sha2.zig
+/home/oleg/.zig/0.16.0/files/lib/std/Io/Dir.zig
+/home/oleg/.zig/0.16.0/files/lib/std/Io/File.zig
+/home/oleg/.zig/0.16.0/files/lib/std/Io/File/Atomic.zig
+```
+
+The accepted specification is exactly 82,425 bytes, regular mode 0644, SHA-256
+`4b851b4a3650e6c55cd53f72b9f3e3e91146433523ccf2bbc6c4ad6dc1065eb3`.
+Current `build.zig` is 36,368 bytes, mode 0664, SHA-256
+`a0c923499cd4515326fb287d729c53ae6d68bb465a4b4a033a737a19466ce466`.
+The two local publication-pattern authorities are:
+
+```text
+tools/zllvm_artifact_store.zig 266895 073bdddeeac4a0b99e39cd54e5b2ea7db403796d25416dcf5ac578ea7ff5ad14
+tools/release_source_object_bundle.zig 11655 e2319a13aa01c00243e8941a75141af3bff3764059200e7092c7ada0d514721a
+```
+
+Specify, without implementing, a private standalone Zig 0.16 tool at
+`tools/inbox206_materialization_readiness.zig`, its minimal build-owned focused
+test step, and its prospective ordinary `zig build install` registration. The
+design must keep the tool private/non-production and give it no resolver,
+authority-selection, generic path, production CLI, or other project
+reachability. Any later implementation, `build.zig` edit, compilation, test,
+install, invocation, or output requires a separate operating directive.
+
+The design must bind:
+
+- raw `[]const u8` parsing with every offset defined as a zero-based half-open
+  byte interval; no character index may substitute for a byte offset;
+- Zig 0.16 standard-library UTF-8 validation and
+  `std.crypto.hash.sha2.Sha256` only, with no handwritten codec, Unicode
+  decoder, hash implementation, or copied cryptographic constants;
+- exact unique/non-nested/non-overlapping parsing of all 39 canonical regions:
+  24 templates, 14 assertion proof copies, and one P001-P140 matrix;
+- exact ordered P001-P140 coverage, process/DAG closure, input/output,
+  stdout/status, checkpoint, producer/consumer, and allowed-write authority;
+- every typed token's declaration, sole provenance, escaping/encoding rule,
+  exact occurrence count, ordered byte spans, non-overlap, and unresolved-
+  future-authority behavior;
+- rejection of missing, unused, duplicate, undeclared, overlapping, cyclic,
+  ambiguous, invalid, or unresolved substitutions;
+- deterministic inert fixture rendering wholly in memory, with fixture hashes
+  segregated as non-executable/non-authoritative and no future operating hash
+  claim;
+- no wrapper, assertion, subprocess, shell, AWK, project command, validation,
+  cache, resolver, production, D01/D02, ratchet, credit, or downstream
+  reachability;
+- fail-closed allocator ownership, stable slice lifetimes, cleanup via
+  `defer`/`errdefer`, bounded input/output allocation, explicit error taxonomy,
+  and no partial output on error.
+
+The only future input and output names are:
+
+```text
+input=/home/oleg/prog/z_llvm/docs/evidence/inbox206bb_phase3_wrapper_package_specification.md
+output=/home/oleg/prog/z_llvm/docs/evidence/inbox206bi_phase3_wrapper_materialization_readiness.md
+continuation=/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206bi
+```
+
+The output remains absent/non-symlink and the continuation remains absent/
+non-symlink throughout BK. Specify an exact Zig 0.16 publication protocol that
+proves input identity, output allowlisting, parent-directory identity, no
+symlink following, no replacement, mode 0644, complete-byte hash/read-back,
+atomic visibility, and directory synchronization using locally verified APIs.
+If the named Zig 0.16 APIs cannot prove every property, record the precise API
+and guarantee gap as an explicit blocking disposition; do not invent a
+fallback or weaken the guarantee.
+
+The document must prominently state:
+
+```text
+design_kind=zig_only_materialization_readiness
+design_status=incomplete
+implementation_authority=none
+execution_authority=none
+build_authority=none
+install_authority=none
+evidence_generation_authority=none
+D01=withheld
+D02=unauthorized
+ratchet=131
+continuation_root_created=false
+evidence_file_created=false
+```
+
+Do not create or edit any `.zig` file or `build.zig`. Run no Zig compiler,
+formatter, build, test, install, executable, project command, generator,
+wrapper, assertion, validation, cache, or artifact workflow. Create no BI
+evidence file, continuation, installation output, cache entry, temporary source,
+or other project artifact. Never access a registered-worktree directory or
+`.claude/settings.local.json`. Preserve every retained root, all 43 registered
+worktrees and their directories, stash, watcher, control identity, protected
+identity, and ratchet 131.
+
+On full success, commit only
+`docs/evidence/inbox206bk_zig_materialization_readiness_design.md` in one
+non-merge commit and stop with main/control clean. On first failure, leave the
+design uncommitted and stop immediately without inspection, diagnosis, retry,
+repair, cleanup, normalization, fix-forward, or later command. Give one concise
+acknowledgment of the Zig-only/document-only, named-read, no-build/no-artifact,
+publication-blocker, success, and failure-stop boundary before acting.
+
+## INBOX-206BJ pure-ECMAScript generator and SHA-256 remediation — PERMANENTLY WITHDRAWN BY USER; NEVER DISPATCHED; SUPERSEDED BY INBOX-206BK
 
 INBOX-206BI is accepted only as a compliant fail-closed absent-artifact stop.
 Credit is limited to its exact operating/protected-state gate, bounded read-only
