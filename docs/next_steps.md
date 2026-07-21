@@ -24,7 +24,158 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BY pure-Zig frozen three-descriptor-chain closure — AUTHORIZED
+## INBOX-206BZ pure-Zig retained root/home/oleg/prog chain — AUTHORIZED
+
+INBOX-206BY is accepted fully within scope. The retained root/home/oleg
+chain, its exact one-shot gates, and focused ownership/runtime evidence are
+accepted. Status remains `conditionally_supported`; ratchet remains 131.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BY completed successfully.
+
+- Commit: bdff288ea54002eb1d18d5561c87685753f8e084
+- Tree: bd615b94dddbc21257d6f99bacb303c7848a4a50
+- Sole committed file: tools/zllvm_inbox206_materialize.zig
+- Both Zig gates passed exactly once.
+- BY caches are retained; BX caches remain absent.
+- Main and control are clean.
+- Status remains conditionally_supported; ratchet remains 131.
+```
+
+Static Watcher review ran no project code. Commit
+`bdff288ea54002eb1d18d5561c87685753f8e084` is non-merge, has parent
+`c552a9dbc3e86936380ee221bafe1ff4271f4f9d` and tree
+`bd615b94dddbc21257d6f99bacb303c7848a4a50`, and changes only mode-0644
+`tools/zllvm_inbox206_materialize.zig` by exactly 76 insertions and no
+deletions. The committed file is 20,117 bytes, SHA-256
+`5d4de91f08c984b6fa8b846511a9e3e7943d50b4816058f8b16cb06ed4e8f6c1`,
+blob `073adb41e3ecd796590600b18d5a1864a4a1e268`, and binary-diff SHA-256
+`cb63ac2a15ffb8f0dc76b80c982e44c51c9f6e3eafca1827604a911b72b8a68d`.
+Diff-check passes.
+
+Retained Worker turn `019f82d0-e753-73d0-a142-246851d73e27` contains only
+the Zig-skill read, complete operating-document reads, one exact-identity
+preflight, one combined gate call that creates only the BY caches and runs
+exactly one format check followed by exactly one focused Zig build, one
+read-only closure, one sole-file commit, and one final verification. Every
+call exits 0. No installed-Zig-source read, edit, extra project command,
+retry, diagnosis, cleanup, or later tool follows final verification.
+
+Main/index/control are clean. Build SHA-256 remains
+`3ab852ee10a670fa076d478ab1b45f9c63dd585950597b6dcb13f2e01cea4a38`;
+watcher SHA-256 remains
+`1221b00a6aacd7deaae9aab50bd2600be33a13b0ed645428f9475a2cb81a893d`
+and PID 3206208 is alive. Stash
+`7985c6d01040a6e47e4ce5b918866d0e89517ac7` is untouched. All 43
+registered worktrees remain protected and the stable path-list SHA-256 is
+`f31d8542baafc7b64cd5ee6fe8cc4194842ca696b97a7ffc8df06ce12d553d7e`.
+BY caches are retained directories, BX caches remain absent, and both BZ
+cache paths are initially absent/non-symlink.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept bdff288ea54002eb1d18d5561c87685753f8e084 fully within BY. The root/home/oleg retained chain and focused ownership/runtime evidence are accepted; status remains
+conditionally_supported.
+
+I authorize Zig-only INBOX-206BZ with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by bdff288ea54002eb1d18d5561c87685753f8e084; update the ignored inbox separately.
+- Modify only tools/zllvm_inbox206_materialize.zig, retaining mode 0644 and all existing APIs, behavior, tests, and build wiring.
+- Add private TrustedProgChain containing owned root, home, oleg, and prog descriptor-plus-identity values.
+- Add private zero-path-parameter acquireTrustedProgChain(io) that:
+    1. acquires and retains TrustedOlegChain;
+    2. registers cleanup in root → home → oleg source order, producing Zig LIFO failure cleanup oleg → home → root;
+    3. calls acquireOneDirectoryComponent(oleg.directory, io, "prog", "prog");
+    4. transfers all four owned values only on success.
+
+- The only new path literals are the two exact "prog" arguments. Do not add an absolute home/prog path, later component, or generic/configured path.
+- Document caller ownership and mandatory close order prog → oleg → home → root.
+- Add exactly one focused private test proving each held identity remains stable through the ordered closes, every saved closed handle yields the accepted error, and all still-open
+  ancestors remain stable.
+
+- Register failure guards in root → home → oleg → prog order so LIFO cleanup is prog → oleg → home → root; disable each immediately after its explicit close.
+- Do not compare identities for inequality or construct a second chain.
+- Keep existing tests byte-identical and all new symbols private/test-root-only.
+- Require fresh absent/non-symlink caches:
+    - /home/oleg/.cache/zllvm-inbox206bz-local
+    - /home/oleg/.cache/zllvm-inbox206bz-global
+
+  Retain them and all prior caches afterward.
+
+- Run exactly once:
+    1. zig fmt --check tools/zllvm_inbox206_materialize.zig
+    2. existing zig build test-inbox206-descriptor-identity with BZ caches.
+
+- Use read-only scope checks without line-number, hunk-count, or matching-line assumptions.
+- Success commits only the Zig file, verifies clean main/control, and stops.
+- First failure stops uncommitted without later command, inspection, diagnosis, retry, repair, cleanup, or fix-forward.
+
+Later components, second-chain comparison, publication, materialization, installation, evidence, production reachability, D01/D02, ratchet movement, credit, and downstream authority remain
+withheld.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`bdff288ea54002eb1d18d5561c87685753f8e084`; update the ignored inbox
+separately. Then modify only mode-0644
+`tools/zllvm_inbox206_materialize.zig`, retaining every existing API,
+behavior, test, and build edge byte-identical.
+
+Add private `TrustedProgChain` containing owned root, home, oleg, and prog
+descriptor-plus-identity values. Add private zero-path-parameter
+`acquireTrustedProgChain(io)` that acquires and retains `TrustedOlegChain`,
+registers cleanup in root/home/oleg source order to produce Zig LIFO failure
+cleanup oleg/home/root, acquires exactly one relative child through
+`acquireOneDirectoryComponent(oleg.directory, io, "prog", "prog")`, and
+transfers all four values only on success. Those two exact `"prog"`
+arguments are the only new path literals. Add no absolute home/prog path,
+later component, or generic/configured/multi-component path. Document caller
+ownership and close order prog/oleg/home/root.
+
+Add exactly one focused private test proving each identity remains stable
+through ordered closes, every saved closed handle yields the accepted error,
+and every still-open ancestor remains stable. Register guards in
+root/home/oleg/prog source order so LIFO is prog/oleg/home/root; disable each
+immediately after explicit close. Do not compare identities for inequality or
+construct a second chain. All new symbols remain private and test-root-only.
+
+Require fresh initially absent/non-symlink retained caches:
+
+```text
+ZIG_LOCAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206bz-local
+ZIG_GLOBAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206bz-global
+```
+
+After exact static scope review, run exactly once in order:
+
+1. `zig fmt --check tools/zllvm_inbox206_materialize.zig`;
+2. existing `zig build test-inbox206-descriptor-identity` with BZ caches.
+
+Use read-only scope checks without line-number, hunk-count, or matching-line
+assumptions. Run no other project command. Retain BZ and all prior caches;
+keep BX absent. Success permits only read-only exact scope/diff/status
+closure, commits only the Zig file, verifies clean main/control, and stops.
+First failure stops uncommitted without later command, inspection, diagnosis,
+retry, repair, cleanup, rewrite, or fix-forward.
+
+The project-language boundary remains absolute: all substantive
+implementation, generators, validators, codecs, hashing, harnesses, workflow,
+and artifact tooling must be Zig. Bash is limited to tiny transparent fixed
+Git/hash/cache orchestration. No JavaScript, ECMAScript, TypeScript, Python,
+Perl, AWK, other-language project solution, or internal-agent project
+algorithm is authorized.
+
+No later component, second chain, publication, materialization, installation,
+evidence, production/wiring/API, BI/continuation, D01/D02, ratchet movement,
+credit, registered-worktree access/modification, cleanup, or downstream
+authority is granted. Status remains `conditionally_supported`; ratchet
+remains 131.
+
+
+## INBOX-206BY pure-Zig frozen three-descriptor-chain closure — ACCEPTED; SUPERSEDED BY INBOX-206BZ
 
 INBOX-206BX is accepted only as a compliant fail-closed pre-gate stop. Its
 exact three-descriptor chain patch receives provisional content credit; no
