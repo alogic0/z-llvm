@@ -24,6 +24,151 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-206BE byte-safe canonical-region remediation — AUTHORIZED
+
+INBOX-206BD is accepted only as a compliant fail-closed no-edit stop. Credit
+is limited to its exact operating binding, complete pre-edit freeze,
+pre-patch stop, and absence of later action. Grant no representation repair,
+delimiter, static closure, commit, package completion, D01, or downstream
+credit.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BD stopped fail-closed before any edit was applied.
+
+The canonical-region construction process failed while locating a frozen later-template region. The patch operation was never reached, so the retained draft remains unchanged and uncommitted. No static closure, wrapper, assertion, project, Zig, production AWK, or commit followed.
+```
+
+Static Watcher review ran no project or Zig code. HEAD remains
+`4e558252a6ce29b5145d7be2626cb3d6fd754e07`, parent
+`21e3b9886df47cf03d258c8cbc1935188e86a31e`, tree
+`2069e10de07114815205ef21ab4e53c0faf8e41a`, with sole commit path
+`docs/next_steps.md`. Tracked, staged, and source diffs are empty. The sole
+dirty path remains the authorized untracked regular-file draft, mode 0644,
+62,198 bytes, 1,109 lines, SHA-256
+`0095d25cfa0f724fa2b2b7dc56877433e6d89f584f7d72a23dd6ef17c9c2d043`.
+Both operating-document hashes, control, stash, watcher, protected identities,
+retained roots, registration invariants, and ratchet 131 remain exact.
+
+Retained turn `019f81ff-948e-7e81-93e1-0d6e3b163bb3` contains exactly four
+tool calls: operating binding, directive read, one successful complete
+pre-edit freeze, and one combined draft-read/construction call. The last call
+failed with `BD_LATER_MISSING_7.1 Canonical ordinary-string outer source`
+before reaching `tools.apply_patch`; the final report and `task_complete`
+follow with no later action.
+
+The exact heading and its successfully frozen 353-byte body are present. The
+new JavaScript locator over-escaped its `RegExp`-constructor strings, searching
+for literal escaped text rather than newlines/arbitrary bytes. Its inner
+locator has the same latent defect. This is a construction-tool representation
+defect; the retained draft and every frozen region remain unchanged.
+
+Reviewer agreement is preserved verbatim:
+
+```text
+I accept INBOX-206BD only as a compliant fail-closed no-edit stop. Credit is limited to the operating binding, complete pre-edit freeze, pre-patch stop, and absence of later action. No delimiter, closure, commit, package, D01, or downstream credit is granted.
+
+I authorize INBOX-206BE with these refinements:
+
+- First create one non-merge operating commit changing only docs/next_steps.md, parented exactly by 4e558252a6ce29b5145d7be2626cb3d6fd754e07; keep the draft unstaged and byte-identical during that commit and update the ignored inbox separately.
+
+- Edit only the retained draft and keep it mode 0644.
+- Include every retained pre-edit byte count and full SHA-256 expectation in the authoritative dispatch; do not require an undisclosed lookup before construction.
+- Use no dynamic regular-expression constructor.
+- Locate headings, fences, matrix boundaries, and assertion/template bodies through unique exact byte-sequence searches. JavaScript UTF-16 string indexes must not be represented as byte offsets; use a byte-safe TextEncoder/Uint8Array search or an equivalently frozen byte-mode mechanism.
+
+- Require each boundary exactly once, with strict ordering, non-overlap, expected final LF, and matching retained byte count/hash before the sole patch call.
+- Preserve every frozen interior byte. Permit only:
+    - removal of the stray heading +;
+    - insertion of canonical unique, non-nested delimiters outside frozen interiors;
+    - the approved static-closure/proof text.
+
+- Freeze the complete post-edit closure source and hash before its one execution.
+- The closure must independently verify delimiter grammar, retained region identities, P002–P015 assertion/template tables, and ordered typed zero-based UTF-8 byte spans derived only from canonical code regions.
+
+- Run exactly one inert static closure; no assertion, wrapper, or package member may execute.
+- Success commits only the draft and stops. Any failure before or after patch leaves it uncommitted and stops without inspection, diagnosis, retry, repair, or fix-forward.
+
+All standing source, project, Zig/build/install, validation, cache, registered-worktree access, ratchet, production-AWK, D01/D02, credit, and downstream prohibitions remain exact.
+```
+
+Create one non-merge operating commit parented exactly by
+`4e558252a6ce29b5145d7be2626cb3d6fd754e07`, changing only tracked
+`docs/next_steps.md`; update only the ignored inbox separately. Keep the draft
+unstaged, mode 0644, and byte-identical at its exact retained identity during
+that commit. No other dirty path is permitted.
+
+BE may edit only the retained draft. Use no dynamic regular-expression
+constructor. Locate all headings, fences, matrix boundaries, inner templates,
+and assertion bodies using unique exact byte-sequence searches. Never report a
+JavaScript UTF-16 string index as a byte offset: use a byte-safe
+`TextEncoder`/`Uint8Array` search or an equivalently frozen byte-mode
+mechanism. Before the sole patch call, require every boundary exactly once,
+strictly ordered and non-overlapping, with its expected final LF and retained
+byte count/SHA-256.
+
+The complete retained pre-edit identity authority is:
+
+```text
+INNER P002 183 f3f07054713485485986b67af5f4ab819ff6f280fa2afddb1d42ac3071826411
+ASSERTION P002 85 453cd42dcf47790fcba30180e7d9e1cb7c1a1997b07c064384b20a9bb067d902
+INNER P003 803 40a7144e019b45af04e112d456a43f63e925992a3d93e93887498ff25c5d8131
+ASSERTION P003 705 e0215d8cdf0a45aea24e0e8f54715159798c24baf782e3c39dd71923c4bbb192
+INNER P004 241 17ec8b17eef2ac773d192b45b1deb8e2fe8bee6f8f5ed7975eb5291c448c9b97
+ASSERTION P004 141 9339e311a57c9e07657f6bb0a2323723784819c418b4058aad6a58c0207eebaa
+INNER P005 3530 e1828a654a4b8262dac83c9fc871df9b4b76bca65353bb90f08aece88261647d
+ASSERTION P005 3430 057a68edb24f99f5c18001203d53846e4ecf0d6fa6dee81acc56c4cc0a1f976a
+INNER P006 247 fd087cb63ce5fe9fbee17a4aff126ea4f3c7869f2336a9f4264d35272f79d245
+ASSERTION P006 146 8d2b7f5092cec8a9bc38b41147e7b47ac3737083c188699bb61c6cb191a2eece
+INNER P007 260 92042292dbe0662a61efda982251e888e44a1580a7b1bbbe1a16446d1a973aef
+ASSERTION P007 159 a430068dfc6efbc1740507f8283e92df449fcc088a2896317c1ab385b038f1d5
+INNER P008 295 27df9fd261ba0e2fe4b575398a709d9a0cb7145827bd72c819031034daee63e0
+ASSERTION P008 194 e7455095df8f6242e7d0bcd1248ac54aa4505cde367bbf0dda6cdb4377453b56
+INNER P009 243 1b97341986df8c9552fd93fa2d4c0a9dc535b89de4319f7b1bbed4bc0bd3ec76
+ASSERTION P009 142 69ddc0b193f29573fb8464ba63f4118c0181834261fc567ab0323fec65b31d4b
+INNER P010 211 78d15fedc6349ecac733d97869b00602b9e97ccaa6153d41b284682fa86ac55d
+ASSERTION P010 110 83fa92142449e13e4741fbfbd50c597df34e165c475f8c8585f8faeb6670e027
+INNER P011 213 07cf33df752f203187c469aeccbc7d20a904d8deae48fc70df001c0592d1c790
+ASSERTION P011 112 3f07f6221fb676d267f137bb8a63309d780d03946ed928f7e26da27129c0aaea
+INNER P012 258 8eb5c3ea80d081f21276a7073548e1044296d115c6a71b80095ac43be816fced
+ASSERTION P012 157 2ec54f435d4c8f5fbbd635f36b382a170eaa56ef37e87c8f5062af16d0438bc3
+INNER P013 249 12550a723800e9dc77f0615f749a777195ef62d8f44a2ee6e2a1f4f547b33770
+ASSERTION P013 148 688ce553003e4634c2537c140fe1f118a361d58a92b44880069e3ea79c1bbb8c
+INNER P014 333 ceda5b7e75492576596a93fb60aa8b813a22cab1785f25706e9e2dc80ed8a935
+ASSERTION P014 232 068279f2354bc4738826a526450e99fccf4a9955c5aa4e23c95b8c1b2cb1820e
+INNER P015 518 0519263f35aa760da0c50d6f5e7b8c0bd894886c718790739934f3797602f2c5
+ASSERTION P015 420 e258aec554bc2567e07d0944d0cc9b55758bc47f25b326f17b64dc1d1f7fd8bb
+MATRIX_ROWS 20318 c2e399d701e96583c7ffa5d0e348dce1cae1c26d0dc05ba34f34c03d1c9459ec
+LATER_T_OUTER 353 8416931252c47e2ac10429e203887a5837b4f47d448a9a449793d20360cf76db
+LATER_T_CONSTRUCT_10 1623 8a25bb3308c2c8cdf02cef8788070c271d139b8127ea0f8a235a98674d180fd2
+LATER_T_READ_GATE 198 f126cde2a7b4596de583a7f43c4a8f72cdeb4b8a95921b4752e112bb0e641a6b
+LATER_T_COPY_SELECTOR 394 0a8ee1a73b9d1b8d33b6c5bf7428546c0db169b912eff798d7d3f5d51f970653
+LATER_T_INVOCATION_BATCH 1286 88cb673bfd5694458dfcbad8ed437847406172de12e044e948068bc217f2b253
+LATER_T_AUDIT_BATCH 491 ecd60eebb766f0ec33f2de343ddfd4551817c47e0477742d85d5fd792152bd57
+LATER_T_ARTIFACT_IDENTITIES 356 eb8498407a2bf2f7177365e8bff61944e2ef45550be2234bb399b42b32cf4fc5
+LATER_T_MARKER_DERIVE 245 f7dfd0b7febf9c065c7404e21b523c591af71831f13da4e9e01ca806c090e201
+LATER_T_MARKER_FINALIZE 280 0bb8edbedfdd3e7295fdf8a422204fb523df980181cc3d6e9f0ed14548c8a9bd
+LATER_T_FINAL_CLOSURE 128 9699aa0bfb49fd45880bdf4cc5e069f052fb0fe017e4ee6049d07b0a57966af8
+```
+
+Preserve every frozen interior byte. The only permitted document changes are
+removing the stray heading `+`, inserting canonical unique non-nested
+delimiters outside frozen interiors, and adding the approved static-proof/
+closure text. Freeze the complete post-edit closure source and SHA-256 before
+its one execution. That closure independently verifies delimiter grammar, all
+retained region identities, P002–P015 assertion/template tables, and ordered
+typed zero-based UTF-8 byte spans derived solely from canonical code regions.
+
+Run exactly one inert static closure; invoke no assertion, wrapper, generated
+command, or package member. Success commits only the draft and stops. Any
+failure before or after patch leaves it uncommitted and stops without
+inspection, diagnosis, retry, repair, cleanup, or fix-forward. Preserve every
+root/protected identity, registered-worktree standing protection, stash, and
+ratchet 131. No source/project/Zig/build/install/validation/cache/registered-
+worktree/production-AWK/D01/D02/credit/downstream authority is granted. Never
+access `.claude/settings.local.json`.
+
 ## INBOX-206BD static-proof remediation — AUTHORIZED
 
 INBOX-206BC is accepted only as a compliant fail-closed uncommitted-draft
