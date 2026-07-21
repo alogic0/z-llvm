@@ -24,7 +24,102 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CA registered-worktree descriptor boundary — AUTHORIZED EVIDENCE/DESIGN ONLY
+## INBOX-206CB CA mode-only remediation — AUTHORIZED
+
+INBOX-206CA is accepted only as a compliant fail-closed uncommitted-document
+stop. Its content has provisional review credit; mode, closure, and commit
+acceptance remain withheld. The Worker final report is preserved verbatim:
+
+```text
+INBOX-206CA stopped at the first failed static closure.
+
+- The evidence document remains uncommitted.
+- No additional path was created.
+- The worktree-list command was invoked exactly once.
+- No diagnosis, retry, repair, cleanup, rewrite, fix-forward, staging, commit, or later command was performed.
+```
+
+Static Watcher review ran no project code. Retained Worker turn
+`019f82e1-1cfb-7e52-a04a-576ef2925592` shows the closed named reads, one
+successful preflight, exactly one worktree-list call, creation and one
+in-scope wording correction of the sole CA evidence file, then exactly one
+static-closure call exiting 1 with no output and no later tool. The first
+assertion failed: required mode 0644 versus actual mode 0664. The draft is
+otherwise the sole untracked and unstaged path, 11,212 bytes, 212 lines, and
+SHA-256
+`a816695372c214d90a893f2da82d84801df72979606b67e64dc8c06e363491d3`.
+Its four matrix rows and exact disposition/blocker fields pass; its no-index
+diff-check is whitespace-clean. All other accepted identities, retention and
+absence conditions remain exact. Status is `conditionally_supported`; ratchet
+is 131; D01 is withheld and D02 is unauthorized.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept INBOX-206CA only as a compliant fail-closed uncommitted-document stop. Its content receives provisional review credit, but mode, closure, and commit acceptance are withheld.
+
+I authorize mode-only INBOX-206CB:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by f0075e12a5cb57ce3508d63171821420a40f4845; preserve the untracked CA draft byte-identical and unstaged, and update the ignored inbox separately.
+
+- Before mutation, require the exact CA path to be a regular non-symlink file with:
+    - mode 0664;
+    - 11,212 bytes;
+    - 212 lines;
+    - SHA-256 a816695372c214d90a893f2da82d84801df72979606b67e64dc8c06e363491d3.
+
+- Perform exactly one mutation: chmod 0644 on that exact file.
+- Edit no content and create no path.
+- Run one newly frozen static closure verifying unchanged bytes/hash/size/lines, mode 0644, sole-path scope, required document dispositions, Git state, and protected identities.
+- Do not rerun git worktree list or perform artifact-path traversal.
+- Success stages and commits only the CA evidence file, verifies its committed blob/content identity and clean main/control, then stops.
+- Any mismatch or failure stops immediately without retry, repair, cleanup, rewrite, or fix-forward.
+
+All source, Zig/build/test/project execution, cache creation, publication, materialization, BI, D01/D02, ratchet, credit, and downstream prohibitions remain exact.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`f0075e12a5cb57ce3508d63171821420a40f4845`; update the ignored inbox
+separately and preserve the exact dirty CA draft byte-identical and unstaged.
+
+Before any mutation, require the sole dirty path to be the untracked and
+unstaged regular non-symlink
+`docs/evidence/inbox206ca_registered_worktree_descriptor_boundary.md` with
+mode 0664, exactly 11,212 bytes, exactly 212 lines, and exact SHA-256
+`a816695372c214d90a893f2da82d84801df72979606b67e64dc8c06e363491d3`.
+Verify clean index/control and the operating commit's exact parent and
+sole-tracked-path scope.
+
+Perform exactly one mutation: change only that file's filesystem mode to
+0644. Edit no content and create no path. Then invoke exactly one newly frozen
+static closure verifying unchanged byte/hash/size/line identity, mode 0644,
+sole-path status, empty index, required CA dispositions and four option rows,
+whitespace-safe no-index diff, accepted BZ Git tree/blob identity, and exact
+build/watcher/stash/control/cache/BI boundaries. Preserve the retained
+43-worktree count/path/topology identities without invoking
+`git worktree list` or entering any registered directory.
+
+Success stages and commits only the CA evidence file, verifies its committed
+mode/blob/content identity and clean main/control, then stops. Any mismatch or
+failure stops immediately without another command, diagnosis, retry, repair,
+cleanup, rewrite, or fix-forward.
+
+Run no source, Zig, build, test, or project command. Read no installed source.
+Create no cache/path. Perform no worktree-list replay, registered-worktree or
+artifact traversal, content edit, publication, materialization, installation,
+BI/continuation creation, D01/D02 action, ratchet movement, credit, production
+wiring, or downstream work.
+
+The project-language boundary remains absolute: every substantive project
+implementation, generator, validator, codec, hash, harness, workflow, and
+artifact tool must be Zig. Bash is limited to tiny transparent fixed
+Git/hash/mode orchestration. No JavaScript, ECMAScript, TypeScript, Python,
+Perl, AWK, other-language project solution, or project algorithm in internal
+agent transport is authorized. Status remains `conditionally_supported`;
+ratchet remains 131.
+
+## INBOX-206CA registered-worktree descriptor boundary — FAILED MODE CLOSURE; SUPERSEDED BY INBOX-206CB
 
 INBOX-206BZ is accepted fully within scope. The retained
 root/home/oleg/prog chain, exact one-shot gates, and focused ownership/runtime
