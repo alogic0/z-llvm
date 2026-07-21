@@ -167,6 +167,22 @@ fn acquireOneDirectoryComponent(
     };
 }
 
+/// Opens only the root of the process's current mount namespace. The caller
+/// owns the returned directory and is solely responsible for closing it.
+fn acquireTrustedRoot(io: std.Io) !AcquiredDirectory {
+    const directory = try std.Io.Dir.openDirAbsolute(io, "/", .{
+        .access_sub_paths = true,
+        .iterate = false,
+        .follow_symlinks = false,
+    });
+    errdefer directory.close(io);
+    const identity = try observeDescriptor(directory.handle, .directory);
+    return .{
+        .directory = directory,
+        .identity = identity,
+    };
+}
+
 fn expectAcquisitionError(
     expected_error: anyerror,
     parent: std.Io.Dir,
@@ -395,4 +411,37 @@ test "single-component directory acquisition rejects regular files and symlinks"
         "link",
         "link",
     );
+}
+
+test "trusted current mount namespace root identity and caller ownership" {
+    const io = std.testing.io;
+    const first = try acquireTrustedRoot(io);
+    var first_open = true;
+    defer {
+        if (first_open) first.directory.close(io);
+    }
+    const second = try acquireTrustedRoot(io);
+    var second_open = true;
+    defer {
+        if (second_open) second.directory.close(io);
+    }
+
+    try std.testing.expect(std.meta.eql(first.identity, second.identity));
+    const first_stable = try observeDescriptor(first.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(first.identity, first_stable));
+    const second_stable = try observeDescriptor(second.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(second.identity, second_stable));
+
+    const first_handle = first.directory.handle;
+    first.directory.close(io);
+    first_open = false;
+    try std.testing.expectError(
+        error.DescriptorIdentityBadDescriptor,
+        observeDescriptor(first_handle, .directory),
+    );
+
+    const second_after_first_close = try observeDescriptor(second.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(second.identity, second_after_first_close));
+    second.directory.close(io);
+    second_open = false;
 }
