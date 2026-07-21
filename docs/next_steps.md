@@ -24,7 +24,133 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BS pure-Zig symlink-rejection expectation correction — AUTHORIZED
+## INBOX-206BT pure-Zig corrected-source gate and commit closure — AUTHORIZED
+
+INBOX-206BS is accepted only as a compliant fail-closed post-edit/pre-gate
+stop. Its one-token correction receives provisional exact-content credit; no
+Zig-gate or commit credit is granted.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BS stopped at the first failed static comparison.
+
+- The one-token edit remains uncommitted and unstaged.
+- No Zig gate ran.
+- No BS cache root was created.
+- No diagnosis, retry, repair, cleanup, rewrite, fix-forward, or later command was performed.
+```
+
+Static Watcher review ran no project code. Main remains at operating commit
+`78bc444920c62aea5c3636a0493673a0b42c961d`; the index is empty. The sole
+dirty path is mode-0644 `tools/zllvm_inbox206_materialize.zig`, 13,298 bytes,
+398 lines, and 173 insertions, with SHA-256
+`4362cb2d71d8e6d8cf0f4c92c60500fc98a676b11110ef0559725385a5a99f96`, Git
+blob `e3bf332c23f53c6ba4ae49c3d2a12b1dbf1ee087`, and binary-diff SHA-256
+`5fe72648d84b31ad56522b225dcf07c29944e98b21c6f455632111360f377797`.
+
+Retained Worker turn `019f82a1-bf02-7420-8f48-41440bb81262` shows only the
+Zig skill and operating-document reads, exact pre-edit binding, the authorized
+one-token patch, and one static comparison call, followed immediately by
+`task_complete`. The comparison failed before reconstruction because it
+incorrectly asserted that the named symlink-test declaration was at line 367;
+that line is `parent_after`, while the declaration is at line 371. The
+authorized corrected token is at line 392. A Watcher read-only reconstruction
+replacing only that corrected token with the frozen BR token reproduces BR
+SHA-256 `bb2194bfa6161b5c33a912561bd7244c51a49658638ed73c7a6057d0a507f06f`
+exactly. Thus the source edit is exact and only the brittle invented line
+assertion failed.
+
+Build/watcher identities, clean control, stash, watcher PID, all 43 registered
+worktrees, BP/BR roots, BI/continuation absence, D01/D02, and ratchet 131
+remain exact. Both BS cache paths remain absent/non-symlink.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept INBOX-206BS only as a compliant fail-closed post-edit/pre-gate stop. The one-token correction receives provisional exact-content credit; no Zig-gate or commit credit is granted.
+
+I authorize no-edit INBOX-206BT with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by 78bc444920c62aea5c3636a0493673a0b42c961d; preserve the corrected Zig file byte-identical, mode
+  0644, unstaged, and update the ignored inbox separately.
+
+- Edit no project content and reread no installed Zig source.
+- Bind the final operating HEAD/parent/tree and verify the exact current file/blob/diff identities.
+- Prove the BR-to-BS change without line numbers:
+    - locate one frozen, unique contextual block inside the named symlink test;
+    - replace exactly its corrected error.NotDir with error.SymLinkLoop in a read-only reconstruction;
+    - require the reconstructed full-file SHA-256 to equal frozen BR SHA-256 bb2194bfa6161b5c33a912561bd7244c51a49658638ed73c7a6057d0a507f06f;
+    - do not assert declaration location, hunk count, or line layout.
+
+- Preserve both BS cache paths absent; do not reuse them.
+- Require fresh absent/non-symlink caches:
+    - /home/oleg/.cache/zllvm-inbox206bt-local
+    - /home/oleg/.cache/zllvm-inbox206bt-global
+
+  Create them immediately before the gates and retain BP/BR/BT caches afterward.
+
+- Run exactly once, in order:
+    1. zig fmt --check tools/zllvm_inbox206_materialize.zig
+    2. zig build test-inbox206-descriptor-identity using the BT caches.
+
+- Success permits only read-only exact identity/scope/status closure, then stages and commits only the frozen Zig file, verifies clean main/control, and stops.
+- First failure stops uncommitted without any later command, inspection, diagnosis, retry, repair, cleanup, rewrite, or fix-forward.
+
+Status remains conditionally_supported; every wider traversal, publication, materialization, installation, evidence, production, D01/D02, ratchet, credit, and downstream boundary remains
+withheld.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`78bc444920c62aea5c3636a0493673a0b42c961d`; preserve the corrected Zig file
+byte-identical, mode 0644, and unstaged during that commit. Update only the
+ignored inbox separately.
+
+Edit no project content and reread no installed Zig source. Bind the final
+operating HEAD/parent/tree and exact current file/blob/diff identities above.
+Prove the BR-to-BS change without line numbers: locate exactly one frozen,
+unique contextual block inside the named symlink test; replace only its
+corrected `error.NotDir` with `error.SymLinkLoop` in a read-only stream; require
+the reconstructed full-file SHA-256 to equal frozen BR SHA-256
+`bb2194bfa6161b5c33a912561bd7244c51a49658638ed73c7a6057d0a507f06f`.
+Do not assert declaration location, hunk count, or line layout.
+
+Preserve both BS cache paths absent and do not reuse them. Require fresh
+initially absent/non-symlink caches:
+
+```text
+ZIG_LOCAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206bt-local
+ZIG_GLOBAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206bt-global
+```
+
+Create them immediately before and retain BP/BR/BT roots after the exact
+one-shot gates:
+
+1. `zig fmt --check tools/zllvm_inbox206_materialize.zig`;
+2. `zig build test-inbox206-descriptor-identity` with both BT cache variables.
+
+Run no other project command. Success permits only read-only exact
+identity/scope/status closure, then stages and commits only the frozen Zig
+file, verifies clean main/control, and stops. First failure stops uncommitted
+without any later command, inspection, diagnosis, retry, repair, cleanup,
+rewrite, or fix-forward.
+
+The project-language boundary remains absolute: all substantive
+implementation, generators, validators, codecs, hashing, harnesses, workflow,
+and artifact tooling must be Zig. Bash is limited to tiny transparent fixed
+Git/hash/cache orchestration. No JavaScript, ECMAScript, TypeScript, Python,
+Perl, AWK, other-language project solution, or internal-agent project
+algorithm is authorized.
+
+No source edit, trusted-root acquisition, traversal expansion, real authority
+path, second chain, publication, materialization, installation, evidence,
+production, BI/continuation, D01/D02, ratchet movement, credit,
+registered-worktree access/modification, cleanup, or downstream authority is
+granted. Status remains `conditionally_supported`; ratchet remains 131.
+
+
+## INBOX-206BS pure-Zig symlink-rejection expectation correction — FAILED; SUPERSEDED BY INBOX-206BT
 
 INBOX-206BR is accepted only as a compliant fail-closed focused-test failure.
 Its exact uncommitted Zig implementation receives provisional content credit;
