@@ -24,7 +24,129 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CK private Zig sealed-descriptor synthetic runtime proof — AUTHORIZED SOLE CURRENT ACTION
+## INBOX-206CL trusted pure-Zig producer/provenance handoff boundary — AUTHORIZED EVIDENCE-ONLY SOLE CURRENT ACTION
+
+INBOX-206CK is fully accepted within its private synthetic runtime-test scope.
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206CK completed successfully.
+
+- Commit: 223cf7667fdcbdf056b9f3a4872151a55dc37ffd
+- Tree: f104929975b2f4a302947638208d93f6b95e2c4e
+- Sole path: tools/zllvm_inbox206_materialize.zig
+- Mode: 100644
+- Blob: bdb382c175f6c87387a5bd29d6f18cab7666044c
+- SHA-256: da6853b04264230cc5b48675c5c598c324e18e3f47ab7f42bc7a63132af98365
+- Size: 59,436 bytes / 1,678 lines
+- zig fmt --check: passed
+- Focused sealed-descriptor test step: passed
+
+CK caches were retained. Main/control are clean and protected identities remain intact. selected_variant=none, D01 withheld, D02 unauthorized, and ratchet 131 remain binding.
+```
+
+Static Watcher and retained-log review ran no project code and verifies exact
+ancestry and sole-file identity, the private positional-I/O and ownership
+diff, four required tests, exactly-once gates, retained caches, clean state,
+protected identities, and terminal stop. CK closes only the tested synthetic
+native sealing/event-freedom mechanism. Trusted producer provenance, real
+BK-byte authority, receiver-origin provenance, and Git identity binding remain
+open.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I fully accept INBOX-206CK within its private synthetic runtime-test scope. It closes the tested sealing/event-freedom mechanism only; selected_variant=none remains correct.
+
+I authorize evidence/design-only INBOX-206CL as proposed, with these refinements:
+
+- Pure-Zig implementation is a language boundary, not itself a trust root. Any prospective producer must have independently authenticated identity, configuration, inputs, and invocation authority.
+
+- Define the provenance statement as a versioned, canonical tuple including commit, tree, repository-relative path, Git object ID plus hash algorithm, raw SHA-256, exact raw length, and producer/protocol identity.
+
+- Separate provenance-record authenticity from correctness of its claims. A producer signing or hashing its own unsupported assertions is circular self-attestation.
+- Bind any received sealed descriptor to its authenticated provenance only through the receiver’s post-seal exact-length/SHA verification; descriptor number, regular mode, seals, or origin claims alone are insufficient.
+
+- Distinguish replay from equivocation. Replaying the identical accepted immutable object may be harmless if freshness is not required; conflicting tuples under one authority must fail closed. Do not invent nonce/freshness requirements without an existing threat-model basis.
+
+- Identify explicitly which future step would authenticate the commit→tree→path→blob chain without violating the current Git-object/worktree prohibitions. Until that authority exists, both selections remain none.
+
+- No prospective class may be selected merely because its implementation is feasible or recommended.
+
+The operating parent 223cf7667fdcbdf056b9f3a4872151a55dc37ffd, sole evidence-file scope, static-only reads, immediate 0644 finalization, fail-closed stop, and every stated authority and pure-Zig prohibition remain exact.
+```
+
+Create only mode-0644
+`docs/evidence/inbox206cl_trusted_producer_provenance_boundary.md`. Read only
+committed CG/CJ, the exact committed CK diff/current private sealed-descriptor
+region, and identity/authority sections of accepted CA/CC evidence and
+operating documents. Do not read BK specification contents, real BK bytes,
+Git object contents, registered worktrees, artifact-store manifests or
+payloads, external provisioner state, or absent BI paths. Run no project
+command and change no source/build/tool/script/cache/output/continuation/
+control/store path.
+
+Preserve all prohibitions on Git CLI/plumbing, direct object extraction,
+pathname reopening, build-time worktree reads, `@embedFile` of registered-
+worktree paths, shell/subprocess production, agent transport, foreign-
+language helpers, and unproved mutable producers. A future amendment may be
+identified but not silently assumed.
+
+Pure Zig is the mandatory language boundary, not a trust root. A prospective
+producer requires independently authenticated identity, configuration,
+inputs, and invocation authority. Define a versioned canonical provenance
+tuple containing commit, tree, repository-relative path, Git object ID and
+hash algorithm, raw SHA-256, exact raw length, producer identity, and protocol
+identity/version.
+
+Separate record authenticity from correctness of its claims and reject
+circular self-attestation. Keep independent the trust roots and evidence for
+producer authority; record origin/integrity; commit→tree→path→blob binding;
+Git versus raw identities; byte acquisition; mutable-alias closure;
+descriptor population/sealing/size; atomic ownership and provenance transfer;
+receiver admission and post-seal length/SHA binding; replay, equivocation,
+TOCTOU, lifetime, close, and failure attribution.
+
+Evaluate only bounded handoff classes supported by current evidence. For each,
+record exact inputs, allowed reads/writes, trust root, producer/receiver
+evidence, CK relationship, verification order, ownership/lifetime, failure
+taxonomy, and current authority status. Feasibility, recommendation, digest
+match, seals, regular mode, descriptor number, pathname, or recorded constants
+cannot establish provenance.
+
+Bind a received sealed descriptor to authenticated provenance only through
+receiver post-seal exact-length/SHA verification. Distinguish harmless replay
+of an identical accepted immutable object from conflicting-tuple equivocation;
+invent no freshness requirement absent a threat-model basis. Identify the
+future step that would authenticate commit→tree→path→blob without violating
+current prohibitions.
+
+Produce a trust-root matrix, canonical tuple, end-to-end sequence, negative/
+shortcut matrix, support verdict, and one smallest reversible recommendation.
+Unless every provenance link is closed, require:
+
+```text
+selected_producer_handoff=none
+selected_variant=none
+```
+
+Run one exact preflight, create the sole evidence file, immediately finalize
+0644, perform one static diff/identity closure, commit only it, verify clean
+main/control, report, and stop. First failure stops uncommitted without
+diagnosis, retry, repair, cleanup, or fix-forward.
+
+CL grants no real bytes, descriptor/syscall, Git extraction, store or
+provisioner access, implementation, compilation, test, cache, materialization,
+publication, installation, validation-v3, production, D01/D02, ratchet
+movement, cleanup, performance, credit, or downstream authority.
+
+All substantive implementation, generators, validators, codecs, hashing,
+harnesses, workflow, provenance, and artifact tooling must be Zig. Bash is
+tiny transparent fixed-command orchestration only. No JavaScript, ECMAScript,
+TypeScript, Python, Perl, AWK, other-language project solution, or project
+algorithm in internal-agent transport is authorized.
+
+## INBOX-206CK private Zig sealed-descriptor synthetic runtime proof — ACCEPTED; SUPERSEDED BY INBOX-206CL
 
 INBOX-206CJ is fully accepted within its evidence/API-audit scope. The Worker
 final report is preserved verbatim:
