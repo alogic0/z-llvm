@@ -24,7 +24,146 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CB CA mode-only remediation — AUTHORIZED
+## INBOX-206CC trusted committed-blob ingress design — AUTHORIZED EVIDENCE/DESIGN ONLY
+
+INBOX-206CB and the committed CA evidence are accepted fully within scope.
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206CB completed successfully.
+
+- Commit: 44b2c2b2fe6b0dfc9eb894a96e99d38b5ecb4227
+- Parent: 87fa9cbcdac525a4d621f65069c9f4a4f12af80b
+- Tree: 9f9f670bba2734dbe7872120d7f7c7e57112761c
+- File: docs/evidence/inbox206ca_registered_worktree_descriptor_boundary.md
+- Mode: 100644
+- Blob: 5958b0c72caad9f704710352ac4874a6da4a383d
+- SHA-256: a816695372c214d90a893f2da82d84801df72979606b67e64dc8c06e363491d3
+- Identity: 11,212 bytes, 212 lines
+- Main/control: clean
+
+The closure preserved the BZ, build, watcher/PID, stash, control, cache, and BI identities. All 43 registered worktrees and their recorded path/topology hashes remain protected; no worktree-list call or registered-directory traversal occurred.
+
+Status remains conditionally_supported; ratchet remains 131; D01 is withheld and D02 unauthorized. No Zig/project execution or downstream work occurred.
+```
+
+Static Watcher review ran no project code. Commit
+`44b2c2b2fe6b0dfc9eb894a96e99d38b5ecb4227` is non-merge, has parent
+`87fa9cbcdac525a4d621f65069c9f4a4f12af80b` and tree
+`9f9f670bba2734dbe7872120d7f7c7e57112761c`, and adds only mode-100644
+`docs/evidence/inbox206ca_registered_worktree_descriptor_boundary.md` by
+212 lines. It is 11,212 bytes, blob
+`5958b0c72caad9f704710352ac4874a6da4a383d`, raw SHA-256
+`a816695372c214d90a893f2da82d84801df72979606b67e64dc8c06e363491d3`,
+and binary-diff SHA-256
+`73835518f5e53511797954cf7957651a33fa3dcee68cf2410a40d84414eada0a`.
+Diff-check passes. Retained Worker turn
+`019f82ec-86db-7ac3-b8ee-c86081ebf1a0` proves the exact one-mutation,
+one-closure, sole-file commit sequence with no project command or retry.
+Main/index/control and all protected identities remain exact. Option 1 is the
+only authorized implementation state; Option 4 is prospective only.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept 44b2c2b2fe6b0dfc9eb894a96e99d38b5ecb4227 fully within CB and accept the CA evidence in full. Option 1 remains the only authorized implementation state; Option 4 is prospective only.
+
+I authorize evidence/design-only INBOX-206CC with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by 44b2c2b2fe6b0dfc9eb894a96e99d38b5ecb4227; update the ignored inbox separately.
+- Add and commit exactly docs/evidence/inbox206cc_trusted_committed_blob_ingress_design.md, mode 0644.
+- Permit one exact-name chmod 0644 immediately after document creation and before its first gate; no later mode repair.
+- Use only the closed named reads and Git metadata described. Do not replay git worktree list, extract Git-object contents, or access registered-worktree paths as artifact targets.
+- Bind the accepted specification using distinct identities:
+    - committed path and commit/tree/blob identity;
+    - raw-content SHA-256;
+    - exact raw byte count;
+    - explicit statement that Git blob identity and raw-content SHA-256 are different domains.
+
+- Define separate, unselected ingress variants for:
+    - caller-supplied held regular-file descriptor;
+    - caller-supplied immutable/sealed descriptor where support is established;
+    - bounded one-shot byte stream.
+
+- For every variant specify provenance inputs, ownership transfer or borrowing, seek/offset rules, close responsibility, maximum accepted bytes, exact real-byte count, and failure behavior.
+
+- The pure-Zig consumer must copy the complete bounded input into owned memory while hashing, require the exact expected length/hash, require EOF immediately afterward, reject partial, trailing, duplicate, or second supply, and parse only the verified immutable in-memory snapshot.
+
+- Define TOCTOU closure separately:
+    - descriptor identity does not alone prove immutable contents;
+    - mutations after snapshot acquisition cannot affect the owned snapshot;
+    - mutations during acquisition must be detected or remain a blocker unless the selected future supply mechanism guarantees immutability.
+
+- External provisioning remains unauthorized. It may not hide extraction, transformation, validation, or hashing logic in Bash, Git plumbing, internal-agent transport, or another language.
+- Map only a future private Zig generic-ingress implementation with synthetic/frozen bytes; real committed-byte supply and execution remain separate later authorities.
+- Include an explicit authority matrix for design, generic implementation, synthetic tests, real-byte provisioning, execution, publication, production, D01/D02, and ratchet.
+- State descriptor_status=conditionally_supported, execution_authority=none, production_authority=none, D01=withheld, D02=unauthorized, and ratchet=131.
+- Run only static document, Git, mode, hash, scope, and status checks.
+- Success commits only CC and stops. First failure stops uncommitted without retry, repair, or fix-forward.
+```
+
+Create and commit exactly one new regular mode-0644 document:
+`docs/evidence/inbox206cc_trusted_committed_blob_ingress_design.md`. It must
+start absent/non-symlink. Immediately after creation, one exact-name
+`chmod 0644` is permitted before its first gate; no later mode repair. No
+other path may change.
+
+The closed named-read ledger permits only the operating documents, committed
+CA and BK evidence, Git commit/tree/blob/status metadata for accepted
+operating/CA/BZ/specification/control identities, exact
+build/watcher/stash/cache/BI checks, and CC for creation and verification. Do
+not replay `git worktree list`, extract Git-object contents, open source as an
+artifact target, or access any registered-worktree path for artifact
+discovery.
+
+Bind the specification through distinct identity domains:
+
+```text
+spec_path=docs/evidence/inbox206bk_zig_materialization_readiness_design.md
+spec_commit=f9b2f30a154e5422c53d04bc21cc1e92e667300b
+spec_tree=174923e4bfd78f6ae003556a9ed17ddf950d74fd
+spec_blob=573e128bb999d8aba15ae5ac6dc69a52ac3e8812
+spec_raw_sha256=66b0dfdff5c61b00a16e815994bb9c06e3596260d611a2e35cb83cbe99b9e187
+spec_raw_bytes=29834
+```
+
+State that Git blob identity and raw-content SHA-256 are different domains.
+Define the three separate unselected ingress variants and, for each, the
+provenance, ownership/borrowing, seek/offset, close, maximum-size,
+exact-real-byte-count, and fail-closed contracts required by Reviewer.
+
+Require a future pure-Zig consumer to copy complete bounded input into owned
+memory while hashing, require exact expected length/hash plus immediate EOF,
+reject partial/trailing/duplicate/second supply, and parse only the verified
+immutable snapshot. Define TOCTOU closure separately and exactly as reviewed.
+
+External provisioning remains unauthorized and cannot hide project logic in
+Bash, Git plumbing, internal-agent transport, or another language. Map only a
+future private Zig generic-ingress/synthetic-test slice; real-byte supply and
+execution remain later separate authorities. Include the explicit authority
+matrix and exact disposition fields. Implement and execute nothing.
+
+Run only static document, Git, mode, hash, scope, and status checks. Commit
+only CC, verify clean main/control, and stop. First failure stops uncommitted
+without later command, diagnosis, retry, repair, cleanup, rewrite, or
+fix-forward.
+
+Run no source, Zig, build, test, or project command. Create no cache or path
+outside CC. Perform no Git-object extraction, worktree-list replay,
+registered-worktree/artifact traversal, supply selection, provisioning,
+publication, materialization, installation, BI/continuation creation,
+pin/contract amendment, D01/D02 action, ratchet movement, credit, production
+wiring, or downstream work.
+
+The project-language boundary remains absolute: every substantive project
+implementation, generator, validator, codec, hash, harness, workflow, and
+artifact tool must be Zig. Bash is limited to tiny transparent fixed Git/hash
+orchestration. No JavaScript, ECMAScript, TypeScript, Python, Perl, AWK,
+other-language project solution, or project algorithm in internal-agent
+transport is authorized. Status remains `conditionally_supported`; ratchet
+remains 131.
+
+## INBOX-206CB CA mode-only remediation — ACCEPTED; SUPERSEDED BY INBOX-206CC
 
 INBOX-206CA is accepted only as a compliant fail-closed uncommitted-document
 stop. Its content has provisional review credit; mode, closure, and commit
