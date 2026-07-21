@@ -24,7 +24,135 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BX pure-Zig retained root-to-home-to-oleg chain — AUTHORIZED
+## INBOX-206BY pure-Zig frozen three-descriptor-chain closure — AUTHORIZED
+
+INBOX-206BX is accepted only as a compliant fail-closed pre-gate stop. Its
+exact three-descriptor chain patch receives provisional content credit; no
+format, focused-test, commit, or downstream credit is granted.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BX stopped at the first failed pre-gate review.
+
+- The Zig patch remains uncommitted and unstaged.
+- No Zig gate ran.
+- No BX cache root was created.
+- No diagnosis, retry, repair, cleanup, fix-forward, or later command was performed.
+```
+
+Static Watcher review ran no project code. Main remains at operating commit
+`3f745baa697407af7d6a6950278839f6c0ae9bdf`, parent/source
+`95f1dc1f3021ee3b8e19c821538be3b2266bf1f3`; the index is empty. The sole
+dirty path is mode-0644 `tools/zllvm_inbox206_materialize.zig`, 20,117 bytes,
+76 insertions and no deletions, SHA-256
+`5d4de91f08c984b6fa8b846511a9e3e7943d50b4816058f8b16cb06ed4e8f6c1`,
+blob `073adb41e3ecd796590600b18d5a1864a4a1e268`, and binary-diff SHA-256
+`cb63ac2a15ffb8f0dc76b80c982e44c51c9f6e3eafca1827604a911b72b8a68d`.
+Diff-check passes.
+
+The additions exactly implement the authorized private `TrustedOlegChain`,
+`acquireTrustedOlegChain` with root cleanup registered before home cleanup,
+relative literal `"oleg"` acquisition, ownership transfer, and one guarded
+oleg/home/root test. Retained Worker turn
+`019f82c9-37ca-7ad2-81d3-d094701d8895` contains only Zig-skill and
+operating-document reads, exact preflight/source reads, the sole Zig patch,
+and one pre-gate static-review call. That call exited 1 with empty output; the
+final report follows with no later tool.
+
+The first failing assertion used ANSI-C-quoted pattern
+`$'*\t0\ttools/...'`; quoting makes `*` literal rather than a case glob.
+Actual numstat is `76\t0\ttools/...`. The failure is solely this malformed
+static predicate. No gate ran and no BX cache was created. Build/watcher
+identities, watcher PID 3206208, clean control, stash `7985c6d...`, all 43
+worktrees, retained BP/BR/BT/BU/BW roots, absent BS/BV/BX roots,
+BI/continuation absence, D01/D02, and ratchet 131 remain exact.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept INBOX-206BX only as a compliant fail-closed pre-gate stop. The exact three-descriptor chain patch receives provisional content credit; no fmt, focused-test, commit, or downstream
+credit is granted.
+
+I authorize no-edit INBOX-206BY:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by 3f745baa697407af7d6a6950278839f6c0ae9bdf; preserve the Zig file byte-identical, mode 0644,
+  unstaged, and update the ignored inbox separately.
+
+- Edit no project content and reread no installed Zig source.
+- Bind the final operating HEAD/parent/tree and verify:
+    - sole dirty unstaged path;
+    - 20,117 bytes, mode 0644;
+    - SHA-256 5d4de91f08c984b6fa8b846511a9e3e7943d50b4816058f8b16cb06ed4e8f6c1;
+    - blob 073adb41e3ecd796590600b18d5a1864a4a1e268;
+    - diff SHA-256 cb63ac2a15ffb8f0dc76b80c982e44c51c9f6e3eafca1827604a911b72b8a68d;
+    - exact sole-path additions/deletions 76/0;
+    - unchanged build and protected identities.
+
+- Treat the complete identities as the sole content/scope authority. Add no shell-pattern, token-count, line, occurrence, hunk, or layout assertion.
+- Preserve BX caches absent. Require fresh absent/non-symlink caches:
+    - /home/oleg/.cache/zllvm-inbox206by-local
+    - /home/oleg/.cache/zllvm-inbox206by-global
+
+  Create them immediately before the gates and retain prior/BY caches afterward.
+
+- Run exactly once:
+    1. zig fmt --check tools/zllvm_inbox206_materialize.zig
+    2. existing zig build test-inbox206-descriptor-identity with BY caches.
+
+- Success permits only read-only identity/scope/status closure, then stages and commits only the frozen Zig file, verifies clean main/control, and stops.
+- First failure stops uncommitted without later command, inspection, diagnosis, retry, repair, cleanup, rewrite, or fix-forward.
+
+Status remains conditionally_supported; all wider path traversal, publication, materialization, installation, evidence, production, D01/D02, ratchet, credit, and downstream authority
+remain withheld.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`3f745baa697407af7d6a6950278839f6c0ae9bdf`; preserve the Zig file
+byte-identical, mode 0644, and unstaged during that commit. Update the ignored
+inbox separately.
+
+Edit no project content and reread no installed Zig source. Bind final
+operating HEAD/parent/tree and verify the sole dirty unstaged path at the
+complete file/blob/binary-diff identities and exact 76/0 scope above, with
+unchanged build/protected identities. Treat those complete identities as sole
+content/scope authority. Add no shell-pattern, token-count, line, occurrence,
+hunk, or layout assertion.
+
+Preserve BX caches absent. Require fresh initially absent/non-symlink caches:
+
+```text
+ZIG_LOCAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206by-local
+ZIG_GLOBAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206by-global
+```
+
+Create them immediately before and retain prior/BY caches after running
+exactly once, in order:
+
+1. `zig fmt --check tools/zllvm_inbox206_materialize.zig`;
+2. the existing `zig build test-inbox206-descriptor-identity` with BY caches.
+
+Run no other project command. Success permits only read-only exact closure,
+then stages and commits only the frozen Zig file, verifies clean main/control,
+and stops. First failure stops uncommitted without later command, inspection,
+diagnosis, retry, repair, cleanup, rewrite, or fix-forward.
+
+The project-language boundary remains absolute: all substantive
+implementation, generators, validators, codecs, hashing, harnesses, workflow,
+and artifact tooling must be Zig. Bash is limited to tiny transparent fixed
+Git/hash/cache orchestration. No JavaScript, ECMAScript, TypeScript, Python,
+Perl, AWK, other-language project solution, or internal-agent project
+algorithm is authorized.
+
+No source edit, prog/later component, absolute/generic/multi-component path,
+second chain, publication, materialization, installation, evidence,
+production/wiring/API, BI/continuation, D01/D02, ratchet movement, credit,
+registered-worktree access/modification, cleanup, or downstream authority is
+granted. Status remains `conditionally_supported`; ratchet remains 131.
+
+
+## INBOX-206BX pure-Zig retained root-to-home-to-oleg chain — FAILED; SUPERSEDED BY INBOX-206BY
 
 INBOX-206BW is accepted fully within scope. The retained root-to-home chain
 and focused ownership/runtime evidence are accepted; status remains
