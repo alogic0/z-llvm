@@ -140,6 +140,33 @@ pub fn build(b: *std.Build) void {
     addToolStep(b, "distribution-aarch64-boundary", "Run AArch64 object target boundary gate", "tools/run_distribution_aarch64_object_boundary.zig");
     addToolStepWithArgs(b, "distribution-all", "Run selected distribution gates, native-link proof/probe, and boundary gates", "tools/run_distribution_all_gates.zig");
     addToolStepWithArgs(b, "distribution-real-rows", "Run ranked real compiler-core rows through staged replacement gate", "tools/run_distribution_real_rows.zig");
+    const execution_oracle_v1 = b.addExecutable(.{
+        .name = "execution-oracle-v1",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/execution_oracle_v1.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }),
+    });
+    const execution_oracle_v1_run = b.addRunArtifact(execution_oracle_v1);
+    if (b.args) |args| execution_oracle_v1_run.addArgs(args);
+    const execution_oracle_v1_step = b.step(
+        "execution-oracle-v1",
+        "Run the non-default current-pin one-row execution oracle",
+    );
+    execution_oracle_v1_step.dependOn(&execution_oracle_v1_run.step);
+    const execution_oracle_v1_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/execution_oracle_v1.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }),
+    });
+    const execution_oracle_v1_test_step = b.step(
+        "test-execution-oracle-v1",
+        "Run focused synthetic execution-oracle-v1 tests",
+    );
+    execution_oracle_v1_test_step.dependOn(&b.addRunArtifact(execution_oracle_v1_tests).step);
     addToolStepWithArgs(b, "clean-tmp", "Report, dry-run, or explicitly delete retention-classified tmp entries", "tools/clean_tmp.zig");
     const artifact_store_tests = b.addTest(.{
         .root_module = b.createModule(.{

@@ -3,6 +3,7 @@ const air_export = @import("zig_air_export.zig");
 const air_lowering = @import("zig_air_lowering.zig");
 const codegen = @import("codegen.zig");
 const mc = @import("mc.zig");
+const target = @import("target.zig");
 const helpers = @import("uncurated_air_gate_helpers.zig");
 
 const selector_version = "real-candidate-selector-v2";
@@ -11,6 +12,36 @@ const ziglang_pin_path = "docs/evidence/ziglang_pin.txt";
 const export_cache_dir = "tmp/real_rows_air_export_cache";
 const target_triple = "x86_64-unknown-linux-gnu";
 const Mode = helpers.Mode;
+
+pub const OracleAbiReturnShape = enum {
+    integer,
+    floating,
+};
+
+pub const OracleAbiProof = struct {
+    supported_target: target.SupportedTarget,
+    parameter_count: usize,
+    return_shape: OracleAbiReturnShape,
+    return_bits: u16,
+    gpr_returns: usize,
+    sse_returns: usize,
+    memory_return: bool,
+};
+
+pub fn oracleAbiProof() !OracleAbiProof {
+    const parsed_target = try target.Triple.parse(target_triple);
+    const supported_target = parsed_target.supportedTarget() orelse return error.UnsupportedTarget;
+    const return_plan = try codegen.x86_64.sysvReturnPlanCountsForTest(.{ .int = 64 });
+    return .{
+        .supported_target = supported_target,
+        .parameter_count = 0,
+        .return_shape = .integer,
+        .return_bits = 64,
+        .gpr_returns = return_plan.gpr_returns,
+        .sse_returns = return_plan.sse_returns,
+        .memory_return = return_plan.memory_return,
+    };
+}
 
 const TempDir = struct {
     path: []const u8,
@@ -657,7 +688,7 @@ fn runCandidate(
     counters: *Counters,
     zig_emitter: []const u8,
 ) !void {
-    const filtered = extractFunctionDescriptor(allocator, descriptor, candidate.function) catch |err| {
+    const filtered = extractOracleFunctionDescriptor(allocator, descriptor, candidate.function) catch |err| {
         try recordFailure(allocator, stdout, counters, mode, candidate, "air-extract", @errorName(err));
         return;
     };
@@ -673,55 +704,17 @@ fn runCandidate(
         try stderr_writer.interface.flush();
     }
 
-    var parsed = air_export.parse(allocator, filtered) catch |err| {
-        try recordFailure(allocator, stdout, counters, mode, candidate, "typed-lowering", @errorName(err));
-        return;
+    var outcome = try lowerOracleFunctionToObject(allocator, filtered);
+    defer outcome.deinit(allocator);
+    const object = switch (outcome) {
+        .failure => |failure| {
+            if (failure.function_lowered) counters.real_functions_lowered += 1;
+            try recordFailure(allocator, stdout, counters, mode, candidate, failure.stage, failure.diagnostic);
+            return;
+        },
+        .success => |object| object,
     };
-    defer parsed.deinit();
-
-    var lowered = air_lowering.lowerCompatible(allocator, parsed) catch |err| {
-        try recordFailure(allocator, stdout, counters, mode, candidate, "typed-lowering", @errorName(err));
-        return;
-    };
-    defer lowered.deinit();
-    if (lowered.accepted_functions != 1 or lowered.unsupported.len != 0 or lowered.module.functions.items.len != 1) {
-        const diagnostic = if (lowered.unsupported.len != 0)
-            try std.fmt.allocPrint(allocator, "unsupported:{s}:{s}", .{
-                @tagName(lowered.unsupported[0].reason),
-                lowered.unsupported[0].opcode,
-            })
-        else
-            try allocator.dupe(u8, "unexpected-lowering-result");
-        defer allocator.free(diagnostic);
-        try recordFailure(allocator, stdout, counters, mode, candidate, "typed-lowering", diagnostic);
-        return;
-    }
     counters.real_functions_lowered += 1;
-
-    var machine = codegen.x86_64.lowerFunction(
-        allocator,
-        target_triple,
-        lowered.module.functions.items[0],
-    ) catch |err| {
-        const diagnostic = try std.fmt.allocPrint(allocator, "x86_64-lower:{s}", .{@errorName(err)});
-        defer allocator.free(diagnostic);
-        try recordFailure(allocator, stdout, counters, mode, candidate, "object-emission", diagnostic);
-        return;
-    };
-    defer machine.deinit(allocator);
-    const machines = [_]codegen.x86_64.MachineFunction{machine};
-    const object = mc.elf.buildObjectWithModuleData(
-        allocator,
-        &machines,
-        lowered.module.aliases.items,
-        lowered.module.globals.items,
-    ) catch |err| {
-        const diagnostic = try std.fmt.allocPrint(allocator, "elf-object:{s}", .{@errorName(err)});
-        defer allocator.free(diagnostic);
-        try recordFailure(allocator, stdout, counters, mode, candidate, "object-emission", diagnostic);
-        return;
-    };
-    defer allocator.free(object);
     counters.real_objects_emitted += 1;
 
     const object_path = try allocTempFile(allocator, temp, candidate.function, ".o");
@@ -746,7 +739,82 @@ fn runCandidate(
     // compiler-rt ABI differential gate owns its own paired-execution counters.
 }
 
-fn extractFunctionDescriptor(allocator: std.mem.Allocator, descriptor: []const u8, function_name: []const u8) ![]u8 {
+pub const OracleObjectFailure = struct {
+    stage: []const u8,
+    diagnostic: []u8,
+    function_lowered: bool,
+};
+
+pub const OracleObjectOutcome = union(enum) {
+    success: []u8,
+    failure: OracleObjectFailure,
+
+    pub fn deinit(self: *OracleObjectOutcome, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            .success => |object| allocator.free(object),
+            .failure => |failure| allocator.free(failure.diagnostic),
+        }
+        self.* = undefined;
+    }
+};
+
+pub fn lowerOracleFunctionToObject(
+    allocator: std.mem.Allocator,
+    filtered_descriptor: []const u8,
+) !OracleObjectOutcome {
+    var parsed = air_export.parse(allocator, filtered_descriptor) catch |err| return .{ .failure = .{
+        .stage = "typed-lowering",
+        .diagnostic = try allocator.dupe(u8, @errorName(err)),
+        .function_lowered = false,
+    } };
+    defer parsed.deinit();
+
+    var lowered = air_lowering.lowerCompatible(allocator, parsed) catch |err| return .{ .failure = .{
+        .stage = "typed-lowering",
+        .diagnostic = try allocator.dupe(u8, @errorName(err)),
+        .function_lowered = false,
+    } };
+    defer lowered.deinit();
+    if (lowered.accepted_functions != 1 or lowered.unsupported.len != 0 or lowered.module.functions.items.len != 1) {
+        const diagnostic = if (lowered.unsupported.len != 0)
+            try std.fmt.allocPrint(allocator, "unsupported:{s}:{s}", .{
+                @tagName(lowered.unsupported[0].reason),
+                lowered.unsupported[0].opcode,
+            })
+        else
+            try allocator.dupe(u8, "unexpected-lowering-result");
+        return .{ .failure = .{
+            .stage = "typed-lowering",
+            .diagnostic = diagnostic,
+            .function_lowered = false,
+        } };
+    }
+
+    var machine = codegen.x86_64.lowerFunction(
+        allocator,
+        target_triple,
+        lowered.module.functions.items[0],
+    ) catch |err| return .{ .failure = .{
+        .stage = "object-emission",
+        .diagnostic = try std.fmt.allocPrint(allocator, "x86_64-lower:{s}", .{@errorName(err)}),
+        .function_lowered = true,
+    } };
+    defer machine.deinit(allocator);
+    const machines = [_]codegen.x86_64.MachineFunction{machine};
+    const object = mc.elf.buildObjectWithModuleData(
+        allocator,
+        &machines,
+        lowered.module.aliases.items,
+        lowered.module.globals.items,
+    ) catch |err| return .{ .failure = .{
+        .stage = "object-emission",
+        .diagnostic = try std.fmt.allocPrint(allocator, "elf-object:{s}", .{@errorName(err)}),
+        .function_lowered = true,
+    } };
+    return .{ .success = object };
+}
+
+pub fn extractOracleFunctionDescriptor(allocator: std.mem.Allocator, descriptor: []const u8, function_name: []const u8) ![]u8 {
     var out: std.ArrayList(u8) = .empty;
     errdefer out.deinit(allocator);
     try appendHeader(allocator, &out, descriptor);

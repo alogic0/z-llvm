@@ -237,7 +237,11 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
 
     var functions: std.ArrayList(Function) = .empty;
     errdefer {
-        for (functions.items) |function| allocator.free(function.instructions);
+        for (functions.items) |function| {
+            if (function.structured_air) |structured_air| structured_air.deinit(allocator);
+            if (function.structured_air_v2) |structured_air_v2| structured_air_v2.deinit(allocator);
+            allocator.free(function.instructions);
+        }
         functions.deinit(allocator);
     }
     try functions.ensureTotalCapacity(allocator, function_count);
@@ -265,8 +269,14 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
             null;
         try cursor.expectLine("function_end");
         const instructions = try parseInstructions(allocator, air_text, instruction_count);
+        var instructions_owned = true;
+        errdefer if (instructions_owned) allocator.free(instructions);
         const structured_air = if (structured_air_text) |text| try parseStructuredAir(allocator, text) else null;
+        var structured_air_owned = structured_air != null;
+        errdefer if (structured_air_owned) structured_air.?.deinit(allocator);
         const structured_air_v2 = if (structured_air_v2_text) |text| try parseStructuredAirV2(allocator, text) else null;
+        var structured_air_v2_owned = structured_air_v2 != null;
+        errdefer if (structured_air_v2_owned) structured_air_v2.?.deinit(allocator);
         functions.appendAssumeCapacity(.{
             .name = name,
             .type_text = type_text,
@@ -280,6 +290,9 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
             .structured_air_v2 = structured_air_v2,
             .instructions = instructions,
         });
+        instructions_owned = false;
+        structured_air_owned = false;
+        structured_air_v2_owned = false;
     }
 
     if (!cursor.onlyWhitespaceRemaining()) return error.TrailingData;
@@ -417,26 +430,21 @@ fn parseStructuredAirV2(allocator: std.mem.Allocator, text: []const u8) !Structu
             saw_end = true;
             break;
         }
-        var fields = std.mem.splitScalar(u8, line, '|');
-        const kind = fields.next() orelse return error.InvalidStructuredAirV2;
+        var fields: StructuredAirV2Cursor = .{ .line = line };
+        const kind = try fields.readField();
         if (!std.mem.eql(u8, kind, "typed_inst")) return error.InvalidStructuredAirV2;
-        const index = try parseUnsigned(u32, fields.next() orelse return error.InvalidStructuredAirV2);
-        const opcode = fields.next() orelse return error.InvalidStructuredAirV2;
-        const result_type_len = try parseUnsigned(usize, fields.next() orelse return error.InvalidStructuredAirV2);
-        const result_type = fields.next() orelse return error.InvalidStructuredAirV2;
-        if (result_type.len != result_type_len) return error.InvalidStructuredAirV2;
-        const data_kind = fields.next() orelse return error.InvalidStructuredAirV2;
-        const operand_count = try parseUnsigned(usize, fields.next() orelse return error.InvalidStructuredAirV2);
+        const index = try parseUnsigned(u32, try fields.readField());
+        const opcode = try fields.readField();
+        const result_type = try fields.readFramedField(true);
+        const data_kind = try fields.readField();
+        const operand_count = try parseUnsigned(usize, try fields.readField());
         const operands = try allocator.alloc(TypedOperand, operand_count);
-        errdefer allocator.free(operands);
-        for (operands) |*operand| {
-            const operand_kind = fields.next() orelse return error.InvalidStructuredAirV2;
-            const value_len = try parseUnsigned(usize, fields.next() orelse return error.InvalidStructuredAirV2);
-            const value = fields.next() orelse return error.InvalidStructuredAirV2;
-            if (value.len != value_len) return error.InvalidStructuredAirV2;
-            const type_len = try parseUnsigned(usize, fields.next() orelse return error.InvalidStructuredAirV2);
-            const type_text = fields.next() orelse return error.InvalidStructuredAirV2;
-            if (type_text.len != type_len) return error.InvalidStructuredAirV2;
+        var operands_owned = true;
+        errdefer if (operands_owned) allocator.free(operands);
+        for (operands, 0..) |*operand, operand_index| {
+            const operand_kind = try fields.readField();
+            const value = try fields.readFramedField(true);
+            const type_text = try fields.readFramedField(operand_index + 1 < operand_count);
             operand.* = .{
                 .kind = operand_kind,
                 .value = value,
@@ -444,22 +452,23 @@ fn parseStructuredAirV2(allocator: std.mem.Allocator, text: []const u8) !Structu
             };
         }
         var details: []TypedDetail = &.{};
-        if (fields.next()) |detail_count_text| {
+        var details_owned = false;
+        errdefer if (details_owned) allocator.free(details);
+        if (!fields.done()) {
+            const detail_count_text = try fields.readField();
             const detail_count = try parseUnsigned(usize, detail_count_text);
             details = try allocator.alloc(TypedDetail, detail_count);
-            errdefer allocator.free(details);
-            for (details) |*detail| {
-                const key = fields.next() orelse return error.InvalidStructuredAirV2;
-                const detail_value_len = try parseUnsigned(usize, fields.next() orelse return error.InvalidStructuredAirV2);
-                const detail_value = fields.next() orelse return error.InvalidStructuredAirV2;
-                if (detail_value.len != detail_value_len) return error.InvalidStructuredAirV2;
+            details_owned = true;
+            for (details, 0..) |*detail, detail_index| {
+                const key = try fields.readField();
+                const detail_value = try fields.readFramedField(detail_index + 1 < detail_count);
                 detail.* = .{
                     .key = key,
                     .value = detail_value,
                 };
             }
         }
-        if (fields.next() != null) return error.InvalidStructuredAirV2;
+        if (!fields.done()) return error.InvalidStructuredAirV2;
         try instructions.append(allocator, .{
             .index = index,
             .opcode = opcode,
@@ -468,10 +477,65 @@ fn parseStructuredAirV2(allocator: std.mem.Allocator, text: []const u8) !Structu
             .operands = operands,
             .details = details,
         });
+        operands_owned = false;
+        details_owned = false;
     }
     if (!saw_end) return error.InvalidStructuredAirV2;
+    while (lines.next()) |line| {
+        if (line.len != 0) return error.InvalidStructuredAirV2;
+    }
     return .{ .instructions = try instructions.toOwnedSlice(allocator) };
 }
+
+const StructuredAirV2Cursor = struct {
+    line: []const u8,
+    offset: usize = 0,
+    trailing_empty: bool = false,
+
+    fn done(self: StructuredAirV2Cursor) bool {
+        return self.offset == self.line.len and !self.trailing_empty;
+    }
+
+    fn readField(self: *StructuredAirV2Cursor) ![]const u8 {
+        if (self.offset > self.line.len) return error.InvalidStructuredAirV2;
+        if (self.trailing_empty) {
+            self.trailing_empty = false;
+            return self.line[self.line.len..];
+        }
+        if (self.offset == self.line.len) return error.InvalidStructuredAirV2;
+        const start = self.offset;
+        const relative_end = std.mem.indexOfScalar(u8, self.line[start..], '|') orelse {
+            self.offset = self.line.len;
+            return self.line[start..];
+        };
+        const end = std.math.add(usize, start, relative_end) catch return error.InvalidStructuredAirV2;
+        self.offset = std.math.add(usize, end, 1) catch return error.InvalidStructuredAirV2;
+        self.trailing_empty = self.offset == self.line.len;
+        return self.line[start..end];
+    }
+
+    fn readFramedField(self: *StructuredAirV2Cursor, expect_more: bool) ![]const u8 {
+        const length = try parseUnsigned(usize, try self.readField());
+        if (self.trailing_empty) {
+            if (length != 0) return error.InvalidStructuredAirV2;
+            self.trailing_empty = false;
+        }
+        const start = self.offset;
+        const end = std.math.add(usize, start, length) catch return error.InvalidStructuredAirV2;
+        if (end > self.line.len) return error.InvalidStructuredAirV2;
+        self.offset = end;
+        if (expect_more) {
+            if (self.offset >= self.line.len or self.line[self.offset] != '|') return error.InvalidStructuredAirV2;
+            self.offset = std.math.add(usize, self.offset, 1) catch return error.InvalidStructuredAirV2;
+            self.trailing_empty = self.offset == self.line.len;
+        } else if (self.offset < self.line.len) {
+            if (self.line[self.offset] != '|') return error.InvalidStructuredAirV2;
+            self.offset = std.math.add(usize, self.offset, 1) catch return error.InvalidStructuredAirV2;
+            self.trailing_empty = self.offset == self.line.len;
+        }
+        return self.line[start..end];
+    }
+};
 
 fn parseStructuredBodyKind(text: []const u8) ?StructuredBodyKind {
     if (std.mem.eql(u8, text, "main")) return .main;
@@ -1032,6 +1096,88 @@ test "parse structured AIR v2 typed instruction details" {
     try std.testing.expectEqual(@as(usize, 1), instruction.details.len);
     try std.testing.expectEqualStrings("literal", instruction.details[0].key);
     try std.testing.expectEqualStrings("<i32, 0>", instruction.details[0].value);
+}
+
+test "structured AIR v2 length framing accepts an embedded pipe in result type" {
+    const text =
+        "structured_air-v2\n" ++
+        "typed_inst|0|ret|3|u|8|un_op|0\n" ++
+        "structured_air_v2_end\n";
+    const parsed = try parseStructuredAirV2(std.testing.allocator, text);
+    defer parsed.deinit(std.testing.allocator);
+    try std.testing.expectEqualStrings("u|8", parsed.instructions[0].result_type);
+}
+
+test "structured AIR v2 length framing accepts an embedded pipe in operand value" {
+    const text =
+        "structured_air-v2\n" ++
+        "typed_inst|0|ret|5|usize|un_op|1|const|3|1|8|5|usize\n" ++
+        "structured_air_v2_end\n";
+    const parsed = try parseStructuredAirV2(std.testing.allocator, text);
+    defer parsed.deinit(std.testing.allocator);
+    try std.testing.expectEqualStrings("1|8", parsed.instructions[0].operands[0].value);
+}
+
+test "structured AIR v2 length framing accepts an embedded pipe in operand type" {
+    const text =
+        "structured_air-v2\n" ++
+        "typed_inst|0|ret|5|usize|un_op|1|const|1|0|3|u|8\n" ++
+        "structured_air_v2_end\n";
+    const parsed = try parseStructuredAirV2(std.testing.allocator, text);
+    defer parsed.deinit(std.testing.allocator);
+    try std.testing.expectEqualStrings("u|8", parsed.instructions[0].operands[0].type_text);
+}
+
+test "structured AIR v2 length framing accepts an embedded pipe in detail value" {
+    const text =
+        "structured_air-v2\n" ++
+        "typed_inst|0|ret|5|usize|none|0|1|literal|3|a|b\n" ++
+        "structured_air_v2_end\n";
+    const parsed = try parseStructuredAirV2(std.testing.allocator, text);
+    defer parsed.deinit(std.testing.allocator);
+    try std.testing.expectEqualStrings("a|b", parsed.instructions[0].details[0].value);
+}
+
+test "structured AIR v2 length framing accepts zero-length values" {
+    const text =
+        "structured_air-v2\n" ++
+        "typed_inst|0|ret|0||none|1|empty|0||0|\n" ++
+        "structured_air_v2_end\n";
+    const parsed = try parseStructuredAirV2(std.testing.allocator, text);
+    defer parsed.deinit(std.testing.allocator);
+    try std.testing.expectEqualStrings("", parsed.instructions[0].result_type);
+    try std.testing.expectEqualStrings("", parsed.instructions[0].operands[0].value);
+    try std.testing.expectEqualStrings("", parsed.instructions[0].operands[0].type_text);
+}
+
+test "structured AIR v2 length framing rejects invalid lengths truncation and missing separators" {
+    const invalid_length = "structured_air-v2\ntyped_inst|0|ret|x|usize|none|0\nstructured_air_v2_end\n";
+    try std.testing.expectError(error.InvalidUnsignedInteger, parseStructuredAirV2(std.testing.allocator, invalid_length));
+    const overflow_length = "structured_air-v2\ntyped_inst|0|ret|999999999999999999999999999999999999999|usize|none|0\nstructured_air_v2_end\n";
+    try std.testing.expectError(error.InvalidUnsignedInteger, parseStructuredAirV2(std.testing.allocator, overflow_length));
+    const truncated = "structured_air-v2\ntyped_inst|0|ret|6|usize\nstructured_air_v2_end\n";
+    try std.testing.expectError(error.InvalidStructuredAirV2, parseStructuredAirV2(std.testing.allocator, truncated));
+    const missing_separator = "structured_air-v2\ntyped_inst|0|ret|5|usizenone|0\nstructured_air_v2_end\n";
+    try std.testing.expectError(error.InvalidStructuredAirV2, parseStructuredAirV2(std.testing.allocator, missing_separator));
+}
+
+test "structured AIR v2 length framing rejects count mismatch trailing data and missing end" {
+    const missing_operand = "structured_air-v2\ntyped_inst|0|ret|5|usize|none|1\nstructured_air_v2_end\n";
+    try std.testing.expectError(error.InvalidStructuredAirV2, parseStructuredAirV2(std.testing.allocator, missing_operand));
+    const missing_detail = "structured_air-v2\ntyped_inst|0|ret|5|usize|none|0|1\nstructured_air_v2_end\n";
+    try std.testing.expectError(error.InvalidStructuredAirV2, parseStructuredAirV2(std.testing.allocator, missing_detail));
+    const trailing_field = "structured_air-v2\ntyped_inst|0|ret|5|usize|none|0|0|extra\nstructured_air_v2_end\n";
+    try std.testing.expectError(error.InvalidStructuredAirV2, parseStructuredAirV2(std.testing.allocator, trailing_field));
+    const trailing_data = "structured_air-v2\ntyped_inst|0|ret|5|usize|none|0\nstructured_air_v2_end\nunexpected\n";
+    try std.testing.expectError(error.InvalidStructuredAirV2, parseStructuredAirV2(std.testing.allocator, trailing_data));
+    const missing_end = "structured_air-v2\ntyped_inst|0|ret|5|usize|none|0\n";
+    try std.testing.expectError(error.InvalidStructuredAirV2, parseStructuredAirV2(std.testing.allocator, missing_end));
+    const malformed_after_valid =
+        "structured_air-v2\n" ++
+        "typed_inst|0|ret|5|usize|none|0\n" ++
+        "typed_inst|1|ret|4|bad\n" ++
+        "structured_air_v2_end\n";
+    try std.testing.expectError(error.InvalidStructuredAirV2, parseStructuredAirV2(std.testing.allocator, malformed_after_valid));
 }
 
 test "reject AIR export instruction index outside storage count" {
