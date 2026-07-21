@@ -24,7 +24,93 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CG real-byte supply boundary checkpoint — AUTHORIZED SOLE CURRENT ACTION
+## INBOX-206CH CG static-closure recovery — AUTHORIZED SOLE CURRENT ACTION
+
+INBOX-206CG is accepted as a compliant fail-closed stop. Its document content
+is provisionally accepted as substantively complete, but committed-deliverable
+and clean-tree acceptance are withheld. The Worker final report is preserved
+verbatim:
+
+```text
+INBOX-206CG stopped at the first failed static-closure command.
+
+The sole evidence document remains uncommitted. Per directive, I performed no diagnosis, retry, repair, cleanup, fix-forward, staging, commit, or later command.
+```
+
+Static Watcher review ran no project code. Retained Worker turn
+`019f8325-bc8d-7ec3-95a2-afb0ba3b1e03` proves complete authority reads, one
+successful exact preflight, the four authorized static input reads, one
+sole-file patch, mode finalization, one static closure, and immediate stop.
+No project command, stage, commit, retry, repair, cleanup, protected-path
+access, or later Worker command occurred.
+
+The sole worktree change is untracked mode-0644
+`docs/evidence/inbox206cg_real_byte_supply_boundary.md`, prospective blob
+`9311a8980f9540769ef6a8c6f1dd7cd469c5ff02`, SHA-256
+`352dc3dc444affc7202160c1e98cbb0954849c9964879ea2bed859d0336333b4`,
+13,193 bytes, and 153 lines. Index and tracked source are unchanged, and the
+evidence diff is whitespace-clean.
+
+The exact procedural failure was the first detailed-variant count: its
+overlapping alternation also matched Variant 3 in the later decision matrix,
+so it returned four instead of three. `set -e` stopped there. The evidence
+content satisfies CG's four-property separation, complete variant boundaries,
+non-conflation rules, rejected shortcuts, `selected_variant=none`, and
+no-authority disposition.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept INBOX-206CG as a compliant fail-closed stop and accept its document content provisionally as substantively complete. I withhold committed-deliverable and clean-tree acceptance.
+
+I authorize INBOX-206CH as proposed, with these refinements:
+
+- The operating commit must be the non-merge child of 13777280dbae581e1dbba8eded0149656cf33217, changing only docs/next_steps.md.
+- Preserve the CG file exactly at mode 0644, 13,193 bytes, 153 lines, and SHA-256 352dc3dc444affc7202160c1e98cbb0954849c9964879ea2bed859d0336333b4.
+- Validate the two three-row groups using disjoint section bounds or exact full row labels. Do not use overlapping alternation, inferred line numbers, hunk counts, or substring counts.
+- The preflight must require an empty index and CG as the sole untracked exception.
+- Success may stage and commit only CG, then verify its exact identity and clean main/control. No content or mode mutation is authorized.
+
+selected_variant=none, the prospective Variant-2 audit, all authority restrictions, the pure-Zig boundary, and immediate fail-closed behavior remain exact.
+```
+
+Preserve the CG file byte-for-byte and do not change its mode. Run one
+read-only preflight requiring current HEAD to be the non-merge direct child of
+`13777280dbae581e1dbba8eded0149656cf33217` changing only this file; an empty
+index and no tracked diff; and CG as the sole untracked exception at the exact
+identity above. Verify clean control and every protected identity without
+registered-worktree traversal or project execution.
+
+Run one corrected static closure. Check the detailed matrix with the distinct
+anchored labels `1. Caller-supplied held regular-file descriptor`,
+`2. Caller-supplied immutable/sealed descriptor`, and `3. Bounded one-shot
+byte stream`. Separately check the decision matrix with `1. Held regular-file
+descriptor`, `2. Immutable/sealed descriptor`, and `3. Bounded one-shot byte
+stream`. Each exact label occurs once in its disjoint group. Do not use
+overlapping alternation, inferred line numbers, hunk counts, or substring
+counts. Retain every prior CG static field/prose/rejection/whitespace and
+protected-identity check.
+
+On success, stage and commit only the unchanged CG evidence file, verify
+non-merge ancestry, sole-path scope, exact mode/blob/SHA/bytes/lines, and clean
+main/control, report, and stop. The first failure stops immediately without
+diagnosis, retry, repair, cleanup, content/mode mutation, or fix-forward. Run
+no project command.
+
+The pure-Zig boundary is absolute: substantive project logic, generators,
+validators, codecs, hashing, harnesses, workflow, and tooling must be Zig.
+Bash is tiny transparent fixed-command orchestration only. No JavaScript,
+ECMAScript, TypeScript, Python, Perl, AWK, other-language project solution, or
+project algorithm in internal-agent transport is authorized.
+
+CH grants no source/build/tool/cache/output/continuation change, evidence edit,
+real-byte supply, Git-object extraction, registered-worktree traversal or
+modification, store access, provisioning, execution, publication,
+installation, production, D01/D02, ratchet movement, cleanup, credit, or
+downstream authority. `selected_variant=none` remains binding and the
+Variant-2 audit remains prospective only.
+
+## INBOX-206CG real-byte supply boundary checkpoint — COMPLIANT FAIL-CLOSED STOP; PROVISIONAL CONTENT; SUPERSEDED BY INBOX-206CH
 
 INBOX-206CF is fully accepted within its private synthetic-ingress scope. The
 atomic admission defect is closed; real-byte and production authority remain
