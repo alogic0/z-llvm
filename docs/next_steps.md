@@ -24,7 +24,174 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CF pure-Zig atomic one-shot token continuation — AUTHORIZED SOLE CURRENT ACTION
+## INBOX-206CG real-byte supply boundary checkpoint — AUTHORIZED SOLE CURRENT ACTION
+
+INBOX-206CF is fully accepted within its private synthetic-ingress scope. The
+atomic admission defect is closed; real-byte and production authority remain
+unchanged. The Worker final report is preserved verbatim:
+
+```text
+INBOX-206CF completed successfully.
+
+- Commit: 86e16bf3bb173d3d72ae1b17b6e64f9e9a3b4e2b
+- Parent: ec85b92e86b63bd09beb01c93198ad639a54f779
+- Tree: da1045a183412d5d0a957e0563ec1c85331e0a6f
+- File: tools/zllvm_inbox206_materialize.zig
+- Mode: 100644
+- Blob: 77809d948ef6ee630f17c721cb071f7353feb3a8
+- SHA-256: f7adf9f37bf7b64b80ef4fe1077562a0a32390e2c07e4db9ddb6f55e4f7cbcef
+- Identity: 46,232 bytes, 1,334 lines
+
+Both one-shot gates passed:
+
+- zig fmt --check tools/zllvm_inbox206_materialize.zig
+- zig build test-inbox206-descriptor-identity
+
+The token now uses atomic single admission with the required memory ordering, and the deterministic two-thread test proves loser rejection with zero allocation/callback. CF caches are retained; main and control are clean.
+
+Status remains conditionally_supported; execution authority remains synthetic-focused-test-only; D01 withheld, D02 unauthorized, ratchet 131.
+```
+
+Static Watcher review ran no project code. Commit
+`86e16bf3bb173d3d72ae1b17b6e64f9e9a3b4e2b` is non-merge, direct child of
+`ec85b92e86b63bd09beb01c93198ad639a54f779`, tree
+`da1045a183412d5d0a957e0563ec1c85331e0a6f`, and changes only mode-100644
+`tools/zllvm_inbox206_materialize.zig` by 163 insertions/10 deletions.
+Diff-check passes. Final blob, SHA-256, bytes, and lines match the report.
+
+Complete source review confirms `SnapshotTokenState` is `enum(u8)`, the
+atomic value initializes `.unused`, exactly one strong CAS claims
+`.unused -> .in_progress` with `.acq_rel/.acquire`, and an immediate defer
+stores `.consumed` with `.release`. Every final state observation is an
+`.acquire` load. Recursive, initially-in-progress, second-use, and
+retry-after-failure cases remain.
+
+The deterministic actual second thread publishes callback entry with release;
+the main thread observes it with acquire before loser invocation. The loser
+gets `SnapshotTokenUnavailable` while state remains `.in_progress`. A
+zero-buffer fixed allocator is the permitted first-allocation-failing proof:
+reaching the positive exact-length allocation would instead yield
+`OutOfMemory`; the required token error and independent zero callback count
+therefore prove rejection before both edges. Claimant release and join precede
+result reads, and owned snapshot transfer reaches exactly one deinitializer.
+
+Retained Worker turn `019f831b-57a7-7523-a84f-ce3fb61f52f2` proves complete
+authority/skill reads, one successful pre-edit gate, one source patch, one
+static source/diff guard, exactly one combined invocation creating fresh CF
+caches then running the formatter check and focused build once in order, one
+read-only closure, sole-file stage/commit, and terminal verification. No
+retry, API reread, other project command, real bytes, Git-object extraction,
+worktree traversal, cleanup, BI/continuation, or later tool occurred.
+
+Main/index/control are clean. CF caches are retained non-symlink directories;
+CE caches remain absent. Build/watcher/PID/stash identities, BI absence,
+D01/D02, ratchet 131, and current 43/33/8/2 registered-worktree inventory
+remain exact.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I fully accept INBOX-206CF within its private synthetic-ingress scope. The atomic admission defect is closed; real-byte and production authority remain unchanged.
+
+I authorize evidence/design-only INBOX-206CG as proposed, with these refinements:
+
+- Trace the required security property to existing BK/CC authority. Do not downgrade “no mutation event during acquisition” to “verified final bytes” merely because the latter is implemented. If existing authority does not explicitly choose one, preserve both as distinct requirements and keep selected_variant=none.
+
+- Evaluate four properties separately: producer provenance, acquisition-time immutability/event-freedom, returned-snapshot identity, and single-use lifecycle.
+- Separate administrative identity binding from runtime proof. Exact commit/tree/blob metadata plus raw length/SHA authority does not itself prove how supplied runtime bytes were obtained.
+- For every variant, identify the producer, consumer, ownership transfer, seek/offset behavior, EOF rule, immutability evidence, and which party verifies each identity. An unspecified external provisioner remains a blocker.
+
+- Do not treat descriptor identity, seals, raw SHA equality, or one-shot admission as interchangeable guarantees.
+- The recommendation may be another bounded Zig-only API/evidence audit; it must not imply implementation or real-byte-supply authority.
+
+The non-merge operating commit atop 86e16bf3bb173d3d72ae1b17b6e64f9e9a3b4e2b, sole evidence-file scope, immediate exact-file mode finalization, static-only checks, fail-closed stop, and all stated prohibitions remain exact.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`86e16bf3bb173d3d72ae1b17b6e64f9e9a3b4e2b`; update the ignored inbox
+separately.
+
+Create only mode-0644
+`docs/evidence/inbox206cg_real_byte_supply_boundary.md`. This is an
+evidence/design-only checkpoint. Do not modify source, `build.zig`, tools,
+scripts, caches, output, continuation, control, store, or another path. Run no
+project command.
+
+Read only these exact committed inputs as static evidence:
+
+- `docs/evidence/inbox206ca_registered_worktree_descriptor_boundary.md`;
+- `docs/evidence/inbox206cc_trusted_committed_blob_ingress_design.md`;
+- `docs/evidence/inbox206bk_zig_materialization_readiness_design.md`;
+- committed CF `tools/zllvm_inbox206_materialize.zig` and its exact CF diff.
+
+Perform no broad traversal, Git-object extraction or content read, real-byte
+read, registered-worktree artifact treatment, artifact-store access, or
+external provisioning.
+
+Freeze CF as fully accepted only for generic private synthetic ingress. Status
+remains `conditionally_supported`; D01 withheld, D02 unauthorized, ratchet
+131. No implementation, real-byte, production, publication, or execution
+authority follows.
+
+Trace the required security property to existing BK/CC authority. Do not
+downgrade “no mutation event during acquisition” to “verified final bytes”
+merely because the latter is implemented. If existing authority does not
+explicitly choose one, preserve both as distinct requirements and set
+`selected_variant=none`.
+
+Evaluate these four properties independently:
+
+1. producer provenance;
+2. acquisition-time immutability/event-freedom;
+3. returned-snapshot identity;
+4. single-use lifecycle.
+
+Separate administrative identity binding from runtime proof. Exact
+commit/tree/blob metadata plus raw length/SHA authority does not prove how
+runtime bytes were obtained. Do not treat descriptor identity, seals, raw SHA
+equality, or one-shot admission as interchangeable guarantees.
+
+Re-evaluate CC Variants 1/2/3. For each, identify the exact producer,
+consumer, ownership transfer, seek/offset behavior, EOF rule, immutability
+evidence, provenance record, and which party verifies each identity. An
+unspecified external provisioner is a blocker. Apply all of these constraints:
+
+- pure Zig for every substantive project component;
+- no runtime registered-worktree traversal;
+- no Git CLI, subprocess, shell producer, foreign helper, or agent transport;
+- distinct exact commit/tree/blob provenance and raw length/SHA identity;
+- explicit ownership, offset/EOF, and one-shot lifecycle.
+
+Explicitly reject `@embedFile` or build-time worktree reads, pathname reopen,
+shell/Git plumbing, agent transport, and unverified mutable supply.
+
+Produce a decision matrix and one recommendation. Select a variant only if
+existing evidence closes both the unchanged threat model and exact provenance
+producer boundary. Otherwise retain `selected_variant=none` and name the
+single smallest subsequent Zig-only API/evidence audit required to choose.
+The recommendation must not imply implementation or real-byte-supply
+authority. CG authorizes no dormant code slice.
+
+Run one preflight, create the sole evidence file once, finalize mode 0644
+immediately, perform static-only diff/check/identity closure, commit only that
+evidence file, verify clean main/control, report, and stop. The first failure
+stops uncommitted immediately without diagnosis, retry, repair, cleanup, or
+fix-forward.
+
+The pure-Zig boundary is absolute: all substantive project logic,
+generators, validators, codecs, hashing, harnesses, workflow, and tooling must
+be Zig. Bash remains tiny transparent fixed-command orchestration only. No
+JavaScript, ECMAScript, TypeScript, Python, Perl, AWK, other-language solution,
+or project algorithm in internal-agent transport is authorized.
+
+No source/build/tool/cache/output/continuation change, Git-object extraction,
+real-byte supply, worktree traversal, artifact-store access, provisioning,
+execution, publication, installation, production, evidence generation beyond
+the sole CG document, BI/continuation creation, D01/D02, ratchet movement,
+cleanup, credit, or downstream authority is granted.
+
+## INBOX-206CF pure-Zig atomic one-shot token continuation — ACCEPTED; SUPERSEDED BY INBOX-206CG
 
 INBOX-206CE is accepted only as a compliant no-change stop. It earns preflight
 credit but no implementation, test, or cache credit. The Worker final report
