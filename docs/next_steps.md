@@ -24,7 +24,113 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BP pure-Zig exhaustive required-mask negative closure — AUTHORIZED
+## INBOX-206BQ check-only exhaustive-mask commit closure — AUTHORIZED
+
+INBOX-206BP is accepted only as a compliant fail-closed post-test/pre-commit
+stop. Its exact Zig bytes and passed one-shot formatter/focused-test results
+receive provisional content and test credit; commit closure remains withheld.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BP stopped at the first failed read-only closure gate.
+
+The sole-file Zig change and both isolated cache roots are retained. No diagnosis, retry, repair, cleanup, staging, commit, fix-forward, or later command was performed. Status remains `conditionally_supported`; ratchet remains 131.
+```
+
+Static Watcher review ran no project code. Main remains at operating commit
+`166b43ecfba59c73f3f6ffb9f4a599b4559a53a8`, parent
+`f1d8c116824aa79e6e7db4d94145b1cdbbc56181`, tree
+`6c16fc411e734c9f1f5faafddcddcc297649d429`; the index is empty. The sole
+dirty path is mode-0644 `tools/zllvm_inbox206_materialize.zig`, 8,107 bytes,
+225 lines, SHA-256
+`b1c5793dff8ff4cf3970492903c9a6de2eb352a38928199fb1d1e3cbe21d0a62`, Git
+blob `7db30e059b50ffe849ece343c9fc2d94bda9f4ff`, with standard Git diff SHA-256
+`7fd5362a112962b585374f50969ea0434daf015bffad8f24f69f35a59f318894`.
+`build.zig` remains SHA-256
+`3ab852ee10a670fa076d478ab1b45f9c63dd585950597b6dcb13f2e01cea4a38`.
+
+Retained Worker turn `019f8285-ec84-70e3-a627-e6e2164bdf1e` proves the
+authorized read/edit only, pre-gate closure, one passing formatter gate, one
+passing focused build/test gate, the first failed read-only closure, and no
+later command. The brittle predicate expected one zero-context diff hunk;
+the authorized changes render as four separated zero-context hunks inside
+the same single test. This is a closure-check defect, not contrary content.
+
+Both BP caches remain retained directories/non-symlinks. Main index, control,
+stash, watcher SHA/blob/PID, all 43 protected registered worktrees and
+directories, protected identities, BI evidence/continuation absence, D01/D02,
+and ratchet 131 remain exact.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept INBOX-206BP only as a compliant fail-closed post-test/pre-commit stop. The exact Zig bytes and passed one-shot fmt/focused-test results receive provisional content and test
+credit; commit closure remains withheld.
+
+I authorize check-only INBOX-206BQ with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by 166b43ecfba59c73f3f6ffb9f4a599b4559a53a8; preserve the Zig file byte-identical, unstaged, and
+  mode 0644 during that commit, and update the ignored inbox separately.
+
+- Edit no project content and rerun no formatter, compiler, build, or test.
+- Require the authoritative directive to bind the final operating HEAD/parent/tree identities.
+- Verify exactly:
+    - sole dirty unstaged path tools/zllvm_inbox206_materialize.zig;
+    - mode 0644, 8,107 bytes, 225 lines;
+    - SHA-256 b1c5793dff8ff4cf3970492903c9a6de2eb352a38928199fb1d1e3cbe21d0a62;
+    - Git blob 7db30e059b50ffe849ece343c9fc2d94bda9f4ff;
+    - standard diff SHA-256 7fd5362a112962b585374f50969ea0434daf015bffad8f24f69f35a59f318894;
+    - unchanged build.zig SHA-256 3ab852ee10a670fa076d478ab1b45f9c63dd585950597b6dcb13f2e01cea4a38;
+    - both retained BP cache roots by no-follow root metadata only;
+    - clean control and all protected identities.
+
+- Treat the exact accepted full-file and diff hashes as the scope authority. Require the named test declaration to remain unique, but do not infer scope from Git hunk count or layout.
+- Success stages and commits only the Zig file, verifies main/control clean, and stops.
+- First failed check stops uncommitted without diagnosis, retry, repair, cleanup, or fix-forward.
+
+Status remains conditionally_supported; traversal, publication, materialization, installation, production reachability, evidence generation, D01/D02, ratchet movement, credit, and
+downstream authority remain withheld.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`166b43ecfba59c73f3f6ffb9f4a599b4559a53a8`; update only the ignored inbox
+separately. Preserve `tools/zllvm_inbox206_materialize.zig` byte-identical,
+unstaged, and mode 0644 during that commit. The dispatch must bind the final
+operating HEAD, parent, and tree identities.
+
+Edit no project content and reread no installed Zig source. Run no formatter,
+compiler, build, test, executable, or other project command. Run only fixed
+read-only Git, hash, line-count, mode, path, and no-follow root-metadata checks
+for the exact identities above and the final operating HEAD/parent/tree. Treat
+the accepted full-file and standard-diff hashes as authoritative scope. Require
+the named test declaration to be unique, but make no assertion about Git hunk
+count or layout.
+
+Require the sole dirty unstaged path, exact mode/bytes/lines/SHA/blob/diff,
+unchanged `build.zig`, both retained BP cache-root identities without
+traversal, clean control, and every protected identity. Success stages and
+commits only `tools/zllvm_inbox206_materialize.zig`, verifies main and control
+clean, and stops. First failed check stops uncommitted without diagnosis,
+retry, repair, cleanup, fix-forward, or later command.
+
+The project-language boundary remains absolute: every substantive
+implementation, generator, validator, codec, hashing operation, test harness,
+workflow, and artifact tool must be Zig. Bash is permitted only for tiny
+transparent orchestration invoking the exact fixed Git/hash/status commands.
+No JavaScript, ECMAScript, TypeScript, Python, Perl, AWK, other-language
+project solution, or internal-agent project algorithm is authorized.
+
+Status remains `conditionally_supported`; ratchet remains 131. Traversal,
+publication, materialization, installation, production reachability, evidence
+generation, BI/continuation creation, D01/D02 action, ratchet movement,
+credit, and downstream authority remain withheld. Before acting, acknowledge
+the check-only byte-preservation boundary, bound operating identities, exact
+checks, prohibited actions, success condition, and first-failure stop.
+
+
+## INBOX-206BP pure-Zig exhaustive required-mask negative closure — COMPLIANT FAIL-CLOSED STOP; SUPERSEDED BY INBOX-206BQ
 
 INBOX-206BO commit
 `f1d8c116824aa79e6e7db4d94145b1cdbbc56181` is accepted within BO's bounded
