@@ -74,7 +74,136 @@ commit is allowed for retries, typos, formatting, diagnostics, transport,
 serializer correction, failed development gates, mode transition, or an
 evidence-only remediation chain.
 
-## INBOX-206CN iterative pure-Zig provenance handoff — AUTHORIZED DEVELOPMENT SOLE CURRENT ACTION
+## INBOX-206CO execution-oracle-v1 — AUTHORIZED DEVELOPMENT SOLE CURRENT ACTION
+
+INBOX-206CN is accepted and closed at capability commit
+`7d3a1e3058371d06d6d4bf0a83bd206c7c3c5b55`, parent
+`a1dd0702836a0a8ca86022ccf6169497a73080e3`, tree
+`cc77d1746eeecca89d37fa76a470fd4fc5568e1f`, within its exact eight-path
+scope. Its canonical receipt binds the same tree and blobs, clean external
+pin `bdee02bc0c7f227c0f11bc9a449df673fe803540`, Zig 0.16.0, green gate
+statuses, mapper equality, and completion. The focused pure-Zig registration
+test passed 1/1. Both later shell-closure exits were no-credit harness
+predicate defects: the first compared an obsolete full pre-commit worktree
+porcelain hash after the authorized main-HEAD transition; the second parsed
+the tab-delimited `git ls-tree` path field with a space-only `IFS`. They are
+not project, receipt, Git, worktree, or acceptance defects. Do not rerun CN
+ACCEPTANCE or its closure harnesses.
+
+The old command
+
+```text
+zig build distribution-real-rows -- --mode=ReleaseFast --limit=1 --strict
+```
+
+is not an execution milestone and must not run under this authority. The
+existing v2 gate stops after native linking, rank 1 is
+`assumed_nondeterministic`, no current-pin cohort is materialized, and the
+accepted mapper records `air_row_binding=false`.
+
+INBOX-206CO is a separate DEVELOPMENT capability. Before editing, require:
+
+- clean main HEAD at the CO operating-authorization commit, with empty index
+  and clean diff checks;
+- clean read-only external Zig repository at
+  `bdee02bc0c7f227c0f11bc9a449df673fe803540`;
+- exact anchored ignore rule `/local-state/`;
+- CN canonical and inert failed receipts preserved untouched;
+- standing stash and registered-worktree protections preserved. Under the
+  reduced DEVELOPMENT oversight policy, do not repeatedly hash stable
+  receipts, stash, transcripts, or worktree inventories.
+
+`coff.Symbol.sizeOf` is only a lookup seed from historical rank 3. Historical
+v1/v2 candidate records are non-authoritative for CO and remain unchanged.
+There is no fallback candidate without a new Watcher/Reviewer review. Before
+any real execution, current-pin tracked source and a fresh current-pin
+descriptor must independently prove all of:
+
+- one unique definition and exact AIR binding;
+- fixed ABI and canonical input;
+- defined deterministic semantics;
+- an observable externally linked call whose occurrence is proven
+  independently from process exit status, so an optimized-away call cannot
+  pass.
+
+Reject the seed and stop before real execution if any proof is absent.
+
+The exact tracked DEVELOPMENT edit ceiling is:
+
+```text
+build.zig
+src/distribution_real_rows_gate.zig
+src/execution_oracle_v1.zig             # new
+```
+
+Add one separate non-default, non-installing `execution-oracle-v1` step.
+Existing v2 inputs, default behavior, schemas, lower/emission/link semantics,
+and counters must remain unchanged. `src/execution_oracle_v1.zig` owns the
+versioned fresh one-row identity and admission, separate pure-Zig reference
+and z_llvm-linked executions, canonical execution records, bounded process
+capture, exact oracle comparison, truthful counters, and focused tests. The
+existing real-row gate may expose or refactor only the minimum typed
+descriptor-extraction/lowering/object-emission seam needed by CO. Do not add
+a C or assembly harness or duplicate candidate-only success.
+
+Select Zig through an explicit absolute executable argument. Never hardcode a
+machine path and never fall back to `PATH`. Canonicalize the selected regular
+executable and measure its Zig version, byte length, and SHA-256 for the run.
+Use a newly constructed closed environment. `HOME`, `TMPDIR`, local/global
+Zig caches, every output, and all replaceable DEVELOPMENT state must remain
+beneath:
+
+```text
+local-state/caches/inbox206co/
+local-state/validations/inbox206co/
+```
+
+Do not touch or reuse historical `tmp/real_rows_air_export_cache`. Before a
+real invocation, declare a finite peak-storage formula and require sufficient
+filesystem headroom. No CO root may enter or traverse a registered worktree.
+
+First make focused synthetic tests green for admission rejection, missing or
+duplicate/current-pin binding, ABI/input mismatch, launch/status/output
+bounds, process inconsistency, oracle mismatch, optimized-away-call
+rejection, and truthful counter transitions. Only after those tests are
+green may DEVELOPMENT run one bounded real invocation. Ordinary in-scope
+diagnosis, Zig edits, formatting, tests, and reruns remain authorized until
+green. The real path must produce exactly one row with:
+
+```text
+real_functions_lowered=1
+real_objects_emitted=1
+real_native_linked=1
+real_executed=1
+real_programs_ok=1
+local_fail=0
+```
+
+`real_executed` advances only after both independent executions terminate
+successfully. `real_programs_ok` advances only after exact canonical-record
+equality across termination, stdout, stderr, and the admitted semantic
+result.
+
+At green, stop unstaged and uncommitted. Report changed paths and purposes,
+focused Zig commands and numeric results, the admitted current-pin row and
+security-critical identity, semantic/ABI/call-occurrence proof, counter
+record, actual bounded local-state sizes, and the minimum later ACCEPTANCE
+bootstrap. ACCEPTANCE is withheld.
+
+Do not edit or add a tracked cohort, evidence Markdown, v1/v2 input/schema,
+default/production wiring, another module, or another tracked path. Do not
+modify the external repository, Git objects, a registered worktree, CN
+receipts, or protected state; stage, commit, clean up, authorize D01/D02,
+move ratchet 131, claim performance/production credit, or enter ACCEPTANCE.
+
+The project-language boundary is absolute. All substantive implementation,
+generation, validation, codecs, hashing, harnesses, process/oracle logic,
+receipts, and tooling must be Zig 0.16. Bash is limited to tiny transparent
+fixed-command orchestration. No JavaScript/ECMAScript, TypeScript, Python,
+Perl, AWK, C, assembly, other-language project solution, or project logic in
+agent transport is authorized.
+
+## INBOX-206CN iterative pure-Zig provenance handoff — ACCEPTED AND CLOSED AT `7d3a1e30`
 
 The Worker's superseded CM stop is accepted as compliant after a delivery
 race. Its final report is preserved verbatim:
