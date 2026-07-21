@@ -4,8 +4,10 @@ pub const source_commit = "43de59b06ca3a687368bfaf0595c5759c8ab3a57";
 pub const external_zig_commit = "bdee02bc0c7f227c0f11bc9a449df673fe803540";
 pub const external_zig_tree = "aa032b2b82a48a4684657f909e6e270a6c925e33";
 pub const bypass_ratchet: u16 = 131;
+pub const mebibyte_bytes: u64 = 1_048_576;
 pub const minimum_available_bytes: u64 = 17_179_869_184;
-pub const accepted_maximum_storage_bytes: ?u64 = null;
+pub const accepted_maximum_storage_bytes: u64 = 14_321_451_008;
+pub const accepted_storage_reserve_bytes: u64 = 2_858_418_176;
 pub const canonical_repetition_count: usize = 3;
 pub const successful_function_count: u16 = 285;
 
@@ -90,6 +92,9 @@ pub const ContractError = error{
     RequiredStorageMaximumZero,
     StorageMaximumMismatch,
     StorageBudgetOverflow,
+    StorageReserveUnderflow,
+    StoragePolicyDrift,
+    AggregateExclusionMismatch,
     MinimumHeadroomSubstitution,
     InsufficientAvailableStorage,
 };
@@ -164,13 +169,13 @@ fn isSupersededV3(path: []const u8) bool {
 
 pub const ExecutionReadiness = enum {
     not_ready_insufficient_capacity,
-    not_ready_maximum_storage_ceiling_absent,
+    not_ready_storage_enforcement_absent,
 };
 
 pub fn executionReadiness(available_bytes: u64) ExecutionReadiness {
     if (available_bytes < minimum_available_bytes) return .not_ready_insufficient_capacity;
-    std.debug.assert(accepted_maximum_storage_bytes == null);
-    return .not_ready_maximum_storage_ceiling_absent;
+    std.debug.assert(accepted_maximum_storage_bytes < minimum_available_bytes);
+    return .not_ready_storage_enforcement_absent;
 }
 
 pub fn requireMinimumCapacity(available_bytes: u64) ContractError!void {
@@ -237,6 +242,95 @@ pub const storage_families = [_]StorageFamily{
     .durability_terminal,
 };
 
+pub const accepted_storage_cap_mib = [_]u64{
+    64,  0,   2048, 384, 1024, 1,  1024, 256,  1536,
+    256, 16,  768,  855, 64,   1,  64,   2048, 1024,
+    7,   512, 192,  512, 570,  64, 96,   256,  16,
+};
+
+pub const StorageRetentionClass = enum {
+    retained,
+    non_retained_namespace,
+};
+
+pub const StorageEnforcementPrimitive = enum {
+    bounded_process_capture,
+    fixed_count_fixed_size_record,
+    explicit_file_size_ceiling,
+    bounded_cache_install_root,
+    aggregate_only_accounting,
+    non_retained_namespace,
+};
+
+pub const StorageCapPolicy = struct {
+    family: StorageFamily,
+    source: StorageCapSource = .accepted_protocol_policy,
+    retention: StorageRetentionClass = .retained,
+    enforcement: StorageEnforcementPrimitive,
+    aggregate_exclusions: u32 = 0,
+};
+
+pub const accepted_storage_policy = [_]StorageCapPolicy{
+    .{ .family = .external_preflight_driver_records, .enforcement = .bounded_process_capture },
+    .{ .family = .namespace_parents, .retention = .non_retained_namespace, .enforcement = .non_retained_namespace },
+    .{
+        .family = .canonical_build_cache_install,
+        .enforcement = .bounded_cache_install_root,
+        .aggregate_exclusions = storageFamilyBit(.canonical_artifact),
+    },
+    .{ .family = .canonical_repetition_home_tmp, .enforcement = .bounded_cache_install_root },
+    .{ .family = .canonical_artifact, .enforcement = .explicit_file_size_ceiling },
+    .{ .family = .canonical_artifact_identity, .enforcement = .fixed_count_fixed_size_record },
+    .{ .family = .canonical_step_status_records, .enforcement = .fixed_count_fixed_size_record },
+    .{ .family = .canonical_build_raw_status, .enforcement = .bounded_process_capture },
+    .{ .family = .repetition_raw_report, .enforcement = .aggregate_only_accounting },
+    .{ .family = .canonical_accepted_ll, .enforcement = .explicit_file_size_ceiling },
+    .{ .family = .accepted_ll_proof, .enforcement = .fixed_count_fixed_size_record },
+    .{
+        .family = .repetition_successful_subset,
+        .enforcement = .aggregate_only_accounting,
+        .aggregate_exclusions = storageFamilyBit(.canonical_per_function) |
+            storageFamilyBit(.canonical_comparisons) |
+            storageFamilyBit(.canonical_final_manifests),
+    },
+    .{ .family = .canonical_per_function, .enforcement = .fixed_count_fixed_size_record },
+    .{ .family = .canonical_comparisons, .enforcement = .fixed_count_fixed_size_record },
+    .{ .family = .canonical_identities, .enforcement = .fixed_count_fixed_size_record },
+    .{ .family = .canonical_final_manifests, .enforcement = .fixed_count_fixed_size_record },
+    .{
+        .family = .coverage_build_cache_install,
+        .enforcement = .bounded_cache_install_root,
+        .aggregate_exclusions = storageFamilyBit(.coverage_artifact),
+    },
+    .{ .family = .coverage_artifact, .enforcement = .aggregate_only_accounting },
+    .{ .family = .coverage_reference, .enforcement = .fixed_count_fixed_size_record },
+    .{
+        .family = .observation_off,
+        .enforcement = .aggregate_only_accounting,
+        .aggregate_exclusions = storageFamilyBit(.coverage_per_function) |
+            storageFamilyBit(.coverage_comparisons) |
+            storageFamilyBit(.coverage_final_manifests),
+    },
+    .{ .family = .observation_on_channels, .enforcement = .fixed_count_fixed_size_record },
+    .{
+        .family = .observation_on_remaining,
+        .enforcement = .aggregate_only_accounting,
+        .aggregate_exclusions = storageFamilyBit(.observation_on_channels) |
+            storageFamilyBit(.coverage_per_function) |
+            storageFamilyBit(.coverage_comparisons) |
+            storageFamilyBit(.coverage_final_manifests),
+    },
+    .{ .family = .coverage_per_function, .enforcement = .fixed_count_fixed_size_record },
+    .{ .family = .coverage_comparisons, .enforcement = .fixed_count_fixed_size_record },
+    .{ .family = .coverage_final_manifests, .enforcement = .fixed_count_fixed_size_record },
+    .{
+        .family = .publication_evidence,
+        .enforcement = .aggregate_only_accounting,
+        .aggregate_exclusions = storageFamilyBit(.durability_terminal),
+    },
+    .{ .family = .durability_terminal, .enforcement = .fixed_count_fixed_size_record },
+};
+
 pub const StorageBudgetEntry = struct {
     family_id: u8,
     retained_bytes_maximum: u64,
@@ -252,6 +346,7 @@ pub const StorageBudgetTotals = struct {
 };
 
 pub const StorageCapSource = enum {
+    accepted_protocol_policy,
     family_cap_ledger,
     minimum_headroom_policy,
 };
@@ -362,6 +457,107 @@ fn storageFamilyFromId(id: u8) ?StorageFamily {
 
 fn storageFamilyRequiresBytes(family: StorageFamily) bool {
     return family != .namespace_parents;
+}
+
+fn storageFamilyBit(family: StorageFamily) u32 {
+    const shift: u5 = @intCast(@intFromEnum(family) - 1);
+    return @as(u32, 1) << shift;
+}
+
+fn expectedAggregateExclusions(family: StorageFamily) u32 {
+    return switch (family) {
+        .canonical_build_cache_install => storageFamilyBit(.canonical_artifact),
+        .repetition_successful_subset => storageFamilyBit(.canonical_per_function) |
+            storageFamilyBit(.canonical_comparisons) |
+            storageFamilyBit(.canonical_final_manifests),
+        .coverage_build_cache_install => storageFamilyBit(.coverage_artifact),
+        .observation_off => storageFamilyBit(.coverage_per_function) |
+            storageFamilyBit(.coverage_comparisons) |
+            storageFamilyBit(.coverage_final_manifests),
+        .observation_on_remaining => storageFamilyBit(.observation_on_channels) |
+            storageFamilyBit(.coverage_per_function) |
+            storageFamilyBit(.coverage_comparisons) |
+            storageFamilyBit(.coverage_final_manifests),
+        .publication_evidence => storageFamilyBit(.durability_terminal),
+        else => 0,
+    };
+}
+
+pub fn validateAcceptedStoragePolicy() ContractError!void {
+    if (accepted_storage_policy.len != storage_families.len or
+        accepted_storage_cap_mib.len != storage_families.len)
+    {
+        return error.StoragePolicyDrift;
+    }
+
+    for (
+        accepted_storage_policy,
+        storage_families,
+        accepted_storage_cap_mib,
+    ) |policy, family, cap_mib| {
+        if (policy.family != family or policy.source != .accepted_protocol_policy)
+            return error.StoragePolicyDrift;
+        if (family == .namespace_parents) {
+            if (cap_mib != 0 or
+                policy.retention != .non_retained_namespace or
+                policy.enforcement != .non_retained_namespace)
+            {
+                return error.StoragePolicyDrift;
+            }
+        } else if (cap_mib == 0) {
+            return error.RequiredStorageMaximumZero;
+        } else if (policy.retention != .retained or
+            policy.enforcement == .non_retained_namespace)
+        {
+            return error.StoragePolicyDrift;
+        }
+        if (policy.aggregate_exclusions != expectedAggregateExclusions(family))
+            return error.AggregateExclusionMismatch;
+    }
+}
+
+pub fn storageMibToBytes(mib: u64) ContractError!u64 {
+    return std.math.mul(u64, mib, mebibyte_bytes) catch
+        return error.StorageBudgetOverflow;
+}
+
+pub fn acceptedStorageBudgetEntries() ContractError![storage_families.len]StorageBudgetEntry {
+    try validateAcceptedStoragePolicy();
+    var entries: [storage_families.len]StorageBudgetEntry = undefined;
+    for (&entries, accepted_storage_policy, accepted_storage_cap_mib) |*entry, policy, cap_mib| {
+        const cap_bytes = try storageMibToBytes(cap_mib);
+        entry.* = .{
+            .family_id = @intFromEnum(policy.family),
+            .retained_bytes_maximum = cap_bytes,
+            .success_retained_bytes = cap_bytes,
+            .failure_retained_bytes = cap_bytes,
+        };
+    }
+    return entries;
+}
+
+pub fn acceptedStorageBudgetTotals(available_bytes: u64) ContractError!StorageBudgetTotals {
+    const entries = try acceptedStorageBudgetEntries();
+    const ledger = StorageBudgetLedger{
+        .entries = &entries,
+        .cap_source = .accepted_protocol_policy,
+    };
+    const totals = try ledger.validateComplete(available_bytes);
+    if (totals.success_retained_bytes != accepted_maximum_storage_bytes or
+        totals.failure_retained_bytes != accepted_maximum_storage_bytes or
+        totals.worst_case_retained_bytes != accepted_maximum_storage_bytes)
+    {
+        return error.StorageMaximumMismatch;
+    }
+    return totals;
+}
+
+pub fn acceptedStorageReserve() ContractError!u64 {
+    return std.math.sub(
+        u64,
+        minimum_available_bytes,
+        accepted_maximum_storage_bytes,
+    ) catch return error.StorageReserveUnderflow;
 }
 
 pub const Phase = enum(u8) {
@@ -808,6 +1004,126 @@ test "baseline validation storage budget rejects minimum headroom substitution" 
     );
 }
 
+test "baseline validation accepted storage cap order vector and zero classification" {
+    const expected = [_]u64{
+        64,  0,   2048, 384, 1024, 1,  1024, 256,  1536,
+        256, 16,  768,  855, 64,   1,  64,   2048, 1024,
+        7,   512, 192,  512, 570,  64, 96,   256,  16,
+    };
+    try std.testing.expectEqualSlices(u64, &expected, &accepted_storage_cap_mib);
+    try validateAcceptedStoragePolicy();
+
+    for (
+        accepted_storage_policy,
+        storage_families,
+        accepted_storage_cap_mib,
+        0..,
+    ) |policy, family, cap_mib, index| {
+        try std.testing.expectEqual(family, policy.family);
+        try std.testing.expectEqual(StorageCapSource.accepted_protocol_policy, policy.source);
+        if (index == 1) {
+            try std.testing.expectEqual(@as(u64, 0), cap_mib);
+            try std.testing.expectEqual(StorageFamily.namespace_parents, family);
+            try std.testing.expectEqual(
+                StorageRetentionClass.non_retained_namespace,
+                policy.retention,
+            );
+            try std.testing.expectEqual(
+                StorageEnforcementPrimitive.non_retained_namespace,
+                policy.enforcement,
+            );
+        } else {
+            try std.testing.expect(cap_mib != 0);
+            try std.testing.expectEqual(StorageRetentionClass.retained, policy.retention);
+        }
+    }
+}
+
+test "baseline validation accepted storage budget uses checked exact totals" {
+    try std.testing.expectEqual(mebibyte_bytes, try storageMibToBytes(1));
+    try std.testing.expectError(
+        error.StorageBudgetOverflow,
+        storageMibToBytes(std.math.maxInt(u64)),
+    );
+
+    const entries = try acceptedStorageBudgetEntries();
+    const ledger = StorageBudgetLedger{
+        .entries = &entries,
+        .cap_source = .accepted_protocol_policy,
+    };
+    const ledger_totals = try ledger.validateComplete(minimum_available_bytes);
+    const accepted_totals = try acceptedStorageBudgetTotals(minimum_available_bytes);
+    try std.testing.expectEqual(accepted_maximum_storage_bytes, ledger_totals.success_retained_bytes);
+    try std.testing.expectEqual(accepted_maximum_storage_bytes, ledger_totals.failure_retained_bytes);
+    try std.testing.expectEqual(accepted_maximum_storage_bytes, ledger_totals.worst_case_retained_bytes);
+    try std.testing.expectEqual(ledger_totals, accepted_totals);
+    try std.testing.expectEqual(accepted_storage_reserve_bytes, try acceptedStorageReserve());
+    try std.testing.expectEqual(
+        minimum_available_bytes,
+        try std.math.add(u64, accepted_maximum_storage_bytes, accepted_storage_reserve_bytes),
+    );
+}
+
+test "baseline validation accepted storage aggregates exclude separately counted families" {
+    try std.testing.expectEqual(
+        storageFamilyBit(.canonical_artifact),
+        accepted_storage_policy[@intFromEnum(StorageFamily.canonical_build_cache_install) - 1].aggregate_exclusions,
+    );
+    try std.testing.expectEqual(
+        storageFamilyBit(.canonical_per_function) |
+            storageFamilyBit(.canonical_comparisons) |
+            storageFamilyBit(.canonical_final_manifests),
+        accepted_storage_policy[@intFromEnum(StorageFamily.repetition_successful_subset) - 1].aggregate_exclusions,
+    );
+    try std.testing.expectEqual(
+        storageFamilyBit(.coverage_artifact),
+        accepted_storage_policy[@intFromEnum(StorageFamily.coverage_build_cache_install) - 1].aggregate_exclusions,
+    );
+    try std.testing.expectEqual(
+        storageFamilyBit(.coverage_per_function) |
+            storageFamilyBit(.coverage_comparisons) |
+            storageFamilyBit(.coverage_final_manifests),
+        accepted_storage_policy[@intFromEnum(StorageFamily.observation_off) - 1].aggregate_exclusions,
+    );
+    try std.testing.expectEqual(
+        storageFamilyBit(.observation_on_channels) |
+            storageFamilyBit(.coverage_per_function) |
+            storageFamilyBit(.coverage_comparisons) |
+            storageFamilyBit(.coverage_final_manifests),
+        accepted_storage_policy[@intFromEnum(StorageFamily.observation_on_remaining) - 1].aggregate_exclusions,
+    );
+    try std.testing.expectEqual(
+        storageFamilyBit(.durability_terminal),
+        accepted_storage_policy[@intFromEnum(StorageFamily.publication_evidence) - 1].aggregate_exclusions,
+    );
+
+    var cap_total_mib: u64 = 0;
+    for (accepted_storage_cap_mib) |cap_mib| {
+        cap_total_mib = try std.math.add(u64, cap_total_mib, cap_mib);
+    }
+    try std.testing.expectEqual(@as(u64, 13_658), cap_total_mib);
+    try std.testing.expectEqual(
+        accepted_maximum_storage_bytes,
+        try storageMibToBytes(cap_total_mib),
+    );
+}
+
+test "baseline validation accepted caps do not imply storage enforcement readiness" {
+    try std.testing.expectError(
+        error.InsufficientCapacity,
+        acceptedStorageBudgetTotals(minimum_available_bytes - 1),
+    );
+    try std.testing.expectEqual(
+        ExecutionReadiness.not_ready_insufficient_capacity,
+        executionReadiness(minimum_available_bytes - 1),
+    );
+    try std.testing.expectEqual(
+        ExecutionReadiness.not_ready_storage_enforcement_absent,
+        executionReadiness(minimum_available_bytes),
+    );
+    try std.testing.expect(accepted_maximum_storage_bytes < minimum_available_bytes);
+}
+
 test "baseline validation rejects identity and compatibility-key drift" {
     try validateIdentities(&closed_identities);
     try validateCompatibilityKeys(&compatibility_keys);
@@ -846,10 +1162,10 @@ test "baseline validation minimum capacity never implies execution readiness" {
         executionReadiness(minimum_available_bytes - 1),
     );
     try std.testing.expectEqual(
-        ExecutionReadiness.not_ready_maximum_storage_ceiling_absent,
+        ExecutionReadiness.not_ready_storage_enforcement_absent,
         executionReadiness(minimum_available_bytes),
     );
-    try std.testing.expect(accepted_maximum_storage_bytes == null);
+    try std.testing.expectEqual(@as(u64, 14_321_451_008), accepted_maximum_storage_bytes);
 }
 
 test "baseline validation rejects canonical repetition mismatch" {
