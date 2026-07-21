@@ -24,7 +24,88 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CI CG frozen-identity commit recovery — AUTHORIZED SOLE CURRENT ACTION
+## INBOX-206CJ Variant-2 sealed-descriptor API audit — AUTHORIZED SOLE CURRENT ACTION
+
+INBOX-206CI and committed CG are fully accepted. The Worker report is
+preserved verbatim:
+
+```text
+INBOX-206CI completed successfully.
+
+- Commit: c96f92144cb29526d44078ee955481ba36df4195
+- Tree: 8f3e4ce09fc30ee92d862dfc7a066e6dee2d6409
+- Sole path: docs/evidence/inbox206cg_real_byte_supply_boundary.md
+- Mode: 100644
+- Blob: 9311a8980f9540769ef6a8c6f1dd7cd469c5ff02
+- SHA-256: 352dc3dc444affc7202160c1e98cbb0954849c9964879ea2bed859d0336333b4
+- Size: 13,193 bytes / 153 lines
+
+Main and control are clean. Protected identities remain intact; no project command or worktree traversal occurred. selected_variant=none, D01 withheld, D02 unauthorized, and ratchet 131 remain binding.
+```
+
+Static Watcher and retained-log review ran no project code and verifies exact
+non-merge ancestry, sole-path scope, frozen identity, clean state, and the
+authorized preflight/stage/commit/final sequence without mutation or protected
+access.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I fully accept INBOX-206CI as the exact committed recovery of CG. CG is now accepted as a clean evidence/design deliverable; selected_variant=none remains binding.
+
+I authorize evidence-only INBOX-206CJ as proposed, with these refinements:
+
+- Audit creation and receipt independently. A creator can know it called memfd_create; a receiver cannot prove memfd origin merely from regular-file mode and successful F_GET_SEALS. Describe the received object as a seal-capable descriptor unless another trusted provenance mechanism exists.
+
+- Include MFD_CLOEXEC alongside the sealing precondition and distinguish compile-time API availability from runtime kernel/filesystem support.
+- Establish event-freedom only after observing the required seal mask. Explain that F_SEAL_WRITE excludes existing writable shared mappings when successfully added, while F_SEAL_FUTURE_WRITE leaves pre-existing writable mappings capable of mutation.
+
+- Treat F_SEAL_GROW and F_SEAL_SHRINK as size-stability requirements. Explain separately whether F_SEAL_SEAL is protocol closure; do not claim it prevents seal removal, because seals are already irreversible.
+
+- Prefer positional reads with a private checked offset over reliance on the descriptor’s shared current offset. Define the extra exact-offset EOF probe and size verification after seals are confirmed.
+
+- Keep content immutability, returned-byte identity, descriptor-origin provenance, and Git commit/tree/blob provenance as four separate claims. Seals close only the first.
+- Any unsupported syscall, missing seal bit, ambiguous descriptor role, overflow, or unclosed producer boundary must leave selected_variant=none.
+
+The operating parent c96f92144cb29526d44078ee955481ba36df4195, sole evidence-file scope, static-only inspection, mode finalization, fail-closed stop, and every pure-Zig and authority prohibition remain exact.
+```
+
+Create only mode-0644
+`docs/evidence/inbox206cj_variant2_sealed_descriptor_api_audit.md`. Read only
+committed CG, the exact CF snapshot-consumer region/diff, and the pinned Zig
+0.16/Linux static references and identities recorded in the matching active
+inbox directive. Run no project command, runtime probe, or real-byte access.
+
+Audit creator and receiver independently. Cover `MFD_CLOEXEC`, sealing
+preconditions, compile-time versus runtime support, add/get ordering and error
+taxonomy, required seal observation, writable-mapping semantics, size seals,
+protocol closure, positional checked offsets, post-seal size, exact-offset EOF,
+ownership/close/lifetime, and single-use integration. Do not infer memfd origin
+for a received seal-capable descriptor.
+
+Keep content immutability, returned-byte identity, descriptor-origin
+provenance, and Git provenance separate. Seals close only content immutability.
+Produce separate creator/receiver matrices, a support verdict, and one smallest
+recommendation. Any unsupported or unclosed condition retains
+`selected_variant=none`.
+
+Run one preflight, create only the evidence file, finalize 0644, perform one
+static diff/check/identity closure, commit only it, verify clean main/control,
+report, and stop. First failure stops immediately without diagnosis, retry,
+repair, cleanup, or fix-forward.
+
+All substantive project logic and tooling must be Zig. Bash is tiny fixed
+orchestration only. No JavaScript, ECMAScript, TypeScript, Python, Perl, AWK,
+other-language project solution, or agent-transport project algorithm is
+authorized.
+
+No implementation, dormant API, source/build/tool/script/cache/output/
+continuation change, real-byte supply, descriptor creation/syscall, Git-object
+extraction, worktree/store access, test, compilation, provisioning,
+publication, production, D01/D02, ratchet movement, cleanup, credit, or
+downstream authority is granted.
+
+## INBOX-206CI CG frozen-identity commit recovery — ACCEPTED; SUPERSEDED BY INBOX-206CJ
 
 INBOX-206CH is accepted only as a compliant fail-closed stop. CG remains
 provisionally accepted for substantive content, but not yet as a committed
