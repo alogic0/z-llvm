@@ -24,7 +24,78 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CH CG static-closure recovery — AUTHORIZED SOLE CURRENT ACTION
+## INBOX-206CI CG frozen-identity commit recovery — AUTHORIZED SOLE CURRENT ACTION
+
+INBOX-206CH is accepted only as a compliant fail-closed stop. CG remains
+provisionally accepted for substantive content, but not yet as a committed
+clean-tree deliverable. The Worker report is preserved verbatim:
+
+```text
+INBOX-206CH stopped at the first failed static-closure command.
+
+The unchanged CG evidence remains uncommitted. I performed no diagnosis, retry, repair, cleanup, mutation, fix-forward, staging, commit, or later command.
+```
+
+Static Watcher review ran no project code. Retained Worker turn
+`019f8332-d912-7c90-89ec-6794290746a3` proves complete CH reads, one
+successful preflight, one static closure, and immediate stop. The failure was
+the third detailed-row assertion: `3. Bounded one-shot byte stream` is the
+same label in both matrices, so its anchored count is two, not one.
+
+CG remains the sole untracked path at mode 0644, blob
+`9311a8980f9540769ef6a8c6f1dd7cd469c5ff02`, SHA-256
+`352dc3dc444affc7202160c1e98cbb0954849c9964879ea2bed859d0336333b4`,
+13,193 bytes, and 153 lines. Index, tracked source, control, and protected
+identities remain unchanged.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept INBOX-206CH only as a compliant fail-closed stop. CG remains provisionally accepted for substantive content, but not yet as a committed clean-tree deliverable.
+
+I authorize INBOX-206CI exactly as proposed:
+
+- Non-merge operating commit directly atop a8de30fab42f47c2d350f5a1028f544fbdb8bbe4, changing only docs/next_steps.md.
+- Preserve CG byte-for-byte and mode-for-mode at blob 9311a8980f9540769ef6a8c6f1dd7cd469c5ff02, SHA-256 352dc3dc444affc7202160c1e98cbb0954849c9964879ea2bed859d0336333b4, 13,193 bytes, 153 lines, mode 0644.
+
+- Use that complete frozen identity as content authority; run no further textual, row-count, regex, line, hunk, or section assertions.
+- Require CG as the sole untracked path and an empty index/no tracked diff before staging.
+- On success, commit only CG and perform the stated identity, ancestry, clean-state, and protected-boundary verification.
+
+All fail-closed, authority, pure-Zig, worktree, D01/D02, and ratchet restrictions remain exact.
+```
+
+Preserve CG byte-for-byte and mode-for-mode. Run one read-only preflight
+requiring current HEAD to be a non-merge direct child of
+`a8de30fab42f47c2d350f5a1028f544fbdb8bbe4` changing only this operating
+document; empty index and no tracked diff; CG as the sole untracked path at
+the exact frozen identity; clean control; and all protected identities. Do
+not list or traverse registered worktrees and run no project command.
+
+The exact mode/blob/SHA/bytes/lines identity is complete authority for the
+already-reviewed content. Run no further textual, row-count, regex, field,
+prose, substring, section, line-number, hunk, or content assertion.
+
+On successful preflight, stage and commit only unchanged CG. Then run one
+read-only final verification of non-merge ancestry, sole committed path,
+exact frozen identity, clean main/control, and protected boundaries. Report
+and stop. The first failure stops immediately without diagnosis, retry,
+repair, cleanup, mutation, or fix-forward.
+
+The pure-Zig boundary remains absolute. All substantive project logic,
+generators, validators, codecs, hashing, harnesses, workflow, and tooling must
+be Zig. Bash is tiny transparent fixed-command orchestration only. No
+JavaScript, ECMAScript, TypeScript, Python, Perl, AWK, other-language project
+solution, or project algorithm in internal-agent transport is authorized.
+
+CI grants no evidence edit/mode change, source/build/tool/cache/output/
+continuation change, real-byte supply, Git-object extraction, worktree access
+or mutation, store access, provisioning, execution, publication,
+installation, production, D01/D02, ratchet movement, cleanup, credit, or
+downstream authority. `selected_variant=none` remains binding and the
+Variant-2 audit remains prospective only.
+
+## INBOX-206CH CG static-closure recovery — COMPLIANT FAIL-CLOSED STOP; SUPERSEDED BY INBOX-206CI
 
 INBOX-206CG is accepted as a compliant fail-closed stop. Its document content
 is provisionally accepted as substantively complete, but committed-deliverable
