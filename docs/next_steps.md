@@ -24,7 +24,158 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CC trusted committed-blob ingress design — AUTHORIZED EVIDENCE/DESIGN ONLY
+## INBOX-206CD pure-Zig private verified-snapshot primitive — AUTHORIZED SOLE CURRENT ACTION
+
+INBOX-206CC is accepted fully within its evidence/design-only scope. The
+Worker final report is preserved verbatim:
+
+```text
+INBOX-206CC completed successfully.
+
+- Commit: f5c560015ce639f94faf75655f4b503bca848e2d
+- Parent: e06ed773f64697fa4a496ad95ffd868554be1c26
+- Tree: 7ca697d2dbfc36027bfddc1febdce10b1bc66f24
+- File: docs/evidence/inbox206cc_trusted_committed_blob_ingress_design.md
+- Mode: 100644
+- Blob: 2482554a55d4660c1304aa6287df59269726972b
+- SHA-256: 955555b90f513936a2a54d2e9b9ded872789c3cc813e2576c605f36970a7eb46
+- Identity: 17,519 bytes, 384 lines
+- Main/control: clean
+
+The specification identities, build, watcher/PID, stash, caches, BI absence, and recorded 43-worktree identities remain preserved. No worktree-list call, Git-object extraction, artifact traversal, Zig/project execution, provisioning, or downstream action occurred.
+
+descriptor_status=conditionally_supported; execution_authority=none; production_authority=none; D01 remains withheld, D02 unauthorized, and ratchet remains 131.
+```
+
+Static Watcher review ran no project code. Commit
+`f5c560015ce639f94faf75655f4b503bca848e2d` is non-merge, parent
+`e06ed773f64697fa4a496ad95ffd868554be1c26`, tree
+`7ca697d2dbfc36027bfddc1febdce10b1bc66f24`, and adds only mode-100644
+`docs/evidence/inbox206cc_trusted_committed_blob_ingress_design.md`: 384
+insertions, 17,519 bytes, blob
+`2482554a55d4660c1304aa6287df59269726972b`, raw SHA-256
+`955555b90f513936a2a54d2e9b9ded872789c3cc813e2576c605f36970a7eb46`,
+binary-diff SHA-256
+`81a9108415dd059c708ffb105d6125703fe1719483a7f2b43d01d7f707675303`;
+diff-check passes. Full content review confirms the three variants remain
+unselected, the Git-blob/raw-SHA domains are distinct, the common owned
+snapshot is fail-closed, during-read mutation remains blocked, and all
+real-byte/execution/publication/production edges remain unauthorized.
+
+Retained Worker turn `019f82f7-a980-79c0-850a-44c211bd8940` proves the exact
+closed-read, one-preflight, one-create, one-immediate-mode, one-gate,
+sole-file-stage/commit, and one-terminal-verification sequence. Every call
+succeeded. No retry, worktree-list call, Git-object extraction,
+source/build/Zig/project command, provisioning, cleanup, or later tool
+occurred. Main/index/control and all protected identities remain exact.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I fully accept INBOX-206CC within its evidence/design-only scope and authorize Zig-only INBOX-206CD as proposed, with these refinements:
+
+- Model the token explicitly as caller-owned state: unused → in_progress → consumed. Set in_progress before allocation or callback; every exit leaves it consumed. Reject non-unused, recursive, concurrent, retry-after-failure, and second-use calls.
+
+- Validate a positive exact length against both the supplied maximum and a fixed internal ceiling before the sole allocation. Use checked conversions/arithmetic.
+- Give the callback an explicit result distinguishing nonempty bytes from canonical EOF. Reject zero-progress. After filling the exact allocation, perform one additional read into a fixed stack byte; only explicit EOF succeeds, while any byte is trailing data.
+
+- Use only std.crypto.hash.sha2.Sha256. Map callback failures to a closed snapshot-read error; preserve OutOfMemory; compare the final digest exactly.
+- Keep the returned private VerifiedSnapshot ownership explicit, with one deinitializer and no exposure to the observer until length, EOF, and digest verification all pass. The observer accepts only that verified type.
+
+- Existing declarations and tests must remain semantically and textually unchanged except for necessary insertion boundaries. No real-byte provenance, immutability, provisioning, or during-read-mutation blocker is resolved by CD.
+
+The operating commit must be the non-merge child of f5c560015ce639f94faf75655f4b503bca848e2d, changing only docs/next_steps.md; the ignored inbox remains separate. The one-file implementation scope, fresh CD caches, exactly-once fmt/focused-test gates, fail-closed behavior, pure-Zig boundary, and every stated prohibition remain exact.
+
+On success, authority remains synthetic focused tests only: real-byte provisioning, production, D01, D02, publication, materialization, and ratchet movement remain unauthorized.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`f5c560015ce639f94faf75655f4b503bca848e2d`; update only the ignored inbox
+separately.
+
+Modify only mode-0644 `tools/zllvm_inbox206_materialize.zig`, starting from
+blob `ab0281e4dbac00fcd2b4b9ba58e569c707eb8ef9`, raw SHA-256
+`788479986467c07051b9cd7021bb1367955d549e262c153581150ef84bd35396`,
+24,326 bytes and 677 lines. Do not change `build.zig` or another path.
+Preserve every existing declaration and test semantically and textually
+unchanged except for necessary insertion boundaries.
+
+Implement a private, test-root-only, mechanism-neutral
+`acquireVerifiedSnapshot`-style primitive for a bounded one-shot `readNext`
+seam. This generic/synthetic support does not select or authorize CC Variant
+3 for real supply.
+
+The caller supplies an allocator, a frozen expectation containing positive
+exact length, supplied maximum, and expected digest, a caller-owned token,
+and a synchronous Zig callback/context. Model the token exactly as
+`unused -> in_progress -> consumed`; set `in_progress` before allocation or
+callback, leave every exit `consumed`, and reject non-unused, recursive,
+concurrent, retry-after-failure, and second-use calls.
+
+Validate the positive exact length against the supplied maximum and a fixed
+internal ceiling before the sole allocation; use checked conversions and
+arithmetic. The callback result explicitly distinguishes nonempty bytes from
+canonical EOF; reject zero-progress. Copy bytes into the sole owned allocation
+while hashing the identical sequence with only
+`std.crypto.hash.sha2.Sha256`. After filling the exact allocation, perform one
+extra read into a fixed stack byte: only explicit EOF succeeds and any byte is
+trailing. Map callback failures to a closed snapshot-read error, preserve
+`OutOfMemory`, compare the digest exactly, and free owned memory exactly once
+on failure.
+
+Return only a private `VerifiedSnapshot` with explicit ownership and one
+deinitializer. Expose nothing to an observer until length, EOF, and digest all
+pass; the observer accepts only that verified type.
+
+Add only inert Zig synthetic/frozen tests for exact 29,834-byte success with
+Zig-generated non-BK bytes and matching standard-library SHA-256; exact/max/
+ceiling checked-size failures; boundary early EOF and one/multiple trailing
+bytes; zero-progress and callback failure; digest mismatch at first/middle/
+last; recursive/concurrent rejection, second use, and retry after failure;
+allocation failure and exact ownership cleanup; post-return input mutation;
+and observer admission only after full verification.
+
+No real BK bytes or its digest may be a fixture. Add no pathname, descriptor,
+Git/process/worktree/artifact access, provisioning, parser, renderer,
+publication, materialization, install, public API, main/src/default-build
+reachability, or production wiring. CD resolves no real-byte provenance,
+immutability, provisioning, or during-read-mutation blocker.
+
+Require both cache roots initially absent and non-symlink:
+
+```text
+ZIG_LOCAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206cd-local
+ZIG_GLOBAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206cd-global
+```
+
+Create them only immediately before the gates and retain them afterward. Run
+exactly once, in order:
+
+1. `zig fmt --check tools/zllvm_inbox206_materialize.zig`;
+2. `zig build test-inbox206-descriptor-identity` with both exact cache
+   variables.
+
+Run no other project command. Success permits only read-only diff, scope,
+identity, and status checks, then one sole-Zig-file commit and clean stop.
+First failure stops uncommitted without diagnosis, retry, repair, cleanup,
+formatting rewrite, or fix-forward.
+
+The pure-Zig boundary is absolute: every substantive implementation,
+generator, validator, codec, hash, harness, workflow, and artifact tool must
+be Zig. Bash is limited to tiny transparent fixed environment/command
+orchestration. No JavaScript, ECMAScript, TypeScript, Python, Perl, AWK,
+other-language project solution, or project algorithm in internal-agent
+transport is authorized.
+
+No real-byte supply, Git-object extraction, registered-worktree traversal,
+publication, materialization, installation, production reachability,
+evidence generation, BI/continuation creation, D01/D02 action, ratchet
+movement, credit, or downstream work is authorized. Status remains
+`conditionally_supported`; execution authority is only the named synthetic
+focused test; D01 remains withheld, D02 unauthorized, and ratchet 131.
+
+## INBOX-206CC trusted committed-blob ingress design — ACCEPTED; SUPERSEDED BY INBOX-206CD
 
 INBOX-206CB and the committed CA evidence are accepted fully within scope.
 The Worker final report is preserved verbatim:
