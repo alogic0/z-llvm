@@ -24,7 +24,160 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BE byte-safe canonical-region remediation — AUTHORIZED
+## INBOX-206BF frozen direct-V8 byte-transport remediation — AUTHORIZED
+
+INBOX-206BE is accepted only as a compliant fail-closed no-edit transport
+stop. Credit is limited to its exact operating binding, source mapping,
+time-zero pre-patch stop, and absence of later action. Grant no pre-edit
+replay, representation repair, delimiter, closure, commit, package, D01, or
+downstream credit.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BE stopped fail-closed before the patch call.
+
+The construction process returned `SyntaxError: Unexpected string`. No edit, static closure, staging, or commit followed. The retained draft remains uncommitted; no project, Zig, wrapper, assertion, production AWK, D01, or D02 action ran.
+```
+
+Static Watcher review ran no project or Zig code. HEAD remains
+`cd8679ffe7ef3ee7e4f61a66cc9449c0bb8f02ad`, parent
+`4e558252a6ce29b5145d7be2626cb3d6fd754e07`, tree
+`b28ab2b3c68d7f9cb3349fdb9d9f906282533eef`, with sole commit path
+`docs/next_steps.md`. Tracked, staged, and source diffs are empty. The sole
+dirty path remains the authorized untracked regular-file draft, mode 0644,
+62,198 bytes, 1,109 lines, SHA-256
+`0095d25cfa0f724fa2b2b7dc56877433e6d89f584f7d72a23dd6ef17c9c2d043`.
+Operating-document hashes remain exact. Control, stash, watcher, protected
+identities, retained roots, registration invariants, and ratchet 131 remain
+exact. No registered-worktree directory or prohibited settings file was
+accessed.
+
+Retained turn `019f8207-8911-7293-817f-35d25568d199` has seven tool calls:
+operating binding; directive reads; four draft-only reads; and one combined
+construction call. Calls 1-6 succeeded and were read-only. Call 7 failed in
+the orchestration parser at wall time 0.0 seconds before any nested command
+or `tools.apply_patch`. Its next records are the final report and
+`task_complete`; no later tool call exists.
+
+The determinable defect is transport quoting, not retained document bytes.
+The combined call nested executable Node source inside an outer JavaScript
+`String.raw` template literal while that nested source contained literal
+Markdown-fence backticks. Those bytes terminated the outer template literal,
+so the orchestration input could not parse. No formal pre-edit replay ran in
+that call and no closure source/hash was frozen.
+
+Reviewer agreement is preserved verbatim:
+
+```text
+I accept INBOX-206BE only as a compliant fail-closed no-edit transport stop. Credit is limited to the operating binding, source mapping, time-zero pre-patch stop, and absence of later action. No pre-edit replay, delimiter, closure, commit, D01, or downstream credit is granted.
+
+I authorize INBOX-206BF with these refinements:
+
+- First create one non-merge operating commit changing only docs/next_steps.md, parented exactly by cd8679ffe7ef3ee7e4f61a66cc9449c0bb8f02ad; keep the draft unstaged and byte-identical during that commit and update the ignored inbox separately.
+
+- Edit only the retained draft and preserve mode 0644.
+- Freeze the complete outer V8 construction source, byte-hash helper, closure bytes/hash, and closure-invocation wrapper before execution.
+- Prohibit JavaScript template literals, dynamic/generated executable source, eval, executable base64 decoding, Node subprocess source, dynamic regular expressions, and literal backtick characters in JavaScript source.
+
+- Backtick bytes may exist only as inert draft data or numeric byte arrays such as 96,96,96; they must never participate in transport syntax.
+- Read the draft through one fixed, pre-frozen, read-only nested command. Perform all exact-once, ordering, non-overlap, final-LF, byte-count, and SHA-256 checks directly over Uint8Array data in the V8 program.
+
+- Require complete pre-edit replay before the sole patch call.
+- Preserve every frozen interior byte. Permit only the agreed heading correction, canonical delimiters, assertion-proof text, and frozen inert closure text.
+- Build inserted text from ordinary quoted string-array lines and numeric byte insertion only.
+- After patching, invoke exactly the pre-frozen inert closure once through its pre-frozen wrapper. No post-patch discovery or newly constructed command is permitted.
+- Success commits only the draft and stops. Any failure leaves it uncommitted and stops without inspection, diagnosis, retry, repair, or fix-forward.
+
+All protected-state, registered-worktree, source/project, Zig/build/install, validation, cache, production-AWK, D01/D02, ratchet, credit, and downstream prohibitions remain exact.
+```
+
+Create one non-merge operating commit parented exactly by
+`cd8679ffe7ef3ee7e4f61a66cc9449c0bb8f02ad`, changing only tracked
+`docs/next_steps.md`; update only the ignored inbox separately. Keep the
+draft unstaged, mode 0644, and byte-identical at its retained identity during
+that commit. No other dirty path is permitted.
+
+BF may edit only the retained draft and must preserve mode 0644. Before any
+execution, freeze the complete outer V8 construction source, byte-hash
+helper, closure bytes/hash, and closure-invocation wrapper. JavaScript
+template literals, dynamic/generated executable source, `eval`, executable
+base64 decoding, Node subprocess source, dynamic regular expressions, and
+literal backtick characters in JavaScript source are prohibited.
+
+Backtick bytes may exist only as inert draft data or numeric byte arrays such
+as `96,96,96`; they may never participate in transport syntax. Read the draft
+through one fixed, pre-frozen, read-only nested command. Perform every
+exact-once, strict-ordering, non-overlap, final-LF, byte-count, and SHA-256
+check directly over `Uint8Array` data in the V8 program. Complete the full
+pre-edit replay before the sole patch call.
+
+The complete retained pre-edit identity authority is unchanged and is:
+
+```text
+INNER P002 183 f3f07054713485485986b67af5f4ab819ff6f280fa2afddb1d42ac3071826411
+ASSERTION P002 85 453cd42dcf47790fcba30180e7d9e1cb7c1a1997b07c064384b20a9bb067d902
+INNER P003 803 40a7144e019b45af04e112d456a43f63e925992a3d93e93887498ff25c5d8131
+ASSERTION P003 705 e0215d8cdf0a45aea24e0e8f54715159798c24baf782e3c39dd71923c4bbb192
+INNER P004 241 17ec8b17eef2ac773d192b45b1deb8e2fe8bee6f8f5ed7975eb5291c448c9b97
+ASSERTION P004 141 9339e311a57c9e07657f6bb0a2323723784819c418b4058aad6a58c0207eebaa
+INNER P005 3530 e1828a654a4b8262dac83c9fc871df9b4b76bca65353bb90f08aece88261647d
+ASSERTION P005 3430 057a68edb24f99f5c18001203d53846e4ecf0d6fa6dee81acc56c4cc0a1f976a
+INNER P006 247 fd087cb63ce5fe9fbee17a4aff126ea4f3c7869f2336a9f4264d35272f79d245
+ASSERTION P006 146 8d2b7f5092cec8a9bc38b41147e7b47ac3737083c188699bb61c6cb191a2eece
+INNER P007 260 92042292dbe0662a61efda982251e888e44a1580a7b1bbbe1a16446d1a973aef
+ASSERTION P007 159 a430068dfc6efbc1740507f8283e92df449fcc088a2896317c1ab385b038f1d5
+INNER P008 295 27df9fd261ba0e2fe4b575398a709d9a0cb7145827bd72c819031034daee63e0
+ASSERTION P008 194 e7455095df8f6242e7d0bcd1248ac54aa4505cde367bbf0dda6cdb4377453b56
+INNER P009 243 1b97341986df8c9552fd93fa2d4c0a9dc535b89de4319f7b1bbed4bc0bd3ec76
+ASSERTION P009 142 69ddc0b193f29573fb8464ba63f4118c0181834261fc567ab0323fec65b31d4b
+INNER P010 211 78d15fedc6349ecac733d97869b00602b9e97ccaa6153d41b284682fa86ac55d
+ASSERTION P010 110 83fa92142449e13e4741fbfbd50c597df34e165c475f8c8585f8faeb6670e027
+INNER P011 213 07cf33df752f203187c469aeccbc7d20a904d8deae48fc70df001c0592d1c790
+ASSERTION P011 112 3f07f6221fb676d267f137bb8a63309d780d03946ed928f7e26da27129c0aaea
+INNER P012 258 8eb5c3ea80d081f21276a7073548e1044296d115c6a71b80095ac43be816fced
+ASSERTION P012 157 2ec54f435d4c8f5fbbd635f36b382a170eaa56ef37e87c8f5062af16d0438bc3
+INNER P013 249 12550a723800e9dc77f0615f749a777195ef62d8f44a2ee6e2a1f4f547b33770
+ASSERTION P013 148 688ce553003e4634c2537c140fe1f118a361d58a92b44880069e3ea79c1bbb8c
+INNER P014 333 ceda5b7e75492576596a93fb60aa8b813a22cab1785f25706e9e2dc80ed8a935
+ASSERTION P014 232 068279f2354bc4738826a526450e99fccf4a9955c5aa4e23c95b8c1b2cb1820e
+INNER P015 518 0519263f35aa760da0c50d6f5e7b8c0bd894886c718790739934f3797602f2c5
+ASSERTION P015 420 e258aec554bc2567e07d0944d0cc9b55758bc47f25b326f17b64dc1d1f7fd8bb
+MATRIX_ROWS 20318 c2e399d701e96583c7ffa5d0e348dce1cae1c26d0dc05ba34f34c03d1c9459ec
+LATER_T_OUTER 353 8416931252c47e2ac10429e203887a5837b4f47d448a9a449793d20360cf76db
+LATER_T_CONSTRUCT_10 1623 8a25bb3308c2c8cdf02cef8788070c271d139b8127ea0f8a235a98674d180fd2
+LATER_T_READ_GATE 198 f126cde2a7b4596de583a7f43c4a8f72cdeb4b8a95921b4752e112bb0e641a6b
+LATER_T_COPY_SELECTOR 394 0a8ee1a73b9d1b8d33b6c5bf7428546c0db169b912eff798d7d3f5d51f970653
+LATER_T_INVOCATION_BATCH 1286 88cb673bfd5694458dfcbad8ed437847406172de12e044e948068bc217f2b253
+LATER_T_AUDIT_BATCH 491 ecd60eebb766f0ec33f2de343ddfd4551817c47e0477742d85d5fd792152bd57
+LATER_T_ARTIFACT_IDENTITIES 356 eb8498407a2bf2f7177365e8bff61944e2ef45550be2234bb399b42b32cf4fc5
+LATER_T_MARKER_DERIVE 245 f7dfd0b7febf9c065c7404e21b523c591af71831f13da4e9e01ca806c090e201
+LATER_T_MARKER_FINALIZE 280 0bb8edbedfdd3e7295fdf8a422204fb523df980181cc3d6e9f0ed14548c8a9bd
+LATER_T_FINAL_CLOSURE 128 9699aa0bfb49fd45880bdf4cc5e069f052fb0fe017e4ee6049d07b0a57966af8
+```
+
+Preserve every frozen interior byte. The only permitted draft changes are
+the agreed heading correction, canonical unique non-nested delimiters outside
+frozen interiors, assertion-proof text, and the frozen inert closure text.
+Build inserted text only from ordinary quoted string-array lines and numeric
+byte insertion. Keep `package_status=incomplete`,
+`implementation_ready=false`, `execution_authority=none`, and all later
+families explicitly blocked.
+
+After the sole patch, invoke exactly the pre-frozen inert closure once
+through its pre-frozen wrapper. No post-patch discovery or newly constructed
+command is allowed. Invoke no assertion, wrapper, generated package command,
+or package member. Success commits only the draft and stops clean. Any
+failure leaves it uncommitted and stops without inspection, diagnosis, retry,
+repair, cleanup, or fix-forward.
+
+Preserve all protected state, the standing registered-worktree prohibition,
+stash, watcher, roots, identities, and ratchet 131. No source/project/Zig/
+build/install/validation/cache/production-AWK/D01/D02/credit/downstream
+authority is granted. Never access `.claude/settings.local.json`. Give one
+concise acknowledgment of every scope and stop boundary before acting.
+
+## INBOX-206BE byte-safe canonical-region remediation — COMPLIANT NO-EDIT TRANSPORT STOP; SUPERSEDED BY INBOX-206BF
 
 INBOX-206BD is accepted only as a compliant fail-closed no-edit stop. Credit
 is limited to its exact operating binding, complete pre-edit freeze,
