@@ -24,7 +24,154 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BW pure-Zig frozen-chain gate and commit closure — AUTHORIZED
+## INBOX-206BX pure-Zig retained root-to-home-to-oleg chain — AUTHORIZED
+
+INBOX-206BW is accepted fully within scope. The retained root-to-home chain
+and focused ownership/runtime evidence are accepted; status remains
+`conditionally_supported` and the ratchet remains 131.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BW completed successfully.
+
+- Commit: 95f1dc1f3021ee3b8e19c821538be3b2266bf1f3
+- Tree: ed145c0e5a4d280c269f071aeb5ae836020ca65a
+- Sole committed file: tools/zllvm_inbox206_materialize.zig
+- Both Zig gates passed exactly once.
+- BW caches are retained; BV caches remain absent.
+- Main and control are clean.
+- Status remains conditionally_supported; ratchet remains 131.
+```
+
+Static Watcher review ran no project code. Commit
+`95f1dc1f3021ee3b8e19c821538be3b2266bf1f3` is non-merge, has parent
+`3e5c5ddb88e4eabd28963ad1a1f0c2c42572d793` and tree
+`ed145c0e5a4d280c269f071aeb5ae836020ca65a`, and changes only mode-0644
+`tools/zllvm_inbox206_materialize.zig` by the frozen 54 insertions. The
+committed file is 17,108 bytes, with SHA-256
+`9492a0a5f39dd47397ea8ca625a0a5d56c1c8ce4edc3491d10cdc2640752f427`
+and blob `bab5e00c28c02868b8c683072342892f6713ab2f`.
+
+Retained Worker turn `019f82c2-b165-7471-a9ca-0539db0d78f2` contains only
+Zig-skill/operating-document reads, the exact identity-only gate, the ordered
+one-shot gate call, read-only closure, sole-file commit, and final
+verification. All calls succeeded; final verification is followed only by
+the final report. Main/index/control are clean; build/watcher identities,
+watcher PID 3206208, stash `7985c6d...`, all 43 worktrees, retained
+BP/BR/BT/BU/BW roots, absent BS/BV roots, BI/continuation absence, D01/D02,
+and ratchet 131 remain exact.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept 95f1dc1f3021ee3b8e19c821538be3b2266bf1f3 fully within BW. The retained root-to-home chain and focused ownership/runtime evidence are accepted; status remains
+conditionally_supported.
+
+I authorize Zig-only INBOX-206BX with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by 95f1dc1f3021ee3b8e19c821538be3b2266bf1f3; update the ignored inbox separately.
+- Modify only tools/zllvm_inbox206_materialize.zig, retaining mode 0644 and all existing APIs, behavior, tests, and build wiring.
+- Add private TrustedOlegChain containing owned root, home, and oleg descriptor-plus-identity values.
+- Add private zero-path-parameter acquireTrustedOlegChain(io) that:
+    1. acquires and retains TrustedHomeChain;
+    2. installs root cleanup before home cleanup so Zig’s LIFO errdefer order closes home before root;
+    3. calls acquireOneDirectoryComponent(home.directory, io, "oleg", "oleg");
+    4. transfers all three owned values to the caller only on success.
+
+- The only new path literals are the two exact "oleg" arguments. Do not add "/home", "/home/oleg", prog, or any caller/configured path.
+- Document caller ownership and mandatory close order: oleg → home → root.
+- Add exactly one focused chain test proving:
+    - all three held identities remain stable;
+    - oleg closes exactly once and its saved handle reports the accepted closed-descriptor error;
+    - home and root remain stable;
+    - home closes exactly once and its saved handle reports that error;
+    - root remains stable;
+    - root closes exactly once and its saved handle reports that error.
+
+- Failure guards must close in oleg → home → root order and be disabled after each explicit successful close to prevent leaks or double-close.
+- Do not assert identities differ or construct a second chain.
+- Existing tests must remain byte-identical; all new symbols remain private and test-root-only.
+- Require fresh absent/non-symlink caches:
+    - /home/oleg/.cache/zllvm-inbox206bx-local
+    - /home/oleg/.cache/zllvm-inbox206bx-global
+
+  Retain them afterward.
+
+- Run exactly once:
+    1. zig fmt --check tools/zllvm_inbox206_materialize.zig
+    2. existing zig build test-inbox206-descriptor-identity with BX caches.
+
+- Success permits only read-only scope/diff/status checks, then commits only the Zig file and stops.
+- First failure stops uncommitted without later command, diagnosis, retry, repair, cleanup, or fix-forward.
+
+Any prog or later component, generic/multi-component path API, second chain, publication, materialization, installation, evidence, production reachability, D01/D02, ratchet movement,
+credit, and downstream authority remain withheld.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`95f1dc1f3021ee3b8e19c821538be3b2266bf1f3`; update the ignored inbox
+separately.
+
+Modify only mode-0644 `tools/zllvm_inbox206_materialize.zig`, preserving all
+existing APIs, behavior, tests, and build wiring. Add private
+`TrustedOlegChain` containing the owned root, home, and oleg
+descriptor-plus-identity values. Add private zero-path-parameter
+`acquireTrustedOlegChain(io)` that acquires and retains
+`TrustedHomeChain`; installs root cleanup before home cleanup so Zig's LIFO
+`errdefer` order closes home before root; calls
+`acquireOneDirectoryComponent(home.directory, io, "oleg", "oleg")`; and
+transfers all three values only on success.
+
+The only new path literals are the two exact `"oleg"` arguments. Do not add
+`/home`, `/home/oleg`, `prog`, or caller/configured paths. Document caller
+ownership and mandatory close order `oleg → home → root`.
+
+Add exactly one focused single-chain test proving all three identities remain
+stable while held; oleg closes exactly once and its saved handle yields the
+accepted closed-descriptor error; home/root remain stable; home closes exactly
+once and its saved handle yields that error; root remains stable; then root
+closes exactly once and its saved handle yields that error. Failure guards
+must close in `oleg → home → root` order and be disabled after each explicit
+successful close. Do not assert identities differ or create a second chain.
+Existing tests remain byte-identical; all new symbols are private and
+test-root-only.
+
+Require fresh initially absent/non-symlink caches and retain them after
+success or failure:
+
+```text
+ZIG_LOCAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206bx-local
+ZIG_GLOBAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206bx-global
+```
+
+Run exactly once, in order:
+
+1. `zig fmt --check tools/zllvm_inbox206_materialize.zig`;
+2. the existing `zig build test-inbox206-descriptor-identity` with BX caches.
+
+Success permits only read-only exact scope/diff/status closure, commits only
+the Zig file, verifies clean main/control, and stops. First failure stops
+uncommitted without any later command, diagnosis, retry, repair, cleanup, or
+fix-forward.
+
+The project-language boundary is absolute: all substantive implementation,
+generators, validators, codecs, hashing, harnesses, workflow, and artifact
+tooling must be Zig. Bash is limited to tiny transparent fixed-command/cache
+orchestration. No JavaScript, ECMAScript, TypeScript, Python, Perl, AWK,
+other-language project solution, or internal-agent project algorithm is
+authorized.
+
+No `prog` or later component, absolute `/home` or `/home/oleg`,
+caller/configured/generic/multi-component path, second chain, publication,
+materialization, installation, evidence, production/wiring/API,
+BI/continuation, D01/D02, ratchet movement, credit, registered-worktree
+access/modification, cleanup, or downstream authority is granted. Status
+remains `conditionally_supported`; ratchet remains 131.
+
+
+## INBOX-206BW pure-Zig frozen-chain gate and commit closure — ACCEPTED; SUPERSEDED BY INBOX-206BX
 
 INBOX-206BV is accepted only as a compliant fail-closed pre-gate stop. Its
 exact Zig patch receives provisional content credit; no format, focused-test,
