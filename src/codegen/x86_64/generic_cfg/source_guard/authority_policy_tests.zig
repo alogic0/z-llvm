@@ -259,6 +259,21 @@ test "composed selector source guard rejects frozen bypass inventory growth" {
         ),
     );
 }
+test "composed selector source guard recounts exactly one retired intByteSize bypass" {
+    const inventory =
+        "file\tenclosing_function\tresolution_or_materialization_sites\n" ++
+        "composed_selector_calls.zig\tlowerIntByteSizeCall\temitValueIntoScratch×1\n";
+    const retired: [:0]const u8 = "fn lowerIntByteSizeCall() void {}";
+    try validateFrozenBypassInventoryForSource(inventory, "composed_selector_calls.zig", retired);
+    try std.testing.expectError(
+        error.FrozenBypassOccurrenceMismatch,
+        validateFrozenBypassInventoryForSource(
+            inventory,
+            "composed_selector_calls.zig",
+            "fn lowerIntByteSizeCall() void { emitValueIntoScratch(); }",
+        ),
+    );
+}
 test "composed selector source guard rejects function predicates in the value-use authority" {
     const accepted =
         "const CallFinalUsePin = struct { plan_identity: usize, " ++

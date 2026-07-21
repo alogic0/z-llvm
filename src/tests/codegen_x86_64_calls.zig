@@ -211,6 +211,90 @@ test "x86_64 codegen rejects unsupported call ABI shapes and lowers advisory tai
     try std.testing.expect(saw_ordinary_call);
 }
 
+test "x86_64 generic cfg executes combined ordinary and intByteSize calls" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @ordinary(i32)
+        \\declare fastcc i16 @zig.target.intByteSize(i16)
+        \\
+        \\define i32 @combined(i32 %input, i32 %bits32) {
+        \\entry:
+        \\  br label %calls
+        \\calls:
+        \\  %ordinary_result = call i32 @ordinary(i32 %input)
+        \\  %bits = trunc i32 %bits32 to i16
+        \\  %byte_size = call fastcc i16 @zig.target.intByteSize(i16 %bits)
+        \\  %wide_byte_size = zext i16 %byte_size to i32
+        \\  %result = add i32 %ordinary_result, %wide_byte_size
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunctionWithOptions(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+        .{ .generic_cfg_selector = true },
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+
+    var ordinary_calls: usize = 0;
+    var int_byte_size_calls: usize = 0;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |call| {
+            if (std.mem.eql(u8, call.symbol, "ordinary")) ordinary_calls += 1;
+            if (std.mem.eql(u8, call.symbol, "zig.target.intByteSize")) int_byte_size_calls += 1;
+        },
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), ordinary_calls);
+    try std.testing.expectEqual(@as(usize, 1), int_byte_size_calls);
+
+    const encoded = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(encoded);
+    const ordinary_stub = [_]u8{ 0x8d, 0x44, 0x7f, 0x05, 0xc3 };
+    const int_byte_size_stub = [_]u8{ 0x89, 0xf8, 0x83, 0xc0, 0x07, 0xc1, 0xe8, 0x03, 0xc3 };
+    const mapping = try std.posix.mmap(
+        null,
+        encoded.len + ordinary_stub.len + int_byte_size_stub.len,
+        .{ .READ = true, .WRITE = true, .EXEC = true },
+        .{ .TYPE = .PRIVATE, .ANONYMOUS = true },
+        -1,
+        0,
+    );
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping[0..encoded.len], encoded);
+    @memcpy(mapping[encoded.len..][0..ordinary_stub.len], &ordinary_stub);
+    @memcpy(mapping[encoded.len + ordinary_stub.len ..], &int_byte_size_stub);
+
+    var offset: usize = 0;
+    for (machine.instructions.items) |instruction| {
+        if (instruction == .direct_call) {
+            const target_offset = if (std.mem.eql(u8, instruction.direct_call.symbol, "ordinary"))
+                encoded.len
+            else if (std.mem.eql(u8, instruction.direct_call.symbol, "zig.target.intByteSize"))
+                encoded.len + ordinary_stub.len
+            else
+                return error.UnexpectedDirectCall;
+            const next_ip = @intFromPtr(mapping.ptr) + offset + 5;
+            const displacement: i32 = @intCast(@intFromPtr(mapping.ptr + target_offset) - next_ip);
+            std.mem.writeInt(i32, mapping[offset + 1 ..][0..4], displacement, .little);
+        }
+        offset += mc.encoding.instructionSize(instruction);
+    }
+
+    const combined: *const fn (u32, u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(u32, 37), combined(10, 9));
+    try std.testing.expectEqual(@as(u32, 40), combined(11, 9));
+    try std.testing.expectEqual(@as(u32, 38), combined(10, 17));
+}
+
 test "x86_64 codegen supports one stack-passed i32 call argument" {
     const stack_arg_input =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -142,7 +142,9 @@ pub fn validateDormantCallActionProductionSites(
         return;
     }
     if (!std.mem.eql(u8, source_name, "composed_selector_calls.zig") or
-        specialized_action_count != 0)
+        attachment_count != 1 or
+        direct_action_count != 0 or
+        specialized_action_count != 2)
     {
         return error.ValueUseCallActionPrematureProductionUse;
     }
@@ -151,12 +153,9 @@ pub fn validateDormantCallActionProductionSites(
     const bodies = try collectFunctionBodies(source, &body_storage);
     const lower_call = functionBodyNamed(bodies, "lowerCall") orelse
         return error.ValueUseCallActionPrematureProductionUse;
-    const classifier = functionBodyNamed(bodies, "isAdmittedOrdinaryDirectCall") orelse
-        return error.ValueUseCallActionPrematureProductionUse;
-    const helper = functionBodyNamed(bodies, "lowerOrdinaryDirectCallValueUse") orelse
+    const helper = functionBodyNamed(bodies, "lowerIntByteSizeCall") orelse
         return error.ValueUseCallActionPrematureProductionUse;
     const helper_source = source[helper.start..helper.end];
-    const classifier_source = source[classifier.start..classifier.end];
     const lower_call_source = source[lower_call.start..lower_call.end];
 
     if (countPattern(helper_source, "ValueUseTransaction.begin(selector)") != 1 or
@@ -169,7 +168,8 @@ pub fn validateDormantCallActionProductionSites(
         countPattern(helper_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
         countPattern(helper_source, "else |err|") != 0 or
         attachment_count != 1 or
-        direct_action_count != 1)
+        countPattern(helper_source, "IntByteSizeCallAction.init(") != 1 or
+        countPattern(helper_source, ".int_byte_size_call") != 1)
     {
         return error.ValueUseCallActionPrematureProductionUse;
     }
@@ -219,31 +219,19 @@ pub fn validateDormantCallActionProductionSites(
         "preparedView(",
         "executePreparedAction(",
     }) |pattern| {
-        if (std.mem.indexOf(u8, helper_source, pattern) != null or
-            std.mem.indexOf(u8, classifier_source, pattern) != null)
-        {
+        if (std.mem.indexOf(u8, helper_source, pattern) != null) {
             return error.ValueUseCallActionPrematureProductionUse;
         }
     }
-    for ([_][]const u8{
-        "selector.",
-        "selector_state.",
-        "function_name",
-        "functionName",
-    }) |pattern| {
-        if (std.mem.indexOf(u8, classifier_source, pattern) != null)
-            return error.ValueUseCallActionPrematureProductionUse;
-    }
-    if (countPattern(lower_call_source, "isAdmittedOrdinaryDirectCall(") != 1 or
-        countPattern(lower_call_source, "lowerOrdinaryDirectCallValueUse(") != 1)
-    {
+    if (countPattern(lower_call_source, "lowerIntByteSizeCall(") != 1) {
         return error.ValueUseCallActionPrematureProductionUse;
     }
     for (bodies) |body| {
-        if (std.mem.eql(u8, body.name, "lowerOrdinaryDirectCallValueUse")) continue;
+        if (std.mem.eql(u8, body.name, "lowerIntByteSizeCall")) continue;
         const function_source = source[body.start..body.end];
         if (std.mem.indexOf(u8, function_source, "attachCallAction(") != null or
-            std.mem.indexOf(u8, function_source, "DirectCallAction") != null)
+            std.mem.indexOf(u8, function_source, "IntByteSizeCallAction") != null or
+            std.mem.indexOf(u8, function_source, ".int_byte_size_call") != null)
         {
             return error.ValueUseCallActionPrematureProductionUse;
         }
@@ -2054,6 +2042,11 @@ pub fn validateFailureProvenanceProductionSites(source_name: []const u8, source:
         expected_count += 3;
     }
     if (functionBodyNamed(bodies, "directCallValueUseDiagnostic")) |mapper| {
+        if (countPattern(source[mapper.start..mapper.end], ".failedRequestIs(") != 1)
+            return error.ValueUseFailureProvenanceAllowlistMismatch;
+        expected_count += 1;
+    }
+    if (functionBodyNamed(bodies, "lowerIntByteSizeCall")) |mapper| {
         if (countPattern(source[mapper.start..mapper.end], ".failedRequestIs(") != 1)
             return error.ValueUseFailureProvenanceAllowlistMismatch;
         expected_count += 1;

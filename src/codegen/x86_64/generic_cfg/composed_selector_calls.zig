@@ -1071,17 +1071,27 @@ pub fn lowerIntByteSizeCall(selector: *ComposedBlockSelector, result: ?[]const u
     const arg = call.args.items[0];
     if (!arg.ty.eql(.{ .int = 16 })) return .{ .no_emitter = "composed-block-intbytesize-arg" };
 
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
-    if (try transaction.prepareCallBeforeArguments(.clobber)) |diagnostic| return diagnostic;
-    selector_state.emitValueIntoScratch(selector, arg.value, .rdi, 16) catch return .{ .unsupported_value = "composed-block-intbytesize-arg-value" };
-    try transaction.finishCallPreparationAfterArguments();
-    const needs_alignment = selector.stack_frame_bytes == 0;
-    if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
-    try selector_state.emitEflagsInstruction(selector, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } }, .clobber);
-    if (needs_alignment) try selector_frame.appendAddRsp(selector, 8);
-    try selector_state.emitEflagsInstruction(selector, .{ .and_eax_imm32 = 0xffff }, .write);
-    try transaction.define(result_name, .zeroExtending(16));
+    const argument = try transaction.register(.{
+        .source = arg.value,
+        .expected = .{ .ty = arg.ty, .register_class = .gpr32 },
+        .form = .gpr32,
+        .destination = .prepared_source,
+    });
+    try transaction.attachCallAction(.{ .int_byte_size_call = try ValueUseTransaction.IntByteSizeCallAction.init(
+        call.callee,
+        result_name,
+        argument,
+    ) });
+    try transaction.seal();
+    try transaction.prepare();
+    transaction.materializeAll() catch |err| {
+        if (err == error.ValueUseActionDiagnostic) return transaction.actionDiagnostic();
+        if (transaction.failedRequestIs(argument))
+            return .{ .unsupported_value = "composed-block-intbytesize-arg-value" };
+        return err;
+    };
     try transaction.commit();
     return null;
 }

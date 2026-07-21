@@ -121,14 +121,12 @@ test "value-use call action wiring is function scoped and registration precedes 
     const accepted: [:0]const u8 = @embedFile("../composed_selector_calls.zig");
     try validateDormantCallActionProductionSites("composed_selector_calls.zig", accepted);
     const wired: [:0]const u8 =
-        "fn lowerCall() void { if (isAdmittedOrdinaryDirectCall(call)) " ++
-        "return lowerOrdinaryDirectCallValueUse(selector, call); } " ++
-        "fn isAdmittedOrdinaryDirectCall(call: Call) bool { " ++
-        "return call.kind == .direct and call.return_type == .i32; } " ++
-        "fn lowerOrdinaryDirectCallValueUse() void { " ++
+        "fn lowerCall() void { return lowerIntByteSizeCall(selector, call); } " ++
+        "fn lowerIntByteSizeCall() void { " ++
         "var transaction = ValueUseTransaction.begin(selector); " ++
-        "for (arguments) |argument| _ = transaction.register(argument); " ++
-        "_ = transaction.attachCallAction(DirectCallAction); " ++
+        "_ = transaction.register(argument); " ++
+        "_ = transaction.attachCallAction(.{ .int_byte_size_call = " ++
+        "IntByteSizeCallAction.init(symbol, result, argument) }); " ++
         "_ = transaction.seal(); _ = transaction.prepare(); " ++
         "_ = transaction.materializeAll(); _ = transaction.commit(); }";
     try validateDormantCallActionProductionSites("composed_selector_calls.zig", wired);
@@ -139,6 +137,13 @@ test "value-use call action wiring is function scoped and registration precedes 
     inline for (.{
         "fn lowerCall() void { transaction.attachCallAction(action); }",
         wired ++ " fn other() void { _ = transaction.attachCallAction(action); }",
+        "fn lowerCall() void { return lowerOrdinaryDirectCallValueUse(selector, call); } " ++
+            "fn lowerOrdinaryDirectCallValueUse() void { " ++
+            "var transaction = ValueUseTransaction.begin(selector); " ++
+            "_ = transaction.register(argument); " ++
+            "_ = transaction.attachCallAction(DirectCallAction); " ++
+            "_ = transaction.seal(); _ = transaction.prepare(); " ++
+            "_ = transaction.materializeAll(); _ = transaction.commit(); }",
         "fn lowerIntByteSizeCall() void { _ = IntByteSizeCallAction; }",
         "fn lowerIntByteSizeCall() void { _ = .int_byte_size_call; }",
         "fn lowerCall() void { if (isAdmittedOrdinaryDirectCall(call)) " ++
@@ -325,9 +330,14 @@ test "composed selector source guard conditionally confines call provenance mapp
     const direct: [:0]const u8 =
         "fn directCallValueUseDiagnostic() void { " ++
         "for (arguments) |argument| _ = transaction.failedRequestIs(argument); }";
+    const int_byte_size: [:0]const u8 =
+        "fn lowerIntByteSizeCall() void { " ++
+        "_ = transaction.failedRequestIs(argument); }";
     try validateFailureProvenanceProductionSites("composed_selector_calls.zig", memcpy);
     try validateFailureProvenanceProductionSites("composed_selector_calls.zig", direct);
+    try validateFailureProvenanceProductionSites("composed_selector_calls.zig", int_byte_size);
     try validateFailureProvenanceProductionSites("composed_selector_calls.zig", memcpy ++ direct);
+    try validateFailureProvenanceProductionSites("composed_selector_calls.zig", memcpy ++ direct ++ int_byte_size);
     try validateFailureProvenanceProductionSites("composed_selector_calls.zig", "fn lowerInlineMemcpy() void {}");
     try std.testing.expectError(
         error.ValueUseFailureProvenanceOutsideAllowlist,

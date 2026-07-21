@@ -205,6 +205,7 @@ const InputSet = authenticated_inputs.InputSet;
 const BaselineExecutionMode = enum {
     accepted,
     development,
+    dj_combined_call_ratchet_130,
 };
 
 const Cli = struct {
@@ -1957,17 +1958,30 @@ fn requirePlannedAbsolute(
 
 const development_root_relative =
     "local-state/validations/o2-calls/compiler-rt-v1/baseline-validation-v3-development";
+const dj_combined_call_ratchet_130_root_relative =
+    "local-state/validations/o2-calls/compiler-rt-v1/combined-call-ratchet-130-development";
 
 fn baselinePlannedPath(mode: BaselineExecutionMode, path: contract.V3Path) []const u8 {
-    if (mode == .accepted) return contract.plannedPath(path);
-    return switch (path) {
-        .validation_root => development_root_relative ++ "/run",
-        .canonical_source => development_root_relative ++ "/repositories/canonical-source",
-        .coverage_source => development_root_relative ++ "/repositories/coverage-source",
-        .canonical_cache => development_root_relative ++ "/work/canonical/cache",
-        .canonical_install => development_root_relative ++ "/work/canonical/install",
-        .coverage_cache => development_root_relative ++ "/work/coverage/cache",
-        .coverage_install => development_root_relative ++ "/work/coverage/install",
+    return switch (mode) {
+        .accepted => contract.plannedPath(path),
+        .development => switch (path) {
+            .validation_root => development_root_relative ++ "/run",
+            .canonical_source => development_root_relative ++ "/repositories/canonical-source",
+            .coverage_source => development_root_relative ++ "/repositories/coverage-source",
+            .canonical_cache => development_root_relative ++ "/work/canonical/cache",
+            .canonical_install => development_root_relative ++ "/work/canonical/install",
+            .coverage_cache => development_root_relative ++ "/work/coverage/cache",
+            .coverage_install => development_root_relative ++ "/work/coverage/install",
+        },
+        .dj_combined_call_ratchet_130 => switch (path) {
+            .validation_root => dj_combined_call_ratchet_130_root_relative ++ "/run",
+            .canonical_source => dj_combined_call_ratchet_130_root_relative ++ "/repositories/canonical-source",
+            .coverage_source => dj_combined_call_ratchet_130_root_relative ++ "/repositories/coverage-source",
+            .canonical_cache => dj_combined_call_ratchet_130_root_relative ++ "/work/canonical/cache",
+            .canonical_install => dj_combined_call_ratchet_130_root_relative ++ "/work/canonical/install",
+            .coverage_cache => dj_combined_call_ratchet_130_root_relative ++ "/work/coverage/cache",
+            .coverage_install => dj_combined_call_ratchet_130_root_relative ++ "/work/coverage/install",
+        },
     };
 }
 
@@ -3794,13 +3808,15 @@ pub fn main(init: std.process.Init) !void {
     _ = args.next() orelse return error.InvalidArguments;
     const mode = try nextArgument(&args);
     if (std.mem.eql(u8, mode, "--run-accepted-baseline") or
-        std.mem.eql(u8, mode, "--run-development-baseline"))
+        std.mem.eql(u8, mode, "--run-development-baseline") or
+        std.mem.eql(u8, mode, "--run-dj-combined-call-ratchet-130-baseline"))
     {
-        const execution_mode: BaselineExecutionMode = if (std.mem.eql(
-            u8,
-            mode,
-            "--run-accepted-baseline",
-        )) .accepted else .development;
+        const execution_mode: BaselineExecutionMode = if (std.mem.eql(u8, mode, "--run-accepted-baseline"))
+            .accepted
+        else if (std.mem.eql(u8, mode, "--run-development-baseline"))
+            .development
+        else
+            .dj_combined_call_ratchet_130;
         const cli = try parseBaselineCli(run_init.gpa, &args, execution_mode);
         try executeAcceptedBaseline(run_init, cli);
     } else if (std.mem.eql(u8, mode, "--accept-cy-source")) {
@@ -3957,6 +3973,65 @@ test "baseline runner development layout confines every mutable path to one root
         development_root_relative ++ "/run",
         baselinePlannedPath(.development, .validation_root),
     );
+}
+
+test "baseline runner DJ combined-call ratchet layout is fixed and confined" {
+    const paths = [_]contract.V3Path{
+        .validation_root,
+        .canonical_source,
+        .coverage_source,
+        .canonical_cache,
+        .canonical_install,
+        .coverage_cache,
+        .coverage_install,
+    };
+    const expected = [_][]const u8{
+        dj_combined_call_ratchet_130_root_relative ++ "/run",
+        dj_combined_call_ratchet_130_root_relative ++ "/repositories/canonical-source",
+        dj_combined_call_ratchet_130_root_relative ++ "/repositories/coverage-source",
+        dj_combined_call_ratchet_130_root_relative ++ "/work/canonical/cache",
+        dj_combined_call_ratchet_130_root_relative ++ "/work/canonical/install",
+        dj_combined_call_ratchet_130_root_relative ++ "/work/coverage/cache",
+        dj_combined_call_ratchet_130_root_relative ++ "/work/coverage/install",
+    };
+    inline for (paths, expected) |path, exact| {
+        const dj = baselinePlannedPath(.dj_combined_call_ratchet_130, path);
+        try std.testing.expectEqualStrings(exact, dj);
+        try std.testing.expect(std.mem.startsWith(
+            u8,
+            dj,
+            dj_combined_call_ratchet_130_root_relative ++ "/",
+        ));
+        try std.testing.expect(!std.mem.eql(u8, dj, baselinePlannedPath(.accepted, path)));
+        try std.testing.expect(!std.mem.eql(u8, dj, baselinePlannedPath(.development, path)));
+    }
+
+    const repository = "/repository";
+    const exact_validation_root =
+        "/repository/" ++ dj_combined_call_ratchet_130_root_relative ++ "/run";
+    try requirePlannedAbsolute(
+        std.testing.allocator,
+        repository,
+        .dj_combined_call_ratchet_130,
+        .validation_root,
+        exact_validation_root,
+    );
+    inline for (.{
+        "/repository/local-state/validations/o2-calls/compiler-rt-v1/combined-call-ratchet-130-development/wrong",
+        "/repository/local-state/validations/o2-calls/compiler-rt-v1/combined-call-ratchet-130-development/./run",
+        "/repository/local-state/validations/o2-calls/compiler-rt-v1/combined-call-ratchet-130-development/../run",
+    }) |rejected| {
+        try std.testing.expectError(
+            error.PathEscape,
+            requirePlannedAbsolute(
+                std.testing.allocator,
+                repository,
+                .dj_combined_call_ratchet_130,
+                .validation_root,
+                rejected,
+            ),
+        );
+    }
 }
 
 test "baseline runner binds strict registered worktree metadata as an order independent exact set" {
