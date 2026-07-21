@@ -24,7 +24,187 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BN Zig descriptor-identity audit check-only closure — AUTHORIZED
+## INBOX-206BO pure-Zig descriptor-identity primitive and focused test — AUTHORIZED
+
+INBOX-206BN commit
+`f6d824077ecbd0a60f09562a20a832c21fe69192` is accepted fully within its
+check-only documentation scope. BL remains
+`descriptor_identity_status=conditionally_supported`; BN grants no
+implementation or downstream acceptance.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BN completed successfully.
+
+- Commit: f6d824077ecbd0a60f09562a20a832c21fe69192
+- Tree: d7403ea4936dad70a188a4cd4e4a750c44ecaba3
+- Sole file: docs/evidence/inbox206bl_zig_descriptor_identity_api_audit.md
+- Mode: 0644
+- SHA-256: 3b22e11c887b0f39c256f6e1c94edff057acb212916ae61bf47b1c9703ca7c64
+
+Main and control repositories are clean. Protected state is unchanged; ratchet remains 131.
+```
+
+Static Watcher review ran no project code. BN is a non-merge commit parented
+exactly by `65c37e69e5f3a5098948896e0a013dacd65d17b9`, with tree
+`d7403ea4936dad70a188a4cd4e4a750c44ecaba3`. Its sole new path is the
+mode-0644, 20,588-byte, 373-line BL audit with SHA-256
+`3b22e11c887b0f39c256f6e1c94edff057acb212916ae61bf47b1c9703ca7c64`
+and Git blob `4299ef22b2190343ecbd6573673739e2aac94695`.
+
+Retained Worker turn `019f826e-9185-7862-af6a-d16c5d52a461` shows only
+the named operating-document read, the approved fixed tri-state
+text/identity/mode/Git check, staging of the sole audit, the sole-file commit,
+and final clean/identity checks. It shows no content edit, installed-source
+reread, compiler, formatter, build, test, install, runtime probe, project
+command, generator, validator, wrapper, artifact workflow,
+registered-worktree access, or protected-path mutation.
+
+Main and control are clean. Control remains at
+`9c55bda34088e1230b0b91a126d35795a3ac70b4` / tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e`, branch `main`, no remote.
+Stash `7985c6d01040a6e47e4ce5b918866d0e89517ac7`, watcher SHA-256
+`1221b00a6aacd7deaae9aab50bd2600be33a13b0ed645428f9475a2cb81a893d`,
+watcher blob `058c659544fd13cc88ff79f62e196f1b9644f9e0`, watcher PID 3206208,
+all 43 registered worktrees and directories, protected identities, BI
+evidence/continuation absence, D01 withheld, D02 unauthorized, and ratchet 131
+remain exact.
+
+At BO authorization, `build.zig` is mode 0664, 36,368 bytes, SHA-256
+`a0c923499cd4515326fb287d729c53ae6d68bb465a4b4a033a737a19466ce466`.
+`tools/zllvm_inbox206_materialize.zig` is absent. The two exact external cache
+roots `/home/oleg/.cache/zllvm-inbox206bo-local` and
+`/home/oleg/.cache/zllvm-inbox206bo-global` are absent.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept f6d824077ecbd0a60f09562a20a832c21fe69192 fully within its check-only documentation scope. BL remains conditionally_supported; it grants no implementation or downstream acceptance.
+
+I authorize INBOX-206BO as the first pure-Zig implementation slice, with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by f6d824077ecbd0a60f09562a20a832c21fe69192; update the ignored inbox separately.
+- Modify only build.zig and new tools/zllvm_inbox206_materialize.zig.
+- Preserve the existing build.zig filesystem mode. Finalize the new Zig file to mode 0644 before its first gate.
+- The new file is a private test root only in BO: no main, installed executable, production import, default-step dependency, or src reachability.
+- Add exactly one dedicated build step named test-inbox206-descriptor-identity, using addTest/its build-owned run artifact only. Do not add install wiring.
+- Implement only a primitive accepting an already-held descriptor plus expected role. Do not implement trusted-path acquisition, traversal, parsing, rendering, publication, or materialization.
+
+- Restrict compilation to native Linux x86_64 LP64/non-x32 through explicit compile-time assertions. Use the audited Zig 0.16 standard-library statx wrapper, types, and constants—no handwritten syscall ABI, codec, or hash logic.
+
+- Request and require the exact essential mask including BASIC_STATS and MNT_ID_UNIQUE; accept additional returned bits but fail if any required bit is absent.
+- Return an owned value tuple containing exact device-major, device-minor, inode, and unique mount ID fields. Keep descriptor ownership with the caller and document its required lifetime.
+- Preserve BL’s fail-closed errno taxonomy. E.INVAL must map to the explicit ambiguity error, never silently to unsupported capability.
+- Tests must cover:
+    - compile-time ABI/type closure;
+    - directory and regular-file success;
+    - required returned masks and role checks;
+    - stable repeated tuples while descriptors remain open;
+    - closed-descriptor failure;
+    - wrong-role failures in both directions;
+    - pure mask and errno-mapping negatives;
+    - explicit failure—not skip—when MNT_ID_UNIQUE is unavailable.
+
+- Use only Zig temporary test paths; never access real authority, store, evidence, continuation, or registered-worktree paths.
+- Use fresh, predeclared external local/global Zig cache roots. Retain them on either success or failure; do not clean them.
+- Run exactly once, in order:
+    1. zig fmt --check on the two touched Zig/build files;
+    2. zig build test-inbox206-descriptor-identity with the isolated cache paths.
+
+- A successful test permits only read-only diff/scope/status checks proving the two-file boundary, private reachability, and absence of install/default wiring.
+- Success commits exactly those two files and stops. First failure leaves the slice uncommitted and stops without diagnosis, retry, formatting repair, or fix-forward.
+
+Status remains conditionally_supported; runtime evidence is provisional. Implementation/build/install/execution authority beyond this focused test, D01/D02, BI evidence, continuation creation, ratchet movement, credit, and downstream work remain withheld.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`f6d824077ecbd0a60f09562a20a832c21fe69192`; update only the ignored inbox
+separately.
+
+Modify exactly two project paths:
+
+```text
+build.zig
+tools/zllvm_inbox206_materialize.zig
+```
+
+Preserve the existing `build.zig` filesystem mode 0664. Finalize the new Zig
+file to mode 0644 before its first gate. In BO the new file is a private test
+root only: it must have no `main`, installed executable, production import,
+default-step dependency, or `src` reachability. Add exactly one dedicated
+build step named `test-inbox206-descriptor-identity`, using `addTest` and its
+build-owned run artifact only. Add no install wiring.
+
+Implement only a pure-Zig primitive accepting an already-held descriptor plus
+an expected directory-or-regular-file role. Do not implement trusted-path
+acquisition, traversal, parsing, rendering, publication, materialization, or
+any other BK feature. Restrict compilation to native Linux x86_64 LP64/non-x32
+through explicit compile-time assertions. Use only the audited Zig 0.16
+standard-library `std.os.linux.statx` wrapper, types, and constants; write no
+syscall assembly, codec, hash implementation, or foreign-language helper.
+
+Request and require the exact essential mask including `BASIC_STATS` and
+`MNT_ID_UNIQUE`; additional returned bits are allowed, but any missing required
+bit fails closed. Return an owned value tuple containing exact device-major,
+device-minor, inode, and unique-mount-ID fields. Descriptor ownership remains
+with the caller; document the lifetime required across comparisons. Preserve
+the BL fail-closed errno taxonomy. `E.INVAL` maps only to the explicit
+ambiguous-invalid-or-unsupported error, never silently to unsupported
+capability.
+
+Focused Zig tests must cover compile-time ABI/type closure, directory and
+regular-file success, required returned masks and role checks, stable repeated
+tuples while descriptors remain open, closed-descriptor failure, wrong-role
+failures in both directions, pure mask and errno-mapping negatives, and an
+explicit test failure rather than a skip when `MNT_ID_UNIQUE` is unavailable.
+Use only Zig temporary test paths. Never access real authority, store,
+evidence, continuation, registered-worktree, or protected paths.
+
+Create only these fresh predeclared external cache roots immediately before
+the gates, and retain them on both success and failure without cleaning:
+
+```text
+ZIG_LOCAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206bo-local
+ZIG_GLOBAL_CACHE_DIR=/home/oleg/.cache/zllvm-inbox206bo-global
+```
+
+Run exactly once, in this order:
+
+1. `zig fmt --check build.zig tools/zllvm_inbox206_materialize.zig`;
+2. `zig build test-inbox206-descriptor-identity` with both exact isolated
+   cache environment variables above.
+
+Run no other compiler, formatter, build, test, install, executable, project
+command, runtime probe, generator, validator, wrapper, artifact workflow, BI
+action, or continuation action. A successful focused test permits only
+read-only diff/scope/status checks proving the two-file boundary, private
+reachability, and absence of install/default wiring.
+
+The project-language boundary is absolute: every substantive implementation,
+generator, validator, codec, hash operation, test harness, workflow, and
+artifact tool must be Zig. Bash is permitted only for tiny transparent
+orchestration invoking the exact fixed Zig/Git commands or setting the two
+cache variables. No JavaScript, ECMAScript, TypeScript, Python, Perl, AWK,
+other-language project solution, or internal-agent project algorithm is
+authorized.
+
+Success commits exactly `build.zig` and
+`tools/zllvm_inbox206_materialize.zig` in one non-merge commit and stops for
+review with main/control clean. First failure leaves the two-file slice
+uncommitted and stops immediately without diagnosis, retry, formatting repair,
+cleanup, normalization, fix-forward, or later command. Status remains
+`conditionally_supported`; runtime evidence is provisional. Authority beyond
+this focused implementation/build/test, install/execution/evidence-generation
+authority, D01/D02, BI evidence, continuation creation, ratchet movement,
+credit, and downstream work remain withheld. Before acting, acknowledge the
+pure-Zig two-file/private-test-root boundary, exact API/error/test scope, exact
+cache/gate sequence, prohibited actions, success condition, and failure-stop
+condition.
+
+
+## INBOX-206BN Zig descriptor-identity audit check-only closure — ACCEPTED; SUPERSEDED BY INBOX-206BO
 
 INBOX-206BM is accepted only as a compliant fail-closed textual-gate stop.
 The corrected draft bytes receive provisional documentation credit, but final
