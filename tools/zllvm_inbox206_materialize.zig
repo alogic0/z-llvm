@@ -527,6 +527,285 @@ fn syntheticExpectation(bytes: []const u8, supplied_maximum: u64) SnapshotExpect
     };
 }
 
+const SealedDescriptorError = error{
+    SealedDescriptorCapabilityUnavailable,
+    SealedDescriptorBadDescriptor,
+    SealedDescriptorInvalidOrUnsupported,
+    SealedDescriptorAbiViolation,
+    SealedDescriptorPermissionDenied,
+    SealedDescriptorSharedWritableMapping,
+    SealedDescriptorSystemResources,
+    SealedDescriptorOperationFailed,
+    SealedDescriptorRoleMismatch,
+    SealedDescriptorRequiredSealsMissing,
+    SealedDescriptorSizeMismatch,
+    SealedDescriptorPositionalIoFailed,
+    SealedDescriptorPositionalIoZeroProgress,
+    SealedDescriptorPositionalIoOverflow,
+    SealedDescriptorOwnershipUnavailable,
+};
+
+const SealedReceiverCounters = struct {
+    size_observations: usize = 0,
+    callback_calls: usize = 0,
+};
+
+const OwnedSyntheticSealedDescriptor = struct {
+    descriptor: std.posix.fd_t,
+    close_count: *usize,
+    owned: bool = true,
+
+    fn close(self: *OwnedSyntheticSealedDescriptor) void {
+        if (!self.owned) return;
+        _ = linux.close(self.descriptor);
+        self.owned = false;
+        self.close_count.* += 1;
+    }
+
+    fn move(self: *OwnedSyntheticSealedDescriptor) SealedDescriptorError!OwnedSyntheticSealedDescriptor {
+        if (!self.owned) return error.SealedDescriptorOwnershipUnavailable;
+        const moved = OwnedSyntheticSealedDescriptor{
+            .descriptor = self.descriptor,
+            .close_count = self.close_count,
+        };
+        self.owned = false;
+        return moved;
+    }
+};
+
+const PositionalSealedReader = struct {
+    descriptor: std.posix.fd_t,
+    offset: u64 = 0,
+    counters: *SealedReceiverCounters,
+
+    fn readNext(
+        raw_context: *anyopaque,
+        destination: []u8,
+    ) anyerror!SnapshotReadNextResult {
+        const self: *PositionalSealedReader = @ptrCast(@alignCast(raw_context));
+        self.counters.callback_calls += 1;
+        if (destination.len == 0) return error.SealedDescriptorPositionalIoFailed;
+        const offset = std.math.cast(i64, self.offset) orelse
+            return error.SealedDescriptorPositionalIoOverflow;
+        const raw_result = linux.pread(
+            self.descriptor,
+            destination.ptr,
+            destination.len,
+            offset,
+        );
+        try requireSealedSyscall(linux.errno(raw_result));
+        const count = raw_result;
+        if (count == 0) return .eof;
+        if (count > destination.len) return error.SealedDescriptorPositionalIoFailed;
+        const next = @addWithOverflow(self.offset, @as(u64, @intCast(count)));
+        if (next[1] != 0) return error.SealedDescriptorPositionalIoOverflow;
+        self.offset = next[0];
+        return .{ .bytes = count };
+    }
+};
+
+fn requiredSealedDescriptorMask() usize {
+    // F_SEAL_SEAL is optional protocol closure, not event-freedom. Seals are
+    // already irreversible, so this private proof requires only these bits.
+    return linux.F.SEAL_WRITE | linux.F.SEAL_GROW | linux.F.SEAL_SHRINK;
+}
+
+fn requireSealedSyscall(errno_value: linux.E) SealedDescriptorError!void {
+    switch (errno_value) {
+        .SUCCESS => return,
+        .NOSYS => return error.SealedDescriptorCapabilityUnavailable,
+        .BADF => return error.SealedDescriptorBadDescriptor,
+        .INVAL => return error.SealedDescriptorInvalidOrUnsupported,
+        .FAULT => return error.SealedDescriptorAbiViolation,
+        .PERM, .ACCES => return error.SealedDescriptorPermissionDenied,
+        .BUSY => return error.SealedDescriptorSharedWritableMapping,
+        .MFILE, .NFILE, .NOMEM => return error.SealedDescriptorSystemResources,
+        else => return error.SealedDescriptorOperationFailed,
+    }
+}
+
+fn positionalWriteAll(
+    descriptor: std.posix.fd_t,
+    bytes: []const u8,
+) SealedDescriptorError!void {
+    if (bytes.len == 0) return error.SealedDescriptorSizeMismatch;
+    const total_length = std.math.cast(u64, bytes.len) orelse
+        return error.SealedDescriptorPositionalIoOverflow;
+    var offset: u64 = 0;
+    while (offset < total_length) {
+        const offset_usize = std.math.cast(usize, offset) orelse
+            return error.SealedDescriptorPositionalIoOverflow;
+        const offset_i64 = std.math.cast(i64, offset) orelse
+            return error.SealedDescriptorPositionalIoOverflow;
+        const remaining = bytes[offset_usize..];
+        const raw_result = linux.pwrite(
+            descriptor,
+            remaining.ptr,
+            remaining.len,
+            offset_i64,
+        );
+        try requireSealedSyscall(linux.errno(raw_result));
+        const count = raw_result;
+        if (count == 0) return error.SealedDescriptorPositionalIoZeroProgress;
+        if (count > remaining.len) return error.SealedDescriptorPositionalIoFailed;
+        const next = @addWithOverflow(offset, @as(u64, @intCast(count)));
+        if (next[1] != 0) return error.SealedDescriptorPositionalIoOverflow;
+        offset = next[0];
+    }
+}
+
+fn getSealedDescriptorMask(descriptor: std.posix.fd_t) SealedDescriptorError!usize {
+    const raw_result = linux.fcntl(descriptor, linux.F.GET_SEALS, 0);
+    try requireSealedSyscall(linux.errno(raw_result));
+    return raw_result;
+}
+
+fn requireRegularSealedDescriptorRole(descriptor: std.posix.fd_t) SealedDescriptorError!void {
+    var requested = std.mem.zeroes(linux.STATX);
+    requested.TYPE = true;
+    var result = std.mem.zeroes(linux.Statx);
+    const raw_result = linux.statx(
+        descriptor,
+        "",
+        linux.AT.EMPTY_PATH | linux.AT.STATX_SYNC_AS_STAT,
+        requested,
+        &result,
+    );
+    try requireSealedSyscall(linux.errno(raw_result));
+    if (!result.mask.TYPE) return error.SealedDescriptorInvalidOrUnsupported;
+    if (result.mode & linux.S.IFMT != linux.S.IFREG) {
+        return error.SealedDescriptorRoleMismatch;
+    }
+}
+
+fn requireFullSealedDescriptorMask(descriptor: std.posix.fd_t) SealedDescriptorError!void {
+    const actual = try getSealedDescriptorMask(descriptor);
+    const required = requiredSealedDescriptorMask();
+    if (actual & required != required) {
+        return error.SealedDescriptorRequiredSealsMissing;
+    }
+}
+
+fn observeSealedDescriptorSize(
+    descriptor: std.posix.fd_t,
+    counters: *SealedReceiverCounters,
+) SealedDescriptorError!u64 {
+    counters.size_observations += 1;
+    var requested = std.mem.zeroes(linux.STATX);
+    requested.SIZE = true;
+    var result = std.mem.zeroes(linux.Statx);
+    const raw_result = linux.statx(
+        descriptor,
+        "",
+        linux.AT.EMPTY_PATH | linux.AT.STATX_SYNC_AS_STAT,
+        requested,
+        &result,
+    );
+    try requireSealedSyscall(linux.errno(raw_result));
+    if (!result.mask.SIZE) return error.SealedDescriptorInvalidOrUnsupported;
+    return result.size;
+}
+
+/// Constructs private synthetic fixtures. The accepted path requests the
+/// complete required mask; intentionally incomplete masks exist only to prove
+/// that the receiver rejects them before size observation or snapshot entry.
+fn createSyntheticSealedFixture(
+    bytes: []const u8,
+    seals: usize,
+    close_count: *usize,
+) SealedDescriptorError!OwnedSyntheticSealedDescriptor {
+    const flags: u32 = linux.MFD.CLOEXEC | linux.MFD.ALLOW_SEALING;
+    const raw_descriptor = linux.memfd_create("zllvm-inbox206ck", flags);
+    try requireSealedSyscall(linux.errno(raw_descriptor));
+    var owned = OwnedSyntheticSealedDescriptor{
+        .descriptor = @intCast(raw_descriptor),
+        .close_count = close_count,
+    };
+    errdefer owned.close();
+
+    try positionalWriteAll(owned.descriptor, bytes);
+    const raw_add = linux.fcntl(owned.descriptor, linux.F.ADD_SEALS, seals);
+    try requireSealedSyscall(linux.errno(raw_add));
+    const observed = try getSealedDescriptorMask(owned.descriptor);
+    if (observed & seals != seals) {
+        return error.SealedDescriptorRequiredSealsMissing;
+    }
+    return owned;
+}
+
+fn createSyntheticFullySealedDescriptor(
+    bytes: []const u8,
+    close_count: *usize,
+) SealedDescriptorError!OwnedSyntheticSealedDescriptor {
+    return createSyntheticSealedFixture(bytes, requiredSealedDescriptorMask(), close_count);
+}
+
+/// Moves creator ownership exactly once. The receiver closes the transferred
+/// descriptor on every exit, while the returned snapshot has its own lifetime.
+fn acquireVerifiedSealedSnapshot(
+    allocator: std.mem.Allocator,
+    expectation: SnapshotExpectation,
+    token: *SnapshotToken,
+    creator_owned: *OwnedSyntheticSealedDescriptor,
+    counters: *SealedReceiverCounters,
+) (SealedDescriptorError || SnapshotError || std.mem.Allocator.Error)!VerifiedSnapshot {
+    var receiver_owned = try creator_owned.move();
+    defer receiver_owned.close();
+
+    try requireRegularSealedDescriptorRole(receiver_owned.descriptor);
+    try requireFullSealedDescriptorMask(receiver_owned.descriptor);
+    const actual_size = try observeSealedDescriptorSize(receiver_owned.descriptor, counters);
+    if (actual_size != expectation.exact_length) {
+        return error.SealedDescriptorSizeMismatch;
+    }
+
+    var reader = PositionalSealedReader{
+        .descriptor = receiver_owned.descriptor,
+        .counters = counters,
+    };
+    return acquireVerifiedSnapshot(
+        allocator,
+        expectation,
+        token,
+        &reader,
+        PositionalSealedReader.readNext,
+    );
+}
+
+fn expectSealedMaskRejection(seals: usize) !void {
+    var bytes: [37]u8 = undefined;
+    fillSyntheticSnapshot(&bytes);
+    const expectation = syntheticExpectation(&bytes, bytes.len);
+    var close_count: usize = 0;
+    var creator_owned = try createSyntheticSealedFixture(&bytes, seals, &close_count);
+    defer creator_owned.close();
+    const saved_descriptor = creator_owned.descriptor;
+    var token = SnapshotToken{};
+    var counters = SealedReceiverCounters{};
+    var no_storage: [0]u8 = .{};
+    var allocation_must_not_run = std.heap.FixedBufferAllocator.init(&no_storage);
+
+    try std.testing.expectError(
+        error.SealedDescriptorRequiredSealsMissing,
+        acquireVerifiedSealedSnapshot(
+            allocation_must_not_run.allocator(),
+            expectation,
+            &token,
+            &creator_owned,
+            &counters,
+        ),
+    );
+    try std.testing.expect(!creator_owned.owned);
+    try std.testing.expectEqual(@as(usize, 1), close_count);
+    try std.testing.expectEqual(@as(usize, 0), counters.size_observations);
+    try std.testing.expectEqual(@as(usize, 0), counters.callback_calls);
+    try std.testing.expectEqual(SnapshotTokenState.unused, token.state.load(.acquire));
+    try std.testing.expectError(
+        error.DescriptorIdentityBadDescriptor,
+        observeDescriptor(saved_descriptor, .regular_file),
+    );
+}
+
 test "compile-time ABI and essential mask closure" {
     comptime assertNativeAbi();
     const mask_bits: u32 = @bitCast(requiredMask());
@@ -1331,4 +1610,69 @@ test "verified snapshot atomically admits one of two actual concurrent callers" 
         SnapshotTokenState.consumed,
         token.state.load(.acquire),
     );
+}
+
+test "sealed descriptor accepts the complete event-freedom mask" {
+    var bytes: [257]u8 = undefined;
+    fillSyntheticSnapshot(&bytes);
+    const expectation = syntheticExpectation(&bytes, bytes.len);
+    var close_count: usize = 0;
+    var creator_owned = try createSyntheticFullySealedDescriptor(&bytes, &close_count);
+    defer creator_owned.close();
+    const saved_descriptor = creator_owned.descriptor;
+    var token = SnapshotToken{};
+    var counters = SealedReceiverCounters{};
+
+    var snapshot = try acquireVerifiedSealedSnapshot(
+        std.testing.allocator,
+        expectation,
+        &token,
+        &creator_owned,
+        &counters,
+    );
+    defer snapshot.deinit();
+
+    try std.testing.expectEqualSlices(u8, &bytes, observeVerifiedSnapshot(&snapshot));
+    try std.testing.expect(!creator_owned.owned);
+    try std.testing.expectEqual(@as(usize, 1), close_count);
+    try std.testing.expectEqual(@as(usize, 1), counters.size_observations);
+    try std.testing.expectEqual(@as(usize, 2), counters.callback_calls);
+    try std.testing.expectEqual(SnapshotTokenState.consumed, token.state.load(.acquire));
+    try std.testing.expectError(
+        error.DescriptorIdentityBadDescriptor,
+        observeDescriptor(saved_descriptor, .regular_file),
+    );
+
+    var reuse_token = SnapshotToken{};
+    var reuse_counters = SealedReceiverCounters{};
+    var no_storage: [0]u8 = .{};
+    var allocation_must_not_run = std.heap.FixedBufferAllocator.init(&no_storage);
+    try std.testing.expectError(
+        error.SealedDescriptorOwnershipUnavailable,
+        acquireVerifiedSealedSnapshot(
+            allocation_must_not_run.allocator(),
+            expectation,
+            &reuse_token,
+            &creator_owned,
+            &reuse_counters,
+        ),
+    );
+    try std.testing.expectEqual(@as(usize, 1), close_count);
+    try std.testing.expectEqual(@as(usize, 0), reuse_counters.size_observations);
+    try std.testing.expectEqual(@as(usize, 0), reuse_counters.callback_calls);
+    try std.testing.expectEqual(SnapshotTokenState.unused, reuse_token.state.load(.acquire));
+}
+
+test "sealed descriptor rejects future-write without required write" {
+    try expectSealedMaskRejection(
+        linux.F.SEAL_FUTURE_WRITE | linux.F.SEAL_GROW | linux.F.SEAL_SHRINK,
+    );
+}
+
+test "sealed descriptor rejects missing grow before snapshot admission" {
+    try expectSealedMaskRejection(linux.F.SEAL_WRITE | linux.F.SEAL_SHRINK);
+}
+
+test "sealed descriptor rejects missing shrink before snapshot admission" {
+    try expectSealedMaskRejection(linux.F.SEAL_WRITE | linux.F.SEAL_GROW);
 }
