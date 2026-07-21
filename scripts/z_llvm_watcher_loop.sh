@@ -72,23 +72,53 @@ PROJECT LANGUAGE:
   directive. If an active task conflicts with it, stop before dispatch or
   execution and agree on the smallest Zig-only replacement.
 
+DEVELOPMENT OVERSIGHT:
+- Verify DEVELOPMENT work proportionately: check allowed-path scope with Git
+  status/diff names, required index state, diff --check, and the Worker-reported
+  focused Zig gates. Do not routinely hash every source, script, cache, stash,
+  worktree, command, prose file, or transcript.
+- Hash only pinned external revisions at capability start, security-critical
+  actual inputs/results/receipts at green, and staged/final identities during
+  ACCEPTANCE.
+- Do not routinely scan session JSONL or reconstruct command ordering. Inspect
+  retained transcripts only when the report conflicts with repository/log
+  state, a prohibited or destructive action is suspected, or final security
+  acceptance requires it.
+- Within an agreed capability and non-destructive scope, the Worker may follow
+  directly relevant main-repository and explicitly named pinned external
+  tracked-source references, diagnose ordinary failures, and iteratively edit,
+  format, test, and rerun within the named file/command scope. Do not create a
+  new inbox or Reviewer round trip for each failed lookup, compile, or test.
+- Review with the Reviewer at green completion, a genuine blocker, or material
+  file/security/external-state scope expansion. Evaluate architecture, threat
+  model, correctness, and acceptance criteria rather than individual commands.
+- Worktree and stash protections remain binding, but verify them only when a
+  task can affect that state or during final acceptance. Monitor DEVELOPMENT
+  cache sizes without immutable inventories or routine hashes.
+
 WHEN NOTIFIED THAT THE WORKER STOPPED:
-1. Preserve the Worker’s final report verbatim.
-2. Inspect the commit, worktree, source diff, evidence, and retained logs. Do
-   not run the project code yourself; review source and existing logs only.
-3. Verify every active-inbox condition, including scope, ratchet, identities,
-   gates, prohibited actions, clean worktree, and untouched stash.
+1. Preserve the Worker's concise conclusion and reported gates. Preserve a
+   verbatim report only when a conflict, suspected prohibited action, or final
+   security acceptance makes it necessary.
+2. Inspect the allowed-path source diff and existing evidence without running
+   project code. Consult retained logs only under the DEVELOPMENT OVERSIGHT
+   conditions above.
+3. Verify scope, required index state, diff --check, and relevant gates.
+   Perform identity, stash, or worktree checks only when task risk or final
+   acceptance makes them relevant.
 4. Discuss acceptance and the next bounded task with the Reviewer on
-   worker:1.0. Every Reviewer message must begin exactly:
+   worker:1.0 at green completion, a genuine blocker, or material scope change.
+   Every Reviewer message must begin exactly:
 It's from Watcher:
    Include the pure-Zig project-language boundary in every proposal.
 5. Reach explicit agreement before assigning anything to the Worker.
    Incorporate all Reviewer refinements.
-6. Surface relevant Worker and Reviewer dialogue verbatim to the user.
-7. After agreement, add the new directive to docs/worker_inbox.md, update
-   docs/next_steps.md to the sole current authorized action, commit only
-   tracked operating-document changes, and dispatch the agreed task to
-   worker:0.0 using tmux bracketed paste. Every Worker directive must require
+6. Surface concise relevant Worker and Reviewer conclusions to the user;
+   provide verbatim dialogue only when materially needed.
+7. After agreement, update the current ignored inbox/runtime instruction.
+   Update docs/next_steps.md or create a tracked operating commit only when the
+   standing capability policy explicitly requires it. Dispatch the agreed task
+   to worker:0.0 using tmux bracketed paste. Every Worker directive must require
    Zig for substantive project logic and limit Bash to tiny orchestration.
 8. Confirm the Worker acknowledged the directive and its stop conditions.
 
@@ -115,18 +145,18 @@ EOF
 
 WORKER_STOPPED_MESSAGE=$(cat <<'EOF'
 The monitoring script detected that the Worker has stopped. Inspect
-worker:0.0 now and determine what it completed. Verify the source diff and
-retained logs without running project code. Then discuss acceptance and the
-next bounded task with the Reviewer on worker:1.0; begin every Reviewer
-message exactly with "It's from Watcher:". Watcher/Reviewer mutual agreement
-is sufficient for all non-destructive decisions, including benchmark/workload
-selection, protocol or identity amendment, materialization, pinning,
-validation, remediation, and bounded scope changes. Do not ask the user to
-choose or wait for user approval. After agreement, update the operating
-documents, dispatch the agreed task to the Worker, and confirm acknowledgment.
-If acceptance failed, dispatch the agreed corrective slice. If no proposed
-option is acceptable, jointly define and dispatch the smallest reversible
-task that reduces the blocker.
+worker:0.0 now and determine what it completed. Without running project code,
+verify allowed-path scope, required index state, diff --check, and reported
+focused Zig gates. Do not routinely rehash unrelated state or scan retained
+transcripts; do so only for conflicting evidence, suspected prohibited action,
+or final security acceptance. Discuss with Reviewer worker:1.0 at green
+completion, a genuine blocker, or material scope/security/external-state
+expansion; every Reviewer message begins exactly "It's from Watcher:".
+Watcher/Reviewer agreement is sufficient for non-destructive decisions. Within
+an agreed DEVELOPMENT capability, ordinary diagnosis and iterative in-scope
+edits/tests need no micro-review. After required agreement, update the current
+runtime instruction, dispatch the agreed task, and confirm acknowledgment. If
+blocked, agree on and dispatch the smallest reversible corrective slice.
 The project is pure Zig: require Zig for all substantive project logic,
 generators, validators, codecs, hashing, harnesses, and tooling. Permit Bash
 only for tiny transparent orchestration. Do not accept another language as a
@@ -136,14 +166,13 @@ EOF
 
 WORKER_STILL_STOPPED_MESSAGE=$(cat <<'EOF'
 Reminder: the Worker remains stopped after the previous notification. Reach
-Watcher/Reviewer agreement and dispatch the agreed next task now; do not wait
-for user selection or approval. Mutual agreement is sufficient for
-non-destructive benchmark/workload, protocol, identity, materialization,
-pinning, validation, remediation, and bounded-scope decisions. If the current
-options remain unacceptable, agree on and dispatch the smallest reversible
-evidence, design, validation, or implementation task that reduces the blocker.
-Communicate the decision to the user as a status update and confirm the
-Worker's acknowledgment.
+Watcher/Reviewer agreement when this is green completion, a genuine blocker,
+or material scope/security/external-state expansion, and dispatch the agreed
+next task without waiting for user selection. Within an already agreed
+DEVELOPMENT scope, resume ordinary diagnosis or iterative edits/tests without
+a new micro-review. If blocked, agree on the smallest reversible task that
+reduces the blocker. Communicate the decision as a status update and confirm
+the Worker's acknowledgment.
 Keep every task Zig-only for substantive project logic. Bash is limited to
 tiny transparent orchestration; no other language is a project solution.
 EOF
