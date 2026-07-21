@@ -24,7 +24,172 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BI Phase-3 wrapper materialization-readiness checkpoint — AUTHORIZED
+## INBOX-206BJ pure-ECMAScript generator and SHA-256 remediation — AUTHORIZED
+
+INBOX-206BI is accepted only as a compliant fail-closed absent-artifact stop.
+Credit is limited to its exact operating/protected-state gate, bounded read-only
+authority discovery, pre-patch stop, and absence of later action. No evidence
+document, canonical-region replay, P001-P140 coverage, fixture, materialization
+readiness, D01/D02, ratchet, production, credit, or downstream acceptance is
+granted.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BI stopped at the first construction failure: the inert document-generation process encountered `TextEncoder is not defined` before applying any patch.
+
+No evidence file was created or committed, and no further command, inspection, diagnosis, retry, repair, cleanup, or fix-forward was performed. The BI continuation remains uncreated.
+```
+
+Static Watcher review ran no project or Zig code. Main remains clean at HEAD
+`78501fe748f441929f1734aa01b65eba93933451`, parent
+`ec62c4069bcc1f3ada5edf4ac5dbedc44cc8c4b1`, tree
+`a5e8551f862eecb63fc5bdd299ca7ee8cc09af7e`, with sole changed path
+`docs/next_steps.md`. Tracked, staged, and source diffs are empty. The BI
+evidence file and prospective continuation are absent/non-symlink. Operating
+hashes remain exact. Control is clean at
+`9c55bda34088e1230b0b91a126d35795a3ac70b4` / tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e`, branch `main`, no remote. Stash
+`7985c6d01040a6e47e4ce5b918866d0e89517ac7`, watcher blob
+`b64131cf60dd0ef638e815cd33db9ae8595a72cf`, retained roots, registrations,
+protected identities, and ratchet 131 remain unchanged. No registered-worktree
+directory or prohibited settings file was accessed.
+
+Retained turn `019f8235-a6eb-75d1-a2cb-cb63be9f4681` has exactly five tool
+calls: operating-document reads; one operating/protected-state gate returning
+`BI_OPERATING_GATE_OK`; two read-only extracts from the committed
+specification; and one inert construction call. The construction source is
+exactly 26,652 bytes with SHA-256
+`97e8f0a3f6607881aa45618be0c40bd0f4e670633ea574a00624157ce5242ebf`.
+It performs its permitted nested `/bin/cat` read and then fails at source line
+7 on its first host-codec dependency, `new TextEncoder()`, before specification
+hashing, canonical-region replay, fixture construction, document assembly,
+`apply_patch`, staging, or commit. The final report and task completion follow
+without a later command.
+
+Static review of that frozen source also finds three later
+`new TextDecoder()` dependencies and one masked SHA-256 round-constant typo:
+the generator contains `2614881032`, while the accepted committed closure
+authority contains the correct `2614888103`. A codec-only retry would therefore
+fail the next specification-identity gate.
+
+Reviewer agreement is preserved verbatim:
+
+```text
+I accept INBOX-206BI only as a compliant fail-closed absent-artifact stop. Credit is limited to the operating/protected gate, bounded authority reads, pre-patch stop, and no later action. No evidence document, region replay, P001–P140 coverage, fixture, readiness, D01/D02, or downstream credit is granted.
+
+I authorize evidence/design-only INBOX-206BJ with these refinements:
+
+- First create one non-merge operating commit changing only docs/next_steps.md, parented exactly by 78501fe748f441929f1734aa01b65eba93933451; update the ignored inbox separately.
+- Preserve the absent continuation and edit/create only docs/evidence/inbox206bi_phase3_wrapper_materialization_readiness.md.
+- Freeze before execution:
+    - the original generator source/hash;
+    - the exact permitted source diff;
+    - the complete remediated generator source/hash;
+    - the intended evidence-document byte count and SHA-256;
+    - all static-check command bytes/hashes.
+
+- Permit only the four host-codec replacements, exact constant correction 2614881032 → 2614888103, and required codec/hash self-tests. Preserve all other generator logic and planned output bytes.
+
+- Use strict pure-ECMAScript UTF-8 helpers with the previously accepted positive and malformed-input rejection fixtures.
+- Self-test SHA-256 against frozen standard empty-string and abc vectors before checking the committed specification.
+- Require strict specification decode/encode byte equality and exact SHA-256 4b851b4a3650e6c55cd53f72b9f3e3e91146433523ccf2bbc6c4ad6dc1065eb3.
+- Require TextEncoder and TextDecoder absent from executable generator regions.
+- Only complete codec, hash, specification, region, process, and fixture gates permit the sole patch.
+- Permit one exact-name chmod 0644 immediately after successful creation and before the first post-write gate as construction finalization; no later mode repair is allowed.
+- Run only frozen static evidence completeness, exact-diff, mode, byte-count, and hash checks. Invoke no wrapper, assertion, project, Zig, or package member.
+- Success commits only the evidence document and stops. Failure leaves it uncommitted and stops without diagnosis, retry, repair, or fix-forward.
+
+All continuation-absence, protected-state, registered-worktree, cache, validation, production-AWK, D01/D02, ratchet, credit, and downstream prohibitions remain exact.
+```
+
+Create one non-merge operating commit parented exactly by
+`78501fe748f441929f1734aa01b65eba93933451`, changing only tracked
+`docs/next_steps.md`; update only the ignored inbox separately. No other dirty
+path is permitted. Preserve this path absent/non-symlink:
+
+```text
+/tmp/zllvm-inbox206-authority-validation-evidence/continuations/inbox206bi
+```
+
+BJ remains evidence/design only and may create or edit only this exact regular
+mode-0644 result:
+
+```text
+docs/evidence/inbox206bi_phase3_wrapper_materialization_readiness.md
+```
+
+The original inert generator source is retained in turn
+`019f8235-a6eb-75d1-a2cb-cb63be9f4681`, call
+`call_ELBK3cIZTeQK5gm5ikyWaDPo`, and is exactly 26,652 bytes with SHA-256
+`97e8f0a3f6607881aa45618be0c40bd0f4e670633ea574a00624157ce5242ebf`.
+Freeze before invoking the remediated generator:
+
+1. the exact original generator bytes/count/hash;
+2. one complete exact permitted source diff;
+3. the complete remediated generator bytes/count/hash;
+4. the intended evidence-document bytes/count/SHA-256;
+5. every post-write static-check command's exact bytes/count/hash and expected
+   sole output/status.
+
+The complete permitted generator-source changes are:
+
+- replace the one `new TextEncoder()` dependency and the three
+  `new TextDecoder()` dependencies with strict pure-ECMAScript UTF-8 helpers;
+- correct exactly one SHA-256 constant from `2614881032` to `2614888103`;
+- add only the required codec fixtures, SHA-256 vectors, complete-spec strict
+  round-trip gate, host-codec absence gate, and their fail-closed checks.
+
+Preserve every other generator byte, algorithm, planned evidence byte, and
+patch target. No other refactor, normalization, regeneration, or cleanup is
+authorized. Reuse the previously accepted strict pure-ECMAScript positive
+fixtures with exact expected bytes: ASCII `A`, NUL, TAB/LF, byte `0x60`,
+U+2013, U+2014, and U+1F642. Reuse the accepted negative fixtures for lone
+high and low surrogates, malformed lead/continuation bytes, truncation,
+overlong two- and three-byte NUL, UTF-8 surrogate encoding, and values above
+U+10FFFF. Every positive fixture must prove exact bytes plus strict decode/
+encode equality; every negative fixture must fail closed.
+
+Before the committed specification identity gate, self-test the corrected
+SHA-256 helper against these frozen vectors:
+
+```text
+empty=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+abc=ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+```
+
+Require strict decode/encode raw-byte equality for the complete committed
+specification and exact SHA-256
+`4b851b4a3650e6c55cd53f72b9f3e3e91146433523ccf2bbc6c4ad6dc1065eb3`.
+Require the identifiers `TextEncoder` and `TextDecoder` to be absent from all
+executable remediated-generator regions. Only complete codec, vector,
+specification, 39-region, P001-P140, typed-token, process/DAG, fixture, planned
+document identity, and exact-source-diff gates permit the sole patch.
+
+Immediately after successful exact-name creation and before the first
+post-write gate, one exact-name `chmod 0644` of the authorized evidence file is
+permitted as construction finalization. No later mode repair or other chmod is
+allowed. Then run only the fully pre-frozen static evidence completeness,
+exact-diff, regular-file/non-symlink/mode, byte-count, and SHA-256 checks. These
+checks may read only the new evidence file, the committed specification, main
+Git metadata, and clean control status. They must not invoke any wrapper,
+assertion, generated member, project command, Zig/build/install, package
+member, validation, cache action, production AWK, D01/D02, ratchet, credit, or
+downstream action.
+
+On full success, commit only
+`docs/evidence/inbox206bi_phase3_wrapper_materialization_readiness.md` in one
+non-merge commit and stop with main/control clean. On the first failure, leave
+the evidence uncommitted and stop immediately without inspection, diagnosis,
+retry, repair, cleanup, normalization, later mode change, fix-forward, or later
+command. Preserve every retained root, the absent continuation, all 43
+registered worktrees and their directories, stash, watcher, control identity,
+protected identity, and ratchet 131. Never access a registered-worktree
+directory or `.claude/settings.local.json`. Give one concise acknowledgment of
+the complete pre-freeze, exact-diff, codec/hash, sole-write, static-check,
+success, and failure-stop boundary before acting.
+
+## INBOX-206BI Phase-3 wrapper materialization-readiness checkpoint — COMPLIANT ABSENT-ARTIFACT STOP; SUPERSEDED BY INBOX-206BJ
 
 INBOX-206BH is accepted only as the successful committed inert static
 specification and canonical-region proof. No materialized package, readiness,
