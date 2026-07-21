@@ -501,6 +501,9 @@ const ParsedCoverageChannel = struct {
 
 const ManifestLine = struct { digest: contract.Digest, path: []const u8 };
 
+const accepted_bundle_manifest_prefix =
+    "tmp/o2_calls_perf/compiler_rt_v1/inbox187_baseline_validation_contract_bundle/";
+
 fn parseManifestLine(line: []const u8) RunnerError!ManifestLine {
     if (line.len < 67) return error.ManifestMismatch;
     const digest = try decodeSha256(line[0..64]);
@@ -520,6 +523,24 @@ fn parseManifestLine(line: []const u8) RunnerError!ManifestLine {
     return .{ .digest = digest, .path = path };
 }
 
+fn manifestPathMatchesBundleMember(
+    manifest_path: []const u8,
+    required_path: []const u8,
+) bool {
+    const expected_length = std.math.add(
+        usize,
+        accepted_bundle_manifest_prefix.len,
+        required_path.len,
+    ) catch return false;
+    return manifest_path.len == expected_length and
+        std.mem.startsWith(u8, manifest_path, accepted_bundle_manifest_prefix) and
+        std.mem.eql(
+            u8,
+            manifest_path[accepted_bundle_manifest_prefix.len..],
+            required_path,
+        );
+}
+
 fn readAuthenticatedBundleMember(
     allocator: std.mem.Allocator,
     io: std.Io,
@@ -537,13 +558,14 @@ fn readAuthenticatedBundleMember(
         if (previous) |prior| if (std.mem.order(u8, prior, entry.path) != .lt)
             return error.ManifestMismatch;
         previous = entry.path;
-        if (std.mem.eql(u8, entry.path, required_path)) {
+        if (manifestPathMatchesBundleMember(entry.path, required_path)) {
             if (found != null) return error.ManifestMismatch;
             found = entry.digest;
         }
     }
     const expected = found orelse return error.ManifestMismatch;
     const absolute = try joinAbsolute(allocator, bundle_root, required_path);
+    defer allocator.free(absolute);
     const identity = try observeFile(io, absolute, false, maximum_input_bytes, registered_worktrees);
     if (!std.mem.eql(u8, &identity.sha256, &expected)) return error.ManifestMismatch;
     return readBoundedAbsolute(allocator, io, absolute, maximum_input_bytes);
@@ -5609,6 +5631,140 @@ test "baseline runner manifest parser rejects malformed and escaping identities"
     try std.testing.expectError(
         error.ManifestMismatch,
         parseManifestLine("00" ** 32 ++ "  /absolute"),
+    );
+}
+
+test "baseline runner bundle manifest namespace requires exact accepted prefix" {
+    var temporary = std.testing.tmpDir(.{});
+    defer temporary.cleanup();
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    const required_path = "manifests/member.txt";
+    const contents = "authenticated bundle member\n";
+    try temporary.dir.createDirPath(io, "bundle/manifests");
+    try temporary.dir.writeFile(io, .{
+        .sub_path = "bundle/" ++ required_path,
+        .data = contents,
+    });
+    var root_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const root_length = try temporary.dir.realPath(io, &root_buffer);
+    const bundle_root = try std.fmt.allocPrint(
+        allocator,
+        "{s}/bundle",
+        .{root_buffer[0..root_length]},
+    );
+    defer allocator.free(bundle_root);
+
+    const digest = sha256(contents);
+    const digest_hex = std.fmt.bytesToHex(digest, .lower);
+    const exact_manifest = try std.fmt.allocPrint(
+        allocator,
+        "{s}  {s}{s}\n",
+        .{ &digest_hex, accepted_bundle_manifest_prefix, required_path },
+    );
+    defer allocator.free(exact_manifest);
+    const member = try readAuthenticatedBundleMember(
+        allocator,
+        io,
+        bundle_root,
+        exact_manifest,
+        required_path,
+        &.{},
+    );
+    defer allocator.free(member);
+    try std.testing.expectEqualStrings(contents, member);
+
+    const absent_manifest = try std.fmt.allocPrint(
+        allocator,
+        "{s}  {s}manifests/other.txt\n",
+        .{ &digest_hex, accepted_bundle_manifest_prefix },
+    );
+    defer allocator.free(absent_manifest);
+    try std.testing.expectError(
+        error.ManifestMismatch,
+        readAuthenticatedBundleMember(
+            allocator,
+            io,
+            bundle_root,
+            absent_manifest,
+            required_path,
+            &.{},
+        ),
+    );
+
+    const unprefixed_manifest = try std.fmt.allocPrint(
+        allocator,
+        "{s}  {s}\n",
+        .{ &digest_hex, required_path },
+    );
+    defer allocator.free(unprefixed_manifest);
+    try std.testing.expectError(
+        error.ManifestMismatch,
+        readAuthenticatedBundleMember(
+            allocator,
+            io,
+            bundle_root,
+            unprefixed_manifest,
+            required_path,
+            &.{},
+        ),
+    );
+
+    const wrong_prefix_manifest = try std.fmt.allocPrint(
+        allocator,
+        "{s}  wrong/{s}\n",
+        .{ &digest_hex, required_path },
+    );
+    defer allocator.free(wrong_prefix_manifest);
+    try std.testing.expectError(
+        error.ManifestMismatch,
+        readAuthenticatedBundleMember(
+            allocator,
+            io,
+            bundle_root,
+            wrong_prefix_manifest,
+            required_path,
+            &.{},
+        ),
+    );
+
+    const duplicate_manifest = try std.fmt.allocPrint(
+        allocator,
+        "{s}{s}",
+        .{ exact_manifest, exact_manifest },
+    );
+    defer allocator.free(duplicate_manifest);
+    try std.testing.expectError(
+        error.ManifestMismatch,
+        readAuthenticatedBundleMember(
+            allocator,
+            io,
+            bundle_root,
+            duplicate_manifest,
+            required_path,
+            &.{},
+        ),
+    );
+
+    var wrong_digest = digest;
+    wrong_digest[0] ^= 1;
+    const wrong_digest_hex = std.fmt.bytesToHex(wrong_digest, .lower);
+    const digest_mismatch_manifest = try std.fmt.allocPrint(
+        allocator,
+        "{s}  {s}{s}\n",
+        .{ &wrong_digest_hex, accepted_bundle_manifest_prefix, required_path },
+    );
+    defer allocator.free(digest_mismatch_manifest);
+    try std.testing.expectError(
+        error.ManifestMismatch,
+        readAuthenticatedBundleMember(
+            allocator,
+            io,
+            bundle_root,
+            digest_mismatch_manifest,
+            required_path,
+            &.{},
+        ),
     );
 }
 
