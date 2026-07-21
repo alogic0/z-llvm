@@ -24,7 +24,141 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BL Zig descriptor-identity API audit — AUTHORIZED
+## INBOX-206BM Zig descriptor-identity audit correction — AUTHORIZED
+
+INBOX-206BL is accepted only as a compliant fail-closed, uncommitted-audit
+stop. Its frozen standard-library/source evidence and
+`descriptor_identity_status=conditionally_supported` conclusion receive
+provisional documentation credit only. It receives no closure, commit,
+implementation, execution, D01/D02, ratchet, or downstream credit.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BL stopped at the first failed static-closure gate.
+
+The audit remains uncommitted at the authorized path. No diagnosis, retry, repair, cleanup, commit, or later command was performed. Protected state and ratchet 131 remain unchanged.
+```
+
+Static Watcher review ran no project code. The current BL operating HEAD is
+`5b3007a502be13a3b6673b6cb47244592c2e09e8`, parent
+`f9b2f30a154e5422c53d04bc21cc1e92e667300b`, tree
+`0346b5d4942612630f125e757e47180899be3767`. Its sole commit change is
+`docs/next_steps.md`, whose SHA-256 is
+`9f8a5fcad3702a7db91dade60bedbb62a1062a388ba1c4a5bb4632981c7bbf3c`.
+The index and tracked diff are empty. The sole untracked path is the authorized
+mode-0644 BL draft
+`docs/evidence/inbox206bl_zig_descriptor_identity_api_audit.md`, 19,397
+bytes, 358 lines, SHA-256
+`657c14a8bfa619b945759f1ba26ad6245311247cb64fc2afc8bacd1d282b22cb`.
+
+Retained Worker turn `019f825a-6c37-7ca1-9484-1e5134e66a52` proves the
+first failed static predicate expected the incorrect BK SHA-256
+`66b0dfdf052fcbcf209579e2f11d6f8298f8f08ba84ea7e12d24e45bbfd70e28`.
+The accepted BK document actually hashes to
+`66b0dfdff5c61b00a16e815994bb9c06e3596260d611a2e35cb83cbe99b9e187`.
+The incorrect literal occurs exactly twice in the BL draft: once in its
+operating table and once in its initial-read ledger. This mismatch explains
+the gate failure. No diagnosis or project command was run by the Worker.
+
+Control remains clean at
+`9c55bda34088e1230b0b91a126d35795a3ac70b4` / tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e`, branch `main`, no remote.
+Stash `7985c6d01040a6e47e4ce5b918866d0e89517ac7`, watcher SHA-256
+`1221b00a6aacd7deaae9aab50bd2600be33a13b0ed645428f9475a2cb81a893d`,
+watcher blob `058c659544fd13cc88ff79f62e196f1b9644f9e0`, watcher PID 3206208,
+all 43 registered worktrees and directories, protected identities, and ratchet
+131 remain exact. The BI evidence file and continuation remain absent and
+non-symlink.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept INBOX-206BL only as a compliant fail-closed uncommitted-audit stop. Its frozen standard-library/source evidence and conditionally_supported conclusion receive provisional documentation credit only. No closure, commit, implementation, D01/D02, or downstream credit is granted.
+
+I authorize INBOX-206BM with these refinements:
+
+- Before updating operating documents, bind the omitted full current BL operating HEAD/tree/document identities in the directive.
+- Create one non-merge operating commit changing only docs/next_steps.md; preserve the untracked BL draft unstaged and byte-identical during that commit, and update the ignored inbox separately.
+
+- Edit only docs/evidence/inbox206bl_zig_descriptor_identity_api_audit.md, retaining mode 0644.
+- Freeze the complete exact patch and permit only:
+    1. replacement of the two incorrect BK hashes with 66b0dfdff5c61b00a16e815994bb9c06e3596260d611a2e35cb83cbe99b9e187;
+    2. a precise trusted-anchor paragraph naming the exact descriptor-acquisition operation and flags already supported by BL’s frozen source evidence;
+    3. per-callsite E.INVAL attribution with explicit precedence.
+
+- The anchor wording must not imply that a single final-component NOFOLLOW check protects ancestor components. It must require a trusted starting descriptor and descriptor-relative, no-follow component acquisition, or retain an explicit blocker if the frozen evidence cannot establish that operation.
+
+- E.INVAL must not appear as two indistinguishable terminal classifications. If the exact call context cannot distinguish unsupported capability from invalid ABI/arguments, classify it conservatively as ambiguous and fail closed.
+
+- Preserve descriptor_identity_status=conditionally_supported, all other content, and every implementation/execution prohibition.
+- Read no standard-library source again. Run only fixed identity, exact-diff, textual-scope, mode, and Git checks.
+- Success commits only the corrected BL audit and stops. Any failure leaves it uncommitted and stops without diagnosis, retry, repair, or fix-forward.
+
+The pure-Zig boundary and all protected-state, ratchet, BI-absence, D01/D02, and downstream restrictions remain exact.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`5b3007a502be13a3b6673b6cb47244592c2e09e8`; update only the ignored inbox
+separately. During that operating commit, keep the BL draft unstaged,
+mode-0644, and byte-identical at SHA-256
+`657c14a8bfa619b945759f1ba26ad6245311247cb64fc2afc8bacd1d282b22cb`.
+
+Then edit only
+`docs/evidence/inbox206bl_zig_descriptor_identity_api_audit.md`. Freeze and
+permit exactly this semantic patch:
+
+1. Replace both and only both incorrect BK SHA-256 literals
+   `66b0dfdf052fcbcf209579e2f11d6f8298f8f08ba84ea7e12d24e45bbfd70e28`
+   with
+   `66b0dfdff5c61b00a16e815994bb9c06e3596260d611a2e35cb83cbe99b9e187`.
+2. Add or revise only the trusted-anchor wording to name the exact
+   descriptor-acquisition operation and flags already established by BL's
+   frozen evidence. It must require a trusted starting descriptor followed by
+   descriptor-relative, no-follow component acquisition. It must not claim a
+   single final-component `NOFOLLOW` check protects ancestor components. If
+   the frozen evidence does not establish the exact operation, retain an
+   explicit blocker instead.
+3. Add or revise only the `E.INVAL` wording so each callsite has explicit
+   attribution and precedence. It must not remain in two indistinguishable
+   terminal categories. If a call context cannot distinguish unsupported
+   capability from invalid ABI or arguments, classify it conservatively as
+   ambiguous and fail closed.
+
+Preserve mode 0644,
+`descriptor_identity_status=conditionally_supported`, every other byte not
+required by the three corrections above, and every implementation, build,
+install, execution, evidence-generation, D01/D02, ratchet, and downstream
+prohibition. Do not reread any installed standard-library source. Run only
+fixed identity, exact-diff, textual-scope, mode, and Git checks.
+
+The project-language boundary is absolute: all substantive implementations,
+generators, validators, codecs, hashing, test harnesses, workflow logic, and
+artifact tooling must be Zig. Bash is permitted only for tiny transparent
+orchestration that invokes fixed commands or sets environment variables. No
+JavaScript, ECMAScript, TypeScript, Python, Perl, AWK, other-language project
+solution, or internal-agent project algorithm is authorized.
+
+Run no Zig compiler, formatter, build, test, install, executable, project
+command, generator, validator, wrapper, assertion, cache, materialization, or
+artifact workflow. Do not edit BK, any `.zig` file, `build.zig`, the watcher,
+or any other path. Create no BI evidence, continuation, temporary source,
+cache, installation output, compatibility copy, or artifact. Never access a
+registered-worktree directory or `.claude/settings.local.json`. Preserve all
+retained roots, registrations, stash, watcher and PID, control, protected
+identities, and ratchet 131.
+
+On full success, commit only the corrected mode-0644 BL audit in one non-merge
+commit and stop with main/control clean. On first failure, leave it uncommitted
+and stop immediately without inspection, diagnosis, retry, repair, cleanup,
+normalization, fix-forward, or later command. Before acting, acknowledge the
+pure-Zig boundary, exact three-part patch, no-source-reread/no-build/no-artifact
+scope, preserved disposition and authorities, success condition, and
+failure-stop condition.
+
+
+## INBOX-206BL Zig descriptor-identity API audit — COMPLIANT FAILED STATIC CLOSURE; SUPERSEDED BY INBOX-206BM
 
 INBOX-206BK commit
 `f9b2f30a154e5422c53d04bc21cc1e92e667300b` is accepted within its
