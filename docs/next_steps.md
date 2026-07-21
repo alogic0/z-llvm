@@ -74,7 +74,98 @@ commit is allowed for retries, typos, formatting, diagnostics, transport,
 serializer correction, failed development gates, mode transition, or an
 evidence-only remediation chain.
 
-## INBOX-206CO execution-oracle-v1 — AUTHORIZED DEVELOPMENT SOLE CURRENT ACTION
+## INBOX-206CQ exact-real validation readiness — AUTHORIZED DEVELOPMENT SOLE CURRENT ACTION
+
+INBOX-206CO is accepted and closed at capability commit
+`b6e44d323dcd3c7a8e2021771dd27d07fb118d66`, sole parent
+`427caf26dfcb560c32800390669f608c12346132`, exact tree
+`7279bde094c8abf0a825c2cd662430094e880b7b`, and exact five-path scope.
+Its accepted one-shot generation-v6 receipt remains mode `0644`, 3333 bytes,
+SHA-256
+`31dcf9d9cd906bfb98d217b24373e5f6d23ca95729ba6f9280fb618577845f87`.
+CO proves only its admitted one-row `coff.Symbol.sizeOf` execution-oracle
+capability on `x86_64-linux-gnu`; it grants no broader row, target, ABI,
+production, D01/D02, ratchet, performance, or downstream credit.
+
+The controlling artifact/calls authority chain is the post-withdrawal
+project-local model: INBOX-199L, INBOX-200, INBOX-201, INBOX-202, and
+INBOX-203A. The abandoned sibling root
+`/home/oleg/prog/z_llvm-baseline-validation-v3` is absent and unauthorized
+and must never be used as a prerequisite or fallback. Accepted design and
+committed state include the anchored ignored `local-state/` boundary,
+protected control repository, local-state v3 path model, transition DAG,
+inert control candidate, verified non-authoritative payload copy, and private
+dormant validator. Real phase-3 candidate validation evidence remains absent.
+Control/main activation, compatibility, source-worktree or v3 creation and
+execution, production calls wiring, D01/D02, ratchet movement, performance,
+and downstream credit remain separately unauthorized. The mandatory
+post-calls checkpoint is not currently reachable.
+
+INBOX-206CQ is DEVELOPMENT only. Before editing, require clean main HEAD at
+this operating-authorization commit, empty index, clean diff checks, and the
+exact anchored `/local-state/` ignore rule. Preserve the accepted CO commit,
+receipt, and generations; the main and control repositories; authoritative
+and copied stores; all registered worktrees, stashes, pins, and unrelated
+local-state content.
+
+The exact tracked edit ceiling is:
+
+```text
+tools/zllvm_artifact_store.zig
+```
+
+Add only a private, test-only caller around the existing exact-real
+constructor/validator. It must be structurally unreachable from production
+and public APIs. DEVELOPMENT uses injected synthetic authority and state
+only; real exact paths, real adapters, external worktrees, control state, and
+payload stores remain dormant and uninvoked.
+
+Prove fail-closed no-write behavior for every admitted rejection class. Each
+rejection must observe zero writes and zero publications and must leave every
+synthetic fixture byte and logical state unchanged. Preserve the existing
+four-role ownership, exact-real path and registration policy, error behavior,
+and no-fallback boundary. Add no control/store activation, compatibility
+path, public API, build-default edge, production resolver reachability, or
+external-worktree access.
+
+Ordinary iterative diagnosis, source editing, Zig 0.16 formatting,
+format-checking, compile checks, and focused existing plus new synthetic tests
+are authorized until green. If replaceable DEVELOPMENT cache state is needed,
+use only:
+
+```text
+local-state/caches/inbox206cq/
+```
+
+Do not create `local-state/validations/inbox206cq/` or any future receipt.
+Do not create immutable per-attempt roots, failure ledgers, or unrelated
+inventories. If another tracked file or security authority is required, stop
+for Watcher/Reviewer review.
+
+At green, stop unstaged and uncommitted. Report the exact source diff and
+purpose, focused Zig commands and numeric results, explicit zero-write/
+zero-publication and unchanged-fixture coverage, cache use and size if any,
+and the exact minimum bootstrap needed for later ACCEPTANCE.
+
+ACCEPTANCE is withheld. A later separate runtime transition may authorize one
+pure-Zig, read-only, one-shot exact-real validation and an ignored
+machine-readable receipt beneath an exact
+`local-state/validations/inbox206cq/` path. Only after independent receipt and
+staged one-file identity review may the eventual capability commit be
+authorized.
+
+No control or store mutation/activation, production reachability,
+compatibility, registered-worktree operation, v3 or source-worktree creation
+or execution, real compiler row, calls wiring, D01/D02, ratchet movement,
+performance run, cleanup, or credit is authorized.
+
+All substantive implementation, generators, validators, codecs, hashing,
+harnesses, tests, receipts, process logic, and tooling must be pure Zig 0.16.
+Bash remains limited to tiny transparent fixed orchestration. No
+JavaScript/ECMAScript, TypeScript, Python, Perl, AWK, C, assembly, other-
+language project solution, or project logic in agent transport is authorized.
+
+## INBOX-206CO execution-oracle-v1 — ACCEPTED AND CLOSED AT `b6e44d32`
 
 INBOX-206CN is accepted and closed at capability commit
 `7d3a1e3058371d06d6d4bf0a83bd206c7c3c5b55`, parent
