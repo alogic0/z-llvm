@@ -24,7 +24,189 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BG strict pure-ECMAScript UTF-8 remediation — AUTHORIZED
+## INBOX-206BH exact complete-heading locator remediation — AUTHORIZED
+
+INBOX-206BG is accepted only as a compliant fail-closed no-edit stop. Credit
+includes its exact operating binding, strict codecs and fixtures, full-draft
+identity replay, ten later-template replays, correct pre-patch stop, and
+absence of later action. Grant no P002-P015 inner/assertion replay, matrix
+replay, delimiter, closure, commit, package, D01, or downstream credit.
+
+The Worker final report is preserved verbatim:
+
+```text
+Acknowledged:
+
+1. Positive fixtures: ASCII A, NUL, TAB/LF, byte `0x60`, U+2013, U+2014, and U+1F642. Negative rejection fixtures: lone high/low surrogates, malformed lead/continuation, truncation, overlong two/three-byte NUL, UTF-8 surrogate encoding, and above U+10FFFF.
+2. Full-draft strict decode/encode equality and SHA-256 `0095d25cfa0f724fa2b2b7dc56877433e6d89f584f7d72a23dd6ef17c9c2d043`.
+3. Both forbidden host-codec identifiers must be absent from executable outer/closure regions.
+4. The complete unchanged BF identity/region replay must precede the sole patch.
+5. Only the authorized representation edits are permitted.
+6. Exactly one pre-frozen inert closure is allowed.
+7. Success commits only the draft and stops; failure stops uncommitted without inspection, diagnosis, retry, repair, cleanup, or fix-forward.
+8. All protected-state, registered-worktree, project/Zig, production-AWK, and D01/D02 prohibitions remain binding.
+
+The BG construction already encountered the first blocking failure: `BG_NONUNIQUE_P002_HL`. Under the acknowledged stop rule, no patch, closure, staging, commit, or further command may follow.
+```
+
+Static Watcher review ran no project or Zig code. HEAD remains
+`c2f8f0a73b91a09cba50a4784b7711e8957d88a6`, parent
+`628acd434c4a84d32482e7ad8f15bb482c20de41`, tree
+`e13ed9f9b34705580b33b98d7d5cac158c7825d7`, with sole commit path
+`docs/next_steps.md`. Tracked, staged, and source diffs are empty. The sole
+dirty path remains the authorized untracked regular-file draft, mode 0644,
+62,198 bytes, 1,109 lines, SHA-256
+`0095d25cfa0f724fa2b2b7dc56877433e6d89f584f7d72a23dd6ef17c9c2d043`.
+Operating hashes, clean control identity, stash, watcher Git blob, protected
+identities, retained roots, registration invariants, and ratchet 131 remain
+exact. No registered-worktree directory or prohibited settings file was
+accessed.
+
+Retained turn `019f821d-a294-7ea0-94ff-2266affbc3cc` has exactly two tool
+calls: operating-document reads and one frozen construction call. Its fixed
+read/hex decode, all positive and negative codec fixtures, complete-draft
+strict round trip/hash, and all ten later-template identities pass. The first
+P002 locator then searches for a unique standalone LF in a 200-byte window
+after an incomplete heading prefix; ordinary later line endings make that
+search non-unique. `BG_NONUNIQUE_P002_HL` occurs before any P002-P015
+inner/assertion replay, matrix replay, patch, closure, staging, or commit.
+The final report and `task_complete` follow with no later command.
+
+Reviewer agreement is preserved verbatim:
+
+```text
+I accept INBOX-206BG only as a compliant fail-closed no-edit stop. Credit includes the operating binding, strict codecs and fixtures, full-draft identity replay, ten later-template replays, and correct pre-patch stop. No P002–P015 replay, delimiter, closure, commit, D01, or downstream credit is granted.
+
+I authorize INBOX-206BH with these refinements:
+
+- First create one non-merge operating commit changing only docs/next_steps.md, parented exactly by c2f8f0a73b91a09cba50a4784b7711e8957d88a6; preserve the draft unstaged and byte-identical during that commit and update the ignored inbox separately.
+
+- Edit only the retained draft and preserve mode 0644.
+- Reuse BG’s frozen read, codecs, fixtures, hash helper, identities, later-template logic, planned output, patch/closure ordering, and prohibitions unchanged.
+- Freeze the exact ordered P002–P015 heading manifest at 594 bytes and SHA-256 49f64eef5b90b16ac120dafe6cc5de423c14f20b983be028941317c3d44a4247.
+- Also freeze the complete P015 terminal boundary—the exact 7.12 heading including final LF—with its full bytes, count, and SHA-256.
+- Locate each complete heading-plus-LF as an exact byte sequence exactly once across the draft and require strict P002–P015 order.
+- Define each search interval as [heading_end, next_heading_start), with P015 ending at the frozen 7.12 heading offset.
+- Do not search for a standalone LF, use a fixed-width heading window, perform prefix-only heading matching, or use character indexes as byte offsets.
+- Require the complete heading/boundary replay before P002–P015 inner/assertion replay and all remaining unchanged BG gates.
+- Preserve BG’s planned canonical labels and every unrelated planned output byte.
+
+Only complete success permits the sole patch and exactly one pre-frozen inert closure. Success commits only the draft and stops. Any failure leaves it uncommitted and stops without inspection, diagnosis, retry, repair, cleanup, or fix-forward. All standing protection and downstream prohibitions remain exact.
+```
+
+Create one non-merge operating commit parented exactly by
+`c2f8f0a73b91a09cba50a4784b7711e8957d88a6`, changing only tracked
+`docs/next_steps.md`; update only the ignored inbox separately. Preserve the
+draft unstaged, regular mode 0644, and byte-identical during that commit. No
+other dirty path is permitted.
+
+BH may edit only the retained draft and must preserve mode 0644. Reuse BG's
+frozen fixed read, strict codecs and fixtures, SHA-256 helper, full-draft
+identity, all identity tables, ten later-template logic, planned canonical
+labels/output bytes, patch/closure ordering, and prohibitions unchanged.
+
+Freeze this exact ordered P002-P015 complete-heading manifest, with one LF
+after every displayed line:
+
+```text
+#### P002 — authority-boundary header
+#### P003 — authority-boundary exact 19-line content
+#### P004 — authority-derivation header
+#### P005 — authority-derivation exact independent 20-line content
+#### P006 — environment-authority header
+#### P007 — exact expected-count stream
+#### P008 — ordered ET01-ET12 IDs
+#### P009 — unique IDs
+#### P010 — unique tokens
+#### P011 — exactly five fields per row
+#### P012 — closed ID domain
+#### P013 — closed count domain
+#### P014 — literal sequential two-digit ordinals
+#### P015 — exact token schema and retained identity
+```
+
+The concatenated 14-line manifest is exactly 594 bytes with SHA-256
+`49f64eef5b90b16ac120dafe6cc5de423c14f20b983be028941317c3d44a4247`.
+Each complete heading-plus-LF must occur exactly once across the retained
+draft, and their byte offsets must be strictly ordered P002 through P015.
+
+Freeze the P015 terminal boundary as the exact complete line plus final LF:
+
+```text
+### 7.12 P002-P015 frozen identities and occurrence manifests
+```
+
+That terminal boundary is exactly 62 bytes with SHA-256
+`60669c3e5373ce578226faf47be78f179feb5d4d3324dd4061db3b2cb5cc8cbc`
+and must occur exactly once after P015.
+
+For P002-P014, define the section interval as the half-open byte range
+`[complete_heading_end, next_complete_heading_start)`. For P015, use
+`[complete_heading_end, terminal_7.12_heading_start)`. Locate the code fence
+and frozen inner/assertion bodies only inside that interval. Do not search for
+a standalone LF, use a fixed-width heading window, perform prefix-only
+heading matching, or use character indexes as byte offsets.
+
+Require the complete heading-manifest and terminal-boundary replay before
+P002-P015 inner/assertion replay and every remaining unchanged BG gate. The
+complete retained pre-edit identity authority remains:
+
+```text
+INNER P002 183 f3f07054713485485986b67af5f4ab819ff6f280fa2afddb1d42ac3071826411
+ASSERTION P002 85 453cd42dcf47790fcba30180e7d9e1cb7c1a1997b07c064384b20a9bb067d902
+INNER P003 803 40a7144e019b45af04e112d456a43f63e925992a3d93e93887498ff25c5d8131
+ASSERTION P003 705 e0215d8cdf0a45aea24e0e8f54715159798c24baf782e3c39dd71923c4bbb192
+INNER P004 241 17ec8b17eef2ac773d192b45b1deb8e2fe8bee6f8f5ed7975eb5291c448c9b97
+ASSERTION P004 141 9339e311a57c9e07657f6bb0a2323723784819c418b4058aad6a58c0207eebaa
+INNER P005 3530 e1828a654a4b8262dac83c9fc871df9b4b76bca65353bb90f08aece88261647d
+ASSERTION P005 3430 057a68edb24f99f5c18001203d53846e4ecf0d6fa6dee81acc56c4cc0a1f976a
+INNER P006 247 fd087cb63ce5fe9fbee17a4aff126ea4f3c7869f2336a9f4264d35272f79d245
+ASSERTION P006 146 8d2b7f5092cec8a9bc38b41147e7b47ac3737083c188699bb61c6cb191a2eece
+INNER P007 260 92042292dbe0662a61efda982251e888e44a1580a7b1bbbe1a16446d1a973aef
+ASSERTION P007 159 a430068dfc6efbc1740507f8283e92df449fcc088a2896317c1ab385b038f1d5
+INNER P008 295 27df9fd261ba0e2fe4b575398a709d9a0cb7145827bd72c819031034daee63e0
+ASSERTION P008 194 e7455095df8f6242e7d0bcd1248ac54aa4505cde367bbf0dda6cdb4377453b56
+INNER P009 243 1b97341986df8c9552fd93fa2d4c0a9dc535b89de4319f7b1bbed4bc0bd3ec76
+ASSERTION P009 142 69ddc0b193f29573fb8464ba63f4118c0181834261fc567ab0323fec65b31d4b
+INNER P010 211 78d15fedc6349ecac733d97869b00602b9e97ccaa6153d41b284682fa86ac55d
+ASSERTION P010 110 83fa92142449e13e4741fbfbd50c597df34e165c475f8c8585f8faeb6670e027
+INNER P011 213 07cf33df752f203187c469aeccbc7d20a904d8deae48fc70df001c0592d1c790
+ASSERTION P011 112 3f07f6221fb676d267f137bb8a63309d780d03946ed928f7e26da27129c0aaea
+INNER P012 258 8eb5c3ea80d081f21276a7073548e1044296d115c6a71b80095ac43be816fced
+ASSERTION P012 157 2ec54f435d4c8f5fbbd635f36b382a170eaa56ef37e87c8f5062af16d0438bc3
+INNER P013 249 12550a723800e9dc77f0615f749a777195ef62d8f44a2ee6e2a1f4f547b33770
+ASSERTION P013 148 688ce553003e4634c2537c140fe1f118a361d58a92b44880069e3ea79c1bbb8c
+INNER P014 333 ceda5b7e75492576596a93fb60aa8b813a22cab1785f25706e9e2dc80ed8a935
+ASSERTION P014 232 068279f2354bc4738826a526450e99fccf4a9955c5aa4e23c95b8c1b2cb1820e
+INNER P015 518 0519263f35aa760da0c50d6f5e7b8c0bd894886c718790739934f3797602f2c5
+ASSERTION P015 420 e258aec554bc2567e07d0944d0cc9b55758bc47f25b326f17b64dc1d1f7fd8bb
+MATRIX_ROWS 20318 c2e399d701e96583c7ffa5d0e348dce1cae1c26d0dc05ba34f34c03d1c9459ec
+LATER_T_OUTER 353 8416931252c47e2ac10429e203887a5837b4f47d448a9a449793d20360cf76db
+LATER_T_CONSTRUCT_10 1623 8a25bb3308c2c8cdf02cef8788070c271d139b8127ea0f8a235a98674d180fd2
+LATER_T_READ_GATE 198 f126cde2a7b4596de583a7f43c4a8f72cdeb4b8a95921b4752e112bb0e641a6b
+LATER_T_COPY_SELECTOR 394 0a8ee1a73b9d1b8d33b6c5bf7428546c0db169b912eff798d7d3f5d51f970653
+LATER_T_INVOCATION_BATCH 1286 88cb673bfd5694458dfcbad8ed437847406172de12e044e948068bc217f2b253
+LATER_T_AUDIT_BATCH 491 ecd60eebb766f0ec33f2de343ddfd4551817c47e0477742d85d5fd792152bd57
+LATER_T_ARTIFACT_IDENTITIES 356 eb8498407a2bf2f7177365e8bff61944e2ef45550be2234bb399b42b32cf4fc5
+LATER_T_MARKER_DERIVE 245 f7dfd0b7febf9c065c7404e21b523c591af71831f13da4e9e01ca806c090e201
+LATER_T_MARKER_FINALIZE 280 0bb8edbedfdd3e7295fdf8a422204fb523df980181cc3d6e9f0ed14548c8a9bd
+LATER_T_FINAL_CLOSURE 128 9699aa0bfb49fd45880bdf4cc5e069f052fb0fe017e4ee6049d07b0a57966af8
+```
+
+Only complete success permits the sole patch and exactly one pre-frozen inert
+closure. Preserve every frozen interior and BG's planned labels and unrelated
+planned output bytes. Success commits only the draft and stops clean. Any
+failure leaves it uncommitted and stops without inspection, diagnosis, retry,
+repair, cleanup, or fix-forward.
+
+Preserve all protected state, registered-worktree standing protection, stash,
+watcher, roots, identities, and ratchet 131. No source/project/Zig/build/
+install/validation/cache/production-AWK/D01/D02/credit/downstream authority
+is granted. Never access `.claude/settings.local.json`. Give one concise
+acknowledgment of every scope, heading/boundary identity, and stop condition
+before acting.
+
+## INBOX-206BG strict pure-ECMAScript UTF-8 remediation — COMPLIANT NO-EDIT HEADING-LOCATOR STOP; SUPERSEDED BY INBOX-206BH
 
 INBOX-206BF is accepted only as a compliant fail-closed no-edit stop. Credit
 is limited to its exact operating binding, frozen construction source,
