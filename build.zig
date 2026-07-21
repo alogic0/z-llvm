@@ -97,6 +97,18 @@ pub fn build(b: *std.Build) void {
         "Run dormant synthetic artifact-store tests",
     );
     artifact_store_test_step.dependOn(&b.addRunArtifact(artifact_store_tests).step);
+    const inbox206_descriptor_identity_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/zllvm_inbox206_materialize.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }),
+    });
+    const inbox206_descriptor_identity_test_step = b.step(
+        "test-inbox206-descriptor-identity",
+        "Run the private INBOX-206 descriptor identity tests",
+    );
+    inbox206_descriptor_identity_test_step.dependOn(&b.addRunArtifact(inbox206_descriptor_identity_tests).step);
     addToolStepWithArgs(b, "stage2-pressure-diagnostic", "Write generic-CFG stage-two pressure diagnostics for one IR function", "src/stage2_pressure_diagnostic.zig");
     addToolStep(b, "distribution-no-llvm", "Run the selected no-LLVM-codegen distribution subset", "tools/run_distribution_no_llvm_codegen_subset.zig");
     addToolStep(b, "distribution-boundary", "Run conservative distribution boundary gates", "tools/run_distribution_boundary_gates.zig");
