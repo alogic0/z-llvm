@@ -24,7 +24,62 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206CL trusted pure-Zig producer/provenance handoff boundary — AUTHORIZED EVIDENCE-ONLY SOLE CURRENT ACTION
+## INBOX-206CM CL transport-safe preflight recovery — AUTHORIZED EVIDENCE-ONLY SOLE CURRENT ACTION
+
+INBOX-206CL stopped compliantly before preflight and receives no preflight,
+evidence, deliverable, downstream, or other credit. The Worker final report is
+preserved verbatim:
+
+```text
+INBOX-206CL stopped before preflight execution due a tool-layer wrapper failure. No task command ran, and no evidence file or commit was created. Per the first-failure rule, I performed no later command, inspection, diagnosis, retry, repair, cleanup, or fix-forward.
+```
+
+Retained turn `019f8360-c29b-7052-bb9f-93f637a08040` proves a JavaScript
+template literal interpreted shell `${tag}` and raised
+`ReferenceError: tag is not defined` before launching the shell tool. Main and
+control remain clean; CL evidence and BI remain absent; all protected state is
+unchanged.
+
+The Reviewer explicitly accepted that no-change stop and authorized CM:
+
+```text
+I accept INBOX-206CL only as a compliant preflight-free transport stop. It earns no preflight, evidence, deliverable, or downstream credit; CL evidence remains absent.
+
+I authorize INBOX-206CM as the narrow CL recovery, with these refinements:
+
+- The operating commit must be the non-merge child of ebf10b7d842c2e239e52a3bc4166abbf6f8b8dc3, changing only docs/next_steps.md.
+- Use ordinary quoted JavaScript command strings or fixed commands only—no JavaScript template literals, interpolation, generated commands, or dynamic executable logic.
+- Prefer spelling the fixed shell comparisons directly rather than carrying tag/side variables through transport.
+- Internal transport conveys only the tiny fixed orchestration; all CL evidence reasoning remains inert document content, not executable transport logic.
+- Preserve the exact CL evidence path, scope, trust model, reads, 0644 finalization, sole-file commit rule, and first-failure stop.
+
+No project implementation, execution, validation, wiring, selection, ratchet, credit, or other authority is added.
+
+Yes. I explicitly authorize INBOX-206CM exactly as proposed and refined: one fresh preflight, unchanged CL evidence/design scope, transport-safe fixed orchestration, no project algorithm in transport, and the absolute pure-Zig boundary with Bash limited to tiny transparent orchestration. All fail-closed and no-expansion restrictions remain exact.
+```
+
+Execute the complete INBOX-206CL directive immediately below without changing
+its evidence path, scope, trust model, authorized reads, prohibitions,
+immediate 0644 finalization, static closure, sole-file commit rule, or terminal
+stop. CM grants one fresh preflight. Its operating commit must be a non-merge
+direct child of `ebf10b7d842c2e239e52a3bc4166abbf6f8b8dc3` and change only
+this file. CL evidence must be initially absent/non-symlink.
+
+Use only ordinary quoted JavaScript command strings carrying fixed shell
+commands. Do not use JavaScript template literals, interpolation, generated
+commands, or dynamic executable logic. Prefer direct fixed comparisons; do
+not carry tag/side variables through transport. Agent transport is tiny fixed
+orchestration only and contains no project logic.
+
+The project is pure Zig: all substantive implementation, generators,
+validators, codecs, hashing, harnesses, workflow, provenance, and artifact
+tooling must be Zig. Bash is permitted only for tiny transparent fixed-command
+orchestration. No other language is an authorized project solution. CM adds
+no project execution, implementation, validation, wiring, selection, ratchet,
+performance, credit, or downstream authority. First failure stops uncommitted
+without diagnosis, retry, repair, cleanup, or fix-forward.
+
+## INBOX-206CL trusted pure-Zig producer/provenance handoff boundary — COMPLIANT PREFLIGHT-FREE STOP; SUPERSEDED BY INBOX-206CM
 
 INBOX-206CK is fully accepted within its private synthetic runtime-test scope.
 The Worker final report is preserved verbatim:
