@@ -38,6 +38,12 @@ const AcquiredDirectory = struct {
     identity: DescriptorIdentity,
 };
 
+const TrustedHomeChain = struct {
+    /// The caller owns both values and must close `home` before `root`.
+    root: AcquiredDirectory,
+    home: AcquiredDirectory,
+};
+
 fn assertNativeAbi() void {
     if (builtin.os.tag != .linux) {
         @compileError("INBOX-206 descriptor identity requires native Linux");
@@ -180,6 +186,18 @@ fn acquireTrustedRoot(io: std.Io) !AcquiredDirectory {
     return .{
         .directory = directory,
         .identity = identity,
+    };
+}
+
+/// Transfers ownership of both held descriptors to the caller, which must
+/// close the home descriptor before the root descriptor.
+fn acquireTrustedHomeChain(io: std.Io) !TrustedHomeChain {
+    const root = try acquireTrustedRoot(io);
+    errdefer root.directory.close(io);
+    const home = try acquireOneDirectoryComponent(root.directory, io, "home", "home");
+    return .{
+        .root = root,
+        .home = home,
     };
 }
 
@@ -444,4 +462,40 @@ test "trusted current mount namespace root identity and caller ownership" {
     try std.testing.expect(std.meta.eql(second.identity, second_after_first_close));
     second.directory.close(io);
     second_open = false;
+}
+
+test "trusted root-to-home chain identity and caller close order" {
+    const io = std.testing.io;
+    const chain = try acquireTrustedHomeChain(io);
+    var root_open = true;
+    defer {
+        if (root_open) chain.root.directory.close(io);
+    }
+    var home_open = true;
+    defer {
+        if (home_open) chain.home.directory.close(io);
+    }
+
+    const root_stable = try observeDescriptor(chain.root.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(chain.root.identity, root_stable));
+    const home_stable = try observeDescriptor(chain.home.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(chain.home.identity, home_stable));
+
+    const home_handle = chain.home.directory.handle;
+    chain.home.directory.close(io);
+    home_open = false;
+    try std.testing.expectError(
+        error.DescriptorIdentityBadDescriptor,
+        observeDescriptor(home_handle, .directory),
+    );
+
+    const root_after_home_close = try observeDescriptor(chain.root.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(chain.root.identity, root_after_home_close));
+    const root_handle = chain.root.directory.handle;
+    chain.root.directory.close(io);
+    root_open = false;
+    try std.testing.expectError(
+        error.DescriptorIdentityBadDescriptor,
+        observeDescriptor(root_handle, .directory),
+    );
 }
