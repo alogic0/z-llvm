@@ -24,7 +24,163 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BZ pure-Zig retained root/home/oleg/prog chain — AUTHORIZED
+## INBOX-206CA registered-worktree descriptor boundary — AUTHORIZED EVIDENCE/DESIGN ONLY
+
+INBOX-206BZ is accepted fully within scope. The retained
+root/home/oleg/prog chain, exact one-shot gates, and focused ownership/runtime
+evidence are accepted. Status remains `conditionally_supported`; ratchet
+remains 131.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BZ completed successfully.
+
+- Commit: 27100817652fa4f18db8fdd6f39874de2cb7b8fb
+- Tree: 4e2c66c0d2e177330fd9541d31c32f42bd5b89db
+- Sole committed file: tools/zllvm_inbox206_materialize.zig
+- Both Zig gates passed exactly once.
+- BZ caches are retained; BX caches remain absent.
+- Main and control are clean.
+- Status remains conditionally_supported; ratchet remains 131.
+```
+
+Static Watcher review ran no project code. Commit
+`27100817652fa4f18db8fdd6f39874de2cb7b8fb` is non-merge, has parent
+`4a28d03a9c2ff6f28cad479b4e09705b1e54285b` and tree
+`4e2c66c0d2e177330fd9541d31c32f42bd5b89db`, and changes only mode-0644
+`tools/zllvm_inbox206_materialize.zig` by 100 insertions and no deletions.
+The committed file is 24,326 bytes, SHA-256
+`788479986467c07051b9cd7021bb1367955d549e262c153581150ef84bd35396`,
+blob `ab0281e4dbac00fcd2b4b9ba58e569c707eb8ef9`, and binary-diff SHA-256
+`bd98475c198b1fc3b7ab5c636732ed7d38e59e119246c6bf724ba0dbfe3270f1`.
+Diff-check passes.
+
+Retained Worker turn `019f82d8-5a5f-7420-9cb5-36926c06fb45` contains only
+the Zig-skill and complete operating-document reads, exact preflight/nearby
+source reads, the sole patch, complete static diff review, one combined gate
+call creating only BZ caches and running exactly one format check followed by
+exactly one focused Zig build, one read-only closure, one sole-file commit,
+and one final verification. Every call exits 0. No retry, diagnosis, cleanup,
+installed-source read, extra project command, or later tool follows final
+verification.
+
+Main/index/control are clean. Build and watcher identities remain exact;
+watcher PID 3206208 is alive; stash
+`7985c6d01040a6e47e4ce5b918866d0e89517ac7` is untouched. All 43
+worktrees remain protected with stable path-list SHA-256
+`f31d8542baafc7b64cd5ee6fe8cc4194842ca696b97a7ffc8df06ce12d553d7e`.
+BY/BZ caches are retained directories, BX caches remain absent, and BI
+evidence and continuation remain absent.
+
+The next intended literal in accepted BK section 12.1 step 3 is `z_llvm`.
+Acquiring it relative to the held `/home/oleg/prog` descriptor would enter
+the protected main registered worktree. The standing user rule excludes every
+registered-worktree tree from artifact traversal and Watcher/Reviewer
+agreement cannot supply that authority. No `TrustedZllvmChain`
+implementation or real-path test is authorized.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept 27100817652fa4f18db8fdd6f39874de2cb7b8fb fully within BZ. The retained root/home/oleg/prog chain and focused ownership/runtime evidence are accepted; status remains
+conditionally_supported.
+
+I also accept the boundary judgment: descriptor-relative acquisition of literal z_llvm from held prog would enter the protected main registered worktree and is not currently authorized. No
+TrustedZllvmChain implementation or test may proceed.
+
+I authorize evidence/design-only INBOX-206CA with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by 27100817652fa4f18db8fdd6f39874de2cb7b8fb; update the ignored inbox separately.
+- Add and commit exactly docs/evidence/inbox206ca_registered_worktree_descriptor_boundary.md, mode 0644.
+- Freeze an exact named-read ledger before dispatch. Permit only:
+    - named committed operating/design documents;
+    - Git commit/tree/blob/status metadata;
+    - exactly one git worktree list --porcelain;
+    - no-follow root metadata for specifically named retained cache roots;
+    - the new CA document for creation and verification.
+
+- Bind BZ source through Git tree/blob identity rather than opening the Zig source as an artifact target.
+- Do not enter, enumerate, resolve, stat, hash, or traverse any registered-worktree directory for artifact discovery. Ordinary Git operations and the explicitly authorized CA document
+  workflow are narrow exceptions, not artifact-path authority.
+
+- State the first blocked transition exactly: held /home/oleg/prog descriptor → relative literal z_llvm.
+- Replace “every conceivable resolution” with a closed reviewed option matrix covering at least:
+    1. retain the blocker;
+    2. future explicit user-named read-only traversal authority for the exact main-worktree chain;
+    3. relocate/copy the specification and output protocol outside registered worktrees;
+    4. supply committed specification bytes through a separately authorized trusted descriptor/blob/materialization boundary without runtime worktree traversal.
+
+- For each option, record required authority, affected identities/contracts, production/build implications, rollback, and remaining blockers.
+- A recommendation may identify the smallest prospective option, but must state that recommendation grants no authority.
+```
+
+Create one non-merge operating commit changing only tracked
+`docs/next_steps.md`, parented exactly by
+`27100817652fa4f18db8fdd6f39874de2cb7b8fb`; update the ignored inbox
+separately. Then create and commit exactly mode-0644
+`docs/evidence/inbox206ca_registered_worktree_descriptor_boundary.md`.
+
+The frozen named-read ledger permits only:
+
+1. ignored operating document `docs/worker_inbox.md`;
+2. committed `docs/next_steps.md`;
+3. committed `docs/evidence/inbox199_local_state_boundary.md`;
+4. committed
+   `docs/evidence/inbox206bk_zig_materialization_readiness_design.md`;
+5. Git commit/tree/blob/status metadata for the operating HEAD, BZ source,
+   control repository, and the one authorized evidence document;
+6. exactly one `git worktree list --porcelain` call for registration metadata;
+7. no-follow root metadata for the exact BP/BR/BT/BU/BW/BY/BZ local/global
+   retained cache roots, plus exact absence/non-symlink checks for BS/BV/BX
+   local/global roots, BI evidence, and BI continuation;
+8. the new CA document for creation and verification.
+
+Bind BZ source only through Git commit/tree/blob identity, never by opening
+the Zig source as an artifact target. Do not enter, enumerate, resolve, stat,
+hash, or traverse any registered-worktree directory for artifact discovery.
+Ordinary Git operations and the explicitly authorized CA-document workflow
+are narrow workflow exceptions, not artifact-path authority.
+
+The document must quote accepted BK section 12.1's intended
+root/home/oleg/prog/z_llvm/docs/evidence chain and the standing registered-
+worktree protection; bind all accepted identities and absence/retention
+conditions; and state the first blocked transition exactly as held
+`/home/oleg/prog` descriptor to relative literal `z_llvm`.
+
+Include a closed reviewed option matrix covering exactly these four options:
+
+1. retain the blocker;
+2. future explicit user-named read-only traversal authority for the exact
+   main-worktree chain;
+3. relocate/copy the specification and output protocol outside registered
+   worktrees;
+4. supply committed specification bytes through a separately authorized
+   trusted descriptor/blob/materialization boundary without runtime worktree
+   traversal.
+
+For each, record required authority, affected identities/contracts,
+production/build implications, rollback, and remaining blockers. A
+recommendation may identify the smallest prospective option, but must state
+that it grants no authority and must implement nothing.
+
+Run no Zig/source/build/test/project command. Read no installed source. Create
+no cache or path outside the one evidence file. Perform no real-path probe,
+worktree access beyond registration metadata, store/control mutation,
+publication, materialization, installation, output/continuation creation,
+D01/D02, ratchet movement, or downstream work. Use exact static
+file/status/diff checks, commit only the evidence document, verify clean
+main/control, and stop.
+
+The project-language boundary remains absolute for every future substantive
+implementation, generator, validator, codec, hash, harness, workflow, and
+artifact tool: Zig only. Bash is limited to tiny transparent fixed Git/hash
+orchestration. No JavaScript, ECMAScript, TypeScript, Python, Perl, AWK,
+other-language project solution, or internal-agent project algorithm is
+authorized. Status remains `conditionally_supported`; ratchet remains 131.
+
+
+## INBOX-206BZ pure-Zig retained root/home/oleg/prog chain — ACCEPTED; SUPERSEDED BY INBOX-206CA
 
 INBOX-206BY is accepted fully within scope. The retained root/home/oleg
 chain, its exact one-shot gates, and focused ownership/runtime evidence are
