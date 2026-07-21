@@ -1,4 +1,5 @@
 const std = @import("std");
+const raw_report_contract = @import("o2_compiler_rt_v1_baseline_validation/raw_report.zig");
 
 pub const source_commit = "43de59b06ca3a687368bfaf0595c5759c8ab3a57";
 pub const external_zig_commit = "bdee02bc0c7f227c0f11bc9a449df673fe803540";
@@ -9,7 +10,7 @@ pub const minimum_available_bytes: u64 = 17_179_869_184;
 pub const accepted_maximum_storage_bytes: u64 = 14_321_451_008;
 pub const accepted_storage_reserve_bytes: u64 = 2_858_418_176;
 pub const canonical_repetition_count: usize = 3;
-pub const successful_function_count: u16 = 285;
+pub const accepted_cohort_ac285_function_count: u16 = 285;
 pub const accepted_process_capture_bytes: u64 = 4 * mebibyte_bytes;
 
 pub const IdentityKind = enum {
@@ -230,7 +231,7 @@ pub const CompleteEnforcementEvidence = struct {
     compatibility_key_count: usize,
     v3_path_count: usize,
     repetition_count: usize,
-    successful_functions: u16,
+    actual_successful_functions: u16,
     phase_count: usize,
     stdout_capture_bytes: u64,
     stderr_capture_bytes: u64,
@@ -656,7 +657,7 @@ pub fn validateCompleteEnforcementEvidence(
         evidence.compatibility_key_count != compatibility_keys.len or
         evidence.v3_path_count != @typeInfo(V3Path).@"enum".fields.len or
         evidence.repetition_count != canonical_repetition_count or
-        evidence.successful_functions != successful_function_count or
+        evidence.actual_successful_functions == 0 or
         evidence.phase_count != @typeInfo(Phase).@"enum".fields.len or
         evidence.stdout_capture_bytes != accepted_process_capture_bytes or
         evidence.stderr_capture_bytes != accepted_process_capture_bytes)
@@ -740,9 +741,16 @@ pub const PhaseMachine = struct {
     }
 };
 
-pub const Digest = [32]u8;
+pub const Digest = raw_report_contract.Digest;
+
+pub const RawReportBinding = raw_report_contract.Binding;
+
+pub fn validateRawReportBinding(binding: RawReportBinding) ContractError!void {
+    raw_report_contract.validateBinding(binding) catch return error.SuccessfulFunctionCountMismatch;
+}
 
 pub const CanonicalRepetition = struct {
+    raw_report: RawReportBinding,
     report: Digest,
     object: Digest,
     owner: Digest,
@@ -751,8 +759,12 @@ pub const CanonicalRepetition = struct {
     accepted_subset_produced: bool,
 };
 
-pub fn validateCanonicalRepetitions(repetitions: []const CanonicalRepetition) ContractError!void {
+pub fn validateCanonicalRepetitions(
+    repetitions: []const CanonicalRepetition,
+    frozen_raw_report: RawReportBinding,
+) ContractError!void {
     if (repetitions.len != canonical_repetition_count) return error.RepetitionCountMismatch;
+    try validateRawReportBinding(frozen_raw_report);
     if (!repetitions[0].accepted_subset_produced or
         repetitions[1].accepted_subset_produced or
         repetitions[2].accepted_subset_produced)
@@ -760,15 +772,19 @@ pub fn validateCanonicalRepetitions(repetitions: []const CanonicalRepetition) Co
         return error.AcceptedSubsetProducerMismatch;
     }
     for (repetitions) |repetition| {
-        if (repetition.function_count != successful_function_count)
+        if (!std.meta.eql(repetition.raw_report, frozen_raw_report) or
+            repetition.function_count != frozen_raw_report.actual_successful_functions)
+        {
             return error.SuccessfulFunctionCountMismatch;
+        }
         if (!sameCanonicalIdentity(repetitions[0], repetition))
             return error.RepetitionMismatch;
     }
 }
 
 fn sameCanonicalIdentity(a: CanonicalRepetition, b: CanonicalRepetition) bool {
-    return std.mem.eql(u8, &a.report, &b.report) and
+    return std.meta.eql(a.raw_report, b.raw_report) and
+        std.mem.eql(u8, &a.report, &b.report) and
         std.mem.eql(u8, &a.object, &b.object) and
         std.mem.eql(u8, &a.owner, &b.owner) and
         std.mem.eql(u8, &a.function_manifest, &b.function_manifest);
@@ -922,13 +938,26 @@ fn testDigest(byte: u8) Digest {
     return [_]u8{byte} ** 32;
 }
 
+const test_actual_successful_functions: u16 = 7;
+
+fn testRawReportBinding() RawReportBinding {
+    return .{
+        .selected_functions = 11,
+        .actual_successful_functions = test_actual_successful_functions,
+        .failed_functions = 4,
+        .failure_order_sha256 = testDigest(5),
+        .successful_manifest_sha256 = testDigest(6),
+    };
+}
+
 fn testCanonicalRepetitions() [canonical_repetition_count]CanonicalRepetition {
     const identity = CanonicalRepetition{
+        .raw_report = testRawReportBinding(),
         .report = testDigest(1),
         .object = testDigest(2),
         .owner = testDigest(3),
         .function_manifest = testDigest(4),
-        .function_count = successful_function_count,
+        .function_count = test_actual_successful_functions,
         .accepted_subset_produced = false,
     };
     var result = [_]CanonicalRepetition{identity} ** canonical_repetition_count;
@@ -1252,7 +1281,7 @@ test "baseline validation complete typed enforcement evidence alone admits readi
         .compatibility_key_count = compatibility_keys.len,
         .v3_path_count = @typeInfo(V3Path).@"enum".fields.len,
         .repetition_count = canonical_repetition_count,
-        .successful_functions = successful_function_count,
+        .actual_successful_functions = test_actual_successful_functions,
         .phase_count = @typeInfo(Phase).@"enum".fields.len,
         .stdout_capture_bytes = accepted_process_capture_bytes,
         .stderr_capture_bytes = accepted_process_capture_bytes,
@@ -1274,7 +1303,7 @@ test "baseline validation typed enforcement evidence rejects omission drift and 
         .compatibility_key_count = compatibility_keys.len,
         .v3_path_count = @typeInfo(V3Path).@"enum".fields.len,
         .repetition_count = canonical_repetition_count,
-        .successful_functions = successful_function_count,
+        .actual_successful_functions = test_actual_successful_functions,
         .phase_count = @typeInfo(Phase).@"enum".fields.len,
         .stdout_capture_bytes = accepted_process_capture_bytes,
         .stderr_capture_bytes = accepted_process_capture_bytes,
@@ -1351,9 +1380,21 @@ test "baseline validation minimum capacity never implies execution readiness" {
 
 test "baseline validation rejects canonical repetition mismatch" {
     var repetitions = testCanonicalRepetitions();
-    try validateCanonicalRepetitions(&repetitions);
+    const raw_report = testRawReportBinding();
+    try validateCanonicalRepetitions(&repetitions, raw_report);
     repetitions[2].object = testDigest(9);
-    try std.testing.expectError(error.RepetitionMismatch, validateCanonicalRepetitions(&repetitions));
+    try std.testing.expectError(error.RepetitionMismatch, validateCanonicalRepetitions(&repetitions, raw_report));
+}
+
+test "baseline validation keeps AC285 identity distinct from actual-derived v3 count" {
+    try std.testing.expectEqual(@as(u16, 285), accepted_cohort_ac285_function_count);
+    const actual = testRawReportBinding();
+    try validateRawReportBinding(actual);
+    try std.testing.expect(actual.actual_successful_functions != accepted_cohort_ac285_function_count);
+    var zero = actual;
+    zero.selected_functions -= zero.actual_successful_functions;
+    zero.actual_successful_functions = 0;
+    try std.testing.expectError(error.SuccessfulFunctionCountMismatch, validateRawReportBinding(zero));
 }
 
 test "baseline validation rejects coverage channel and counter violations" {
