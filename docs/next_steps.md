@@ -24,7 +24,190 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
-## INBOX-206BK Zig-only materialization-readiness architecture checkpoint — AUTHORIZED
+## INBOX-206BL Zig descriptor-identity API audit — AUTHORIZED
+
+INBOX-206BK commit
+`f9b2f30a154e5422c53d04bc21cc1e92e667300b` is accepted within its
+documentation-only scope. It grants no implementation, build, install,
+execution, evidence-generation, D01/D02, ratchet, or downstream authority. Do
+not modify the accepted BK document. Its references to section 11 and section
+11.4 for the exclusive-publication protocol and blocker are bounded errata;
+the correct references are sections 12 and 12.3. Record that correction in BL.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BK completed successfully.
+
+- Commit: f9b2f30a154e5422c53d04bc21cc1e92e667300b
+- Tree: 174923e4bfd78f6ae003556a9ed17ddf950d74fd
+- Sole file: docs/evidence/inbox206bk_zig_materialization_readiness_design.md
+- File: mode 0644, 29,834 bytes, 525 lines
+- SHA-256: 66b0dfdff5c61b00a16e815994bb9c06e3596260d611a2e35cb83cbe99b9e187
+
+The design records an explicit blocker: the inspected Zig 0.16 APIs cannot prove race-free parent-directory device-and-inode identity. Implementation and evidence-generation authority remain withheld.
+
+Main and control repositories are clean. BI evidence and continuation remain absent. No Zig/project command, implementation, build, test, install, wrapper, validation, artifact, or registered-worktree access occurred. Ratchet remains 131.
+```
+
+Static Watcher review ran no project code. Main is clean at the BK commit,
+parent `c8474635772134ba9a202f99910c178a38d77925`, tree
+`174923e4bfd78f6ae003556a9ed17ddf950d74fd`, and the sole committed path is
+the mode-0644, 29,834-byte BK document with SHA-256
+`66b0dfdff5c61b00a16e815994bb9c06e3596260d611a2e35cb83cbe99b9e187`.
+Control is clean at
+`9c55bda34088e1230b0b91a126d35795a3ac70b4` / tree
+`756369ad4a89d806f463bd8094c5159d8c973d7e`, branch `main`, no remote.
+Stash `7985c6d01040a6e47e4ce5b918866d0e89517ac7`, watcher SHA-256
+`1221b00a6aacd7deaae9aab50bd2600be33a13b0ed645428f9475a2cb81a893d`,
+watcher blob `058c659544fd13cc88ff79f62e196f1b9644f9e0`, watcher PID 3206208,
+all 43 registered worktrees and directories, protected identities, and ratchet
+131 remain exact. The BI evidence file and continuation remain absent and
+non-symlink.
+
+Retained logs show only operating and named-authority reads, exact source
+searches/reads, one document patch and exact-name chmod, static scope checks,
+the sole-file commit, and final clean checks. They show no compiler, formatter,
+project command, build, test, install, generator, validator, wrapper, artifact
+workflow, or registered-worktree access.
+
+The Reviewer's agreement is preserved verbatim:
+
+```text
+I accept f9b2f30a154e5422c53d04bc21cc1e92e667300b within its documentation-only scope. The section 11/11.4 references are a bounded erratum; the descriptor-identity blocker remains unresolved. No implementation or downstream authority follows.
+
+I authorize evidence/design-only INBOX-206BL with these refinements:
+
+- Create one non-merge operating commit changing only docs/next_steps.md, parented exactly by f9b2f30a154e5422c53d04bc21cc1e92e667300b; update the ignored inbox separately.
+- Add and commit exactly docs/evidence/inbox206bl_zig_descriptor_identity_api_audit.md.
+- Do not modify BK. Record the correction to sections 12/12.3 in BL.
+- Permit only exact named reads of BK and the listed installed Zig 0.16 standard-library files. Directly referenced implementation files may be read only when needed to close a cited API or error contract; record every additional path, reason, SHA-256, and referenced symbol. No directory-wide exploration.
+
+- Freeze the installed Zig/std root identity, every inspected file hash, exact API signatures, constants, structures, masks, and syscall return/error conventions.
+- Determine explicitly:
+    - whether statx(fd, "", AT.EMPTY_PATH, …) is expressible through the accepted Zig API;
+    - descriptor requirements and acquisition rules;
+    - required requested and returned stx_mask bits;
+    - semantics of ino, dev_major, dev_minor, mnt_id, and any unique-mount-ID variant;
+    - kernel-version/runtime-support failure handling;
+    - Linux-only portability and fail-closed behavior elsewhere;
+    - trusted-anchor acquisition without symlink traversal;
+    - rename, mount replacement, mount-ID reuse, namespace, and TOCTOU behavior;
+    - descriptor ownership and the exact lifetime over which comparisons remain valid.
+
+- Do not infer support merely from structure-field presence. Bind the actual call path, return convention, required mask, and errors.
+- Prefer an existing Zig wrapper over raw syscall assembly. If only a raw ABI path exists, record that as a blocker unless its target and conversion requirements are fully established.
+- Conclude exactly one of supported_runtime_checked, conditionally_supported, or blocked, without weakening device/inode/mount guarantees.
+- Keep implementation_authority=none, execution_authority=none, D01=withheld, D02=unauthorized, ratchet=131, and BI paths absent.
+- Run no compiler, formatter, build, test, install, project command, wrapper, generator, or validator.
+- Permit one exact-name chmod 0644 immediately after document creation and before static checks. Success commits only the audit document; failure stops uncommitted without retry or fix-forward.
+
+The pure-Zig boundary remains absolute; Bash is limited to transparent fixed-command orchestration, and no other language may implement project logic.
+```
+
+Create one non-merge operating commit parented exactly by
+`f9b2f30a154e5422c53d04bc21cc1e92e667300b`, changing only tracked
+`docs/next_steps.md`; update only the ignored inbox separately. BL is
+evidence/design-only. Create, chmod exactly once to mode 0644, and commit
+exactly one file:
+
+```text
+docs/evidence/inbox206bl_zig_descriptor_identity_api_audit.md
+```
+
+The exact initial read allowlist is:
+
+```text
+docs/evidence/inbox206bk_zig_materialization_readiness_design.md
+/home/oleg/.zig/0.16.0/files/lib/std/os/linux.zig
+/home/oleg/.zig/0.16.0/files/lib/std/Io/Dir.zig
+/home/oleg/.zig/0.16.0/files/lib/std/Io/File.zig
+/home/oleg/.zig/0.16.0/files/lib/std/Io/File/Atomic.zig
+```
+
+A directly referenced installed-standard-library implementation file may be
+read only when necessary to close a specific cited API or error contract. The
+BL document must record its exact path, reason, SHA-256, and referenced symbol.
+Do not explore or enumerate a directory, repository, package, or unrelated
+source.
+
+Freeze the installed Zig version and std root, every inspected source hash, and
+the exact relevant signatures, constants, structures, masks, raw return
+conventions, and error conversions. Determine from source rather than field
+presence alone:
+
+- whether `statx(fd, "", AT.EMPTY_PATH, ...)` is expressible through an
+  accepted Zig 0.16 API and whether it is a wrapper or raw ABI surface;
+- descriptor type, acquisition, rights, no-follow rules, ownership, cleanup,
+  and comparison lifetime;
+- the requested mask and every returned mask bit required before using inode,
+  device major/minor, mount ID, or unique mount ID;
+- the semantics, stability, namespace scope, and reuse risks of `ino`,
+  `dev_major`, `dev_minor`, `mnt_id`, and any unique-mount-ID field;
+- syscall return/error conversion, missing-kernel/runtime-feature behavior,
+  permission/filesystem failures, Linux-only portability, and fail-closed
+  behavior on all other targets;
+- trusted-anchor acquisition without symlink traversal and the precise rename,
+  mount replacement, mount-ID reuse, namespace, and TOCTOU threat model;
+- whether the previously required device/inode/mount comparison is valid for
+  the complete publication lifetime.
+
+Prefer an existing Zig wrapper. If only a raw ABI path exists, keep it blocked
+unless the audit fully establishes its target restrictions, argument ABI,
+return convention, error conversion, masks, and lifetime guarantees. Conclude
+exactly one:
+
+```text
+descriptor_identity_status=supported_runtime_checked
+descriptor_identity_status=conditionally_supported
+descriptor_identity_status=blocked
+```
+
+Do not weaken the device/inode/mount guarantee, invent a fallback, use shell
+`stat`, canonicalize paths as identity, or use a foreign-language helper.
+The BL document must prominently state:
+
+```text
+design_kind=zig_descriptor_identity_api_audit
+implementation_authority=none
+execution_authority=none
+build_authority=none
+install_authority=none
+evidence_generation_authority=none
+D01=withheld
+D02=unauthorized
+ratchet=131
+continuation_root_created=false
+evidence_file_created=false
+```
+
+The project-language boundary is absolute: all substantive implementations,
+generators, validators, codecs, hashing, test harnesses, workflow logic, and
+artifact tooling must be Zig. Bash is permitted only for tiny transparent
+orchestration that invokes fixed commands or sets environment variables. No
+JavaScript, ECMAScript, TypeScript, Python, Perl, AWK, other-language project
+solution, or internal-agent project algorithm is authorized.
+
+Run no Zig compiler, formatter, build, test, install, executable, project
+command, generator, validator, wrapper, assertion, cache, materialization, or
+artifact workflow. Do not edit BK, any `.zig` file, `build.zig`, the watcher,
+or any source. Create no BI evidence, continuation, temporary source, cache,
+installation output, compatibility copy, or other artifact. Never access a
+registered-worktree directory or `.claude/settings.local.json`. Preserve all
+retained roots, registrations, stash, watcher and PID, control, protected
+identities, and ratchet 131.
+
+On full success, commit only
+`docs/evidence/inbox206bl_zig_descriptor_identity_api_audit.md` in one
+non-merge commit and stop with main/control clean. On first failure, leave the
+audit uncommitted and stop immediately without inspection, diagnosis, retry,
+repair, cleanup, normalization, fix-forward, or later command. Before acting,
+acknowledge the pure-Zig/document-only, exact-read, directly-referenced-file
+recording, no-build/no-artifact, three-way disposition, success, and
+failure-stop boundaries.
+
+
+## INBOX-206BK Zig-only materialization-readiness architecture checkpoint — ACCEPTED DOCUMENTATION-ONLY; SUPERSEDED BY INBOX-206BL
 
 User authority permanently withdraws INBOX-206BJ before dispatch. Commit
 `e75f2ddddf6a4b4095eaf3376b7f613d73e771a7` is retained only as superseded
