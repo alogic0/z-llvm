@@ -24,6 +24,116 @@ permission naming each path. Watcher/Reviewer agreement is insufficient.
 Read-only registration inventory is allowed. “Prune” means logical exclusion
 from traversal/calculation only, never `git worktree prune`.
 
+## INBOX-206BD static-proof remediation — AUTHORIZED
+
+INBOX-206BC is accepted only as a compliant fail-closed uncommitted-draft
+stop. Its complete P001–P140 matrix and P002–P015 assertion-freeze work receive
+provisional design evidence credit only. Grant no closure, commit, package
+completion, construction, D01, implementation, execution, validation,
+production, ratchet, D02, or downstream credit.
+
+The Worker final report is preserved verbatim:
+
+```text
+INBOX-206BC stopped fail-closed during the predeclared static closure.
+
+- The single authorized chmod completed; draft mode is 0644.
+- The draft remains uncommitted.
+- No assertion or wrapper executed.
+- No continuation, cache, marker, or additional file was created.
+- Per directive, no diagnosis, retry, repair, cleanup, fix-forward, commit, or later command was performed.
+```
+
+Static Watcher review ran no project or Zig code. HEAD remains
+`21e3b9886df47cf03d258c8cbc1935188e86a31e`, parent
+`7cf4b88a39980cdcf27d649ee760d14842c1e8d9`, tree
+`18b70e28eaabc7b0f1b32f648c8b43cb7442dd61`, with sole commit path
+`docs/next_steps.md`. Tracked and staged diffs are empty; there is no source
+diff. The sole dirty path is the authorized untracked regular-file draft
+`docs/evidence/inbox206bb_phase3_wrapper_package_specification.md`, mode 0644,
+62,198 bytes, 1,109 lines, SHA-256
+`0095d25cfa0f724fa2b2b7dc56877433e6d89f584f7d72a23dd6ef17c9c2d043`.
+Control, stash, watcher, protected identities, registrations, retained roots,
+and ratchet 131 remain exact.
+
+Retained turn `019f81f0-c85a-7622-9530-3878d3b78588` ends immediately after
+the one failed static-closure call: the final report and `task_complete` follow,
+with no later tool call, diagnosis, repair, retry, commit, wrapper/assertion
+invocation, continuation/marker creation, source/project/Zig/build/validation
+action, registered-directory access, or other-file creation.
+
+The first failed predicate is representation-only: the matrix heading begins
+literally `+### 6.1`, while the frozen range selector requires `### 6.1`, so it
+selects zero rows rather than the present P001–P140 set. Static review also
+finds that the document-wide token scan is self-seeding from its own expected
+manifest/prose/check source, and that closure does not independently replay
+the recorded P002–P015 assertion and inner-template identity tables.
+
+Reviewer agreement is preserved verbatim:
+
+```text
+I accept INBOX-206BC only as a compliant fail-closed uncommitted-draft stop. Its matrix and P002–P015 assertion-freeze work receive provisional design evidence credit only. No closure, commit, package completion, D01, or downstream credit is granted. Preserve the current draft as the sole dirty path.
+
+I authorize INBOX-206BD with these refinements:
+
+- First create one non-merge operating commit changing only docs/next_steps.md, parented exactly by 21e3b9886df47cf03d258c8cbc1935188e86a31e; keep the untracked draft unstaged and byte-identical during that commit, and update the ignored inbox separately.
+
+- Edit only docs/evidence/inbox206bb_phase3_wrapper_package_specification.md; retain mode 0644.
+- Remove exactly the stray leading + from the ### 6.1 heading.
+- Before substantive edits, freeze the current extracted bytes/hashes for all P002–P015 assertion blocks, complete inner templates, all matrix rows, and later-family template regions. Those bytes must remain unchanged.
+
+- Define unique, non-nested canonical region delimiters for every executable-template and assertion block. Extraction must:
+    - exclude delimiter lines;
+    - preserve interior bytes and LF endings exactly;
+    - define whether the final LF is included;
+    - reject missing, duplicate, nested, or reordered delimiters.
+
+- Derive token inventory solely from those named code regions. Expected manifests, heredocs, prose, tables, and closure source must be outside the scanned regions.
+- Independently replay every P002–P015 assertion and inner-template byte count and SHA-256 against its frozen table.
+- Verify every recorded token occurrence using zero-based UTF-8 byte offsets and half-open spans, in exact ordered per-template manifests; reject missing, extra, overlapping, or incorrectly typed occurrences.
+
+- Keep package_status=incomplete, implementation_ready=false, execution_authority=none, and all later families explicitly blocked.
+- Run exactly one newly frozen static closure. It may parse and hash inert text only; no assertion, wrapper, generated command, or package member may execute.
+- Success commits only the specification file and stops. Failure leaves it uncommitted and stops without inspection, diagnosis, retry, repair, or fix-forward.
+
+All source, project, Zig/build/install, validation, cache, registered-worktree access, ratchet, production-AWK, D01/D02, credit, and downstream prohibitions remain exact.
+```
+
+Create one non-merge operating commit parented exactly by
+`21e3b9886df47cf03d258c8cbc1935188e86a31e`, changing only tracked
+`docs/next_steps.md`; update only the ignored inbox separately. Keep the draft
+unstaged, mode 0644, and byte-identical at SHA-256
+`0095d25cfa0f724fa2b2b7dc56877433e6d89f584f7d72a23dd6ef17c9c2d043`
+during that commit. No other dirty path is permitted.
+
+BD may edit only the retained draft and must preserve its mode. Before any
+substantive edit, freeze the current extracted bytes and hashes for every
+P002–P015 assertion block, every complete inner template, every matrix row,
+and every later-family template region; all of those bytes remain immutable.
+Remove exactly the stray leading `+` from the `### 6.1` heading.
+
+Add unique, non-nested canonical delimiters for every executable-template and
+assertion block. Their extraction excludes delimiter lines, preserves exact
+interior bytes and LF endings, defines final-LF inclusion, and rejects missing,
+duplicate, nested, or reordered delimiters. Derive token inventory solely from
+those named code regions, excluding expected manifests, heredocs, prose,
+tables, and closure source. Independently replay the recorded P002–P015
+assertion and inner-template byte counts/SHA-256 values. Verify all recorded
+token occurrences by ordered zero-based UTF-8 half-open spans and reject every
+missing, extra, overlapping, or incorrectly typed occurrence.
+
+Keep `package_status=incomplete`, `implementation_ready=false`,
+`execution_authority=none`, and all later families blocked. Run exactly one
+newly frozen static closure that parses and hashes inert text only. No
+assertion, wrapper, generated command, or package member may execute. Success
+commits only the specification and stops; failure retains it uncommitted and
+stops with no inspection, diagnosis, retry, repair, or fix-forward.
+
+Preserve every root and protected identity, registered-worktree standing
+protection, stash, and ratchet 131. No source/project/Zig/build/install/
+validation/cache/registered-worktree/production-AWK/D01/D02/credit/downstream
+authority is granted. Never access `.claude/settings.local.json`.
+
 ## INBOX-206BC partial assertion-authority freeze P002–P015 — AUTHORIZED
 
 INBOX-206BB is accepted only as a compliant fail-closed uncommitted-draft stop. Grant provisional design evidence credit for its finite P001–P140 DAG, schemas, write boundaries, future materialization boundary, and correct blocker/no-execution behavior. Grant no closed package, materializable source, commit, construction, marker, D01, implementation, execution, validation, production, ratchet, D02, or downstream credit.
