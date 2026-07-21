@@ -84,6 +84,14 @@ pub const ContractError = error{
     SemanticMismatch,
     PhaseOutOfOrder,
     PhaseSuppressed,
+    UnknownStorageFamily,
+    DuplicateStorageFamily,
+    MissingStorageFamily,
+    RequiredStorageMaximumZero,
+    StorageMaximumMismatch,
+    StorageBudgetOverflow,
+    MinimumHeadroomSubstitution,
+    InsufficientAvailableStorage,
 };
 
 pub fn validateIdentities(observed: []const IdentityDescriptor) ContractError!void {
@@ -167,6 +175,193 @@ pub fn executionReadiness(available_bytes: u64) ExecutionReadiness {
 
 pub fn requireMinimumCapacity(available_bytes: u64) ContractError!void {
     if (available_bytes < minimum_available_bytes) return error.InsufficientCapacity;
+}
+
+pub const StorageFamily = enum(u8) {
+    external_preflight_driver_records = 1,
+    namespace_parents = 2,
+    canonical_build_cache_install = 3,
+    canonical_repetition_home_tmp = 4,
+    canonical_artifact = 5,
+    canonical_artifact_identity = 6,
+    canonical_step_status_records = 7,
+    canonical_build_raw_status = 8,
+    repetition_raw_report = 9,
+    canonical_accepted_ll = 10,
+    accepted_ll_proof = 11,
+    repetition_successful_subset = 12,
+    canonical_per_function = 13,
+    canonical_comparisons = 14,
+    canonical_identities = 15,
+    canonical_final_manifests = 16,
+    coverage_build_cache_install = 17,
+    coverage_artifact = 18,
+    coverage_reference = 19,
+    observation_off = 20,
+    observation_on_channels = 21,
+    observation_on_remaining = 22,
+    coverage_per_function = 23,
+    coverage_comparisons = 24,
+    coverage_final_manifests = 25,
+    publication_evidence = 26,
+    durability_terminal = 27,
+};
+
+pub const storage_families = [_]StorageFamily{
+    .external_preflight_driver_records,
+    .namespace_parents,
+    .canonical_build_cache_install,
+    .canonical_repetition_home_tmp,
+    .canonical_artifact,
+    .canonical_artifact_identity,
+    .canonical_step_status_records,
+    .canonical_build_raw_status,
+    .repetition_raw_report,
+    .canonical_accepted_ll,
+    .accepted_ll_proof,
+    .repetition_successful_subset,
+    .canonical_per_function,
+    .canonical_comparisons,
+    .canonical_identities,
+    .canonical_final_manifests,
+    .coverage_build_cache_install,
+    .coverage_artifact,
+    .coverage_reference,
+    .observation_off,
+    .observation_on_channels,
+    .observation_on_remaining,
+    .coverage_per_function,
+    .coverage_comparisons,
+    .coverage_final_manifests,
+    .publication_evidence,
+    .durability_terminal,
+};
+
+pub const StorageBudgetEntry = struct {
+    family_id: u8,
+    retained_bytes_maximum: u64,
+    success_retained_bytes: u64,
+    failure_retained_bytes: u64,
+};
+
+pub const StorageBudgetTotals = struct {
+    success_retained_bytes: u64,
+    failure_retained_bytes: u64,
+    worst_case_retained_bytes: u64,
+    available_bytes: u64,
+};
+
+pub const StorageCapSource = enum {
+    family_cap_ledger,
+    minimum_headroom_policy,
+};
+
+pub const StorageBudgetAssessment = union(enum) {
+    first_missing: StorageFamily,
+    complete_unapproved: StorageBudgetTotals,
+};
+
+pub const StorageBudgetLedger = struct {
+    entries: []const StorageBudgetEntry,
+    cap_source: StorageCapSource,
+
+    pub fn assess(self: StorageBudgetLedger, available_bytes: u64) ContractError!StorageBudgetAssessment {
+        if (self.cap_source == .minimum_headroom_policy)
+            return error.MinimumHeadroomSubstitution;
+
+        var seen = [_]bool{false} ** storage_families.len;
+        for (self.entries) |entry| {
+            _ = storageFamilyFromId(entry.family_id) orelse
+                return error.UnknownStorageFamily;
+            const index: usize = @intCast(entry.family_id - 1);
+            if (seen[index]) return error.DuplicateStorageFamily;
+            seen[index] = true;
+        }
+
+        for (storage_families, 0..) |family, index| {
+            if (!seen[index]) return .{ .first_missing = family };
+        }
+
+        var success_total: u64 = 0;
+        var failure_total: u64 = 0;
+        for (self.entries) |entry| {
+            const family = storageFamilyFromId(entry.family_id).?;
+            if (storageFamilyRequiresBytes(family) and entry.retained_bytes_maximum == 0)
+                return error.RequiredStorageMaximumZero;
+            if (entry.retained_bytes_maximum !=
+                @max(entry.success_retained_bytes, entry.failure_retained_bytes))
+            {
+                return error.StorageMaximumMismatch;
+            }
+            success_total = std.math.add(
+                u64,
+                success_total,
+                entry.success_retained_bytes,
+            ) catch return error.StorageBudgetOverflow;
+            failure_total = std.math.add(
+                u64,
+                failure_total,
+                entry.failure_retained_bytes,
+            ) catch return error.StorageBudgetOverflow;
+        }
+
+        try requireMinimumCapacity(available_bytes);
+        const worst_case = @max(success_total, failure_total);
+        if (available_bytes < worst_case) return error.InsufficientAvailableStorage;
+        return .{ .complete_unapproved = .{
+            .success_retained_bytes = success_total,
+            .failure_retained_bytes = failure_total,
+            .worst_case_retained_bytes = worst_case,
+            .available_bytes = available_bytes,
+        } };
+    }
+
+    pub fn validateComplete(
+        self: StorageBudgetLedger,
+        available_bytes: u64,
+    ) ContractError!StorageBudgetTotals {
+        return switch (try self.assess(available_bytes)) {
+            .first_missing => error.MissingStorageFamily,
+            .complete_unapproved => |totals| totals,
+        };
+    }
+};
+
+fn storageFamilyFromId(id: u8) ?StorageFamily {
+    return switch (id) {
+        1 => .external_preflight_driver_records,
+        2 => .namespace_parents,
+        3 => .canonical_build_cache_install,
+        4 => .canonical_repetition_home_tmp,
+        5 => .canonical_artifact,
+        6 => .canonical_artifact_identity,
+        7 => .canonical_step_status_records,
+        8 => .canonical_build_raw_status,
+        9 => .repetition_raw_report,
+        10 => .canonical_accepted_ll,
+        11 => .accepted_ll_proof,
+        12 => .repetition_successful_subset,
+        13 => .canonical_per_function,
+        14 => .canonical_comparisons,
+        15 => .canonical_identities,
+        16 => .canonical_final_manifests,
+        17 => .coverage_build_cache_install,
+        18 => .coverage_artifact,
+        19 => .coverage_reference,
+        20 => .observation_off,
+        21 => .observation_on_channels,
+        22 => .observation_on_remaining,
+        23 => .coverage_per_function,
+        24 => .coverage_comparisons,
+        25 => .coverage_final_manifests,
+        26 => .publication_evidence,
+        27 => .durability_terminal,
+        else => null,
+    };
+}
+
+fn storageFamilyRequiresBytes(family: StorageFamily) bool {
+    return family != .namespace_parents;
 }
 
 pub const Phase = enum(u8) {
@@ -469,6 +664,148 @@ fn testCoverageState() CoverageState {
         .object = families,
         .owner = families,
     };
+}
+
+fn testStorageBudgetEntries() [storage_families.len]StorageBudgetEntry {
+    var entries: [storage_families.len]StorageBudgetEntry = undefined;
+    for (&entries, storage_families, 0..) |*entry, family, index| {
+        const success_bytes: u64 = @intCast(index + 1);
+        const failure_bytes = success_bytes + 1;
+        entry.* = .{
+            .family_id = @intFromEnum(family),
+            .retained_bytes_maximum = failure_bytes,
+            .success_retained_bytes = success_bytes,
+            .failure_retained_bytes = failure_bytes,
+        };
+    }
+    return entries;
+}
+
+fn testStorageBudgetLedger(entries: []const StorageBudgetEntry) StorageBudgetLedger {
+    return .{
+        .entries = entries,
+        .cap_source = .family_cap_ledger,
+    };
+}
+
+test "baseline validation storage budget accepts complete synthetic structure as unapproved" {
+    var entries = testStorageBudgetEntries();
+    const ledger = testStorageBudgetLedger(&entries);
+
+    const assessment = try ledger.assess(minimum_available_bytes);
+    const totals = switch (assessment) {
+        .first_missing => return error.TestUnexpectedResult,
+        .complete_unapproved => |value| value,
+    };
+    var expected_success: u64 = 0;
+    var expected_failure: u64 = 0;
+    for (entries) |entry| {
+        expected_success += entry.success_retained_bytes;
+        expected_failure += entry.failure_retained_bytes;
+    }
+    try std.testing.expectEqual(expected_success, totals.success_retained_bytes);
+    try std.testing.expectEqual(expected_failure, totals.failure_retained_bytes);
+    try std.testing.expectEqual(expected_failure, totals.worst_case_retained_bytes);
+    try std.testing.expectEqual(minimum_available_bytes, totals.available_bytes);
+    try std.testing.expectEqual(totals, try ledger.validateComplete(minimum_available_bytes));
+
+    entries[0].retained_bytes_maximum = 0;
+    entries[0].success_retained_bytes = 0;
+    entries[0].failure_retained_bytes = 0;
+    try std.testing.expectError(
+        error.RequiredStorageMaximumZero,
+        testStorageBudgetLedger(&entries).assess(minimum_available_bytes),
+    );
+
+    entries = testStorageBudgetEntries();
+    entries[0].retained_bytes_maximum += 1;
+    try std.testing.expectError(
+        error.StorageMaximumMismatch,
+        testStorageBudgetLedger(&entries).assess(minimum_available_bytes),
+    );
+}
+
+test "baseline validation storage budget reports family one as first missing" {
+    const entries = testStorageBudgetEntries();
+    const ledger = testStorageBudgetLedger(entries[1..]);
+
+    switch (try ledger.assess(minimum_available_bytes)) {
+        .first_missing => |family| try std.testing.expectEqual(
+            StorageFamily.external_preflight_driver_records,
+            family,
+        ),
+        .complete_unapproved => return error.TestUnexpectedResult,
+    }
+    try std.testing.expectError(
+        error.MissingStorageFamily,
+        ledger.validateComplete(minimum_available_bytes),
+    );
+}
+
+test "baseline validation storage budget rejects duplicate and unknown families" {
+    var duplicate_entries = testStorageBudgetEntries();
+    duplicate_entries[duplicate_entries.len - 1].family_id = duplicate_entries[0].family_id;
+    try std.testing.expectError(
+        error.DuplicateStorageFamily,
+        testStorageBudgetLedger(&duplicate_entries).assess(minimum_available_bytes),
+    );
+
+    var unknown_entries = testStorageBudgetEntries();
+    unknown_entries[0].family_id = 0;
+    try std.testing.expectError(
+        error.UnknownStorageFamily,
+        testStorageBudgetLedger(&unknown_entries).assess(minimum_available_bytes),
+    );
+}
+
+test "baseline validation storage budget rejects checked overflow" {
+    var entries = testStorageBudgetEntries();
+    entries[0].retained_bytes_maximum = std.math.maxInt(u64);
+    entries[0].success_retained_bytes = std.math.maxInt(u64);
+    entries[0].failure_retained_bytes = std.math.maxInt(u64);
+    entries[1].retained_bytes_maximum = 1;
+    entries[1].success_retained_bytes = 1;
+    entries[1].failure_retained_bytes = 1;
+
+    try std.testing.expectError(
+        error.StorageBudgetOverflow,
+        testStorageBudgetLedger(&entries).assess(std.math.maxInt(u64)),
+    );
+}
+
+test "baseline validation storage budget includes failure retention" {
+    var entries = testStorageBudgetEntries();
+    for (&entries) |*entry| {
+        entry.retained_bytes_maximum = 1;
+        entry.success_retained_bytes = 1;
+        entry.failure_retained_bytes = 1;
+    }
+    entries[0].failure_retained_bytes = minimum_available_bytes + 100;
+    entries[0].retained_bytes_maximum = entries[0].failure_retained_bytes;
+    const expected_failure = minimum_available_bytes + 100 + entries.len - 1;
+    const ledger = testStorageBudgetLedger(&entries);
+
+    const totals = try ledger.validateComplete(expected_failure);
+    try std.testing.expectEqual(@as(u64, entries.len), totals.success_retained_bytes);
+    try std.testing.expectEqual(expected_failure, totals.failure_retained_bytes);
+    try std.testing.expectEqual(expected_failure, totals.worst_case_retained_bytes);
+    try std.testing.expectError(
+        error.InsufficientAvailableStorage,
+        ledger.validateComplete(expected_failure - 1),
+    );
+}
+
+test "baseline validation storage budget rejects minimum headroom substitution" {
+    const entries = testStorageBudgetEntries();
+    const ledger = StorageBudgetLedger{
+        .entries = &entries,
+        .cap_source = .minimum_headroom_policy,
+    };
+
+    try std.testing.expectError(
+        error.MinimumHeadroomSubstitution,
+        ledger.assess(minimum_available_bytes),
+    );
 }
 
 test "baseline validation rejects identity and compatibility-key drift" {
