@@ -26,6 +26,18 @@ const DescriptorIdentityError = error{
     DescriptorIdentityRoleMismatch,
 };
 
+const ComponentValidationError = error{
+    ComponentLexicallyInvalid,
+    ComponentNameMismatch,
+};
+
+const AcquiredDirectory = struct {
+    /// The caller owns this directory and must close it. The identity remains
+    /// comparable only while this exact descriptor stays open.
+    directory: std.Io.Dir,
+    identity: DescriptorIdentity,
+};
+
 fn assertNativeAbi() void {
     if (builtin.os.tag != .linux) {
         @compileError("INBOX-206 descriptor identity requires native Linux");
@@ -109,6 +121,65 @@ fn observeDescriptor(
         .inode = result.ino,
         .mount_id_unique = result.mnt_id,
     };
+}
+
+fn validateComponentLexical(component: []const u8) ComponentValidationError!void {
+    if (component.len == 0 or
+        std.mem.eql(u8, component, ".") or
+        std.mem.eql(u8, component, ".."))
+    {
+        return error.ComponentLexicallyInvalid;
+    }
+    for (component) |byte| {
+        if (byte == '/' or byte == 0) return error.ComponentLexicallyInvalid;
+    }
+}
+
+fn validateComponent(
+    candidate: []const u8,
+    expected: []const u8,
+) ComponentValidationError!void {
+    try validateComponentLexical(candidate);
+    try validateComponentLexical(expected);
+    if (!std.mem.eql(u8, candidate, expected)) return error.ComponentNameMismatch;
+}
+
+/// Borrows `parent` without closing it and opens exactly one validated child.
+/// On success the caller owns `directory`, must close it, and must keep its
+/// descriptor open for the complete lifetime of comparisons with `identity`.
+fn acquireOneDirectoryComponent(
+    parent: std.Io.Dir,
+    io: std.Io,
+    candidate: []const u8,
+    expected: []const u8,
+) !AcquiredDirectory {
+    try validateComponent(candidate, expected);
+    const child = try parent.openDir(io, candidate, .{
+        .access_sub_paths = true,
+        .iterate = false,
+        .follow_symlinks = false,
+    });
+    errdefer child.close(io);
+    const identity = try observeDescriptor(child.handle, .directory);
+    return .{
+        .directory = child,
+        .identity = identity,
+    };
+}
+
+fn expectAcquisitionError(
+    expected_error: anyerror,
+    parent: std.Io.Dir,
+    io: std.Io,
+    candidate: []const u8,
+    expected: []const u8,
+) !void {
+    if (acquireOneDirectoryComponent(parent, io, candidate, expected)) |acquired| {
+        acquired.directory.close(io);
+        return error.TestUnexpectedResult;
+    } else |actual_error| {
+        try std.testing.expect(actual_error == expected_error);
+    }
 }
 
 test "compile-time ABI and essential mask closure" {
@@ -221,5 +292,107 @@ test "closed descriptor fails and MNT_ID_UNIQUE is never skipped" {
     try std.testing.expectError(
         error.DescriptorIdentityBadDescriptor,
         observeDescriptor(closed_descriptor, .regular_file),
+    );
+}
+
+test "single-component validation rejects lexical and mismatch errors before access" {
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+
+    try temp.dir.createDir(io, "closed-parent", .default_dir);
+    const closed_parent = try temp.dir.openDir(io, "closed-parent", .{
+        .access_sub_paths = true,
+        .iterate = false,
+        .follow_symlinks = false,
+    });
+    closed_parent.close(io);
+
+    const invalid_components = [_][]const u8{
+        "",
+        ".",
+        "..",
+        "two/parts",
+        "nul\x00byte",
+    };
+    for (invalid_components) |invalid| {
+        try expectAcquisitionError(
+            error.ComponentLexicallyInvalid,
+            closed_parent,
+            io,
+            invalid,
+            "valid",
+        );
+        try expectAcquisitionError(
+            error.ComponentLexicallyInvalid,
+            closed_parent,
+            io,
+            "valid",
+            invalid,
+        );
+    }
+    try expectAcquisitionError(
+        error.ComponentNameMismatch,
+        closed_parent,
+        io,
+        "candidate",
+        "expected",
+    );
+}
+
+test "single-component directory acquisition preserves parent and child ownership" {
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+
+    try temp.dir.createDir(io, "nested", .default_dir);
+    const parent_before = try observeDescriptor(temp.dir.handle, .directory);
+    const acquired = try acquireOneDirectoryComponent(
+        temp.dir,
+        io,
+        "nested",
+        "nested",
+    );
+    const parent_during = try observeDescriptor(temp.dir.handle, .directory);
+    try std.testing.expect(std.meta.eql(parent_before, parent_during));
+    const child_repeated = try observeDescriptor(acquired.directory.handle, .directory);
+    try std.testing.expect(std.meta.eql(acquired.identity, child_repeated));
+
+    const child_handle = acquired.directory.handle;
+    acquired.directory.close(io);
+    try std.testing.expectError(
+        error.DescriptorIdentityBadDescriptor,
+        observeDescriptor(child_handle, .directory),
+    );
+    const parent_after = try observeDescriptor(temp.dir.handle, .directory);
+    try std.testing.expect(std.meta.eql(parent_before, parent_after));
+}
+
+test "single-component directory acquisition rejects regular files and symlinks" {
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+
+    const file = try temp.dir.createFile(io, "regular", .{
+        .read = true,
+        .exclusive = true,
+    });
+    defer file.close(io);
+    try expectAcquisitionError(
+        error.NotDir,
+        temp.dir,
+        io,
+        "regular",
+        "regular",
+    );
+
+    try temp.dir.createDir(io, "target", .default_dir);
+    try temp.dir.symLink(io, "target", "link", .{ .is_directory = true });
+    try expectAcquisitionError(
+        error.NotDir,
+        temp.dir,
+        io,
+        "link",
+        "link",
     );
 }
