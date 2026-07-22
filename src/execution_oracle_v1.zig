@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const real_rows = @import("distribution_real_rows_gate.zig");
+const execution_cohort = @import("distribution_execution_cohort_v1.zig");
 const air_export = @import("zig_air_export.zig");
 const air_types = @import("zig_air_types.zig");
 const project_target = @import("target.zig");
@@ -17,8 +18,8 @@ const definition_path = "lib/std/coff.zig";
 const std_path = "lib/std/std.zig";
 const use_path = "src/libs/mingw/implib.zig";
 const function_name = "coff.Symbol.sizeOf";
-const expected_result: usize = 18;
-const expected_execution_stdout = "execution-oracle-v1 result=18 witness=61\n";
+const expected_result = execution_cohort.expected_result;
+const expected_execution_stdout = execution_cohort.expected_stdout;
 const generation_root = "local-state/validations/inbox206co/generation-v5";
 const retained_diagnostic_generation_root = "local-state/validations/inbox206co/generation-v3";
 const retained_reference_generation_root = "local-state/validations/inbox206co/generation-v4";
@@ -46,7 +47,7 @@ const weak_external_function_name = "coff.WeakExternalDefinition.sizeOf";
 const weak_external_definition_path = "lib/std/coff.zig";
 const weak_external_import_path = "lib/std/std.zig";
 const weak_external_use_path = "src/libs/mingw/implib.zig";
-const weak_external_expected_result: usize = 18;
+const weak_external_expected_result = execution_cohort.expected_result;
 const weak_external_validation_root = "local-state/validations/o2-calls/production-target-audit/weak-external-definition-sizeof-development";
 const weak_external_cache_root = "local-state/caches/o2-calls/production-target-audit/weak-external-definition-sizeof-development";
 const weak_external_runtime_cache_name = "audit-runtime";
@@ -56,14 +57,9 @@ const weak_external_execution_mode = "--execute-weak-external-definition-sizeof"
 const weak_external_execution_validation_root = "local-state/validations/o2-calls/production-target-execution/weak-external-definition-sizeof-development";
 const weak_external_execution_cache_root = "local-state/caches/o2-calls/production-target-execution/weak-external-definition-sizeof-development";
 const weak_external_execution_runtime_cache_name = "execution-runtime";
-const weak_external_expected_selector_version = "0.17.0-dev.364+bdee02bc0";
-const weak_external_expected_selector_length: u64 = 530_327_885;
-const weak_external_expected_selector_sha256 = [_]u8{
-    0xdc, 0xea, 0x34, 0x78, 0x27, 0x3d, 0x7f, 0xfe,
-    0x38, 0x95, 0x70, 0x9c, 0x8e, 0xed, 0x4c, 0xcc,
-    0x07, 0x24, 0x54, 0x88, 0x69, 0xcd, 0xb8, 0x61,
-    0x83, 0xfc, 0x73, 0x56, 0x16, 0x44, 0x10, 0xb7,
-};
+const weak_external_expected_selector_version = execution_cohort.selector_version;
+const weak_external_expected_selector_length = execution_cohort.selector_length;
+const weak_external_expected_selector_sha256 = execution_cohort.selector_sha256;
 const weak_external_expected_stdout = "execution-oracle-v1 result=18 witness=61\n";
 const weak_external_object_max_bytes = 16 * 1024 * 1024;
 const weak_external_executable_max_bytes = 512 * 1024 * 1024;
@@ -476,23 +472,8 @@ const ExecutionBridgeContract = struct {
     bridge_calling_convention: BridgeCallingConvention,
 };
 
-const ExecutionRecord = struct {
-    termination: Termination,
-    status: u8,
-    stdout_sha256: [Sha256.digest_length]u8,
-    stderr_sha256: [Sha256.digest_length]u8,
-    stdout_length: usize,
-    stderr_length: usize,
-    semantic_result: usize,
-    call_occurrence: bool,
-};
-
-const Termination = enum {
-    exited,
-    signaled,
-    stopped,
-    unknown,
-};
+const ExecutionRecord = execution_cohort.ExecutionRecord;
+const Termination = execution_cohort.Termination;
 
 const Counters = struct {
     real_functions_lowered: usize = 0,
@@ -515,17 +496,15 @@ const Counters = struct {
     }
 
     fn noteBothExecuted(self: *Counters, reference: ExecutionRecord, linked: ExecutionRecord) OracleError!void {
-        if (reference.termination != .exited or linked.termination != .exited or reference.status != 0 or linked.status != 0) {
-            return error.ProcessInconsistent;
-        }
-        self.real_executed += 1;
+        var pair: execution_cohort.PairCounters = .{ .real_executed = self.real_executed, .real_programs_ok = self.real_programs_ok };
+        try pair.noteBothExecuted(reference, linked);
+        self.real_executed = pair.real_executed;
     }
 
     fn noteOracleAccepted(self: *Counters, reference: ExecutionRecord, linked: ExecutionRecord) OracleError!void {
-        if (self.real_executed != 1) return error.ProcessInconsistent;
-        if (!reference.call_occurrence or !linked.call_occurrence) return error.CallOccurrenceMissing;
-        if (!std.meta.eql(reference, linked)) return error.OracleMismatch;
-        self.real_programs_ok += 1;
+        var pair: execution_cohort.PairCounters = .{ .real_executed = self.real_executed, .real_programs_ok = self.real_programs_ok };
+        try pair.noteOracleAccepted(reference, linked);
+        self.real_programs_ok = pair.real_programs_ok;
     }
 };
 
@@ -542,17 +521,7 @@ const OracleOutcome = struct {
     counters: Counters,
 };
 
-const OwnedProcessResult = struct {
-    term: std.process.Child.Term,
-    stdout: []u8,
-    stderr: []u8,
-
-    fn deinit(self: *OwnedProcessResult, allocator: std.mem.Allocator) void {
-        allocator.free(self.stdout);
-        allocator.free(self.stderr);
-        self.* = undefined;
-    }
-};
+const OwnedProcessResult = execution_cohort.OwnedProcessResult;
 
 const BuildPhase = enum(u8) {
     reference = 1,
@@ -1702,20 +1671,13 @@ fn closedEnvironmentForPaths(
     global_cache: []const u8,
     descriptor: ?[]const u8,
 ) !std.process.Environ.Map {
-    var environment = std.process.Environ.Map.init(allocator);
+    var environment = try execution_cohort.closedEnvironment(allocator, .{
+        .home = home,
+        .temporary = temporary,
+        .local_cache = local_cache,
+        .global_cache = global_cache,
+    });
     errdefer environment.deinit();
-    try environment.put("LC_ALL", "C");
-    try environment.put("LANG", "C");
-    try environment.put("TZ", "UTC0");
-    try environment.put("HOME", home);
-    try environment.put("TMPDIR", temporary);
-    try environment.put("ZIG_LOCAL_CACHE_DIR", local_cache);
-    try environment.put("ZIG_GLOBAL_CACHE_DIR", global_cache);
-    try environment.put("GIT_OPTIONAL_LOCKS", "0");
-    try environment.put("GIT_CONFIG_NOSYSTEM", "1");
-    try environment.put("GIT_CONFIG_SYSTEM", "/dev/null");
-    try environment.put("GIT_CONFIG_GLOBAL", "/dev/null");
-    try environment.put("GIT_TERMINAL_PROMPT", "0");
     if (descriptor) |path| try environment.put("ZLLVM_AIR_EXPORT_PATH", path);
     return environment;
 }
@@ -1726,25 +1688,11 @@ fn runBounded(
     argv: []const []const u8,
     environment: ?*const std.process.Environ.Map,
 ) !OwnedProcessResult {
-    if (argv.len == 0 or !std.fs.path.isAbsolute(argv[0])) return error.ChildFailed;
-    const result = std.process.run(allocator, io, .{
-        .argv = argv,
-        .cwd = .{ .path = repository_root },
-        .environ_map = environment,
-        .stdout_limit = .limited(process_output_max),
-        .stderr_limit = .limited(process_output_max),
-    }) catch |failure| switch (failure) {
-        error.StreamTooLong => return error.ChildOutputBoundExceeded,
-        else => return error.ChildFailed,
-    };
-    return .{ .term = result.term, .stdout = result.stdout, .stderr = result.stderr };
+    return execution_cohort.runBounded(allocator, io, argv, environment);
 }
 
 fn requireExitedZero(result: OwnedProcessResult) OracleError!void {
-    switch (result.term) {
-        .exited => |code| if (code != 0) return error.ChildFailed,
-        else => return error.ChildFailed,
-    }
+    execution_cohort.requireExitedZero(result) catch return error.ChildFailed;
 }
 
 fn observeZig(
@@ -1821,20 +1769,10 @@ fn requireExternalRevisionAndVersionWithEnvironment(
     io: std.Io,
     environment: *const std.process.Environ.Map,
 ) !ExpectedExternalVersion {
+    try execution_cohort.requireExternalRepositoryClean(allocator, io, environment);
     const prefix = [_][]const u8{
         "/usr/bin/git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-C", zig_repository_root,
     };
-    const head_argv = prefix ++ [_][]const u8{ "rev-parse", "HEAD" };
-    var head = try runBounded(allocator, io, &head_argv, environment);
-    defer head.deinit(allocator);
-    try requireExitedZero(head);
-    if (!std.mem.eql(u8, head.stdout, zig_revision ++ "\n")) return error.ExternalRevisionMismatch;
-    const status_argv = prefix ++ [_][]const u8{ "status", "--porcelain=v1", "--untracked-files=all" };
-    var status = try runBounded(allocator, io, &status_argv, environment);
-    defer status.deinit(allocator);
-    try requireExitedZero(status);
-    if (status.stdout.len != 0) return error.ExternalRepositoryDirty;
-
     const describe_argv = prefix ++ [_][]const u8{ "describe", "--match", "*.*.*", "--tags", "--abbrev=9" };
     var describe = try runBounded(allocator, io, &describe_argv, environment);
     defer describe.deinit(allocator);
@@ -1900,19 +1838,9 @@ fn deriveExternalVersion(build_source: []const u8, describe_untrimmed: []const u
 }
 
 fn proveCurrentSource(allocator: std.mem.Allocator, io: std.Io) !SourceProof {
-    var root = try std.Io.Dir.openDirAbsolute(io, zig_repository_root, .{
-        .access_sub_paths = true,
-        .iterate = false,
-        .follow_symlinks = false,
-    });
-    defer root.close(io);
-    const definition = try root.readFileAlloc(io, definition_path, allocator, .limited(source_max_bytes));
-    defer allocator.free(definition);
-    const std_source = try root.readFileAlloc(io, std_path, allocator, .limited(source_max_bytes));
-    defer allocator.free(std_source);
-    const uses = try root.readFileAlloc(io, use_path, allocator, .limited(source_max_bytes));
-    defer allocator.free(uses);
-    return proveSourceBytes(allocator, definition, std_source, uses);
+    var sources = try execution_cohort.readCurrentSources(allocator, io, source_max_bytes);
+    defer sources.deinit(allocator);
+    return proveSourceBytes(allocator, sources.definition, sources.import_source, sources.use_source);
 }
 
 fn proveSourceBytes(
@@ -1937,19 +1865,9 @@ fn proveSourceBytes(
 }
 
 fn proveWeakExternalCurrentSource(allocator: std.mem.Allocator, io: std.Io) !SourceProof {
-    var root = try std.Io.Dir.openDirAbsolute(io, zig_repository_root, .{
-        .access_sub_paths = true,
-        .iterate = false,
-        .follow_symlinks = false,
-    });
-    defer root.close(io);
-    const definition = try root.readFileAlloc(io, weak_external_definition_path, allocator, .limited(source_max_bytes));
-    defer allocator.free(definition);
-    const import_source = try root.readFileAlloc(io, weak_external_import_path, allocator, .limited(source_max_bytes));
-    defer allocator.free(import_source);
-    const use_source = try root.readFileAlloc(io, weak_external_use_path, allocator, .limited(source_max_bytes));
-    defer allocator.free(use_source);
-    return proveWeakExternalSourceBytes(allocator, definition, import_source, use_source);
+    var sources = try execution_cohort.readCurrentSources(allocator, io, source_max_bytes);
+    defer sources.deinit(allocator);
+    return proveWeakExternalSourceBytes(allocator, sources.definition, sources.import_source, sources.use_source);
 }
 
 fn proveWeakExternalSourceBytes(
@@ -2169,11 +2087,7 @@ const WeakExternalAuditProof = struct {
     compatibility: WeakExternalCompatibilityProof,
 };
 
-const ExecutionArtifactIdentity = struct {
-    length: u64,
-    sha256: [Sha256.digest_length]u8,
-    executable: bool,
-};
+const ExecutionArtifactIdentity = execution_cohort.ArtifactIdentity;
 
 const WeakExternalExecutionOutcome = struct {
     selector_initial: ZigIdentity,
@@ -2775,34 +2689,11 @@ fn runWeakExternalDefinitionAudit(
     try std.Io.File.stdout().writeStreamingAll(io, diagnostic);
 }
 
-const weak_external_reference_harness_source =
-    \\const std = @import("std");
-    \\pub fn main(init: std.process.Init) !void {
-    \\    const result: usize = 18;
-    \\    const witness = result *% 3 +% 7;
-    \\    var buffer: [128]u8 = undefined;
-    \\    var writer = std.Io.File.stdout().writer(init.io, &buffer);
-    \\    try writer.interface.print("execution-oracle-v1 result={} witness={}\n", .{ result, witness });
-    \\    try writer.interface.flush();
-    \\}
-    \\
-;
-
-const weak_external_linked_harness_source =
-    \\const std = @import("std");
-    \\const size_of = @extern(*const fn () callconv(.{ .x86_64_sysv = .{} }) usize, .{ .name = "coff.WeakExternalDefinition.sizeOf" });
-    \\pub fn main(init: std.process.Init) !void {
-    \\    const result = size_of();
-    \\    const witness = result *% 3 +% 7;
-    \\    var buffer: [128]u8 = undefined;
-    \\    var writer = std.Io.File.stdout().writer(init.io, &buffer);
-    \\    try writer.interface.print("execution-oracle-v1 result={} witness={}\n", .{ result, witness });
-    \\    try writer.interface.flush();
-    \\}
-    \\
-;
+const weak_external_reference_harness_source = execution_cohort.reference_harness_source;
+const weak_external_linked_harness_source = execution_cohort.weak_external_linked_harness_source;
 
 fn proveWeakExternalReferenceHarness(allocator: std.mem.Allocator, source: []const u8) !void {
+    try execution_cohort.validateHarnesses(.weak_external_definition_size_of);
     if (!std.mem.eql(u8, source, weak_external_reference_harness_source) or
         countExact(source, "const result: usize = 18;") != 1 or countExact(source, "witness={}\\n") != 1)
     {
@@ -2812,6 +2703,7 @@ fn proveWeakExternalReferenceHarness(allocator: std.mem.Allocator, source: []con
 }
 
 fn proveWeakExternalLinkedHarness(allocator: std.mem.Allocator, source: []const u8) !void {
+    try execution_cohort.validateHarnesses(.weak_external_definition_size_of);
     if (!std.mem.eql(u8, source, weak_external_linked_harness_source) or
         countExact(source, weak_external_function_name) != 1 or countExact(source, "size_of()") != 1 or
         countExact(source, "callconv(.{ .x86_64_sysv = .{} })") != 1 or
@@ -2828,12 +2720,14 @@ fn proveWeakExternalLinkedHarness(allocator: std.mem.Allocator, source: []const 
 }
 
 fn requireWeakExternalSelectorIdentity(identity: ZigIdentity) OracleError!void {
-    if (!std.mem.eql(u8, identity.versionSlice(), weak_external_expected_selector_version) or
-        identity.length != weak_external_expected_selector_length or
-        !std.mem.eql(u8, &identity.sha256, &weak_external_expected_selector_sha256))
-    {
-        return error.SelectorDrift;
-    }
+    var shared: execution_cohort.SelectorIdentity = .{
+        .version = [_]u8{0} ** 128,
+        .version_length = identity.version_length,
+        .length = identity.length,
+        .sha256 = identity.sha256,
+    };
+    @memcpy(shared.version[0..identity.version_length], identity.versionSlice());
+    execution_cohort.requireSelector(shared) catch return error.SelectorDrift;
 }
 
 fn admitWeakExternalExecutionCandidate(
@@ -2919,27 +2813,20 @@ fn observeExecutionArtifact(
     max_bytes: usize,
 ) !ExecutionArtifactIdentity {
     const absolute = try BoundPath.absolute(path);
-    var file = try std.Io.Dir.openFileAbsolute(io, absolute.slice(), .{ .mode = .read_only, .follow_symlinks = false });
-    defer file.close(io);
-    const metadata = try file.stat(io);
-    const executable = std.Io.File.Permissions.has_executable_bit and metadata.permissions.toMode() & 0o111 != 0;
-    if (metadata.kind != .file or metadata.size == 0 or metadata.size > max_bytes or executable != require_executable) {
-        return error.ExecutionArtifactInvalid;
-    }
-    var reader = file.reader(io, &.{});
-    const bytes = try reader.interface.allocRemaining(allocator, .limited(max_bytes));
-    defer allocator.free(bytes);
-    if (bytes.len != metadata.size) return error.ExecutionArtifactInvalid;
-    return .{ .length = metadata.size, .sha256 = sha256(bytes), .executable = executable };
+    return execution_cohort.observeArtifact(allocator, io, absolute.slice(), require_executable, max_bytes);
 }
 
 fn writeWeakExternalHarnesses(io: std.Io, admission: CandidateAdmission, layout: *const WeakExternalExecutionLayout) !void {
     try requireCandidateAdmission(admission);
     try proveWeakExternalReferenceHarness(std.heap.page_allocator, weak_external_reference_harness_source);
     try proveWeakExternalLinkedHarness(std.heap.page_allocator, weak_external_linked_harness_source);
-    const cwd = std.Io.Dir.cwd();
-    try cwd.writeFile(io, .{ .sub_path = layout.reference_source.slice(), .data = weak_external_reference_harness_source });
-    try cwd.writeFile(io, .{ .sub_path = layout.linked_source.slice(), .data = weak_external_linked_harness_source });
+    try execution_cohort.writeHarnesses(io, .weak_external_definition_size_of, .{
+        .reference_source = layout.reference_source.slice(),
+        .linked_source = layout.linked_source.slice(),
+        .object = layout.object.slice(),
+        .reference_executable = layout.reference_executable.slice(),
+        .linked_executable = layout.linked_executable.slice(),
+    });
 }
 
 fn buildWeakExternalReference(
@@ -2952,9 +2839,13 @@ fn buildWeakExternalReference(
     defer environment.deinit();
     const source = try BoundPath.absolute(&layout.reference_source);
     const executable = try BoundPath.absolute(&layout.reference_executable);
-    var emit_buffer: [std.Io.Dir.max_path_bytes + 32]u8 = undefined;
-    const emit = try std.fmt.bufPrint(&emit_buffer, "-femit-bin={s}", .{executable.slice()});
-    var result = try runBounded(allocator, io, &.{ zig_path, "build-exe", source.slice(), "-OReleaseFast", emit }, &environment);
+    var result = try execution_cohort.buildReference(allocator, io, zig_path, "-OReleaseFast", .{
+        .reference_source = source.slice(),
+        .linked_source = layout.linked_source.slice(),
+        .object = layout.object.slice(),
+        .reference_executable = executable.slice(),
+        .linked_executable = layout.linked_executable.slice(),
+    }, &environment);
     defer result.deinit(allocator);
     var directory = try std.Io.Dir.cwd().openDir(io, layout.validation_root.slice(), .{
         .access_sub_paths = true,
@@ -2976,14 +2867,13 @@ fn buildWeakExternalLinked(
     const source = try BoundPath.absolute(&layout.linked_source);
     const object = try BoundPath.absolute(&layout.object);
     const executable = try BoundPath.absolute(&layout.linked_executable);
-    var emit_buffer: [std.Io.Dir.max_path_bytes + 32]u8 = undefined;
-    const emit = try std.fmt.bufPrint(&emit_buffer, "-femit-bin={s}", .{executable.slice()});
-    var result = try runBounded(
-        allocator,
-        io,
-        &.{ zig_path, "build-exe", "-fno-lld", source.slice(), object.slice(), "-OReleaseFast", emit },
-        &environment,
-    );
+    var result = try execution_cohort.buildLinked(allocator, io, zig_path, "-OReleaseFast", .{
+        .reference_source = layout.reference_source.slice(),
+        .linked_source = source.slice(),
+        .object = object.slice(),
+        .reference_executable = layout.reference_executable.slice(),
+        .linked_executable = executable.slice(),
+    }, &environment);
     defer result.deinit(allocator);
     var directory = try std.Io.Dir.cwd().openDir(io, layout.validation_root.slice(), .{
         .access_sub_paths = true,
@@ -3195,32 +3085,8 @@ fn requireStorageHeadroom(
     if (available < peak_storage_bytes) return error.InsufficientStorage;
 }
 
-const reference_harness_source =
-    \\const std = @import("std");
-    \\pub fn main(init: std.process.Init) !void {
-    \\    const result: usize = 18;
-    \\    const witness = result *% 3 +% 7;
-    \\    var buffer: [128]u8 = undefined;
-    \\    var writer = std.Io.File.stdout().writer(init.io, &buffer);
-    \\    try writer.interface.print("execution-oracle-v1 result={} witness={}\n", .{ result, witness });
-    \\    try writer.interface.flush();
-    \\}
-    \\
-;
-
-const linked_harness_source =
-    \\const std = @import("std");
-    \\const size_of = @extern(*const fn () callconv(.{ .x86_64_sysv = .{} }) usize, .{ .name = "coff.Symbol.sizeOf" });
-    \\pub fn main(init: std.process.Init) !void {
-    \\    const result = size_of();
-    \\    const witness = result *% 3 +% 7;
-    \\    var buffer: [128]u8 = undefined;
-    \\    var writer = std.Io.File.stdout().writer(init.io, &buffer);
-    \\    try writer.interface.print("execution-oracle-v1 result={} witness={}\n", .{ result, witness });
-    \\    try writer.interface.flush();
-    \\}
-    \\
-;
+const reference_harness_source = execution_cohort.reference_harness_source;
+const linked_harness_source = execution_cohort.symbol_linked_harness_source;
 
 fn proveHarnessNewlineAst(allocator: std.mem.Allocator, source: []const u8) !void {
     const sentinel = try allocator.dupeZ(u8, source);
@@ -3236,11 +3102,13 @@ fn proveHarnessNewlineAst(allocator: std.mem.Allocator, source: []const u8) !voi
 }
 
 fn proveReferenceHarnessAst(allocator: std.mem.Allocator, source: []const u8) !void {
+    try execution_cohort.validateHarnesses(.symbol_size_of);
     if (!std.mem.eql(u8, source, reference_harness_source)) return error.CandidateBindingMismatch;
     try proveHarnessNewlineAst(allocator, source);
 }
 
 fn proveLinkedHarnessAst(allocator: std.mem.Allocator, source: []const u8) !void {
+    try execution_cohort.validateHarnesses(.symbol_size_of);
     if (!std.mem.eql(u8, source, linked_harness_source)) return error.CandidateBindingMismatch;
     try proveHarnessNewlineAst(allocator, source);
     const sentinel = try allocator.dupeZ(u8, source);
@@ -3269,9 +3137,13 @@ fn writeHarnesses(io: std.Io, admission: CandidateAdmission, layout: *const Gene
     try requireCandidateAdmission(admission);
     try proveReferenceHarnessAst(std.heap.page_allocator, reference_harness_source);
     try proveLinkedHarnessAst(std.heap.page_allocator, linked_harness_source);
-    const cwd = std.Io.Dir.cwd();
-    try cwd.writeFile(io, .{ .sub_path = layout.reference_source.slice(), .data = reference_harness_source });
-    try cwd.writeFile(io, .{ .sub_path = layout.linked_source.slice(), .data = linked_harness_source });
+    try execution_cohort.writeHarnesses(io, .symbol_size_of, .{
+        .reference_source = layout.reference_source.slice(),
+        .linked_source = layout.linked_source.slice(),
+        .object = layout.object.slice(),
+        .reference_executable = layout.reference_executable.slice(),
+        .linked_executable = layout.linked_executable.slice(),
+    });
 }
 
 fn buildReferenceExecutable(
@@ -3284,12 +3156,13 @@ fn buildReferenceExecutable(
     defer environment.deinit();
     const source = try BoundPath.absolute(&layout.reference_source);
     const executable = try BoundPath.absolute(&layout.reference_executable);
-    var reference_emit_buffer: [std.Io.Dir.max_path_bytes + 32]u8 = undefined;
-    const reference_emit = try std.fmt.bufPrint(&reference_emit_buffer, "-femit-bin={s}", .{executable.slice()});
-    const reference_argv = [_][]const u8{
-        zig_path, "build-exe", source.slice(), "-OReleaseFast", reference_emit,
-    };
-    var reference = try runBounded(allocator, io, &reference_argv, &environment);
+    var reference = try execution_cohort.buildReference(allocator, io, zig_path, "-OReleaseFast", .{
+        .reference_source = source.slice(),
+        .linked_source = layout.linked_source.slice(),
+        .object = layout.object.slice(),
+        .reference_executable = executable.slice(),
+        .linked_executable = layout.linked_executable.slice(),
+    }, &environment);
     defer reference.deinit(allocator);
     var generation_directory = try std.Io.Dir.cwd().openDir(io, layout.root.slice(), .{
         .access_sub_paths = true,
@@ -3317,18 +3190,13 @@ fn buildLinkedExecutable(
     const source = try BoundPath.absolute(&layout.linked_source);
     const object = try BoundPath.absolute(&layout.object);
     const executable = try BoundPath.absolute(&layout.linked_executable);
-    var linked_emit_buffer: [std.Io.Dir.max_path_bytes + 32]u8 = undefined;
-    const linked_emit = try std.fmt.bufPrint(&linked_emit_buffer, "-femit-bin={s}", .{executable.slice()});
-    const linked_argv = [_][]const u8{
-        zig_path,
-        "build-exe",
-        "-fno-lld",
-        source.slice(),
-        object.slice(),
-        "-OReleaseFast",
-        linked_emit,
-    };
-    var linked = try runBounded(allocator, io, &linked_argv, &environment);
+    var linked = try execution_cohort.buildLinked(allocator, io, zig_path, "-OReleaseFast", .{
+        .reference_source = layout.reference_source.slice(),
+        .linked_source = source.slice(),
+        .object = object.slice(),
+        .reference_executable = layout.reference_executable.slice(),
+        .linked_executable = executable.slice(),
+    }, &environment);
     defer linked.deinit(allocator);
     var generation_directory = try std.Io.Dir.cwd().openDir(io, layout.root.slice(), .{
         .access_sub_paths = true,
@@ -3375,18 +3243,9 @@ fn canonicalExecutionRecord(result: OwnedProcessResult, admission: CandidateAdmi
         .stderr_length = result.stderr.len,
         .exact_eof = true,
     });
-    if (!std.mem.eql(u8, result.stdout, expected_execution_stdout) or result.stderr.len != 0) {
-        return error.ProcessInconsistent;
-    }
-    return .{
-        .termination = termination,
-        .status = status,
-        .stdout_sha256 = sha256(result.stdout),
-        .stderr_sha256 = sha256(result.stderr),
-        .stdout_length = result.stdout.len,
-        .stderr_length = result.stderr.len,
-        .semantic_result = expected_result,
-        .call_occurrence = true,
+    return execution_cohort.canonicalExecutionRecord(result, expected_result, true) catch |failure| switch (failure) {
+        error.ChildOutputBoundExceeded => error.ChildOutputBoundExceeded,
+        else => error.ProcessInconsistent,
     };
 }
 

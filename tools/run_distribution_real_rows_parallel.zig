@@ -6,6 +6,8 @@ pub const mode_count = 3;
 pub const normalization_schema_version: u32 = 1;
 const monitor_interval_ns: u64 = std.time.ns_per_s;
 const modes = [_][]const u8{ "ReleaseFast", "ReleaseSafe", "ReleaseSmall" };
+const cohort_denominator_sha256 = "83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d";
+const cohort_functions = [_][]const u8{ "coff.Symbol.sizeOf", "coff.WeakExternalDefinition.sizeOf" };
 
 pub const Completed = struct {
     result: std.process.RunResult,
@@ -656,12 +658,20 @@ fn preserveFailureEvidence(allocator: std.mem.Allocator, io: std.Io, options: Pa
 fn validateWorkerOutput(output: []const u8, mode: []const u8) !void {
     var header_count: usize = 0;
     var cache_count: usize = 0;
+    var cohort_row_count: usize = 0;
+    var cohort_seen = [_]bool{false} ** cohort_functions.len;
     var summary_count: usize = 0;
     var lines = std.mem.splitScalar(u8, output, '\n');
     while (lines.next()) |line| {
         if (line.len == 0) continue;
         if (std.mem.startsWith(u8, line, "distribution-real-rows ")) {
             header_count += 1;
+            if (!std.mem.eql(u8, fieldValue(line, "candidate_file_hash=") orelse return error.RealRowsOutputMissingDenominator, cohort_denominator_sha256) or
+                !std.mem.eql(u8, fieldValue(line, "limit=") orelse return error.RealRowsOutputCounterMismatch, "100") or
+                !std.mem.eql(u8, fieldValue(line, "strict=") orelse return error.RealRowsOutputCounterMismatch, "true"))
+            {
+                return error.RealRowsOutputDenominatorMismatch;
+            }
             continue;
         }
         if (std.mem.startsWith(u8, line, "air-export-cache ")) {
@@ -670,21 +680,50 @@ fn validateWorkerOutput(output: []const u8, mode: []const u8) !void {
             if (!std.mem.eql(u8, fieldValue(line, "status=") orelse return error.RealRowsOutputMissingCacheStatus, "hit")) return error.RealRowsOutputCacheNotHit;
             continue;
         }
+        if (std.mem.startsWith(u8, line, "execution-cohort-row ")) {
+            cohort_row_count += 1;
+            if (!std.mem.eql(u8, fieldValue(line, "mode=") orelse return error.RealRowsOutputCohortModeMismatch, mode)) {
+                return error.RealRowsOutputCohortModeMismatch;
+            }
+            if (!std.mem.eql(u8, fieldValue(line, "schema=") orelse return error.RealRowsOutputCohortUnauthenticated, "distribution-execution-cohort-v1") or
+                !std.mem.eql(u8, fieldValue(line, "source=") orelse return error.RealRowsOutputCohortUnauthenticated, "../ziglang/src/main.zig") or
+                !std.mem.eql(u8, fieldValue(line, "result=") orelse return error.RealRowsOutputCohortUnauthenticated, "18") or
+                !std.mem.eql(u8, fieldValue(line, "witness=") orelse return error.RealRowsOutputCohortUnauthenticated, "61") or
+                !std.mem.eql(u8, fieldValue(line, "reference_status=") orelse return error.RealRowsOutputCohortUnauthenticated, "0") or
+                !std.mem.eql(u8, fieldValue(line, "linked_status=") orelse return error.RealRowsOutputCohortUnauthenticated, "0") or
+                !std.mem.eql(u8, fieldValue(line, "real_executed=") orelse return error.RealRowsOutputCohortUnauthenticated, "1") or
+                !std.mem.eql(u8, fieldValue(line, "real_programs_ok=") orelse return error.RealRowsOutputCohortUnauthenticated, "1"))
+            {
+                return error.RealRowsOutputCohortUnauthenticated;
+            }
+            const function = fieldValue(line, "function=") orelse return error.RealRowsOutputCohortUnauthenticated;
+            var matched = false;
+            for (cohort_functions, 0..) |expected, index| if (std.mem.eql(u8, function, expected)) {
+                if (cohort_seen[index]) return error.RealRowsOutputCohortDuplicate;
+                cohort_seen[index] = true;
+                matched = true;
+            };
+            if (!matched) return error.RealRowsOutputCohortUnauthenticated;
+            continue;
+        }
         if (std.mem.startsWith(u8, line, "summary distribution-real-rows ")) {
             summary_count += 1;
             if (!std.mem.eql(u8, fieldValue(line, "mode=") orelse return error.RealRowsOutputMissingSummaryMode, mode)) return error.RealRowsOutputSummaryModeMismatch;
             const required = [_][]const u8{
-                "counter_schema=distribution-real-rows-v2", "limit=100",                "candidate_rows=100",
-                "real_functions_lowered=100",               "real_objects_emitted=100", "real_native_linked=100",
-                "real_executed=0",                          "real_programs_ok=0",       "first_failing_real_row=-",
-                "first_failing_stage=-",                    "local_fail=0",
+                "counter_schema=distribution-real-rows-v2",          "limit=100",                  "candidate_rows=100",
+                "candidate_file_hash=" ++ cohort_denominator_sha256, "real_functions_lowered=100", "real_objects_emitted=100",
+                "real_native_linked=100",                            "real_executed=2",            "real_programs_ok=2",
+                "first_failing_real_row=-",                          "first_failing_stage=-",      "local_fail=0",
             };
             for (required) |field| if (std.mem.indexOf(u8, line, field) == null) return error.RealRowsOutputCounterMismatch;
             continue;
         }
         return error.RealRowsOutputUnexpectedRecord;
     }
-    if (header_count != 1 or cache_count != 1 or summary_count != 1) return error.RealRowsOutputTopologyMismatch;
+    if (header_count != 1 or cache_count != 1 or cohort_row_count != cohort_functions.len or summary_count != 1) {
+        return error.RealRowsOutputTopologyMismatch;
+    }
+    for (cohort_seen) |seen| if (!seen) return error.RealRowsOutputCohortMissing;
 }
 
 fn collectCompleted(
@@ -960,7 +999,7 @@ test "normalization removes only frozen volatile scheduling fields" {
     const input =
         "distribution-real-rows selector_version=real-candidate-selector-v2 candidate_file=x candidate_file_hash=abc limit=100 strict=true\n" ++
         "air-export-cache mode=ReleaseFast status=hit duration_ms=12 cache_key=key-fast descriptor_bytes=44\n" ++
-        "summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode=ReleaseFast candidate_file_hash=abc real_native_linked=100 real_programs_ok=0 local_fail=0\n" ++
+        "summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode=ReleaseFast candidate_file_hash=abc real_native_linked=100 real_programs_ok=2 local_fail=0\n" ++
         "real-rows-mode-parallel schema_version=1 wall_ms=9 root=owned/run local_fail=0\n" ++
         "air-export-cache mode=ReleaseSafe status=hit duration_ms=13 cache_key=key-safe descriptor_bytes=45\n" ++
         "air-export-cache mode=ReleaseSmall status=hit duration_ms=14 cache_key=key-small descriptor_bytes=46\n";
@@ -971,11 +1010,43 @@ test "normalization removes only frozen volatile scheduling fields" {
     try std.testing.expect(std.mem.indexOf(u8, normalized, "real-rows-mode-parallel") == null);
     try std.testing.expectEqual(@as(usize, 3), std.mem.count(u8, normalized, "duration_ms=<volatile>"));
     try std.testing.expect(std.mem.indexOf(u8, normalized, "candidate_file_hash=abc") != null);
-    try std.testing.expect(std.mem.indexOf(u8, normalized, "real_native_linked=100 real_programs_ok=0 local_fail=0") != null);
+    try std.testing.expect(std.mem.indexOf(u8, normalized, "real_native_linked=100 real_programs_ok=2 local_fail=0") != null);
     const fast = std.mem.indexOf(u8, normalized, "mode=ReleaseFast").?;
     const safe = std.mem.indexOf(u8, normalized, "mode=ReleaseSafe").?;
     const small = std.mem.indexOf(u8, normalized, "mode=ReleaseSmall").?;
     try std.testing.expect(fast < safe and safe < small);
+}
+
+fn syntheticCohortWorkerOutput(mode: []const u8, allocator: std.mem.Allocator) ![]u8 {
+    return std.fmt.allocPrint(
+        allocator,
+        "distribution-real-rows selector_version=real-candidate-selector-v2 candidate_file=docs/evidence/real_candidates_release_v2.tsv candidate_file_hash={s} limit=100 strict=true\n" ++
+            "air-export-cache mode={s} status=hit duration_ms=1 cache_key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa descriptor_bytes=1\n" ++
+            "execution-cohort-row schema=distribution-execution-cohort-v1 mode={s} source=../ziglang/src/main.zig function=coff.Symbol.sizeOf descriptor_sha256=a object_bytes=1 object_sha256=b reference_bytes=1 reference_sha256=c linked_bytes=1 linked_sha256=d result=18 witness=61 result_sha256=e reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
+            "execution-cohort-row schema=distribution-execution-cohort-v1 mode={s} source=../ziglang/src/main.zig function=coff.WeakExternalDefinition.sizeOf descriptor_sha256=f object_bytes=1 object_sha256=g reference_bytes=1 reference_sha256=h linked_bytes=1 linked_sha256=i result=18 witness=61 result_sha256=j reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
+            "summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode={s} selector_version=real-candidate-selector-v2 candidate_file_hash={s} limit=100 candidate_rows=100 real_functions_lowered=100 real_objects_emitted=100 real_native_linked=100 real_executed=2 real_programs_ok=2 first_failing_real_row=- first_failing_stage=- local_fail=0\n",
+        .{ cohort_denominator_sha256, mode, mode, mode, mode, cohort_denominator_sha256 },
+    );
+}
+
+test "cohort summary authentication rejects partial mode denominator and identity drift" {
+    const allocator = std.testing.allocator;
+    const valid = try syntheticCohortWorkerOutput("ReleaseFast", allocator);
+    defer allocator.free(valid);
+    try validateWorkerOutput(valid, "ReleaseFast");
+
+    const partial = try std.mem.replaceOwned(u8, allocator, valid, "real_executed=2 real_programs_ok=2", "real_executed=1 real_programs_ok=1");
+    defer allocator.free(partial);
+    try std.testing.expectError(error.RealRowsOutputCounterMismatch, validateWorkerOutput(partial, "ReleaseFast"));
+    const wrong_mode = try std.mem.replaceOwned(u8, allocator, valid, "mode=ReleaseFast source=", "mode=ReleaseSafe source=");
+    defer allocator.free(wrong_mode);
+    try std.testing.expectError(error.RealRowsOutputCohortModeMismatch, validateWorkerOutput(wrong_mode, "ReleaseFast"));
+    const wrong_denominator = try std.mem.replaceOwned(u8, allocator, valid, cohort_denominator_sha256, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    defer allocator.free(wrong_denominator);
+    try std.testing.expectError(error.RealRowsOutputDenominatorMismatch, validateWorkerOutput(wrong_denominator, "ReleaseFast"));
+    const duplicate = try std.mem.replaceOwned(u8, allocator, valid, "coff.WeakExternalDefinition.sizeOf", "coff.Symbol.sizeOf");
+    defer allocator.free(duplicate);
+    try std.testing.expectError(error.RealRowsOutputCohortDuplicate, validateWorkerOutput(duplicate, "ReleaseFast"));
 }
 
 test "resource state fails closed at disk and memory floors" {

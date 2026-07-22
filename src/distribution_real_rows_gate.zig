@@ -5,12 +5,18 @@ const codegen = @import("codegen.zig");
 const mc = @import("mc.zig");
 const target = @import("target.zig");
 const helpers = @import("uncurated_air_gate_helpers.zig");
+const execution_cohort = @import("distribution_execution_cohort_v1.zig");
 
 const selector_version = "real-candidate-selector-v2";
 const default_candidate_path = "docs/evidence/real_candidates_release_v2.tsv";
 const ziglang_pin_path = "docs/evidence/ziglang_pin.txt";
 const export_cache_dir = "tmp/real_rows_air_export_cache";
 const target_triple = "x86_64-unknown-linux-gnu";
+const cohort_denominator_sha256 = "83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d";
+const cohort_validation_root = "local-state/validations/o2-calls/production-execution-cohort-v1-development";
+const cohort_cache_root = "local-state/caches/o2-calls/production-execution-cohort-v1-development";
+const cohort_object_max_bytes = 16 * 1024 * 1024;
+const cohort_executable_max_bytes = 512 * 1024 * 1024;
 const Mode = helpers.Mode;
 
 pub const OracleAbiReturnShape = enum {
@@ -81,6 +87,7 @@ const Options = struct {
     require_cache_hit: bool = false,
     cache_probe_only: bool = false,
     runner_temp_root: ?[]const u8 = null,
+    export_cache_root: []const u8 = export_cache_dir,
 };
 
 const Candidate = struct {
@@ -110,6 +117,28 @@ const Counters = struct {
 
     fn hasFailure(self: Counters) bool {
         return self.first_failing_real_row != null;
+    }
+};
+
+const CohortTracker = struct {
+    executed: [execution_cohort.programs.len]bool = [_]bool{false} ** execution_cohort.programs.len,
+    accepted: [execution_cohort.programs.len]bool = [_]bool{false} ** execution_cohort.programs.len,
+
+    fn record(tracker: *CohortTracker, program: execution_cohort.Program, pair: execution_cohort.PairCounters) !void {
+        const index = @intFromEnum(program);
+        if (tracker.executed[index] or tracker.accepted[index] or pair.real_executed != 1 or pair.real_programs_ok != 1) {
+            return error.ExecutionCohortPartialCredit;
+        }
+        tracker.executed[index] = true;
+        tracker.accepted[index] = true;
+    }
+
+    fn finalize(tracker: CohortTracker, counters: *Counters) !void {
+        for (tracker.executed, tracker.accepted) |executed, accepted| {
+            if (!executed or !accepted) return error.ExecutionCohortPartialCredit;
+        }
+        counters.real_executed += execution_cohort.programs.len;
+        counters.real_programs_ok += execution_cohort.programs.len;
     }
 };
 
@@ -190,6 +219,8 @@ fn parseRawOptions(io: std.Io, raw_args: []const []const u8) !Options {
             options.candidate_path = arg["--candidate-file=".len..];
         } else if (std.mem.startsWith(u8, arg, "--runner-temp-root=")) {
             options.runner_temp_root = arg["--runner-temp-root=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--export-cache-root=")) {
+            options.export_cache_root = arg["--export-cache-root=".len..];
         } else {
             try validationError(io, "unexpected argument: {s}\n", .{arg});
         }
@@ -204,7 +235,50 @@ fn parseRawOptions(io: std.Io, raw_args: []const []const u8) !Options {
     if (options.runner_temp_root) |path| if (path.len == 0) {
         return error.EmptyRunnerTempRoot;
     };
+    if (options.export_cache_root.len == 0) return error.EmptyExportCacheRoot;
     return options;
+}
+
+fn cohortEnabled(options: Options) bool {
+    return options.strict and options.limit == 100 and !options.cache_probe_only and
+        std.mem.eql(u8, options.candidate_path, default_candidate_path);
+}
+
+fn cohortProgram(candidate: Candidate) ?execution_cohort.Program {
+    for (execution_cohort.programs) |program| {
+        if (std.mem.eql(u8, candidate.source, program.denominatorSource()) and
+            std.mem.eql(u8, candidate.function, program.functionName())) return program;
+    }
+    return null;
+}
+
+fn requireCohortDenominator(candidates: []const Candidate, candidate_hash: *const [64]u8) !void {
+    if (candidates.len != 100 or !std.mem.eql(u8, candidate_hash, cohort_denominator_sha256)) {
+        return error.ExecutionCohortDenominatorDrift;
+    }
+    var counts = [_]usize{0} ** execution_cohort.programs.len;
+    for (candidates) |candidate| if (cohortProgram(candidate)) |program| {
+        counts[@intFromEnum(program)] += 1;
+    };
+    for (counts) |count| if (count != 1) return error.ExecutionCohortMembershipMismatch;
+}
+
+fn requireCohortModeRoot(options: Options, mode: Mode) !void {
+    const runner_root = options.runner_temp_root orelse return error.ExecutionCohortRootMissing;
+    var expected_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const expected_prefix = try std.fmt.bufPrint(&expected_buffer, "{s}/{s}/", .{ cohort_validation_root, mode.name() });
+    if (!std.mem.startsWith(u8, runner_root, expected_prefix) or std.fs.path.isAbsolute(runner_root) or
+        std.mem.indexOf(u8, runner_root, "..") != null)
+    {
+        return error.ExecutionCohortRootInvalid;
+    }
+    var cache_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const cache_prefix = try std.fmt.bufPrint(&cache_buffer, "{s}/{s}/", .{ cohort_cache_root, mode.name() });
+    if (!std.mem.startsWith(u8, options.export_cache_root, cache_prefix) or std.fs.path.isAbsolute(options.export_cache_root) or
+        std.mem.indexOf(u8, options.export_cache_root, "..") != null)
+    {
+        return error.ExecutionCohortRootInvalid;
+    }
 }
 
 test "parallel worker arguments round-trip through the production parser" {
@@ -227,6 +301,47 @@ test "cache probe parser is fail-closed and rejects partial cache authority" {
     try std.testing.expect(parsed.cache_probe_only);
     try std.testing.expectError(error.CacheProbeRequiresModeAndRequiredHit, parseRawOptions(std.testing.io, &.{ "--mode=ReleaseFast", "--cache-probe-only" }));
     try std.testing.expectError(error.FreshExportConflictsWithRequiredCacheHit, parseRawOptions(std.testing.io, &.{ "--mode=ReleaseFast", "--fresh-export", "--require-cache-hit" }));
+}
+
+fn syntheticCohortCandidate(source: []const u8, function: []const u8) Candidate {
+    return .{
+        .rank = 999,
+        .source = source,
+        .function = function,
+        .instruction_count = 2,
+        .signature_class = "internal-callable",
+        .call_class = "leaf",
+        .global_refs = 0,
+        .runtime_refs = 0,
+        .determinism = "assumed_nondeterministic",
+        .harnessable_reason = "harnessable:leaf_no_refs_supported",
+    };
+}
+
+test "execution cohort denominator is exact rank independent and atomic" {
+    var candidates = [_]Candidate{syntheticCohortCandidate("other", "other")} ** 100;
+    candidates[17] = syntheticCohortCandidate("../ziglang/src/main.zig", "coff.Symbol.sizeOf");
+    candidates[83] = syntheticCohortCandidate("../ziglang/src/main.zig", "coff.WeakExternalDefinition.sizeOf");
+    var digest: [64]u8 = undefined;
+    @memcpy(&digest, cohort_denominator_sha256);
+    try requireCohortDenominator(&candidates, &digest);
+    candidates[83].function = "other";
+    try std.testing.expectError(error.ExecutionCohortMembershipMismatch, requireCohortDenominator(&candidates, &digest));
+    candidates[83] = candidates[17];
+    try std.testing.expectError(error.ExecutionCohortMembershipMismatch, requireCohortDenominator(&candidates, &digest));
+    digest[0] = if (digest[0] == '0') '1' else '0';
+    try std.testing.expectError(error.ExecutionCohortDenominatorDrift, requireCohortDenominator(&candidates, &digest));
+
+    var tracker: CohortTracker = .{};
+    try tracker.record(.symbol_size_of, .{ .real_executed = 1, .real_programs_ok = 1 });
+    var counters: Counters = .{ .mode = .ReleaseFast, .limit = 100, .candidate_rows = 100 };
+    try std.testing.expectError(error.ExecutionCohortPartialCredit, tracker.finalize(&counters));
+    try std.testing.expectEqual(@as(usize, 0), counters.real_executed);
+    try std.testing.expectEqual(@as(usize, 0), counters.real_programs_ok);
+    try tracker.record(.weak_external_definition_size_of, .{ .real_executed = 1, .real_programs_ok = 1 });
+    try tracker.finalize(&counters);
+    try std.testing.expectEqual(@as(usize, 2), counters.real_executed);
+    try std.testing.expectEqual(@as(usize, 2), counters.real_programs_ok);
 }
 
 fn parseMode(io: std.Io, text: []const u8) !Mode {
@@ -300,6 +415,12 @@ fn runMode(
         .limit = options.limit,
         .candidate_rows = candidates.len,
     };
+    const cohort_enabled = cohortEnabled(options);
+    if (cohort_enabled) {
+        try requireCohortDenominator(candidates, candidate_hash);
+        try requireCohortModeRoot(options, mode);
+    }
+    var cohort_tracker: CohortTracker = .{};
 
     const temp = if (options.runner_temp_root) |path|
         try TempDir.useRunnerOwned(allocator, io, path)
@@ -310,6 +431,10 @@ fn runMode(
     defer allocator.free(descriptor_path);
     const zig_cache_path = try temp.join(allocator, "zig-cache");
     defer allocator.free(zig_cache_path);
+    const cohort_source_initial = if (cohort_enabled)
+        try observeCohortSourceIdentity(allocator, io, temp.path)
+    else
+        null;
     const zig_emitter = try readStage4Emitter(allocator, io, init);
     defer allocator.free(zig_emitter);
 
@@ -324,6 +449,7 @@ fn runMode(
         descriptor_path,
         zig_cache_path,
         zig_emitter,
+        options.export_cache_root,
     ) orelse {
         if (options.require_cache_hit) return error.RealRowsCacheHitRequired;
         for (candidates) |candidate| try setFirstFailure(allocator, &counters, candidate, "air-export");
@@ -332,9 +458,45 @@ fn runMode(
     defer allocator.free(descriptor);
     if (options.cache_probe_only) return counters;
     for (candidates) |candidate| {
-        try runCandidate(allocator, io, init, stdout, mode, temp, descriptor, candidate, candidate_hash, &counters, zig_emitter);
+        try runCandidate(
+            allocator,
+            io,
+            init,
+            stdout,
+            mode,
+            temp,
+            descriptor,
+            candidate,
+            candidate_hash,
+            &counters,
+            zig_emitter,
+            if (cohort_enabled) &cohort_tracker else null,
+        );
+    }
+    if (cohort_enabled and !counters.hasFailure()) {
+        const cohort_source_final = try observeCohortSourceIdentity(allocator, io, temp.path);
+        if (!std.meta.eql(cohort_source_initial.?, cohort_source_final)) return error.ExecutionCohortSourceDrift;
+        try cohort_tracker.finalize(&counters);
     }
     return counters;
+}
+
+fn observeCohortSourceIdentity(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    temporary_root: []const u8,
+) !execution_cohort.SourceIdentity {
+    var environment = try execution_cohort.closedEnvironment(allocator, .{
+        .home = temporary_root,
+        .temporary = temporary_root,
+        .local_cache = temporary_root,
+        .global_cache = temporary_root,
+    });
+    defer environment.deinit();
+    try execution_cohort.requireExternalRepositoryClean(allocator, io, &environment);
+    var sources = try execution_cohort.readCurrentSources(allocator, io, 32 * 1024 * 1024);
+    defer sources.deinit(allocator);
+    return sources.identity();
 }
 
 fn loadOrExportDescriptor(
@@ -348,6 +510,7 @@ fn loadOrExportDescriptor(
     descriptor_path: []const u8,
     zig_cache_path: []const u8,
     zig_emitter: []const u8,
+    selected_export_cache_root: []const u8,
 ) !?[]u8 {
     const ziglang_pin = try readZiglangPin(allocator, io);
     defer allocator.free(ziglang_pin);
@@ -366,7 +529,7 @@ fn loadOrExportDescriptor(
 
     if (!options.fresh_export) {
         const cache_start = std.Io.Timestamp.now(io, .awake);
-        if (try loadCachedDescriptor(allocator, io, &cache_key, cache_key_text, mode, candidates)) |descriptor| {
+        if (try loadCachedDescriptor(allocator, io, selected_export_cache_root, &cache_key, cache_key_text, mode, candidates)) |descriptor| {
             try printCacheEvent(stdout, mode, "hit", elapsedMs(io, cache_start), &cache_key, descriptor.len);
             return descriptor;
         }
@@ -374,7 +537,7 @@ fn loadOrExportDescriptor(
             try printCacheEvent(stdout, mode, "miss-read-only", elapsedMs(io, cache_start), &cache_key, 0);
             return null;
         }
-        try pruneOldPinCacheEntries(allocator, io, ziglang_pin);
+        try pruneOldPinCacheEntries(allocator, io, selected_export_cache_root, ziglang_pin);
     }
 
     const export_start = std.Io.Timestamp.now(io, .awake);
@@ -417,7 +580,7 @@ fn loadOrExportDescriptor(
         try printCacheEvent(stdout, mode, "export-invalid", duration_ms, &cache_key, descriptor.len);
         return null;
     }
-    try storeCachedDescriptor(allocator, io, &cache_key, cache_key_text, ziglang_pin, &z_llvm_export_state, mode, descriptor);
+    try storeCachedDescriptor(allocator, io, selected_export_cache_root, &cache_key, cache_key_text, ziglang_pin, &z_llvm_export_state, mode, descriptor);
     try printCacheEvent(stdout, mode, if (options.fresh_export) "fresh-export" else "miss-export", duration_ms, &cache_key, descriptor.len);
     return descriptor;
 }
@@ -425,14 +588,15 @@ fn loadOrExportDescriptor(
 fn loadCachedDescriptor(
     allocator: std.mem.Allocator,
     io: std.Io,
+    selected_export_cache_root: []const u8,
     cache_key: *const [64]u8,
     cache_key_text: []const u8,
     mode: Mode,
     candidates: []const Candidate,
 ) !?[]u8 {
-    const meta_path = try cachePath(allocator, cache_key, ".meta");
+    const meta_path = try cachePath(allocator, selected_export_cache_root, cache_key, ".meta");
     defer allocator.free(meta_path);
-    const descriptor_path = try cachePath(allocator, cache_key, ".air");
+    const descriptor_path = try cachePath(allocator, selected_export_cache_root, cache_key, ".air");
     defer allocator.free(descriptor_path);
 
     const meta = std.Io.Dir.cwd().readFileAlloc(io, meta_path, allocator, .limited(64 * 1024)) catch return null;
@@ -451,6 +615,7 @@ fn loadCachedDescriptor(
 fn storeCachedDescriptor(
     allocator: std.mem.Allocator,
     io: std.Io,
+    selected_export_cache_root: []const u8,
     cache_key: *const [64]u8,
     cache_key_text: []const u8,
     ziglang_pin: []const u8,
@@ -459,10 +624,10 @@ fn storeCachedDescriptor(
     descriptor: []const u8,
 ) !void {
     var cwd = std.Io.Dir.cwd();
-    try cwd.createDirPath(io, export_cache_dir);
-    const descriptor_path = try cachePath(allocator, cache_key, ".air");
+    try cwd.createDirPath(io, selected_export_cache_root);
+    const descriptor_path = try cachePath(allocator, selected_export_cache_root, cache_key, ".air");
     defer allocator.free(descriptor_path);
-    const meta_path = try cachePath(allocator, cache_key, ".meta");
+    const meta_path = try cachePath(allocator, selected_export_cache_root, cache_key, ".meta");
     defer allocator.free(meta_path);
 
     const descriptor_hash = sha256Hex(descriptor);
@@ -497,8 +662,8 @@ fn metadataValue(meta: []const u8, key: []const u8) ?[]const u8 {
     return null;
 }
 
-fn pruneOldPinCacheEntries(allocator: std.mem.Allocator, io: std.Io, current_pin: []const u8) !void {
-    var cache_dir = std.Io.Dir.cwd().openDir(io, export_cache_dir, .{ .iterate = true }) catch |err| switch (err) {
+fn pruneOldPinCacheEntries(allocator: std.mem.Allocator, io: std.Io, selected_export_cache_root: []const u8, current_pin: []const u8) !void {
+    var cache_dir = std.Io.Dir.cwd().openDir(io, selected_export_cache_root, .{ .iterate = true }) catch |err| switch (err) {
         error.FileNotFound => return,
         else => return err,
     };
@@ -508,9 +673,9 @@ fn pruneOldPinCacheEntries(allocator: std.mem.Allocator, io: std.Io, current_pin
     while (try iter.next(io)) |entry| {
         if (entry.kind != .file or !std.mem.endsWith(u8, entry.name, ".meta")) continue;
         const stem = entry.name[0 .. entry.name.len - ".meta".len];
-        const meta_path = try std.fmt.allocPrint(allocator, "{s}/{s}.meta", .{ export_cache_dir, stem });
+        const meta_path = try std.fmt.allocPrint(allocator, "{s}/{s}.meta", .{ selected_export_cache_root, stem });
         defer allocator.free(meta_path);
-        const air_path = try std.fmt.allocPrint(allocator, "{s}/{s}.air", .{ export_cache_dir, stem });
+        const air_path = try std.fmt.allocPrint(allocator, "{s}/{s}.air", .{ selected_export_cache_root, stem });
         defer allocator.free(air_path);
 
         const meta = std.Io.Dir.cwd().readFileAlloc(io, meta_path, allocator, .limited(64 * 1024)) catch continue;
@@ -523,8 +688,8 @@ fn pruneOldPinCacheEntries(allocator: std.mem.Allocator, io: std.Io, current_pin
     }
 }
 
-fn cachePath(allocator: std.mem.Allocator, cache_key: *const [64]u8, suffix: []const u8) ![]const u8 {
-    return std.fmt.allocPrint(allocator, "{s}/{s}{s}", .{ export_cache_dir, cache_key, suffix });
+fn cachePath(allocator: std.mem.Allocator, selected_export_cache_root: []const u8, cache_key: *const [64]u8, suffix: []const u8) ![]const u8 {
+    return std.fmt.allocPrint(allocator, "{s}/{s}{s}", .{ selected_export_cache_root, cache_key, suffix });
 }
 
 fn descriptorLooksValid(
@@ -675,6 +840,196 @@ fn printCacheEvent(
     try writer.flush();
 }
 
+const CohortPaths = struct {
+    root: []u8,
+    home: []u8,
+    temporary: []u8,
+    local_cache: []u8,
+    global_cache: []u8,
+    reference_source: []u8,
+    linked_source: []u8,
+    reference_executable: []u8,
+    linked_executable: []u8,
+
+    fn init(allocator: std.mem.Allocator, io: std.Io, temp: TempDir, program: execution_cohort.Program) !CohortPaths {
+        const cohort_root = try temp.join(allocator, "execution-cohort-v1");
+        defer allocator.free(cohort_root);
+        try std.Io.Dir.cwd().createDirPath(io, cohort_root);
+        const root = try std.fs.path.join(allocator, &.{ cohort_root, program.functionName() });
+        errdefer allocator.free(root);
+        try std.Io.Dir.cwd().createDir(io, root, .default_dir);
+        const home = try std.fs.path.join(allocator, &.{ root, "home" });
+        errdefer allocator.free(home);
+        const temporary = try std.fs.path.join(allocator, &.{ root, "tmp" });
+        errdefer allocator.free(temporary);
+        const local_cache = try std.fs.path.join(allocator, &.{ root, "zig-local-cache" });
+        errdefer allocator.free(local_cache);
+        const global_cache = try std.fs.path.join(allocator, &.{ root, "zig-global-cache" });
+        errdefer allocator.free(global_cache);
+        const reference_source = try std.fs.path.join(allocator, &.{ root, "reference.zig" });
+        errdefer allocator.free(reference_source);
+        const linked_source = try std.fs.path.join(allocator, &.{ root, "linked.zig" });
+        errdefer allocator.free(linked_source);
+        const reference_executable = try std.fs.path.join(allocator, &.{ root, "reference" });
+        errdefer allocator.free(reference_executable);
+        const linked_executable = try std.fs.path.join(allocator, &.{ root, "linked" });
+        errdefer allocator.free(linked_executable);
+        for ([_][]const u8{ home, temporary, local_cache, global_cache }) |path| {
+            try std.Io.Dir.cwd().createDir(io, path, .default_dir);
+        }
+        return .{
+            .root = root,
+            .home = home,
+            .temporary = temporary,
+            .local_cache = local_cache,
+            .global_cache = global_cache,
+            .reference_source = reference_source,
+            .linked_source = linked_source,
+            .reference_executable = reference_executable,
+            .linked_executable = linked_executable,
+        };
+    }
+
+    fn deinit(paths: *CohortPaths, allocator: std.mem.Allocator) void {
+        allocator.free(paths.linked_executable);
+        allocator.free(paths.reference_executable);
+        allocator.free(paths.linked_source);
+        allocator.free(paths.reference_source);
+        allocator.free(paths.global_cache);
+        allocator.free(paths.local_cache);
+        allocator.free(paths.temporary);
+        allocator.free(paths.home);
+        allocator.free(paths.root);
+        paths.* = undefined;
+    }
+};
+
+fn cohortOptimizeArg(mode: Mode) []const u8 {
+    return switch (mode) {
+        .ReleaseFast => "-OReleaseFast",
+        .ReleaseSafe => "-OReleaseSafe",
+        .ReleaseSmall => "-OReleaseSmall",
+    };
+}
+
+fn absolutePath(allocator: std.mem.Allocator, path: []const u8) ![]u8 {
+    return std.fs.path.resolve(allocator, &.{ execution_cohort.repository_root, path });
+}
+
+fn runCohortPair(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    stdout: *std.Io.Writer,
+    mode: Mode,
+    temp: TempDir,
+    program: execution_cohort.Program,
+    filtered_descriptor: []const u8,
+    object: []const u8,
+    object_path: []const u8,
+    zig_emitter: []const u8,
+) !execution_cohort.PairCounters {
+    if (!std.fs.path.isAbsolute(zig_emitter)) return error.ExecutionCohortSelectorInvalid;
+    var paths = try CohortPaths.init(allocator, io, temp, program);
+    defer paths.deinit(allocator);
+    const home = try absolutePath(allocator, paths.home);
+    defer allocator.free(home);
+    const temporary = try absolutePath(allocator, paths.temporary);
+    defer allocator.free(temporary);
+    const local_cache = try absolutePath(allocator, paths.local_cache);
+    defer allocator.free(local_cache);
+    const global_cache = try absolutePath(allocator, paths.global_cache);
+    defer allocator.free(global_cache);
+    const reference_source = try absolutePath(allocator, paths.reference_source);
+    defer allocator.free(reference_source);
+    const linked_source = try absolutePath(allocator, paths.linked_source);
+    defer allocator.free(linked_source);
+    const absolute_object = try absolutePath(allocator, object_path);
+    defer allocator.free(absolute_object);
+    const reference_executable = try absolutePath(allocator, paths.reference_executable);
+    defer allocator.free(reference_executable);
+    const linked_executable = try absolutePath(allocator, paths.linked_executable);
+    defer allocator.free(linked_executable);
+    const build_paths: execution_cohort.BuildPaths = .{
+        .reference_source = reference_source,
+        .linked_source = linked_source,
+        .object = absolute_object,
+        .reference_executable = reference_executable,
+        .linked_executable = linked_executable,
+    };
+    var environment = try execution_cohort.closedEnvironment(allocator, .{
+        .home = home,
+        .temporary = temporary,
+        .local_cache = local_cache,
+        .global_cache = global_cache,
+    });
+    defer environment.deinit();
+    const selector_initial = try execution_cohort.observeSelector(allocator, io, zig_emitter, &environment);
+    try execution_cohort.requireSelector(selector_initial);
+    try execution_cohort.writeHarnesses(io, program, build_paths);
+
+    var reference_build = try execution_cohort.buildReference(allocator, io, zig_emitter, cohortOptimizeArg(mode), build_paths, &environment);
+    defer reference_build.deinit(allocator);
+    try execution_cohort.requireExitedZero(reference_build);
+    var linked_build = try execution_cohort.buildLinked(allocator, io, zig_emitter, cohortOptimizeArg(mode), build_paths, &environment);
+    defer linked_build.deinit(allocator);
+    try execution_cohort.requireExitedZero(linked_build);
+
+    const object_identity = try execution_cohort.observeArtifact(allocator, io, absolute_object, false, cohort_object_max_bytes);
+    const expected_object_sha = execution_cohort.sha256(object);
+    if (object_identity.length != object.len or !std.mem.eql(u8, &object_identity.sha256, &expected_object_sha)) {
+        return error.ExecutionCohortObjectMismatch;
+    }
+    const reference_identity = try execution_cohort.observeArtifact(allocator, io, reference_executable, true, cohort_executable_max_bytes);
+    const linked_identity = try execution_cohort.observeArtifact(allocator, io, linked_executable, true, cohort_executable_max_bytes);
+    var reference_result = try execution_cohort.runBounded(allocator, io, &.{reference_executable}, &environment);
+    defer reference_result.deinit(allocator);
+    var linked_result = try execution_cohort.runBounded(allocator, io, &.{linked_executable}, &environment);
+    defer linked_result.deinit(allocator);
+    const reference_record = try execution_cohort.canonicalExecutionRecord(reference_result, execution_cohort.expected_result, true);
+    const linked_record = try execution_cohort.canonicalExecutionRecord(linked_result, execution_cohort.expected_result, true);
+    var pair: execution_cohort.PairCounters = .{};
+    try pair.noteBothExecuted(reference_record, linked_record);
+    try pair.noteOracleAccepted(reference_record, linked_record);
+
+    const selector_final = try execution_cohort.observeSelector(allocator, io, zig_emitter, &environment);
+    try execution_cohort.requireSelector(selector_final);
+    if (!std.meta.eql(selector_initial, selector_final) or
+        !std.meta.eql(object_identity, try execution_cohort.observeArtifact(allocator, io, absolute_object, false, cohort_object_max_bytes)) or
+        !std.meta.eql(reference_identity, try execution_cohort.observeArtifact(allocator, io, reference_executable, true, cohort_executable_max_bytes)) or
+        !std.meta.eql(linked_identity, try execution_cohort.observeArtifact(allocator, io, linked_executable, true, cohort_executable_max_bytes)))
+    {
+        return error.ExecutionCohortIdentityDrift;
+    }
+    const descriptor_hex = std.fmt.bytesToHex(execution_cohort.sha256(filtered_descriptor), .lower);
+    const object_hex = std.fmt.bytesToHex(object_identity.sha256, .lower);
+    const reference_hex = std.fmt.bytesToHex(reference_identity.sha256, .lower);
+    const linked_hex = std.fmt.bytesToHex(linked_identity.sha256, .lower);
+    const result_hex = std.fmt.bytesToHex(reference_record.stdout_sha256, .lower);
+    try stdout.print(
+        "execution-cohort-row schema={s} mode={s} source={s} function={s} descriptor_sha256={s} object_bytes={} object_sha256={s} reference_bytes={} reference_sha256={s} linked_bytes={} linked_sha256={s} result={} witness={} result_sha256={s} reference_status={} linked_status={} real_executed=1 real_programs_ok=1\n",
+        .{
+            execution_cohort.schema,
+            mode.name(),
+            program.denominatorSource(),
+            program.functionName(),
+            &descriptor_hex,
+            object_identity.length,
+            &object_hex,
+            reference_identity.length,
+            &reference_hex,
+            linked_identity.length,
+            &linked_hex,
+            execution_cohort.expected_result,
+            execution_cohort.expected_witness,
+            &result_hex,
+            reference_record.status,
+            linked_record.status,
+        },
+    );
+    try stdout.flush();
+    return pair;
+}
+
 fn runCandidate(
     allocator: std.mem.Allocator,
     io: std.Io,
@@ -687,6 +1042,7 @@ fn runCandidate(
     candidate_hash: *const [64]u8,
     counters: *Counters,
     zig_emitter: []const u8,
+    cohort_tracker: ?*CohortTracker,
 ) !void {
     const filtered = extractOracleFunctionDescriptor(allocator, descriptor, candidate.function) catch |err| {
         try recordFailure(allocator, stdout, counters, mode, candidate, "air-extract", @errorName(err));
@@ -732,11 +1088,27 @@ fn runCandidate(
         return;
     }
     counters.real_native_linked += 1;
-
-    // This gate has no behavioral reference executable. A candidate-only zero
-    // exit proves neither an output match nor a whole-program match, so the v2
-    // counter schema deliberately ends at native-link evidence. The separate
-    // compiler-rt ABI differential gate owns its own paired-execution counters.
+    if (cohort_tracker) |tracker| if (cohortProgram(candidate)) |program| {
+        const pair = runCohortPair(
+            allocator,
+            io,
+            stdout,
+            mode,
+            temp,
+            program,
+            filtered,
+            object,
+            object_path,
+            zig_emitter,
+        ) catch |failure| {
+            try recordFailure(allocator, stdout, counters, mode, candidate, "paired-execution", @errorName(failure));
+            return;
+        };
+        tracker.record(program, pair) catch |failure| {
+            try recordFailure(allocator, stdout, counters, mode, candidate, "paired-execution-credit", @errorName(failure));
+            return;
+        };
+    };
 }
 
 pub const OracleObjectFailure = struct {
