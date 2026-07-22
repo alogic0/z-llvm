@@ -3,7 +3,7 @@ const common = @import("tool_common.zig");
 const policy_authority = @import("distribution_real_rows_parallel_policy.zig");
 
 pub const mode_count = 3;
-pub const normalization_schema_version: u32 = 1;
+pub const normalization_schema_version: u32 = policy_authority.schema_version;
 const monitor_interval_ns: u64 = std.time.ns_per_s;
 const modes = [_][]const u8{ "ReleaseFast", "ReleaseSafe", "ReleaseSmall" };
 const cohort_denominator_sha256 = "83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d";
@@ -18,11 +18,13 @@ pub const Evidence = struct {
     concurrency: u8,
     run_id: [32]u8,
     root: []u8,
+    work_selection_root: []u8,
+    export_cache_selection_root: []u8,
     pin_manifest_sha256: [64]u8,
     wall_ms: i96,
     summed_child_ms: i96,
     filesystem_total_bytes: u64,
-    floor_bytes: u64,
+    post_run_free_floor_bytes: u64,
     projected_peak_bytes: u64,
     required_start_bytes: u64,
     starting_free_bytes: u64,
@@ -37,6 +39,8 @@ pub const Evidence = struct {
     pub fn deinit(evidence: *Evidence, allocator: std.mem.Allocator) void {
         allocator.free(evidence.load_end);
         allocator.free(evidence.load_start);
+        allocator.free(evidence.export_cache_selection_root);
+        allocator.free(evidence.work_selection_root);
         allocator.free(evidence.root);
         evidence.* = undefined;
     }
@@ -65,6 +69,7 @@ pub const GroupResult = struct {
 pub const ParentOptions = struct {
     target_assignment: []const u8,
     scratch_path: []const u8,
+    export_cache_path: ?[]const u8 = null,
     concurrency: u8,
     test_options: ?*TestOptions = null,
 };
@@ -74,12 +79,14 @@ const ModePaths = struct {
     work: []u8,
     local_cache: []u8,
     global_cache: []u8,
+    export_cache: []u8,
     result: []u8,
     log: []u8,
 
     fn deinit(paths: *ModePaths, allocator: std.mem.Allocator) void {
         allocator.free(paths.log);
         allocator.free(paths.result);
+        allocator.free(paths.export_cache);
         allocator.free(paths.global_cache);
         allocator.free(paths.local_cache);
         allocator.free(paths.work);
@@ -95,9 +102,13 @@ const OwnedPaths = struct {
     root: []u8,
     stop: []u8,
     pin_manifest: []u8,
+    failure_root: []u8,
     mode_paths: [mode_count]ModePaths,
 
-    fn init(allocator: std.mem.Allocator, io: std.Io, scratch_path: []const u8) !OwnedPaths {
+    fn init(allocator: std.mem.Allocator, io: std.Io, scratch_path: []const u8, export_cache_path: []const u8) !OwnedPaths {
+        const scratch_owner = try requireCanonicalContractBase(io, scratch_path);
+        const cache_owner = try requireCanonicalContractBase(io, export_cache_path);
+        if (!std.mem.eql(u8, scratch_owner, cache_owner)) return error.RealRowsRootSelectionMismatch;
         var random_bytes: [16]u8 = undefined;
         var cwd = std.Io.Dir.cwd();
         var root: []u8 = undefined;
@@ -127,37 +138,122 @@ const OwnedPaths = struct {
         errdefer allocator.free(stop);
         const pin_manifest = try std.fs.path.join(allocator, &.{ root, "live_pins.tsv" });
         errdefer allocator.free(pin_manifest);
+        const failure_root = try std.fs.path.join(allocator, &.{ scratch_path, "failures" });
+        errdefer allocator.free(failure_root);
         var initialized: usize = 0;
         var mode_paths: [mode_count]ModePaths = undefined;
-        errdefer for (mode_paths[0..initialized]) |*paths| paths.deinit(allocator);
+        errdefer for (mode_paths[0..initialized]) |*paths| {
+            cwd.deleteTree(io, paths.work) catch {};
+            paths.deinit(allocator);
+        };
         for (&mode_paths, modes) |*paths, mode| {
             const mode_root = try std.fs.path.join(allocator, &.{ root, mode });
             errdefer allocator.free(mode_root);
             try cwd.createDir(io, mode_root, .default_dir);
-            const work = try createOwnedSubdir(allocator, io, mode_root, "work");
+            const work_parent = try std.fs.path.join(allocator, &.{ scratch_path, mode });
+            defer allocator.free(work_parent);
+            try cwd.createDirPath(io, work_parent);
+            const work_name = try std.fmt.allocPrint(allocator, "work_{s}", .{&run_id});
+            defer allocator.free(work_name);
+            const work = try createOwnedSubdir(allocator, io, work_parent, work_name);
+            errdefer cwd.deleteTree(io, work) catch {};
             errdefer allocator.free(work);
+            const work_owner = try requireCanonicalModeOwnedDirectory(io, work, mode);
+            if (!std.mem.eql(u8, work_owner, scratch_owner)) return error.RealRowsRootSelectionMismatch;
             const local_cache = try createOwnedSubdir(allocator, io, mode_root, "zig-local-cache");
             errdefer allocator.free(local_cache);
             const global_cache = try createOwnedSubdir(allocator, io, mode_root, "zig-global-cache");
             errdefer allocator.free(global_cache);
+            const export_cache = try std.fs.path.join(allocator, &.{ export_cache_path, mode, "export" });
+            errdefer allocator.free(export_cache);
+            const export_owner = try requireCanonicalModeOwnedDirectory(io, export_cache, mode);
+            if (!std.mem.eql(u8, export_owner, cache_owner)) return error.RealRowsRootSelectionMismatch;
             const result = try std.fs.path.join(allocator, &.{ mode_root, "result.txt" });
             errdefer allocator.free(result);
             const log = try std.fs.path.join(allocator, &.{ mode_root, "worker.log" });
-            paths.* = .{ .root = mode_root, .work = work, .local_cache = local_cache, .global_cache = global_cache, .result = result, .log = log };
+            paths.* = .{ .root = mode_root, .work = work, .local_cache = local_cache, .global_cache = global_cache, .export_cache = export_cache, .result = result, .log = log };
             initialized += 1;
         }
-        return .{ .allocator = allocator, .io = io, .run_id = run_id, .root = root, .stop = stop, .pin_manifest = pin_manifest, .mode_paths = mode_paths };
+        return .{ .allocator = allocator, .io = io, .run_id = run_id, .root = root, .stop = stop, .pin_manifest = pin_manifest, .failure_root = failure_root, .mode_paths = mode_paths };
     }
 
     fn deinit(paths: *OwnedPaths) void {
         std.Io.Dir.cwd().deleteTree(paths.io, paths.root) catch {};
-        for (&paths.mode_paths) |*mode_path| mode_path.deinit(paths.allocator);
+        for (&paths.mode_paths) |*mode_path| {
+            std.Io.Dir.cwd().deleteTree(paths.io, mode_path.work) catch {};
+            mode_path.deinit(paths.allocator);
+        }
+        paths.allocator.free(paths.failure_root);
         paths.allocator.free(paths.pin_manifest);
         paths.allocator.free(paths.stop);
         paths.allocator.free(paths.root);
         paths.* = undefined;
     }
 };
+
+fn requireCanonicalContractBase(io: std.Io, path: []const u8) ![]const u8 {
+    if (path.len == 0 or std.fs.path.isAbsolute(path) or path[path.len - 1] == '/') return error.RealRowsRootSelectionInvalid;
+    var last: ?[]const u8 = null;
+    var parts = std.mem.splitScalar(u8, path, '/');
+    var current = std.Io.Dir.cwd();
+    var current_owned = false;
+    defer if (current_owned) current.close(io);
+    while (parts.next()) |part| {
+        if (part.len == 0 or std.mem.eql(u8, part, ".") or std.mem.eql(u8, part, "..") or
+            std.mem.indexOfScalar(u8, part, 0) != null)
+        {
+            return error.RealRowsRootSelectionInvalid;
+        }
+        for (modes) |mode| if (std.mem.eql(u8, part, mode)) return error.RealRowsRootSelectionModeMismatch;
+        const next = current.openDir(io, part, .{ .access_sub_paths = true, .iterate = false, .follow_symlinks = false }) catch {
+            return error.RealRowsRootSelectionInvalid;
+        };
+        if (current_owned) current.close(io);
+        current = next;
+        current_owned = true;
+        last = part;
+    }
+    return last orelse error.RealRowsRootSelectionInvalid;
+}
+
+fn requireCanonicalModeOwnedDirectory(io: std.Io, path: []const u8, mode: []const u8) ![]const u8 {
+    if (path.len == 0 or std.fs.path.isAbsolute(path) or path[path.len - 1] == '/') return error.RealRowsRootSelectionInvalid;
+    var previous_previous: ?[]const u8 = null;
+    var previous: ?[]const u8 = null;
+    var selected_mode_count: usize = 0;
+    var parts = std.mem.splitScalar(u8, path, '/');
+    var current = std.Io.Dir.cwd();
+    var current_owned = false;
+    defer if (current_owned) current.close(io);
+    while (parts.next()) |part| {
+        if (part.len == 0 or std.mem.eql(u8, part, ".") or std.mem.eql(u8, part, "..") or
+            std.mem.indexOfScalar(u8, part, 0) != null)
+        {
+            return error.RealRowsRootSelectionInvalid;
+        }
+        for (modes) |known_mode| if (std.mem.eql(u8, part, known_mode)) {
+            if (!std.mem.eql(u8, known_mode, mode)) return error.RealRowsRootSelectionModeMismatch;
+            selected_mode_count += 1;
+        };
+        const next = current.openDir(io, part, .{ .access_sub_paths = true, .iterate = false, .follow_symlinks = false }) catch {
+            return error.RealRowsRootSelectionInvalid;
+        };
+        if (current_owned) current.close(io);
+        current = next;
+        current_owned = true;
+        previous_previous = previous;
+        previous = part;
+    }
+    _ = previous orelse return error.RealRowsRootSelectionInvalid;
+    const mode_component = previous_previous orelse return error.RealRowsRootSelectionInvalid;
+    if (!std.mem.eql(u8, mode_component, mode) or selected_mode_count != 1) return error.RealRowsRootSelectionModeMismatch;
+    const mode_start = @intFromPtr(mode_component.ptr) - @intFromPtr(path.ptr);
+    if (mode_start == 0 or path[mode_start - 1] != '/') return error.RealRowsRootSelectionInvalid;
+    const owner_end = mode_start - 1;
+    const owner_start = if (std.mem.lastIndexOfScalar(u8, path[0..owner_end], '/')) |slash| slash + 1 else 0;
+    if (owner_start == owner_end) return error.RealRowsRootSelectionInvalid;
+    return path[owner_start..owner_end];
+}
 
 fn createOwnedSubdir(allocator: std.mem.Allocator, io: std.Io, root: []const u8, name: []const u8) ![]u8 {
     const path = try std.fs.path.join(allocator, &.{ root, name });
@@ -204,6 +300,7 @@ fn buildWorkerArgv(allocator: std.mem.Allocator, target_assignment: []const u8, 
     try storage.argv.appendSlice(allocator, &.{ "--strict", "--limit=100", "--require-cache-hit" });
     if (probe_only) try storage.argv.append(allocator, "--cache-probe-only");
     try storage.addOwned("--runner-temp-root={s}", .{paths.work});
+    try storage.addOwned("--export-cache-root={s}", .{paths.export_cache});
     return storage;
 }
 
@@ -223,7 +320,7 @@ fn metadataValue(meta: []const u8, key: []const u8) ?[]const u8 {
     return null;
 }
 
-fn parseProbeOutput(allocator: std.mem.Allocator, io: std.Io, output: []const u8, mode: []const u8) !CachePin {
+fn parseProbeOutput(allocator: std.mem.Allocator, io: std.Io, output: []const u8, mode: []const u8, export_cache_root: []const u8) !CachePin {
     var cache_line: ?[]const u8 = null;
     var probe_summary = false;
     var lines = std.mem.splitScalar(u8, output, '\n');
@@ -241,7 +338,7 @@ fn parseProbeOutput(allocator: std.mem.Allocator, io: std.Io, output: []const u8
     const key_text = fieldValue(line, "cache_key=") orelse return error.RealRowsProbeMissingKey;
     if (key_text.len != 64) return error.RealRowsProbeInvalidKey;
     const bytes_text = fieldValue(line, "descriptor_bytes=") orelse return error.RealRowsProbeMissingBytes;
-    const meta_path = try std.fmt.allocPrint(allocator, "tmp/real_rows_air_export_cache/{s}.meta", .{key_text});
+    const meta_path = try std.fmt.allocPrint(allocator, "{s}/{s}.meta", .{ export_cache_root, key_text });
     defer allocator.free(meta_path);
     const meta = try std.Io.Dir.cwd().readFileAlloc(io, meta_path, allocator, .limited(64 * 1024));
     defer allocator.free(meta);
@@ -253,8 +350,8 @@ fn parseProbeOutput(allocator: std.mem.Allocator, io: std.Io, output: []const u8
     return pin;
 }
 
-fn verifyPin(allocator: std.mem.Allocator, io: std.Io, pin: CachePin) !void {
-    const air_path = try std.fmt.allocPrint(allocator, "tmp/real_rows_air_export_cache/{s}.air", .{&pin.key});
+fn verifyPin(allocator: std.mem.Allocator, io: std.Io, pin: CachePin, export_cache_root: []const u8) !void {
+    const air_path = try std.fmt.allocPrint(allocator, "{s}/{s}.air", .{ export_cache_root, &pin.key });
     defer allocator.free(air_path);
     const descriptor = try std.Io.Dir.cwd().readFileAlloc(io, air_path, allocator, .limited(2 * 1024 * 1024 * 1024));
     defer allocator.free(descriptor);
@@ -286,8 +383,8 @@ fn probeAndPin(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions,
         const result = try std.process.run(allocator, io, .{ .argv = argv.argv.items, .stdout_limit = .limited(4 * 1024 * 1024), .stderr_limit = .limited(4 * 1024 * 1024) });
         defer common.freeRunResult(allocator, result);
         if (!common.termOk(result.term)) return error.RealRowsParallelCacheUnavailable;
-        pins[index] = try parseProbeOutput(allocator, io, result.stdout, mode);
-        try verifyPin(allocator, io, pins[index]);
+        pins[index] = try parseProbeOutput(allocator, io, result.stdout, mode, paths.mode_paths[index].export_cache);
+        try verifyPin(allocator, io, pins[index], paths.mode_paths[index].export_cache);
         try manifest.print("mode={s}\tcache_key={s}\tdescriptor_sha256={s}\tdescriptor_bytes={}\n", .{ mode, &pins[index].key, &pins[index].descriptor_sha256, pins[index].descriptor_bytes });
     }
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = paths.pin_manifest, .data = manifest.buffered() });
@@ -306,7 +403,7 @@ const FilesystemSample = struct { total_bytes: u64, free_bytes: u64 };
 
 const ResourceState = struct {
     filesystem_total_bytes: u64,
-    floor_bytes: u64,
+    post_run_free_floor_bytes: u64,
     minimum_available_threshold_bytes: u64,
     starting_free_bytes: u64,
     minimum_free_bytes: u64,
@@ -324,7 +421,7 @@ const ResourceState = struct {
         state.peak_disk_bytes = @max(state.peak_disk_bytes, disk_bytes);
         state.peak_aggregate_rss_bytes = @max(state.peak_aggregate_rss_bytes, rss_bytes);
         state.minimum_available_memory_bytes = @min(state.minimum_available_memory_bytes, available_memory_bytes);
-        if (sample.free_bytes < state.floor_bytes) return error.RealRowsParallelDiskFloorCrossed;
+        if (sample.free_bytes < state.post_run_free_floor_bytes) return error.RealRowsParallelDiskFloorCrossed;
         if (available_memory_bytes < state.minimum_available_threshold_bytes) return error.RealRowsParallelMemoryFloorCrossed;
     }
 };
@@ -627,7 +724,7 @@ fn runBatch(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions, pa
 }
 
 fn preserveFailureEvidence(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions, paths: *const OwnedPaths, waits: [mode_count]?WorkerWait, failure: anyerror) !void {
-    const evidence_dir = if (options.test_options) |test_options| test_options.failure_evidence_dir else "tmp/real_rows_parallel_failures";
+    const evidence_dir = if (options.test_options) |test_options| test_options.failure_evidence_dir else paths.failure_root;
     var cwd = std.Io.Dir.cwd();
     try cwd.createDirPath(io, evidence_dir);
     const manifest_name = try std.fmt.allocPrint(allocator, "{s}.manifest", .{&paths.run_id});
@@ -753,11 +850,12 @@ fn collectCompleted(
 
 pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions) !GroupResult {
     if (options.concurrency != 1 and options.concurrency != 3) return error.InvalidRealRowsConcurrency;
-    var paths = try OwnedPaths.init(allocator, io, options.scratch_path);
+    const export_cache_path = options.export_cache_path orelse return error.RealRowsRootSelectionMissing;
+    var paths = try OwnedPaths.init(allocator, io, options.scratch_path, export_cache_path);
     defer paths.deinit();
     const wall_start = std.Io.Timestamp.now(io, .awake);
     const preflight = try sampleFilesystem(allocator, io, paths.root, options);
-    const policy = policy_authority.forFilesystem(preflight.total_bytes);
+    const policy = try policy_authority.forFilesystem(preflight.total_bytes);
     if (preflight.free_bytes < policy.required_start_bytes) return error.InsufficientRealRowsParallelHeadroom;
     const available_memory = try sampleAvailableMemory(allocator, io, options);
     if (available_memory < policy.minimum_available_memory_bytes) return error.InsufficientRealRowsParallelMemory;
@@ -765,7 +863,7 @@ pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions
     const pin_manifest_sha256 = try sha256File(allocator, io, paths.pin_manifest);
     var resource: ResourceState = .{
         .filesystem_total_bytes = preflight.total_bytes,
-        .floor_bytes = policy.floor_bytes,
+        .post_run_free_floor_bytes = policy.post_run_free_floor_bytes,
         .minimum_available_threshold_bytes = policy.minimum_available_memory_bytes,
         .starting_free_bytes = preflight.free_bytes,
         .minimum_free_bytes = preflight.free_bytes,
@@ -794,8 +892,8 @@ pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions
         try preserveFailureEvidence(allocator, io, options, &paths, waits, err);
         return err;
     };
-    for (pins) |pin| if (options.test_options == null) {
-        verifyPin(allocator, io, pin) catch |err| {
+    for (pins, paths.mode_paths) |pin, mode_path| if (options.test_options == null) {
+        verifyPin(allocator, io, pin, mode_path.export_cache) catch |err| {
             try preserveFailureEvidence(allocator, io, options, &paths, waits, err);
             return err;
         };
@@ -812,17 +910,25 @@ pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions
     }
     const load_end = if (options.test_options != null) try allocator.dupe(u8, "fixture") else try readLoadAverage(allocator, io);
     errdefer allocator.free(load_end);
+    const evidence_root = try allocator.dupe(u8, paths.root);
+    errdefer allocator.free(evidence_root);
+    const work_selection_root = try allocator.dupe(u8, options.scratch_path);
+    errdefer allocator.free(work_selection_root);
+    const export_cache_selection_root = try allocator.dupe(u8, export_cache_path);
+    errdefer allocator.free(export_cache_selection_root);
     return .{
         .completed = completed,
         .evidence = .{
             .concurrency = options.concurrency,
             .run_id = paths.run_id,
-            .root = try allocator.dupe(u8, paths.root),
+            .root = evidence_root,
+            .work_selection_root = work_selection_root,
+            .export_cache_selection_root = export_cache_selection_root,
             .pin_manifest_sha256 = pin_manifest_sha256,
             .wall_ms = elapsedMs(io, wall_start),
             .summed_child_ms = summed_child_ms,
             .filesystem_total_bytes = policy.filesystem_total_bytes,
-            .floor_bytes = policy.floor_bytes,
+            .post_run_free_floor_bytes = policy.post_run_free_floor_bytes,
             .projected_peak_bytes = policy.projected_peak_bytes,
             .required_start_bytes = policy.required_start_bytes,
             .starting_free_bytes = resource.starting_free_bytes,
@@ -839,9 +945,61 @@ pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions
 
 pub fn writeEvidence(writer: *std.Io.Writer, evidence: *const Evidence) !void {
     try writer.print(
-        "real-rows-mode-parallel schema_version={} normalization_schema={} concurrency={} workers=3 modes=ReleaseFast,ReleaseSafe,ReleaseSmall run_id={s} root={s} fast_temp={s}/ReleaseFast/work fast_local_cache={s}/ReleaseFast/zig-local-cache fast_global_cache={s}/ReleaseFast/zig-global-cache safe_temp={s}/ReleaseSafe/work safe_local_cache={s}/ReleaseSafe/zig-local-cache safe_global_cache={s}/ReleaseSafe/zig-global-cache small_temp={s}/ReleaseSmall/work small_local_cache={s}/ReleaseSmall/zig-local-cache small_global_cache={s}/ReleaseSmall/zig-global-cache pin_manifest_sha256={s} cache_status=hit,hit,hit air_cache=read-only pruning=suspended wall_ms={} summed_child_ms={} filesystem_total_bytes={} floor_bytes={} projected_peak_bytes={} required_start_bytes={} starting_free_bytes={} minimum_free_bytes={} final_free_bytes={} peak_disk_bytes={} peak_aggregate_rss_bytes={} minimum_available_memory_bytes={} memory_floor_bytes={} load_start={s} load_end={s} execution_results_cached=false local_fail=0\n",
-        .{ normalization_schema_version, normalization_schema_version, evidence.concurrency, &evidence.run_id, evidence.root, evidence.root, evidence.root, evidence.root, evidence.root, evidence.root, evidence.root, evidence.root, evidence.root, evidence.root, &evidence.pin_manifest_sha256, evidence.wall_ms, evidence.summed_child_ms, evidence.filesystem_total_bytes, evidence.floor_bytes, evidence.projected_peak_bytes, evidence.required_start_bytes, evidence.starting_free_bytes, evidence.minimum_free_bytes, evidence.final_free_bytes, evidence.peak_disk_bytes, evidence.peak_aggregate_rss_bytes, evidence.minimum_available_memory_bytes, policy_authority.minimum_available_memory_bytes, evidence.load_start, evidence.load_end },
+        "real-rows-mode-parallel schema_version={} normalization_schema={} concurrency={} workers=3 modes=ReleaseFast,ReleaseSafe,ReleaseSmall run_id={s} root={s} work_selection_root={s} export_cache_selection_root={s} fast_temp={s}/ReleaseFast/work_{s} fast_local_cache={s}/ReleaseFast/zig-local-cache fast_global_cache={s}/ReleaseFast/zig-global-cache fast_air_cache={s}/ReleaseFast/export safe_temp={s}/ReleaseSafe/work_{s} safe_local_cache={s}/ReleaseSafe/zig-local-cache safe_global_cache={s}/ReleaseSafe/zig-global-cache safe_air_cache={s}/ReleaseSafe/export small_temp={s}/ReleaseSmall/work_{s} small_local_cache={s}/ReleaseSmall/zig-local-cache small_global_cache={s}/ReleaseSmall/zig-global-cache small_air_cache={s}/ReleaseSmall/export pin_manifest_sha256={s} cache_status=hit,hit,hit air_cache=read-only pruning=suspended ",
+        .{
+            normalization_schema_version,
+            normalization_schema_version,
+            evidence.concurrency,
+            &evidence.run_id,
+            evidence.root,
+            evidence.work_selection_root,
+            evidence.export_cache_selection_root,
+            evidence.work_selection_root,
+            &evidence.run_id,
+            evidence.root,
+            evidence.root,
+            evidence.export_cache_selection_root,
+            evidence.work_selection_root,
+            &evidence.run_id,
+            evidence.root,
+            evidence.root,
+            evidence.export_cache_selection_root,
+            evidence.work_selection_root,
+            &evidence.run_id,
+            evidence.root,
+            evidence.root,
+            evidence.export_cache_selection_root,
+            &evidence.pin_manifest_sha256,
+        },
     );
+    try writer.print(
+        "wall_ms={} summed_child_ms={} filesystem_total_bytes={} post_run_free_floor_bytes={} projected_peak_bytes={} required_start_bytes={} starting_free_bytes={} minimum_free_bytes={} final_free_bytes={} peak_disk_bytes={} peak_aggregate_rss_bytes={} minimum_available_memory_bytes={} memory_floor_bytes={} load_start={s} load_end={s} execution_results_cached=false local_fail=0\n",
+        .{
+            evidence.wall_ms,
+            evidence.summed_child_ms,
+            evidence.filesystem_total_bytes,
+            evidence.post_run_free_floor_bytes,
+            evidence.projected_peak_bytes,
+            evidence.required_start_bytes,
+            evidence.starting_free_bytes,
+            evidence.minimum_free_bytes,
+            evidence.final_free_bytes,
+            evidence.peak_disk_bytes,
+            evidence.peak_aggregate_rss_bytes,
+            evidence.minimum_available_memory_bytes,
+            policy_authority.minimum_available_memory_bytes,
+            evidence.load_start,
+            evidence.load_end,
+        },
+    );
+}
+
+fn requireParallelEvidenceSchema(line: []const u8) !void {
+    const schema = fieldValue(line, "schema_version=") orelse return error.RealRowsParallelEvidenceSchemaMissing;
+    const normalization = fieldValue(line, "normalization_schema=") orelse return error.RealRowsParallelEvidenceSchemaMissing;
+    if (!std.mem.eql(u8, schema, "2") or !std.mem.eql(u8, normalization, "2")) {
+        return error.RealRowsParallelEvidenceSchemaMismatch;
+    }
 }
 
 pub fn writeNormalizedOutput(output: []const u8, writer: *std.Io.Writer) !void {
@@ -850,10 +1008,16 @@ pub fn writeNormalizedOutput(output: []const u8, writer: *std.Io.Writer) !void {
         "starting_free_bytes=",            "minimum_free_bytes=", "final_free_bytes=", "peak_disk_bytes=", "peak_aggregate_rss_bytes=",
         "minimum_available_memory_bytes=", "load_start=",         "load_end=",
     };
+    var evidence_count: usize = 0;
     var lines = std.mem.splitScalar(u8, output, '\n');
     while (lines.next()) |line| {
         if (line.len == 0) continue;
-        if (std.mem.startsWith(u8, line, "real-rows-mode-parallel ")) continue;
+        if (std.mem.startsWith(u8, line, "real-rows-mode-parallel ")) {
+            evidence_count += 1;
+            if (evidence_count != 1) return error.RealRowsParallelEvidenceDuplicate;
+            try requireParallelEvidenceSchema(line);
+            continue;
+        }
         var fields = std.mem.tokenizeScalar(u8, line, ' ');
         var first = true;
         while (fields.next()) |field| {
@@ -869,6 +1033,7 @@ pub fn writeNormalizedOutput(output: []const u8, writer: *std.Io.Writer) !void {
         }
         try writer.writeByte('\n');
     }
+    if (evidence_count != 1) return error.RealRowsParallelEvidenceSchemaMissing;
 }
 
 fn elapsedMs(io: std.Io, start: std.Io.Timestamp) i96 {
@@ -891,51 +1056,40 @@ pub fn admission(fresh_real_rows: bool, cache_hits: [mode_count]bool) Admission 
     return .parallel;
 }
 
-fn createFocusedScratch(allocator: std.mem.Allocator, io: std.Io) ![]u8 {
-    try std.Io.Dir.cwd().createDirPath(io, "tmp");
-    var random: [16]u8 = undefined;
-    var attempt: usize = 0;
-    while (attempt < 16) : (attempt += 1) {
-        io.random(&random);
-        const id = std.fmt.bytesToHex(random, .lower);
-        const path = try std.fmt.allocPrint(allocator, "tmp/real_rows_focused_{s}", .{&id});
-        std.Io.Dir.cwd().createDir(io, path, .default_dir) catch |err| switch (err) {
-            error.PathAlreadyExists => {
-                allocator.free(path);
-                continue;
-            },
-            else => {
-                allocator.free(path);
-                return err;
-            },
-        };
-        return path;
-    }
-    return error.RealRowsFocusedRootCollisionLimit;
-}
-
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
     var concurrency: u8 = 3;
+    var scratch_root: ?[]const u8 = null;
+    var export_cache_root: ?[]const u8 = null;
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
     defer args.deinit();
     _ = args.skip();
     while (args.next()) |arg| {
-        if (std.mem.startsWith(u8, arg, "--concurrency=")) concurrency = try std.fmt.parseUnsigned(u8, arg["--concurrency=".len..], 10) else return error.UnexpectedArgument;
+        if (std.mem.startsWith(u8, arg, "--concurrency=")) {
+            concurrency = try std.fmt.parseUnsigned(u8, arg["--concurrency=".len..], 10);
+        } else if (std.mem.startsWith(u8, arg, "--scratch-root=")) {
+            if (scratch_root != null) return error.DuplicateRealRowsScratchRoot;
+            scratch_root = arg["--scratch-root=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--export-cache-root=")) {
+            if (export_cache_root != null) return error.DuplicateRealRowsExportCacheRoot;
+            export_cache_root = arg["--export-cache-root=".len..];
+        } else return error.UnexpectedArgument;
     }
     if (concurrency != 1 and concurrency != 3) return error.InvalidRealRowsConcurrency;
+    const selected_scratch_root = scratch_root orelse return error.RealRowsRootSelectionMissing;
+    const selected_export_cache_root = export_cache_root orelse return error.RealRowsRootSelectionMissing;
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
     const target = target_env orelse "x86_64-unknown-linux-gnu";
     const target_assignment = try std.fmt.allocPrint(allocator, "TARGET={s}", .{target});
     defer allocator.free(target_assignment);
-    const scratch = try createFocusedScratch(allocator, io);
-    defer {
-        std.Io.Dir.cwd().deleteTree(io, scratch) catch {};
-        allocator.free(scratch);
-    }
-    var result = try runGroup(allocator, io, .{ .target_assignment = target_assignment, .scratch_path = scratch, .concurrency = concurrency });
+    var result = try runGroup(allocator, io, .{
+        .target_assignment = target_assignment,
+        .scratch_path = selected_scratch_root,
+        .export_cache_path = selected_export_cache_root,
+        .concurrency = concurrency,
+    });
     defer result.deinit(allocator);
     var buffer: [4096]u8 = undefined;
     var stdout = std.Io.File.stdout().writer(io, &buffer);
@@ -965,6 +1119,7 @@ test "production argv construction covers every actual mode and isolated path" {
             .work = try std.fmt.allocPrint(allocator, "{s}/work", .{root}),
             .local_cache = try std.fmt.allocPrint(allocator, "{s}/local", .{root}),
             .global_cache = try std.fmt.allocPrint(allocator, "{s}/global", .{root}),
+            .export_cache = try std.fmt.allocPrint(allocator, "cache/contract/{s}/export", .{mode}),
             .result = try std.fmt.allocPrint(allocator, "{s}/result", .{root}),
             .log = try std.fmt.allocPrint(allocator, "{s}/log", .{root}),
         };
@@ -983,9 +1138,19 @@ test "production argv construction covers every actual mode and isolated path" {
         defer allocator.free(local_arg);
         const global_arg = try std.fmt.allocPrint(allocator, "ZIG_GLOBAL_CACHE_DIR={s}/global", .{root});
         defer allocator.free(global_arg);
+        const export_arg = try std.fmt.allocPrint(allocator, "--export-cache-root=cache/contract/{s}/export", .{mode});
+        defer allocator.free(export_arg);
         try std.testing.expect(std.mem.indexOf(u8, joined, temp_arg) != null);
         try std.testing.expect(std.mem.indexOf(u8, joined, local_arg) != null);
         try std.testing.expect(std.mem.indexOf(u8, joined, global_arg) != null);
+        try std.testing.expect(std.mem.indexOf(u8, joined, export_arg) != null);
+        var probe = try buildWorkerArgv(allocator, "TARGET=x86_64-unknown-linux-gnu", index, paths, true);
+        defer probe.deinit();
+        const probe_joined = try joinedArgv(allocator, probe.argv.items);
+        defer allocator.free(probe_joined);
+        try std.testing.expect(std.mem.indexOf(u8, probe_joined, temp_arg) != null);
+        try std.testing.expect(std.mem.indexOf(u8, probe_joined, export_arg) != null);
+        try std.testing.expect(std.mem.indexOf(u8, probe_joined, "--cache-probe-only") != null);
     }
 }
 
@@ -995,12 +1160,93 @@ test "parallel admission requires three hits and rejects fresh rows" {
     try std.testing.expectEqual(Admission.serial_fallback, admission(true, .{ true, true, true }));
 }
 
+test "root selections reject missing absolute escape symlink owner and mode drift before execution" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+    var roots = try fixtureRoots(allocator, io, &temp);
+    defer roots.deinit(allocator);
+    var audit: LifecycleAudit = .{};
+    var test_options: TestOptions = .{
+        .filesystem_sample = .{ .total_bytes = 100 * 1024 * 1024 * 1024, .free_bytes = 90 * 1024 * 1024 * 1024 },
+        .failure_evidence_dir = roots.scratch,
+        .audit = &audit,
+    };
+    try std.testing.expectError(error.RealRowsRootSelectionMissing, runGroup(allocator, io, .{
+        .target_assignment = "TARGET=test",
+        .scratch_path = roots.scratch,
+        .concurrency = 3,
+        .test_options = &test_options,
+    }));
+    try std.testing.expectError(error.RealRowsRootSelectionInvalid, requireCanonicalContractBase(io, "/absolute/root"));
+    try std.testing.expectError(error.RealRowsRootSelectionInvalid, requireCanonicalContractBase(io, "relative/../escape"));
+
+    const base = std.fs.path.dirname(std.fs.path.dirname(roots.scratch).?).?;
+    const other_cache = try std.fs.path.join(allocator, &.{ base, "cache", "other-contract" });
+    defer allocator.free(other_cache);
+    try std.Io.Dir.cwd().createDirPath(io, other_cache);
+    try std.testing.expectError(error.RealRowsRootSelectionMismatch, OwnedPaths.init(allocator, io, roots.scratch, other_cache));
+
+    const symlink = try std.fs.path.join(allocator, &.{ base, "linked-contract" });
+    defer allocator.free(symlink);
+    try std.Io.Dir.cwd().symLink(io, "validation/contract", symlink, .{ .is_directory = true });
+    try std.testing.expectError(error.RealRowsRootSelectionInvalid, requireCanonicalContractBase(io, symlink));
+
+    const wrong_mode = try std.fs.path.join(allocator, &.{ roots.cache, "ReleaseSafe", "export" });
+    defer allocator.free(wrong_mode);
+    try std.testing.expectError(error.RealRowsRootSelectionModeMismatch, requireCanonicalModeOwnedDirectory(io, wrong_mode, "ReleaseFast"));
+    try std.testing.expectEqual(@as(usize, 0), audit.launched[0] + audit.launched[1] + audit.launched[2]);
+}
+
+test "fixed capacity admits exact start boundary emits schema two and rejects insufficient capacity" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+    var roots = try fixtureRoots(allocator, io, &temp);
+    defer roots.deinit(allocator);
+    var audit: LifecycleAudit = .{};
+    var test_options: TestOptions = .{
+        .worker_fixture = .success,
+        .filesystem_sample = .{ .total_bytes = policy_authority.required_start_bytes, .free_bytes = policy_authority.required_start_bytes },
+        .failure_evidence_dir = roots.scratch,
+        .audit = &audit,
+    };
+    var result = try runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = roots.scratch, .export_cache_path = roots.cache, .concurrency = 3, .test_options = &test_options });
+    defer result.deinit(allocator);
+    try std.testing.expectEqual(policy_authority.post_run_free_floor_bytes, result.evidence.post_run_free_floor_bytes);
+    try std.testing.expectEqual(policy_authority.projected_disk_peak_bytes, result.evidence.projected_peak_bytes);
+    try std.testing.expectEqual(policy_authority.required_start_bytes, result.evidence.required_start_bytes);
+    try std.testing.expectEqual(policy_authority.required_start_bytes, result.evidence.starting_free_bytes);
+    try std.testing.expectEqual(policy_authority.required_start_bytes, result.evidence.minimum_free_bytes);
+    try std.testing.expectEqual(policy_authority.required_start_bytes, result.evidence.final_free_bytes);
+    var evidence_buffer: [8192]u8 = undefined;
+    var evidence_writer = std.Io.Writer.fixed(&evidence_buffer);
+    try writeEvidence(&evidence_writer, &result.evidence);
+    const evidence = evidence_writer.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, evidence, "schema_version=2 normalization_schema=2") != null);
+    try std.testing.expect(std.mem.indexOf(u8, evidence, "post_run_free_floor_bytes=34359738368") != null);
+    try std.testing.expect(std.mem.indexOf(u8, evidence, "projected_peak_bytes=4834125664") != null);
+    try std.testing.expect(std.mem.indexOf(u8, evidence, "required_start_bytes=39193864032") != null);
+
+    audit = .{};
+    test_options.filesystem_sample = .{ .total_bytes = policy_authority.required_start_bytes, .free_bytes = policy_authority.required_start_bytes - 1 };
+    try std.testing.expectError(error.InsufficientRealRowsParallelHeadroom, runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = roots.scratch, .export_cache_path = roots.cache, .concurrency = 3, .test_options = &test_options }));
+    try std.testing.expectEqual(@as(usize, 0), audit.launched[0] + audit.launched[1] + audit.launched[2]);
+
+    audit = .{};
+    test_options.filesystem_sample = .{ .total_bytes = policy_authority.required_start_bytes - 1, .free_bytes = policy_authority.required_start_bytes - 1 };
+    try std.testing.expectError(error.RealRowsParallelFilesystemTooSmall, runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = roots.scratch, .export_cache_path = roots.cache, .concurrency = 3, .test_options = &test_options }));
+    try std.testing.expectEqual(@as(usize, 0), audit.launched[0] + audit.launched[1] + audit.launched[2]);
+}
+
 test "normalization removes only frozen volatile scheduling fields" {
     const input =
         "distribution-real-rows selector_version=real-candidate-selector-v2 candidate_file=x candidate_file_hash=abc limit=100 strict=true\n" ++
         "air-export-cache mode=ReleaseFast status=hit duration_ms=12 cache_key=key-fast descriptor_bytes=44\n" ++
         "summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode=ReleaseFast candidate_file_hash=abc real_native_linked=100 real_programs_ok=2 local_fail=0\n" ++
-        "real-rows-mode-parallel schema_version=1 wall_ms=9 root=owned/run local_fail=0\n" ++
+        "real-rows-mode-parallel schema_version=2 normalization_schema=2 wall_ms=9 root=owned/run local_fail=0\n" ++
         "air-export-cache mode=ReleaseSafe status=hit duration_ms=13 cache_key=key-safe descriptor_bytes=45\n" ++
         "air-export-cache mode=ReleaseSmall status=hit duration_ms=14 cache_key=key-small descriptor_bytes=46\n";
     var buffer: [4096]u8 = undefined;
@@ -1015,6 +1261,22 @@ test "normalization removes only frozen volatile scheduling fields" {
     const safe = std.mem.indexOf(u8, normalized, "mode=ReleaseSafe").?;
     const small = std.mem.indexOf(u8, normalized, "mode=ReleaseSmall").?;
     try std.testing.expect(fast < safe and safe < small);
+
+    const schema_one = try std.mem.replaceOwned(u8, std.testing.allocator, input, "schema_version=2", "schema_version=1");
+    defer std.testing.allocator.free(schema_one);
+    var schema_one_buffer: [4096]u8 = undefined;
+    var schema_one_writer = std.Io.Writer.fixed(&schema_one_buffer);
+    try std.testing.expectError(error.RealRowsParallelEvidenceSchemaMismatch, writeNormalizedOutput(schema_one, &schema_one_writer));
+
+    const normalization_one = try std.mem.replaceOwned(u8, std.testing.allocator, input, "normalization_schema=2", "normalization_schema=1");
+    defer std.testing.allocator.free(normalization_one);
+    var normalization_one_buffer: [4096]u8 = undefined;
+    var normalization_one_writer = std.Io.Writer.fixed(&normalization_one_buffer);
+    try std.testing.expectError(error.RealRowsParallelEvidenceSchemaMismatch, writeNormalizedOutput(normalization_one, &normalization_one_writer));
+
+    var missing_buffer: [4096]u8 = undefined;
+    var missing_writer = std.Io.Writer.fixed(&missing_buffer);
+    try std.testing.expectError(error.RealRowsParallelEvidenceSchemaMissing, writeNormalizedOutput("ReleaseFast\n", &missing_writer));
 }
 
 fn syntheticCohortWorkerOutput(mode: []const u8, allocator: std.mem.Allocator) ![]u8 {
@@ -1049,11 +1311,14 @@ test "cohort summary authentication rejects partial mode denominator and identit
     try std.testing.expectError(error.RealRowsOutputCohortDuplicate, validateWorkerOutput(duplicate, "ReleaseFast"));
 }
 
-test "resource state fails closed at disk and memory floors" {
-    var disk: ResourceState = .{ .filesystem_total_bytes = 1000, .floor_bytes = 100, .minimum_available_threshold_bytes = 200, .starting_free_bytes = 500, .minimum_free_bytes = 500, .final_free_bytes = 500, .minimum_available_memory_bytes = 500 };
-    try std.testing.expectError(error.RealRowsParallelDiskFloorCrossed, disk.observe(.{ .total_bytes = 1000, .free_bytes = 99 }, 1, 2, 500));
-    var memory: ResourceState = .{ .filesystem_total_bytes = 1000, .floor_bytes = 100, .minimum_available_threshold_bytes = 200, .starting_free_bytes = 500, .minimum_free_bytes = 500, .final_free_bytes = 500, .minimum_available_memory_bytes = 500 };
-    try std.testing.expectError(error.RealRowsParallelMemoryFloorCrossed, memory.observe(.{ .total_bytes = 1000, .free_bytes = 400 }, 1, 2, 199));
+test "resource state accepts exact fixed floor and fails closed below disk and memory floors" {
+    const floor = policy_authority.post_run_free_floor_bytes;
+    var disk: ResourceState = .{ .filesystem_total_bytes = policy_authority.required_start_bytes, .post_run_free_floor_bytes = floor, .minimum_available_threshold_bytes = 200, .starting_free_bytes = policy_authority.required_start_bytes, .minimum_free_bytes = policy_authority.required_start_bytes, .final_free_bytes = policy_authority.required_start_bytes, .minimum_available_memory_bytes = 500 };
+    try disk.observe(.{ .total_bytes = policy_authority.required_start_bytes, .free_bytes = floor }, 1, 2, 500);
+    try std.testing.expectEqual(floor, disk.minimum_free_bytes);
+    try std.testing.expectError(error.RealRowsParallelDiskFloorCrossed, disk.observe(.{ .total_bytes = policy_authority.required_start_bytes, .free_bytes = floor - 1 }, 1, 2, 500));
+    var memory: ResourceState = .{ .filesystem_total_bytes = policy_authority.required_start_bytes, .post_run_free_floor_bytes = floor, .minimum_available_threshold_bytes = 200, .starting_free_bytes = policy_authority.required_start_bytes, .minimum_free_bytes = policy_authority.required_start_bytes, .final_free_bytes = policy_authority.required_start_bytes, .minimum_available_memory_bytes = 500 };
+    try std.testing.expectError(error.RealRowsParallelMemoryFloorCrossed, memory.observe(.{ .total_bytes = policy_authority.required_start_bytes, .free_bytes = floor }, 1, 2, 199));
 }
 
 test "cache miss is a serial-fallback signal before any worker launch" {
@@ -1061,16 +1326,16 @@ test "cache miss is a serial-fallback signal before any worker launch" {
     const io = std.testing.io;
     var temp = std.testing.tmpDir(.{});
     defer temp.cleanup();
-    const scratch = try fixtureScratch(allocator, &temp);
-    defer allocator.free(scratch);
+    var roots = try fixtureRoots(allocator, io, &temp);
+    defer roots.deinit(allocator);
     var audit: LifecycleAudit = .{};
     var test_options: TestOptions = .{
         .cache_hits = false,
         .filesystem_sample = .{ .total_bytes = 100 * 1024 * 1024 * 1024, .free_bytes = 90 * 1024 * 1024 * 1024 },
-        .failure_evidence_dir = scratch,
+        .failure_evidence_dir = roots.scratch,
         .audit = &audit,
     };
-    try std.testing.expectError(error.RealRowsParallelCacheUnavailable, runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = scratch, .concurrency = 3, .test_options = &test_options }));
+    try std.testing.expectError(error.RealRowsParallelCacheUnavailable, runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = roots.scratch, .export_cache_path = roots.cache, .concurrency = 3, .test_options = &test_options }));
     try std.testing.expectEqual(@as(usize, 0), audit.launched[0] + audit.launched[1] + audit.launched[2]);
 }
 
@@ -1079,17 +1344,17 @@ test "successful fixed group buffers and returns outputs in manifest order" {
     const io = std.testing.io;
     var temp = std.testing.tmpDir(.{});
     defer temp.cleanup();
-    const scratch = try fixtureScratch(allocator, &temp);
-    defer allocator.free(scratch);
+    var roots = try fixtureRoots(allocator, io, &temp);
+    defer roots.deinit(allocator);
     for ([_]u8{ 1, 3 }) |concurrency| {
         var audit: LifecycleAudit = .{};
         var test_options: TestOptions = .{
             .worker_fixture = .success,
             .filesystem_sample = .{ .total_bytes = 100 * 1024 * 1024 * 1024, .free_bytes = 90 * 1024 * 1024 * 1024 },
-            .failure_evidence_dir = scratch,
+            .failure_evidence_dir = roots.scratch,
             .audit = &audit,
         };
-        var result = try runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = scratch, .concurrency = concurrency, .test_options = &test_options });
+        var result = try runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = roots.scratch, .export_cache_path = roots.cache, .concurrency = concurrency, .test_options = &test_options });
         defer result.deinit(allocator);
         for (result.completed, modes) |completed, mode| {
             var expected_buffer: [64]u8 = undefined;
@@ -1103,8 +1368,31 @@ test "successful fixed group buffers and returns outputs in manifest order" {
     }
 }
 
-fn fixtureScratch(allocator: std.mem.Allocator, temp: *std.testing.TmpDir) ![]u8 {
-    return std.fs.path.join(allocator, &.{ ".zig-cache", "tmp", &temp.sub_path });
+const FixtureRoots = struct {
+    scratch: []u8,
+    cache: []u8,
+
+    fn deinit(roots: *FixtureRoots, allocator: std.mem.Allocator) void {
+        allocator.free(roots.cache);
+        allocator.free(roots.scratch);
+        roots.* = undefined;
+    }
+};
+
+fn fixtureRoots(allocator: std.mem.Allocator, io: std.Io, temp: *std.testing.TmpDir) !FixtureRoots {
+    const base = try std.fs.path.join(allocator, &.{ ".zig-cache", "tmp", &temp.sub_path });
+    defer allocator.free(base);
+    const scratch = try std.fs.path.join(allocator, &.{ base, "validation", "contract" });
+    errdefer allocator.free(scratch);
+    const cache = try std.fs.path.join(allocator, &.{ base, "cache", "contract" });
+    errdefer allocator.free(cache);
+    try std.Io.Dir.cwd().createDirPath(io, scratch);
+    for (modes) |mode| {
+        const export_path = try std.fs.path.join(allocator, &.{ cache, mode, "export" });
+        defer allocator.free(export_path);
+        try std.Io.Dir.cwd().createDirPath(io, export_path);
+    }
+    return .{ .scratch = scratch, .cache = cache };
 }
 
 test "partial wait-future setup reaps every worker before closing descriptors" {
@@ -1112,11 +1400,11 @@ test "partial wait-future setup reaps every worker before closing descriptors" {
     const io = std.testing.io;
     var temp = std.testing.tmpDir(.{});
     defer temp.cleanup();
-    const scratch = try fixtureScratch(allocator, &temp);
-    defer allocator.free(scratch);
+    var roots = try fixtureRoots(allocator, io, &temp);
+    defer roots.deinit(allocator);
     var audit: LifecycleAudit = .{};
-    var test_options: TestOptions = .{ .worker_fixture = .all_sleep, .fail_wait_future_before_index = 1, .filesystem_sample = .{ .total_bytes = 100 * 1024 * 1024 * 1024, .free_bytes = 90 * 1024 * 1024 * 1024 }, .failure_evidence_dir = scratch, .audit = &audit };
-    try std.testing.expectError(error.InjectedRealRowsWaitFutureSetupFailure, runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = scratch, .concurrency = 3, .test_options = &test_options }));
+    var test_options: TestOptions = .{ .worker_fixture = .all_sleep, .fail_wait_future_before_index = 1, .filesystem_sample = .{ .total_bytes = 100 * 1024 * 1024 * 1024, .free_bytes = 90 * 1024 * 1024 * 1024 }, .failure_evidence_dir = roots.scratch, .audit = &audit };
+    try std.testing.expectError(error.InjectedRealRowsWaitFutureSetupFailure, runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = roots.scratch, .export_cache_path = roots.cache, .concurrency = 3, .test_options = &test_options }));
     try std.testing.expectEqual(@as(usize, 3), audit.launched[0] + audit.launched[1] + audit.launched[2]);
     for (0..mode_count) |index| {
         try std.testing.expectEqual(@as(usize, 1), audit.reaped[index]);
@@ -1132,11 +1420,11 @@ test "injected production-batch child failure preserves the original failure and
     const io = std.testing.io;
     var temp = std.testing.tmpDir(.{});
     defer temp.cleanup();
-    const scratch = try fixtureScratch(allocator, &temp);
-    defer allocator.free(scratch);
+    var roots = try fixtureRoots(allocator, io, &temp);
+    defer roots.deinit(allocator);
     var audit: LifecycleAudit = .{};
-    var test_options: TestOptions = .{ .worker_fixture = .first_child_fails, .filesystem_sample = .{ .total_bytes = 100 * 1024 * 1024 * 1024, .free_bytes = 90 * 1024 * 1024 * 1024 }, .failure_evidence_dir = scratch, .audit = &audit };
-    try std.testing.expectError(error.RealRowsParallelChildFailed, runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = scratch, .concurrency = 3, .test_options = &test_options }));
+    var test_options: TestOptions = .{ .worker_fixture = .first_child_fails, .filesystem_sample = .{ .total_bytes = 100 * 1024 * 1024 * 1024, .free_bytes = 90 * 1024 * 1024 * 1024 }, .failure_evidence_dir = roots.scratch, .audit = &audit };
+    try std.testing.expectError(error.RealRowsParallelChildFailed, runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = roots.scratch, .export_cache_path = roots.cache, .concurrency = 3, .test_options = &test_options }));
     try std.testing.expectEqual(@as(usize, 1), audit.shared_stop_requests);
     for (0..mode_count) |index| {
         try std.testing.expectEqual(@as(usize, 1), audit.reaped[index]);
@@ -1149,14 +1437,14 @@ test "injected production-batch child failure preserves the original failure and
     try std.testing.expect(audit.failure_run_id_recorded);
     const log_name = try std.fmt.allocPrint(allocator, "{s}.ReleaseFast.log", .{&audit.failure_run_id});
     defer allocator.free(log_name);
-    const log_path = try std.fs.path.join(allocator, &.{ scratch, log_name });
+    const log_path = try std.fs.path.join(allocator, &.{ roots.scratch, log_name });
     defer allocator.free(log_path);
     const log = try std.Io.Dir.cwd().readFileAlloc(io, log_path, allocator, .limited(4096));
     defer allocator.free(log);
     try std.testing.expect(std.mem.indexOf(u8, log, "injected-original-real-row-child-failure") != null);
     const manifest_name = try std.fmt.allocPrint(allocator, "{s}.manifest", .{&audit.failure_run_id});
     defer allocator.free(manifest_name);
-    const manifest_path = try std.fs.path.join(allocator, &.{ scratch, manifest_name });
+    const manifest_path = try std.fs.path.join(allocator, &.{ roots.scratch, manifest_name });
     defer allocator.free(manifest_path);
     const manifest = try std.Io.Dir.cwd().readFileAlloc(io, manifest_path, allocator, .limited(4096));
     defer allocator.free(manifest);

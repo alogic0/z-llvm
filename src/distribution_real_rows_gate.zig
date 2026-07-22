@@ -13,8 +13,6 @@ const ziglang_pin_path = "docs/evidence/ziglang_pin.txt";
 const export_cache_dir = "tmp/real_rows_air_export_cache";
 const target_triple = "x86_64-unknown-linux-gnu";
 const cohort_denominator_sha256 = "83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d";
-const cohort_validation_root = "local-state/validations/o2-calls/production-execution-cohort-v1-development";
-const cohort_cache_root = "local-state/caches/o2-calls/production-execution-cohort-v1-development";
 const cohort_object_max_bytes = 16 * 1024 * 1024;
 const cohort_executable_max_bytes = 512 * 1024 * 1024;
 const Mode = helpers.Mode;
@@ -88,6 +86,7 @@ const Options = struct {
     cache_probe_only: bool = false,
     runner_temp_root: ?[]const u8 = null,
     export_cache_root: []const u8 = export_cache_dir,
+    export_cache_root_explicit: bool = false,
 };
 
 const Candidate = struct {
@@ -221,6 +220,7 @@ fn parseRawOptions(io: std.Io, raw_args: []const []const u8) !Options {
             options.runner_temp_root = arg["--runner-temp-root=".len..];
         } else if (std.mem.startsWith(u8, arg, "--export-cache-root=")) {
             options.export_cache_root = arg["--export-cache-root=".len..];
+            options.export_cache_root_explicit = true;
         } else {
             try validationError(io, "unexpected argument: {s}\n", .{arg});
         }
@@ -240,7 +240,11 @@ fn parseRawOptions(io: std.Io, raw_args: []const []const u8) !Options {
 }
 
 fn cohortEnabled(options: Options) bool {
-    return options.strict and options.limit == 100 and !options.cache_probe_only and
+    return cohortSelected(options) and !options.cache_probe_only;
+}
+
+fn cohortSelected(options: Options) bool {
+    return options.strict and options.limit == 100 and
         std.mem.eql(u8, options.candidate_path, default_candidate_path);
 }
 
@@ -263,22 +267,58 @@ fn requireCohortDenominator(candidates: []const Candidate, candidate_hash: *cons
     for (counts) |count| if (count != 1) return error.ExecutionCohortMembershipMismatch;
 }
 
-fn requireCohortModeRoot(options: Options, mode: Mode) !void {
+fn requireCohortModeRoot(io: std.Io, options: Options, mode: Mode) !void {
     const runner_root = options.runner_temp_root orelse return error.ExecutionCohortRootMissing;
-    var expected_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
-    const expected_prefix = try std.fmt.bufPrint(&expected_buffer, "{s}/{s}/", .{ cohort_validation_root, mode.name() });
-    if (!std.mem.startsWith(u8, runner_root, expected_prefix) or std.fs.path.isAbsolute(runner_root) or
-        std.mem.indexOf(u8, runner_root, "..") != null)
-    {
+    if (!options.export_cache_root_explicit) return error.ExecutionCohortRootMissing;
+    const runner_owner = try requireCanonicalModeOwnedDirectory(io, runner_root, mode);
+    const cache_owner = try requireCanonicalModeOwnedDirectory(io, options.export_cache_root, mode);
+    if (!std.mem.eql(u8, runner_owner, cache_owner)) return error.ExecutionCohortRootMismatch;
+}
+
+fn requireCanonicalModeOwnedDirectory(io: std.Io, path: []const u8, mode: Mode) ![]const u8 {
+    if (path.len == 0 or std.fs.path.isAbsolute(path) or path[path.len - 1] == '/') {
         return error.ExecutionCohortRootInvalid;
     }
-    var cache_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
-    const cache_prefix = try std.fmt.bufPrint(&cache_buffer, "{s}/{s}/", .{ cohort_cache_root, mode.name() });
-    if (!std.mem.startsWith(u8, options.export_cache_root, cache_prefix) or std.fs.path.isAbsolute(options.export_cache_root) or
-        std.mem.indexOf(u8, options.export_cache_root, "..") != null)
-    {
-        return error.ExecutionCohortRootInvalid;
+    var previous_previous: ?[]const u8 = null;
+    var previous: ?[]const u8 = null;
+    var selected_mode_count: usize = 0;
+    var parts = std.mem.splitScalar(u8, path, '/');
+    var current = std.Io.Dir.cwd();
+    var current_owned = false;
+    defer if (current_owned) current.close(io);
+    while (parts.next()) |part| {
+        if (part.len == 0 or std.mem.eql(u8, part, ".") or std.mem.eql(u8, part, "..") or
+            std.mem.indexOfScalar(u8, part, 0) != null)
+        {
+            return error.ExecutionCohortRootInvalid;
+        }
+        for ([_]Mode{ .ReleaseFast, .ReleaseSafe, .ReleaseSmall }) |known_mode| {
+            if (std.mem.eql(u8, part, known_mode.name())) {
+                if (known_mode != mode) return error.ExecutionCohortRootModeMismatch;
+                selected_mode_count += 1;
+            }
+        }
+        const next = current.openDir(io, part, .{ .access_sub_paths = true, .iterate = false, .follow_symlinks = false }) catch {
+            return error.ExecutionCohortRootInvalid;
+        };
+        if (current_owned) current.close(io);
+        current = next;
+        current_owned = true;
+        previous_previous = previous;
+        previous = part;
     }
+    const leaf = previous orelse return error.ExecutionCohortRootInvalid;
+    _ = leaf;
+    const mode_component = previous_previous orelse return error.ExecutionCohortRootInvalid;
+    if (!std.mem.eql(u8, mode_component, mode.name()) or selected_mode_count != 1) {
+        return error.ExecutionCohortRootModeMismatch;
+    }
+    const mode_start = @intFromPtr(mode_component.ptr) - @intFromPtr(path.ptr);
+    if (mode_start == 0 or path[mode_start - 1] != '/') return error.ExecutionCohortRootInvalid;
+    const owner_end = mode_start - 1;
+    const owner_start = if (std.mem.lastIndexOfScalar(u8, path[0..owner_end], '/')) |slash| slash + 1 else 0;
+    if (owner_start == owner_end) return error.ExecutionCohortRootInvalid;
+    return path[owner_start..owner_end];
 }
 
 test "parallel worker arguments round-trip through the production parser" {
@@ -287,20 +327,66 @@ test "parallel worker arguments round-trip through the production parser" {
     for (mode_names, expected_modes) |name, expected| {
         var mode_buffer: [64]u8 = undefined;
         const mode_arg = try std.fmt.bufPrint(&mode_buffer, "--mode={s}", .{name});
-        const parsed = try parseRawOptions(std.testing.io, &.{ mode_arg, "--strict", "--limit=100", "--require-cache-hit", "--runner-temp-root=owned/work" });
+        const parsed = try parseRawOptions(std.testing.io, &.{ mode_arg, "--strict", "--limit=100", "--require-cache-hit", "--runner-temp-root=owned/contract/ReleaseFast/work", "--export-cache-root=cache/contract/ReleaseFast/export" });
         try std.testing.expectEqual(expected, parsed.mode.?);
         try std.testing.expect(parsed.strict);
         try std.testing.expectEqual(@as(usize, 100), parsed.limit);
         try std.testing.expect(parsed.require_cache_hit);
-        try std.testing.expectEqualStrings("owned/work", parsed.runner_temp_root.?);
+        try std.testing.expectEqualStrings("owned/contract/ReleaseFast/work", parsed.runner_temp_root.?);
+        try std.testing.expectEqualStrings("cache/contract/ReleaseFast/export", parsed.export_cache_root);
+        try std.testing.expect(parsed.export_cache_root_explicit);
     }
 }
 
 test "cache probe parser is fail-closed and rejects partial cache authority" {
-    const parsed = try parseRawOptions(std.testing.io, &.{ "--mode=ReleaseFast", "--require-cache-hit", "--cache-probe-only", "--runner-temp-root=owned/work" });
+    const parsed = try parseRawOptions(std.testing.io, &.{ "--mode=ReleaseFast", "--strict", "--limit=100", "--require-cache-hit", "--cache-probe-only", "--runner-temp-root=owned/contract/ReleaseFast/work", "--export-cache-root=cache/contract/ReleaseFast/export" });
     try std.testing.expect(parsed.cache_probe_only);
+    try std.testing.expect(cohortSelected(parsed));
+    try std.testing.expect(!cohortEnabled(parsed));
     try std.testing.expectError(error.CacheProbeRequiresModeAndRequiredHit, parseRawOptions(std.testing.io, &.{ "--mode=ReleaseFast", "--cache-probe-only" }));
     try std.testing.expectError(error.FreshExportConflictsWithRequiredCacheHit, parseRawOptions(std.testing.io, &.{ "--mode=ReleaseFast", "--fresh-export", "--require-cache-hit" }));
+}
+
+test "cohort root contract authenticates complete worker selections and rejects drift" {
+    const io = std.testing.io;
+    var path_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const fixture = try std.fmt.bufPrint(&path_buffer, "local-state/caches/o2-calls/production-execution-cohort-v1-corrective-development/gate-root-test-{}", .{std.os.linux.getpid()});
+    var cwd = std.Io.Dir.cwd();
+    cwd.deleteTree(io, fixture) catch {};
+    defer cwd.deleteTree(io, fixture) catch {};
+    const work = try std.fmt.allocPrint(std.testing.allocator, "{s}/contract-a/ReleaseFast/work", .{fixture});
+    defer std.testing.allocator.free(work);
+    const cache = try std.fmt.allocPrint(std.testing.allocator, "{s}/contract-a/ReleaseFast/export", .{fixture});
+    defer std.testing.allocator.free(cache);
+    const other_owner = try std.fmt.allocPrint(std.testing.allocator, "{s}/contract-b/ReleaseFast/export", .{fixture});
+    defer std.testing.allocator.free(other_owner);
+    const wrong_mode = try std.fmt.allocPrint(std.testing.allocator, "{s}/contract-a/ReleaseSafe/export", .{fixture});
+    defer std.testing.allocator.free(wrong_mode);
+    try cwd.createDirPath(io, work);
+    try cwd.createDirPath(io, cache);
+    try cwd.createDirPath(io, other_owner);
+    try cwd.createDirPath(io, wrong_mode);
+    var options: Options = .{ .strict = true, .limit = 100, .mode = .ReleaseFast, .runner_temp_root = work, .export_cache_root = cache, .export_cache_root_explicit = true };
+    try requireCohortModeRoot(io, options, .ReleaseFast);
+    options.export_cache_root = other_owner;
+    try std.testing.expectError(error.ExecutionCohortRootMismatch, requireCohortModeRoot(io, options, .ReleaseFast));
+    options.export_cache_root = wrong_mode;
+    try std.testing.expectError(error.ExecutionCohortRootModeMismatch, requireCohortModeRoot(io, options, .ReleaseFast));
+    options.export_cache_root = cache;
+    options.export_cache_root_explicit = false;
+    try std.testing.expectError(error.ExecutionCohortRootMissing, requireCohortModeRoot(io, options, .ReleaseFast));
+    options.export_cache_root_explicit = true;
+    options.runner_temp_root = "/absolute/contract-a/ReleaseFast/work";
+    try std.testing.expectError(error.ExecutionCohortRootInvalid, requireCohortModeRoot(io, options, .ReleaseFast));
+    const escaping = try std.fmt.allocPrint(std.testing.allocator, "{s}/contract-a/ReleaseFast/../work", .{fixture});
+    defer std.testing.allocator.free(escaping);
+    options.runner_temp_root = escaping;
+    try std.testing.expectError(error.ExecutionCohortRootInvalid, requireCohortModeRoot(io, options, .ReleaseFast));
+    const symlink = try std.fmt.allocPrint(std.testing.allocator, "{s}/contract-a/ReleaseFast/work-link", .{fixture});
+    defer std.testing.allocator.free(symlink);
+    try cwd.symLink(io, "work", symlink, .{ .is_directory = true });
+    options.runner_temp_root = symlink;
+    try std.testing.expectError(error.ExecutionCohortRootInvalid, requireCohortModeRoot(io, options, .ReleaseFast));
 }
 
 fn syntheticCohortCandidate(source: []const u8, function: []const u8) Candidate {
@@ -415,10 +501,11 @@ fn runMode(
         .limit = options.limit,
         .candidate_rows = candidates.len,
     };
+    const cohort_selected = cohortSelected(options);
     const cohort_enabled = cohortEnabled(options);
-    if (cohort_enabled) {
+    if (cohort_selected) {
         try requireCohortDenominator(candidates, candidate_hash);
-        try requireCohortModeRoot(options, mode);
+        try requireCohortModeRoot(io, options, mode);
     }
     var cohort_tracker: CohortTracker = .{};
 
