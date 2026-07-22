@@ -41,6 +41,32 @@ const linked_frame_inspector_mode = "--inspect-generation-v3-linked-frame";
 const reference_output_inspector_mode = "--inspect-generation-v4-reference-output";
 const diagnostic_stream_max_bytes = 64 * 1024;
 const diagnostic_render_max_bytes = 256 * 1024;
+const weak_external_audit_mode = "--audit-weak-external-definition-sizeof";
+const weak_external_function_name = "coff.WeakExternalDefinition.sizeOf";
+const weak_external_definition_path = "lib/std/coff.zig";
+const weak_external_import_path = "lib/std/std.zig";
+const weak_external_use_path = "src/libs/mingw/implib.zig";
+const weak_external_expected_result: usize = 18;
+const weak_external_validation_root = "local-state/validations/o2-calls/production-target-audit/weak-external-definition-sizeof-development";
+const weak_external_cache_root = "local-state/caches/o2-calls/production-target-audit/weak-external-definition-sizeof-development";
+const weak_external_runtime_cache_name = "audit-runtime";
+const weak_external_diagnostic_name = "weak-external-definition-sizeof-audit-v1.tsv";
+const weak_external_diagnostic_max_bytes = 64 * 1024;
+const weak_external_execution_mode = "--execute-weak-external-definition-sizeof";
+const weak_external_execution_validation_root = "local-state/validations/o2-calls/production-target-execution/weak-external-definition-sizeof-development";
+const weak_external_execution_cache_root = "local-state/caches/o2-calls/production-target-execution/weak-external-definition-sizeof-development";
+const weak_external_execution_runtime_cache_name = "execution-runtime";
+const weak_external_expected_selector_version = "0.17.0-dev.364+bdee02bc0";
+const weak_external_expected_selector_length: u64 = 530_327_885;
+const weak_external_expected_selector_sha256 = [_]u8{
+    0xdc, 0xea, 0x34, 0x78, 0x27, 0x3d, 0x7f, 0xfe,
+    0x38, 0x95, 0x70, 0x9c, 0x8e, 0xed, 0x4c, 0xcc,
+    0x07, 0x24, 0x54, 0x88, 0x69, 0xcd, 0xb8, 0x61,
+    0x83, 0xfc, 0x73, 0x56, 0x16, 0x44, 0x10, 0xb7,
+};
+const weak_external_expected_stdout = "execution-oracle-v1 result=18 witness=61\n";
+const weak_external_object_max_bytes = 16 * 1024 * 1024;
+const weak_external_executable_max_bytes = 512 * 1024 * 1024;
 
 const OracleError = error{
     AbiMismatch,
@@ -76,6 +102,12 @@ const OracleError = error{
     ZigExecutableInvalid,
     ZigSelectorInvalid,
     ZigVersionMismatch,
+    AuditBindingMismatch,
+    AuditDiagnosticBoundExceeded,
+    AuditDiagnosticCollision,
+    AuditDiagnosticReadBackMismatch,
+    AuditExecutionForbidden,
+    ExecutionArtifactInvalid,
 };
 
 const BoundPath = struct {
@@ -218,6 +250,149 @@ const GenerationLayout = struct {
 
     fn descriptorForFinalRead(self: *const GenerationLayout) []const u8 {
         return self.descriptor.slice();
+    }
+};
+
+const WeakExternalAuditLayout = struct {
+    validation_root: BoundPath,
+    cache_root: BoundPath,
+    runtime_cache_root: BoundPath,
+    descriptor: BoundPath,
+    diagnostic: BoundPath,
+    local_cache: BoundPath,
+    global_cache: BoundPath,
+    home: BoundPath,
+    temporary: BoundPath,
+
+    fn init() OracleError!WeakExternalAuditLayout {
+        var layout: WeakExternalAuditLayout = .{
+            .validation_root = try BoundPath.init(weak_external_validation_root),
+            .cache_root = try BoundPath.init(weak_external_cache_root),
+            .runtime_cache_root = undefined,
+            .descriptor = undefined,
+            .diagnostic = undefined,
+            .local_cache = undefined,
+            .global_cache = undefined,
+            .home = undefined,
+            .temporary = undefined,
+        };
+        layout.runtime_cache_root = try BoundPath.child(&layout.cache_root, weak_external_runtime_cache_name);
+        layout.descriptor = try BoundPath.child(&layout.validation_root, "compiler.air");
+        layout.diagnostic = try BoundPath.child(&layout.validation_root, weak_external_diagnostic_name);
+        layout.local_cache = try BoundPath.child(&layout.runtime_cache_root, "zig-local-cache");
+        layout.global_cache = try BoundPath.child(&layout.runtime_cache_root, "zig-global-cache");
+        layout.home = try BoundPath.child(&layout.runtime_cache_root, "home");
+        layout.temporary = try BoundPath.child(&layout.runtime_cache_root, "tmp");
+        try layout.validate();
+        return layout;
+    }
+
+    fn validate(self: *const WeakExternalAuditLayout) OracleError!void {
+        if (!std.mem.eql(u8, self.validation_root.slice(), weak_external_validation_root) or
+            !std.mem.eql(u8, self.cache_root.slice(), weak_external_cache_root) or
+            !isStrictDescendant(self.cache_root.slice(), self.runtime_cache_root.slice()) or
+            !isStrictDescendant(self.validation_root.slice(), self.descriptor.slice()) or
+            !isStrictDescendant(self.validation_root.slice(), self.diagnostic.slice()) or
+            !isStrictDescendant(self.runtime_cache_root.slice(), self.local_cache.slice()) or
+            !isStrictDescendant(self.runtime_cache_root.slice(), self.global_cache.slice()) or
+            !isStrictDescendant(self.runtime_cache_root.slice(), self.home.slice()) or
+            !isStrictDescendant(self.runtime_cache_root.slice(), self.temporary.slice()))
+        {
+            return error.GenerationLayoutInvalid;
+        }
+    }
+};
+
+const WeakExternalExecutionLayout = struct {
+    validation_root: BoundPath,
+    cache_root: BoundPath,
+    runtime_cache_root: BoundPath,
+    descriptor: BoundPath,
+    local_cache: BoundPath,
+    global_cache: BoundPath,
+    home: BoundPath,
+    temporary: BoundPath,
+    reference_source: BoundPath,
+    linked_source: BoundPath,
+    object: BoundPath,
+    reference_executable: BoundPath,
+    linked_executable: BoundPath,
+    reference_stdout: BoundPath,
+    reference_stderr: BoundPath,
+    linked_stdout: BoundPath,
+    linked_stderr: BoundPath,
+    reference_build_frame: BoundPath,
+    linked_build_frame: BoundPath,
+
+    fn init() OracleError!WeakExternalExecutionLayout {
+        var layout: WeakExternalExecutionLayout = .{
+            .validation_root = try BoundPath.init(weak_external_execution_validation_root),
+            .cache_root = try BoundPath.init(weak_external_execution_cache_root),
+            .runtime_cache_root = undefined,
+            .descriptor = undefined,
+            .local_cache = undefined,
+            .global_cache = undefined,
+            .home = undefined,
+            .temporary = undefined,
+            .reference_source = undefined,
+            .linked_source = undefined,
+            .object = undefined,
+            .reference_executable = undefined,
+            .linked_executable = undefined,
+            .reference_stdout = undefined,
+            .reference_stderr = undefined,
+            .linked_stdout = undefined,
+            .linked_stderr = undefined,
+            .reference_build_frame = undefined,
+            .linked_build_frame = undefined,
+        };
+        layout.runtime_cache_root = try BoundPath.child(&layout.cache_root, weak_external_execution_runtime_cache_name);
+        layout.descriptor = try BoundPath.child(&layout.validation_root, "compiler.air");
+        layout.local_cache = try BoundPath.child(&layout.runtime_cache_root, "zig-local-cache");
+        layout.global_cache = try BoundPath.child(&layout.runtime_cache_root, "zig-global-cache");
+        layout.home = try BoundPath.child(&layout.runtime_cache_root, "home");
+        layout.temporary = try BoundPath.child(&layout.runtime_cache_root, "tmp");
+        layout.reference_source = try BoundPath.child(&layout.validation_root, "reference.zig");
+        layout.linked_source = try BoundPath.child(&layout.validation_root, "linked.zig");
+        layout.object = try BoundPath.child(&layout.validation_root, "coff.WeakExternalDefinition.sizeOf.o");
+        layout.reference_executable = try BoundPath.child(&layout.validation_root, "reference");
+        layout.linked_executable = try BoundPath.child(&layout.validation_root, "linked");
+        layout.reference_stdout = try BoundPath.child(&layout.validation_root, "reference.stdout");
+        layout.reference_stderr = try BoundPath.child(&layout.validation_root, "reference.stderr");
+        layout.linked_stdout = try BoundPath.child(&layout.validation_root, "linked.stdout");
+        layout.linked_stderr = try BoundPath.child(&layout.validation_root, "linked.stderr");
+        layout.reference_build_frame = try BoundPath.child(&layout.validation_root, reference_build_frame_final);
+        layout.linked_build_frame = try BoundPath.child(&layout.validation_root, linked_build_frame_final);
+        try layout.validate();
+        return layout;
+    }
+
+    fn validate(self: *const WeakExternalExecutionLayout) OracleError!void {
+        if (!std.mem.eql(u8, self.validation_root.slice(), weak_external_execution_validation_root) or
+            !std.mem.eql(u8, self.cache_root.slice(), weak_external_execution_cache_root) or
+            !isStrictDescendant(self.cache_root.slice(), self.runtime_cache_root.slice()))
+        {
+            return error.GenerationLayoutInvalid;
+        }
+        for ([_]*const BoundPath{
+            &self.descriptor,
+            &self.reference_source,
+            &self.linked_source,
+            &self.object,
+            &self.reference_executable,
+            &self.linked_executable,
+            &self.reference_stdout,
+            &self.reference_stderr,
+            &self.linked_stdout,
+            &self.linked_stderr,
+            &self.reference_build_frame,
+            &self.linked_build_frame,
+        }) |path| {
+            if (!isStrictDescendant(self.validation_root.slice(), path.slice())) return error.GenerationLayoutInvalid;
+        }
+        for ([_]*const BoundPath{ &self.local_cache, &self.global_cache, &self.home, &self.temporary }) |path| {
+            if (!isStrictDescendant(self.runtime_cache_root.slice(), path.slice())) return error.GenerationLayoutInvalid;
+        }
     }
 };
 
@@ -1095,8 +1270,43 @@ pub fn main(init: std.process.Init) !void {
         try runAcceptanceOracle(init.gpa, init.io, acceptance_selector);
         return;
     }
+    if (std.mem.eql(u8, selector, weak_external_audit_mode)) {
+        const external_selector = try requireWeakExternalAuditDispatch(selector, args.next(), args.next());
+        try runWeakExternalDefinitionAudit(init.gpa, init.io, external_selector);
+        return;
+    }
+    if (std.mem.eql(u8, selector, weak_external_execution_mode)) {
+        const external_selector = try requireWeakExternalExecutionDispatch(selector, args.next(), args.next());
+        try runWeakExternalDefinitionExecution(init.gpa, init.io, external_selector);
+        return;
+    }
+    if (std.mem.startsWith(u8, selector, "--audit-")) return error.InvalidArguments;
     if (args.next() != null) return error.InvalidArguments;
     try runRealOracle(init.gpa, init.io, selector);
+}
+
+fn requireWeakExternalAuditDispatch(
+    mode: []const u8,
+    selector: ?[]const u8,
+    extra: ?[]const u8,
+) OracleError![]const u8 {
+    if (!std.mem.eql(u8, mode, weak_external_audit_mode) or selector == null or extra != null) {
+        return error.InvalidArguments;
+    }
+    try requireAbsoluteSelector(selector.?);
+    return selector.?;
+}
+
+fn requireWeakExternalExecutionDispatch(
+    mode: []const u8,
+    selector: ?[]const u8,
+    extra: ?[]const u8,
+) OracleError![]const u8 {
+    if (!std.mem.eql(u8, mode, weak_external_execution_mode) or selector == null or extra != null) {
+        return error.InvalidArguments;
+    }
+    try requireAbsoluteSelector(selector.?);
+    return selector.?;
 }
 
 comptime {
@@ -1434,21 +1644,79 @@ fn closedEnvironment(
     const local_cache = try BoundPath.absolute(&layout.local_cache);
     const global_cache = try BoundPath.absolute(&layout.global_cache);
     const descriptor = try BoundPath.absolute(&layout.descriptor);
+    return closedEnvironmentForPaths(
+        allocator,
+        home.slice(),
+        temporary.slice(),
+        local_cache.slice(),
+        global_cache.slice(),
+        if (include_export) descriptor.slice() else null,
+    );
+}
+
+fn weakExternalAuditEnvironment(
+    allocator: std.mem.Allocator,
+    include_export: bool,
+    layout: *const WeakExternalAuditLayout,
+) !std.process.Environ.Map {
+    const home = try BoundPath.absolute(&layout.home);
+    const temporary = try BoundPath.absolute(&layout.temporary);
+    const local_cache = try BoundPath.absolute(&layout.local_cache);
+    const global_cache = try BoundPath.absolute(&layout.global_cache);
+    const descriptor = try BoundPath.absolute(&layout.descriptor);
+    return closedEnvironmentForPaths(
+        allocator,
+        home.slice(),
+        temporary.slice(),
+        local_cache.slice(),
+        global_cache.slice(),
+        if (include_export) descriptor.slice() else null,
+    );
+}
+
+fn weakExternalExecutionEnvironment(
+    allocator: std.mem.Allocator,
+    include_export: bool,
+    layout: *const WeakExternalExecutionLayout,
+) !std.process.Environ.Map {
+    const home = try BoundPath.absolute(&layout.home);
+    const temporary = try BoundPath.absolute(&layout.temporary);
+    const local_cache = try BoundPath.absolute(&layout.local_cache);
+    const global_cache = try BoundPath.absolute(&layout.global_cache);
+    const descriptor = try BoundPath.absolute(&layout.descriptor);
+    return closedEnvironmentForPaths(
+        allocator,
+        home.slice(),
+        temporary.slice(),
+        local_cache.slice(),
+        global_cache.slice(),
+        if (include_export) descriptor.slice() else null,
+    );
+}
+
+fn closedEnvironmentForPaths(
+    allocator: std.mem.Allocator,
+    home: []const u8,
+    temporary: []const u8,
+    local_cache: []const u8,
+    global_cache: []const u8,
+    descriptor: ?[]const u8,
+) !std.process.Environ.Map {
     var environment = std.process.Environ.Map.init(allocator);
     errdefer environment.deinit();
     try environment.put("LC_ALL", "C");
     try environment.put("LANG", "C");
     try environment.put("TZ", "UTC0");
-    try environment.put("HOME", home.slice());
-    try environment.put("TMPDIR", temporary.slice());
-    try environment.put("ZIG_LOCAL_CACHE_DIR", local_cache.slice());
-    try environment.put("ZIG_GLOBAL_CACHE_DIR", global_cache.slice());
+    try environment.put("HOME", home);
+    try environment.put("TMPDIR", temporary);
+    try environment.put("ZIG_LOCAL_CACHE_DIR", local_cache);
+    try environment.put("ZIG_GLOBAL_CACHE_DIR", global_cache);
     try environment.put("GIT_OPTIONAL_LOCKS", "0");
     try environment.put("GIT_CONFIG_NOSYSTEM", "1");
     try environment.put("GIT_CONFIG_SYSTEM", "/dev/null");
     try environment.put("GIT_CONFIG_GLOBAL", "/dev/null");
     try environment.put("GIT_TERMINAL_PROMPT", "0");
-    if (include_export) try environment.put("ZLLVM_AIR_EXPORT_PATH", descriptor.slice());
+    if (descriptor) |path| try environment.put("ZLLVM_AIR_EXPORT_PATH", path);
     return environment;
 }
 
@@ -1486,6 +1754,18 @@ fn observeZig(
     expected_version: []const u8,
     layout: *const GenerationLayout,
 ) !ZigIdentity {
+    var environment = try closedEnvironment(allocator, false, layout);
+    defer environment.deinit();
+    return observeZigWithEnvironment(allocator, io, canonical_path, expected_version, &environment);
+}
+
+fn observeZigWithEnvironment(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    canonical_path: []const u8,
+    expected_version: []const u8,
+    environment: *const std.process.Environ.Map,
+) !ZigIdentity {
     try requireAbsoluteSelector(canonical_path);
     var file = try std.Io.Dir.openFileAbsolute(io, canonical_path, .{ .mode = .read_only, .follow_symlinks = false });
     defer file.close(io);
@@ -1500,9 +1780,7 @@ fn observeZig(
     const bytes = try reader.interface.allocRemaining(allocator, .limited(zig_max_bytes));
     defer allocator.free(bytes);
     if (bytes.len != metadata.size) return error.ZigExecutableInvalid;
-    var environment = try closedEnvironment(allocator, false, layout);
-    defer environment.deinit();
-    var version = try runBounded(allocator, io, &.{ canonical_path, "version" }, &environment);
+    var version = try runBounded(allocator, io, &.{ canonical_path, "version" }, environment);
     defer version.deinit(allocator);
     try requireExitedZero(version);
     try validateExactVersionOutput(expected_version, version.stdout, version.stderr);
@@ -1535,22 +1813,30 @@ fn requireExternalRevisionAndVersion(
 ) !ExpectedExternalVersion {
     var environment = try closedEnvironment(allocator, false, layout);
     defer environment.deinit();
+    return requireExternalRevisionAndVersionWithEnvironment(allocator, io, &environment);
+}
+
+fn requireExternalRevisionAndVersionWithEnvironment(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    environment: *const std.process.Environ.Map,
+) !ExpectedExternalVersion {
     const prefix = [_][]const u8{
         "/usr/bin/git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-C", zig_repository_root,
     };
     const head_argv = prefix ++ [_][]const u8{ "rev-parse", "HEAD" };
-    var head = try runBounded(allocator, io, &head_argv, &environment);
+    var head = try runBounded(allocator, io, &head_argv, environment);
     defer head.deinit(allocator);
     try requireExitedZero(head);
     if (!std.mem.eql(u8, head.stdout, zig_revision ++ "\n")) return error.ExternalRevisionMismatch;
     const status_argv = prefix ++ [_][]const u8{ "status", "--porcelain=v1", "--untracked-files=all" };
-    var status = try runBounded(allocator, io, &status_argv, &environment);
+    var status = try runBounded(allocator, io, &status_argv, environment);
     defer status.deinit(allocator);
     try requireExitedZero(status);
     if (status.stdout.len != 0) return error.ExternalRepositoryDirty;
 
     const describe_argv = prefix ++ [_][]const u8{ "describe", "--match", "*.*.*", "--tags", "--abbrev=9" };
-    var describe = try runBounded(allocator, io, &describe_argv, &environment);
+    var describe = try runBounded(allocator, io, &describe_argv, environment);
     defer describe.deinit(allocator);
     try requireExitedZero(describe);
     if (describe.stderr.len != 0) return error.ExternalVersionUnavailable;
@@ -1648,6 +1934,92 @@ fn proveSourceBytes(
         .definition_count = 1,
         .use_count = use_count,
     };
+}
+
+fn proveWeakExternalCurrentSource(allocator: std.mem.Allocator, io: std.Io) !SourceProof {
+    var root = try std.Io.Dir.openDirAbsolute(io, zig_repository_root, .{
+        .access_sub_paths = true,
+        .iterate = false,
+        .follow_symlinks = false,
+    });
+    defer root.close(io);
+    const definition = try root.readFileAlloc(io, weak_external_definition_path, allocator, .limited(source_max_bytes));
+    defer allocator.free(definition);
+    const import_source = try root.readFileAlloc(io, weak_external_import_path, allocator, .limited(source_max_bytes));
+    defer allocator.free(import_source);
+    const use_source = try root.readFileAlloc(io, weak_external_use_path, allocator, .limited(source_max_bytes));
+    defer allocator.free(use_source);
+    return proveWeakExternalSourceBytes(allocator, definition, import_source, use_source);
+}
+
+fn proveWeakExternalSourceBytes(
+    allocator: std.mem.Allocator,
+    definition: []const u8,
+    import_source: []const u8,
+    use_source: []const u8,
+) !SourceProof {
+    const exact_import = "pub const coff = @import(\"coff.zig\");";
+    const exact_use = "std.coff.WeakExternalDefinition.sizeOf()";
+    try proveWeakExternalSizeOfAst(allocator, definition);
+    if (countExact(import_source, exact_import) != 1) return error.SourceImportMismatch;
+    const use_count = countExact(use_source, exact_use);
+    if (use_count != 1) return error.SourceUseMismatch;
+    return .{
+        .definition_sha256 = sha256(definition),
+        .import_sha256 = sha256(import_source),
+        .use_sha256 = sha256(use_source),
+        .definition_count = 1,
+        .use_count = use_count,
+    };
+}
+
+fn proveWeakExternalSizeOfAst(allocator: std.mem.Allocator, source: []const u8) !void {
+    const sentinel = try allocator.dupeZ(u8, source);
+    defer allocator.free(sentinel);
+    var tree = try std.zig.Ast.parse(allocator, sentinel, .zig);
+    defer tree.deinit(allocator);
+    if (tree.errors.len != 0) return error.InvalidSourceDefinition;
+
+    var container_count: usize = 0;
+    var members: ?[]const std.zig.Ast.Node.Index = null;
+    for (tree.rootDecls()) |decl| {
+        if (functionName(&tree, decl)) |name| {
+            if (std.mem.eql(u8, name, "sizeOf")) return error.InvalidSourceDefinition;
+        }
+        const var_decl = tree.fullVarDecl(decl) orelse continue;
+        if (!std.mem.eql(u8, tree.tokenSlice(var_decl.ast.mut_token + 1), "WeakExternalDefinition")) continue;
+        container_count += 1;
+        if (container_count != 1) return error.SourceDefinitionDuplicate;
+        if (tree.tokenTag(var_decl.ast.mut_token) != .keyword_const or
+            var_decl.visib_token == null or tree.tokenTag(var_decl.visib_token.?) != .keyword_pub or
+            var_decl.extern_export_token != null or var_decl.threadlocal_token != null or var_decl.comptime_token != null or
+            var_decl.ast.type_node != .none or var_decl.ast.align_node != .none or var_decl.ast.addrspace_node != .none or
+            var_decl.ast.section_node != .none)
+        {
+            return error.InvalidSourceDefinition;
+        }
+        const init = var_decl.ast.init_node.unwrap() orelse return error.InvalidSourceDefinition;
+        var container_buffer: [2]std.zig.Ast.Node.Index = undefined;
+        const container = tree.fullContainerDecl(&container_buffer, init) orelse return error.InvalidSourceDefinition;
+        if (tree.tokenTag(container.ast.main_token) != .keyword_struct or container.layout_token != null or container.ast.arg != .none) {
+            return error.InvalidSourceDefinition;
+        }
+        members = container.ast.members;
+    }
+    if (container_count == 0) return error.SourceDefinitionMissing;
+
+    var method_count: usize = 0;
+    for (members.?) |member| {
+        if (functionName(&tree, member)) |name| {
+            if (!std.mem.eql(u8, name, "sizeOf")) continue;
+            method_count += 1;
+            if (method_count != 1) return error.SourceDefinitionDuplicate;
+            try proveSizeOfMethod(&tree, member);
+            continue;
+        }
+        if (containsNestedFunctionNamed(&tree, member, "sizeOf")) return error.InvalidSourceDefinition;
+    }
+    if (method_count == 0) return error.SourceDefinitionMissing;
 }
 
 fn proveSymbolSizeOfAst(allocator: std.mem.Allocator, source: []const u8) !void {
@@ -1780,6 +2152,189 @@ fn proveDescriptor(allocator: std.mem.Allocator, descriptor: []const u8) !Descri
         .parameter_count = function_type.params.len,
         .return_bits = 64,
         .calling_convention = .default,
+    };
+}
+
+const WeakExternalCompatibilityProof = struct {
+    filtered_descriptor_sha256: [Sha256.digest_length]u8,
+    object_sha256: [Sha256.digest_length]u8,
+    object_length: usize,
+    observable_call_source_sha256: [Sha256.digest_length]u8,
+};
+
+const WeakExternalAuditProof = struct {
+    selector: ZigIdentity,
+    source: SourceProof,
+    descriptor: DescriptorProof,
+    compatibility: WeakExternalCompatibilityProof,
+};
+
+const ExecutionArtifactIdentity = struct {
+    length: u64,
+    sha256: [Sha256.digest_length]u8,
+    executable: bool,
+};
+
+const WeakExternalExecutionOutcome = struct {
+    selector_initial: ZigIdentity,
+    selector_final: ZigIdentity,
+    source_initial: SourceProof,
+    source_final: SourceProof,
+    descriptor_initial: DescriptorProof,
+    descriptor_final: DescriptorProof,
+    compatibility: WeakExternalCompatibilityProof,
+    object: ExecutionArtifactIdentity,
+    reference_executable: ExecutionArtifactIdentity,
+    linked_executable: ExecutionArtifactIdentity,
+    reference_record: ExecutionRecord,
+    linked_record: ExecutionRecord,
+    counters: Counters,
+};
+
+const WeakExternalAuditClaim = struct {
+    revision: []const u8,
+    function: []const u8,
+    definition_path: []const u8,
+    import_path: []const u8,
+    use_path: []const u8,
+    canonical_input_count: usize,
+    expected_result: usize,
+    execution_target: []const u8,
+};
+
+fn requireWeakExternalAuditClaim(
+    claim: WeakExternalAuditClaim,
+    source: SourceProof,
+    descriptor: DescriptorProof,
+) OracleError!void {
+    if (!std.mem.eql(u8, claim.revision, zig_revision) or
+        !std.mem.eql(u8, claim.function, weak_external_function_name) or
+        !std.mem.eql(u8, claim.definition_path, weak_external_definition_path) or
+        !std.mem.eql(u8, claim.import_path, weak_external_import_path) or
+        !std.mem.eql(u8, claim.use_path, weak_external_use_path) or
+        claim.canonical_input_count != 0 or claim.expected_result != weak_external_expected_result or
+        !std.mem.eql(u8, claim.execution_target, execution_target) or
+        source.definition_count != 1 or source.use_count != 1 or
+        descriptor.instruction_count != 2 or descriptor.parameter_count != 0 or
+        descriptor.return_bits != 64 or descriptor.calling_convention != .default)
+    {
+        return error.AuditBindingMismatch;
+    }
+}
+
+fn fixedWeakExternalAuditClaim() WeakExternalAuditClaim {
+    return .{
+        .revision = zig_revision,
+        .function = weak_external_function_name,
+        .definition_path = weak_external_definition_path,
+        .import_path = weak_external_import_path,
+        .use_path = weak_external_use_path,
+        .canonical_input_count = 0,
+        .expected_result = weak_external_expected_result,
+        .execution_target = execution_target,
+    };
+}
+
+const weak_external_observable_call_source =
+    "const std = @import(\"std\");\n" ++
+    "const Bridge = fn () callconv(.{ .x86_64_sysv = .{} }) usize;\n" ++
+    "const candidate: *const Bridge = @extern(*const Bridge, .{ .name = \"coff.WeakExternalDefinition.sizeOf\" });\n" ++
+    "pub fn main(init: std.process.Init) !void {\n" ++
+    "    const value = candidate();\n" ++
+    "    var buffer: [64]u8 = undefined;\n" ++
+    "    var writer = std.Io.File.stdout().writer(init.io, &buffer);\n" ++
+    "    try writer.interface.print(\"weak-external-size={} witness={}\\n\", .{ value, value * 3 + 7 });\n" ++
+    "    try writer.interface.flush();\n" ++
+    "}\n";
+
+fn proveWeakExternalDescriptor(allocator: std.mem.Allocator, descriptor: []const u8) !DescriptorProof {
+    var module = try air_export.parse(allocator, descriptor);
+    defer module.deinit();
+    var found: ?air_export.Function = null;
+    var count: usize = 0;
+    for (module.functions) |function| {
+        if (!std.mem.eql(u8, function.name, weak_external_function_name)) continue;
+        count += 1;
+        found = function;
+    }
+    if (count == 0) return error.AirBindingMissing;
+    if (count != 1) return error.AirBindingDuplicate;
+    const function = found.?;
+    var function_type = try air_types.parseFunctionType(allocator, function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 0 or function_type.c_calling_convention or function_type.non_default_calling_convention or
+        !function_type.return_type.ir_type.eql(.{ .int = 64 }))
+    {
+        return error.AbiMismatch;
+    }
+    if (function.instruction_count != 2 or function.structured_air_v2 == null or
+        function.structured_air_v2.?.instructions.len != 2)
+    {
+        return error.DescriptorInvalid;
+    }
+    var return_count: usize = 0;
+    for (function.structured_air_v2.?.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, "dbg_stmt")) continue;
+        if (!std.mem.eql(u8, instruction.opcode, "ret") or instruction.operands.len != 1) {
+            return error.DescriptorInvalid;
+        }
+        const operand = instruction.operands[0];
+        _ = std.fmt.parseUnsigned(usize, operand.value, 10) catch return error.DescriptorInvalid;
+        if (!std.mem.eql(u8, operand.kind, "const") or !std.mem.eql(u8, operand.type_text, "usize") or
+            instruction.details.len != 1 or
+            !std.mem.eql(u8, instruction.details[0].key, "operand0_text") or
+            !std.mem.eql(u8, instruction.details[0].value, "<usize, 18>"))
+        {
+            return error.DescriptorInvalid;
+        }
+        return_count += 1;
+    }
+    if (return_count != 1 or countExact(function.air_text, "ret(<usize, 18>)") != 1) return error.DescriptorInvalid;
+    return .{
+        .descriptor_sha256 = sha256(descriptor),
+        .function_type_sha256 = sha256(function.type_text),
+        .instruction_count = function.instruction_count,
+        .parameter_count = 0,
+        .return_bits = 64,
+        .calling_convention = .default,
+    };
+}
+
+fn proveWeakExternalObservableCallSource(allocator: std.mem.Allocator, source: []const u8) !void {
+    if (countExact(source, "coff.WeakExternalDefinition.sizeOf") != 1 or
+        countExact(source, "candidate()") != 1 or
+        countExact(source, "value * 3 + 7") != 1 or
+        countExact(source, "callconv(.{ .x86_64_sysv = .{} })") != 1)
+    {
+        return error.CallOccurrenceMissing;
+    }
+    const sentinel = try allocator.dupeZ(u8, source);
+    defer allocator.free(sentinel);
+    var tree = try std.zig.Ast.parse(allocator, sentinel, .zig);
+    defer tree.deinit(allocator);
+    if (tree.errors.len != 0) return error.CallOccurrenceMissing;
+}
+
+fn proveWeakExternalGenericCfg(
+    allocator: std.mem.Allocator,
+    descriptor: []const u8,
+) !WeakExternalCompatibilityProof {
+    const filtered = try real_rows.extractOracleFunctionDescriptor(allocator, descriptor, weak_external_function_name);
+    defer allocator.free(filtered);
+    var outcome = try real_rows.lowerOracleFunctionToObject(allocator, filtered);
+    defer outcome.deinit(allocator);
+    const object = switch (outcome) {
+        .failure => return error.DescriptorInvalid,
+        .success => |bytes| bytes,
+    };
+    if (object.len == 0 or object.len > process_output_max) return error.DescriptorInvalid;
+    try validateOracleAbiProof(execution_target, try deriveOracleAbiProof());
+    try proveWeakExternalObservableCallSource(allocator, weak_external_observable_call_source);
+    return .{
+        .filtered_descriptor_sha256 = sha256(filtered),
+        .object_sha256 = sha256(object),
+        .object_length = object.len,
+        .observable_call_source_sha256 = sha256(weak_external_observable_call_source),
     };
 }
 
@@ -1947,6 +2502,677 @@ fn exportFreshDescriptor(
     var result = try runBounded(allocator, io, &argv, &environment);
     defer result.deinit(allocator);
     try requireExitedZero(result);
+}
+
+fn requireWeakExternalAuditRootsAbsent(io: std.Io, layout: *const WeakExternalAuditLayout) !void {
+    const cwd = std.Io.Dir.cwd();
+    for ([_][]const u8{ layout.validation_root.slice(), layout.runtime_cache_root.slice() }) |path| {
+        _ = cwd.statFile(io, path, .{ .follow_symlinks = false }) catch |failure| switch (failure) {
+            error.FileNotFound => continue,
+            else => return failure,
+        };
+        return error.GenerationCollision;
+    }
+}
+
+fn ensureWeakExternalAuditDirectory(io: std.Io, fixed_path: []const u8) !void {
+    if (fixed_path.len == 0 or std.fs.path.isAbsolute(fixed_path)) return error.GenerationLayoutInvalid;
+    const cwd = std.Io.Dir.cwd();
+    var path_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    var path_length: usize = 0;
+    var components = std.mem.splitScalar(u8, fixed_path, '/');
+    while (components.next()) |component| {
+        if (component.len == 0 or std.mem.eql(u8, component, ".") or std.mem.eql(u8, component, "..")) {
+            return error.GenerationLayoutInvalid;
+        }
+        const rendered = std.fmt.bufPrint(path_buffer[path_length..], "{s}{s}", .{
+            if (path_length == 0) "" else "/",
+            component,
+        }) catch return error.GenerationLayoutInvalid;
+        path_length += rendered.len;
+        const current = path_buffer[0..path_length];
+        const metadata = cwd.statFile(io, current, .{ .follow_symlinks = false }) catch |failure| switch (failure) {
+            error.FileNotFound => {
+                try cwd.createDir(io, current, .default_dir);
+                continue;
+            },
+            else => return failure,
+        };
+        if (metadata.kind != .directory) return error.GenerationLayoutInvalid;
+    }
+}
+
+fn createFreshWeakExternalAudit(io: std.Io, layout: *const WeakExternalAuditLayout) !void {
+    try layout.validate();
+    try ensureWeakExternalAuditDirectory(io, "local-state/validations/o2-calls/production-target-audit");
+    try ensureWeakExternalAuditDirectory(io, weak_external_cache_root);
+    try requireWeakExternalAuditRootsAbsent(io, layout);
+    const cwd = std.Io.Dir.cwd();
+    cwd.createDir(io, layout.validation_root.slice(), .default_dir) catch |failure| switch (failure) {
+        error.PathAlreadyExists => return error.GenerationCollision,
+        else => return failure,
+    };
+    cwd.createDir(io, layout.runtime_cache_root.slice(), .default_dir) catch |failure| switch (failure) {
+        error.PathAlreadyExists => return error.GenerationCollision,
+        else => return failure,
+    };
+    try cwd.createDir(io, layout.local_cache.slice(), .default_dir);
+    try cwd.createDir(io, layout.global_cache.slice(), .default_dir);
+    try cwd.createDir(io, layout.home.slice(), .default_dir);
+    try cwd.createDir(io, layout.temporary.slice(), .default_dir);
+}
+
+fn exportWeakExternalDescriptor(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    zig_path: []const u8,
+    layout: *const WeakExternalAuditLayout,
+) !void {
+    var environment = try weakExternalAuditEnvironment(allocator, true, layout);
+    defer environment.deinit();
+    const local_cache = try BoundPath.absolute(&layout.local_cache);
+    const argv = [_][]const u8{
+        zig_path,
+        "build",
+        "--build-file",
+        zig_repository_root ++ "/build.zig",
+        "--cache-dir",
+        local_cache.slice(),
+        "-Dno-bin",
+        "-Dno-lib",
+        "-Dno-langref",
+        "-Ddebug-extensions=true",
+        "-Dtarget=x86_64-linux-gnu",
+        "-Doptimize=ReleaseFast",
+    };
+    var result = try runBounded(allocator, io, &argv, &environment);
+    defer result.deinit(allocator);
+    try requireExitedZero(result);
+    if (result.stdout.len != 0 or result.stderr.len != 0) return error.ProcessInconsistent;
+}
+
+fn encodeWeakExternalAuditDiagnostic(
+    allocator: std.mem.Allocator,
+    proof: WeakExternalAuditProof,
+) ![]u8 {
+    const selector_hex = std.fmt.bytesToHex(proof.selector.sha256, .lower);
+    const definition_hex = std.fmt.bytesToHex(proof.source.definition_sha256, .lower);
+    const import_hex = std.fmt.bytesToHex(proof.source.import_sha256, .lower);
+    const use_hex = std.fmt.bytesToHex(proof.source.use_sha256, .lower);
+    const descriptor_hex = std.fmt.bytesToHex(proof.descriptor.descriptor_sha256, .lower);
+    const type_hex = std.fmt.bytesToHex(proof.descriptor.function_type_sha256, .lower);
+    const filtered_hex = std.fmt.bytesToHex(proof.compatibility.filtered_descriptor_sha256, .lower);
+    const object_hex = std.fmt.bytesToHex(proof.compatibility.object_sha256, .lower);
+    const call_hex = std.fmt.bytesToHex(proof.compatibility.observable_call_source_sha256, .lower);
+    const bytes = try std.fmt.allocPrint(
+        allocator,
+        "weak-external-definition-sizeof-audit-v1\n" ++
+            "controller_version=0.16.0\n" ++
+            "external_revision={s}\n" ++
+            "external_selector_version={s}\n" ++
+            "external_selector_bytes={}\n" ++
+            "external_selector_sha256={s}\n" ++
+            "function={s}\n" ++
+            "definition_path={s}\n" ++
+            "import_path={s}\n" ++
+            "use_path={s}\n" ++
+            "definition_sha256={s}\n" ++
+            "import_sha256={s}\n" ++
+            "use_sha256={s}\n" ++
+            "definition_count={}\n" ++
+            "use_count={}\n" ++
+            "descriptor_sha256={s}\n" ++
+            "function_type_sha256={s}\n" ++
+            "instruction_count={}\n" ++
+            "calling_convention=default\n" ++
+            "parameter_count=0\n" ++
+            "return_bits=64\n" ++
+            "canonical_input=none\n" ++
+            "expected_result={}\n" ++
+            "filtered_descriptor_sha256={s}\n" ++
+            "generic_cfg_object_bytes={}\n" ++
+            "generic_cfg_object_sha256={s}\n" ++
+            "observable_call_source_sha256={s}\n" ++
+            "observable_call_return_drives_output=true\n" ++
+            "candidate_executable_created=false\n" ++
+            "candidate_executed=false\n" ++
+            "future_counter=real_programs_ok\n" ++
+            "counter_advanced=false\n" ++
+            "bypass_ratchet_claim=false\n" ++
+            "completion=admitted\n",
+        .{
+            zig_revision,
+            proof.selector.versionSlice(),
+            proof.selector.length,
+            &selector_hex,
+            weak_external_function_name,
+            weak_external_definition_path,
+            weak_external_import_path,
+            weak_external_use_path,
+            &definition_hex,
+            &import_hex,
+            &use_hex,
+            proof.source.definition_count,
+            proof.source.use_count,
+            &descriptor_hex,
+            &type_hex,
+            proof.descriptor.instruction_count,
+            weak_external_expected_result,
+            &filtered_hex,
+            proof.compatibility.object_length,
+            &object_hex,
+            &call_hex,
+        },
+    );
+    errdefer allocator.free(bytes);
+    try requireWeakExternalDiagnosticBound(bytes.len);
+    return bytes;
+}
+
+fn requireWeakExternalDiagnosticBound(length: usize) OracleError!void {
+    if (length == 0 or length > weak_external_diagnostic_max_bytes) return error.AuditDiagnosticBoundExceeded;
+}
+
+fn publishWeakExternalAuditDiagnostic(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    layout: *const WeakExternalAuditLayout,
+    encoded: []const u8,
+) !void {
+    var directory = try std.Io.Dir.cwd().openDir(io, layout.validation_root.slice(), .{
+        .access_sub_paths = false,
+        .iterate = false,
+        .follow_symlinks = false,
+    });
+    defer directory.close(io);
+    const temporary_name = weak_external_diagnostic_name ++ ".tmp";
+    var temporary = directory.createFile(io, temporary_name, .{
+        .read = false,
+        .truncate = false,
+        .exclusive = true,
+    }) catch |failure| switch (failure) {
+        error.PathAlreadyExists => return error.AuditDiagnosticCollision,
+        else => return failure,
+    };
+    var temporary_open = true;
+    defer if (temporary_open) temporary.close(io);
+    try temporary.writeStreamingAll(io, encoded);
+    try temporary.sync(io);
+    temporary.close(io);
+    temporary_open = false;
+    directory.renamePreserve(temporary_name, directory, weak_external_diagnostic_name, io) catch |failure| switch (failure) {
+        error.PathAlreadyExists => return error.AuditDiagnosticCollision,
+        else => return failure,
+    };
+    try syncOwnedDirectory(directory, io);
+    const final = try directory.openFile(io, weak_external_diagnostic_name, .{
+        .mode = .read_only,
+        .follow_symlinks = false,
+        .resolve_beneath = true,
+    });
+    defer final.close(io);
+    const metadata = try final.stat(io);
+    if (metadata.kind != .file or metadata.size != encoded.len or metadata.size > weak_external_diagnostic_max_bytes) {
+        return error.AuditDiagnosticReadBackMismatch;
+    }
+    const read_back = try allocator.alloc(u8, encoded.len);
+    defer allocator.free(read_back);
+    if (try final.readPositionalAll(io, read_back, 0) != encoded.len or !std.mem.eql(u8, read_back, encoded)) {
+        return error.AuditDiagnosticReadBackMismatch;
+    }
+    var trailing: [1]u8 = undefined;
+    if (try final.readPositionalAll(io, &trailing, encoded.len) != 0) return error.AuditDiagnosticReadBackMismatch;
+}
+
+fn runWeakExternalDefinitionAudit(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    selector: []const u8,
+) !void {
+    try requireAbsoluteSelector(selector);
+    const layout = try WeakExternalAuditLayout.init();
+    try createFreshWeakExternalAudit(io, &layout);
+    var environment = try weakExternalAuditEnvironment(allocator, false, &layout);
+    defer environment.deinit();
+    const expected_version = try requireExternalRevisionAndVersionWithEnvironment(allocator, io, &environment);
+    var canonical_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const canonical_length = try std.Io.Dir.realPathFileAbsolute(io, selector, &canonical_buffer);
+    const canonical_selector = canonical_buffer[0..canonical_length];
+    const selector_initial = try observeZigWithEnvironment(allocator, io, canonical_selector, expected_version.slice(), &environment);
+    const source_initial = try proveWeakExternalCurrentSource(allocator, io);
+    try exportWeakExternalDescriptor(allocator, io, canonical_selector, &layout);
+    try requireZigStable(selector_initial, try observeZigWithEnvironment(allocator, io, canonical_selector, expected_version.slice(), &environment));
+    const descriptor = try std.Io.Dir.cwd().readFileAlloc(io, layout.descriptor.slice(), allocator, .limited(descriptor_max_bytes));
+    defer allocator.free(descriptor);
+    const descriptor_initial = try proveWeakExternalDescriptor(allocator, descriptor);
+    try requireWeakExternalAuditClaim(fixedWeakExternalAuditClaim(), source_initial, descriptor_initial);
+    const compatibility = try proveWeakExternalGenericCfg(allocator, descriptor);
+
+    const final_version = try requireExternalRevisionAndVersionWithEnvironment(allocator, io, &environment);
+    if (!std.mem.eql(u8, expected_version.slice(), final_version.slice())) return error.ExternalVersionUnavailable;
+    try requireZigStable(selector_initial, try observeZigWithEnvironment(allocator, io, canonical_selector, expected_version.slice(), &environment));
+    const source_final = try proveWeakExternalCurrentSource(allocator, io);
+    if (!std.meta.eql(source_initial, source_final)) return error.AuditBindingMismatch;
+    const descriptor_final_bytes = try std.Io.Dir.cwd().readFileAlloc(io, layout.descriptor.slice(), allocator, .limited(descriptor_max_bytes));
+    defer allocator.free(descriptor_final_bytes);
+    const descriptor_final = try proveWeakExternalDescriptor(allocator, descriptor_final_bytes);
+    try requireWeakExternalAuditClaim(fixedWeakExternalAuditClaim(), source_final, descriptor_final);
+    if (!std.meta.eql(descriptor_initial, descriptor_final) or !std.mem.eql(u8, descriptor, descriptor_final_bytes)) {
+        return error.AuditBindingMismatch;
+    }
+    const compatibility_final = try proveWeakExternalGenericCfg(allocator, descriptor_final_bytes);
+    if (!std.meta.eql(compatibility, compatibility_final)) return error.AuditBindingMismatch;
+
+    const proof: WeakExternalAuditProof = .{
+        .selector = selector_initial,
+        .source = source_initial,
+        .descriptor = descriptor_initial,
+        .compatibility = compatibility,
+    };
+    const diagnostic = try encodeWeakExternalAuditDiagnostic(allocator, proof);
+    defer allocator.free(diagnostic);
+    try publishWeakExternalAuditDiagnostic(allocator, io, &layout, diagnostic);
+    try std.Io.File.stdout().writeStreamingAll(io, diagnostic);
+}
+
+const weak_external_reference_harness_source =
+    \\const std = @import("std");
+    \\pub fn main(init: std.process.Init) !void {
+    \\    const result: usize = 18;
+    \\    const witness = result *% 3 +% 7;
+    \\    var buffer: [128]u8 = undefined;
+    \\    var writer = std.Io.File.stdout().writer(init.io, &buffer);
+    \\    try writer.interface.print("execution-oracle-v1 result={} witness={}\n", .{ result, witness });
+    \\    try writer.interface.flush();
+    \\}
+    \\
+;
+
+const weak_external_linked_harness_source =
+    \\const std = @import("std");
+    \\const size_of = @extern(*const fn () callconv(.{ .x86_64_sysv = .{} }) usize, .{ .name = "coff.WeakExternalDefinition.sizeOf" });
+    \\pub fn main(init: std.process.Init) !void {
+    \\    const result = size_of();
+    \\    const witness = result *% 3 +% 7;
+    \\    var buffer: [128]u8 = undefined;
+    \\    var writer = std.Io.File.stdout().writer(init.io, &buffer);
+    \\    try writer.interface.print("execution-oracle-v1 result={} witness={}\n", .{ result, witness });
+    \\    try writer.interface.flush();
+    \\}
+    \\
+;
+
+fn proveWeakExternalReferenceHarness(allocator: std.mem.Allocator, source: []const u8) !void {
+    if (!std.mem.eql(u8, source, weak_external_reference_harness_source) or
+        countExact(source, "const result: usize = 18;") != 1 or countExact(source, "witness={}\\n") != 1)
+    {
+        return error.CandidateBindingMismatch;
+    }
+    try proveHarnessNewlineAst(allocator, source);
+}
+
+fn proveWeakExternalLinkedHarness(allocator: std.mem.Allocator, source: []const u8) !void {
+    if (!std.mem.eql(u8, source, weak_external_linked_harness_source) or
+        countExact(source, weak_external_function_name) != 1 or countExact(source, "size_of()") != 1 or
+        countExact(source, "callconv(.{ .x86_64_sysv = .{} })") != 1 or
+        countExact(source, "const witness = result *% 3 +% 7;") != 1)
+    {
+        return error.CallOccurrenceMissing;
+    }
+    try proveHarnessNewlineAst(allocator, source);
+    const sentinel = try allocator.dupeZ(u8, source);
+    defer allocator.free(sentinel);
+    var tree = try std.zig.Ast.parse(allocator, sentinel, .zig);
+    defer tree.deinit(allocator);
+    if (tree.errors.len != 0) return error.CandidateBindingMismatch;
+}
+
+fn requireWeakExternalSelectorIdentity(identity: ZigIdentity) OracleError!void {
+    if (!std.mem.eql(u8, identity.versionSlice(), weak_external_expected_selector_version) or
+        identity.length != weak_external_expected_selector_length or
+        !std.mem.eql(u8, &identity.sha256, &weak_external_expected_selector_sha256))
+    {
+        return error.SelectorDrift;
+    }
+}
+
+fn admitWeakExternalExecutionCandidate(
+    source: SourceProof,
+    descriptor: DescriptorProof,
+) OracleError!CandidateAdmission {
+    try requireWeakExternalAuditClaim(fixedWeakExternalAuditClaim(), source, descriptor);
+    const harness: HarnessContract = .{
+        .parameter_count = 0,
+        .return_bits = 64,
+        .calling_convention = .default,
+        .return_value_drives_output = true,
+    };
+    const bridge = expectedExecutionBridge();
+    try validateExecutionBridge(bridge, descriptor, harness);
+    return .{
+        .source = source,
+        .descriptor = descriptor,
+        .harness = harness,
+        .bridge = bridge,
+    };
+}
+
+fn requireWeakExternalExecutionRootsAbsent(io: std.Io, layout: *const WeakExternalExecutionLayout) !void {
+    const cwd = std.Io.Dir.cwd();
+    for ([_][]const u8{ layout.validation_root.slice(), layout.runtime_cache_root.slice() }) |path| {
+        _ = cwd.statFile(io, path, .{ .follow_symlinks = false }) catch |failure| switch (failure) {
+            error.FileNotFound => continue,
+            else => return failure,
+        };
+        return error.GenerationCollision;
+    }
+}
+
+fn createFreshWeakExternalExecution(io: std.Io, layout: *const WeakExternalExecutionLayout) !void {
+    try layout.validate();
+    try ensureWeakExternalAuditDirectory(io, "local-state/validations/o2-calls/production-target-execution");
+    try ensureWeakExternalAuditDirectory(io, weak_external_execution_cache_root);
+    try requireWeakExternalExecutionRootsAbsent(io, layout);
+    const cwd = std.Io.Dir.cwd();
+    try cwd.createDir(io, layout.validation_root.slice(), .default_dir);
+    try cwd.createDir(io, layout.runtime_cache_root.slice(), .default_dir);
+    try cwd.createDir(io, layout.local_cache.slice(), .default_dir);
+    try cwd.createDir(io, layout.global_cache.slice(), .default_dir);
+    try cwd.createDir(io, layout.home.slice(), .default_dir);
+    try cwd.createDir(io, layout.temporary.slice(), .default_dir);
+}
+
+fn exportWeakExternalExecutionDescriptor(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    zig_path: []const u8,
+    layout: *const WeakExternalExecutionLayout,
+) !void {
+    var environment = try weakExternalExecutionEnvironment(allocator, true, layout);
+    defer environment.deinit();
+    const local_cache = try BoundPath.absolute(&layout.local_cache);
+    const argv = [_][]const u8{
+        zig_path,
+        "build",
+        "--build-file",
+        zig_repository_root ++ "/build.zig",
+        "--cache-dir",
+        local_cache.slice(),
+        "-Dno-bin",
+        "-Dno-lib",
+        "-Dno-langref",
+        "-Ddebug-extensions=true",
+        "-Dtarget=x86_64-linux-gnu",
+        "-Doptimize=ReleaseFast",
+    };
+    var result = try runBounded(allocator, io, &argv, &environment);
+    defer result.deinit(allocator);
+    try requireExitedZero(result);
+    if (result.stdout.len != 0 or result.stderr.len != 0) return error.ProcessInconsistent;
+}
+
+fn observeExecutionArtifact(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    path: *const BoundPath,
+    require_executable: bool,
+    max_bytes: usize,
+) !ExecutionArtifactIdentity {
+    const absolute = try BoundPath.absolute(path);
+    var file = try std.Io.Dir.openFileAbsolute(io, absolute.slice(), .{ .mode = .read_only, .follow_symlinks = false });
+    defer file.close(io);
+    const metadata = try file.stat(io);
+    const executable = std.Io.File.Permissions.has_executable_bit and metadata.permissions.toMode() & 0o111 != 0;
+    if (metadata.kind != .file or metadata.size == 0 or metadata.size > max_bytes or executable != require_executable) {
+        return error.ExecutionArtifactInvalid;
+    }
+    var reader = file.reader(io, &.{});
+    const bytes = try reader.interface.allocRemaining(allocator, .limited(max_bytes));
+    defer allocator.free(bytes);
+    if (bytes.len != metadata.size) return error.ExecutionArtifactInvalid;
+    return .{ .length = metadata.size, .sha256 = sha256(bytes), .executable = executable };
+}
+
+fn writeWeakExternalHarnesses(io: std.Io, admission: CandidateAdmission, layout: *const WeakExternalExecutionLayout) !void {
+    try requireCandidateAdmission(admission);
+    try proveWeakExternalReferenceHarness(std.heap.page_allocator, weak_external_reference_harness_source);
+    try proveWeakExternalLinkedHarness(std.heap.page_allocator, weak_external_linked_harness_source);
+    const cwd = std.Io.Dir.cwd();
+    try cwd.writeFile(io, .{ .sub_path = layout.reference_source.slice(), .data = weak_external_reference_harness_source });
+    try cwd.writeFile(io, .{ .sub_path = layout.linked_source.slice(), .data = weak_external_linked_harness_source });
+}
+
+fn buildWeakExternalReference(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    zig_path: []const u8,
+    layout: *const WeakExternalExecutionLayout,
+) !void {
+    var environment = try weakExternalExecutionEnvironment(allocator, false, layout);
+    defer environment.deinit();
+    const source = try BoundPath.absolute(&layout.reference_source);
+    const executable = try BoundPath.absolute(&layout.reference_executable);
+    var emit_buffer: [std.Io.Dir.max_path_bytes + 32]u8 = undefined;
+    const emit = try std.fmt.bufPrint(&emit_buffer, "-femit-bin={s}", .{executable.slice()});
+    var result = try runBounded(allocator, io, &.{ zig_path, "build-exe", source.slice(), "-OReleaseFast", emit }, &environment);
+    defer result.deinit(allocator);
+    var directory = try std.Io.Dir.cwd().openDir(io, layout.validation_root.slice(), .{
+        .access_sub_paths = true,
+        .iterate = false,
+        .follow_symlinks = false,
+    });
+    defer directory.close(io);
+    _ = try persistBuildPhaseThenRequireSuccess(allocator, directory, io, .reference, &result);
+}
+
+fn buildWeakExternalLinked(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    zig_path: []const u8,
+    layout: *const WeakExternalExecutionLayout,
+) !void {
+    var environment = try weakExternalExecutionEnvironment(allocator, false, layout);
+    defer environment.deinit();
+    const source = try BoundPath.absolute(&layout.linked_source);
+    const object = try BoundPath.absolute(&layout.object);
+    const executable = try BoundPath.absolute(&layout.linked_executable);
+    var emit_buffer: [std.Io.Dir.max_path_bytes + 32]u8 = undefined;
+    const emit = try std.fmt.bufPrint(&emit_buffer, "-femit-bin={s}", .{executable.slice()});
+    var result = try runBounded(
+        allocator,
+        io,
+        &.{ zig_path, "build-exe", "-fno-lld", source.slice(), object.slice(), "-OReleaseFast", emit },
+        &environment,
+    );
+    defer result.deinit(allocator);
+    var directory = try std.Io.Dir.cwd().openDir(io, layout.validation_root.slice(), .{
+        .access_sub_paths = true,
+        .iterate = false,
+        .follow_symlinks = false,
+    });
+    defer directory.close(io);
+    _ = try persistBuildPhaseThenRequireSuccess(allocator, directory, io, .linked, &result);
+}
+
+fn writeWeakExternalExecutionOutputs(
+    io: std.Io,
+    layout: *const WeakExternalExecutionLayout,
+    reference: OwnedProcessResult,
+    linked: OwnedProcessResult,
+) !void {
+    const cwd = std.Io.Dir.cwd();
+    try cwd.writeFile(io, .{ .sub_path = layout.reference_stdout.slice(), .data = reference.stdout });
+    try cwd.writeFile(io, .{ .sub_path = layout.reference_stderr.slice(), .data = reference.stderr });
+    try cwd.writeFile(io, .{ .sub_path = layout.linked_stdout.slice(), .data = linked.stdout });
+    try cwd.writeFile(io, .{ .sub_path = layout.linked_stderr.slice(), .data = linked.stderr });
+}
+
+fn runWeakExternalDefinitionExecution(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    selector: []const u8,
+) !void {
+    const outcome = try executeWeakExternalDefinition(allocator, io, selector);
+    try writeWeakExternalExecutionSummary(io, &outcome);
+}
+
+fn executeWeakExternalDefinition(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    selector: []const u8,
+) !WeakExternalExecutionOutcome {
+    try requireAbsoluteSelector(selector);
+    const layout = try WeakExternalExecutionLayout.init();
+    try createFreshWeakExternalExecution(io, &layout);
+    var environment = try weakExternalExecutionEnvironment(allocator, false, &layout);
+    defer environment.deinit();
+    const expected_version = try requireExternalRevisionAndVersionWithEnvironment(allocator, io, &environment);
+    if (!std.mem.eql(u8, expected_version.slice(), weak_external_expected_selector_version)) return error.ZigVersionMismatch;
+    var canonical_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const canonical_length = try std.Io.Dir.realPathFileAbsolute(io, selector, &canonical_buffer);
+    const canonical_selector = canonical_buffer[0..canonical_length];
+    const selector_initial = try observeZigWithEnvironment(allocator, io, canonical_selector, expected_version.slice(), &environment);
+    try requireWeakExternalSelectorIdentity(selector_initial);
+    const source_initial = try proveWeakExternalCurrentSource(allocator, io);
+
+    try exportWeakExternalExecutionDescriptor(allocator, io, canonical_selector, &layout);
+    const selector_after_export = try observeZigWithEnvironment(allocator, io, canonical_selector, expected_version.slice(), &environment);
+    try requireZigStable(selector_initial, selector_after_export);
+    try requireWeakExternalSelectorIdentity(selector_after_export);
+    const descriptor = try std.Io.Dir.cwd().readFileAlloc(io, layout.descriptor.slice(), allocator, .limited(descriptor_max_bytes));
+    defer allocator.free(descriptor);
+    const descriptor_initial = try proveWeakExternalDescriptor(allocator, descriptor);
+    const admission = try admitWeakExternalExecutionCandidate(source_initial, descriptor_initial);
+    try requireCandidateAdmission(admission);
+    const compatibility = try proveWeakExternalGenericCfg(allocator, descriptor);
+
+    const filtered = try real_rows.extractOracleFunctionDescriptor(allocator, descriptor, weak_external_function_name);
+    defer allocator.free(filtered);
+    var object_outcome = try real_rows.lowerOracleFunctionToObject(allocator, filtered);
+    defer object_outcome.deinit(allocator);
+    const object_bytes = switch (object_outcome) {
+        .failure => return error.DescriptorInvalid,
+        .success => |bytes| bytes,
+    };
+    if (object_bytes.len == 0 or object_bytes.len > weak_external_object_max_bytes or
+        !std.mem.eql(u8, &sha256(object_bytes), &compatibility.object_sha256))
+    {
+        return error.ExecutionArtifactInvalid;
+    }
+    var counters: Counters = .{};
+    counters.noteLowered();
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = layout.object.slice(), .data = object_bytes });
+    const object_identity = try observeExecutionArtifact(allocator, io, &layout.object, false, weak_external_object_max_bytes);
+    if (object_identity.length != object_bytes.len or !std.mem.eql(u8, &object_identity.sha256, &compatibility.object_sha256)) {
+        return error.ExecutionArtifactInvalid;
+    }
+    counters.noteEmitted();
+
+    try writeWeakExternalHarnesses(io, admission, &layout);
+    try buildWeakExternalReference(allocator, io, canonical_selector, &layout);
+    const selector_after_reference = try observeZigWithEnvironment(allocator, io, canonical_selector, expected_version.slice(), &environment);
+    try requireZigStable(selector_initial, selector_after_reference);
+    try requireWeakExternalSelectorIdentity(selector_after_reference);
+    try buildWeakExternalLinked(allocator, io, canonical_selector, &layout);
+    const selector_after_link = try observeZigWithEnvironment(allocator, io, canonical_selector, expected_version.slice(), &environment);
+    try requireZigStable(selector_initial, selector_after_link);
+    try requireWeakExternalSelectorIdentity(selector_after_link);
+    counters.noteLinked();
+
+    const reference_executable = try observeExecutionArtifact(allocator, io, &layout.reference_executable, true, weak_external_executable_max_bytes);
+    const linked_executable = try observeExecutionArtifact(allocator, io, &layout.linked_executable, true, weak_external_executable_max_bytes);
+    const reference_path = try BoundPath.absolute(&layout.reference_executable);
+    const linked_path = try BoundPath.absolute(&layout.linked_executable);
+    var reference_result = try runBounded(allocator, io, &.{reference_path.slice()}, &environment);
+    defer reference_result.deinit(allocator);
+    var linked_result = try runBounded(allocator, io, &.{linked_path.slice()}, &environment);
+    defer linked_result.deinit(allocator);
+    try writeWeakExternalExecutionOutputs(io, &layout, reference_result, linked_result);
+    const reference_record = try canonicalExecutionRecord(reference_result, admission);
+    const linked_record = try canonicalExecutionRecord(linked_result, admission);
+    try counters.noteBothExecuted(reference_record, linked_record);
+    try counters.noteOracleAccepted(reference_record, linked_record);
+
+    const final_version = try requireExternalRevisionAndVersionWithEnvironment(allocator, io, &environment);
+    if (!std.mem.eql(u8, expected_version.slice(), final_version.slice())) return error.ExternalVersionUnavailable;
+    const selector_final = try observeZigWithEnvironment(allocator, io, canonical_selector, expected_version.slice(), &environment);
+    try requireZigStable(selector_initial, selector_final);
+    try requireWeakExternalSelectorIdentity(selector_final);
+    const source_final = try proveWeakExternalCurrentSource(allocator, io);
+    if (!std.meta.eql(source_initial, source_final)) return error.CandidateBindingMismatch;
+    const descriptor_final_bytes = try std.Io.Dir.cwd().readFileAlloc(io, layout.descriptor.slice(), allocator, .limited(descriptor_max_bytes));
+    defer allocator.free(descriptor_final_bytes);
+    const descriptor_final = try proveWeakExternalDescriptor(allocator, descriptor_final_bytes);
+    if (!std.meta.eql(descriptor_initial, descriptor_final) or !std.mem.eql(u8, descriptor, descriptor_final_bytes)) {
+        return error.CandidateBindingMismatch;
+    }
+    const final_compatibility = try proveWeakExternalGenericCfg(allocator, descriptor_final_bytes);
+    if (!std.meta.eql(compatibility, final_compatibility) or
+        !std.meta.eql(reference_executable, try observeExecutionArtifact(allocator, io, &layout.reference_executable, true, weak_external_executable_max_bytes)) or
+        !std.meta.eql(linked_executable, try observeExecutionArtifact(allocator, io, &layout.linked_executable, true, weak_external_executable_max_bytes)) or
+        !std.meta.eql(object_identity, try observeExecutionArtifact(allocator, io, &layout.object, false, weak_external_object_max_bytes)))
+    {
+        return error.CandidateBindingMismatch;
+    }
+    try requireCandidateStable(admission, source_final, descriptor_final, expectedExecutionBridge());
+    if (counters.real_functions_lowered != 1 or counters.real_objects_emitted != 1 or counters.real_native_linked != 1 or
+        counters.real_executed != 1 or counters.real_programs_ok != 1 or counters.local_fail != 0)
+    {
+        return error.ProcessInconsistent;
+    }
+    return .{
+        .selector_initial = selector_initial,
+        .selector_final = selector_final,
+        .source_initial = source_initial,
+        .source_final = source_final,
+        .descriptor_initial = descriptor_initial,
+        .descriptor_final = descriptor_final,
+        .compatibility = compatibility,
+        .object = object_identity,
+        .reference_executable = reference_executable,
+        .linked_executable = linked_executable,
+        .reference_record = reference_record,
+        .linked_record = linked_record,
+        .counters = counters,
+    };
+}
+
+fn writeWeakExternalExecutionSummary(io: std.Io, outcome: *const WeakExternalExecutionOutcome) !void {
+    var stdout_buffer: [4096]u8 = undefined;
+    var writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    const source_hex = std.fmt.bytesToHex(outcome.source_initial.definition_sha256, .lower);
+    const descriptor_hex = std.fmt.bytesToHex(outcome.descriptor_initial.descriptor_sha256, .lower);
+    const object_hex = std.fmt.bytesToHex(outcome.object.sha256, .lower);
+    const reference_hex = std.fmt.bytesToHex(outcome.reference_executable.sha256, .lower);
+    const linked_hex = std.fmt.bytesToHex(outcome.linked_executable.sha256, .lower);
+    const result_hex = std.fmt.bytesToHex(outcome.reference_record.stdout_sha256, .lower);
+    try writer.interface.print(
+        "weak-external-definition-sizeof-execution-v1 row={s} revision={s} source_sha256={s} descriptor_sha256={s} instructions={} object_bytes={} object_sha256={s} reference_bytes={} reference_sha256={s} linked_bytes={} linked_sha256={s} result={} witness=61 result_sha256={s} reference_status={} linked_status={} real_functions_lowered={} real_objects_emitted={} real_native_linked={} real_executed={} real_programs_ok={} local_fail={} completion=green\n",
+        .{
+            weak_external_function_name,
+            zig_revision,
+            &source_hex,
+            &descriptor_hex,
+            outcome.descriptor_initial.instruction_count,
+            outcome.object.length,
+            &object_hex,
+            outcome.reference_executable.length,
+            &reference_hex,
+            outcome.linked_executable.length,
+            &linked_hex,
+            weak_external_expected_result,
+            &result_hex,
+            outcome.reference_record.status,
+            outcome.linked_record.status,
+            outcome.counters.real_functions_lowered,
+            outcome.counters.real_objects_emitted,
+            outcome.counters.real_native_linked,
+            outcome.counters.real_executed,
+            outcome.counters.real_programs_ok,
+            outcome.counters.local_fail,
+        },
+    );
+    try writer.interface.flush();
 }
 
 fn requireStorageHeadroom(
@@ -2226,6 +3452,44 @@ fn syntheticDescriptor(
         const frame = try std.fmt.allocPrint(
             allocator,
             "function_begin\nname_bytes={}\n{s}\ntype_bytes={}\n{s}\ninstruction_count=1\nmain_body_count=1\nliveness=present\nair_bytes={}\n{s}\nstructured_air_v2_bytes={}\n{s}\nfunction_end\n",
+            .{ name.len, name, function_type.len, function_type, air_text.len, air_text, structured_v2.len, structured_v2 },
+        );
+        defer allocator.free(frame);
+        try output.appendSlice(allocator, frame);
+    }
+    return output.toOwnedSlice(allocator);
+}
+
+fn syntheticWeakExternalDescriptor(
+    allocator: std.mem.Allocator,
+    names: []const []const u8,
+    function_type: []const u8,
+    result_text: []const u8,
+) ![]u8 {
+    const structured_v2 = try std.fmt.allocPrint(
+        allocator,
+        "structured_air-v2\n" ++
+            "typed_inst|0|dbg_stmt|4|void|none|0\n" ++
+            "typed_inst|1|ret|8|noreturn|un_op|1|const|1|1|5|usize|1|operand0_text|11|<usize, 18>\n" ++
+            "structured_air_v2_end\n",
+        .{},
+    );
+    defer allocator.free(structured_v2);
+    const air_text = try std.fmt.allocPrint(allocator, "  %0!= dbg_stmt()\n  %1!= ret(<usize, {s}>)\n", .{result_text});
+    defer allocator.free(air_text);
+    var output: std.ArrayList(u8) = .empty;
+    errdefer output.deinit(allocator);
+    const header = try std.fmt.allocPrint(
+        allocator,
+        "zllvm-air-export-v1\ncontract_version=1\npayload=zig-air-print-v1\nproducer=test\nroot_source=test.zig\nwrapper=test.zig\nmode=ReleaseFast\ntarget=x86_64-linux-gnu\nfunction_count={}\nglobal_count=0\n",
+        .{names.len},
+    );
+    defer allocator.free(header);
+    try output.appendSlice(allocator, header);
+    for (names) |name| {
+        const frame = try std.fmt.allocPrint(
+            allocator,
+            "function_begin\nname_bytes={}\n{s}\ntype_bytes={}\n{s}\ninstruction_count=2\nmain_body_count=2\nliveness=present\nair_bytes={}\n{s}\nstructured_air_v2_bytes={}\n{s}\nfunction_end\n",
             .{ name.len, name, function_type.len, function_type, air_text.len, air_text, structured_v2.len, structured_v2 },
         );
         defer allocator.free(frame);
@@ -3123,6 +4387,306 @@ test "descriptor admission rejects missing duplicate and ABI-mismatched AIR bind
     const wrong_abi = try syntheticDescriptor(allocator, &.{function_name}, "fn (u8) usize");
     defer allocator.free(wrong_abi);
     try std.testing.expectError(error.AbiMismatch, proveDescriptor(allocator, wrong_abi));
+}
+
+test "weak external audit dispatch is exact and cannot reach execution or acceptance modes" {
+    const path = "/opt/current-pin-stage4/zig";
+    try std.testing.expectEqualStrings(path, try requireWeakExternalAuditDispatch(weak_external_audit_mode, path, null));
+    try std.testing.expectError(error.InvalidArguments, requireWeakExternalAuditDispatch("--audit-other", path, null));
+    try std.testing.expectError(error.InvalidArguments, requireWeakExternalAuditDispatch(weak_external_audit_mode, null, null));
+    try std.testing.expectError(error.InvalidArguments, requireWeakExternalAuditDispatch(weak_external_audit_mode, path, "extra"));
+    try std.testing.expectError(error.ZigSelectorInvalid, requireWeakExternalAuditDispatch(weak_external_audit_mode, "zig", null));
+    try std.testing.expectError(error.InvalidArguments, requireWeakExternalAuditDispatch(acceptance.dispatch_mode, path, null));
+    try std.testing.expectError(error.InvalidArguments, requireWeakExternalAuditDispatch(linked_frame_inspector_mode, path, null));
+    try std.testing.expectError(error.InvalidArguments, requireWeakExternalAuditDispatch(reference_output_inspector_mode, path, null));
+}
+
+test "weak external source admission binds exact owner import use and semantics" {
+    const definition =
+        "pub const Sibling = struct { pub fn sizeOf() usize { return 18; } };\n" ++
+        "pub const WeakExternalDefinition = struct {\n" ++
+        "    tag_index: u32,\n" ++
+        "    flag: u32,\n" ++
+        "    unused: [10]u8,\n" ++
+        "    pub fn sizeOf() usize { return 18; }\n" ++
+        "};\n";
+    const import_source = "pub const coff = @import(\"coff.zig\");\n";
+    const use_source = "const n = std.coff.WeakExternalDefinition.sizeOf();\n";
+    const proof = try proveWeakExternalSourceBytes(std.testing.allocator, definition, import_source, use_source);
+    try std.testing.expectEqual(@as(usize, 1), proof.definition_count);
+    try std.testing.expectEqual(@as(usize, 1), proof.use_count);
+
+    const missing = "pub const Other = struct { pub fn sizeOf() usize { return 18; } };\n";
+    try std.testing.expectError(error.SourceDefinitionMissing, proveWeakExternalSourceBytes(std.testing.allocator, missing, import_source, use_source));
+    const duplicate = definition ++
+        "pub const WeakExternalDefinition = struct { pub fn sizeOf() usize { return 18; } };\n";
+    try std.testing.expectError(error.SourceDefinitionDuplicate, proveWeakExternalSourceBytes(std.testing.allocator, duplicate, import_source, use_source));
+    const wrong_semantics =
+        "pub const WeakExternalDefinition = struct { pub fn sizeOf() usize { return 19; } };\n";
+    try std.testing.expectError(error.InvalidSourceDefinition, proveWeakExternalSourceBytes(std.testing.allocator, wrong_semantics, import_source, use_source));
+    try std.testing.expectError(error.SourceImportMismatch, proveWeakExternalSourceBytes(std.testing.allocator, definition, "", use_source));
+    try std.testing.expectError(error.SourceUseMismatch, proveWeakExternalSourceBytes(std.testing.allocator, definition, import_source, ""));
+    try std.testing.expectError(error.SourceUseMismatch, proveWeakExternalSourceBytes(std.testing.allocator, definition, import_source, use_source ++ use_source));
+}
+
+test "weak external descriptor and claim reject binding ABI and semantic drift" {
+    const allocator = std.testing.allocator;
+    const descriptor_bytes = try syntheticWeakExternalDescriptor(allocator, &.{weak_external_function_name}, "fn () usize", "18");
+    defer allocator.free(descriptor_bytes);
+    const descriptor = try proveWeakExternalDescriptor(allocator, descriptor_bytes);
+    const source: SourceProof = .{
+        .definition_sha256 = sha256("definition"),
+        .import_sha256 = sha256("import"),
+        .use_sha256 = sha256("use"),
+        .definition_count = 1,
+        .use_count = 1,
+    };
+    try requireWeakExternalAuditClaim(fixedWeakExternalAuditClaim(), source, descriptor);
+
+    const missing = try syntheticWeakExternalDescriptor(allocator, &.{"other"}, "fn () usize", "18");
+    defer allocator.free(missing);
+    try std.testing.expectError(error.AirBindingMissing, proveWeakExternalDescriptor(allocator, missing));
+    const duplicate = try syntheticWeakExternalDescriptor(allocator, &.{ weak_external_function_name, weak_external_function_name }, "fn () usize", "18");
+    defer allocator.free(duplicate);
+    try std.testing.expectError(error.AirBindingDuplicate, proveWeakExternalDescriptor(allocator, duplicate));
+    const wrong_abi = try syntheticWeakExternalDescriptor(allocator, &.{weak_external_function_name}, "fn (u8) usize", "18");
+    defer allocator.free(wrong_abi);
+    try std.testing.expectError(error.AbiMismatch, proveWeakExternalDescriptor(allocator, wrong_abi));
+    const wrong_result = try syntheticWeakExternalDescriptor(allocator, &.{weak_external_function_name}, "fn () usize", "19");
+    defer allocator.free(wrong_result);
+    try std.testing.expectError(error.DescriptorInvalid, proveWeakExternalDescriptor(allocator, wrong_result));
+
+    var claim = fixedWeakExternalAuditClaim();
+    claim.revision = "wrong";
+    try std.testing.expectError(error.AuditBindingMismatch, requireWeakExternalAuditClaim(claim, source, descriptor));
+    claim = fixedWeakExternalAuditClaim();
+    claim.function = function_name;
+    try std.testing.expectError(error.AuditBindingMismatch, requireWeakExternalAuditClaim(claim, source, descriptor));
+    claim = fixedWeakExternalAuditClaim();
+    claim.definition_path = "src/main.zig";
+    try std.testing.expectError(error.AuditBindingMismatch, requireWeakExternalAuditClaim(claim, source, descriptor));
+    claim = fixedWeakExternalAuditClaim();
+    claim.expected_result = 19;
+    try std.testing.expectError(error.AuditBindingMismatch, requireWeakExternalAuditClaim(claim, source, descriptor));
+    claim = fixedWeakExternalAuditClaim();
+    claim.execution_target = "aarch64-linux-gnu";
+    try std.testing.expectError(error.AuditBindingMismatch, requireWeakExternalAuditClaim(claim, source, descriptor));
+
+    var selector: ZigIdentity = .{
+        .version = [_]u8{0} ** version_max_bytes,
+        .version_length = 6,
+        .length = 123,
+        .sha256 = sha256("external selector"),
+    };
+    @memcpy(selector.version[0..6], "0.99.0");
+    var drifted_selector = selector;
+    drifted_selector.sha256 = sha256("wrong external selector");
+    try std.testing.expectError(error.SelectorDrift, requireZigStable(selector, drifted_selector));
+    try std.testing.expectError(error.ZigVersionMismatch, validateExactVersionOutput("0.99.0", "0.99.1\n", ""));
+}
+
+test "weak external audit layout and diagnostic are fixed bounded and execution-free" {
+    const layout = try WeakExternalAuditLayout.init();
+    try layout.validate();
+    try std.testing.expectEqualStrings(weak_external_validation_root, layout.validation_root.slice());
+    try std.testing.expectEqualStrings(weak_external_cache_root, layout.cache_root.slice());
+    try std.testing.expect(isStrictDescendant(layout.cache_root.slice(), layout.runtime_cache_root.slice()));
+    try std.testing.expect(isStrictDescendant(layout.validation_root.slice(), layout.descriptor.slice()));
+    try std.testing.expect(isStrictDescendant(layout.validation_root.slice(), layout.diagnostic.slice()));
+    try std.testing.expect(isStrictDescendant(layout.runtime_cache_root.slice(), layout.local_cache.slice()));
+    try std.testing.expect(std.mem.indexOf(u8, layout.descriptor.slice(), "reference") == null);
+    try std.testing.expect(std.mem.indexOf(u8, layout.descriptor.slice(), "linked") == null);
+    var escaped = layout;
+    escaped.descriptor = try BoundPath.init("local-state/validations/o2-calls/production-target-audit/outside.air");
+    try std.testing.expectError(error.GenerationLayoutInvalid, escaped.validate());
+    try requireWeakExternalDiagnosticBound(1);
+    try requireWeakExternalDiagnosticBound(weak_external_diagnostic_max_bytes);
+    try std.testing.expectError(error.AuditDiagnosticBoundExceeded, requireWeakExternalDiagnosticBound(0));
+    try std.testing.expectError(
+        error.AuditDiagnosticBoundExceeded,
+        requireWeakExternalDiagnosticBound(weak_external_diagnostic_max_bytes + 1),
+    );
+
+    var selector: ZigIdentity = .{
+        .version = [_]u8{0} ** version_max_bytes,
+        .version_length = 6,
+        .length = 123,
+        .sha256 = sha256("selector"),
+    };
+    @memcpy(selector.version[0..6], "0.99.0");
+    const proof: WeakExternalAuditProof = .{
+        .selector = selector,
+        .source = .{
+            .definition_sha256 = sha256("definition"),
+            .import_sha256 = sha256("import"),
+            .use_sha256 = sha256("use"),
+            .definition_count = 1,
+            .use_count = 1,
+        },
+        .descriptor = .{
+            .descriptor_sha256 = sha256("descriptor"),
+            .function_type_sha256 = sha256("fn () usize"),
+            .instruction_count = 2,
+            .parameter_count = 0,
+            .return_bits = 64,
+            .calling_convention = .default,
+        },
+        .compatibility = .{
+            .filtered_descriptor_sha256 = sha256("filtered"),
+            .object_sha256 = sha256("object"),
+            .object_length = 456,
+            .observable_call_source_sha256 = sha256(weak_external_observable_call_source),
+        },
+    };
+    const diagnostic = try encodeWeakExternalAuditDiagnostic(std.testing.allocator, proof);
+    defer std.testing.allocator.free(diagnostic);
+    try std.testing.expect(diagnostic.len < weak_external_diagnostic_max_bytes);
+    try std.testing.expectEqual(@as(usize, 1), countExact(diagnostic, "candidate_executable_created=false\n"));
+    try std.testing.expectEqual(@as(usize, 1), countExact(diagnostic, "candidate_executed=false\n"));
+    try std.testing.expectEqual(@as(usize, 1), countExact(diagnostic, "future_counter=real_programs_ok\n"));
+    try std.testing.expectEqual(@as(usize, 1), countExact(diagnostic, "completion=admitted\n"));
+    try proveWeakExternalObservableCallSource(std.testing.allocator, weak_external_observable_call_source);
+    const optimized_away = try std.mem.replaceOwned(u8, std.testing.allocator, weak_external_observable_call_source, "value * 3 + 7", "18 * 3 + 7");
+    defer std.testing.allocator.free(optimized_away);
+    try std.testing.expectError(error.CallOccurrenceMissing, proveWeakExternalObservableCallSource(std.testing.allocator, optimized_away));
+}
+
+test "weak external execution dispatch roots and compiler identities are exact" {
+    const selector_path = "/home/oleg/prog/ziglang/build/stage4/bin/zig";
+    try std.testing.expectEqualStrings(
+        selector_path,
+        try requireWeakExternalExecutionDispatch(weak_external_execution_mode, selector_path, null),
+    );
+    try std.testing.expectError(error.InvalidArguments, requireWeakExternalExecutionDispatch(weak_external_audit_mode, selector_path, null));
+    try std.testing.expectError(error.InvalidArguments, requireWeakExternalExecutionDispatch(acceptance.dispatch_mode, selector_path, null));
+    try std.testing.expectError(error.InvalidArguments, requireWeakExternalExecutionDispatch(linked_frame_inspector_mode, selector_path, null));
+    try std.testing.expectError(error.InvalidArguments, requireWeakExternalExecutionDispatch(reference_output_inspector_mode, selector_path, null));
+    try std.testing.expectError(error.InvalidArguments, requireWeakExternalExecutionDispatch(weak_external_execution_mode, null, null));
+    try std.testing.expectError(error.InvalidArguments, requireWeakExternalExecutionDispatch(weak_external_execution_mode, selector_path, "extra"));
+    try std.testing.expectError(error.ZigSelectorInvalid, requireWeakExternalExecutionDispatch(weak_external_execution_mode, "zig", null));
+
+    const layout = try WeakExternalExecutionLayout.init();
+    try layout.validate();
+    try std.testing.expectEqualStrings(weak_external_execution_validation_root, layout.validation_root.slice());
+    try std.testing.expectEqualStrings(weak_external_execution_cache_root, layout.cache_root.slice());
+    try std.testing.expect(isStrictDescendant(layout.cache_root.slice(), layout.runtime_cache_root.slice()));
+    try std.testing.expect(isStrictDescendant(layout.validation_root.slice(), layout.reference_executable.slice()));
+    try std.testing.expect(isStrictDescendant(layout.validation_root.slice(), layout.linked_executable.slice()));
+    var escaped = layout;
+    escaped.linked_executable = try BoundPath.init("local-state/validations/o2-calls/production-target-execution/linked");
+    try std.testing.expectError(error.GenerationLayoutInvalid, escaped.validate());
+
+    var identity: ZigIdentity = .{
+        .version = [_]u8{0} ** version_max_bytes,
+        .version_length = weak_external_expected_selector_version.len,
+        .length = weak_external_expected_selector_length,
+        .sha256 = weak_external_expected_selector_sha256,
+    };
+    @memcpy(identity.version[0..weak_external_expected_selector_version.len], weak_external_expected_selector_version);
+    try requireWeakExternalSelectorIdentity(identity);
+    var drifted = identity;
+    drifted.length += 1;
+    try std.testing.expectError(error.SelectorDrift, requireWeakExternalSelectorIdentity(drifted));
+    drifted = identity;
+    drifted.sha256 = sha256("wrong selector");
+    try std.testing.expectError(error.SelectorDrift, requireWeakExternalSelectorIdentity(drifted));
+    drifted = identity;
+    drifted.version[0] = '9';
+    try std.testing.expectError(error.SelectorDrift, requireWeakExternalSelectorIdentity(drifted));
+}
+
+test "weak external reference and linked harnesses bind independent result and observable call" {
+    try proveWeakExternalReferenceHarness(std.testing.allocator, weak_external_reference_harness_source);
+    try proveWeakExternalLinkedHarness(std.testing.allocator, weak_external_linked_harness_source);
+    try std.testing.expectEqual(@as(usize, 1), countExact(weak_external_reference_harness_source, "const result: usize = 18;"));
+    try std.testing.expectEqual(@as(usize, 0), countExact(weak_external_reference_harness_source, weak_external_function_name));
+    try std.testing.expectEqual(@as(usize, 1), countExact(weak_external_linked_harness_source, weak_external_function_name));
+    try std.testing.expectEqual(@as(usize, 1), countExact(weak_external_linked_harness_source, "size_of()"));
+
+    const wrong_symbol = try std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        weak_external_linked_harness_source,
+        weak_external_function_name,
+        function_name,
+    );
+    defer std.testing.allocator.free(wrong_symbol);
+    try std.testing.expectError(error.CallOccurrenceMissing, proveWeakExternalLinkedHarness(std.testing.allocator, wrong_symbol));
+    const optimized_away = try std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        weak_external_linked_harness_source,
+        "const result = size_of();",
+        "const result: usize = 18;",
+    );
+    defer std.testing.allocator.free(optimized_away);
+    try std.testing.expectError(error.CallOccurrenceMissing, proveWeakExternalLinkedHarness(std.testing.allocator, optimized_away));
+    const dependent_output_drift = try std.mem.replaceOwned(
+        u8,
+        std.testing.allocator,
+        weak_external_linked_harness_source,
+        "const witness = result *% 3 +% 7;",
+        "const witness: usize = 61;",
+    );
+    defer std.testing.allocator.free(dependent_output_drift);
+    try std.testing.expectError(error.CallOccurrenceMissing, proveWeakExternalLinkedHarness(std.testing.allocator, dependent_output_drift));
+}
+
+test "weak external execution admission and canonical records fail closed" {
+    const source: SourceProof = .{
+        .definition_sha256 = sha256("definition"),
+        .import_sha256 = sha256("import"),
+        .use_sha256 = sha256("use"),
+        .definition_count = 1,
+        .use_count = 1,
+    };
+    const descriptor: DescriptorProof = .{
+        .descriptor_sha256 = sha256("descriptor"),
+        .function_type_sha256 = sha256("fn () usize"),
+        .instruction_count = 2,
+        .parameter_count = 0,
+        .return_bits = 64,
+        .calling_convention = .default,
+    };
+    const admission = try admitWeakExternalExecutionCandidate(source, descriptor);
+    try requireCandidateAdmission(admission);
+    try requireCandidateStable(admission, source, descriptor, expectedExecutionBridge());
+    var wrong_source = source;
+    wrong_source.use_count = 0;
+    try std.testing.expectError(error.AuditBindingMismatch, admitWeakExternalExecutionCandidate(wrong_source, descriptor));
+    var wrong_descriptor = descriptor;
+    wrong_descriptor.calling_convention = .c;
+    try std.testing.expectError(error.AuditBindingMismatch, admitWeakExternalExecutionCandidate(source, wrong_descriptor));
+
+    const accepted_stdout = try std.testing.allocator.dupe(u8, weak_external_expected_stdout);
+    defer std.testing.allocator.free(accepted_stdout);
+    const accepted_stderr = try std.testing.allocator.dupe(u8, "");
+    defer std.testing.allocator.free(accepted_stderr);
+    const accepted_result: OwnedProcessResult = .{
+        .term = .{ .exited = 0 },
+        .stdout = accepted_stdout,
+        .stderr = accepted_stderr,
+    };
+    const record = try canonicalExecutionRecord(accepted_result, admission);
+    try std.testing.expectEqual(@as(usize, 18), record.semantic_result);
+    try std.testing.expect(record.call_occurrence);
+
+    const wrong_stdout = try std.testing.allocator.dupe(u8, "execution-oracle-v1 result=19 witness=64\n");
+    defer std.testing.allocator.free(wrong_stdout);
+    var changed = accepted_result;
+    changed.stdout = wrong_stdout;
+    try std.testing.expectError(error.ProcessInconsistent, canonicalExecutionRecord(changed, admission));
+    changed = accepted_result;
+    changed.term = .{ .exited = 1 };
+    try std.testing.expectError(error.ProcessInconsistent, canonicalExecutionRecord(changed, admission));
+    try std.testing.expectError(error.ChildOutputBoundExceeded, validateProcessBoundary(.{
+        .launched = true,
+        .termination = .exited,
+        .status = 0,
+        .stdout_length = process_output_max + 1,
+        .stderr_length = 0,
+        .exact_eof = true,
+    }));
 }
 
 test "process boundary rejects launch status bounds and incomplete EOF independently" {
