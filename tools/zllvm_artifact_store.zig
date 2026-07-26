@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const capacity = @import("zllvm_artifact_store/capacity.zig");
 const digest_model = @import("zllvm_artifact_store/digest.zig");
+const identity_model = @import("zllvm_artifact_store/identity.zig");
 const manifest_model = @import("zllvm_artifact_store/manifest.zig");
 const path_policy = @import("zllvm_artifact_store/path_policy.zig");
 const process_result = @import("zllvm_artifact_store/process_result.zig");
@@ -76,6 +77,11 @@ const normalizedAbsolute = path_policy.normalizedAbsolute;
 const termSuccess = process_result.termSuccess;
 const freeRunResult = process_result.freeRunResult;
 const freshCapacity = capacity.freshCapacity;
+const sameFileIdentity = identity_model.sameFileIdentity;
+const verifyRelativeFile = identity_model.verifyRelativeFile;
+const identityOfOpenFile = identity_model.identityOfOpenFile;
+const identityOfOpenFileAnyMode = identity_model.identityOfOpenFileAnyMode;
+const copyFileContents = identity_model.copyFileContents;
 
 const SourceSpecRow = struct {
     logical_id: []const u8,
@@ -122,31 +128,8 @@ pub const RegistrationSnapshot = registration.RegistrationSnapshot;
 pub const parseRegistration = registration.parseRegistration;
 pub const RegistrationGuard = registration.RegistrationGuard;
 
-pub const FileIdentity = struct {
-    sha256: [64]u8,
-    bytes: u64,
-    mode: u16,
-    key: []u8,
-
-    pub fn deinit(identity: *FileIdentity, allocator: std.mem.Allocator) void {
-        allocator.free(identity.key);
-        identity.* = undefined;
-    }
-};
-
-pub const SnapshotIdentity = struct {
-    archive: FileIdentity,
-    constituent: FileIdentity,
-    member_keys: [][]u8,
-
-    pub fn deinit(snapshot: *SnapshotIdentity, allocator: std.mem.Allocator) void {
-        snapshot.archive.deinit(allocator);
-        snapshot.constituent.deinit(allocator);
-        for (snapshot.member_keys) |key| allocator.free(key);
-        allocator.free(snapshot.member_keys);
-        snapshot.* = undefined;
-    }
-};
+pub const FileIdentity = identity_model.FileIdentity;
+pub const SnapshotIdentity = identity_model.SnapshotIdentity;
 
 pub const CapacityObservation = capacity.CapacityObservation;
 pub const CapacityRequirement = capacity.CapacityRequirement;
@@ -3554,12 +3537,6 @@ fn finishVerifiedAtomic(
     return created;
 }
 
-fn sameFileIdentity(a: FileIdentity, b: FileIdentity) bool {
-    return std.mem.eql(u8, &a.sha256, &b.sha256) and
-        a.bytes == b.bytes and
-        a.mode == b.mode;
-}
-
 fn writeExclusive(
     io: std.Io,
     dir: std.Io.Dir,
@@ -3577,71 +3554,6 @@ fn writeExclusive(
     try file.setPermissions(io, .fromMode(mode));
     try file.sync(io);
     try syncDirectory(dir);
-}
-
-fn verifyRelativeFile(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    dir: std.Io.Dir,
-    basename: []const u8,
-    expected_mode: u16,
-) !FileIdentity {
-    var file = try dir.openFile(io, basename, .{
-        .allow_directory = false,
-        .follow_symlinks = false,
-    });
-    defer file.close(io);
-    return identityOfOpenFile(allocator, io, file, expected_mode);
-}
-
-fn identityOfOpenFile(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    file: std.Io.File,
-    expected_mode: u16,
-) !FileIdentity {
-    var identity = try identityOfOpenFileAnyMode(allocator, io, file);
-    errdefer identity.deinit(allocator);
-    if (identity.mode != expected_mode) return error.ModeMismatch;
-    return identity;
-}
-
-fn identityOfOpenFileAnyMode(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    file: std.Io.File,
-) !FileIdentity {
-    const stat = try file.stat(io);
-    if (stat.kind != .file) return error.NotRegularFile;
-    const actual_mode: u16 = @intCast(stat.permissions.toMode() & 0o7777);
-    var hasher = digest_model.Sha256.init(.{});
-    var offset: u64 = 0;
-    var buffer: [64 * 1024]u8 = undefined;
-    while (true) {
-        const count = try file.readPositional(io, &.{&buffer}, offset);
-        if (count == 0) break;
-        hasher.update(buffer[0..count]);
-        offset += count;
-    }
-    var digest: [digest_model.Sha256.digest_length]u8 = undefined;
-    hasher.final(&digest);
-    return .{
-        .sha256 = std.fmt.bytesToHex(digest, .lower),
-        .bytes = offset,
-        .mode = actual_mode,
-        .key = try allocator.dupe(u8, "-"),
-    };
-}
-
-fn copyFileContents(io: std.Io, source: std.Io.File, destination: std.Io.File) !void {
-    var offset: u64 = 0;
-    var buffer: [64 * 1024]u8 = undefined;
-    while (true) {
-        const count = try source.readPositional(io, &.{&buffer}, offset);
-        if (count == 0) break;
-        try destination.writePositionalAll(io, buffer[0..count], offset);
-        offset += count;
-    }
 }
 
 threadlocal var test_directory_sync_count: usize = 0;
