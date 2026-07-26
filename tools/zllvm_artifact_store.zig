@@ -1,8 +1,9 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const digest_model = @import("zllvm_artifact_store/digest.zig");
 const manifest_model = @import("zllvm_artifact_store/manifest.zig");
+const registration = @import("zllvm_artifact_store/registration.zig");
 
-const Sha256 = std.crypto.hash.sha2.Sha256;
 const original_failed_store = "/home/oleg/prog/z_llvm-inbox193-artifact-store-synthetic";
 const prior_first_continuation_store = "/home/oleg/prog/z_llvm-inbox193a-artifact-store-synthetic";
 const prior_second_continuation_store = "/home/oleg/prog/z_llvm-inbox193b-artifact-store-synthetic";
@@ -69,6 +70,7 @@ const isLowerHex = manifest_model.isLowerHex;
 const isLowerAlphaNumeric = manifest_model.isLowerAlphaNumeric;
 const splitObjectKey = manifest_model.splitObjectKey;
 const splitSnapshotKey = manifest_model.splitSnapshotKey;
+const sha256Hex = digest_model.sha256Hex;
 
 const SourceSpecRow = struct {
     logical_id: []const u8,
@@ -111,34 +113,8 @@ const PublishedSnapshot = struct {
     identity: SnapshotIdentity,
 };
 
-pub const RegistrationSnapshot = struct {
-    raw: []u8,
-    paths: [][]const u8,
-    full_hash: [64]u8,
-    path_hash: [64]u8,
-    topology_hash: [64]u8,
-    non_main_hash: [64]u8,
-    repository_tmp_count: usize,
-    system_tmp_count: usize,
-    other_count: usize,
-
-    pub fn deinit(snapshot: *RegistrationSnapshot, allocator: std.mem.Allocator) void {
-        allocator.free(snapshot.paths);
-        allocator.free(snapshot.raw);
-        snapshot.* = undefined;
-    }
-
-    pub fn count(snapshot: RegistrationSnapshot) usize {
-        return snapshot.paths.len;
-    }
-
-    pub fn eql(a: RegistrationSnapshot, b: RegistrationSnapshot) bool {
-        return std.mem.eql(u8, &a.full_hash, &b.full_hash) and
-            std.mem.eql(u8, &a.path_hash, &b.path_hash) and
-            std.mem.eql(u8, &a.topology_hash, &b.topology_hash) and
-            std.mem.eql(u8, &a.non_main_hash, &b.non_main_hash);
-    }
-};
+pub const RegistrationSnapshot = registration.RegistrationSnapshot;
+pub const parseRegistration = registration.parseRegistration;
 
 pub const RegistrationGuard = struct {
     allocator: std.mem.Allocator,
@@ -3418,70 +3394,6 @@ pub fn resolveAuthority(
     return std.fs.path.join(allocator, &.{ parent, store_name });
 }
 
-pub fn parseRegistration(allocator: std.mem.Allocator, raw_input: []const u8) !RegistrationSnapshot {
-    if (!std.mem.endsWith(u8, raw_input, "\n\n")) return error.NonCanonicalRegistrationRecord;
-    const raw = try allocator.dupe(u8, raw_input);
-    errdefer allocator.free(raw);
-    var paths_list: std.ArrayList([]const u8) = .empty;
-    errdefer paths_list.deinit(allocator);
-    var path_record: std.ArrayList(u8) = .empty;
-    defer path_record.deinit(allocator);
-    var topology_record: std.ArrayList(u8) = .empty;
-    defer topology_record.deinit(allocator);
-    var repo_count: usize = 0;
-    var tmp_count: usize = 0;
-    var other_count: usize = 0;
-
-    var lines = std.mem.splitScalar(u8, raw, '\n');
-    while (lines.next()) |line| {
-        if (std.mem.startsWith(u8, line, "worktree ")) {
-            const path = line["worktree ".len..];
-            if (!std.fs.path.isAbsolute(path)) return error.NonCanonicalRegistrationRecord;
-            for (paths_list.items) |prior| {
-                if (std.mem.eql(u8, prior, path)) return error.DuplicateRegistration;
-            }
-            try paths_list.append(allocator, path);
-            try path_record.appendSlice(allocator, path);
-            try path_record.append(allocator, '\n');
-            try topology_record.appendSlice(allocator, path);
-            try topology_record.append(allocator, '\n');
-            if (std.mem.startsWith(u8, path, "/home/oleg/prog/z_llvm/tmp/")) {
-                repo_count += 1;
-            } else if (std.mem.startsWith(u8, path, "/tmp/")) {
-                tmp_count += 1;
-            } else {
-                other_count += 1;
-            }
-        } else if (std.mem.startsWith(u8, line, "branch ") or
-            std.mem.eql(u8, line, "detached") or
-            std.mem.startsWith(u8, line, "locked") or
-            std.mem.startsWith(u8, line, "prunable"))
-        {
-            try topology_record.appendSlice(allocator, line);
-            try topology_record.append(allocator, '\n');
-        } else if (line.len == 0 or std.mem.startsWith(u8, line, "HEAD ")) {
-            continue;
-        } else {
-            return error.UnknownRegistrationField;
-        }
-    }
-    if (paths_list.items.len == 0) return error.EmptyRegistration;
-    const first_separator = std.mem.indexOf(u8, raw, "\n\n") orelse
-        return error.NonCanonicalRegistrationRecord;
-    const non_main = raw[first_separator + 2 ..];
-    return .{
-        .raw = raw,
-        .paths = try paths_list.toOwnedSlice(allocator),
-        .full_hash = sha256Hex(raw),
-        .path_hash = sha256Hex(path_record.items),
-        .topology_hash = sha256Hex(topology_record.items),
-        .non_main_hash = sha256Hex(non_main),
-        .repository_tmp_count = repo_count,
-        .system_tmp_count = tmp_count,
-        .other_count = other_count,
-    };
-}
-
 fn captureRegistration(allocator: std.mem.Allocator, io: std.Io) !RegistrationSnapshot {
     const result = try std.process.run(allocator, io, .{
         .argv = &.{
@@ -3569,12 +3481,6 @@ fn encodeMemberList(
         try output.append(allocator, 0);
     }
     return output.toOwnedSlice(allocator);
-}
-
-fn sha256Hex(bytes: []const u8) [64]u8 {
-    var digest: [Sha256.digest_length]u8 = undefined;
-    Sha256.hash(bytes, &digest, .{});
-    return std.fmt.bytesToHex(digest, .lower);
 }
 
 fn objectKey(allocator: std.mem.Allocator, sha: []const u8) ![]u8 {
@@ -3853,7 +3759,7 @@ fn identityOfOpenFileAnyMode(
     const stat = try file.stat(io);
     if (stat.kind != .file) return error.NotRegularFile;
     const actual_mode: u16 = @intCast(stat.permissions.toMode() & 0o7777);
-    var hasher = Sha256.init(.{});
+    var hasher = digest_model.Sha256.init(.{});
     var offset: u64 = 0;
     var buffer: [64 * 1024]u8 = undefined;
     while (true) {
@@ -3862,7 +3768,7 @@ fn identityOfOpenFileAnyMode(
         hasher.update(buffer[0..count]);
         offset += count;
     }
-    var digest: [Sha256.digest_length]u8 = undefined;
+    var digest: [digest_model.Sha256.digest_length]u8 = undefined;
     hasher.final(&digest);
     return .{
         .sha256 = std.fmt.bytesToHex(digest, .lower),
