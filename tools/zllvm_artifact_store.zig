@@ -2,6 +2,8 @@ const std = @import("std");
 const builtin = @import("builtin");
 const digest_model = @import("zllvm_artifact_store/digest.zig");
 const manifest_model = @import("zllvm_artifact_store/manifest.zig");
+const path_policy = @import("zllvm_artifact_store/path_policy.zig");
+const process_result = @import("zllvm_artifact_store/process_result.zig");
 const registration = @import("zllvm_artifact_store/registration.zig");
 
 const original_failed_store = "/home/oleg/prog/z_llvm-inbox193-artifact-store-synthetic";
@@ -16,14 +18,11 @@ const prior_failed_materialize_third_continuation_store =
     "/home/oleg/prog/z_llvm-inbox194c-artifact-store-synthetic";
 const synthetic_store = "/home/oleg/prog/z_llvm-inbox194d-artifact-store-synthetic";
 const default_store = "/home/oleg/prog/z_llvm-artifacts";
-const main_repository = "/home/oleg/prog/z_llvm";
-const main_git_common_dir = "/home/oleg/prog/z_llvm/.git";
+const main_repository = registration.main_repository;
+const main_git_common_dir = registration.main_git_common_dir;
 const canonical_source_spec_path = "docs/evidence/inbox194_calls_canonical_source_spec_v1.tsv";
 const canonical_source_spec_sha = "0dd908eed246b09fbea8fd87241ce899b100823b8d83c7223d4e48928e7c599b";
 const proposed_live_manifest_path = "docs/evidence/inbox194_calls_proposed_live_manifest_v1.tsv";
-const expected_path_hash = "f31d8542baafc7b64cd5ee6fe8cc4194842ca696b97a7ffc8df06ce12d553d7e";
-const expected_topology_hash = "6c868e3b6d436cfba92a1e2b21dbd616391763961f1cba9b6670b1ed4a6ebb62";
-const expected_non_main_hash = "ebc30a376b3db4c6fbf788f49ea85f4ce792471e539c0a89308068efdf96ebbe";
 
 const schema_magic = manifest_model.schema_magic;
 const schema_header = manifest_model.schema_header;
@@ -71,6 +70,10 @@ const isLowerAlphaNumeric = manifest_model.isLowerAlphaNumeric;
 const splitObjectKey = manifest_model.splitObjectKey;
 const splitSnapshotKey = manifest_model.splitSnapshotKey;
 const sha256Hex = digest_model.sha256Hex;
+const pathContains = path_policy.pathContains;
+const normalizedAbsolute = path_policy.normalizedAbsolute;
+const termSuccess = process_result.termSuccess;
+const freeRunResult = process_result.freeRunResult;
 
 const SourceSpecRow = struct {
     logical_id: []const u8,
@@ -115,93 +118,7 @@ const PublishedSnapshot = struct {
 
 pub const RegistrationSnapshot = registration.RegistrationSnapshot;
 pub const parseRegistration = registration.parseRegistration;
-
-pub const RegistrationGuard = struct {
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    frozen: RegistrationSnapshot,
-
-    pub fn init(allocator: std.mem.Allocator, io: std.Io) !RegistrationGuard {
-        const frozen = try captureRegistration(allocator, io);
-        errdefer {
-            var mutable = frozen;
-            mutable.deinit(allocator);
-        }
-        try validateExpectedRegistration(frozen);
-        return .{ .allocator = allocator, .io = io, .frozen = frozen };
-    }
-
-    pub fn deinit(guard: *RegistrationGuard) void {
-        guard.frozen.deinit(guard.allocator);
-        guard.* = undefined;
-    }
-
-    pub fn assertCurrent(guard: *const RegistrationGuard) !void {
-        var current = try captureRegistration(guard.allocator, guard.io);
-        defer current.deinit(guard.allocator);
-        if (!guard.frozen.eql(current)) return error.RegisteredWorktreeDrift;
-    }
-
-    pub fn assertStoreRoot(guard: *const RegistrationGuard, absolute_path: []const u8) !void {
-        try guard.assertDisjointFromEveryRegistration(absolute_path);
-    }
-
-    pub fn assertReadSource(
-        guard: *const RegistrationGuard,
-        bounded_root: []const u8,
-        absolute_path: []const u8,
-    ) !void {
-        const normalized_root = try normalizedAbsolute(guard.allocator, bounded_root);
-        defer guard.allocator.free(normalized_root);
-        const normalized_path = try normalizedAbsolute(guard.allocator, absolute_path);
-        defer guard.allocator.free(normalized_path);
-        if (!std.mem.eql(u8, normalized_root, bounded_root) or
-            !std.mem.eql(u8, normalized_path, absolute_path))
-        {
-            return error.PathNotNormalized;
-        }
-        if (!pathContains(main_repository, bounded_root) or
-            !pathContains(bounded_root, absolute_path))
-        {
-            return error.ReadSourceOutsideBound;
-        }
-        for (guard.frozen.paths[1..]) |protected| {
-            if (pathContains(protected, bounded_root) or
-                pathContains(protected, absolute_path) or
-                pathContains(bounded_root, protected))
-            {
-                return error.RegisteredWorktreeOverlap;
-            }
-        }
-    }
-
-    pub fn assertSyntheticWrite(
-        guard: *const RegistrationGuard,
-        store_root: []const u8,
-        absolute_path: []const u8,
-    ) !void {
-        try guard.assertStoreRoot(store_root);
-        const normalized = try normalizedAbsolute(guard.allocator, absolute_path);
-        defer guard.allocator.free(normalized);
-        if (!std.mem.eql(u8, normalized, absolute_path)) return error.PathNotNormalized;
-        if (!pathContains(store_root, absolute_path)) return error.WriteOutsideSyntheticStore;
-    }
-
-    fn assertDisjointFromEveryRegistration(
-        guard: *const RegistrationGuard,
-        absolute_path: []const u8,
-    ) !void {
-        if (!std.fs.path.isAbsolute(absolute_path)) return error.PathNotAbsolute;
-        const normalized = try normalizedAbsolute(guard.allocator, absolute_path);
-        defer guard.allocator.free(normalized);
-        if (!std.mem.eql(u8, normalized, absolute_path)) return error.PathNotNormalized;
-        for (guard.frozen.paths) |protected| {
-            if (pathContains(protected, absolute_path) or pathContains(absolute_path, protected)) {
-                return error.RegisteredWorktreeOverlap;
-            }
-        }
-    }
-};
+pub const RegistrationGuard = registration.RegistrationGuard;
 
 pub const FileIdentity = struct {
     sha256: [64]u8,
@@ -3394,36 +3311,6 @@ pub fn resolveAuthority(
     return std.fs.path.join(allocator, &.{ parent, store_name });
 }
 
-fn captureRegistration(allocator: std.mem.Allocator, io: std.Io) !RegistrationSnapshot {
-    const result = try std.process.run(allocator, io, .{
-        .argv = &.{
-            "/usr/bin/git",
-            "--git-dir=" ++ main_git_common_dir,
-            "worktree",
-            "list",
-            "--porcelain",
-        },
-        .stdout_limit = .limited(1024 * 1024),
-        .stderr_limit = .limited(1024 * 1024),
-    });
-    defer freeRunResult(allocator, result);
-    if (!termSuccess(result.term)) return error.RegistrationInventoryFailed;
-    return parseRegistration(allocator, result.stdout);
-}
-
-fn validateExpectedRegistration(snapshot: RegistrationSnapshot) !void {
-    if (snapshot.count() != 43 or
-        snapshot.repository_tmp_count != 33 or
-        snapshot.system_tmp_count != 8 or
-        snapshot.other_count != 2 or
-        !std.mem.eql(u8, &snapshot.path_hash, expected_path_hash) or
-        !std.mem.eql(u8, &snapshot.topology_hash, expected_topology_hash) or
-        !std.mem.eql(u8, &snapshot.non_main_hash, expected_non_main_hash))
-    {
-        return error.UnexpectedRegistrationInventory;
-    }
-}
-
 fn sortedObjectGroup(
     allocator: std.mem.Allocator,
     objects: []const FileIdentity,
@@ -3491,17 +3378,6 @@ fn objectKey(allocator: std.mem.Allocator, sha: []const u8) ![]u8 {
 fn snapshotKey(allocator: std.mem.Allocator, sha: []const u8) ![]u8 {
     try validateSha(sha);
     return std.fmt.allocPrint(allocator, "snapshots/sha256/{s}/{s}.tar.zst", .{ sha[0..2], sha[2..] });
-}
-
-fn pathContains(parent: []const u8, child: []const u8) bool {
-    if (std.mem.eql(u8, parent, child)) return true;
-    return std.mem.startsWith(u8, child, parent) and child.len > parent.len and
-        parent[parent.len - 1] != '/' and child[parent.len] == '/';
-}
-
-fn normalizedAbsolute(allocator: std.mem.Allocator, path: []const u8) ![]u8 {
-    if (!std.fs.path.isAbsolute(path)) return error.PathNotAbsolute;
-    return std.fs.path.resolve(allocator, &.{path});
 }
 
 fn openOrCreateDir(io: std.Io, parent: std.Io.Dir, name: []const u8) !std.Io.Dir {
@@ -3943,13 +3819,6 @@ fn capacityFromFields(
     };
 }
 
-fn termSuccess(term: std.process.Child.Term) bool {
-    return switch (term) {
-        .exited => |code| code == 0,
-        else => false,
-    };
-}
-
 fn validateSnapshotListing(
     allocator: std.mem.Allocator,
     listing: []const u8,
@@ -3974,11 +3843,6 @@ fn validateSnapshotListing(
     {
         return error.UnsafeOrUnexpectedSnapshotMember;
     }
-}
-
-fn freeRunResult(allocator: std.mem.Allocator, result: std.process.RunResult) void {
-    allocator.free(result.stdout);
-    allocator.free(result.stderr);
 }
 
 fn createAbsoluteDirectorySynced(
@@ -7997,26 +7861,6 @@ test "capacity arithmetic counts each component once and fails closed" {
         capacityFromFields(std.math.maxInt(u64), 2, 0),
     );
     try std.testing.expectError(error.InvalidCapacityObservation, capacityFromFields(1, 0, 0));
-}
-
-test "registration drift is modeled without mutating git" {
-    const allocator = std.testing.allocator;
-    const io = std.testing.io;
-    var actual = try captureRegistration(allocator, io);
-    defer actual.deinit(allocator);
-    try validateExpectedRegistration(actual);
-
-    const changed = try std.mem.replaceOwned(
-        u8,
-        allocator,
-        actual.raw,
-        "worktree /home/oleg/prog/z_llvm\n",
-        "worktree /home/oleg/prog/z_llvm-drift\n",
-    );
-    defer allocator.free(changed);
-    var drift = try parseRegistration(allocator, changed);
-    defer drift.deinit(allocator);
-    try std.testing.expect(!actual.eql(drift));
 }
 
 test "canonical calls source specification is closed and produces canonical proposed rows" {
