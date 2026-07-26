@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const manifest_model = @import("zllvm_artifact_store/manifest.zig");
 
 const Sha256 = std.crypto.hash.sha2.Sha256;
 const original_failed_store = "/home/oleg/prog/z_llvm-inbox193-artifact-store-synthetic";
@@ -23,14 +24,13 @@ const expected_path_hash = "f31d8542baafc7b64cd5ee6fe8cc4194842ca696b97a7ffc8df0
 const expected_topology_hash = "6c868e3b6d436cfba92a1e2b21dbd616391763961f1cba9b6670b1ed4a6ebb62";
 const expected_non_main_hash = "ebc30a376b3db4c6fbf788f49ea85f4ce792471e539c0a89308068efdf96ebbe";
 
-const schema_magic = "zllvm-artifact-manifest-v1";
-const schema_header =
-    "kind\tlogical_id\tsha256\tbytes\tmode\tmedia_type\tprovenance\treconstruction\tretention_class\tstatus\tkey\ttarget_id\tsnapshot_id\tmember_path\tsnapshot_format\trecipe_sha256\tconstituent_sha256";
-const snapshot_format = "ustar+zstd-v1";
+const schema_magic = manifest_model.schema_magic;
+const schema_header = manifest_model.schema_header;
+const snapshot_format = manifest_model.snapshot_format;
 const snapshot_recipe =
     "tar-1.35:--format=ustar,--sort=name,--mtime=@0,--owner=0,--group=0,--numeric-owner,--mode=0444,--no-acls,--no-xattrs,--no-selinux,--no-recursion,--null,--files-from;zstd-1.5.5:-T1,-19,--check,--no-progress,-c";
-const snapshot_recipe_sha = "cb9f999404a7dd9eb991d73d18078b20d99e82399d1d415eb1afa3398e97113a";
-const max_snapshot_members = 1024;
+const snapshot_recipe_sha = manifest_model.snapshot_recipe_sha;
+const max_snapshot_members = manifest_model.max_snapshot_members;
 const source_spec_magic = "zllvm-calls-canonical-source-spec-v1";
 const source_spec_header =
     "logical_id\tsource_set_id\tsource_path\tsha256\tbytes\tsource_mode\tmedia_type\tretention_class\tobject_key\tmember_path\tgroup_id\tsnapshot_id\tsnapshot_format\trecipe_sha256\tconstituent_sha256\tgroup_manifest_sha256";
@@ -45,58 +45,30 @@ const retained_materialize_object_sha =
     "d8da86cae494d7d4a58053ab24b1e8be944859263072b85ffa164880b0110cd4";
 const retained_materialize_object_bytes = 7_215_373;
 
-pub const RowKind = enum {
-    object,
-    logical_ref,
-    snapshot,
-    snapshot_member,
-};
+pub const RowKind = manifest_model.RowKind;
+pub const Status = manifest_model.Status;
+pub const RetentionClass = manifest_model.RetentionClass;
+pub const Row = manifest_model.Row;
+pub const Manifest = manifest_model.Manifest;
+pub const parseManifest = manifest_model.parseManifest;
+pub const encodeManifest = manifest_model.encodeManifest;
 
-pub const Status = enum {
-    active,
-    exhausted_evidence,
-    future_required,
-    superseded,
-    absent_unrecoverable,
-};
-
-pub const RetentionClass = enum {
-    canonical_input,
-    irreplaceable_acceptance_evidence,
-    reproducible_cache,
-    ephemeral_scratch,
-};
-
-pub const Row = struct {
-    kind: RowKind,
-    logical_id: []const u8,
-    sha256: []const u8,
-    bytes: u64,
-    mode: u16,
-    media_type: []const u8,
-    provenance: []const u8,
-    reconstruction: []const u8,
-    retention_class: RetentionClass,
-    status: Status,
-    key: []const u8,
-    target_id: []const u8,
-    snapshot_id: []const u8,
-    member_path: []const u8,
-    snapshot_format: []const u8,
-    recipe_sha256: []const u8,
-    constituent_sha256: []const u8,
-};
-
-pub const Manifest = struct {
-    storage: []u8,
-    rows: []Row,
-
-    pub fn deinit(manifest: *Manifest, allocator: std.mem.Allocator) void {
-        allocator.free(manifest.rows);
-        allocator.free(manifest.storage);
-        manifest.* = undefined;
-    }
-};
+const appendManifestPreamble = manifest_model.appendManifestPreamble;
+const appendManifestRowText = manifest_model.appendManifestRowText;
+const findRow = manifest_model.findRow;
+const sameIdentity = manifest_model.sameIdentity;
+const logicalRefMatchesTarget = manifest_model.logicalRefMatchesTarget;
+const parseEnum = manifest_model.parseEnum;
+const externalEnumName = manifest_model.externalEnumName;
+const validateCanonicalField = manifest_model.validateCanonicalField;
+const encodeField = manifest_model.encodeField;
+const validateLogicalId = manifest_model.validateLogicalId;
+const validateRelativeKey = manifest_model.validateRelativeKey;
+const validateSha = manifest_model.validateSha;
+const isLowerHex = manifest_model.isLowerHex;
+const isLowerAlphaNumeric = manifest_model.isLowerAlphaNumeric;
+const splitObjectKey = manifest_model.splitObjectKey;
+const splitSnapshotKey = manifest_model.splitSnapshotKey;
 
 const SourceSpecRow = struct {
     logical_id: []const u8,
@@ -3421,46 +3393,6 @@ fn appendPublishedSnapshot(
     }
 }
 
-fn appendManifestPreamble(
-    allocator: std.mem.Allocator,
-    output: *std.ArrayList(u8),
-) !void {
-    try output.appendSlice(allocator, schema_magic);
-    try output.append(allocator, '\n');
-    try output.appendSlice(allocator, schema_header);
-    try output.append(allocator, '\n');
-}
-
-fn appendManifestRowText(
-    allocator: std.mem.Allocator,
-    output: *std.ArrayList(u8),
-    row: Row,
-) !void {
-    try output.print(
-        allocator,
-        "{s}\t{s}\t{s}\t{}\t{o}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\n",
-        .{
-            externalEnumName(row.kind),
-            row.logical_id,
-            row.sha256,
-            row.bytes,
-            row.mode,
-            row.media_type,
-            row.provenance,
-            row.reconstruction,
-            externalEnumName(row.retention_class),
-            externalEnumName(row.status),
-            row.key,
-            row.target_id,
-            row.snapshot_id,
-            row.member_path,
-            row.snapshot_format,
-            row.recipe_sha256,
-            row.constituent_sha256,
-        },
-    );
-}
-
 pub fn resolveAuthority(
     allocator: std.mem.Allocator,
     environment_value: ?[]const u8,
@@ -3484,95 +3416,6 @@ pub fn resolveAuthority(
     const store_name = try std.fmt.allocPrint(allocator, "{s}-artifacts", .{name});
     defer allocator.free(store_name);
     return std.fs.path.join(allocator, &.{ parent, store_name });
-}
-
-pub fn parseManifest(allocator: std.mem.Allocator, text: []const u8) !Manifest {
-    if (text.len == 0 or text[text.len - 1] != '\n') return error.NonCanonicalManifest;
-    const storage = try allocator.dupe(u8, text);
-    errdefer allocator.free(storage);
-    var lines = std.mem.splitScalar(u8, storage, '\n');
-    if (!std.mem.eql(u8, lines.next() orelse return error.MissingSchemaMagic, schema_magic)) {
-        return error.UnknownSchemaVersion;
-    }
-    if (!std.mem.eql(u8, lines.next() orelse return error.MissingSchemaHeader, schema_header)) {
-        return error.UnknownOrReorderedField;
-    }
-    var rows: std.ArrayList(Row) = .empty;
-    errdefer rows.deinit(allocator);
-    while (lines.next()) |line| {
-        if (line.len == 0) {
-            if (lines.peek() == null) break;
-            return error.EmptyManifestRow;
-        }
-        var fields: [17][]const u8 = undefined;
-        var field_it = std.mem.splitScalar(u8, line, '\t');
-        for (&fields) |*field| field.* = field_it.next() orelse return error.MissingManifestField;
-        if (field_it.next() != null) return error.UnknownManifestField;
-        for (fields) |field| try validateCanonicalField(allocator, field);
-        const row: Row = .{
-            .kind = parseEnum(RowKind, fields[0]) orelse return error.UnknownRowKind,
-            .logical_id = fields[1],
-            .sha256 = fields[2],
-            .bytes = std.fmt.parseInt(u64, fields[3], 10) catch return error.InvalidByteCount,
-            .mode = std.fmt.parseInt(u16, fields[4], 8) catch return error.InvalidMode,
-            .media_type = fields[5],
-            .provenance = fields[6],
-            .reconstruction = fields[7],
-            .retention_class = parseEnum(RetentionClass, fields[8]) orelse
-                return error.UnknownRetentionClass,
-            .status = parseEnum(Status, fields[9]) orelse return error.UnknownStatus,
-            .key = fields[10],
-            .target_id = fields[11],
-            .snapshot_id = fields[12],
-            .member_path = fields[13],
-            .snapshot_format = fields[14],
-            .recipe_sha256 = fields[15],
-            .constituent_sha256 = fields[16],
-        };
-        try validateLogicalId(row.logical_id);
-        if (row.mode > 0o7777) return error.InvalidMode;
-        for (rows.items) |prior| {
-            if (std.mem.eql(u8, prior.logical_id, row.logical_id)) return error.DuplicateLogicalId;
-        }
-        try validateRowShape(row);
-        try rows.append(allocator, row);
-    }
-    const owned = try rows.toOwnedSlice(allocator);
-    errdefer allocator.free(owned);
-    const manifest: Manifest = .{ .storage = storage, .rows = owned };
-    try validateRelationships(manifest);
-    return manifest;
-}
-
-pub fn encodeManifest(allocator: std.mem.Allocator, manifest: Manifest) ![]u8 {
-    var output: std.ArrayList(u8) = .empty;
-    errdefer output.deinit(allocator);
-    try output.appendSlice(allocator, schema_magic);
-    try output.append(allocator, '\n');
-    try output.appendSlice(allocator, schema_header);
-    try output.append(allocator, '\n');
-    for (manifest.rows) |row| {
-        try output.print(allocator, "{s}\t{s}\t{s}\t{}\t{o}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\t{s}\n", .{
-            externalEnumName(row.kind),
-            row.logical_id,
-            row.sha256,
-            row.bytes,
-            row.mode,
-            row.media_type,
-            row.provenance,
-            row.reconstruction,
-            externalEnumName(row.retention_class),
-            externalEnumName(row.status),
-            row.key,
-            row.target_id,
-            row.snapshot_id,
-            row.member_path,
-            row.snapshot_format,
-            row.recipe_sha256,
-            row.constituent_sha256,
-        });
-    }
-    return output.toOwnedSlice(allocator);
 }
 
 pub fn parseRegistration(allocator: std.mem.Allocator, raw_input: []const u8) !RegistrationSnapshot {
@@ -3669,152 +3512,6 @@ fn validateExpectedRegistration(snapshot: RegistrationSnapshot) !void {
     }
 }
 
-fn validateRowShape(row: Row) !void {
-    try validateSha(row.sha256);
-    try validateRelativeKey(row.key);
-    switch (row.kind) {
-        .object => {
-            const split = splitObjectKey(row.key) orelse return error.InvalidObjectRow;
-            if (row.mode != 0o444 or
-                row.target_id.len != 1 or row.target_id[0] != '-' or
-                row.snapshot_id.len != 1 or row.snapshot_id[0] != '-' or
-                row.member_path.len != 1 or row.member_path[0] != '-' or
-                !isDash(row.snapshot_format) or
-                !isDash(row.recipe_sha256) or
-                !isDash(row.constituent_sha256) or
-                !std.mem.eql(u8, split.prefix, row.sha256[0..2]) or
-                !std.mem.eql(u8, split.basename, row.sha256[2..]))
-            {
-                return error.InvalidObjectRow;
-            }
-        },
-        .logical_ref => {
-            try validateLogicalId(row.target_id);
-            if (row.snapshot_id.len != 1 or row.snapshot_id[0] != '-' or
-                row.member_path.len != 1 or row.member_path[0] != '-' or
-                !isDash(row.snapshot_format) or
-                !isDash(row.recipe_sha256) or
-                !isDash(row.constituent_sha256))
-            {
-                return error.InvalidLogicalRefRow;
-            }
-        },
-        .snapshot => {
-            const split = splitSnapshotKey(row.key) orelse return error.InvalidSnapshotRow;
-            if (row.mode != 0o444 or
-                row.target_id.len != 1 or row.target_id[0] != '-' or
-                row.snapshot_id.len != 1 or row.snapshot_id[0] != '-' or
-                row.member_path.len != 1 or row.member_path[0] != '-' or
-                !std.mem.eql(u8, row.snapshot_format, snapshot_format) or
-                !std.mem.eql(u8, row.recipe_sha256, snapshot_recipe_sha) or
-                !std.mem.eql(u8, split.prefix, row.sha256[0..2]) or
-                !std.mem.eql(u8, split.basename[0..62], row.sha256[2..]))
-            {
-                return error.InvalidSnapshotRow;
-            }
-            try validateSha(row.constituent_sha256);
-        },
-        .snapshot_member => {
-            try validateLogicalId(row.target_id);
-            try validateLogicalId(row.snapshot_id);
-            try validateRelativeKey(row.member_path);
-            if (row.mode != 0o444 or
-                !isDash(row.snapshot_format) or
-                !isDash(row.recipe_sha256) or
-                !isDash(row.constituent_sha256))
-            {
-                return error.InvalidSnapshotMemberRow;
-            }
-        },
-    }
-}
-
-fn isDash(text: []const u8) bool {
-    return text.len == 1 and text[0] == '-';
-}
-
-fn validateRelationships(manifest: Manifest) !void {
-    for (manifest.rows, 0..) |row, row_index| {
-        for (manifest.rows[0..row_index]) |prior| {
-            if (std.mem.eql(u8, prior.key, row.key)) {
-                if (!sameIdentity(prior, row)) return error.ConflictingManifestKey;
-                const object_member_pair =
-                    (prior.kind == .object and row.kind == .snapshot_member) or
-                    (prior.kind == .snapshot_member and row.kind == .object);
-                const separate_snapshot_members =
-                    prior.kind == .snapshot_member and row.kind == .snapshot_member and
-                    !std.mem.eql(u8, prior.snapshot_id, row.snapshot_id);
-                if (!object_member_pair and !separate_snapshot_members) {
-                    return error.AmbiguousManifestKey;
-                }
-            }
-        }
-        switch (row.kind) {
-            .object => {},
-            .logical_ref => {
-                const target = findRow(manifest, row.target_id) orelse return error.MissingTargetObject;
-                if (target.kind != .object or !logicalRefMatchesTarget(row, target)) {
-                    return error.LogicalRefMismatch;
-                }
-            },
-            .snapshot => {
-                var constituent_matches: usize = 0;
-                var member_count: usize = 0;
-                for (manifest.rows) |candidate| {
-                    if (candidate.kind == .object and
-                        std.mem.eql(u8, candidate.sha256, row.constituent_sha256))
-                    {
-                        constituent_matches += 1;
-                    }
-                    if (candidate.kind == .snapshot_member and
-                        std.mem.eql(u8, candidate.snapshot_id, row.logical_id))
-                    {
-                        member_count += 1;
-                    }
-                }
-                if (constituent_matches != 1) return error.InvalidSnapshotConstituent;
-                if (member_count == 0 or member_count > max_snapshot_members) {
-                    return error.InvalidSnapshotMemberCount;
-                }
-            },
-            .snapshot_member => {
-                const target = findRow(manifest, row.target_id) orelse return error.MissingTargetObject;
-                const snapshot = findRow(manifest, row.snapshot_id) orelse return error.MissingSnapshot;
-                if (target.kind != .object or snapshot.kind != .snapshot or
-                    !sameIdentity(row, target) or !std.mem.eql(u8, row.member_path, target.key))
-                {
-                    return error.SnapshotMemberMismatch;
-                }
-                for (manifest.rows[0..row_index]) |other| {
-                    if (other.kind == .snapshot_member and
-                        std.mem.eql(u8, row.snapshot_id, other.snapshot_id) and
-                        std.mem.eql(u8, row.member_path, other.member_path))
-                    {
-                        return error.DuplicateSnapshotMember;
-                    }
-                }
-            },
-        }
-    }
-}
-
-fn findRow(manifest: Manifest, logical_id: []const u8) ?Row {
-    for (manifest.rows) |row| {
-        if (std.mem.eql(u8, row.logical_id, logical_id)) return row;
-    }
-    return null;
-}
-
-fn sameIdentity(a: Row, b: Row) bool {
-    return std.mem.eql(u8, a.sha256, b.sha256) and a.bytes == b.bytes and a.mode == b.mode;
-}
-
-fn logicalRefMatchesTarget(logical_ref: Row, target: Row) bool {
-    return std.mem.eql(u8, logical_ref.sha256, target.sha256) and
-        logical_ref.bytes == target.bytes and
-        std.mem.eql(u8, logical_ref.media_type, target.media_type);
-}
-
 fn sortedObjectGroup(
     allocator: std.mem.Allocator,
     objects: []const FileIdentity,
@@ -3874,136 +3571,6 @@ fn encodeMemberList(
     return output.toOwnedSlice(allocator);
 }
 
-fn parseEnum(comptime E: type, text: []const u8) ?E {
-    inline for (@typeInfo(E).@"enum".fields) |field| {
-        if (externalTagMatches(field.name, text)) return @enumFromInt(field.value);
-    }
-    return null;
-}
-
-fn externalTagMatches(comptime internal: []const u8, external: []const u8) bool {
-    if (internal.len != external.len) return false;
-    for (internal, external) |internal_byte, external_byte| {
-        if ((if (internal_byte == '_') '-' else internal_byte) != external_byte) return false;
-    }
-    return true;
-}
-
-fn externalEnumName(value: anytype) []const u8 {
-    return switch (@TypeOf(value)) {
-        RowKind => switch (value) {
-            .object => "object",
-            .logical_ref => "logical-ref",
-            .snapshot => "snapshot",
-            .snapshot_member => "snapshot-member",
-        },
-        Status => switch (value) {
-            .active => "active",
-            .exhausted_evidence => "exhausted-evidence",
-            .future_required => "future-required",
-            .superseded => "superseded",
-            .absent_unrecoverable => "absent-unrecoverable",
-        },
-        RetentionClass => switch (value) {
-            .canonical_input => "canonical-input",
-            .irreplaceable_acceptance_evidence => "irreplaceable-acceptance-evidence",
-            .reproducible_cache => "reproducible-cache",
-            .ephemeral_scratch => "ephemeral-scratch",
-        },
-        else => @compileError("unsupported external enum"),
-    };
-}
-
-fn validateCanonicalField(allocator: std.mem.Allocator, encoded: []const u8) !void {
-    if (encoded.len == 0) return error.EmptyManifestField;
-    var decoded: std.ArrayList(u8) = .empty;
-    defer decoded.deinit(allocator);
-    var index: usize = 0;
-    while (index < encoded.len) {
-        const byte = encoded[index];
-        if (byte == '%') {
-            if (index + 2 >= encoded.len or
-                !std.ascii.isHex(encoded[index + 1]) or
-                !std.ascii.isHex(encoded[index + 2]) or
-                std.ascii.isLower(encoded[index + 1]) or
-                std.ascii.isLower(encoded[index + 2]))
-            {
-                return error.InvalidPercentEncoding;
-            }
-            const value = std.fmt.parseInt(u8, encoded[index + 1 .. index + 3], 16) catch
-                return error.InvalidPercentEncoding;
-            try decoded.append(allocator, value);
-            index += 3;
-        } else {
-            if (byte == '\t' or byte == '\r' or byte == '\n' or byte == 0 or byte == '\\' or
-                byte < 0x20 or byte >= 0x7f)
-            {
-                return error.UnencodedUnsafeByte;
-            }
-            try decoded.append(allocator, byte);
-            index += 1;
-        }
-    }
-    const reencoded = try encodeField(allocator, decoded.items);
-    defer allocator.free(reencoded);
-    if (!std.mem.eql(u8, reencoded, encoded)) return error.NonCanonicalPercentEncoding;
-}
-
-fn encodeField(allocator: std.mem.Allocator, decoded: []const u8) ![]u8 {
-    var encoded: std.ArrayList(u8) = .empty;
-    errdefer encoded.deinit(allocator);
-    const hex = "0123456789ABCDEF";
-    for (decoded) |byte| {
-        const safe = byte >= 0x20 and byte < 0x7f and
-            byte != '%' and byte != '\\' and byte != '\t' and byte != '\r' and byte != '\n';
-        if (safe) {
-            try encoded.append(allocator, byte);
-        } else {
-            try encoded.appendSlice(allocator, &.{ '%', hex[byte >> 4], hex[byte & 0xf] });
-        }
-    }
-    return encoded.toOwnedSlice(allocator);
-}
-
-fn validateLogicalId(id: []const u8) !void {
-    if (id.len == 0 or !isLowerAlphaNumeric(id[0])) return error.InvalidLogicalId;
-    try validateRelativeKey(id);
-}
-
-fn validateRelativeKey(key: []const u8) !void {
-    if (key.len == 0 or std.fs.path.isAbsolute(key) or key[0] == '/' or key[key.len - 1] == '/') {
-        return error.UnsafeRelativeKey;
-    }
-    var segments = std.mem.splitScalar(u8, key, '/');
-    while (segments.next()) |segment| {
-        if (segment.len == 0 or segment.len > 255 or
-            std.mem.eql(u8, segment, ".") or std.mem.eql(u8, segment, ".."))
-        {
-            return error.UnsafeRelativeKey;
-        }
-        for (segment) |byte| {
-            if (!isLowerAlphaNumeric(byte) and byte != '.' and byte != '_' and byte != '-') {
-                return error.UnsafeRelativeKey;
-            }
-        }
-    }
-}
-
-fn validateSha(text: []const u8) !void {
-    if (text.len != 64 or !isLowerHex(text)) return error.InvalidSha256;
-}
-
-fn isLowerHex(text: []const u8) bool {
-    for (text) |byte| {
-        if (!std.ascii.isDigit(byte) and !(byte >= 'a' and byte <= 'f')) return false;
-    }
-    return true;
-}
-
-fn isLowerAlphaNumeric(byte: u8) bool {
-    return std.ascii.isDigit(byte) or (byte >= 'a' and byte <= 'z');
-}
-
 fn sha256Hex(bytes: []const u8) [64]u8 {
     var digest: [Sha256.digest_length]u8 = undefined;
     Sha256.hash(bytes, &digest, .{});
@@ -4018,29 +3585,6 @@ fn objectKey(allocator: std.mem.Allocator, sha: []const u8) ![]u8 {
 fn snapshotKey(allocator: std.mem.Allocator, sha: []const u8) ![]u8 {
     try validateSha(sha);
     return std.fmt.allocPrint(allocator, "snapshots/sha256/{s}/{s}.tar.zst", .{ sha[0..2], sha[2..] });
-}
-
-const KeySplit = struct { prefix: []const u8, basename: []const u8 };
-
-fn splitObjectKey(key: []const u8) ?KeySplit {
-    const prefix = "objects/sha256/";
-    if (!std.mem.startsWith(u8, key, prefix) or key.len != prefix.len + 2 + 1 + 62) return null;
-    if (key[prefix.len + 2] != '/') return null;
-    const a = key[prefix.len .. prefix.len + 2];
-    const b = key[prefix.len + 3 ..];
-    if (!isLowerHex(a) or !isLowerHex(b)) return null;
-    return .{ .prefix = a, .basename = b };
-}
-
-fn splitSnapshotKey(key: []const u8) ?KeySplit {
-    const prefix = "snapshots/sha256/";
-    const suffix = ".tar.zst";
-    if (!std.mem.startsWith(u8, key, prefix) or !std.mem.endsWith(u8, key, suffix)) return null;
-    if (key.len != prefix.len + 2 + 1 + 62 + suffix.len or key[prefix.len + 2] != '/') return null;
-    const a = key[prefix.len .. prefix.len + 2];
-    const b = key[prefix.len + 3 ..];
-    if (!isLowerHex(a) or !isLowerHex(b[0..62])) return null;
-    return .{ .prefix = a, .basename = b };
 }
 
 fn pathContains(parent: []const u8, child: []const u8) bool {
@@ -8302,239 +7846,6 @@ test "authority resolution is closed and default remains read only" {
     );
     try std.testing.expect(parseEnum(RowKind, "logical_ref") == null);
     try std.testing.expectEqualStrings(snapshot_recipe_sha, &sha256Hex(snapshot_recipe));
-}
-
-test "manifest schema round trips and rejects unsafe or unknown input" {
-    const allocator = std.testing.allocator;
-    const zero_sha = "0000000000000000000000000000000000000000000000000000000000000000";
-    const one_sha = "1111111111111111111111111111111111111111111111111111111111111111";
-    const two_sha = "2222222222222222222222222222222222222222222222222222222222222222";
-    const text = try std.fmt.allocPrint(
-        allocator,
-        schema_magic ++ "\n" ++ schema_header ++ "\n" ++
-            "object\tobject.one\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tobjects/sha256/00/{s}\t-\t-\t-\t-\t-\t-\n" ++
-            "object\tconstituent.one\t{s}\t2\t444\ttext/tab-separated-values\tproof\tunavailable\treproducible-cache\tactive\tobjects/sha256/22/{s}\t-\t-\t-\t-\t-\t-\n" ++
-            "snapshot\tsnapshot.one\t{s}\t2\t444\tapplication/zstd+tar\tproof\tunavailable\tirreplaceable-acceptance-evidence\tactive\tsnapshots/sha256/11/{s}.tar.zst\t-\t-\t-\t{s}\t{s}\t{s}\n" ++
-            "snapshot-member\tmember.one\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tobjects/sha256/00/{s}\tobject.one\tsnapshot.one\tobjects/sha256/00/{s}\t-\t-\t-\n",
-        .{
-            zero_sha,
-            zero_sha[2..],
-            two_sha,
-            two_sha[2..],
-            one_sha,
-            one_sha[2..],
-            snapshot_format,
-            snapshot_recipe_sha,
-            two_sha,
-            zero_sha,
-            zero_sha[2..],
-            zero_sha[2..],
-        },
-    );
-    defer allocator.free(text);
-    var manifest = try parseManifest(allocator, text);
-    defer manifest.deinit(allocator);
-    const encoded = try encodeManifest(allocator, manifest);
-    defer allocator.free(encoded);
-    try std.testing.expectEqualStrings(text, encoded);
-
-    try std.testing.expectError(error.UnsafeRelativeKey, validateRelativeKey("../escape"));
-    try std.testing.expectError(error.UnsafeRelativeKey, validateRelativeKey("a//b"));
-    try std.testing.expectError(error.InvalidLogicalId, validateLogicalId("-bad"));
-    try std.testing.expectError(error.InvalidPercentEncoding, validateCanonicalField(allocator, "%2f"));
-
-    const duplicate = try std.fmt.allocPrint(
-        allocator,
-        schema_magic ++ "\n" ++ schema_header ++ "\n" ++
-            "object\tobject.one\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tobjects/sha256/00/{s}\t-\t-\t-\t-\t-\t-\n" ++
-            "object\tobject.one\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tobjects/sha256/00/{s}\t-\t-\t-\t-\t-\t-\n",
-        .{ zero_sha, zero_sha[2..], zero_sha, zero_sha[2..] },
-    );
-    defer allocator.free(duplicate);
-    try std.testing.expectError(error.DuplicateLogicalId, parseManifest(allocator, duplicate));
-
-    const ambiguous_key = try std.fmt.allocPrint(
-        allocator,
-        schema_magic ++ "\n" ++ schema_header ++ "\n" ++
-            "object\tobject.one\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tobjects/sha256/00/{s}\t-\t-\t-\t-\t-\t-\n" ++
-            "object\tobject.two\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tobjects/sha256/00/{s}\t-\t-\t-\t-\t-\t-\n",
-        .{ zero_sha, zero_sha[2..], zero_sha, zero_sha[2..] },
-    );
-    defer allocator.free(ambiguous_key);
-    try std.testing.expectError(error.AmbiguousManifestKey, parseManifest(allocator, ambiguous_key));
-
-    const unknown = try std.mem.replaceOwned(
-        u8,
-        allocator,
-        text,
-        "snapshot-member",
-        "unknown-kind",
-    );
-    defer allocator.free(unknown);
-    try std.testing.expectError(error.UnknownRowKind, parseManifest(allocator, unknown));
-
-    const extra_field = try std.fmt.allocPrint(
-        allocator,
-        schema_magic ++ "\n" ++ schema_header ++ "\n" ++
-            "object\tobject.one\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tobjects/sha256/00/{s}\t-\t-\t-\t-\t-\t-\textra\n",
-        .{ zero_sha, zero_sha[2..] },
-    );
-    defer allocator.free(extra_field);
-    try std.testing.expectError(error.UnknownManifestField, parseManifest(allocator, extra_field));
-
-    const missing_target = try std.fmt.allocPrint(
-        allocator,
-        schema_magic ++ "\n" ++ schema_header ++ "\n" ++
-            "logical-ref\tref.one\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tcompatibility/object.one\tobject.missing\t-\t-\t-\t-\t-\n",
-        .{zero_sha},
-    );
-    defer allocator.free(missing_target);
-    try std.testing.expectError(error.MissingTargetObject, parseManifest(allocator, missing_target));
-
-    const logical_mode_split = try std.fmt.allocPrint(
-        allocator,
-        schema_magic ++ "\n" ++ schema_header ++ "\n" ++
-            "object\tobject.one\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tobjects/sha256/00/{s}\t-\t-\t-\t-\t-\t-\n" ++
-            "logical-ref\tref.one\t{s}\t1\t664\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tcompatibility/object.one\tobject.one\t-\t-\t-\t-\t-\n",
-        .{ zero_sha, zero_sha[2..], zero_sha },
-    );
-    defer allocator.free(logical_mode_split);
-    var split_manifest = try parseManifest(allocator, logical_mode_split);
-    defer split_manifest.deinit(allocator);
-    const split_ref = findRow(split_manifest, "ref.one") orelse return error.MissingLogicalReference;
-    const split_target = findRow(split_manifest, "object.one") orelse return error.MissingTargetObject;
-    try std.testing.expectEqual(@as(u16, 0o664), split_ref.mode);
-    try std.testing.expectEqual(@as(u16, 0o444), split_target.mode);
-    try std.testing.expect(logicalRefMatchesTarget(split_ref, split_target));
-
-    const logical_hash_mismatch = try std.mem.replaceOwned(
-        u8,
-        allocator,
-        logical_mode_split,
-        "logical-ref\tref.one\t0000000000000000000000000000000000000000000000000000000000000000",
-        "logical-ref\tref.one\t1111111111111111111111111111111111111111111111111111111111111111",
-    );
-    defer allocator.free(logical_hash_mismatch);
-    try std.testing.expectError(
-        error.LogicalRefMismatch,
-        parseManifest(allocator, logical_hash_mismatch),
-    );
-    const logical_byte_mismatch = try std.mem.replaceOwned(
-        u8,
-        allocator,
-        logical_mode_split,
-        "logical-ref\tref.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t664",
-        "logical-ref\tref.one\t0000000000000000000000000000000000000000000000000000000000000000\t2\t664",
-    );
-    defer allocator.free(logical_byte_mismatch);
-    try std.testing.expectError(
-        error.LogicalRefMismatch,
-        parseManifest(allocator, logical_byte_mismatch),
-    );
-    const logical_media_mismatch = try std.mem.replaceOwned(
-        u8,
-        allocator,
-        logical_mode_split,
-        "logical-ref\tref.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t664\tapplication/octet-stream",
-        "logical-ref\tref.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t664\ttext/plain",
-    );
-    defer allocator.free(logical_media_mismatch);
-    try std.testing.expectError(
-        error.LogicalRefMismatch,
-        parseManifest(allocator, logical_media_mismatch),
-    );
-    const logical_target_mismatch = try std.mem.replaceOwned(
-        u8,
-        allocator,
-        logical_mode_split,
-        "\tobject.one\t-\t-\t-\t-\t-\n",
-        "\tobject.missing\t-\t-\t-\t-\t-\n",
-    );
-    defer allocator.free(logical_target_mismatch);
-    try std.testing.expectError(
-        error.MissingTargetObject,
-        parseManifest(allocator, logical_target_mismatch),
-    );
-    const logical_target_key_mismatch = try std.mem.replaceOwned(
-        u8,
-        allocator,
-        logical_mode_split,
-        "objects/sha256/00/00000000000000000000000000000000000000000000000000000000000000",
-        "objects/sha256/00/00000000000000000000000000000000000000000000000000000000000001",
-    );
-    defer allocator.free(logical_target_key_mismatch);
-    try std.testing.expectError(
-        error.InvalidObjectRow,
-        parseManifest(allocator, logical_target_key_mismatch),
-    );
-    const non_immutable_object = try std.mem.replaceOwned(
-        u8,
-        allocator,
-        logical_mode_split,
-        "object\tobject.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t444",
-        "object\tobject.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t400",
-    );
-    defer allocator.free(non_immutable_object);
-    try std.testing.expectError(
-        error.InvalidObjectRow,
-        parseManifest(allocator, non_immutable_object),
-    );
-
-    const incomplete_snapshot = try std.mem.replaceOwned(
-        u8,
-        allocator,
-        text,
-        snapshot_format,
-        "-",
-    );
-    defer allocator.free(incomplete_snapshot);
-    try std.testing.expectError(error.InvalidSnapshotRow, parseManifest(allocator, incomplete_snapshot));
-
-    const non_immutable_snapshot = try std.mem.replaceOwned(
-        u8,
-        allocator,
-        text,
-        "snapshot\tsnapshot.one\t1111111111111111111111111111111111111111111111111111111111111111\t2\t444",
-        "snapshot\tsnapshot.one\t1111111111111111111111111111111111111111111111111111111111111111\t2\t400",
-    );
-    defer allocator.free(non_immutable_snapshot);
-    try std.testing.expectError(
-        error.InvalidSnapshotRow,
-        parseManifest(allocator, non_immutable_snapshot),
-    );
-    const non_immutable_snapshot_member = try std.mem.replaceOwned(
-        u8,
-        allocator,
-        text,
-        "snapshot-member\tmember.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t444",
-        "snapshot-member\tmember.one\t0000000000000000000000000000000000000000000000000000000000000000\t1\t400",
-    );
-    defer allocator.free(non_immutable_snapshot_member);
-    try std.testing.expectError(
-        error.InvalidSnapshotMemberRow,
-        parseManifest(allocator, non_immutable_snapshot_member),
-    );
-
-    const key_mismatch = try std.fmt.allocPrint(
-        allocator,
-        schema_magic ++ "\n" ++ schema_header ++ "\n" ++
-            "object\tobject.one\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tobjects/sha256/00/{s}\t-\t-\t-\t-\t-\t-\n",
-        .{ one_sha, zero_sha[2..] },
-    );
-    defer allocator.free(key_mismatch);
-    try std.testing.expectError(error.InvalidObjectRow, parseManifest(allocator, key_mismatch));
-
-    const conflicting_key = try std.fmt.allocPrint(
-        allocator,
-        schema_magic ++ "\n" ++ schema_header ++ "\n" ++
-            "object\tobject.zero\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tobjects/sha256/00/{s}\t-\t-\t-\t-\t-\t-\n" ++
-            "object\tobject.one\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tobjects/sha256/11/{s}\t-\t-\t-\t-\t-\t-\n" ++
-            "logical-ref\tref.zero\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tshared.bin\tobject.zero\t-\t-\t-\t-\t-\n" ++
-            "logical-ref\tref.one\t{s}\t1\t444\tapplication/octet-stream\tproof\tunavailable\tcanonical-input\tactive\tshared.bin\tobject.one\t-\t-\t-\t-\t-\n",
-        .{ zero_sha, zero_sha[2..], one_sha, one_sha[2..], zero_sha, one_sha },
-    );
-    defer allocator.free(conflicting_key);
-    try std.testing.expectError(error.ConflictingManifestKey, parseManifest(allocator, conflicting_key));
 }
 
 test "published snapshot generator binds every member to its exact object key" {
