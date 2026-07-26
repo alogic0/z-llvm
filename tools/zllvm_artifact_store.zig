@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const capacity = @import("zllvm_artifact_store/capacity.zig");
 const digest_model = @import("zllvm_artifact_store/digest.zig");
+const filesystem = @import("zllvm_artifact_store/filesystem.zig");
 const identity_model = @import("zllvm_artifact_store/identity.zig");
 const manifest_model = @import("zllvm_artifact_store/manifest.zig");
 const path_policy = @import("zllvm_artifact_store/path_policy.zig");
@@ -82,6 +83,18 @@ const verifyRelativeFile = identity_model.verifyRelativeFile;
 const identityOfOpenFile = identity_model.identityOfOpenFile;
 const identityOfOpenFileAnyMode = identity_model.identityOfOpenFileAnyMode;
 const copyFileContents = identity_model.copyFileContents;
+const openOrCreateDir = filesystem.openOrCreateDir;
+const openExistingDir = filesystem.openExistingDir;
+const openPathNoFollow = filesystem.openPathNoFollow;
+const writeCollisionFixtureAtomic = filesystem.writeCollisionFixtureAtomic;
+const PublishFault = filesystem.PublishFault;
+const publishVerifiedBytes = filesystem.publishVerifiedBytes;
+const publishVerifiedFile = filesystem.publishVerifiedFile;
+const finishVerifiedAtomic = filesystem.finishVerifiedAtomic;
+const writeExclusive = filesystem.writeExclusive;
+const syncDirectory = filesystem.syncDirectory;
+const resetTestDirectorySyncCount = filesystem.resetTestDirectorySyncCount;
+const readTestDirectorySyncCount = filesystem.readTestDirectorySyncCount;
 
 const SourceSpecRow = struct {
     logical_id: []const u8,
@@ -3340,230 +3353,6 @@ fn objectKey(allocator: std.mem.Allocator, sha: []const u8) ![]u8 {
 fn snapshotKey(allocator: std.mem.Allocator, sha: []const u8) ![]u8 {
     try validateSha(sha);
     return std.fmt.allocPrint(allocator, "snapshots/sha256/{s}/{s}.tar.zst", .{ sha[0..2], sha[2..] });
-}
-
-fn openOrCreateDir(io: std.Io, parent: std.Io.Dir, name: []const u8) !std.Io.Dir {
-    if (std.mem.indexOfScalar(u8, name, '/') != null or
-        std.mem.eql(u8, name, ".") or std.mem.eql(u8, name, ".."))
-    {
-        return error.UnsafePathComponent;
-    }
-    const created = created: {
-        parent.createDir(io, name, .default_dir) catch |err| switch (err) {
-            error.PathAlreadyExists => break :created false,
-            else => return err,
-        };
-        break :created true;
-    };
-    if (parent.openDir(io, name, .{
-        .access_sub_paths = true,
-        .iterate = true,
-        .follow_symlinks = false,
-    })) |dir| {
-        if (created) {
-            try syncDirectory(dir);
-            try syncDirectory(parent);
-        }
-        return dir;
-    } else |err| return err;
-}
-
-fn openExistingDir(io: std.Io, parent: std.Io.Dir, name: []const u8) !std.Io.Dir {
-    if (std.mem.indexOfScalar(u8, name, '/') != null) return error.UnsafePathComponent;
-    return parent.openDir(io, name, .{
-        .access_sub_paths = true,
-        .iterate = true,
-        .follow_symlinks = false,
-    });
-}
-
-fn openPathNoFollow(io: std.Io, start: std.Io.Dir, relative: []const u8, create: bool) !std.Io.Dir {
-    if (std.mem.eql(u8, relative, ".")) {
-        return start.openDir(io, ".", .{
-            .access_sub_paths = true,
-            .iterate = true,
-            .follow_symlinks = false,
-        });
-    }
-    try validateRelativeKey(relative);
-    var current = start;
-    var current_owned = false;
-    errdefer if (current_owned) current.close(io);
-    var segments = std.mem.splitScalar(u8, relative, '/');
-    while (segments.next()) |segment| {
-        const next = if (create)
-            try openOrCreateDir(io, current, segment)
-        else
-            try openExistingDir(io, current, segment);
-        if (current_owned) current.close(io);
-        current = next;
-        current_owned = true;
-    }
-    return current;
-}
-
-fn writeCollisionFixtureAtomic(
-    io: std.Io,
-    dir: std.Io.Dir,
-    basename: []const u8,
-    bytes: []const u8,
-    mode: u16,
-) !void {
-    if (!builtin.is_test) return error.TestOnlyOperation;
-    if (std.mem.indexOfScalar(u8, basename, '/') != null) return error.UnsafePathComponent;
-    var atomic = try dir.createFileAtomic(io, basename, .{
-        .permissions = .fromMode(0o600),
-        .replace = false,
-    });
-    defer atomic.deinit(io);
-    try atomic.file.writeStreamingAll(io, bytes);
-    try atomic.file.sync(io);
-    try atomic.file.setPermissions(io, .fromMode(mode));
-    try atomic.file.sync(io);
-    try atomic.link(io);
-    try syncDirectory(dir);
-}
-
-const PublishFault = enum {
-    none,
-    corrupt_incoming,
-    corrupt_final,
-};
-
-fn publishVerifiedBytes(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    dir: std.Io.Dir,
-    basename: []const u8,
-    bytes: []const u8,
-    expected: FileIdentity,
-    fault: PublishFault,
-) !bool {
-    var atomic = try dir.createFileAtomic(io, basename, .{
-        .permissions = .fromMode(0o600),
-        .replace = false,
-    });
-    defer atomic.deinit(io);
-    try atomic.file.writeStreamingAll(io, bytes);
-    return finishVerifiedAtomic(allocator, io, dir, basename, &atomic, expected, fault);
-}
-
-fn publishVerifiedFile(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    dir: std.Io.Dir,
-    basename: []const u8,
-    source: std.Io.File,
-    expected: FileIdentity,
-    fault: PublishFault,
-) !bool {
-    var atomic = try dir.createFileAtomic(io, basename, .{
-        .permissions = .fromMode(0o600),
-        .replace = false,
-    });
-    defer atomic.deinit(io);
-    try copyFileContents(io, source, atomic.file);
-    return finishVerifiedAtomic(allocator, io, dir, basename, &atomic, expected, fault);
-}
-
-fn finishVerifiedAtomic(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    dir: std.Io.Dir,
-    basename: []const u8,
-    atomic: *std.Io.File.Atomic,
-    expected: FileIdentity,
-    fault: PublishFault,
-) !bool {
-    try atomic.file.sync(io);
-    if (fault == .corrupt_incoming) {
-        try atomic.file.writePositionalAll(io, "!", 0);
-        try atomic.file.sync(io);
-    }
-    try atomic.file.setPermissions(io, .fromMode(expected.mode));
-    try atomic.file.sync(io);
-    var incoming = try identityOfOpenFile(allocator, io, atomic.file, expected.mode);
-    defer incoming.deinit(allocator);
-    if (!sameFileIdentity(incoming, expected)) return error.PrepublicationVerificationFailed;
-
-    var created = true;
-    atomic.link(io) catch |err| switch (err) {
-        error.PathAlreadyExists => created = false,
-        else => return err,
-    };
-    try syncDirectory(dir);
-
-    if (created and fault == .corrupt_final) {
-        try dir.setFilePermissions(
-            io,
-            basename,
-            .fromMode(0o600),
-            .{ .follow_symlinks = false },
-        );
-        var final_for_fault = try dir.openFile(io, basename, .{
-            .mode = .read_write,
-            .allow_directory = false,
-            .follow_symlinks = false,
-        });
-        defer final_for_fault.close(io);
-        try final_for_fault.writePositionalAll(io, "!", 0);
-        try final_for_fault.sync(io);
-        try final_for_fault.setPermissions(io, .fromMode(expected.mode));
-        try final_for_fault.sync(io);
-    }
-
-    const verified = verifyRelativeFile(allocator, io, dir, basename, expected.mode) catch |err| {
-        if (created) {
-            dir.deleteFile(io, basename) catch {};
-            syncDirectory(dir) catch {};
-        }
-        return err;
-    };
-    defer {
-        var mutable = verified;
-        mutable.deinit(allocator);
-    }
-    if (!sameFileIdentity(verified, expected)) {
-        if (created) {
-            try dir.deleteFile(io, basename);
-            try syncDirectory(dir);
-        }
-        return if (created)
-            error.PostPublicationReadBackMismatch
-        else
-            error.UnequalExistingCollision;
-    }
-    try syncDirectory(dir);
-    return created;
-}
-
-fn writeExclusive(
-    io: std.Io,
-    dir: std.Io.Dir,
-    basename: []const u8,
-    bytes: []const u8,
-    mode: u16,
-) !void {
-    var file = try dir.createFile(io, basename, .{
-        .exclusive = true,
-        .permissions = .fromMode(0o600),
-    });
-    defer file.close(io);
-    try file.writeStreamingAll(io, bytes);
-    try file.sync(io);
-    try file.setPermissions(io, .fromMode(mode));
-    try file.sync(io);
-    try syncDirectory(dir);
-}
-
-threadlocal var test_directory_sync_count: usize = 0;
-
-fn syncDirectory(dir: std.Io.Dir) !void {
-    switch (std.os.linux.errno(std.os.linux.fsync(dir.handle))) {
-        .SUCCESS => {},
-        else => |err| return std.posix.unexpectedErrno(err),
-    }
-    if (builtin.is_test) test_directory_sync_count += 1;
 }
 
 fn expectSnapshotProofDirectoryEmpty(store: *Store) !void {
@@ -7845,9 +7634,9 @@ test "synthetic store publishes verifies snapshots and resolves without overwrit
     }
     try assertRetainedMaterializeBoundaries(io);
 
-    const sync_before_root = test_directory_sync_count;
+    const sync_before_root = try readTestDirectorySyncCount();
     try prepareStoreRoot(allocator, io, &guard, synthetic_store);
-    try std.testing.expect(test_directory_sync_count >= sync_before_root + 2);
+    try std.testing.expect(try readTestDirectorySyncCount() >= sync_before_root + 2);
     errdefer std.debug.print(
         "INBOX-194D retain-on-failure synthetic_root={s}\n",
         .{synthetic_store},
@@ -8226,7 +8015,7 @@ test "synthetic store publishes verifies snapshots and resolves without overwrit
     } else |_| {}
 
     try guard.assertCurrent();
-    try std.testing.expect(test_directory_sync_count > sync_before_root + 10);
+    try std.testing.expect(try readTestDirectorySyncCount() > sync_before_root + 10);
     store.deinit();
     store_open = false;
     try guard.assertCurrent();
