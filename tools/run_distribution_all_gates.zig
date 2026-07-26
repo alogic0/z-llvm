@@ -52,9 +52,15 @@ const Options = struct {
     fresh_real_rows: bool = false,
     real_rows_concurrency: u8 = 3,
     real_rows_concurrency_explicit: bool = false,
+    zig_emitter: ?[]u8 = null,
+    real_rows_validation_root: ?[]u8 = null,
+    real_rows_cache_root: ?[]u8 = null,
     serial_root: ?[]u8 = null,
 
     fn deinit(options: *Options) void {
+        if (options.zig_emitter) |path| options.allocator.free(path);
+        if (options.real_rows_cache_root) |path| options.allocator.free(path);
+        if (options.real_rows_validation_root) |path| options.allocator.free(path);
         if (options.serial_root) |path| options.allocator.free(path);
         options.* = undefined;
     }
@@ -125,26 +131,18 @@ pub fn main(init: std.process.Init) !void {
     var tool_index: usize = 0;
     while (tool_index < tools.len) {
         if (tool_index == 9) {
-            var first = try io.concurrent(runTool, .{ allocator, io, target_assignment, bundle_assignment, tool_index, fresh_real_rows });
-            var second = try io.concurrent(runTool, .{ allocator, io, target_assignment, bundle_assignment, tool_index + 1, fresh_real_rows });
-            var third = try io.concurrent(runTool, .{ allocator, io, target_assignment, bundle_assignment, tool_index + 2, fresh_real_rows });
-            var completed = [_]CompletedTool{
-                try first.await(io),
-                try second.await(io),
-                try third.await(io),
-            };
-            for (&completed, tool_index..) |*item, completed_index| {
-                try recordTool(
-                    &stdout_writer.interface,
-                    completed_index,
-                    item.*,
-                    &metrics,
-                    target,
-                    fresh_real_rows,
-                );
-                common.freeRunResult(allocator, item.result);
+            var group = try real_rows_parallel.runGroup(allocator, io, realRowsParentOptions(target_assignment, options));
+            defer group.deinit(allocator);
+            for (0..real_rows_parallel.mode_count) |offset| {
+                const completed_index = tool_index + offset;
+                try writeToolStart(&stdout_writer.interface, completed_index, target, fresh_real_rows);
+                const group_completed = group.takeCompleted(offset);
+                const completed: CompletedTool = .{ .result = group_completed.result, .duration_ms = group_completed.duration_ms };
+                defer common.freeRunResult(allocator, completed.result);
+                try recordToolCompletion(&stdout_writer.interface, completed_index, completed, &metrics);
             }
-            tool_index += completed.len;
+            try real_rows_parallel.writeEvidence(&stdout_writer.interface, &group.evidence);
+            tool_index += real_rows_parallel.mode_count;
             continue;
         }
         const completed = try runTool(allocator, io, target_assignment, bundle_assignment, tool_index, fresh_real_rows);
@@ -419,11 +417,7 @@ fn runSerial(
         &tracker,
         sampler,
         real_executor.interface(),
-        .{
-            .target_assignment = target_assignment,
-            .scratch_path = paths.scratch_path,
-            .concurrency = options.real_rows_concurrency,
-        },
+        realRowsParentOptions(target_assignment, options),
         &metrics,
         &bundle_evidence,
     );
@@ -460,6 +454,17 @@ fn runSerial(
     try writer.flush();
 }
 
+fn realRowsParentOptions(target_assignment: []const u8, options: Options) real_rows_parallel.ParentOptions {
+    return .{
+        .target_assignment = target_assignment,
+        .zig_emitter_path = options.zig_emitter.?,
+        .scratch_path = options.real_rows_validation_root.?,
+        .export_cache_path = options.real_rows_cache_root.?,
+        .cache_mode = if (options.fresh_real_rows) .fresh else .require_hit,
+        .concurrency = options.real_rows_concurrency,
+    };
+}
+
 fn executeSerialTools(
     allocator: std.mem.Allocator,
     io: std.Io,
@@ -471,39 +476,31 @@ fn executeSerialTools(
     tracker: *headroom_policy.Tracker,
     sampler: FreeSpaceSampler,
     executor: ToolExecutor,
-    real_rows_options: ?real_rows_parallel.ParentOptions,
+    real_rows_options: real_rows_parallel.ParentOptions,
     metrics: *RunMetrics,
     bundle_evidence: *BundleEvidence,
 ) !void {
     var tool_index: usize = 0;
     while (tool_index < tools.len) {
-        if (tool_index == 9 and real_rows_options != null and !fresh_real_rows) {
-            var maybe_group: ?real_rows_parallel.GroupResult = real_rows_parallel.runGroup(
+        if (tool_index == 9) {
+            var group = try real_rows_parallel.runGroup(
                 allocator,
                 io,
-                real_rows_options.?,
-            ) catch |err| switch (err) {
-                error.RealRowsParallelCacheUnavailable => null,
-                else => return err,
-            };
-            if (maybe_group) |*group| {
-                defer group.deinit(allocator);
-                for (0..real_rows_parallel.mode_count) |offset| {
-                    const current_index = tool_index + offset;
-                    try sampleBeforeTool(allocator, io, writer, scratch_path, current_index, policy, tracker, sampler);
-                    try writeToolStart(writer, current_index, target, false);
-                    const group_completed = group.takeCompleted(offset);
-                    const completed: CompletedTool = .{ .result = group_completed.result, .duration_ms = group_completed.duration_ms };
-                    defer common.freeRunResult(allocator, completed.result);
-                    try recordToolCompletion(writer, current_index, completed, metrics);
-                }
-                try real_rows_parallel.writeEvidence(writer, &group.evidence);
-                tool_index += real_rows_parallel.mode_count;
-                continue;
+                real_rows_options,
+            );
+            defer group.deinit(allocator);
+            for (0..real_rows_parallel.mode_count) |offset| {
+                const current_index = tool_index + offset;
+                try sampleBeforeTool(allocator, io, writer, scratch_path, current_index, policy, tracker, sampler);
+                try writeToolStart(writer, current_index, target, fresh_real_rows);
+                const group_completed = group.takeCompleted(offset);
+                const completed: CompletedTool = .{ .result = group_completed.result, .duration_ms = group_completed.duration_ms };
+                defer common.freeRunResult(allocator, completed.result);
+                try recordToolCompletion(writer, current_index, completed, metrics);
             }
-            try writer.writeAll("real-rows-mode-parallel schema_version=1 admission=serial-fallback reason=cache-miss-or-invalid execution_results_cached=false local_fail=0\n");
-        } else if (tool_index == 9 and real_rows_options != null and fresh_real_rows) {
-            try writer.writeAll("real-rows-mode-parallel schema_version=1 admission=serial-fallback reason=fresh-real-rows execution_results_cached=false local_fail=0\n");
+            try real_rows_parallel.writeEvidence(writer, &group.evidence);
+            tool_index += real_rows_parallel.mode_count;
+            continue;
         }
         try sampleBeforeTool(allocator, io, writer, scratch_path, tool_index, policy, tracker, sampler);
         try writeToolStart(writer, tool_index, target, fresh_real_rows);
@@ -607,7 +604,10 @@ fn writeToolStart(
     fresh_real_rows: bool,
 ) !void {
     const tool = tools[tool_index];
-    const cache_mode: []const u8 = if (fresh_real_rows and tool.cache_contract == .air_export_v1) "fresh" else "default";
+    const cache_mode: []const u8 = if (tool.cache_contract == .air_export_v1)
+        (if (fresh_real_rows) "fresh" else "require-hit")
+    else
+        "default";
     try writer.print(
         "gate-input id={s} tool={s}",
         .{ tool.id, tool.path },
@@ -710,6 +710,7 @@ fn runTool(
     fresh_real_rows: bool,
 ) !CompletedTool {
     const tool = tools[tool_index];
+    if (tool.cache_contract == .air_export_v1) return error.RealRowsMustUseSharedRunner;
     var argv: std.ArrayList([]const u8) = .empty;
     defer argv.deinit(allocator);
     try argv.appendSlice(allocator, &.{ "env", target_assignment });
@@ -721,10 +722,7 @@ fn runTool(
         try argv.append(allocator, "--");
         try argv.appendSlice(allocator, tool.args);
     }
-    if (fresh_real_rows and std.mem.eql(u8, tool.path, "src/distribution_real_rows_gate.zig")) {
-        if (tool.args.len == 0) try argv.append(allocator, "--");
-        try argv.append(allocator, "--fresh-export");
-    }
+    _ = fresh_real_rows;
     const start = std.Io.Timestamp.now(io, .awake);
     return .{
         .result = try common.runCapture(allocator, io, argv.items, tool.path),
@@ -756,6 +754,21 @@ fn parseArgs(allocator: std.mem.Allocator, init: std.process.Init) !Options {
             const path = arg["--serial-root=".len..];
             if (path.len == 0) return error.InvalidSerialRoot;
             options.serial_root = try allocator.dupe(u8, path);
+        } else if (std.mem.startsWith(u8, arg, "--real-rows-validation-root=")) {
+            if (options.real_rows_validation_root != null) return error.DuplicateRealRowsValidationRoot;
+            const path = arg["--real-rows-validation-root=".len..];
+            if (path.len == 0) return error.InvalidRealRowsValidationRoot;
+            options.real_rows_validation_root = try allocator.dupe(u8, path);
+        } else if (std.mem.startsWith(u8, arg, "--real-rows-cache-root=")) {
+            if (options.real_rows_cache_root != null) return error.DuplicateRealRowsCacheRoot;
+            const path = arg["--real-rows-cache-root=".len..];
+            if (path.len == 0) return error.InvalidRealRowsCacheRoot;
+            options.real_rows_cache_root = try allocator.dupe(u8, path);
+        } else if (std.mem.startsWith(u8, arg, "--zig-emitter=")) {
+            if (options.zig_emitter != null) return error.DuplicateRealRowsZigEmitter;
+            const path = arg["--zig-emitter=".len..];
+            if (path.len == 0) return error.InvalidRealRowsZigEmitter;
+            options.zig_emitter = try allocator.dupe(u8, path);
         } else {
             return error.UnexpectedArgument;
         }
@@ -766,10 +779,14 @@ fn parseArgs(allocator: std.mem.Allocator, init: std.process.Init) !Options {
     if (options.real_rows_concurrency != 1 and options.real_rows_concurrency != 3) {
         return error.InvalidRealRowsConcurrency;
     }
-    if (options.real_rows_concurrency_explicit and options.mode != .serial) {
-        return error.RealRowsConcurrencyRequiresSerialMode;
-    }
     if (options.mode == .inventory and options.fresh_real_rows) {
+        return error.InventoryDoesNotRunGates;
+    }
+    if (options.mode == .inventory and options.real_rows_concurrency_explicit) return error.InventoryDoesNotRunGates;
+    if (options.mode != .inventory and (options.real_rows_validation_root == null or options.real_rows_cache_root == null or options.zig_emitter == null)) {
+        return error.RealRowsRootSelectionMissing;
+    }
+    if (options.mode == .inventory and (options.real_rows_validation_root != null or options.real_rows_cache_root != null or options.zig_emitter != null)) {
         return error.InventoryDoesNotRunGates;
     }
     return options;
@@ -940,6 +957,31 @@ test "tracked parallel activation is bounded to real-row gates ten through twelv
     try std.testing.expectEqual(CacheContract.unreported, tools[12].cache_contract);
 }
 
+test "default and serial cohort paths compose the same explicit shared-runner contract" {
+    const allocator = std.testing.allocator;
+    var fresh: Options = .{
+        .allocator = allocator,
+        .fresh_real_rows = true,
+        .real_rows_concurrency = 1,
+        .zig_emitter = try allocator.dupe(u8, "/test/stage4/zig"),
+        .real_rows_validation_root = try allocator.dupe(u8, "local-state/validations/contract"),
+        .real_rows_cache_root = try allocator.dupe(u8, "local-state/caches/contract"),
+    };
+    defer fresh.deinit();
+    const fresh_parent = realRowsParentOptions("TARGET=x86_64-unknown-linux-gnu", fresh);
+    try std.testing.expectEqual(real_rows_parallel.CacheMode.fresh, fresh_parent.cache_mode);
+    try std.testing.expectEqual(@as(u8, 1), fresh_parent.concurrency);
+    try std.testing.expectEqualStrings(fresh.real_rows_validation_root.?, fresh_parent.scratch_path);
+    try std.testing.expectEqualStrings(fresh.real_rows_cache_root.?, fresh_parent.export_cache_path.?);
+
+    fresh.fresh_real_rows = false;
+    fresh.mode = .serial;
+    fresh.real_rows_concurrency = 1;
+    const hit_parent = realRowsParentOptions("TARGET=x86_64-unknown-linux-gnu", fresh);
+    try std.testing.expectEqual(real_rows_parallel.CacheMode.require_hit, hit_parent.cache_mode);
+    try std.testing.expectEqual(@as(u8, 1), hit_parent.concurrency);
+}
+
 test "filesystem sample parser reads df size and available bytes" {
     const sample = try parseFilesystemSample(
         "1B-blocks        Avail\n982240026624 115192393728\n",
@@ -972,6 +1014,27 @@ test "bounded fake serial orchestration uses all 17 authoritative subgates in or
     var writer = std.Io.Writer.fixed(&output_buffer);
     var metrics: RunMetrics = .{};
     var bundle_evidence: BundleEvidence = .{};
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+    const base = try std.fs.path.join(allocator, &.{ ".zig-cache", "tmp", &temp.sub_path });
+    defer allocator.free(base);
+    const real_rows_validation = try std.fs.path.join(allocator, &.{ base, "validation", "contract" });
+    defer allocator.free(real_rows_validation);
+    const real_rows_cache = try std.fs.path.join(allocator, &.{ base, "cache", "contract" });
+    defer allocator.free(real_rows_cache);
+    try std.Io.Dir.cwd().createDirPath(io, real_rows_validation);
+    for ([_][]const u8{ "ReleaseFast", "ReleaseSafe", "ReleaseSmall" }) |mode| {
+        const export_path = try std.fs.path.join(allocator, &.{ real_rows_cache, mode, "export" });
+        defer allocator.free(export_path);
+        try std.Io.Dir.cwd().createDirPath(io, export_path);
+    }
+    var audit: real_rows_parallel.LifecycleAudit = .{};
+    var real_rows_test_options: real_rows_parallel.TestOptions = .{
+        .worker_fixture = .success,
+        .filesystem_sample = .{ .total_bytes = 100 * 1024 * 1024 * 1024, .free_bytes = 90 * 1024 * 1024 * 1024 },
+        .failure_evidence_dir = real_rows_validation,
+        .audit = &audit,
+    };
 
     try executeSerialTools(
         allocator,
@@ -984,23 +1047,30 @@ test "bounded fake serial orchestration uses all 17 authoritative subgates in or
         &tracker,
         sampler_context.interface(),
         executor_context.interface(),
-        null,
+        .{
+            .target_assignment = "TARGET=x86_64-unknown-linux-gnu",
+            .scratch_path = real_rows_validation,
+            .export_cache_path = real_rows_cache,
+            .concurrency = 1,
+            .test_options = &real_rows_test_options,
+        },
         &metrics,
         &bundle_evidence,
     );
     try bundle_evidence.finish();
 
-    try std.testing.expectEqual(@as(usize, tools.len), executor_context.call_count);
+    try std.testing.expectEqual(@as(usize, tools.len - real_rows_parallel.mode_count), executor_context.call_count);
     try std.testing.expectEqual(@as(usize, tools.len), sampler_context.index);
-    for (executor_context.call_order, 0..) |actual, expected| {
-        try std.testing.expectEqual(expected, actual);
-    }
+    const expected_call_order = [_]usize{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 13, 14, 15, 16 };
+    try std.testing.expectEqualSlices(usize, &expected_call_order, executor_context.call_order[0..executor_context.call_count]);
     try std.testing.expectEqual(@as(usize, 1), bundle_evidence.producer_count);
     try std.testing.expectEqual(@as(usize, 3), bundle_evidence.consumer_count);
     try std.testing.expectEqual(@as(u64, 17_000), tracker.observedPeakBytes());
     try std.testing.expectEqual(@as(usize, tools.len), std.mem.count(u8, writer.buffered(), "gate-start id="));
     try std.testing.expectEqual(@as(usize, tools.len), std.mem.count(u8, writer.buffered(), "gate-end id="));
     try std.testing.expectEqual(@as(usize, tools.len), std.mem.count(u8, writer.buffered(), "headroom-before index="));
+    try std.testing.expect(std.mem.indexOf(u8, writer.buffered(), "schema_version=2 normalization_schema=2") != null);
+    try std.testing.expect(std.mem.indexOf(u8, writer.buffered(), "serial-fallback") == null);
 }
 
 test "generated serial paths are unique across repeated invocations" {

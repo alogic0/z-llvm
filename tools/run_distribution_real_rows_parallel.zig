@@ -15,6 +15,7 @@ pub const Completed = struct {
 };
 
 pub const Evidence = struct {
+    cache_mode: CacheMode,
     concurrency: u8,
     run_id: [32]u8,
     root: []u8,
@@ -68,11 +69,15 @@ pub const GroupResult = struct {
 
 pub const ParentOptions = struct {
     target_assignment: []const u8,
+    zig_emitter_path: ?[]const u8 = null,
     scratch_path: []const u8,
     export_cache_path: ?[]const u8 = null,
+    cache_mode: CacheMode = .require_hit,
     concurrency: u8,
     test_options: ?*TestOptions = null,
 };
+
+pub const CacheMode = enum { fresh, require_hit };
 
 const ModePaths = struct {
     root: []u8,
@@ -105,7 +110,7 @@ const OwnedPaths = struct {
     failure_root: []u8,
     mode_paths: [mode_count]ModePaths,
 
-    fn init(allocator: std.mem.Allocator, io: std.Io, scratch_path: []const u8, export_cache_path: []const u8) !OwnedPaths {
+    fn init(allocator: std.mem.Allocator, io: std.Io, scratch_path: []const u8, export_cache_path: []const u8, cache_mode: CacheMode) !OwnedPaths {
         const scratch_owner = try requireCanonicalContractBase(io, scratch_path);
         const cache_owner = try requireCanonicalContractBase(io, export_cache_path);
         if (!std.mem.eql(u8, scratch_owner, cache_owner)) return error.RealRowsRootSelectionMismatch;
@@ -164,8 +169,15 @@ const OwnedPaths = struct {
             errdefer allocator.free(local_cache);
             const global_cache = try createOwnedSubdir(allocator, io, mode_root, "zig-global-cache");
             errdefer allocator.free(global_cache);
-            const export_cache = try std.fs.path.join(allocator, &.{ export_cache_path, mode, "export" });
+            const cache_mode_root = try std.fs.path.join(allocator, &.{ export_cache_path, mode });
+            defer allocator.free(cache_mode_root);
+            if (cache_mode == .fresh) {
+                try cwd.createDir(io, cache_mode_root, .default_dir);
+                errdefer cwd.deleteTree(io, cache_mode_root) catch {};
+            }
+            const export_cache = try std.fs.path.join(allocator, &.{ cache_mode_root, "export" });
             errdefer allocator.free(export_cache);
+            if (cache_mode == .fresh) try cwd.createDir(io, export_cache, .default_dir);
             const export_owner = try requireCanonicalModeOwnedDirectory(io, export_cache, mode);
             if (!std.mem.eql(u8, export_owner, cache_owner)) return error.RealRowsRootSelectionMismatch;
             const result = try std.fs.path.join(allocator, &.{ mode_root, "result.txt" });
@@ -288,16 +300,18 @@ const ArgvStorage = struct {
     }
 };
 
-fn buildWorkerArgv(allocator: std.mem.Allocator, target_assignment: []const u8, mode_index: usize, paths: ModePaths, probe_only: bool) !ArgvStorage {
+fn buildWorkerArgv(allocator: std.mem.Allocator, target_assignment: []const u8, zig_emitter_path: []const u8, mode_index: usize, paths: ModePaths, cache_mode: CacheMode, probe_only: bool) !ArgvStorage {
     var storage: ArgvStorage = .{ .allocator = allocator };
     errdefer storage.deinit();
     try storage.argv.appendSlice(allocator, &.{ "env", target_assignment });
+    try storage.addOwned("ZIG_EMITTER={s}", .{zig_emitter_path});
     try storage.addOwned("ZIG_LOCAL_CACHE_DIR={s}", .{paths.local_cache});
     try storage.addOwned("ZIG_GLOBAL_CACHE_DIR={s}", .{paths.global_cache});
     try storage.argv.append(allocator, "ZLLVM_REAL_ROWS_PRUNING=suspended");
     try storage.argv.appendSlice(allocator, &.{ "zig", "run", "src/distribution_real_rows_gate.zig", "--" });
     try storage.addOwned("--mode={s}", .{modes[mode_index]});
-    try storage.argv.appendSlice(allocator, &.{ "--strict", "--limit=100", "--require-cache-hit" });
+    try storage.argv.appendSlice(allocator, &.{ "--strict", "--limit=100" });
+    try storage.argv.append(allocator, if (probe_only or cache_mode == .require_hit) "--require-cache-hit" else "--fresh-export");
     if (probe_only) try storage.argv.append(allocator, "--cache-probe-only");
     try storage.addOwned("--runner-temp-root={s}", .{paths.work});
     try storage.addOwned("--export-cache-root={s}", .{paths.export_cache});
@@ -378,7 +392,7 @@ fn probeAndPin(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions,
                 continue;
             }
         }
-        var argv = try buildWorkerArgv(allocator, options.target_assignment, index, paths.mode_paths[index], true);
+        var argv = try buildWorkerArgv(allocator, options.target_assignment, options.zig_emitter_path.?, index, paths.mode_paths[index], .require_hit, true);
         defer argv.deinit();
         const result = try std.process.run(allocator, io, .{ .argv = argv.argv.items, .stdout_limit = .limited(4 * 1024 * 1024), .stderr_limit = .limited(4 * 1024 * 1024) });
         defer common.freeRunResult(allocator, result);
@@ -399,7 +413,7 @@ fn sha256File(allocator: std.mem.Allocator, io: std.Io, path: []const u8) ![64]u
     return std.fmt.bytesToHex(digest, .lower);
 }
 
-const FilesystemSample = struct { total_bytes: u64, free_bytes: u64 };
+pub const FilesystemSample = struct { total_bytes: u64, free_bytes: u64 };
 
 const ResourceState = struct {
     filesystem_total_bytes: u64,
@@ -455,8 +469,8 @@ const SpawnedWorker = struct {
     descriptors_closed: bool = false,
 };
 
-const TestWorkerFixture = enum { production, success, first_child_fails, all_sleep };
-const LifecycleAudit = struct {
+pub const TestWorkerFixture = enum { production, success, first_child_fails, all_sleep };
+pub const LifecycleAudit = struct {
     launched: [mode_count]usize = .{ 0, 0, 0 },
     wait_futures_started: [mode_count]usize = .{ 0, 0, 0 },
     termination_requests: [mode_count]usize = .{ 0, 0, 0 },
@@ -485,7 +499,7 @@ pub const TestOptions = struct {
 
 fn spawnWorker(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions, paths: *const OwnedPaths, mode_index: usize) !SpawnedWorker {
     const mode_path = paths.mode_paths[mode_index];
-    var argv = try buildWorkerArgv(allocator, options.target_assignment, mode_index, mode_path, false);
+    var argv = try buildWorkerArgv(allocator, options.target_assignment, options.zig_emitter_path.?, mode_index, mode_path, options.cache_mode, false);
     defer argv.deinit();
     const result_file = try std.Io.Dir.cwd().createFile(io, mode_path.result, .{ .exclusive = true });
     errdefer result_file.close(io);
@@ -493,7 +507,12 @@ fn spawnWorker(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions,
     errdefer log_file.close(io);
     const child = if (options.test_options) |test_options| switch (test_options.worker_fixture) {
         .production => try std.process.spawn(io, .{ .argv = argv.argv.items, .stdin = .ignore, .stdout = .{ .file = result_file }, .stderr = .{ .file = log_file }, .request_resource_usage_statistics = true, .pgid = 0 }),
-        .success => try std.process.spawn(io, .{ .argv = &.{ "/bin/sh", "-c", "printf '%s\\n' \"$1\"", "real-row-fixture", modes[mode_index] }, .stdin = .ignore, .stdout = .{ .file = result_file }, .stderr = .{ .file = log_file }, .request_resource_usage_statistics = true, .pgid = 0 }),
+        .success => blk: {
+            const status: []const u8 = if (options.cache_mode == .fresh) "fresh-export" else "hit";
+            const output = try syntheticCohortWorkerOutput(modes[mode_index], status, allocator);
+            defer allocator.free(output);
+            break :blk try std.process.spawn(io, .{ .argv = &.{ "/usr/bin/printf", "%s", output }, .stdin = .ignore, .stdout = .{ .file = result_file }, .stderr = .{ .file = log_file }, .request_resource_usage_statistics = true, .pgid = 0 });
+        },
         .first_child_fails => if (mode_index == 0)
             try std.process.spawn(io, .{ .argv = &.{ "/bin/sh", "-c", "printf 'injected-original-real-row-child-failure\\n' >&2; exit 7" }, .stdin = .ignore, .stdout = .{ .file = result_file }, .stderr = .{ .file = log_file }, .request_resource_usage_statistics = true, .pgid = 0 })
         else
@@ -752,7 +771,7 @@ fn preserveFailureEvidence(allocator: std.mem.Allocator, io: std.Io, options: Pa
     }
 }
 
-fn validateWorkerOutput(output: []const u8, mode: []const u8) !void {
+fn validateWorkerOutput(output: []const u8, mode: []const u8, cache_mode: CacheMode) !void {
     var header_count: usize = 0;
     var cache_count: usize = 0;
     var cohort_row_count: usize = 0;
@@ -774,7 +793,8 @@ fn validateWorkerOutput(output: []const u8, mode: []const u8) !void {
         if (std.mem.startsWith(u8, line, "air-export-cache ")) {
             cache_count += 1;
             if (!std.mem.eql(u8, fieldValue(line, "mode=") orelse return error.RealRowsOutputMissingCacheMode, mode)) return error.RealRowsOutputCacheModeMismatch;
-            if (!std.mem.eql(u8, fieldValue(line, "status=") orelse return error.RealRowsOutputMissingCacheStatus, "hit")) return error.RealRowsOutputCacheNotHit;
+            const expected_status: []const u8 = if (cache_mode == .fresh) "fresh-export" else "hit";
+            if (!std.mem.eql(u8, fieldValue(line, "status=") orelse return error.RealRowsOutputMissingCacheStatus, expected_status)) return error.RealRowsOutputCacheStatusMismatch;
             continue;
         }
         if (std.mem.startsWith(u8, line, "execution-cohort-row ")) {
@@ -841,17 +861,24 @@ fn collectCompleted(
         errdefer allocator.free(stderr);
         if (!common.termOk(wait.term)) return error.RealRowsParallelChildFailed;
         if (stderr.len != 0) return error.RealRowsParallelUnexpectedStderr;
-        if (options.test_options == null) try validateWorkerOutput(stdout, mode);
+        if (options.test_options == null) try validateWorkerOutput(stdout, mode, options.cache_mode);
         item.* = .{ .result = .{ .term = wait.term, .stdout = stdout, .stderr = stderr }, .duration_ms = wait.duration_ms };
         initialized += 1;
     }
     return completed;
 }
 
-pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions) !GroupResult {
+pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, provided_options: ParentOptions) !GroupResult {
+    var options = provided_options;
+    if (options.zig_emitter_path == null) {
+        if (options.test_options == null) return error.RealRowsZigEmitterMissing;
+        options.zig_emitter_path = "/test/stage4/zig";
+    } else if (options.test_options == null) {
+        try requireCanonicalAbsoluteExecutable(allocator, io, options.zig_emitter_path.?);
+    }
     if (options.concurrency != 1 and options.concurrency != 3) return error.InvalidRealRowsConcurrency;
     const export_cache_path = options.export_cache_path orelse return error.RealRowsRootSelectionMissing;
-    var paths = try OwnedPaths.init(allocator, io, options.scratch_path, export_cache_path);
+    var paths = try OwnedPaths.init(allocator, io, options.scratch_path, export_cache_path, options.cache_mode);
     defer paths.deinit();
     const wall_start = std.Io.Timestamp.now(io, .awake);
     const preflight = try sampleFilesystem(allocator, io, paths.root, options);
@@ -859,8 +886,8 @@ pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions
     if (preflight.free_bytes < policy.required_start_bytes) return error.InsufficientRealRowsParallelHeadroom;
     const available_memory = try sampleAvailableMemory(allocator, io, options);
     if (available_memory < policy.minimum_available_memory_bytes) return error.InsufficientRealRowsParallelMemory;
-    const pins = try probeAndPin(allocator, io, options, &paths);
-    const pin_manifest_sha256 = try sha256File(allocator, io, paths.pin_manifest);
+    var pins: [mode_count]CachePin = undefined;
+    if (options.cache_mode == .require_hit) pins = try probeAndPin(allocator, io, options, &paths);
     var resource: ResourceState = .{
         .filesystem_total_bytes = preflight.total_bytes,
         .post_run_free_floor_bytes = policy.post_run_free_floor_bytes,
@@ -892,6 +919,11 @@ pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions
         try preserveFailureEvidence(allocator, io, options, &paths, waits, err);
         return err;
     };
+    if (options.cache_mode == .fresh) pins = probeAndPin(allocator, io, options, &paths) catch |err| {
+        try preserveFailureEvidence(allocator, io, options, &paths, waits, err);
+        return err;
+    };
+    const pin_manifest_sha256 = try sha256File(allocator, io, paths.pin_manifest);
     for (pins, paths.mode_paths) |pin, mode_path| if (options.test_options == null) {
         verifyPin(allocator, io, pin, mode_path.export_cache) catch |err| {
             try preserveFailureEvidence(allocator, io, options, &paths, waits, err);
@@ -919,6 +951,7 @@ pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions
     return .{
         .completed = completed,
         .evidence = .{
+            .cache_mode = options.cache_mode,
             .concurrency = options.concurrency,
             .run_id = paths.run_id,
             .root = evidence_root,
@@ -943,9 +976,21 @@ pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions
     };
 }
 
+fn requireCanonicalAbsoluteExecutable(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !void {
+    if (!std.fs.path.isAbsolute(path)) return error.RealRowsZigEmitterInvalid;
+    const canonical = std.Io.Dir.realPathFileAbsoluteAlloc(io, path, allocator) catch return error.RealRowsZigEmitterInvalid;
+    defer allocator.free(canonical);
+    if (!std.mem.eql(u8, canonical, path)) return error.RealRowsZigEmitterInvalid;
+    const file = std.Io.Dir.openFileAbsolute(io, path, .{ .allow_directory = false, .follow_symlinks = false }) catch return error.RealRowsZigEmitterInvalid;
+    defer file.close(io);
+    std.Io.Dir.cwd().access(io, path, .{ .execute = true }) catch return error.RealRowsZigEmitterInvalid;
+}
+
 pub fn writeEvidence(writer: *std.Io.Writer, evidence: *const Evidence) !void {
+    const cache_status: []const u8 = if (evidence.cache_mode == .fresh) "fresh-export,fresh-export,fresh-export" else "hit,hit,hit";
+    const air_cache: []const u8 = if (evidence.cache_mode == .fresh) "populated-authenticated" else "read-only";
     try writer.print(
-        "real-rows-mode-parallel schema_version={} normalization_schema={} concurrency={} workers=3 modes=ReleaseFast,ReleaseSafe,ReleaseSmall run_id={s} root={s} work_selection_root={s} export_cache_selection_root={s} fast_temp={s}/ReleaseFast/work_{s} fast_local_cache={s}/ReleaseFast/zig-local-cache fast_global_cache={s}/ReleaseFast/zig-global-cache fast_air_cache={s}/ReleaseFast/export safe_temp={s}/ReleaseSafe/work_{s} safe_local_cache={s}/ReleaseSafe/zig-local-cache safe_global_cache={s}/ReleaseSafe/zig-global-cache safe_air_cache={s}/ReleaseSafe/export small_temp={s}/ReleaseSmall/work_{s} small_local_cache={s}/ReleaseSmall/zig-local-cache small_global_cache={s}/ReleaseSmall/zig-global-cache small_air_cache={s}/ReleaseSmall/export pin_manifest_sha256={s} cache_status=hit,hit,hit air_cache=read-only pruning=suspended ",
+        "real-rows-mode-parallel schema_version={} normalization_schema={} concurrency={} workers=3 modes=ReleaseFast,ReleaseSafe,ReleaseSmall run_id={s} root={s} work_selection_root={s} export_cache_selection_root={s} fast_temp={s}/ReleaseFast/work_{s} fast_local_cache={s}/ReleaseFast/zig-local-cache fast_global_cache={s}/ReleaseFast/zig-global-cache fast_air_cache={s}/ReleaseFast/export safe_temp={s}/ReleaseSafe/work_{s} safe_local_cache={s}/ReleaseSafe/zig-local-cache safe_global_cache={s}/ReleaseSafe/zig-global-cache safe_air_cache={s}/ReleaseSafe/export small_temp={s}/ReleaseSmall/work_{s} small_local_cache={s}/ReleaseSmall/zig-local-cache small_global_cache={s}/ReleaseSmall/zig-global-cache small_air_cache={s}/ReleaseSmall/export pin_manifest_sha256={s} cache_status={s} air_cache={s} pruning=suspended ",
         .{
             normalization_schema_version,
             normalization_schema_version,
@@ -970,6 +1015,8 @@ pub fn writeEvidence(writer: *std.Io.Writer, evidence: *const Evidence) !void {
             evidence.root,
             evidence.export_cache_selection_root,
             &evidence.pin_manifest_sha256,
+            cache_status,
+            air_cache,
         },
     );
     try writer.print(
@@ -1048,20 +1095,13 @@ fn pathExists(io: std.Io, path: []const u8) !bool {
     return true;
 }
 
-pub const Admission = enum { parallel, serial_fallback };
-
-pub fn admission(fresh_real_rows: bool, cache_hits: [mode_count]bool) Admission {
-    if (fresh_real_rows) return .serial_fallback;
-    for (cache_hits) |hit| if (!hit) return .serial_fallback;
-    return .parallel;
-}
-
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
     var concurrency: u8 = 3;
     var scratch_root: ?[]const u8 = null;
     var export_cache_root: ?[]const u8 = null;
+    var zig_emitter: ?[]const u8 = null;
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
     defer args.deinit();
     _ = args.skip();
@@ -1074,11 +1114,15 @@ pub fn main(init: std.process.Init) !void {
         } else if (std.mem.startsWith(u8, arg, "--export-cache-root=")) {
             if (export_cache_root != null) return error.DuplicateRealRowsExportCacheRoot;
             export_cache_root = arg["--export-cache-root=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--zig-emitter=")) {
+            if (zig_emitter != null) return error.DuplicateRealRowsZigEmitter;
+            zig_emitter = arg["--zig-emitter=".len..];
         } else return error.UnexpectedArgument;
     }
     if (concurrency != 1 and concurrency != 3) return error.InvalidRealRowsConcurrency;
     const selected_scratch_root = scratch_root orelse return error.RealRowsRootSelectionMissing;
     const selected_export_cache_root = export_cache_root orelse return error.RealRowsRootSelectionMissing;
+    const selected_zig_emitter = zig_emitter orelse return error.RealRowsZigEmitterMissing;
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
     const target = target_env orelse "x86_64-unknown-linux-gnu";
@@ -1086,6 +1130,7 @@ pub fn main(init: std.process.Init) !void {
     defer allocator.free(target_assignment);
     var result = try runGroup(allocator, io, .{
         .target_assignment = target_assignment,
+        .zig_emitter_path = selected_zig_emitter,
         .scratch_path = selected_scratch_root,
         .export_cache_path = selected_export_cache_root,
         .concurrency = concurrency,
@@ -1124,13 +1169,14 @@ test "production argv construction covers every actual mode and isolated path" {
             .log = try std.fmt.allocPrint(allocator, "{s}/log", .{root}),
         };
         defer paths.deinit(allocator);
-        var argv = try buildWorkerArgv(allocator, "TARGET=x86_64-unknown-linux-gnu", index, paths, false);
+        var argv = try buildWorkerArgv(allocator, "TARGET=x86_64-unknown-linux-gnu", "/test/stage4/zig", index, paths, .require_hit, false);
         defer argv.deinit();
         const joined = try joinedArgv(allocator, argv.argv.items);
         defer allocator.free(joined);
         const mode_arg = try std.fmt.allocPrint(allocator, "--mode={s}", .{mode});
         defer allocator.free(mode_arg);
         try std.testing.expect(std.mem.indexOf(u8, joined, mode_arg) != null);
+        try std.testing.expect(std.mem.indexOf(u8, joined, "ZIG_EMITTER=/test/stage4/zig") != null);
         try std.testing.expect(std.mem.indexOf(u8, joined, "--require-cache-hit") != null);
         const temp_arg = try std.fmt.allocPrint(allocator, "--runner-temp-root={s}/work", .{root});
         defer allocator.free(temp_arg);
@@ -1144,7 +1190,13 @@ test "production argv construction covers every actual mode and isolated path" {
         try std.testing.expect(std.mem.indexOf(u8, joined, local_arg) != null);
         try std.testing.expect(std.mem.indexOf(u8, joined, global_arg) != null);
         try std.testing.expect(std.mem.indexOf(u8, joined, export_arg) != null);
-        var probe = try buildWorkerArgv(allocator, "TARGET=x86_64-unknown-linux-gnu", index, paths, true);
+        var fresh = try buildWorkerArgv(allocator, "TARGET=x86_64-unknown-linux-gnu", "/test/stage4/zig", index, paths, .fresh, false);
+        defer fresh.deinit();
+        const fresh_joined = try joinedArgv(allocator, fresh.argv.items);
+        defer allocator.free(fresh_joined);
+        try std.testing.expect(std.mem.indexOf(u8, fresh_joined, "--fresh-export") != null);
+        try std.testing.expect(std.mem.indexOf(u8, fresh_joined, "--require-cache-hit") == null);
+        var probe = try buildWorkerArgv(allocator, "TARGET=x86_64-unknown-linux-gnu", "/test/stage4/zig", index, paths, .fresh, true);
         defer probe.deinit();
         const probe_joined = try joinedArgv(allocator, probe.argv.items);
         defer allocator.free(probe_joined);
@@ -1154,10 +1206,9 @@ test "production argv construction covers every actual mode and isolated path" {
     }
 }
 
-test "parallel admission requires three hits and rejects fresh rows" {
-    try std.testing.expectEqual(Admission.parallel, admission(false, .{ true, true, true }));
-    try std.testing.expectEqual(Admission.serial_fallback, admission(false, .{ true, false, true }));
-    try std.testing.expectEqual(Admission.serial_fallback, admission(true, .{ true, true, true }));
+test "cache policy admits only explicit fresh or authenticated hit operation" {
+    try std.testing.expectEqualStrings("fresh", @tagName(CacheMode.fresh));
+    try std.testing.expectEqualStrings("require_hit", @tagName(CacheMode.require_hit));
 }
 
 test "root selections reject missing absolute escape symlink owner and mode drift before execution" {
@@ -1186,7 +1237,7 @@ test "root selections reject missing absolute escape symlink owner and mode drif
     const other_cache = try std.fs.path.join(allocator, &.{ base, "cache", "other-contract" });
     defer allocator.free(other_cache);
     try std.Io.Dir.cwd().createDirPath(io, other_cache);
-    try std.testing.expectError(error.RealRowsRootSelectionMismatch, OwnedPaths.init(allocator, io, roots.scratch, other_cache));
+    try std.testing.expectError(error.RealRowsRootSelectionMismatch, OwnedPaths.init(allocator, io, roots.scratch, other_cache, .require_hit));
 
     const symlink = try std.fs.path.join(allocator, &.{ base, "linked-contract" });
     defer allocator.free(symlink);
@@ -1279,36 +1330,40 @@ test "normalization removes only frozen volatile scheduling fields" {
     try std.testing.expectError(error.RealRowsParallelEvidenceSchemaMissing, writeNormalizedOutput("ReleaseFast\n", &missing_writer));
 }
 
-fn syntheticCohortWorkerOutput(mode: []const u8, allocator: std.mem.Allocator) ![]u8 {
+fn syntheticCohortWorkerOutput(mode: []const u8, cache_status: []const u8, allocator: std.mem.Allocator) ![]u8 {
     return std.fmt.allocPrint(
         allocator,
         "distribution-real-rows selector_version=real-candidate-selector-v2 candidate_file=docs/evidence/real_candidates_release_v2.tsv candidate_file_hash={s} limit=100 strict=true\n" ++
-            "air-export-cache mode={s} status=hit duration_ms=1 cache_key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa descriptor_bytes=1\n" ++
+            "air-export-cache mode={s} status={s} duration_ms=1 cache_key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa descriptor_bytes=1\n" ++
             "execution-cohort-row schema=distribution-execution-cohort-v1 mode={s} source=../ziglang/src/main.zig function=coff.Symbol.sizeOf descriptor_sha256=a object_bytes=1 object_sha256=b reference_bytes=1 reference_sha256=c linked_bytes=1 linked_sha256=d result=18 witness=61 result_sha256=e reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
             "execution-cohort-row schema=distribution-execution-cohort-v1 mode={s} source=../ziglang/src/main.zig function=coff.WeakExternalDefinition.sizeOf descriptor_sha256=f object_bytes=1 object_sha256=g reference_bytes=1 reference_sha256=h linked_bytes=1 linked_sha256=i result=18 witness=61 result_sha256=j reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
             "summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode={s} selector_version=real-candidate-selector-v2 candidate_file_hash={s} limit=100 candidate_rows=100 real_functions_lowered=100 real_objects_emitted=100 real_native_linked=100 real_executed=2 real_programs_ok=2 first_failing_real_row=- first_failing_stage=- local_fail=0\n",
-        .{ cohort_denominator_sha256, mode, mode, mode, mode, cohort_denominator_sha256 },
+        .{ cohort_denominator_sha256, mode, cache_status, mode, mode, mode, cohort_denominator_sha256 },
     );
 }
 
 test "cohort summary authentication rejects partial mode denominator and identity drift" {
     const allocator = std.testing.allocator;
-    const valid = try syntheticCohortWorkerOutput("ReleaseFast", allocator);
+    const valid = try syntheticCohortWorkerOutput("ReleaseFast", "hit", allocator);
     defer allocator.free(valid);
-    try validateWorkerOutput(valid, "ReleaseFast");
+    try validateWorkerOutput(valid, "ReleaseFast", .require_hit);
+    const fresh = try syntheticCohortWorkerOutput("ReleaseFast", "fresh-export", allocator);
+    defer allocator.free(fresh);
+    try validateWorkerOutput(fresh, "ReleaseFast", .fresh);
+    try std.testing.expectError(error.RealRowsOutputCacheStatusMismatch, validateWorkerOutput(fresh, "ReleaseFast", .require_hit));
 
     const partial = try std.mem.replaceOwned(u8, allocator, valid, "real_executed=2 real_programs_ok=2", "real_executed=1 real_programs_ok=1");
     defer allocator.free(partial);
-    try std.testing.expectError(error.RealRowsOutputCounterMismatch, validateWorkerOutput(partial, "ReleaseFast"));
+    try std.testing.expectError(error.RealRowsOutputCounterMismatch, validateWorkerOutput(partial, "ReleaseFast", .require_hit));
     const wrong_mode = try std.mem.replaceOwned(u8, allocator, valid, "mode=ReleaseFast source=", "mode=ReleaseSafe source=");
     defer allocator.free(wrong_mode);
-    try std.testing.expectError(error.RealRowsOutputCohortModeMismatch, validateWorkerOutput(wrong_mode, "ReleaseFast"));
+    try std.testing.expectError(error.RealRowsOutputCohortModeMismatch, validateWorkerOutput(wrong_mode, "ReleaseFast", .require_hit));
     const wrong_denominator = try std.mem.replaceOwned(u8, allocator, valid, cohort_denominator_sha256, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     defer allocator.free(wrong_denominator);
-    try std.testing.expectError(error.RealRowsOutputDenominatorMismatch, validateWorkerOutput(wrong_denominator, "ReleaseFast"));
+    try std.testing.expectError(error.RealRowsOutputDenominatorMismatch, validateWorkerOutput(wrong_denominator, "ReleaseFast", .require_hit));
     const duplicate = try std.mem.replaceOwned(u8, allocator, valid, "coff.WeakExternalDefinition.sizeOf", "coff.Symbol.sizeOf");
     defer allocator.free(duplicate);
-    try std.testing.expectError(error.RealRowsOutputCohortDuplicate, validateWorkerOutput(duplicate, "ReleaseFast"));
+    try std.testing.expectError(error.RealRowsOutputCohortDuplicate, validateWorkerOutput(duplicate, "ReleaseFast", .require_hit));
 }
 
 test "resource state accepts exact fixed floor and fails closed below disk and memory floors" {
@@ -1321,7 +1376,7 @@ test "resource state accepts exact fixed floor and fails closed below disk and m
     try std.testing.expectError(error.RealRowsParallelMemoryFloorCrossed, memory.observe(.{ .total_bytes = policy_authority.required_start_bytes, .free_bytes = floor }, 1, 2, 199));
 }
 
-test "cache miss is a serial-fallback signal before any worker launch" {
+test "required cache miss fails closed before any worker launch" {
     const allocator = std.testing.allocator;
     const io = std.testing.io;
     var temp = std.testing.tmpDir(.{});
@@ -1357,15 +1412,44 @@ test "successful fixed group buffers and returns outputs in manifest order" {
         var result = try runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = roots.scratch, .export_cache_path = roots.cache, .concurrency = concurrency, .test_options = &test_options });
         defer result.deinit(allocator);
         for (result.completed, modes) |completed, mode| {
-            var expected_buffer: [64]u8 = undefined;
-            const expected = try std.fmt.bufPrint(&expected_buffer, "{s}\n", .{mode});
-            try std.testing.expectEqualStrings(expected, completed.result.stdout);
+            try std.testing.expect(std.mem.indexOf(u8, completed.result.stdout, mode) != null);
+            try std.testing.expect(std.mem.indexOf(u8, completed.result.stdout, "real_executed=2 real_programs_ok=2") != null);
         }
         for (0..mode_count) |index| {
             try std.testing.expectEqual(@as(usize, 1), audit.reaped[index]);
             try std.testing.expectEqual(@as(usize, 1), audit.descriptors_closed[index]);
         }
     }
+}
+
+test "fresh population and authenticated hit reuse share exact mode-owned roots without fallback" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+    var roots = try fixtureRootsWithCaches(allocator, io, &temp, false);
+    defer roots.deinit(allocator);
+    var audit: LifecycleAudit = .{};
+    var test_options: TestOptions = .{
+        .worker_fixture = .success,
+        .filesystem_sample = .{ .total_bytes = 100 * 1024 * 1024 * 1024, .free_bytes = 90 * 1024 * 1024 * 1024 },
+        .failure_evidence_dir = roots.scratch,
+        .audit = &audit,
+    };
+    var fresh = try runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = roots.scratch, .export_cache_path = roots.cache, .cache_mode = .fresh, .concurrency = 3, .test_options = &test_options });
+    defer fresh.deinit(allocator);
+    try std.testing.expectEqual(CacheMode.fresh, fresh.evidence.cache_mode);
+    for (fresh.completed) |completed| try std.testing.expect(std.mem.indexOf(u8, completed.result.stdout, "status=fresh-export") != null);
+    var fresh_evidence_buffer: [8192]u8 = undefined;
+    var fresh_evidence_writer = std.Io.Writer.fixed(&fresh_evidence_buffer);
+    try writeEvidence(&fresh_evidence_writer, &fresh.evidence);
+    try std.testing.expect(std.mem.indexOf(u8, fresh_evidence_writer.buffered(), "cache_status=fresh-export,fresh-export,fresh-export air_cache=populated-authenticated") != null);
+
+    audit = .{};
+    var hit = try runGroup(allocator, io, .{ .target_assignment = "TARGET=test", .scratch_path = roots.scratch, .export_cache_path = roots.cache, .cache_mode = .require_hit, .concurrency = 3, .test_options = &test_options });
+    defer hit.deinit(allocator);
+    try std.testing.expectEqual(CacheMode.require_hit, hit.evidence.cache_mode);
+    for (hit.completed) |completed| try std.testing.expect(std.mem.indexOf(u8, completed.result.stdout, "status=hit") != null);
 }
 
 const FixtureRoots = struct {
@@ -1380,6 +1464,10 @@ const FixtureRoots = struct {
 };
 
 fn fixtureRoots(allocator: std.mem.Allocator, io: std.Io, temp: *std.testing.TmpDir) !FixtureRoots {
+    return fixtureRootsWithCaches(allocator, io, temp, true);
+}
+
+fn fixtureRootsWithCaches(allocator: std.mem.Allocator, io: std.Io, temp: *std.testing.TmpDir, populate_caches: bool) !FixtureRoots {
     const base = try std.fs.path.join(allocator, &.{ ".zig-cache", "tmp", &temp.sub_path });
     defer allocator.free(base);
     const scratch = try std.fs.path.join(allocator, &.{ base, "validation", "contract" });
@@ -1387,11 +1475,12 @@ fn fixtureRoots(allocator: std.mem.Allocator, io: std.Io, temp: *std.testing.Tmp
     const cache = try std.fs.path.join(allocator, &.{ base, "cache", "contract" });
     errdefer allocator.free(cache);
     try std.Io.Dir.cwd().createDirPath(io, scratch);
-    for (modes) |mode| {
+    try std.Io.Dir.cwd().createDirPath(io, cache);
+    if (populate_caches) for (modes) |mode| {
         const export_path = try std.fs.path.join(allocator, &.{ cache, mode, "export" });
         defer allocator.free(export_path);
         try std.Io.Dir.cwd().createDirPath(io, export_path);
-    }
+    };
     return .{ .scratch = scratch, .cache = cache };
 }
 
