@@ -1,4 +1,5 @@
 const std = @import("std");
+const air_export = @import("zig_air_export.zig");
 
 const Sha256 = std.crypto.hash.sha2.Sha256;
 
@@ -9,6 +10,8 @@ pub const external_revision = "bdee02bc0c7f227c0f11bc9a449df673fe803540";
 pub const definition_path = "lib/std/coff.zig";
 pub const import_path = "lib/std/std.zig";
 pub const use_path = "src/libs/mingw/implib.zig";
+pub const requirements_definition_path = "src/link/MachO/CodeSignature.zig";
+pub const requirements_import_path = "src/link/MachO.zig";
 pub const expected_result: usize = 18;
 pub const expected_witness: usize = 61;
 pub const expected_stdout = "execution-oracle-v1 result=18 witness=61\n";
@@ -25,11 +28,13 @@ pub const selector_sha256 = [_]u8{
 pub const Program = enum {
     symbol_size_of,
     weak_external_definition_size_of,
+    requirements_size,
 
     pub fn functionName(program: Program) []const u8 {
         return switch (program) {
             .symbol_size_of => "coff.Symbol.sizeOf",
             .weak_external_definition_size_of => "coff.WeakExternalDefinition.sizeOf",
+            .requirements_size => "link.MachO.CodeSignature.Requirements.size",
         };
     }
 
@@ -42,11 +47,51 @@ pub const Program = enum {
         return switch (program) {
             .symbol_size_of => symbol_linked_harness_source,
             .weak_external_definition_size_of => weak_external_linked_harness_source,
+            .requirements_size => requirements_linked_harness_source,
+        };
+    }
+
+    pub fn referenceHarness(program: Program) []const u8 {
+        return switch (program) {
+            .symbol_size_of, .weak_external_definition_size_of => reference_harness_source,
+            .requirements_size => requirements_reference_harness_source,
+        };
+    }
+
+    pub fn expectedResult(program: Program) usize {
+        return switch (program) {
+            .symbol_size_of, .weak_external_definition_size_of => 18,
+            .requirements_size => 12,
+        };
+    }
+
+    pub fn expectedWitness(program: Program) usize {
+        return program.expectedResult() *% 3 +% 7;
+    }
+
+    pub fn expectedStdout(program: Program) []const u8 {
+        return switch (program) {
+            .symbol_size_of, .weak_external_definition_size_of => expected_stdout,
+            .requirements_size => requirements_expected_stdout,
+        };
+    }
+
+    fn descriptorType(program: Program) []const u8 {
+        return switch (program) {
+            .symbol_size_of, .weak_external_definition_size_of => "fn () usize",
+            .requirements_size => "fn (link.MachO.CodeSignature.Requirements) u32",
+        };
+    }
+
+    fn descriptorReturnType(program: Program) []const u8 {
+        return switch (program) {
+            .symbol_size_of, .weak_external_definition_size_of => "usize",
+            .requirements_size => "u32",
         };
     }
 };
 
-pub const programs = [_]Program{ .symbol_size_of, .weak_external_definition_size_of };
+pub const programs = [_]Program{ .symbol_size_of, .weak_external_definition_size_of, .requirements_size };
 
 pub const reference_harness_source =
     \\const std = @import("std");
@@ -78,6 +123,35 @@ pub const symbol_linked_harness_source =
 pub const weak_external_linked_harness_source =
     \\const std = @import("std");
     \\const size_of = @extern(*const fn () callconv(.{ .x86_64_sysv = .{} }) usize, .{ .name = "coff.WeakExternalDefinition.sizeOf" });
+    \\pub fn main(init: std.process.Init) !void {
+    \\    const result = size_of();
+    \\    const witness = result *% 3 +% 7;
+    \\    var buffer: [128]u8 = undefined;
+    \\    var writer = std.Io.File.stdout().writer(init.io, &buffer);
+    \\    try writer.interface.print("execution-oracle-v1 result={} witness={}\n", .{ result, witness });
+    \\    try writer.interface.flush();
+    \\}
+    \\
+;
+
+pub const requirements_expected_stdout = "execution-oracle-v1 result=12 witness=43\n";
+
+pub const requirements_reference_harness_source =
+    \\const std = @import("std");
+    \\pub fn main(init: std.process.Init) !void {
+    \\    const result: u32 = 12;
+    \\    const witness = result *% 3 +% 7;
+    \\    var buffer: [128]u8 = undefined;
+    \\    var writer = std.Io.File.stdout().writer(init.io, &buffer);
+    \\    try writer.interface.print("execution-oracle-v1 result={} witness={}\n", .{ result, witness });
+    \\    try writer.interface.flush();
+    \\}
+    \\
+;
+
+pub const requirements_linked_harness_source =
+    \\const std = @import("std");
+    \\const size_of = @extern(*const fn () callconv(.{ .x86_64_sysv = .{} }) u32, .{ .name = "link.MachO.CodeSignature.Requirements.size" });
     \\pub fn main(init: std.process.Init) !void {
     \\    const result = size_of();
     \\    const witness = result *% 3 +% 7;
@@ -176,14 +250,20 @@ pub const SourceIdentity = struct {
     definition_sha256: [Sha256.digest_length]u8,
     import_sha256: [Sha256.digest_length]u8,
     use_sha256: [Sha256.digest_length]u8,
+    requirements_definition_sha256: [Sha256.digest_length]u8,
+    requirements_import_sha256: [Sha256.digest_length]u8,
 };
 
 pub const OwnedSourceFiles = struct {
     definition: []u8,
     import_source: []u8,
     use_source: []u8,
+    requirements_definition: []u8,
+    requirements_import_source: []u8,
 
     pub fn deinit(files: *OwnedSourceFiles, allocator: std.mem.Allocator) void {
+        allocator.free(files.requirements_import_source);
+        allocator.free(files.requirements_definition);
         allocator.free(files.use_source);
         allocator.free(files.import_source);
         allocator.free(files.definition);
@@ -195,9 +275,43 @@ pub const OwnedSourceFiles = struct {
             .definition_sha256 = sha256(files.definition),
             .import_sha256 = sha256(files.import_source),
             .use_sha256 = sha256(files.use_source),
+            .requirements_definition_sha256 = sha256(files.requirements_definition),
+            .requirements_import_sha256 = sha256(files.requirements_import_source),
         };
     }
+
+    pub fn validate(files: *const OwnedSourceFiles) !void {
+        try validateRequirementsSources(files.requirements_definition, files.requirements_import_source);
+    }
 };
+
+fn validateRequirementsSources(definition: []const u8, import_source: []const u8) !void {
+    const definition_block =
+        \\const Requirements = struct {
+        \\    fn deinit(self: *Requirements, allocator: Allocator) void {
+    ;
+    const size_block =
+        \\    fn size(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return 3 * @sizeOf(u32);
+        \\    }
+    ;
+    const write_block =
+        \\    fn write(self: Requirements, writer: anytype) !void {
+        \\        try writer.writeInt(u32, macho.CSMAGIC_REQUIREMENTS, .big);
+        \\        try writer.writeInt(u32, self.size(), .big);
+        \\        try writer.writeInt(u32, 0, .big);
+        \\    }
+    ;
+    const import_line = "const CodeSignature = @import(\"MachO/CodeSignature.zig\");";
+    if (std.mem.count(u8, definition, definition_block) != 1 or
+        std.mem.count(u8, definition, size_block) != 1 or
+        std.mem.count(u8, definition, write_block) != 1 or
+        std.mem.count(u8, import_source, import_line) != 1)
+    {
+        return error.CohortSourceBindingMismatch;
+    }
+}
 
 pub fn sha256(bytes: []const u8) [Sha256.digest_length]u8 {
     var digest: [Sha256.digest_length]u8 = undefined;
@@ -206,9 +320,14 @@ pub fn sha256(bytes: []const u8) [Sha256.digest_length]u8 {
 }
 
 pub fn validateHarnesses(program: Program) !void {
-    if (std.mem.count(u8, reference_harness_source, "const result: usize = 18;") != 1 or
-        std.mem.count(u8, reference_harness_source, "witness={}\\n") != 1 or
-        std.mem.count(u8, reference_harness_source, "witness={}\\\\n") != 0)
+    const reference = program.referenceHarness();
+    const reference_result = switch (program) {
+        .symbol_size_of, .weak_external_definition_size_of => "const result: usize = 18;",
+        .requirements_size => "const result: u32 = 12;",
+    };
+    if (std.mem.count(u8, reference, reference_result) != 1 or
+        std.mem.count(u8, reference, "witness={}\\n") != 1 or
+        std.mem.count(u8, reference, "witness={}\\\\n") != 0)
     {
         return error.HarnessBindingMismatch;
     }
@@ -227,7 +346,7 @@ pub fn validateHarnesses(program: Program) !void {
 pub fn writeHarnesses(io: std.Io, program: Program, paths: BuildPaths) !void {
     try validateHarnesses(program);
     const cwd = std.Io.Dir.cwd();
-    try cwd.writeFile(io, .{ .sub_path = paths.reference_source, .data = reference_harness_source });
+    try cwd.writeFile(io, .{ .sub_path = paths.reference_source, .data = program.referenceHarness() });
     try cwd.writeFile(io, .{ .sub_path = paths.linked_source, .data = program.linkedHarness() });
 }
 
@@ -307,6 +426,46 @@ pub fn buildLinked(
     );
 }
 
+const artifact_hash_chunk_bytes = 64 * 1024;
+
+const ArtifactFileState = struct {
+    kind: std.Io.File.Kind,
+    length: u64,
+    executable: bool,
+};
+
+fn artifactFileState(metadata: std.Io.File.Stat) ArtifactFileState {
+    return .{
+        .kind = metadata.kind,
+        .length = metadata.size,
+        .executable = std.Io.File.Permissions.has_executable_bit and metadata.permissions.toMode() & 0o111 != 0,
+    };
+}
+
+fn requireArtifactFileState(state: ArtifactFileState, require_executable: bool, max_bytes: usize) !void {
+    if (state.kind != .file or state.length == 0 or state.length > max_bytes or
+        state.executable != require_executable)
+    {
+        return error.ExecutionArtifactInvalid;
+    }
+}
+
+fn requireStableArtifactFileState(
+    initial: ArtifactFileState,
+    final: ArtifactFileState,
+    streamed_length: u64,
+    require_executable: bool,
+    max_bytes: usize,
+) !void {
+    try requireArtifactFileState(initial, require_executable, max_bytes);
+    try requireArtifactFileState(final, require_executable, max_bytes);
+    if (final.kind != initial.kind or final.length != initial.length or
+        final.executable != initial.executable or streamed_length != initial.length)
+    {
+        return error.ExecutionArtifactInvalid;
+    }
+}
+
 pub fn observeArtifact(
     allocator: std.mem.Allocator,
     io: std.Io,
@@ -314,18 +473,31 @@ pub fn observeArtifact(
     require_executable: bool,
     max_bytes: usize,
 ) !ArtifactIdentity {
+    _ = allocator;
     var file = try std.Io.Dir.openFileAbsolute(io, path, .{ .mode = .read_only, .follow_symlinks = false });
     defer file.close(io);
-    const metadata = try file.stat(io);
-    const executable = std.Io.File.Permissions.has_executable_bit and metadata.permissions.toMode() & 0o111 != 0;
-    if (metadata.kind != .file or metadata.size == 0 or metadata.size > max_bytes or executable != require_executable) {
-        return error.ExecutionArtifactInvalid;
+    const initial = artifactFileState(try file.stat(io));
+    try requireArtifactFileState(initial, require_executable, max_bytes);
+
+    var hasher = Sha256.init(.{});
+    var reader = file.readerStreaming(io, &.{});
+    var chunk: [artifact_hash_chunk_bytes]u8 = undefined;
+    var streamed_length: u64 = 0;
+    while (true) {
+        const length = try reader.interface.readSliceShort(&chunk);
+        if (length == 0) break;
+        streamed_length = std.math.add(u64, streamed_length, length) catch
+            return error.ExecutionArtifactInvalid;
+        if (streamed_length > initial.length or streamed_length > max_bytes) {
+            return error.ExecutionArtifactInvalid;
+        }
+        hasher.update(chunk[0..length]);
     }
-    var reader = file.reader(io, &.{});
-    const bytes = try reader.interface.allocRemaining(allocator, .limited(max_bytes));
-    defer allocator.free(bytes);
-    if (bytes.len != metadata.size) return error.ExecutionArtifactInvalid;
-    return .{ .length = metadata.size, .sha256 = sha256(bytes), .executable = executable };
+    const final = artifactFileState(try file.stat(io));
+    try requireStableArtifactFileState(initial, final, streamed_length, require_executable, max_bytes);
+    var digest: [Sha256.digest_length]u8 = undefined;
+    hasher.final(&digest);
+    return .{ .length = initial.length, .sha256 = digest, .executable = initial.executable };
 }
 
 pub fn observeSelector(
@@ -394,12 +566,121 @@ pub fn readCurrentSources(allocator: std.mem.Allocator, io: std.Io, max_bytes: u
     const import_source = try root.readFileAlloc(io, import_path, allocator, .limited(max_bytes));
     errdefer allocator.free(import_source);
     const use_source = try root.readFileAlloc(io, use_path, allocator, .limited(max_bytes));
-    return .{ .definition = definition, .import_source = import_source, .use_source = use_source };
+    errdefer allocator.free(use_source);
+    const requirements_definition = try root.readFileAlloc(io, requirements_definition_path, allocator, .limited(max_bytes));
+    errdefer allocator.free(requirements_definition);
+    const requirements_import_source = try root.readFileAlloc(io, requirements_import_path, allocator, .limited(max_bytes));
+    return .{
+        .definition = definition,
+        .import_source = import_source,
+        .use_source = use_source,
+        .requirements_definition = requirements_definition,
+        .requirements_import_source = requirements_import_source,
+    };
+}
+
+const SemanticReturn = struct {
+    type_text: []const u8,
+    value: usize,
+};
+
+fn parseSemanticReturn(text: []const u8) !SemanticReturn {
+    const trimmed = std.mem.trim(u8, text, " \t\r\n");
+    if (trimmed.len < 5 or trimmed[0] != '<' or trimmed[trimmed.len - 1] != '>') {
+        return error.CohortDescriptorBindingMismatch;
+    }
+    const fields = trimmed[1 .. trimmed.len - 1];
+    const comma = std.mem.indexOfScalar(u8, fields, ',') orelse return error.CohortDescriptorBindingMismatch;
+    if (std.mem.indexOfScalarPos(u8, fields, comma + 1, ',') != null) {
+        return error.CohortDescriptorBindingMismatch;
+    }
+    const type_text = std.mem.trim(u8, fields[0..comma], " \t\r\n");
+    const value_text = std.mem.trim(u8, fields[comma + 1 ..], " \t\r\n");
+    if (type_text.len == 0 or value_text.len == 0) return error.CohortDescriptorBindingMismatch;
+    return .{
+        .type_text = type_text,
+        .value = std.fmt.parseUnsigned(usize, value_text, 10) catch
+            return error.CohortDescriptorBindingMismatch,
+    };
+}
+
+fn requireSemanticReturn(program: Program, function: air_export.Function) !void {
+    const structured = function.structured_air_v2 orelse return error.CohortDescriptorBindingMismatch;
+    var matching_return_count: usize = 0;
+    for (structured.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "ret") and
+            !std.mem.eql(u8, instruction.opcode, "ret_safe")) continue;
+        matching_return_count += 1;
+        if (matching_return_count != 1 or
+            !std.mem.eql(u8, instruction.result_type, "noreturn") or
+            !std.mem.eql(u8, instruction.data_kind, "un_op") or
+            instruction.operands.len != 1)
+        {
+            return error.CohortDescriptorBindingMismatch;
+        }
+        const operand = instruction.operands[0];
+        if (!std.mem.eql(u8, operand.kind, "const") or
+            !std.mem.eql(u8, operand.type_text, program.descriptorReturnType()))
+        {
+            return error.CohortDescriptorBindingMismatch;
+        }
+        var semantic_text: ?[]const u8 = null;
+        for (instruction.details) |detail| {
+            if (!std.mem.eql(u8, detail.key, "operand0_text")) continue;
+            if (semantic_text != null) return error.CohortDescriptorBindingMismatch;
+            semantic_text = detail.value;
+        }
+        const semantic_return = try parseSemanticReturn(semantic_text orelse
+            return error.CohortDescriptorBindingMismatch);
+        if (!std.mem.eql(u8, semantic_return.type_text, program.descriptorReturnType()) or
+            semantic_return.value != program.expectedResult())
+        {
+            return error.CohortDescriptorBindingMismatch;
+        }
+    }
+    if (matching_return_count != 1) return error.CohortDescriptorBindingMismatch;
+}
+
+pub fn validateDescriptor(allocator: std.mem.Allocator, program: Program, descriptor: []const u8) !void {
+    var module = air_export.parse(allocator, descriptor) catch
+        return error.CohortDescriptorBindingMismatch;
+    defer module.deinit();
+    if (module.functions.len != 1) return error.CohortDescriptorBindingMismatch;
+    const function = module.functions[0];
+    if (!std.mem.eql(u8, function.name, program.functionName()) or
+        !std.mem.eql(u8, function.type_text, program.descriptorType()))
+    {
+        return error.CohortDescriptorBindingMismatch;
+    }
+    try requireSemanticReturn(program, function);
 }
 
 pub fn canonicalExecutionRecord(
     result: OwnedProcessResult,
     semantic_result: usize,
+    call_occurrence: bool,
+) !ExecutionRecord {
+    return canonicalExecutionRecordWithExpected(result, semantic_result, expected_stdout, call_occurrence);
+}
+
+pub fn canonicalProgramExecutionRecord(
+    result: OwnedProcessResult,
+    program: Program,
+    call_occurrence: bool,
+) !ExecutionRecord {
+    const record = try canonicalExecutionRecordWithExpected(
+        result,
+        program.expectedResult(),
+        program.expectedStdout(),
+        call_occurrence,
+    );
+    return record;
+}
+
+fn canonicalExecutionRecordWithExpected(
+    result: OwnedProcessResult,
+    semantic_result: usize,
+    expected_output: []const u8,
     call_occurrence: bool,
 ) !ExecutionRecord {
     const termination: Termination, const status: u8 = switch (result.term) {
@@ -411,7 +692,7 @@ pub fn canonicalExecutionRecord(
     if (result.stdout.len > process_output_max or result.stderr.len > process_output_max) {
         return error.ChildOutputBoundExceeded;
     }
-    if (termination != .exited or status != 0 or !std.mem.eql(u8, result.stdout, expected_stdout) or result.stderr.len != 0) {
+    if (termination != .exited or status != 0 or !std.mem.eql(u8, result.stdout, expected_output) or result.stderr.len != 0) {
         return error.ProcessInconsistent;
     }
     return .{
@@ -426,13 +707,291 @@ pub fn canonicalExecutionRecord(
     };
 }
 
+test "artifact identity streams with bounded memory and preserves exact boundaries" {
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    var payload: [artifact_hash_chunk_bytes * 3 + 17]u8 = undefined;
+    for (&payload, 0..) |*byte, index| byte.* = @truncate(index);
+    try tmp.dir.writeFile(io, .{ .sub_path = "artifact", .data = &payload });
+    try tmp.dir.writeFile(io, .{
+        .sub_path = "executable",
+        .data = "executable",
+        .flags = .{ .permissions = .fromMode(0o755) },
+    });
+
+    var root_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const root_length = try tmp.dir.realPath(io, &root_buffer);
+    const root = root_buffer[0..root_length];
+    var artifact_path_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const artifact_path = try std.fmt.bufPrint(&artifact_path_buffer, "{s}/artifact", .{root});
+    var executable_path_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const executable_path = try std.fmt.bufPrint(&executable_path_buffer, "{s}/executable", .{root});
+
+    const identity = try observeArtifact(std.testing.failing_allocator, io, artifact_path, false, payload.len);
+    try std.testing.expectEqual(@as(u64, payload.len), identity.length);
+    try std.testing.expectEqualSlices(u8, &sha256(&payload), &identity.sha256);
+    try std.testing.expect(!identity.executable);
+    try std.testing.expectError(
+        error.ExecutionArtifactInvalid,
+        observeArtifact(std.testing.failing_allocator, io, artifact_path, false, payload.len - 1),
+    );
+    try std.testing.expectError(
+        error.ExecutionArtifactInvalid,
+        observeArtifact(std.testing.failing_allocator, io, artifact_path, true, payload.len),
+    );
+    const executable_identity = try observeArtifact(std.testing.failing_allocator, io, executable_path, true, "executable".len);
+    try std.testing.expect(executable_identity.executable);
+    try std.testing.expectError(
+        error.ExecutionArtifactInvalid,
+        observeArtifact(std.testing.failing_allocator, io, executable_path, false, "executable".len),
+    );
+}
+
+test "artifact identity rejects symlinks non-files and final metadata drift" {
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(io, .{ .sub_path = "artifact", .data = "artifact" });
+    try tmp.dir.symLink(io, "artifact", "artifact-link", .{});
+    try tmp.dir.createDir(io, "directory", .default_dir);
+
+    var root_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const root_length = try tmp.dir.realPath(io, &root_buffer);
+    const root = root_buffer[0..root_length];
+    var symlink_path_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const symlink_path = try std.fmt.bufPrint(&symlink_path_buffer, "{s}/artifact-link", .{root});
+    var directory_path_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const directory_path = try std.fmt.bufPrint(&directory_path_buffer, "{s}/directory", .{root});
+
+    if (observeArtifact(std.testing.failing_allocator, io, symlink_path, false, 8)) |_| {
+        return error.TestExpectedError;
+    } else |_| {}
+    try std.testing.expectError(
+        error.ExecutionArtifactInvalid,
+        observeArtifact(std.testing.failing_allocator, io, directory_path, false, 8),
+    );
+
+    const initial = ArtifactFileState{ .kind = .file, .length = 8, .executable = false };
+    try requireStableArtifactFileState(initial, initial, 8, false, 8);
+    try std.testing.expectError(
+        error.ExecutionArtifactInvalid,
+        requireStableArtifactFileState(initial, .{ .kind = .file, .length = 7, .executable = false }, 8, false, 8),
+    );
+    try std.testing.expectError(
+        error.ExecutionArtifactInvalid,
+        requireStableArtifactFileState(initial, .{ .kind = .directory, .length = 8, .executable = false }, 8, false, 8),
+    );
+    try std.testing.expectError(
+        error.ExecutionArtifactInvalid,
+        requireStableArtifactFileState(initial, .{ .kind = .file, .length = 8, .executable = true }, 8, false, 8),
+    );
+    try std.testing.expectError(
+        error.ExecutionArtifactInvalid,
+        requireStableArtifactFileState(initial, initial, 7, false, 8),
+    );
+}
+
+const SemanticDescriptorFixture = struct {
+    program: Program,
+    mode: []const u8 = "ReleaseFast",
+    opcode: []const u8 = "ret",
+    instruction_count: usize = 2,
+    main_body_count: usize = 2,
+    function_name: ?[]const u8 = null,
+    type_text: ?[]const u8 = null,
+    return_type: ?[]const u8 = null,
+    return_value: ?usize = null,
+    duplicate_function: bool = false,
+};
+
+fn semanticDescriptorForTest(allocator: std.mem.Allocator, fixture: SemanticDescriptorFixture) ![]u8 {
+    const function_name = fixture.function_name orelse fixture.program.functionName();
+    const type_text = fixture.type_text orelse fixture.program.descriptorType();
+    const return_type = fixture.return_type orelse fixture.program.descriptorReturnType();
+    const return_value = fixture.return_value orelse fixture.program.expectedResult();
+    const return_index = fixture.instruction_count - 1;
+    const semantic_text = try std.fmt.allocPrint(allocator, "<{s}, {}>", .{ return_type, return_value });
+    defer allocator.free(semantic_text);
+    const air_text = try std.fmt.allocPrint(allocator, "  %{}!= {s}({s})\n", .{ return_index, fixture.opcode, semantic_text });
+    defer allocator.free(air_text);
+    const structured_text = try std.fmt.allocPrint(
+        allocator,
+        "structured_air-v2\ntyped_inst|{}|{s}|8|noreturn|un_op|1|const|4|1361|{}|{s}|1|operand0_text|{}|{s}\nstructured_air_v2_end\n",
+        .{ return_index, fixture.opcode, return_type.len, return_type, semantic_text.len, semantic_text },
+    );
+    defer allocator.free(structured_text);
+    const function_frame = try std.fmt.allocPrint(
+        allocator,
+        "function_begin\nname_bytes={}\n{s}\ntype_bytes={}\n{s}\ninstruction_count={}\nmain_body_count={}\nliveness=present\nair_bytes={}\n{s}\nstructured_air_v2_bytes={}\n{s}\nfunction_end\n",
+        .{
+            function_name.len,
+            function_name,
+            type_text.len,
+            type_text,
+            fixture.instruction_count,
+            fixture.main_body_count,
+            air_text.len,
+            air_text,
+            structured_text.len,
+            structured_text,
+        },
+    );
+    defer allocator.free(function_frame);
+    const functions = if (fixture.duplicate_function)
+        try std.fmt.allocPrint(allocator, "{s}{s}", .{ function_frame, function_frame })
+    else
+        try allocator.dupe(u8, function_frame);
+    defer allocator.free(functions);
+    return std.fmt.allocPrint(
+        allocator,
+        "zllvm-air-export-v1\ncontract_version=1\npayload=zig-air-print-v1\nproducer=test\nroot_source=test.zig\nwrapper=test.zig\nmode={s}\ntarget=x86_64-unknown-linux-gnu\nfunction_count={}\nglobal_count=0\n{s}",
+        .{ fixture.mode, @as(usize, if (fixture.duplicate_function) 2 else 1), functions },
+    );
+}
+
 test "fixed cohort identities and harnesses are exact" {
-    try std.testing.expectEqual(@as(usize, 2), programs.len);
+    try std.testing.expectEqual(@as(usize, 3), programs.len);
     try std.testing.expectEqualStrings("coff.Symbol.sizeOf", programs[0].functionName());
     try std.testing.expectEqualStrings("coff.WeakExternalDefinition.sizeOf", programs[1].functionName());
-    try validateHarnesses(.symbol_size_of);
-    try validateHarnesses(.weak_external_definition_size_of);
-    try std.testing.expectEqual(@as(usize, 0), std.mem.count(u8, programs[0].linkedHarness(), programs[1].functionName()));
+    try std.testing.expectEqualStrings("link.MachO.CodeSignature.Requirements.size", programs[2].functionName());
+    for (programs) |program| try validateHarnesses(program);
+    for (programs, 0..) |program, index| for (programs, 0..) |other, other_index| {
+        if (index != other_index) try std.testing.expectEqual(@as(usize, 0), std.mem.count(u8, program.linkedHarness(), other.functionName()));
+    };
+    try std.testing.expectEqual(@as(usize, 12), programs[2].expectedResult());
+    try std.testing.expectEqual(@as(usize, 43), programs[2].expectedWitness());
+}
+
+test "requirements source and bridge admission are exact" {
+    const definition =
+        \\const Requirements = struct {
+        \\    fn deinit(self: *Requirements, allocator: Allocator) void {
+        \\    }
+        \\    fn size(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return 3 * @sizeOf(u32);
+        \\    }
+        \\    fn write(self: Requirements, writer: anytype) !void {
+        \\        try writer.writeInt(u32, macho.CSMAGIC_REQUIREMENTS, .big);
+        \\        try writer.writeInt(u32, self.size(), .big);
+        \\        try writer.writeInt(u32, 0, .big);
+        \\    }
+        \\};
+    ;
+    const import_source = "const CodeSignature = @import(\"MachO/CodeSignature.zig\");\n";
+    try validateRequirementsSources(definition, import_source);
+    const blank_line_drifted_definition =
+        \\const Requirements = struct {
+        \\
+        \\    fn deinit(self: *Requirements, allocator: Allocator) void {
+        \\    }
+        \\    fn size(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return 3 * @sizeOf(u32);
+        \\    }
+        \\    fn write(self: Requirements, writer: anytype) !void {
+        \\        try writer.writeInt(u32, macho.CSMAGIC_REQUIREMENTS, .big);
+        \\        try writer.writeInt(u32, self.size(), .big);
+        \\        try writer.writeInt(u32, 0, .big);
+        \\    }
+        \\};
+    ;
+    try std.testing.expectError(error.CohortSourceBindingMismatch, validateRequirementsSources(blank_line_drifted_definition, import_source));
+    const unqualified_write_definition =
+        \\const Requirements = struct {
+        \\    fn deinit(self: *Requirements, allocator: Allocator) void {
+        \\    }
+        \\    fn size(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return 3 * @sizeOf(u32);
+        \\    }
+        \\};
+        \\        try writer.writeInt(u32, self.size(), .big);
+    ;
+    try std.testing.expectError(error.CohortSourceBindingMismatch, validateRequirementsSources(unqualified_write_definition, import_source));
+    const other_owner_write_definition =
+        \\const Requirements = struct {
+        \\    fn deinit(self: *Requirements, allocator: Allocator) void {
+        \\    }
+        \\    fn size(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return 3 * @sizeOf(u32);
+        \\    }
+        \\};
+        \\const Entitlements = struct {
+        \\    fn write(self: Entitlements, writer: anytype) !void {
+        \\        try writer.writeInt(u32, self.size(), .big);
+        \\    }
+        \\};
+    ;
+    try std.testing.expectError(error.CohortSourceBindingMismatch, validateRequirementsSources(other_owner_write_definition, import_source));
+    const drifted_write_definition =
+        \\const Requirements = struct {
+        \\    fn deinit(self: *Requirements, allocator: Allocator) void {
+        \\    }
+        \\    fn size(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return 3 * @sizeOf(u32);
+        \\    }
+        \\    fn write(self: Requirements, writer: anytype) !void {
+        \\        try writer.writeInt(u32, macho.CSMAGIC_REQUIREMENTS, .big);
+        \\        try writer.writeInt(u32, self.size(), .big);
+        \\        try writer.writeInt(u32, 1, .big);
+        \\    }
+        \\};
+    ;
+    try std.testing.expectError(error.CohortSourceBindingMismatch, validateRequirementsSources(drifted_write_definition, import_source));
+    const drifted_definition =
+        \\const Requirements = struct {
+        \\    fn size(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return 8;
+        \\    }
+        \\};
+    ;
+    try std.testing.expectError(error.CohortSourceBindingMismatch, validateRequirementsSources(drifted_definition, import_source));
+}
+
+test "semantic cohort descriptor binding accepts Fast and Safe shapes" {
+    const allocator = std.testing.allocator;
+    const fast = try semanticDescriptorForTest(allocator, .{ .program = .symbol_size_of });
+    defer allocator.free(fast);
+    try validateDescriptor(allocator, .symbol_size_of, fast);
+
+    const safe = try semanticDescriptorForTest(allocator, .{
+        .program = .requirements_size,
+        .mode = "ReleaseSafe",
+        .opcode = "ret_safe",
+        .instruction_count = 5,
+        .main_body_count = 3,
+    });
+    defer allocator.free(safe);
+    try validateDescriptor(allocator, .requirements_size, safe);
+}
+
+test "semantic cohort descriptor binding rejects function signature return multiplicity and malformed drift" {
+    const allocator = std.testing.allocator;
+    const fixtures = [_]SemanticDescriptorFixture{
+        .{ .program = .symbol_size_of, .function_name = "coff.Symbol.other" },
+        .{ .program = .symbol_size_of, .type_text = "fn () u64" },
+        .{ .program = .symbol_size_of, .return_type = "u64" },
+        .{ .program = .symbol_size_of, .return_value = 19 },
+        .{ .program = .symbol_size_of, .duplicate_function = true },
+    };
+    for (fixtures) |fixture| {
+        const descriptor = try semanticDescriptorForTest(allocator, fixture);
+        defer allocator.free(descriptor);
+        try std.testing.expectError(
+            error.CohortDescriptorBindingMismatch,
+            validateDescriptor(allocator, .symbol_size_of, descriptor),
+        );
+    }
+    try std.testing.expectError(
+        error.CohortDescriptorBindingMismatch,
+        validateDescriptor(allocator, .symbol_size_of, "malformed"),
+    );
 }
 
 test "paired counters reject partial status semantic and call drift" {

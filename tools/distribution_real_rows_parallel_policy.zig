@@ -6,7 +6,6 @@ pub const post_run_free_floor_bytes: u64 = 34_359_738_368;
 // additive-margin branch is max(measured * 1.25, measured + 4 GiB).
 pub const projected_disk_peak_bytes: u64 = 4_834_125_664;
 pub const required_start_bytes: u64 = 39_193_864_032;
-pub const minimum_available_memory_bytes: u64 = 8 * 1024 * 1024 * 1024;
 pub const worker_count: usize = 3;
 
 pub const Policy = struct {
@@ -14,7 +13,6 @@ pub const Policy = struct {
     post_run_free_floor_bytes: u64,
     projected_peak_bytes: u64,
     required_start_bytes: u64,
-    minimum_available_memory_bytes: u64,
 };
 
 fn checkedRequiredStart(post_run_floor: u64, projected_peak: u64) !u64 {
@@ -31,7 +29,6 @@ pub fn forFilesystem(filesystem_total_bytes: u64) !Policy {
         .post_run_free_floor_bytes = post_run_free_floor_bytes,
         .projected_peak_bytes = projected_disk_peak_bytes,
         .required_start_bytes = computed_required_start,
-        .minimum_available_memory_bytes = minimum_available_memory_bytes,
     };
 }
 
@@ -41,7 +38,6 @@ test "real-row parallel policy uses exact fixed floor projected peak and checked
     try std.testing.expectEqual(@as(u64, 34_359_738_368), policy.post_run_free_floor_bytes);
     try std.testing.expectEqual(@as(u64, 4_834_125_664), policy.projected_peak_bytes);
     try std.testing.expectEqual(@as(u64, 39_193_864_032), policy.required_start_bytes);
-    try std.testing.expectEqual(@as(u64, 8_589_934_592), policy.minimum_available_memory_bytes);
     try std.testing.expectEqual(@as(usize, 3), worker_count);
 }
 

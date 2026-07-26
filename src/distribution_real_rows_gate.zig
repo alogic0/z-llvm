@@ -15,6 +15,14 @@ const target_triple = "x86_64-unknown-linux-gnu";
 const cohort_denominator_sha256 = "83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d";
 const cohort_object_max_bytes = 16 * 1024 * 1024;
 const cohort_executable_max_bytes = 512 * 1024 * 1024;
+const air_generation_contract_schema = "distribution-real-rows-air-generation-v1";
+const air_export_target = "x86_64-linux-gnu";
+const air_export_target_arg = "-Dtarget=x86_64-linux-gnu";
+const air_export_pruning = "suspended";
+const air_export_argv_contract =
+    "<authenticated-emitter>\x00build\x00--build-file\x00../ziglang/build.zig\x00--cache-dir\x00<runner-cache>\x00-Dno-bin\x00-Dno-lib\x00-Dno-langref\x00-Ddebug-extensions=true\x00-Dtarget=x86_64-linux-gnu\x00<mode-optimize>";
+const air_export_environment_contract =
+    "LC_ALL=C\x00LANG=C\x00TZ=UTC0\x00HOME=<runner-temp>\x00TMPDIR=<runner-temp>\x00ZIG_LOCAL_CACHE_DIR=<runner-cache>\x00ZIG_GLOBAL_CACHE_DIR=<runner-cache>\x00GIT_OPTIONAL_LOCKS=0\x00GIT_CONFIG_NOSYSTEM=1\x00GIT_CONFIG_SYSTEM=/dev/null\x00GIT_CONFIG_GLOBAL=/dev/null\x00GIT_TERMINAL_PROMPT=0\x00ZLLVM_AIR_EXPORT_PATH=<descriptor-output>\x00ZLLVM_REAL_ROWS_PRUNING=suspended";
 const Mode = helpers.Mode;
 
 pub const OracleAbiReturnShape = enum {
@@ -407,6 +415,7 @@ fn syntheticCohortCandidate(source: []const u8, function: []const u8) Candidate 
 test "execution cohort denominator is exact rank independent and atomic" {
     var candidates = [_]Candidate{syntheticCohortCandidate("other", "other")} ** 100;
     candidates[17] = syntheticCohortCandidate("../ziglang/src/main.zig", "coff.Symbol.sizeOf");
+    candidates[42] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Requirements.size");
     candidates[83] = syntheticCohortCandidate("../ziglang/src/main.zig", "coff.WeakExternalDefinition.sizeOf");
     var digest: [64]u8 = undefined;
     @memcpy(&digest, cohort_denominator_sha256);
@@ -425,9 +434,87 @@ test "execution cohort denominator is exact rank independent and atomic" {
     try std.testing.expectEqual(@as(usize, 0), counters.real_executed);
     try std.testing.expectEqual(@as(usize, 0), counters.real_programs_ok);
     try tracker.record(.weak_external_definition_size_of, .{ .real_executed = 1, .real_programs_ok = 1 });
+    try std.testing.expectError(error.ExecutionCohortPartialCredit, tracker.finalize(&counters));
+    try tracker.record(.requirements_size, .{ .real_executed = 1, .real_programs_ok = 1 });
     try tracker.finalize(&counters);
-    try std.testing.expectEqual(@as(usize, 2), counters.real_executed);
-    try std.testing.expectEqual(@as(usize, 2), counters.real_programs_ok);
+    try std.testing.expectEqual(@as(usize, 3), counters.real_executed);
+    try std.testing.expectEqual(@as(usize, 3), counters.real_programs_ok);
+}
+
+fn airGenerationCacheKeyForTest(identity: DescriptorCacheIdentity) ![64]u8 {
+    const text = try airGenerationCacheKeyText(std.testing.allocator, identity);
+    defer std.testing.allocator.free(text);
+    return sha256Hex(text);
+}
+
+fn expectAirGenerationCacheKeyDrift(expected: *const [64]u8, identity: DescriptorCacheIdentity) !void {
+    const actual = try airGenerationCacheKeyForTest(identity);
+    try std.testing.expect(!std.mem.eql(u8, expected, &actual));
+}
+
+test "causal AIR generation cache identity excludes admission parser bytes and binds every generation input" {
+    const base: DescriptorCacheIdentity = .{
+        .generation = .{
+            .ziglang_pin = "pin-a",
+            .external_revision = "revision-a",
+            .source_authority_sha256 = [_]u8{'a'} ** 64,
+            .selector_version = "selector-a",
+            .selector_length = 100,
+            .selector_sha256 = [_]u8{'b'} ** 64,
+            .target = air_export_target,
+            .mode = "ReleaseSafe",
+            .pruning = air_export_pruning,
+            .optimize_argv = "-Doptimize=ReleaseSafe",
+            .argv_contract = air_export_argv_contract,
+            .environment_contract = air_export_environment_contract,
+        },
+        .admission_implementation = "admission-a",
+        .parser_implementation = "parser-a",
+    };
+    const expected = try airGenerationCacheKeyForTest(base);
+
+    var non_causal = base;
+    non_causal.admission_implementation = "admission-b";
+    non_causal.parser_implementation = "parser-b";
+    const non_causal_key = try airGenerationCacheKeyForTest(non_causal);
+    try std.testing.expectEqualSlices(u8, &expected, &non_causal_key);
+
+    var causal = base;
+    causal.generation.ziglang_pin = "pin-b";
+    try expectAirGenerationCacheKeyDrift(&expected, causal);
+    causal = base;
+    causal.generation.source_authority_sha256[0] = 'c';
+    try expectAirGenerationCacheKeyDrift(&expected, causal);
+    causal = base;
+    causal.generation.selector_sha256[0] = 'c';
+    try expectAirGenerationCacheKeyDrift(&expected, causal);
+    causal = base;
+    causal.generation.target = "aarch64-linux-gnu";
+    try expectAirGenerationCacheKeyDrift(&expected, causal);
+    causal = base;
+    causal.generation.mode = "ReleaseFast";
+    try expectAirGenerationCacheKeyDrift(&expected, causal);
+    causal = base;
+    causal.generation.pruning = "enabled";
+    try expectAirGenerationCacheKeyDrift(&expected, causal);
+    causal = base;
+    causal.generation.argv_contract = "different-argv";
+    try expectAirGenerationCacheKeyDrift(&expected, causal);
+    causal = base;
+    causal.generation.environment_contract = "different-environment";
+    try expectAirGenerationCacheKeyDrift(&expected, causal);
+}
+
+test "cohort descriptor membership requires each selected function exactly once" {
+    const candidates = [_]Candidate{syntheticCohortCandidate("../ziglang/src/main.zig", "coff.Symbol.sizeOf")};
+    const frame =
+        "function_begin\n" ++
+        "name_bytes=18\n" ++
+        "coff.Symbol.sizeOf\n" ++
+        "function_end\n";
+    try std.testing.expect(try descriptorContainsAllFunctions(std.testing.allocator, frame, &candidates));
+    const duplicate = frame ++ frame;
+    try std.testing.expect(!try descriptorContainsAllFunctions(std.testing.allocator, duplicate, &candidates));
 }
 
 fn parseMode(io: std.Io, text: []const u8) !Mode {
@@ -518,10 +605,7 @@ fn runMode(
     defer allocator.free(descriptor_path);
     const zig_cache_path = try temp.join(allocator, "zig-cache");
     defer allocator.free(zig_cache_path);
-    const cohort_source_initial = if (cohort_enabled)
-        try observeCohortSourceIdentity(allocator, io, temp.path)
-    else
-        null;
+    const generation_source_initial = try observeCohortSourceIdentity(allocator, io, temp.path);
     const zig_emitter = try readStage4Emitter(allocator, io, init);
     defer allocator.free(zig_emitter);
 
@@ -536,6 +620,7 @@ fn runMode(
         descriptor_path,
         zig_cache_path,
         zig_emitter,
+        generation_source_initial,
         options.export_cache_root,
     ) orelse {
         if (options.require_cache_hit) return error.RealRowsCacheHitRequired;
@@ -562,7 +647,7 @@ fn runMode(
     }
     if (cohort_enabled and !counters.hasFailure()) {
         const cohort_source_final = try observeCohortSourceIdentity(allocator, io, temp.path);
-        if (!std.meta.eql(cohort_source_initial.?, cohort_source_final)) return error.ExecutionCohortSourceDrift;
+        if (!std.meta.eql(generation_source_initial, cohort_source_final)) return error.ExecutionCohortSourceDrift;
         try cohort_tracker.finalize(&counters);
     }
     return counters;
@@ -583,7 +668,75 @@ fn observeCohortSourceIdentity(
     try execution_cohort.requireExternalRepositoryClean(allocator, io, &environment);
     var sources = try execution_cohort.readCurrentSources(allocator, io, 32 * 1024 * 1024);
     defer sources.deinit(allocator);
+    try sources.validate();
     return sources.identity();
+}
+
+const AirGenerationInputs = struct {
+    ziglang_pin: []const u8,
+    external_revision: []const u8,
+    source_authority_sha256: [64]u8,
+    selector_version: []const u8,
+    selector_length: u64,
+    selector_sha256: [64]u8,
+    target: []const u8,
+    mode: []const u8,
+    pruning: []const u8,
+    optimize_argv: []const u8,
+    argv_contract: []const u8,
+    environment_contract: []const u8,
+};
+
+const DescriptorCacheIdentity = struct {
+    generation: AirGenerationInputs,
+    admission_implementation: []const u8 = "mandatory-runtime",
+    parser_implementation: []const u8 = "mandatory-runtime",
+};
+
+fn sourceAuthoritySha256(identity: execution_cohort.SourceIdentity) [64]u8 {
+    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    inline for (@typeInfo(execution_cohort.SourceIdentity).@"struct".fields) |field| {
+        hasher.update(field.name);
+        hasher.update("\x00");
+        hasher.update(&@field(identity, field.name));
+    }
+    var digest: [32]u8 = undefined;
+    hasher.final(&digest);
+    return std.fmt.bytesToHex(digest, .lower);
+}
+
+fn airGenerationCacheKeyText(allocator: std.mem.Allocator, identity: DescriptorCacheIdentity) ![]u8 {
+    _ = identity.admission_implementation;
+    _ = identity.parser_implementation;
+    const generation = identity.generation;
+    return std.fmt.allocPrint(
+        allocator,
+        "{s}\nziglang_pin_bytes={}\n{s}\nexternal_revision_bytes={}\n{s}\nsource_authority_sha256={s}\nselector_version_bytes={}\n{s}\nselector_length={}\nselector_sha256={s}\ntarget_bytes={}\n{s}\nmode_bytes={}\n{s}\npruning_bytes={}\n{s}\noptimize_argv_bytes={}\n{s}\nargv_contract_bytes={}\n{s}\nenvironment_contract_bytes={}\n{s}\n",
+        .{
+            air_generation_contract_schema,
+            generation.ziglang_pin.len,
+            generation.ziglang_pin,
+            generation.external_revision.len,
+            generation.external_revision,
+            &generation.source_authority_sha256,
+            generation.selector_version.len,
+            generation.selector_version,
+            generation.selector_length,
+            &generation.selector_sha256,
+            generation.target.len,
+            generation.target,
+            generation.mode.len,
+            generation.mode,
+            generation.pruning.len,
+            generation.pruning,
+            generation.optimize_argv.len,
+            generation.optimize_argv,
+            generation.argv_contract.len,
+            generation.argv_contract,
+            generation.environment_contract.len,
+            generation.environment_contract,
+        },
+    );
 }
 
 fn loadOrExportDescriptor(
@@ -597,20 +750,50 @@ fn loadOrExportDescriptor(
     descriptor_path: []const u8,
     zig_cache_path: []const u8,
     zig_emitter: []const u8,
+    source_identity: execution_cohort.SourceIdentity,
     selected_export_cache_root: []const u8,
 ) !?[]u8 {
     const ziglang_pin = try readZiglangPin(allocator, io);
     defer allocator.free(ziglang_pin);
-    const z_llvm_export_state = try exporterRelevantStateHash(allocator, io);
-    const cache_key_text = try std.fmt.allocPrint(
-        allocator,
-        "schema=2\nziglang_pin={s}\nz_llvm_export_state={s}\nmode={s}\n",
-        .{
-            ziglang_pin,
-            &z_llvm_export_state,
-            mode.name(),
+    if (!std.mem.eql(u8, ziglang_pin, execution_cohort.external_revision)) {
+        return error.ExternalRevisionMismatch;
+    }
+    const temporary_root = std.fs.path.dirname(descriptor_path) orelse return error.InvalidAirGenerationPath;
+    var env_map = try execution_cohort.closedEnvironment(allocator, .{
+        .home = temporary_root,
+        .temporary = temporary_root,
+        .local_cache = zig_cache_path,
+        .global_cache = zig_cache_path,
+    });
+    defer env_map.deinit();
+    try env_map.put("ZLLVM_AIR_EXPORT_PATH", descriptor_path);
+    try env_map.put("ZLLVM_REAL_ROWS_PRUNING", air_export_pruning);
+    const inherited_pruning = init.minimal.environ.getAlloc(allocator, "ZLLVM_REAL_ROWS_PRUNING") catch |err| switch (err) {
+        error.EnvironmentVariableMissing => return error.AirGenerationPruningMissing,
+        else => return err,
+    };
+    defer allocator.free(inherited_pruning);
+    if (!std.mem.eql(u8, inherited_pruning, air_export_pruning)) return error.AirGenerationPruningMismatch;
+
+    const selector_identity = try execution_cohort.observeSelector(allocator, io, zig_emitter, &env_map);
+    try execution_cohort.requireSelector(selector_identity);
+    const cache_identity: DescriptorCacheIdentity = .{
+        .generation = .{
+            .ziglang_pin = ziglang_pin,
+            .external_revision = execution_cohort.external_revision,
+            .source_authority_sha256 = sourceAuthoritySha256(source_identity),
+            .selector_version = selector_identity.versionSlice(),
+            .selector_length = selector_identity.length,
+            .selector_sha256 = std.fmt.bytesToHex(selector_identity.sha256, .lower),
+            .target = air_export_target,
+            .mode = mode.name(),
+            .pruning = air_export_pruning,
+            .optimize_argv = zigBuildOptimizeArg(mode),
+            .argv_contract = air_export_argv_contract,
+            .environment_contract = air_export_environment_contract,
         },
-    );
+    };
+    const cache_key_text = try airGenerationCacheKeyText(allocator, cache_identity);
     defer allocator.free(cache_key_text);
     const cache_key = sha256Hex(cache_key_text);
 
@@ -628,9 +811,6 @@ fn loadOrExportDescriptor(
     }
 
     const export_start = std.Io.Timestamp.now(io, .awake);
-    var env_map = try helpers.cloneEnvironment(allocator, init.environ_map);
-    defer env_map.deinit();
-    try env_map.put("ZLLVM_AIR_EXPORT_PATH", descriptor_path);
     const build_argv = [_][]const u8{
         zig_emitter,
         "build",
@@ -642,11 +822,12 @@ fn loadOrExportDescriptor(
         "-Dno-lib",
         "-Dno-langref",
         "-Ddebug-extensions=true",
-        "-Dtarget=x86_64-linux-gnu",
+        air_export_target_arg,
         zigBuildOptimizeArg(mode),
     };
     const build_result = try std.process.run(allocator, io, .{
         .argv = &build_argv,
+        .cwd = .{ .path = execution_cohort.repository_root },
         .environ_map = &env_map,
         .stdout_limit = .limited(16 * 1024 * 1024),
         .stderr_limit = .limited(32 * 1024 * 1024),
@@ -667,7 +848,7 @@ fn loadOrExportDescriptor(
         try printCacheEvent(stdout, mode, "export-invalid", duration_ms, &cache_key, descriptor.len);
         return null;
     }
-    try storeCachedDescriptor(allocator, io, selected_export_cache_root, &cache_key, cache_key_text, ziglang_pin, &z_llvm_export_state, mode, descriptor);
+    try storeCachedDescriptor(allocator, io, selected_export_cache_root, &cache_key, cache_key_text, ziglang_pin, mode, descriptor);
     try printCacheEvent(stdout, mode, if (options.fresh_export) "fresh-export" else "miss-export", duration_ms, &cache_key, descriptor.len);
     return descriptor;
 }
@@ -706,7 +887,6 @@ fn storeCachedDescriptor(
     cache_key: *const [64]u8,
     cache_key_text: []const u8,
     ziglang_pin: []const u8,
-    z_llvm_export_state: *const [64]u8,
     mode: Mode,
     descriptor: []const u8,
 ) !void {
@@ -720,8 +900,8 @@ fn storeCachedDescriptor(
     const descriptor_hash = sha256Hex(descriptor);
     const meta = try std.fmt.allocPrint(
         allocator,
-        "schema=2\ncache_key={s}\nziglang_pin={s}\nz_llvm_export_state={s}\nmode={s}\ndescriptor_sha256={s}\nkey_begin\n{s}key_end\n",
-        .{ cache_key, ziglang_pin, z_llvm_export_state, mode.name(), &descriptor_hash, cache_key_text },
+        "schema=3\ncache_key={s}\nziglang_pin={s}\nmode={s}\ndescriptor_sha256={s}\nkey_begin\n{s}key_end\n",
+        .{ cache_key, ziglang_pin, mode.name(), &descriptor_hash, cache_key_text },
     );
     defer allocator.free(meta);
     try cwd.writeFile(io, .{ .sub_path = descriptor_path, .data = descriptor });
@@ -730,7 +910,7 @@ fn storeCachedDescriptor(
 
 fn metadataMatches(meta: []const u8, cache_key: *const [64]u8, cache_key_text: []const u8) bool {
     const schema = metadataValue(meta, "schema") orelse return false;
-    if (!std.mem.eql(u8, schema, "2")) return false;
+    if (!std.mem.eql(u8, schema, "3")) return false;
     const stored_key = metadataValue(meta, "cache_key") orelse return false;
     if (!std.mem.eql(u8, stored_key, cache_key)) return false;
     const key_begin = std.mem.indexOf(u8, meta, "key_begin\n") orelse return false;
@@ -827,10 +1007,10 @@ fn descriptorContainsAllFunctions(
         const frame_marker_start = std.mem.indexOfPos(u8, descriptor, name_end, "\nfunction_end\n") orelse return false;
         const frame_end = frame_marker_start + "\nfunction_end\n".len;
         for (candidates, 0..) |candidate, index| {
-            if (!found[index] and std.mem.eql(u8, name, candidate.function)) {
+            if (std.mem.eql(u8, name, candidate.function)) {
+                if (found[index]) return false;
                 found[index] = true;
                 found_count += 1;
-                if (found_count == candidates.len) return true;
                 break;
             }
         }
@@ -843,41 +1023,6 @@ fn readZiglangPin(allocator: std.mem.Allocator, io: std.Io) ![]const u8 {
     const pin_contents = try std.Io.Dir.cwd().readFileAlloc(io, ziglang_pin_path, allocator, .limited(4096));
     defer allocator.free(pin_contents);
     return try allocator.dupe(u8, std.mem.trim(u8, pin_contents, " \t\r\n"));
-}
-
-fn readStage4Version(allocator: std.mem.Allocator, io: std.Io, zig_emitter: []const u8) ![]const u8 {
-    const argv = [_][]const u8{ zig_emitter, "version" };
-    const result = try std.process.run(allocator, io, .{
-        .argv = &argv,
-        .stdout_limit = .limited(1024 * 1024),
-        .stderr_limit = .limited(1024 * 1024),
-    });
-    defer {
-        allocator.free(result.stdout);
-        allocator.free(result.stderr);
-    }
-    if (!helpers.termOk(result.term)) return error.Stage4VersionFailed;
-    return try allocator.dupe(u8, std.mem.trim(u8, result.stdout, " \t\r\n"));
-}
-
-fn exporterRelevantStateHash(allocator: std.mem.Allocator, io: std.Io) ![64]u8 {
-    const files = [_][]const u8{
-        "src/distribution_real_rows_gate.zig",
-        "src/zig_air_export.zig",
-        "docs/evidence/ziglang_pin.txt",
-    };
-    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
-    for (files) |path| {
-        hasher.update(path);
-        hasher.update("\n");
-        const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(32 * 1024 * 1024));
-        defer allocator.free(contents);
-        hasher.update(contents);
-        hasher.update("\n");
-    }
-    var digest: [32]u8 = undefined;
-    hasher.final(&digest);
-    return std.fmt.bytesToHex(digest, .lower);
 }
 
 fn candidateSliceHash(candidates: []const Candidate) [64]u8 {
@@ -1072,8 +1217,8 @@ fn runCohortPair(
     defer reference_result.deinit(allocator);
     var linked_result = try execution_cohort.runBounded(allocator, io, &.{linked_executable}, &environment);
     defer linked_result.deinit(allocator);
-    const reference_record = try execution_cohort.canonicalExecutionRecord(reference_result, execution_cohort.expected_result, true);
-    const linked_record = try execution_cohort.canonicalExecutionRecord(linked_result, execution_cohort.expected_result, true);
+    const reference_record = try execution_cohort.canonicalProgramExecutionRecord(reference_result, program, true);
+    const linked_record = try execution_cohort.canonicalProgramExecutionRecord(linked_result, program, true);
     var pair: execution_cohort.PairCounters = .{};
     try pair.noteBothExecuted(reference_record, linked_record);
     try pair.noteOracleAccepted(reference_record, linked_record);
@@ -1106,8 +1251,8 @@ fn runCohortPair(
             &reference_hex,
             linked_identity.length,
             &linked_hex,
-            execution_cohort.expected_result,
-            execution_cohort.expected_witness,
+            program.expectedResult(),
+            program.expectedWitness(),
             &result_hex,
             reference_record.status,
             linked_record.status,
@@ -1136,6 +1281,12 @@ fn runCandidate(
         return;
     };
     defer allocator.free(filtered);
+    if (cohortProgram(candidate)) |program| {
+        execution_cohort.validateDescriptor(allocator, program, filtered) catch |err| {
+            try recordFailure(allocator, stdout, counters, mode, candidate, "cohort-admission", @errorName(err));
+            return;
+        };
+    }
 
     if (try debugDumpMatches(allocator, init, candidate)) {
         var stderr_buffer: [4096]u8 = undefined;

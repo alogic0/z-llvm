@@ -124,6 +124,7 @@ pub fn main(init: std.process.Init) !void {
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     try stdout_writer.interface.print("distribution all gates target={s}\n", .{target});
+    try writeMemoryPolicyEvidence(&stdout_writer.interface);
     try stdout_writer.interface.flush();
 
     var metrics: RunMetrics = .{};
@@ -379,6 +380,7 @@ fn runSerial(
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const writer = &stdout_writer.interface;
     try writer.print("distribution all gates target={s}\n", .{target});
+    try writeMemoryPolicyEvidence(writer);
 
     var real_sampler: RealSampler = .{};
     const sampler = real_sampler.interface();
@@ -463,6 +465,13 @@ fn realRowsParentOptions(target_assignment: []const u8, options: Options) real_r
         .cache_mode = if (options.fresh_real_rows) .fresh else .require_hit,
         .concurrency = options.real_rows_concurrency,
     };
+}
+
+fn writeMemoryPolicyEvidence(writer: *std.Io.Writer) !void {
+    try writer.print(
+        "summary distribution-all-real-rows-memory-policy memory_policy={s} local_fail=0\n",
+        .{real_rows_parallel.memory_policy_label},
+    );
 }
 
 fn executeSerialTools(
@@ -980,6 +989,16 @@ test "default and serial cohort paths compose the same explicit shared-runner co
     const hit_parent = realRowsParentOptions("TARGET=x86_64-unknown-linux-gnu", fresh);
     try std.testing.expectEqual(real_rows_parallel.CacheMode.require_hit, hit_parent.cache_mode);
     try std.testing.expectEqual(@as(u8, 1), hit_parent.concurrency);
+}
+
+test "distribution all emits one constant os-managed non-gating memory label" {
+    var buffer: [512]u8 = undefined;
+    var writer = std.Io.Writer.fixed(&buffer);
+    try writeMemoryPolicyEvidence(&writer);
+    try std.testing.expectEqualStrings(
+        "summary distribution-all-real-rows-memory-policy memory_policy=os-managed-non-gating local_fail=0\n",
+        writer.buffered(),
+    );
 }
 
 test "filesystem sample parser reads df size and available bytes" {
