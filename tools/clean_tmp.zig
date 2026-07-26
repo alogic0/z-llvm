@@ -9,18 +9,23 @@ const default_max_age_seconds = 2 * 60 * 60;
 const default_grace_seconds = 24 * 60 * 60;
 const default_tmp_soft_limit_bytes = 8 * 1024 * 1024 * 1024;
 const export_cache_name = "real_rows_air_export_cache";
+const abi_differential_container_name = "inbox66_abi_diff";
+const abi_differential_inbox_number = 66;
+const abi_differential_run_class = "abi-differential-scratch-run";
 
 const usage =
     \\usage: zig build clean-tmp -- [--delete] [--tmp-dir=PATH] [--pin-file=PATH] [--older-than-seconds=N] [--keep-newest-per-mode]
     \\       zig build clean-tmp -- --retention-report [report options]
-    \\       zig build clean-tmp -- --retention-cleanup [--delete] [retention options]
+    \\       zig build clean-tmp -- --retention-cleanup [--delete]
+    \\         [--only-class=CLASS] [retention options]
     \\
     \\Dry-run is the default. --delete is required to remove stale tmp files.
     \\--keep-newest-per-mode keeps at most one current-pin export-cache entry per mode.
     \\--retention-report emits the deterministic INBOX retention/headroom manifest and rejects --delete.
     \\--retention-cleanup applies the same pin/INBOX/grace classifier to per-INBOX
-    \\  directories and export-cache pairs. It is a dry-run unless --delete is also
-    \\  present; delete mode fails closed on Git worktrees or open files.
+    \\  directories, nested ABI differential run scratch, and export-cache pairs.
+    \\  It is a dry-run unless --delete is also present; delete mode fails closed
+    \\  on Git worktrees or open files.
     \\Report options: --retention-manifest=PATH --patched-zig-cache=PATH
     \\  --accepted-through-inbox=N --active-inbox=N --grace-seconds=N --now-seconds=N
     \\  --filesystem-total-bytes=N --filesystem-free-bytes=N --sharding-peak-bytes=N
@@ -37,6 +42,7 @@ const Options = struct {
     retention_report: bool = false,
     retention_cleanup: bool = false,
     retention_manifest: []const u8 = default_retention_manifest,
+    only_class: ?[]const u8 = null,
     patched_zig_cache: ?[]const u8 = null,
     accepted_through_inbox: u32 = 0,
     active_inbox: u32 = 0,
@@ -84,6 +90,9 @@ pub fn main(init: std.process.Init) !void {
 
     if (options.retention_report and options.retention_cleanup) {
         try common.validationError(io, "--retention-report and --retention-cleanup are mutually exclusive\n", .{});
+    }
+    if (options.only_class != null and !options.retention_cleanup) {
+        try common.validationError(io, "--only-class requires --retention-cleanup\n", .{});
     }
     if (options.retention_report) {
         if (options.delete) {
@@ -186,6 +195,8 @@ fn parseOptions(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init
             options.older_than_seconds = try std.fmt.parseUnsigned(u64, arg["--older-than-seconds=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--retention-manifest=")) {
             options.retention_manifest = arg["--retention-manifest=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--only-class=")) {
+            options.only_class = arg["--only-class=".len..];
         } else if (std.mem.startsWith(u8, arg, "--patched-zig-cache=")) {
             options.patched_zig_cache = arg["--patched-zig-cache=".len..];
         } else if (std.mem.startsWith(u8, arg, "--accepted-through-inbox=")) {
@@ -568,6 +579,7 @@ const RetentionItem = struct {
     class: []const u8,
     size_bytes: u64,
     age_seconds: u64,
+    root_inode: ?std.Io.File.INode = null,
     pin_or_key: []u8,
     status: RetentionStatus,
     reason: []const u8,
@@ -760,6 +772,14 @@ fn runRetentionCleanup(
             "full-patched-zig-rebuild",
         );
     }
+    for (items.items) |*item| {
+        if (item.status == .candidate and
+            !retentionClassSelected(options.only_class, item.class))
+        {
+            item.status = .protected;
+            item.reason = "filtered-by-only-class";
+        }
+    }
     std.mem.sort(RetentionItem, items.items, {}, retentionItemLessThan);
 
     var candidate_count: usize = 0;
@@ -778,10 +798,44 @@ fn runRetentionCleanup(
         },
     );
     try stdout.writeAll("path\tclass\tsize_bytes\tage_seconds\tpin_or_key\tstatus\treason\tregeneration_cost\taction\n");
+    const batch_abi_cleanup = options.delete and retentionClassSelected(
+        options.only_class,
+        abi_differential_run_class,
+    ) and options.only_class != null;
+    const abi_container_path = if (batch_abi_cleanup)
+        try std.fs.path.join(allocator, &.{ options.tmp_dir, abi_differential_container_name })
+    else
+        null;
+    defer if (abi_container_path) |path| allocator.free(path);
+
     if (options.delete) {
-        for (items.items) |item| {
-            if (item.status == .candidate) {
-                try ensureRetentionCandidateUnused(allocator, io, item);
+        if (abi_container_path) |container_path| {
+            const current_pins = try std.Io.Dir.cwd().readFileAlloc(
+                io,
+                options.retention_manifest,
+                allocator,
+                .limited(64 * 1024),
+            );
+            defer allocator.free(current_pins);
+            for (items.items) |item| {
+                if (item.status == .candidate) {
+                    try validateAbiDifferentialDeletionCandidate(
+                        allocator,
+                        io,
+                        options,
+                        current_pins,
+                        now_seconds,
+                        container_path,
+                        item,
+                    );
+                }
+            }
+            try ensurePathUnused(allocator, io, container_path, true);
+        } else {
+            for (items.items) |item| {
+                if (item.status == .candidate) {
+                    try ensureRetentionCandidateUnused(allocator, io, item);
+                }
             }
         }
     }
@@ -794,9 +848,28 @@ fn runRetentionCleanup(
                 reclaimable_bytes +|= item.size_bytes;
                 action = if (options.delete) "delete" else "would-delete";
                 if (options.delete) {
-                    // Repeat immediately before deletion to close most of the
-                    // gap between the all-candidate preflight and mutation.
-                    try ensureRetentionCandidateUnused(allocator, io, item);
+                    if (abi_container_path) |container_path| {
+                        const current_pins = try std.Io.Dir.cwd().readFileAlloc(
+                            io,
+                            options.retention_manifest,
+                            allocator,
+                            .limited(64 * 1024),
+                        );
+                        defer allocator.free(current_pins);
+                        try validateAbiDifferentialDeletionCandidate(
+                            allocator,
+                            io,
+                            options,
+                            current_pins,
+                            now_seconds,
+                            container_path,
+                            item,
+                        );
+                    } else {
+                        // Repeat immediately before deletion to close most of
+                        // the gap between preflight and mutation.
+                        try ensureRetentionCandidateUnused(allocator, io, item);
+                    }
                     try deleteRetentionCandidate(allocator, io, item);
                     deleted_count += 1;
                     deleted_bytes +|= item.size_bytes;
@@ -876,6 +949,63 @@ fn ensurePathUnused(
     }
 }
 
+fn validateAbiDifferentialDeletionCandidate(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    options: Options,
+    pins: []const u8,
+    now_seconds: u64,
+    container_path: []const u8,
+    item: RetentionItem,
+) !void {
+    if (!std.mem.eql(u8, item.class, abi_differential_run_class) or
+        item.status != .candidate)
+    {
+        return error.RetentionCandidateClassMismatch;
+    }
+    const candidate_parent = std.fs.path.dirname(item.path) orelse
+        return error.RetentionCandidatePathInvalid;
+    const candidate_name = std.fs.path.basename(item.path);
+    if (!std.mem.eql(u8, candidate_parent, container_path) or
+        !isAbiDifferentialRunName(candidate_name))
+    {
+        return error.RetentionCandidatePathInvalid;
+    }
+
+    const cwd = std.Io.Dir.cwd();
+    const container_stat = try cwd.statFile(io, container_path, .{ .follow_symlinks = false });
+    if (container_stat.kind != .directory) return error.RetentionContainerNotDirectory;
+    const candidate_stat = try cwd.statFile(io, item.path, .{ .follow_symlinks = false });
+    if (candidate_stat.kind != .directory) return error.RetentionCandidateNotDirectory;
+    if (candidate_stat.inode != (item.root_inode orelse
+        return error.RetentionCandidateIdentityMissing))
+    {
+        return error.RetentionCandidateIdentityChanged;
+    }
+
+    const canonical_container = try cwd.realPathFileAlloc(io, container_path, allocator);
+    defer allocator.free(canonical_container);
+    const canonical_candidate = try cwd.realPathFileAlloc(io, item.path, allocator);
+    defer allocator.free(canonical_candidate);
+    const canonical_parent = std.fs.path.dirname(canonical_candidate) orelse
+        return error.RetentionCandidateOutsideContainer;
+    if (!std.mem.eql(u8, canonical_parent, canonical_container)) {
+        return error.RetentionCandidateOutsideContainer;
+    }
+
+    if (retentionPathPinned(pins, item.path)) return error.RetentionCandidatePinned;
+    if (options.active_inbox == abi_differential_inbox_number or
+        options.accepted_through_inbox < abi_differential_inbox_number)
+    {
+        return error.RetentionCandidateIneligible;
+    }
+    const facts = try treeFacts(allocator, io, item.path);
+    if (facts.contains_git_marker) return error.RetentionCandidateContainsGitMarker;
+    if (retentionAgeSeconds(now_seconds, facts.newest_mtime_ns) < options.grace_seconds) {
+        return error.RetentionCandidateInGracePeriod;
+    }
+}
+
 fn deleteRetentionCandidate(
     allocator: std.mem.Allocator,
     io: std.Io,
@@ -930,6 +1060,7 @@ fn appendRetentionItem(
         .class = class,
         .size_bytes = size_bytes,
         .age_seconds = age_seconds,
+        .root_inode = null,
         .pin_or_key = owned_key,
         .status = status,
         .reason = reason,
@@ -992,6 +1123,18 @@ fn collectTmpRetentionItems(
     for (names.items) |name| {
         const path = try std.fs.path.join(allocator, &.{ options.tmp_dir, name });
         defer allocator.free(path);
+        if (std.mem.eql(u8, name, abi_differential_container_name)) {
+            try collectAbiDifferentialRetentionItems(
+                allocator,
+                io,
+                options,
+                pins,
+                now_seconds,
+                path,
+                items,
+            );
+            continue;
+        }
         const facts = try treeFacts(allocator, io, path);
         const age_seconds = retentionAgeSeconds(now_seconds, facts.newest_mtime_ns);
         const inbox_number = parseInboxNumber(name);
@@ -1044,6 +1187,115 @@ fn collectTmpRetentionItems(
     }
 }
 
+fn collectAbiDifferentialRetentionItems(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    options: Options,
+    pins: []const u8,
+    now_seconds: u64,
+    container_path: []const u8,
+    items: *std.ArrayListUnmanaged(RetentionItem),
+) !void {
+    var container = try std.Io.Dir.cwd().openDir(io, container_path, .{ .iterate = true });
+    defer container.close(io);
+
+    var names: std.ArrayListUnmanaged([]u8) = .empty;
+    defer {
+        for (names.items) |name| allocator.free(name);
+        names.deinit(allocator);
+    }
+    var iter = container.iterate();
+    while (try iter.next(io)) |entry| {
+        if (entry.kind != .directory) continue;
+        try names.append(allocator, try allocator.dupe(u8, entry.name));
+    }
+    std.mem.sort([]u8, names.items, {}, stringSliceLessThan);
+
+    for (names.items) |name| {
+        const path = try std.fs.path.join(allocator, &.{ container_path, name });
+        defer allocator.free(path);
+        const root_stat = try std.Io.Dir.cwd().statFile(io, path, .{ .follow_symlinks = false });
+        const is_run = isAbiDifferentialRunName(name);
+        if (root_stat.kind != .directory) {
+            try appendRetentionItem(
+                allocator,
+                items,
+                path,
+                if (is_run)
+                    "abi-differential-scratch-run"
+                else
+                    "abi-differential-retained-result",
+                root_stat.size,
+                0,
+                "INBOX-66",
+                .protected,
+                "not-ordinary-directory",
+                if (is_run)
+                    "rerun-abi-differential"
+                else
+                    "named-result-preserved",
+            );
+            continue;
+        }
+        const facts = try treeFacts(allocator, io, path);
+        const age_seconds = retentionAgeSeconds(now_seconds, facts.newest_mtime_ns);
+        const pin_key = retentionPinKey(pins, path);
+
+        var status: RetentionStatus = .protected;
+        var reason: []const u8 = "named-result-not-run-scratch";
+        if (!is_run) {
+            if (pin_key != null) reason = "explicit-live-pin";
+        } else if (pin_key != null) {
+            reason = "explicit-live-pin";
+        } else if (facts.contains_git_marker) {
+            reason = "contains-git-worktree-marker";
+        } else if (options.active_inbox == abi_differential_inbox_number) {
+            reason = "active-inbox";
+        } else if (options.accepted_through_inbox < abi_differential_inbox_number) {
+            reason = "inbox-not-accepted";
+        } else if (age_seconds < options.grace_seconds) {
+            reason = "accepted-inbox-grace-window";
+        } else {
+            status = .candidate;
+            reason = "accepted-abi-run-after-grace";
+        }
+
+        try appendRetentionItem(
+            allocator,
+            items,
+            path,
+            if (is_run)
+                abi_differential_run_class
+            else
+                "abi-differential-retained-result",
+            facts.size,
+            age_seconds,
+            pin_key orelse "INBOX-66",
+            status,
+            reason,
+            if (is_run)
+                "rerun-abi-differential"
+            else
+                "named-result-preserved",
+        );
+        items.items[items.items.len - 1].root_inode = root_stat.inode;
+    }
+}
+
+fn isAbiDifferentialRunName(name: []const u8) bool {
+    const prefix = "run-";
+    if (!std.mem.startsWith(u8, name, prefix) or name.len == prefix.len) return false;
+    for (name[prefix.len..]) |byte| {
+        if (!std.ascii.isDigit(byte)) return false;
+    }
+    return true;
+}
+
+fn retentionClassSelected(only_class: ?[]const u8, class: []const u8) bool {
+    const selected = only_class orelse return true;
+    return std.mem.eql(u8, selected, class);
+}
+
 fn stringSliceLessThan(_: void, lhs: []u8, rhs: []u8) bool {
     return std.mem.lessThan(u8, lhs, rhs);
 }
@@ -1076,6 +1328,195 @@ fn tmpRegenerationCost(class: []const u8) []const u8 {
     if (std.mem.eql(u8, class, "short-run-tmp")) return "rerun-short-focused-command";
     if (std.mem.eql(u8, class, "diagnostic-build-cache")) return "rebuild-diagnostic-capture";
     return "unknown-review-required";
+}
+
+test "ABI differential run names require a numeric run suffix" {
+    try std.testing.expect(isAbiDifferentialRunName("run-1"));
+    try std.testing.expect(isAbiDifferentialRunName("run-4193611"));
+    try std.testing.expect(!isAbiDifferentialRunName("run-"));
+    try std.testing.expect(!isAbiDifferentialRunName("run-current"));
+    try std.testing.expect(!isAbiDifferentialRunName("focused-final"));
+    try std.testing.expect(!isAbiDifferentialRunName("run-12-final"));
+}
+
+test "retention class filter fails closed on other classes" {
+    try std.testing.expect(retentionClassSelected(null, "anything"));
+    try std.testing.expect(retentionClassSelected(
+        "abi-differential-scratch-run",
+        "abi-differential-scratch-run",
+    ));
+    try std.testing.expect(!retentionClassSelected(
+        "abi-differential-scratch-run",
+        "per-inbox-tmp",
+    ));
+    try std.testing.expect(!retentionClassSelected("", "abi-differential-scratch-run"));
+}
+
+fn retentionItemNamed(items: []const RetentionItem, name: []const u8) ?RetentionItem {
+    for (items) |item| {
+        if (std.mem.eql(u8, std.fs.path.basename(item.path), name)) return item;
+    }
+    return null;
+}
+
+test "ABI retention fixture rejects protected and replaced paths" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+
+    const fixture_root = try temp.dir.realPathFileAlloc(io, ".", allocator);
+    defer allocator.free(fixture_root);
+    const container_path = try std.fs.path.join(
+        allocator,
+        &.{ fixture_root, abi_differential_container_name },
+    );
+    defer allocator.free(container_path);
+    const candidate_path = try std.fs.path.join(allocator, &.{ container_path, "run-100" });
+    defer allocator.free(candidate_path);
+    const pinned_path = try std.fs.path.join(allocator, &.{ container_path, "run-300" });
+    defer allocator.free(pinned_path);
+
+    try temp.dir.createDirPath(io, abi_differential_container_name ++ "/run-100");
+    try temp.dir.createDirPath(io, abi_differential_container_name ++ "/run-200/.git");
+    try temp.dir.createDirPath(io, abi_differential_container_name ++ "/run-300");
+    try temp.dir.createDirPath(io, abi_differential_container_name ++ "/focused-final");
+    try temp.dir.symLink(
+        io,
+        "run-100",
+        abi_differential_container_name ++ "/run-400",
+        .{ .is_directory = true },
+    );
+
+    const pins = try std.fmt.allocPrint(
+        allocator,
+        "{s}\tabi-differential-scratch-run\tfixture-pin\n",
+        .{pinned_path},
+    );
+    defer allocator.free(pins);
+    const options: Options = .{
+        .tmp_dir = fixture_root,
+        .accepted_through_inbox = 206,
+        .active_inbox = 207,
+        .grace_seconds = 0,
+    };
+    var items: std.ArrayListUnmanaged(RetentionItem) = .empty;
+    defer {
+        for (items.items) |item| item.deinit(allocator);
+        items.deinit(allocator);
+    }
+    try collectAbiDifferentialRetentionItems(
+        allocator,
+        io,
+        options,
+        pins,
+        1,
+        container_path,
+        &items,
+    );
+
+    try std.testing.expectEqual(@as(usize, 4), items.items.len);
+    const candidate = retentionItemNamed(items.items, "run-100") orelse
+        return error.TestExpectedCandidate;
+    try std.testing.expectEqual(RetentionStatus.candidate, candidate.status);
+    try std.testing.expectEqualStrings(abi_differential_run_class, candidate.class);
+    try std.testing.expectEqual(
+        RetentionStatus.protected,
+        (retentionItemNamed(items.items, "run-200") orelse
+            return error.TestExpectedGitMarker).status,
+    );
+    try std.testing.expectEqual(
+        RetentionStatus.protected,
+        (retentionItemNamed(items.items, "run-300") orelse
+            return error.TestExpectedPinned).status,
+    );
+    try std.testing.expectEqual(
+        RetentionStatus.protected,
+        (retentionItemNamed(items.items, "focused-final") orelse
+            return error.TestExpectedNamedResult).status,
+    );
+    try std.testing.expect(retentionItemNamed(items.items, "run-400") == null);
+
+    try validateAbiDifferentialDeletionCandidate(
+        allocator,
+        io,
+        options,
+        "",
+        1,
+        container_path,
+        candidate,
+    );
+    const candidate_pins = try std.fmt.allocPrint(
+        allocator,
+        "{s}\tabi-differential-scratch-run\tfixture-candidate-pin\n",
+        .{candidate_path},
+    );
+    defer allocator.free(candidate_pins);
+    try std.testing.expectError(
+        error.RetentionCandidatePinned,
+        validateAbiDifferentialDeletionCandidate(
+            allocator,
+            io,
+            options,
+            candidate_pins,
+            1,
+            container_path,
+            candidate,
+        ),
+    );
+    var active_options = options;
+    active_options.active_inbox = abi_differential_inbox_number;
+    try std.testing.expectError(
+        error.RetentionCandidateIneligible,
+        validateAbiDifferentialDeletionCandidate(
+            allocator,
+            io,
+            active_options,
+            "",
+            1,
+            container_path,
+            candidate,
+        ),
+    );
+    var grace_options = options;
+    grace_options.grace_seconds = 1;
+    try std.testing.expectError(
+        error.RetentionCandidateInGracePeriod,
+        validateAbiDifferentialDeletionCandidate(
+            allocator,
+            io,
+            grace_options,
+            "",
+            1,
+            container_path,
+            candidate,
+        ),
+    );
+
+    try temp.dir.rename(
+        abi_differential_container_name ++ "/run-100",
+        temp.dir,
+        abi_differential_container_name ++ "/run-100-original",
+        io,
+    );
+    try temp.dir.symLink(
+        io,
+        "run-100-original",
+        abi_differential_container_name ++ "/run-100",
+        .{ .is_directory = true },
+    );
+    try std.testing.expectError(
+        error.RetentionCandidateNotDirectory,
+        validateAbiDifferentialDeletionCandidate(
+            allocator,
+            io,
+            options,
+            "",
+            1,
+            container_path,
+            candidate,
+        ),
+    );
 }
 
 fn collectExportRetentionItems(
