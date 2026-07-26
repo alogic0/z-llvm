@@ -1550,6 +1550,36 @@ const dormant_git_bytes = 4_066_232;
 const dormant_git_sha256 = "2a8c18fbf43da9f692d75474c72bea9dfd796c260b0f3dfe456376abc3bbd668";
 const dormant_control_commit = "9c55bda34088e1230b0b91a126d35795a3ac70b4";
 const dormant_control_tree = "756369ad4a89d806f463bd8094c5159d8c973d7e";
+const dormant_exact_real_source_manifest_sha256 =
+    "61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d";
+const dormant_exact_real_source_inventory_sha256 =
+    "3234fb508d370878efe082cf1accb5af3b488372bf3f1ee7e9e87408a37a2d7c";
+const dormant_exact_real_source_file_ledger_sha256 =
+    "a06c48e1549d16b9f924cc2b5f0404e60d7755a785bf3a4a23311c2383279a65";
+const dormant_exact_real_source_destination_ledger_sha256 =
+    "4c29709b9ef9242dd799ab52d346cdf302f5728d35e37e0d78063e892a6cf9e8";
+const dormant_exact_real_copy_evidence_path =
+    "docs/evidence/inbox202_local_state_artifact_copy_verify.md";
+const dormant_exact_real_copy_evidence_sha256 =
+    "4b532daabe33e7c6eaca7f0ab412d9c271b55b6b1de8235dd3d4f65d7ab6f7a6";
+const dormant_exact_real_acceptance_environment =
+    "ZLLVM_INBOX206CQ_EXACT_REAL_ACCEPTANCE";
+const dormant_exact_real_acceptance_token =
+    "INBOX-206CQ-EXACT-REAL-ACCEPTANCE-V1";
+const dormant_exact_real_acceptance_receipt_directory =
+    "local-state/validations/inbox206cq";
+const dormant_exact_real_acceptance_receipt_basename =
+    "exact_real_acceptance_receipt_v1.tsv";
+const dormant_exact_real_acceptance_magic =
+    "zllvm-exact-real-acceptance-receipt-v1";
+const dormant_exact_real_acceptance_capability =
+    "inbox206cq-exact-real-validation-v1";
+const dormant_exact_real_acceptance_header =
+    "capability\tcontrol_root\tauthority_root\tpayload_root\tsource_root\tsource_manifest_sha256\tsource_inventory_sha256\tsource_file_ledger_sha256\tsource_destination_ledger_sha256\tcopy_evidence_path\tcopy_evidence_sha256\tregistration_full_sha256\tregistration_path_sha256\tregistration_topology_sha256\tregistration_non_main_sha256\tbefore_snapshot_bytes\tbefore_snapshot_sha256\tafter_snapshot_bytes\tafter_snapshot_sha256\tvalidation_disposition\tgeneration_manifest_sha256\tpayload_files\tpayload_bytes\tobjects\tsnapshots\tcreated_paths\tremoved_paths\tmodified_paths\tpublication_path_changes\tlogical_state_modified\tcompletion";
+const dormant_exact_real_acceptance_identity_header =
+    "canonical_body_bytes\tcanonical_body_sha256";
+const dormant_exact_real_acceptance_receipt_max_bytes = 16 * 1024;
+const dormant_exact_real_copy_evidence_max_bytes = 1024 * 1024;
 
 const ControlGitEntrySpec = struct {
     mode: []const u8,
@@ -2581,6 +2611,81 @@ fn validateDormantRoots(config: *const DormantAuthorityConfig) !void {
     try validateDormantSourceRoot(config);
 }
 
+fn verifyDormantCopyEvidenceFromHeldRoot(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    root: std.Io.Dir,
+    relative_path: []const u8,
+    expected_sha256: []const u8,
+    max_bytes: u64,
+) !FileIdentity {
+    validateRelativeKey(relative_path) catch return error.DormantCopyEvidenceUnsafe;
+    validateSha(expected_sha256) catch return error.DormantCopyEvidenceMismatched;
+    const parent_path = std.fs.path.dirname(relative_path) orelse ".";
+    const basename = std.fs.path.basename(relative_path);
+    var parent = openPathNoFollow(io, root, parent_path, false) catch |err|
+        return switch (err) {
+            error.FileNotFound => error.DormantCopyEvidenceMissing,
+            error.SymLinkLoop, error.NotDir => error.DormantCopyEvidenceUnsafe,
+            else => error.DormantCopyEvidenceUnreadable,
+        };
+    defer parent.close(io);
+    var file = parent.openFile(io, basename, .{
+        .allow_directory = true,
+        .follow_symlinks = false,
+    }) catch |err| return switch (err) {
+        error.FileNotFound => error.DormantCopyEvidenceMissing,
+        error.SymLinkLoop, error.NotDir => error.DormantCopyEvidenceUnsafe,
+        else => error.DormantCopyEvidenceUnreadable,
+    };
+    defer file.close(io);
+    const stat = file.stat(io) catch return error.DormantCopyEvidenceUnreadable;
+    if (stat.kind != .file) return error.DormantCopyEvidenceUnsafe;
+    const mode: u16 = @intCast(stat.permissions.toMode() & 0o7777);
+    if (mode & 0o111 != 0) return error.DormantCopyEvidenceExecutable;
+    if (stat.size > max_bytes) return error.DormantCopyEvidenceTooLarge;
+    var identity = identityOfOpenFileAnyMode(allocator, io, file) catch
+        return error.DormantCopyEvidenceUnreadable;
+    errdefer identity.deinit(allocator);
+    if (identity.bytes != stat.size or identity.bytes > max_bytes or identity.mode != mode) {
+        return error.DormantCopyEvidenceChangedDuringRead;
+    }
+    if (!std.mem.eql(u8, &identity.sha256, expected_sha256)) {
+        return error.DormantCopyEvidenceMismatched;
+    }
+    return identity;
+}
+
+fn verifyDormantExactRealCopyEvidence(
+    config: *const DormantAuthorityConfig,
+) !void {
+    if (config.root_policy.kind != .exact_real or
+        !std.mem.eql(u8, config.root_policy.main_root, main_repository) or
+        !std.mem.eql(u8, config.expected_copy_evidence_path, dormant_exact_real_copy_evidence_path) or
+        !std.mem.eql(
+            u8,
+            &config.expected_copy_evidence_sha256,
+            dormant_exact_real_copy_evidence_sha256,
+        ))
+    {
+        return error.DormantCopyEvidenceAuthorityMismatched;
+    }
+    var repository = std.Io.Dir.openDirAbsolute(config.io, main_repository, .{
+        .access_sub_paths = true,
+        .follow_symlinks = false,
+    }) catch return error.DormantCopyEvidenceUnsafe;
+    defer repository.close(config.io);
+    var identity = try verifyDormantCopyEvidenceFromHeldRoot(
+        config.allocator,
+        config.io,
+        repository,
+        config.expected_copy_evidence_path,
+        &config.expected_copy_evidence_sha256,
+        dormant_exact_real_copy_evidence_max_bytes,
+    );
+    identity.deinit(config.allocator);
+}
+
 fn validateDormantRoleDirectory(
     config: *const DormantAuthorityConfig,
     actual: []const u8,
@@ -2898,6 +3003,11 @@ fn validateDormantAuthorityCandidate(
 ) !DormantAuthorityValidation {
     try config.validateRegistration();
     try validateDormantRoots(config);
+    if (config.root_policy.kind == .exact_real and
+        std.mem.eql(u8, config.root_policy.main_root, main_repository))
+    {
+        try verifyDormantExactRealCopyEvidence(config);
+    }
 
     const candidate_bytes = try readDormantControlFile(
         config,
@@ -3048,6 +3158,52 @@ fn validateDormantAuthorityCandidate(
     validation.manifest_sha256 = sha256Hex(generation_bytes);
     try config.validateRegistration();
     return validation;
+}
+
+const DormantExactRealValidationInput = struct {
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    source_manifest_sha256: []const u8,
+    source_inventory_sha256: []const u8,
+    source_file_ledger_sha256: []const u8,
+    source_destination_ledger_sha256: []const u8,
+    copy_evidence_path: []const u8,
+    copy_evidence_sha256: []const u8,
+};
+
+const DormantValidationReadinessInput = union(enum) {
+    exact_real: DormantExactRealValidationInput,
+    synthetic: *const DormantAuthorityConfig,
+};
+
+fn invokeDormantValidationReadinessForTest(
+    input: DormantValidationReadinessInput,
+) !DormantAuthorityValidation {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    return switch (input) {
+        .exact_real => |exact| blk: {
+            var config = try DormantAuthorityConfig.initExactRealCandidate(
+                exact.allocator,
+                exact.io,
+                exact.source_manifest_sha256,
+                exact.source_inventory_sha256,
+                exact.source_file_ledger_sha256,
+                exact.source_destination_ledger_sha256,
+                exact.copy_evidence_path,
+                exact.copy_evidence_sha256,
+            );
+            defer config.deinit();
+            break :blk try validateDormantAuthorityCandidate(&config);
+        },
+        .synthetic => |config| validateDormantAuthorityCandidate(config),
+    };
+}
+
+fn callDormantValidationReadinessForTest(
+    input: DormantValidationReadinessInput,
+) !DormantAuthorityValidation {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    return invokeDormantValidationReadinessForTest(input);
 }
 
 fn validateAuthorityAncestry(
@@ -5195,9 +5351,10 @@ fn expectDormantReceiptIdentityMismatch(
     defer fixture.allocator.free(candidate);
     try fixture.replaceControl(dormant_receipt_key, receipt);
     try fixture.replaceControl(dormant_candidate_key, candidate);
-    try std.testing.expectError(
+    try expectDormantReadinessRejection(
+        fixture,
+        config,
         error.DormantReceiptMismatched,
-        validateDormantAuthorityCandidate(config),
     );
     try fixture.replaceControl(dormant_receipt_key, fixture.receipt);
     try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
@@ -5222,6 +5379,2391 @@ fn restoreDormantTestOwnedBytes(
     if (!builtin.is_test) @panic("test-only dormant restoration");
     allocator.free(slot.*);
     slot.* = previous;
+}
+
+const DormantReadinessTreeEntry = struct {
+    name: []u8,
+    kind: std.Io.File.Kind,
+
+    fn deinit(entry: *DormantReadinessTreeEntry, allocator: std.mem.Allocator) void {
+        allocator.free(entry.name);
+        entry.* = undefined;
+    }
+};
+
+const DormantReadinessSnapshotEntry = struct {
+    path: []u8,
+    state: []u8,
+
+    fn deinit(entry: *DormantReadinessSnapshotEntry, allocator: std.mem.Allocator) void {
+        allocator.free(entry.state);
+        allocator.free(entry.path);
+        entry.* = undefined;
+    }
+};
+
+const DormantReadinessSnapshot = struct {
+    allocator: std.mem.Allocator,
+    logical_state: []u8,
+    entries: []DormantReadinessSnapshotEntry,
+
+    fn deinit(snapshot: *DormantReadinessSnapshot) void {
+        for (snapshot.entries) |*entry| entry.deinit(snapshot.allocator);
+        snapshot.allocator.free(snapshot.entries);
+        snapshot.allocator.free(snapshot.logical_state);
+        snapshot.* = undefined;
+    }
+};
+
+fn appendDormantReadinessSnapshotEntry(
+    allocator: std.mem.Allocator,
+    entries: *std.ArrayList(DormantReadinessSnapshotEntry),
+    owned_path: *?[]u8,
+    owned_state: *?[]u8,
+) !void {
+    const path = owned_path.* orelse return error.DormantReadinessMissingOwnedPath;
+    const state = owned_state.* orelse return error.DormantReadinessMissingOwnedState;
+    try entries.append(allocator, .{ .path = path, .state = state });
+    owned_path.* = null;
+    owned_state.* = null;
+}
+
+const DormantReadinessNetEffects = struct {
+    created_paths: usize = 0,
+    removed_paths: usize = 0,
+    modified_paths: usize = 0,
+    publication_path_changes: usize = 0,
+    logical_state_modified: bool = false,
+
+    fn isUnchanged(effects: DormantReadinessNetEffects) bool {
+        return effects.created_paths == 0 and
+            effects.removed_paths == 0 and
+            effects.modified_paths == 0 and
+            effects.publication_path_changes == 0 and
+            !effects.logical_state_modified;
+    }
+};
+
+const dormant_readiness_publication_prefix =
+    "main/control/authority/zllvm/v1/receipts/publication";
+
+fn dormantReadinessPublicationPath(path: []const u8) bool {
+    return std.mem.eql(u8, path, dormant_readiness_publication_prefix) or
+        (std.mem.startsWith(u8, path, dormant_readiness_publication_prefix) and
+            path.len > dormant_readiness_publication_prefix.len and
+            path[dormant_readiness_publication_prefix.len] == '/');
+}
+
+fn appendDormantReadinessField(
+    allocator: std.mem.Allocator,
+    output: *std.ArrayList(u8),
+    value: []const u8,
+) !void {
+    try output.print(allocator, "{}:", .{value.len});
+    try output.appendSlice(allocator, value);
+    try output.append(allocator, '\n');
+}
+
+fn appendDormantReadinessInteger(
+    allocator: std.mem.Allocator,
+    output: *std.ArrayList(u8),
+    value: anytype,
+) !void {
+    try output.print(allocator, "{}\n", .{value});
+}
+
+fn appendDormantControlObservationState(
+    allocator: std.mem.Allocator,
+    output: *std.ArrayList(u8),
+    observation: *const ControlGitObservation,
+) !void {
+    try appendDormantReadinessField(allocator, output, &observation.commit);
+    try appendDormantReadinessField(allocator, output, &observation.tree);
+    try appendDormantReadinessField(allocator, output, observation.branch);
+    try appendDormantReadinessField(allocator, output, observation.status);
+    try appendDormantReadinessField(allocator, output, observation.remotes);
+    try appendDormantReadinessInteger(allocator, output, observation.entries.len);
+    for (observation.entries) |entry| {
+        try appendDormantReadinessField(allocator, output, &entry.mode);
+        try appendDormantReadinessField(allocator, output, &entry.kind);
+        try appendDormantReadinessField(allocator, output, &entry.object_id);
+        try appendDormantReadinessField(allocator, output, entry.path);
+    }
+}
+
+fn appendDormantRegistrationState(
+    allocator: std.mem.Allocator,
+    output: *std.ArrayList(u8),
+    snapshot: *const RegistrationSnapshot,
+) !void {
+    try appendDormantReadinessField(allocator, output, snapshot.raw);
+    try appendDormantReadinessInteger(allocator, output, snapshot.paths.len);
+    for (snapshot.paths) |path| {
+        try appendDormantReadinessField(allocator, output, path);
+    }
+    try appendDormantReadinessField(allocator, output, &snapshot.full_hash);
+    try appendDormantReadinessField(allocator, output, &snapshot.path_hash);
+    try appendDormantReadinessField(allocator, output, &snapshot.topology_hash);
+    try appendDormantReadinessField(allocator, output, &snapshot.non_main_hash);
+    try appendDormantReadinessInteger(allocator, output, snapshot.repository_tmp_count);
+    try appendDormantReadinessInteger(allocator, output, snapshot.system_tmp_count);
+    try appendDormantReadinessInteger(allocator, output, snapshot.other_count);
+}
+
+fn appendDormantLogicalState(
+    allocator: std.mem.Allocator,
+    output: *std.ArrayList(u8),
+    config: *const DormantAuthorityConfig,
+) !void {
+    try appendDormantReadinessField(allocator, output, config.control_root);
+    try appendDormantReadinessField(allocator, output, config.authority_root);
+    try appendDormantReadinessField(allocator, output, config.payload_root);
+    try appendDormantReadinessField(allocator, output, config.source_root);
+    try appendDormantReadinessField(allocator, output, &config.source_manifest_sha256);
+    try appendDormantReadinessField(
+        allocator,
+        output,
+        &config.expected_source_inventory_sha256,
+    );
+    try appendDormantReadinessField(
+        allocator,
+        output,
+        &config.expected_source_file_ledger_sha256,
+    );
+    try appendDormantReadinessField(
+        allocator,
+        output,
+        &config.expected_source_destination_ledger_sha256,
+    );
+    try appendDormantReadinessField(allocator, output, config.expected_copy_evidence_path);
+    try appendDormantReadinessField(allocator, output, &config.expected_copy_evidence_sha256);
+    try appendDormantReadinessField(allocator, output, &config.expected_registration_full_hash);
+    try appendDormantReadinessField(allocator, output, &config.expected_registration_path_hash);
+    try appendDormantReadinessField(
+        allocator,
+        output,
+        &config.expected_registration_topology_hash,
+    );
+    try appendDormantReadinessField(
+        allocator,
+        output,
+        &config.expected_registration_non_main_hash,
+    );
+
+    const policy = &config.root_policy;
+    try appendDormantReadinessField(allocator, output, @tagName(policy.kind));
+    try appendDormantReadinessField(allocator, output, policy.main_root);
+    try appendDormantReadinessField(allocator, output, policy.control_root);
+    try appendDormantReadinessField(allocator, output, policy.authority_root);
+    try appendDormantReadinessField(allocator, output, policy.payload_root);
+    try appendDormantReadinessField(allocator, output, policy.source_root);
+    try appendDormantReadinessField(allocator, output, policy.supplemental_control_root);
+    try appendDormantReadinessInteger(allocator, output, policy.non_main_roots.len);
+    for (policy.non_main_roots) |path| {
+        try appendDormantReadinessField(allocator, output, path);
+    }
+    try appendDormantReadinessInteger(allocator, output, policy.control_files.len);
+    for (policy.control_files) |expectation| {
+        try appendDormantReadinessField(
+            allocator,
+            output,
+            @tagName(expectation.component),
+        );
+        try appendDormantReadinessField(allocator, output, expectation.path);
+        try appendDormantReadinessField(allocator, output, &expectation.sha256);
+        try appendDormantReadinessInteger(allocator, output, expectation.bytes);
+        try appendDormantReadinessInteger(allocator, output, expectation.mode);
+    }
+    try appendDormantControlObservationState(allocator, output, &policy.observed_control);
+    try appendDormantControlObservationState(allocator, output, &policy.expected_control);
+    try appendDormantRegistrationState(allocator, output, &config.guard.frozen);
+}
+
+fn appendDormantReadinessTree(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    absolute_root: []const u8,
+    directory: std.Io.Dir,
+    prefix: []const u8,
+    snapshot_entries: *std.ArrayList(DormantReadinessSnapshotEntry),
+) !void {
+    var entries: std.ArrayList(DormantReadinessTreeEntry) = .empty;
+    defer {
+        for (entries.items) |*entry| entry.deinit(allocator);
+        entries.deinit(allocator);
+    }
+    var iterator = directory.iterate();
+    while (try iterator.next(io)) |entry| {
+        try entries.append(allocator, .{
+            .name = try allocator.dupe(u8, entry.name),
+            .kind = entry.kind,
+        });
+    }
+    std.mem.sort(DormantReadinessTreeEntry, entries.items, {}, struct {
+        fn lessThan(_: void, a: DormantReadinessTreeEntry, b: DormantReadinessTreeEntry) bool {
+            return std.mem.order(u8, a.name, b.name) == .lt;
+        }
+    }.lessThan);
+    for (entries.items) |entry| {
+        var owned_path: ?[]u8 = if (prefix.len == 0)
+            try allocator.dupe(u8, entry.name)
+        else
+            try std.fs.path.join(allocator, &.{ prefix, entry.name });
+        errdefer if (owned_path) |path| allocator.free(path);
+        const relative = owned_path.?;
+        const stat = try directory.statFile(io, entry.name, .{ .follow_symlinks = false });
+        var state: std.ArrayList(u8) = .empty;
+        errdefer state.deinit(allocator);
+        try appendDormantReadinessField(allocator, &state, @tagName(entry.kind));
+        try appendDormantReadinessInteger(
+            allocator,
+            &state,
+            @as(u16, @intCast(stat.permissions.toMode() & 0o7777)),
+        );
+        switch (entry.kind) {
+            .directory => {
+                var child = try directory.openDir(io, entry.name, .{
+                    .access_sub_paths = true,
+                    .iterate = true,
+                    .follow_symlinks = false,
+                });
+                defer child.close(io);
+                try appendDormantReadinessTree(
+                    allocator,
+                    io,
+                    absolute_root,
+                    child,
+                    relative,
+                    snapshot_entries,
+                );
+            },
+            .file => {
+                var file = try directory.openFile(io, entry.name, .{
+                    .allow_directory = false,
+                    .follow_symlinks = false,
+                });
+                defer file.close(io);
+                var identity = try identityOfOpenFileAnyMode(allocator, io, file);
+                defer identity.deinit(allocator);
+                try appendDormantReadinessInteger(allocator, &state, identity.bytes);
+                try appendDormantReadinessField(allocator, &state, &identity.sha256);
+            },
+            .sym_link => {
+                const absolute = try std.fs.path.join(
+                    allocator,
+                    &.{ absolute_root, relative },
+                );
+                defer allocator.free(absolute);
+                var target_buffer: [4096]u8 = undefined;
+                const target_len = try std.Io.Dir.readLinkAbsolute(
+                    io,
+                    absolute,
+                    &target_buffer,
+                );
+                try appendDormantReadinessField(
+                    allocator,
+                    &state,
+                    target_buffer[0..target_len],
+                );
+            },
+            else => return error.DormantReadinessUnsupportedFixtureKind,
+        }
+        var owned_state: ?[]u8 = try state.toOwnedSlice(allocator);
+        errdefer if (owned_state) |state_bytes| allocator.free(state_bytes);
+        try appendDormantReadinessSnapshotEntry(
+            allocator,
+            snapshot_entries,
+            &owned_path,
+            &owned_state,
+        );
+    }
+}
+
+fn captureDormantReadinessState(
+    fixture: *const DormantSyntheticFixture,
+    config: *const DormantAuthorityConfig,
+) !DormantReadinessSnapshot {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    var logical_state: std.ArrayList(u8) = .empty;
+    errdefer logical_state.deinit(fixture.allocator);
+    try appendDormantReadinessField(fixture.allocator, &logical_state, "logical-v1");
+    try appendDormantLogicalState(fixture.allocator, &logical_state, config);
+    const owned_logical_state = try logical_state.toOwnedSlice(fixture.allocator);
+    errdefer fixture.allocator.free(owned_logical_state);
+
+    var entries: std.ArrayList(DormantReadinessSnapshotEntry) = .empty;
+    errdefer {
+        for (entries.items) |*entry| entry.deinit(fixture.allocator);
+        entries.deinit(fixture.allocator);
+    }
+    var root = try std.Io.Dir.openDirAbsolute(fixture.io, fixture.root, .{
+        .access_sub_paths = true,
+        .iterate = true,
+        .follow_symlinks = false,
+    });
+    defer root.close(fixture.io);
+    const root_stat = try root.stat(fixture.io);
+    var root_state: std.ArrayList(u8) = .empty;
+    defer root_state.deinit(fixture.allocator);
+    try appendDormantReadinessField(fixture.allocator, &root_state, "directory");
+    try appendDormantReadinessInteger(
+        fixture.allocator,
+        &root_state,
+        @as(u16, @intCast(root_stat.permissions.toMode() & 0o7777)),
+    );
+    var owned_root_state: ?[]u8 = try root_state.toOwnedSlice(fixture.allocator);
+    errdefer if (owned_root_state) |state| fixture.allocator.free(state);
+    var owned_root_path: ?[]u8 = try fixture.allocator.dupe(u8, ".");
+    errdefer if (owned_root_path) |path| fixture.allocator.free(path);
+    try appendDormantReadinessSnapshotEntry(
+        fixture.allocator,
+        &entries,
+        &owned_root_path,
+        &owned_root_state,
+    );
+    try appendDormantReadinessTree(
+        fixture.allocator,
+        fixture.io,
+        fixture.root,
+        root,
+        "",
+        &entries,
+    );
+    std.mem.sort(DormantReadinessSnapshotEntry, entries.items, {}, struct {
+        fn lessThan(
+            _: void,
+            a: DormantReadinessSnapshotEntry,
+            b: DormantReadinessSnapshotEntry,
+        ) bool {
+            return std.mem.order(u8, a.path, b.path) == .lt;
+        }
+    }.lessThan);
+    return .{
+        .allocator = fixture.allocator,
+        .logical_state = owned_logical_state,
+        .entries = try entries.toOwnedSlice(fixture.allocator),
+    };
+}
+
+fn compareDormantReadinessStates(
+    before: *const DormantReadinessSnapshot,
+    after: *const DormantReadinessSnapshot,
+) DormantReadinessNetEffects {
+    var effects: DormantReadinessNetEffects = .{
+        .logical_state_modified = !std.mem.eql(
+            u8,
+            before.logical_state,
+            after.logical_state,
+        ),
+    };
+    var before_index: usize = 0;
+    var after_index: usize = 0;
+    while (before_index < before.entries.len or after_index < after.entries.len) {
+        if (before_index == before.entries.len) {
+            const entry = after.entries[after_index];
+            effects.created_paths += 1;
+            if (dormantReadinessPublicationPath(entry.path)) {
+                effects.publication_path_changes += 1;
+            }
+            after_index += 1;
+            continue;
+        }
+        if (after_index == after.entries.len) {
+            const entry = before.entries[before_index];
+            effects.removed_paths += 1;
+            if (dormantReadinessPublicationPath(entry.path)) {
+                effects.publication_path_changes += 1;
+            }
+            before_index += 1;
+            continue;
+        }
+        const old_entry = before.entries[before_index];
+        const new_entry = after.entries[after_index];
+        switch (std.mem.order(u8, old_entry.path, new_entry.path)) {
+            .lt => {
+                effects.removed_paths += 1;
+                if (dormantReadinessPublicationPath(old_entry.path)) {
+                    effects.publication_path_changes += 1;
+                }
+                before_index += 1;
+            },
+            .gt => {
+                effects.created_paths += 1;
+                if (dormantReadinessPublicationPath(new_entry.path)) {
+                    effects.publication_path_changes += 1;
+                }
+                after_index += 1;
+            },
+            .eq => {
+                if (!std.mem.eql(u8, old_entry.state, new_entry.state)) {
+                    effects.modified_paths += 1;
+                    if (dormantReadinessPublicationPath(old_entry.path)) {
+                        effects.publication_path_changes += 1;
+                    }
+                }
+                before_index += 1;
+                after_index += 1;
+            },
+        }
+    }
+    return effects;
+}
+
+fn expectDormantReadinessEffects(
+    actual: DormantReadinessNetEffects,
+    expected: DormantReadinessNetEffects,
+) !void {
+    try std.testing.expectEqual(expected.created_paths, actual.created_paths);
+    try std.testing.expectEqual(expected.removed_paths, actual.removed_paths);
+    try std.testing.expectEqual(expected.modified_paths, actual.modified_paths);
+    try std.testing.expectEqual(
+        expected.publication_path_changes,
+        actual.publication_path_changes,
+    );
+    try std.testing.expectEqual(expected.logical_state_modified, actual.logical_state_modified);
+}
+
+fn expectDormantReadinessRejection(
+    fixture: *const DormantSyntheticFixture,
+    config: *const DormantAuthorityConfig,
+    expected_error: anyerror,
+) !void {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    var before = try captureDormantReadinessState(fixture, config);
+    defer before.deinit();
+    if (callDormantValidationReadinessForTest(.{ .synthetic = config })) |_| {
+        return error.ExpectedDormantValidationRejection;
+    } else |actual_error| {
+        try std.testing.expectEqual(expected_error, actual_error);
+    }
+    var after = try captureDormantReadinessState(fixture, config);
+    defer after.deinit();
+    const effects = compareDormantReadinessStates(&before, &after);
+    try std.testing.expect(effects.isUnchanged());
+}
+
+fn expectDormantReadinessSuccess(
+    fixture: *const DormantSyntheticFixture,
+    config: *const DormantAuthorityConfig,
+) !DormantAuthorityValidation {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    var before = try captureDormantReadinessState(fixture, config);
+    defer before.deinit();
+    const validation = try callDormantValidationReadinessForTest(.{ .synthetic = config });
+    var after = try captureDormantReadinessState(fixture, config);
+    defer after.deinit();
+    const effects = compareDormantReadinessStates(&before, &after);
+    try std.testing.expect(effects.isUnchanged());
+    return validation;
+}
+
+fn testDormantReadinessObserverControls(
+    fixture: *DormantSyntheticFixture,
+    config: *const DormantAuthorityConfig,
+) !void {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    var baseline = try captureDormantReadinessState(fixture, config);
+    defer baseline.deinit();
+
+    try fixture.replaceControl(dormant_candidate_key, "readiness modified content\n");
+    var modified = try captureDormantReadinessState(fixture, config);
+    defer modified.deinit();
+    try expectDormantReadinessEffects(
+        compareDormantReadinessStates(&baseline, &modified),
+        .{ .modified_paths = 1 },
+    );
+    try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
+    var modification_restored = try captureDormantReadinessState(fixture, config);
+    defer modification_restored.deinit();
+    try std.testing.expect(
+        compareDormantReadinessStates(&baseline, &modification_restored).isUnchanged(),
+    );
+
+    const created_path = "readiness-observer-created";
+    var payload = try std.Io.Dir.openDirAbsolute(fixture.io, fixture.payload_root, .{
+        .access_sub_paths = true,
+        .iterate = true,
+        .follow_symlinks = false,
+    });
+    defer payload.close(fixture.io);
+    try writeDormantFixtureRelative(fixture.io, payload, created_path, "created\n", 0o444);
+    var created = try captureDormantReadinessState(fixture, config);
+    defer created.deinit();
+    try expectDormantReadinessEffects(
+        compareDormantReadinessStates(&baseline, &created),
+        .{ .created_paths = 1 },
+    );
+    try deleteDormantFixtureRelative(fixture.io, payload, created_path);
+    var removed = try captureDormantReadinessState(fixture, config);
+    defer removed.deinit();
+    try expectDormantReadinessEffects(
+        compareDormantReadinessStates(&created, &removed),
+        .{ .removed_paths = 1 },
+    );
+    try std.testing.expect(compareDormantReadinessStates(&baseline, &removed).isUnchanged());
+
+    const publication_path =
+        "authority/zllvm/v1/receipts/publication/readiness-observer.tsv";
+    var control = try std.Io.Dir.openDirAbsolute(fixture.io, fixture.control_root, .{
+        .access_sub_paths = true,
+        .iterate = true,
+        .follow_symlinks = false,
+    });
+    defer control.close(fixture.io);
+    try writeDormantFixtureRelative(
+        fixture.io,
+        control,
+        publication_path,
+        "publication-shaped\n",
+        0o644,
+    );
+    var publication = try captureDormantReadinessState(fixture, config);
+    defer publication.deinit();
+    try expectDormantReadinessEffects(
+        compareDormantReadinessStates(&baseline, &publication),
+        .{ .created_paths = 1, .publication_path_changes = 1 },
+    );
+    try deleteDormantFixtureRelative(fixture.io, control, publication_path);
+    var publication_restored = try captureDormantReadinessState(fixture, config);
+    defer publication_restored.deinit();
+    try std.testing.expect(
+        compareDormantReadinessStates(&baseline, &publication_restored).isUnchanged(),
+    );
+}
+
+fn exerciseDormantReadinessOwnershipFailure(
+    allocator: std.mem.Allocator,
+    appended_entries: *usize,
+) !void {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    var entries: std.ArrayList(DormantReadinessSnapshotEntry) = .empty;
+    defer {
+        for (entries.items) |*entry| entry.deinit(allocator);
+        entries.deinit(allocator);
+    }
+
+    var first_path: ?[]u8 = try allocator.dupe(u8, "first/child");
+    errdefer if (first_path) |path| allocator.free(path);
+    var first_state: ?[]u8 = try allocator.dupe(u8, "first-state");
+    errdefer if (first_state) |state| allocator.free(state);
+    try appendDormantReadinessSnapshotEntry(
+        allocator,
+        &entries,
+        &first_path,
+        &first_state,
+    );
+    appended_entries.* += 1;
+
+    var later_path: ?[]u8 = try allocator.dupe(u8, "later/recursive/child");
+    errdefer if (later_path) |path| allocator.free(path);
+    var later_state: ?[]u8 = try allocator.dupe(u8, "later-state");
+    errdefer if (later_state) |state| allocator.free(state);
+    try appendDormantReadinessSnapshotEntry(
+        allocator,
+        &entries,
+        &later_path,
+        &later_state,
+    );
+    appended_entries.* += 1;
+}
+
+const DormantExactAcceptanceSnapshotIdentity = struct {
+    bytes: u64,
+    sha256: [64]u8,
+};
+
+const DormantExactObserverPathSpec = struct {
+    label: []u8,
+    path: []u8,
+    unexpected_publication: bool,
+
+    fn deinit(spec: *DormantExactObserverPathSpec, allocator: std.mem.Allocator) void {
+        allocator.free(spec.path);
+        allocator.free(spec.label);
+        spec.* = undefined;
+    }
+};
+
+const DormantExactObserverRow = struct {
+    label: []u8,
+    path: []u8,
+    state: []u8,
+    exists: bool,
+    logical: bool,
+    unexpected_publication: bool,
+
+    fn deinit(row: *DormantExactObserverRow, allocator: std.mem.Allocator) void {
+        allocator.free(row.state);
+        allocator.free(row.path);
+        allocator.free(row.label);
+        row.* = undefined;
+    }
+};
+
+const DormantExactRealObservation = struct {
+    allocator: std.mem.Allocator,
+    rows: []DormantExactObserverRow,
+    identity: DormantExactAcceptanceSnapshotIdentity,
+
+    fn deinit(observation: *DormantExactRealObservation) void {
+        for (observation.rows) |*row| row.deinit(observation.allocator);
+        observation.allocator.free(observation.rows);
+        observation.* = undefined;
+    }
+};
+
+fn appendDormantExactObserverSpec(
+    allocator: std.mem.Allocator,
+    specs: *std.ArrayList(DormantExactObserverPathSpec),
+    label: []const u8,
+    path: []const u8,
+    unexpected_publication: bool,
+) !void {
+    for (specs.items) |existing| {
+        if (std.mem.eql(u8, existing.label, label) or
+            std.mem.eql(u8, existing.path, path))
+        {
+            if (!std.mem.eql(u8, existing.label, label) or
+                !std.mem.eql(u8, existing.path, path) or
+                existing.unexpected_publication != unexpected_publication)
+            {
+                return error.DormantExactObserverAmbiguousPath;
+            }
+            return;
+        }
+    }
+    const owned_label = try allocator.dupe(u8, label);
+    errdefer allocator.free(owned_label);
+    const owned_path = try allocator.dupe(u8, path);
+    errdefer allocator.free(owned_path);
+    try specs.append(allocator, .{
+        .label = owned_label,
+        .path = owned_path,
+        .unexpected_publication = unexpected_publication,
+    });
+}
+
+fn appendDormantExactObserverAllocatedSpec(
+    allocator: std.mem.Allocator,
+    specs: *std.ArrayList(DormantExactObserverPathSpec),
+    label: []const u8,
+    path: []const u8,
+    unexpected_publication: bool,
+) !void {
+    try appendDormantExactObserverSpec(
+        allocator,
+        specs,
+        label,
+        path,
+        unexpected_publication,
+    );
+}
+
+fn appendDormantExactObserverAncestors(
+    allocator: std.mem.Allocator,
+    specs: *std.ArrayList(DormantExactObserverPathSpec),
+    root: []const u8,
+    domain: []const u8,
+    relative_path: []const u8,
+) !void {
+    const parent = std.fs.path.dirname(relative_path) orelse return;
+    if (std.mem.eql(u8, parent, ".")) return;
+    var prefix: std.ArrayList(u8) = .empty;
+    defer prefix.deinit(allocator);
+    var segments = std.mem.splitScalar(u8, parent, '/');
+    while (segments.next()) |segment| {
+        if (prefix.items.len != 0) try prefix.append(allocator, '/');
+        try prefix.appendSlice(allocator, segment);
+        const label = try std.fmt.allocPrint(
+            allocator,
+            "{s}-directory:{s}",
+            .{ domain, prefix.items },
+        );
+        defer allocator.free(label);
+        const path = try std.fs.path.join(allocator, &.{ root, prefix.items });
+        defer allocator.free(path);
+        try appendDormantExactObserverAllocatedSpec(
+            allocator,
+            specs,
+            label,
+            path,
+            false,
+        );
+    }
+}
+
+fn appendDormantExactObserverFileSpec(
+    allocator: std.mem.Allocator,
+    specs: *std.ArrayList(DormantExactObserverPathSpec),
+    root: []const u8,
+    domain: []const u8,
+    relative_path: []const u8,
+) !void {
+    try appendDormantExactObserverAncestors(
+        allocator,
+        specs,
+        root,
+        domain,
+        relative_path,
+    );
+    const label = try std.fmt.allocPrint(
+        allocator,
+        "{s}-file:{s}",
+        .{ domain, relative_path },
+    );
+    defer allocator.free(label);
+    const path = try std.fs.path.join(allocator, &.{ root, relative_path });
+    defer allocator.free(path);
+    try appendDormantExactObserverAllocatedSpec(allocator, specs, label, path, false);
+}
+
+fn dormantExactObserverRowLessThan(
+    _: void,
+    a: DormantExactObserverRow,
+    b: DormantExactObserverRow,
+) bool {
+    const label_order = std.mem.order(u8, a.label, b.label);
+    if (label_order != .eq) return label_order == .lt;
+    return std.mem.order(u8, a.path, b.path) == .lt;
+}
+
+fn captureDormantExactObserverRowFromDir(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    directory: std.Io.Dir,
+    basename: []const u8,
+    label: []const u8,
+    canonical_path: []const u8,
+    unexpected_publication: bool,
+) !DormantExactObserverRow {
+    const owned_label = try allocator.dupe(u8, label);
+    errdefer allocator.free(owned_label);
+    const owned_path = try allocator.dupe(u8, canonical_path);
+    errdefer allocator.free(owned_path);
+    var state: std.ArrayList(u8) = .empty;
+    errdefer state.deinit(allocator);
+    const stat = directory.statFile(io, basename, .{ .follow_symlinks = false }) catch |err|
+        switch (err) {
+            error.FileNotFound => {
+                try appendDormantReadinessField(allocator, &state, "absent");
+                return .{
+                    .label = owned_label,
+                    .path = owned_path,
+                    .state = try state.toOwnedSlice(allocator),
+                    .exists = false,
+                    .logical = false,
+                    .unexpected_publication = unexpected_publication,
+                };
+            },
+            else => return err,
+        };
+    try appendDormantReadinessField(allocator, &state, "present");
+    try appendDormantReadinessField(allocator, &state, @tagName(stat.kind));
+    try appendDormantReadinessInteger(
+        allocator,
+        &state,
+        @as(u16, @intCast(stat.permissions.toMode() & 0o7777)),
+    );
+    try appendDormantReadinessInteger(allocator, &state, stat.inode);
+    try appendDormantReadinessInteger(allocator, &state, stat.nlink);
+    try appendDormantReadinessInteger(allocator, &state, stat.size);
+    if (stat.kind == .file) {
+        var file = try directory.openFile(io, basename, .{
+            .allow_directory = false,
+            .follow_symlinks = false,
+        });
+        defer file.close(io);
+        var identity = try identityOfOpenFileAnyMode(allocator, io, file);
+        defer identity.deinit(allocator);
+        if (identity.bytes != stat.size or
+            identity.mode != @as(u16, @intCast(stat.permissions.toMode() & 0o7777)))
+        {
+            return error.DormantExactObserverPathDrift;
+        }
+        try appendDormantReadinessField(allocator, &state, &identity.sha256);
+    } else {
+        try appendDormantReadinessField(allocator, &state, "not-applicable");
+    }
+    return .{
+        .label = owned_label,
+        .path = owned_path,
+        .state = try state.toOwnedSlice(allocator),
+        .exists = true,
+        .logical = false,
+        .unexpected_publication = unexpected_publication,
+    };
+}
+
+fn captureDormantExactObserverAbsoluteRow(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    spec: DormantExactObserverPathSpec,
+) !DormantExactObserverRow {
+    const parent_path = std.fs.path.dirname(spec.path) orelse
+        return error.DormantExactObserverUnsafePath;
+    const basename = std.fs.path.basename(spec.path);
+    var parent = std.Io.Dir.openDirAbsolute(io, parent_path, .{
+        .access_sub_paths = true,
+        .follow_symlinks = false,
+    }) catch |err| switch (err) {
+        error.FileNotFound => {
+            const owned_label = try allocator.dupe(u8, spec.label);
+            errdefer allocator.free(owned_label);
+            const owned_path = try allocator.dupe(u8, spec.path);
+            errdefer allocator.free(owned_path);
+            var state: std.ArrayList(u8) = .empty;
+            errdefer state.deinit(allocator);
+            try appendDormantReadinessField(allocator, &state, "absent");
+            return .{
+                .label = owned_label,
+                .path = owned_path,
+                .state = try state.toOwnedSlice(allocator),
+                .exists = false,
+                .logical = false,
+                .unexpected_publication = spec.unexpected_publication,
+            };
+        },
+        else => return err,
+    };
+    defer parent.close(io);
+    return captureDormantExactObserverRowFromDir(
+        allocator,
+        io,
+        parent,
+        basename,
+        spec.label,
+        spec.path,
+        spec.unexpected_publication,
+    );
+}
+
+fn appendDormantExactObserverLogicalRow(
+    allocator: std.mem.Allocator,
+    rows: *std.ArrayList(DormantExactObserverRow),
+    label: []const u8,
+    path: []const u8,
+    state: []const u8,
+) !void {
+    const owned_label = try allocator.dupe(u8, label);
+    errdefer allocator.free(owned_label);
+    const owned_path = try allocator.dupe(u8, path);
+    errdefer allocator.free(owned_path);
+    const owned_state = try allocator.dupe(u8, state);
+    errdefer allocator.free(owned_state);
+    try rows.append(allocator, .{
+        .label = owned_label,
+        .path = owned_path,
+        .state = owned_state,
+        .exists = true,
+        .logical = true,
+        .unexpected_publication = false,
+    });
+}
+
+fn dormantExactObserverIdentity(
+    allocator: std.mem.Allocator,
+    rows: []const DormantExactObserverRow,
+) !DormantExactAcceptanceSnapshotIdentity {
+    var encoded: std.ArrayList(u8) = .empty;
+    defer encoded.deinit(allocator);
+    try appendDormantReadinessField(allocator, &encoded, "dormant-exact-real-observer-v1");
+    try appendDormantReadinessInteger(allocator, &encoded, rows.len);
+    for (rows) |row| {
+        try appendDormantReadinessField(allocator, &encoded, row.label);
+        try appendDormantReadinessField(allocator, &encoded, row.path);
+        try appendDormantReadinessField(
+            allocator,
+            &encoded,
+            if (row.exists) "present" else "absent",
+        );
+        try appendDormantReadinessField(
+            allocator,
+            &encoded,
+            if (row.logical) "logical" else "path",
+        );
+        try appendDormantReadinessField(
+            allocator,
+            &encoded,
+            if (row.unexpected_publication) "unexpected-publication" else "admitted",
+        );
+        try appendDormantReadinessField(allocator, &encoded, row.state);
+    }
+    return .{
+        .bytes = std.math.cast(u64, encoded.items.len) orelse
+            return error.DormantAcceptanceSnapshotTooLarge,
+        .sha256 = sha256Hex(encoded.items),
+    };
+}
+
+fn finishDormantExactObservation(
+    allocator: std.mem.Allocator,
+    rows: *std.ArrayList(DormantExactObserverRow),
+) !DormantExactRealObservation {
+    std.mem.sort(DormantExactObserverRow, rows.items, {}, dormantExactObserverRowLessThan);
+    for (rows.items, 0..) |row, index| {
+        if (index != 0) {
+            const previous = rows.items[index - 1];
+            if (std.mem.eql(u8, previous.label, row.label) or
+                std.mem.eql(u8, previous.path, row.path))
+            {
+                return error.DormantExactObserverDuplicateRow;
+            }
+        }
+    }
+    const identity = try dormantExactObserverIdentity(allocator, rows.items);
+    return .{
+        .allocator = allocator,
+        .rows = try rows.toOwnedSlice(allocator),
+        .identity = identity,
+    };
+}
+
+fn compareDormantExactRealObservations(
+    before: *const DormantExactRealObservation,
+    after: *const DormantExactRealObservation,
+) DormantReadinessNetEffects {
+    var effects: DormantReadinessNetEffects = .{};
+    var before_index: usize = 0;
+    var after_index: usize = 0;
+    while (before_index < before.rows.len or after_index < after.rows.len) {
+        const old: ?DormantExactObserverRow = if (before_index < before.rows.len)
+            before.rows[before_index]
+        else
+            null;
+        const new: ?DormantExactObserverRow = if (after_index < after.rows.len)
+            after.rows[after_index]
+        else
+            null;
+        const order = if (old == null)
+            std.math.Order.gt
+        else if (new == null)
+            std.math.Order.lt
+        else blk: {
+            const label_order = std.mem.order(u8, old.?.label, new.?.label);
+            break :blk if (label_order != .eq)
+                label_order
+            else
+                std.mem.order(u8, old.?.path, new.?.path);
+        };
+        if (order == .lt) {
+            const row = old.?;
+            if (row.logical) {
+                effects.logical_state_modified = true;
+            } else if (row.exists) {
+                effects.removed_paths += 1;
+            }
+            if (row.unexpected_publication and row.exists) {
+                effects.publication_path_changes += 1;
+            }
+            before_index += 1;
+        } else if (order == .gt) {
+            const row = new.?;
+            if (row.logical) {
+                effects.logical_state_modified = true;
+            } else if (row.exists) {
+                effects.created_paths += 1;
+            }
+            if (row.unexpected_publication and row.exists) {
+                effects.publication_path_changes += 1;
+            }
+            after_index += 1;
+        } else {
+            const old_row = old.?;
+            const new_row = new.?;
+            if (old_row.logical or new_row.logical) {
+                if (!old_row.logical or !new_row.logical or
+                    !std.mem.eql(u8, old_row.state, new_row.state))
+                {
+                    effects.logical_state_modified = true;
+                }
+            } else if (!old_row.exists and new_row.exists) {
+                effects.created_paths += 1;
+            } else if (old_row.exists and !new_row.exists) {
+                effects.removed_paths += 1;
+            } else if (old_row.exists and new_row.exists and
+                !std.mem.eql(u8, old_row.state, new_row.state))
+            {
+                effects.modified_paths += 1;
+            }
+            if ((old_row.unexpected_publication and old_row.exists) or
+                (new_row.unexpected_publication and new_row.exists))
+            {
+                effects.publication_path_changes += 1;
+            }
+            before_index += 1;
+            after_index += 1;
+        }
+    }
+    return effects;
+}
+
+fn deinitDormantExactObserverSpecs(
+    allocator: std.mem.Allocator,
+    specs: *std.ArrayList(DormantExactObserverPathSpec),
+) void {
+    for (specs.items) |*spec| spec.deinit(allocator);
+    specs.deinit(allocator);
+}
+
+fn appendDormantExactObserverDirectorySpec(
+    allocator: std.mem.Allocator,
+    specs: *std.ArrayList(DormantExactObserverPathSpec),
+    root: []const u8,
+    domain: []const u8,
+    relative_path: []const u8,
+) !void {
+    const label = try std.fmt.allocPrint(
+        allocator,
+        "{s}-directory:{s}",
+        .{ domain, relative_path },
+    );
+    defer allocator.free(label);
+    const path = try std.fs.path.join(allocator, &.{ root, relative_path });
+    defer allocator.free(path);
+    try appendDormantExactObserverAllocatedSpec(allocator, specs, label, path, false);
+}
+
+fn appendDormantExactObserverControlSpecs(
+    allocator: std.mem.Allocator,
+    specs: *std.ArrayList(DormantExactObserverPathSpec),
+    config: *const DormantAuthorityConfig,
+) !void {
+    for (config.root_policy.control_files) |expectation| {
+        try appendDormantExactObserverFileSpec(
+            allocator,
+            specs,
+            config.control_root,
+            "control",
+            expectation.path,
+        );
+    }
+}
+
+fn appendDormantExactObserverPayloadSpecs(
+    allocator: std.mem.Allocator,
+    specs: *std.ArrayList(DormantExactObserverPathSpec),
+    config: *const DormantAuthorityConfig,
+) !void {
+    const generation_bytes = try readDormantControlFile(
+        config,
+        .generation,
+        dormant_generation_key,
+    );
+    defer allocator.free(generation_bytes);
+    var manifest = try parseManifest(allocator, generation_bytes);
+    defer manifest.deinit(allocator);
+    for ([_][]const u8{
+        "incoming",
+        "objects",
+        "objects/sha256",
+        "snapshots",
+        "snapshots/sha256",
+    }) |relative_path| {
+        try appendDormantExactObserverDirectorySpec(
+            allocator,
+            specs,
+            config.payload_root,
+            "payload",
+            relative_path,
+        );
+    }
+    for (manifest.rows) |row| {
+        if (row.kind != .object and row.kind != .snapshot) continue;
+        const parent_path = std.fs.path.dirname(row.key) orelse
+            return error.DormantExactObserverUnsafePath;
+        try appendDormantExactObserverDirectorySpec(
+            allocator,
+            specs,
+            config.payload_root,
+            "payload",
+            parent_path,
+        );
+        try appendDormantExactObserverFileSpec(
+            allocator,
+            specs,
+            config.payload_root,
+            "payload",
+            row.key,
+        );
+    }
+}
+
+fn appendDormantExactObserverUnexpectedPublicationSpecs(
+    allocator: std.mem.Allocator,
+    specs: *std.ArrayList(DormantExactObserverPathSpec),
+    config: *const DormantAuthorityConfig,
+) !void {
+    const relative_directory = "authority/zllvm/v1/receipts/publication";
+    var control = std.Io.Dir.openDirAbsolute(config.io, config.control_root, .{
+        .access_sub_paths = true,
+        .iterate = true,
+        .follow_symlinks = false,
+    }) catch |err| switch (err) {
+        error.FileNotFound => return,
+        else => return err,
+    };
+    defer control.close(config.io);
+    var publication = openPathNoFollow(
+        config.io,
+        control,
+        relative_directory,
+        false,
+    ) catch |err| switch (err) {
+        error.FileNotFound => return,
+        else => return err,
+    };
+    defer publication.close(config.io);
+    var iterator = publication.iterate();
+    var entry_count: usize = 0;
+    while (try iterator.next(config.io)) |entry| {
+        entry_count += 1;
+        if (entry_count > 64) return error.DormantExactObserverPublicationBoundExceeded;
+        if (std.mem.eql(u8, entry.name, std.fs.path.basename(dormant_receipt_key))) continue;
+        const relative_path = try std.fs.path.join(
+            allocator,
+            &.{ relative_directory, entry.name },
+        );
+        defer allocator.free(relative_path);
+        const path = try std.fs.path.join(allocator, &.{ config.control_root, relative_path });
+        defer allocator.free(path);
+        const label = try std.fmt.allocPrint(
+            allocator,
+            "unexpected-publication:{s}",
+            .{entry.name},
+        );
+        defer allocator.free(label);
+        try appendDormantExactObserverAllocatedSpec(allocator, specs, label, path, true);
+    }
+}
+
+fn captureDormantExactRealObservation(
+    config: *const DormantAuthorityConfig,
+) !DormantExactRealObservation {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    var specs: std.ArrayList(DormantExactObserverPathSpec) = .empty;
+    defer deinitDormantExactObserverSpecs(config.allocator, &specs);
+    try appendDormantExactObserverSpec(
+        config.allocator,
+        &specs,
+        "root:main",
+        config.root_policy.main_root,
+        false,
+    );
+    try appendDormantExactObserverSpec(
+        config.allocator,
+        &specs,
+        "root:control",
+        config.control_root,
+        false,
+    );
+    try appendDormantExactObserverSpec(
+        config.allocator,
+        &specs,
+        "root:payload",
+        config.payload_root,
+        false,
+    );
+    try appendDormantExactObserverSpec(
+        config.allocator,
+        &specs,
+        "root:source",
+        config.source_root,
+        false,
+    );
+    try appendDormantExactObserverSpec(
+        config.allocator,
+        &specs,
+        "tool:git",
+        dormant_git_executable,
+        false,
+    );
+    try appendDormantExactObserverFileSpec(
+        config.allocator,
+        &specs,
+        config.root_policy.main_root,
+        "copy-evidence",
+        config.expected_copy_evidence_path,
+    );
+    try appendDormantExactObserverControlSpecs(config.allocator, &specs, config);
+    try appendDormantExactObserverPayloadSpecs(config.allocator, &specs, config);
+    try appendDormantExactObserverUnexpectedPublicationSpecs(
+        config.allocator,
+        &specs,
+        config,
+    );
+
+    var rows: std.ArrayList(DormantExactObserverRow) = .empty;
+    errdefer {
+        for (rows.items) |*row| row.deinit(config.allocator);
+        rows.deinit(config.allocator);
+    }
+    for (specs.items) |spec| {
+        try rows.append(
+            config.allocator,
+            try captureDormantExactObserverAbsoluteRow(
+                config.allocator,
+                config.io,
+                spec,
+            ),
+        );
+    }
+    var logical_state: std.ArrayList(u8) = .empty;
+    defer logical_state.deinit(config.allocator);
+    try appendDormantReadinessField(
+        config.allocator,
+        &logical_state,
+        "dormant-exact-real-logical-state-v1",
+    );
+    try appendDormantLogicalState(config.allocator, &logical_state, config);
+    try appendDormantExactObserverLogicalRow(
+        config.allocator,
+        &rows,
+        "logical:authority-and-registration",
+        "logical://authority-and-registration",
+        logical_state.items,
+    );
+    return finishDormantExactObservation(config.allocator, &rows);
+}
+
+const DormantExactAcceptanceEvidence = struct {
+    control_root: []const u8,
+    authority_root: []const u8,
+    payload_root: []const u8,
+    source_root: []const u8,
+    source_manifest_sha256: []const u8,
+    source_inventory_sha256: []const u8,
+    source_file_ledger_sha256: []const u8,
+    source_destination_ledger_sha256: []const u8,
+    copy_evidence_path: []const u8,
+    copy_evidence_sha256: []const u8,
+    registration_full_sha256: []const u8,
+    registration_path_sha256: []const u8,
+    registration_topology_sha256: []const u8,
+    registration_non_main_sha256: []const u8,
+    before_snapshot: DormantExactAcceptanceSnapshotIdentity,
+    after_snapshot: DormantExactAcceptanceSnapshotIdentity,
+    validation: DormantAuthorityValidation,
+    effects: DormantReadinessNetEffects,
+};
+
+const DormantExactAcceptanceParsedReceipt = struct {
+    fields: [31][]const u8,
+    body_identity: DormantExactAcceptanceSnapshotIdentity,
+};
+
+const DormantExactAcceptancePublishFault = enum {
+    none,
+    before_link,
+};
+
+fn requireDormantExactRealAcceptanceGate(token: ?[]const u8) !void {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    const value = token orelse return error.SkipZigTest;
+    if (!std.mem.eql(u8, value, dormant_exact_real_acceptance_token)) {
+        return error.SkipZigTest;
+    }
+}
+
+fn appendDormantExactAcceptanceString(
+    allocator: std.mem.Allocator,
+    output: *std.ArrayList(u8),
+    field_index: *usize,
+    value: []const u8,
+) !void {
+    if (field_index.* != 0) try output.append(allocator, '\t');
+    const encoded = try encodeField(allocator, value);
+    defer allocator.free(encoded);
+    try output.appendSlice(allocator, encoded);
+    field_index.* += 1;
+}
+
+fn appendDormantExactAcceptanceInteger(
+    allocator: std.mem.Allocator,
+    output: *std.ArrayList(u8),
+    field_index: *usize,
+    value: u64,
+) !void {
+    if (field_index.* != 0) try output.append(allocator, '\t');
+    try output.print(allocator, "{}", .{value});
+    field_index.* += 1;
+}
+
+fn parseDormantExactAcceptanceInteger(text: []const u8) !u64 {
+    if (text.len == 0) return error.NonCanonicalExactAcceptanceReceipt;
+    const value = std.fmt.parseInt(u64, text, 10) catch
+        return error.NonCanonicalExactAcceptanceReceipt;
+    var buffer: [32]u8 = undefined;
+    const canonical = std.fmt.bufPrint(&buffer, "{}", .{value}) catch unreachable;
+    if (!std.mem.eql(u8, text, canonical)) {
+        return error.NonCanonicalExactAcceptanceReceipt;
+    }
+    return value;
+}
+
+fn validateDormantExactAcceptanceHash(text: []const u8) !void {
+    validateSha(text) catch return error.NonCanonicalExactAcceptanceReceipt;
+}
+
+fn encodeDormantExactAcceptanceReceipt(
+    allocator: std.mem.Allocator,
+    evidence: DormantExactAcceptanceEvidence,
+) ![]u8 {
+    var output: std.ArrayList(u8) = .empty;
+    errdefer output.deinit(allocator);
+    try output.appendSlice(allocator, dormant_exact_real_acceptance_magic);
+    try output.append(allocator, '\n');
+    try output.appendSlice(allocator, dormant_exact_real_acceptance_header);
+    try output.append(allocator, '\n');
+    var field_index: usize = 0;
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        dormant_exact_real_acceptance_capability,
+    );
+    try appendDormantExactAcceptanceString(allocator, &output, &field_index, evidence.control_root);
+    try appendDormantExactAcceptanceString(allocator, &output, &field_index, evidence.authority_root);
+    try appendDormantExactAcceptanceString(allocator, &output, &field_index, evidence.payload_root);
+    try appendDormantExactAcceptanceString(allocator, &output, &field_index, evidence.source_root);
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        evidence.source_manifest_sha256,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        evidence.source_inventory_sha256,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        evidence.source_file_ledger_sha256,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        evidence.source_destination_ledger_sha256,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        evidence.copy_evidence_path,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        evidence.copy_evidence_sha256,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        evidence.registration_full_sha256,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        evidence.registration_path_sha256,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        evidence.registration_topology_sha256,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        evidence.registration_non_main_sha256,
+    );
+    try appendDormantExactAcceptanceInteger(
+        allocator,
+        &output,
+        &field_index,
+        evidence.before_snapshot.bytes,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        &evidence.before_snapshot.sha256,
+    );
+    try appendDormantExactAcceptanceInteger(
+        allocator,
+        &output,
+        &field_index,
+        evidence.after_snapshot.bytes,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        &evidence.after_snapshot.sha256,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        "validated",
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        &evidence.validation.manifest_sha256,
+    );
+    try appendDormantExactAcceptanceInteger(
+        allocator,
+        &output,
+        &field_index,
+        evidence.validation.payload_files,
+    );
+    try appendDormantExactAcceptanceInteger(
+        allocator,
+        &output,
+        &field_index,
+        evidence.validation.payload_bytes,
+    );
+    try appendDormantExactAcceptanceInteger(
+        allocator,
+        &output,
+        &field_index,
+        evidence.validation.objects,
+    );
+    try appendDormantExactAcceptanceInteger(
+        allocator,
+        &output,
+        &field_index,
+        evidence.validation.snapshots,
+    );
+    try appendDormantExactAcceptanceInteger(
+        allocator,
+        &output,
+        &field_index,
+        std.math.cast(u64, evidence.effects.created_paths) orelse
+            return error.DormantAcceptanceEffectOverflow,
+    );
+    try appendDormantExactAcceptanceInteger(
+        allocator,
+        &output,
+        &field_index,
+        std.math.cast(u64, evidence.effects.removed_paths) orelse
+            return error.DormantAcceptanceEffectOverflow,
+    );
+    try appendDormantExactAcceptanceInteger(
+        allocator,
+        &output,
+        &field_index,
+        std.math.cast(u64, evidence.effects.modified_paths) orelse
+            return error.DormantAcceptanceEffectOverflow,
+    );
+    try appendDormantExactAcceptanceInteger(
+        allocator,
+        &output,
+        &field_index,
+        std.math.cast(u64, evidence.effects.publication_path_changes) orelse
+            return error.DormantAcceptanceEffectOverflow,
+    );
+    try appendDormantExactAcceptanceString(
+        allocator,
+        &output,
+        &field_index,
+        if (evidence.effects.logical_state_modified) "true" else "false",
+    );
+    try appendDormantExactAcceptanceString(allocator, &output, &field_index, "complete");
+    if (field_index != 31) return error.DormantAcceptanceReceiptFieldCount;
+    try output.append(allocator, '\n');
+
+    const body_bytes = std.math.cast(u64, output.items.len) orelse
+        return error.DormantAcceptanceReceiptTooLarge;
+    const body_sha256 = sha256Hex(output.items);
+    try output.appendSlice(allocator, dormant_exact_real_acceptance_identity_header);
+    try output.append(allocator, '\n');
+    try output.print(allocator, "{}\t{s}\n", .{ body_bytes, &body_sha256 });
+    if (output.items.len > dormant_exact_real_acceptance_receipt_max_bytes) {
+        return error.DormantAcceptanceReceiptTooLarge;
+    }
+    return output.toOwnedSlice(allocator);
+}
+
+fn parseDormantExactAcceptanceReceipt(
+    allocator: std.mem.Allocator,
+    input: []const u8,
+) !DormantExactAcceptanceParsedReceipt {
+    if (input.len == 0 or
+        input.len > dormant_exact_real_acceptance_receipt_max_bytes or
+        input[input.len - 1] != '\n' or
+        std.mem.indexOfScalar(u8, input, '\r') != null)
+    {
+        return error.NonCanonicalExactAcceptanceReceipt;
+    }
+    var lines = std.mem.splitScalar(u8, input, '\n');
+    const magic = lines.next() orelse return error.NonCanonicalExactAcceptanceReceipt;
+    const header = lines.next() orelse return error.NonCanonicalExactAcceptanceReceipt;
+    const data = lines.next() orelse return error.NonCanonicalExactAcceptanceReceipt;
+    const identity_header = lines.next() orelse return error.NonCanonicalExactAcceptanceReceipt;
+    const identity_data = lines.next() orelse return error.NonCanonicalExactAcceptanceReceipt;
+    if (!std.mem.eql(u8, magic, dormant_exact_real_acceptance_magic) or
+        !std.mem.eql(u8, header, dormant_exact_real_acceptance_header) or
+        !std.mem.eql(u8, identity_header, dormant_exact_real_acceptance_identity_header) or
+        data.len == 0 or identity_data.len == 0 or
+        !std.mem.eql(u8, lines.next() orelse return error.NonCanonicalExactAcceptanceReceipt, "") or
+        lines.next() != null)
+    {
+        return error.NonCanonicalExactAcceptanceReceipt;
+    }
+
+    var result: DormantExactAcceptanceParsedReceipt = undefined;
+    var fields = std.mem.splitScalar(u8, data, '\t');
+    for (&result.fields) |*field| {
+        field.* = fields.next() orelse return error.NonCanonicalExactAcceptanceReceipt;
+        validateCanonicalField(allocator, field.*) catch
+            return error.NonCanonicalExactAcceptanceReceipt;
+    }
+    if (fields.next() != null or
+        !std.mem.eql(u8, result.fields[0], dormant_exact_real_acceptance_capability) or
+        !std.mem.eql(u8, result.fields[19], "validated") or
+        (!std.mem.eql(u8, result.fields[29], "false") and
+            !std.mem.eql(u8, result.fields[29], "true")) or
+        !std.mem.eql(u8, result.fields[30], "complete"))
+    {
+        return error.NonCanonicalExactAcceptanceReceipt;
+    }
+    for ([_]usize{ 5, 6, 7, 8, 10, 11, 12, 13, 14, 16, 18, 20 }) |index| {
+        try validateDormantExactAcceptanceHash(result.fields[index]);
+    }
+    for ([_]usize{ 15, 17, 21, 22, 23, 24, 25, 26, 27, 28 }) |index| {
+        _ = try parseDormantExactAcceptanceInteger(result.fields[index]);
+    }
+
+    var identity_fields = std.mem.splitScalar(u8, identity_data, '\t');
+    const body_bytes_text = identity_fields.next() orelse
+        return error.NonCanonicalExactAcceptanceReceipt;
+    const body_sha256_text = identity_fields.next() orelse
+        return error.NonCanonicalExactAcceptanceReceipt;
+    if (identity_fields.next() != null) return error.NonCanonicalExactAcceptanceReceipt;
+    const body_bytes = try parseDormantExactAcceptanceInteger(body_bytes_text);
+    try validateDormantExactAcceptanceHash(body_sha256_text);
+    const body_len = dormant_exact_real_acceptance_magic.len + 1 +
+        dormant_exact_real_acceptance_header.len + 1 + data.len + 1;
+    if (body_bytes != body_len or body_len > input.len) {
+        return error.DormantAcceptanceReceiptIdentityMismatch;
+    }
+    const body_sha256 = sha256Hex(input[0..body_len]);
+    if (!std.mem.eql(u8, body_sha256_text, &body_sha256)) {
+        return error.DormantAcceptanceReceiptIdentityMismatch;
+    }
+    result.body_identity = .{
+        .bytes = body_bytes,
+        .sha256 = body_sha256,
+    };
+    return result;
+}
+
+fn validateDormantExactAcceptanceReceipt(
+    allocator: std.mem.Allocator,
+    input: []const u8,
+    expected: DormantExactAcceptanceEvidence,
+) !void {
+    _ = try parseDormantExactAcceptanceReceipt(allocator, input);
+    const canonical = try encodeDormantExactAcceptanceReceipt(allocator, expected);
+    defer allocator.free(canonical);
+    if (!std.mem.eql(u8, input, canonical)) {
+        return error.DormantAcceptanceReceiptEvidenceMismatch;
+    }
+}
+
+fn readDormantExactAcceptanceReceipt(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    directory: std.Io.Dir,
+    basename: []const u8,
+) ![]u8 {
+    var file = try directory.openFile(io, basename, .{
+        .allow_directory = false,
+        .follow_symlinks = false,
+    });
+    defer file.close(io);
+    const stat = try file.stat(io);
+    if (stat.kind != .file or
+        @as(u16, @intCast(stat.permissions.toMode() & 0o7777)) != 0o644 or
+        stat.size == 0 or stat.size > dormant_exact_real_acceptance_receipt_max_bytes)
+    {
+        return error.DormantAcceptanceReceiptReadBackMismatch;
+    }
+    const size = std.math.cast(usize, stat.size) orelse
+        return error.DormantAcceptanceReceiptReadBackMismatch;
+    const bytes = try allocator.alloc(u8, size);
+    errdefer allocator.free(bytes);
+    var offset: usize = 0;
+    while (offset < bytes.len) {
+        const count = try file.readPositional(io, &.{bytes[offset..]}, offset);
+        if (count == 0) return error.DormantAcceptanceReceiptReadBackMismatch;
+        offset += count;
+    }
+    var extra: [1]u8 = undefined;
+    if (try file.readPositional(io, &.{&extra}, bytes.len) != 0) {
+        return error.DormantAcceptanceReceiptReadBackMismatch;
+    }
+    return bytes;
+}
+
+fn publishDormantExactAcceptanceReceipt(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    directory: std.Io.Dir,
+    bytes: []const u8,
+    expected: DormantExactAcceptanceEvidence,
+    fault: DormantExactAcceptancePublishFault,
+) !void {
+    try validateDormantExactAcceptanceReceipt(allocator, bytes, expected);
+    var atomic = try directory.createFileAtomic(
+        io,
+        dormant_exact_real_acceptance_receipt_basename,
+        .{ .permissions = .fromMode(0o600), .replace = false },
+    );
+    defer atomic.deinit(io);
+    try atomic.file.writeStreamingAll(io, bytes);
+    try atomic.file.sync(io);
+    try atomic.file.setPermissions(io, .fromMode(0o644));
+    try atomic.file.sync(io);
+    if (fault == .before_link) return error.DormantAcceptanceSyntheticPublicationFailure;
+    atomic.link(io) catch |err| switch (err) {
+        error.PathAlreadyExists => return error.DormantAcceptanceReceiptCollision,
+        else => return err,
+    };
+    try syncDirectory(directory);
+    const readback = try readDormantExactAcceptanceReceipt(
+        allocator,
+        io,
+        directory,
+        dormant_exact_real_acceptance_receipt_basename,
+    );
+    defer allocator.free(readback);
+    if (!std.mem.eql(u8, readback, bytes)) {
+        return error.DormantAcceptanceReceiptReadBackMismatch;
+    }
+    try validateDormantExactAcceptanceReceipt(allocator, readback, expected);
+}
+
+fn requireDormantExactAcceptanceValidation(
+    validation: DormantAuthorityValidation,
+) !void {
+    if (!std.mem.eql(
+        u8,
+        &validation.manifest_sha256,
+        dormant_exact_real_source_manifest_sha256,
+    ) or
+        validation.payload_files != 20 or
+        validation.payload_bytes != 9_970_364 or
+        validation.objects != 18 or
+        validation.snapshots != 2)
+    {
+        return error.DormantAcceptanceValidationMismatch;
+    }
+}
+
+fn openDormantExactAcceptanceReceiptDirectory(io: std.Io) !std.Io.Dir {
+    var repository = try std.Io.Dir.openDirAbsolute(io, main_repository, .{
+        .access_sub_paths = true,
+        .iterate = true,
+        .follow_symlinks = false,
+    });
+    defer repository.close(io);
+    var local_state = try openExistingDir(io, repository, "local-state");
+    defer local_state.close(io);
+    var validations = try openOrCreateDir(io, local_state, "validations");
+    defer validations.close(io);
+    return openOrCreateDir(io, validations, "inbox206cq");
+}
+
+fn runDormantExactRealAcceptanceForTest(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    token: ?[]const u8,
+) !void {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    try requireDormantExactRealAcceptanceGate(token);
+
+    var config = try DormantAuthorityConfig.initExactRealCandidate(
+        allocator,
+        io,
+        dormant_exact_real_source_manifest_sha256,
+        dormant_exact_real_source_inventory_sha256,
+        dormant_exact_real_source_file_ledger_sha256,
+        dormant_exact_real_source_destination_ledger_sha256,
+        dormant_exact_real_copy_evidence_path,
+        dormant_exact_real_copy_evidence_sha256,
+    );
+    defer config.deinit();
+    var before = try captureDormantExactRealObservation(&config);
+    defer before.deinit();
+    const validation = try validateDormantAuthorityCandidate(&config);
+    try requireDormantExactAcceptanceValidation(validation);
+    var after = try captureDormantExactRealObservation(&config);
+    defer after.deinit();
+    const effects = compareDormantExactRealObservations(&before, &after);
+    if (!effects.isUnchanged()) return error.DormantAcceptanceObservedMutation;
+    const evidence: DormantExactAcceptanceEvidence = .{
+        .control_root = config.control_root,
+        .authority_root = config.authority_root,
+        .payload_root = config.payload_root,
+        .source_root = config.source_root,
+        .source_manifest_sha256 = &config.source_manifest_sha256,
+        .source_inventory_sha256 = &config.expected_source_inventory_sha256,
+        .source_file_ledger_sha256 = &config.expected_source_file_ledger_sha256,
+        .source_destination_ledger_sha256 = &config.expected_source_destination_ledger_sha256,
+        .copy_evidence_path = config.expected_copy_evidence_path,
+        .copy_evidence_sha256 = &config.expected_copy_evidence_sha256,
+        .registration_full_sha256 = &config.expected_registration_full_hash,
+        .registration_path_sha256 = &config.expected_registration_path_hash,
+        .registration_topology_sha256 = &config.expected_registration_topology_hash,
+        .registration_non_main_sha256 = &config.expected_registration_non_main_hash,
+        .before_snapshot = before.identity,
+        .after_snapshot = after.identity,
+        .validation = validation,
+        .effects = effects,
+    };
+    const receipt = try encodeDormantExactAcceptanceReceipt(allocator, evidence);
+    defer allocator.free(receipt);
+    var receipt_directory = try openDormantExactAcceptanceReceiptDirectory(io);
+    defer receipt_directory.close(io);
+    try publishDormantExactAcceptanceReceipt(
+        allocator,
+        io,
+        receipt_directory,
+        receipt,
+        evidence,
+        .none,
+    );
+}
+
+const dormant_acceptance_synthetic_hash_a =
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const dormant_acceptance_synthetic_hash_b =
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const dormant_acceptance_synthetic_hash_c =
+    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const dormant_acceptance_synthetic_hash_d =
+    "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+const dormant_acceptance_synthetic_hash_e =
+    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+const dormant_acceptance_synthetic_hash_f =
+    "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+
+fn dormantSyntheticExactAcceptanceEvidence() DormantExactAcceptanceEvidence {
+    return .{
+        .control_root = "/synthetic/control",
+        .authority_root = "/synthetic/control/authority/zllvm/v1",
+        .payload_root = "/synthetic/payload",
+        .source_root = "/synthetic/source",
+        .source_manifest_sha256 = dormant_acceptance_synthetic_hash_a,
+        .source_inventory_sha256 = dormant_acceptance_synthetic_hash_b,
+        .source_file_ledger_sha256 = dormant_acceptance_synthetic_hash_c,
+        .source_destination_ledger_sha256 = dormant_acceptance_synthetic_hash_d,
+        .copy_evidence_path = "docs/evidence/synthetic-copy-proof.md",
+        .copy_evidence_sha256 = dormant_acceptance_synthetic_hash_e,
+        .registration_full_sha256 = dormant_acceptance_synthetic_hash_a,
+        .registration_path_sha256 = dormant_acceptance_synthetic_hash_b,
+        .registration_topology_sha256 = dormant_acceptance_synthetic_hash_c,
+        .registration_non_main_sha256 = dormant_acceptance_synthetic_hash_d,
+        .before_snapshot = .{
+            .bytes = 1234,
+            .sha256 = dormant_acceptance_synthetic_hash_e[0..64].*,
+        },
+        .after_snapshot = .{
+            .bytes = 1234,
+            .sha256 = dormant_acceptance_synthetic_hash_e[0..64].*,
+        },
+        .validation = .{
+            .manifest_sha256 = dormant_acceptance_synthetic_hash_f[0..64].*,
+            .payload_files = 20,
+            .payload_bytes = 9_970_364,
+            .objects = 18,
+            .snapshots = 2,
+        },
+        .effects = .{},
+    };
+}
+
+const DormantExactObserverFixtureSpec = struct {
+    label: []const u8,
+    path: []const u8,
+    unexpected_publication: bool = false,
+};
+
+fn captureDormantExactObserverFixture(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    directory: std.Io.Dir,
+    specs: []const DormantExactObserverFixtureSpec,
+    logical_state: []const u8,
+) !DormantExactRealObservation {
+    if (!builtin.is_test) return error.TestOnlyOperation;
+    var rows: std.ArrayList(DormantExactObserverRow) = .empty;
+    errdefer {
+        for (rows.items) |*row| row.deinit(allocator);
+        rows.deinit(allocator);
+    }
+    for (specs) |spec| {
+        try rows.append(
+            allocator,
+            try captureDormantExactObserverRowFromDir(
+                allocator,
+                io,
+                directory,
+                spec.path,
+                spec.label,
+                spec.path,
+                spec.unexpected_publication,
+            ),
+        );
+    }
+    try appendDormantExactObserverLogicalRow(
+        allocator,
+        &rows,
+        "logical:synthetic-authority",
+        "logical://synthetic-authority",
+        logical_state,
+    );
+    return finishDormantExactObservation(allocator, &rows);
+}
+
+fn expectDormantExactObserverEffects(
+    before: *const DormantExactRealObservation,
+    after: *const DormantExactRealObservation,
+    expected: DormantReadinessNetEffects,
+) !DormantReadinessNetEffects {
+    const effects = compareDormantExactRealObservations(before, after);
+    try expectDormantReadinessEffects(effects, expected);
+    return effects;
+}
+
+fn expectDormantAcceptanceDirectoryEmpty(io: std.Io, directory: std.Io.Dir) !void {
+    var iterator = directory.iterate();
+    if (try iterator.next(io) != null) return error.DormantAcceptanceTemporaryRetained;
+}
+
+test "dormant exact-real acceptance gate precedes real paths" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    try std.testing.expectError(
+        error.SkipZigTest,
+        runDormantExactRealAcceptanceForTest(allocator, io, null),
+    );
+    try std.testing.expectError(
+        error.SkipZigTest,
+        runDormantExactRealAcceptanceForTest(allocator, io, "invalid-token"),
+    );
+}
+
+test "dormant exact-real copy evidence verifies actual held-root bytes" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    const evidence_path = "docs/evidence/copy-proof.md";
+    const evidence_bytes = "synthetic exact-real copy evidence\n";
+    const evidence_sha256 = sha256Hex(evidence_bytes);
+    var fixture = std.testing.tmpDir(.{ .iterate = true });
+    defer fixture.cleanup();
+    var evidence_directory = try openPathNoFollow(io, fixture.dir, "docs/evidence", true);
+    defer evidence_directory.close(io);
+
+    try std.testing.expectError(
+        error.DormantCopyEvidenceMissing,
+        verifyDormantCopyEvidenceFromHeldRoot(
+            allocator,
+            io,
+            fixture.dir,
+            evidence_path,
+            &evidence_sha256,
+            dormant_exact_real_copy_evidence_max_bytes,
+        ),
+    );
+
+    try writeExclusive(io, evidence_directory, "target.md", evidence_bytes, 0o664);
+    try evidence_directory.symLink(io, "target.md", "copy-proof.md", .{});
+    try std.testing.expectError(
+        error.DormantCopyEvidenceUnsafe,
+        verifyDormantCopyEvidenceFromHeldRoot(
+            allocator,
+            io,
+            fixture.dir,
+            evidence_path,
+            &evidence_sha256,
+            dormant_exact_real_copy_evidence_max_bytes,
+        ),
+    );
+    try evidence_directory.deleteFile(io, "copy-proof.md");
+
+    try evidence_directory.createDir(io, "copy-proof.md", .default_dir);
+    try std.testing.expectError(
+        error.DormantCopyEvidenceUnsafe,
+        verifyDormantCopyEvidenceFromHeldRoot(
+            allocator,
+            io,
+            fixture.dir,
+            evidence_path,
+            &evidence_sha256,
+            dormant_exact_real_copy_evidence_max_bytes,
+        ),
+    );
+    try evidence_directory.deleteDir(io, "copy-proof.md");
+
+    try writeExclusive(io, evidence_directory, "copy-proof.md", evidence_bytes, 0o755);
+    try std.testing.expectError(
+        error.DormantCopyEvidenceExecutable,
+        verifyDormantCopyEvidenceFromHeldRoot(
+            allocator,
+            io,
+            fixture.dir,
+            evidence_path,
+            &evidence_sha256,
+            dormant_exact_real_copy_evidence_max_bytes,
+        ),
+    );
+    try evidence_directory.deleteFile(io, "copy-proof.md");
+
+    try writeExclusive(io, evidence_directory, "copy-proof.md", evidence_bytes, 0o664);
+    var wrong_sha256 = evidence_sha256;
+    wrong_sha256[0] = if (wrong_sha256[0] == '0') '1' else '0';
+    try std.testing.expectError(
+        error.DormantCopyEvidenceMismatched,
+        verifyDormantCopyEvidenceFromHeldRoot(
+            allocator,
+            io,
+            fixture.dir,
+            evidence_path,
+            &wrong_sha256,
+            dormant_exact_real_copy_evidence_max_bytes,
+        ),
+    );
+    try std.testing.expectError(
+        error.DormantCopyEvidenceTooLarge,
+        verifyDormantCopyEvidenceFromHeldRoot(
+            allocator,
+            io,
+            fixture.dir,
+            evidence_path,
+            &evidence_sha256,
+            evidence_bytes.len - 1,
+        ),
+    );
+
+    var identity = try verifyDormantCopyEvidenceFromHeldRoot(
+        allocator,
+        io,
+        fixture.dir,
+        evidence_path,
+        &evidence_sha256,
+        dormant_exact_real_copy_evidence_max_bytes,
+    );
+    defer identity.deinit(allocator);
+    try std.testing.expectEqual(@as(u16, 0o664), identity.mode);
+    try std.testing.expectEqual(@as(u64, evidence_bytes.len), identity.bytes);
+    try std.testing.expectEqualSlices(u8, &evidence_sha256, &identity.sha256);
+    try std.testing.expectError(
+        error.FileNotFound,
+        fixture.dir.statFile(io, "validation", .{ .follow_symlinks = false }),
+    );
+}
+
+test "dormant exact-real copy evidence is unchanged in finite observer" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    const evidence_path = "docs/evidence/copy-proof.md";
+    const evidence_bytes = "synthetic observed copy evidence\n";
+    const evidence_sha256 = sha256Hex(evidence_bytes);
+    const specs = [_]DormantExactObserverFixtureSpec{.{
+        .label = "copy-evidence-file:docs/evidence/copy-proof.md",
+        .path = evidence_path,
+    }};
+    var fixture = std.testing.tmpDir(.{ .iterate = true });
+    defer fixture.cleanup();
+    try writeDormantFixtureRelative(io, fixture.dir, evidence_path, evidence_bytes, 0o664);
+    var before = try captureDormantExactObserverFixture(
+        allocator,
+        io,
+        fixture.dir,
+        &specs,
+        "copy-evidence-logical-state",
+    );
+    defer before.deinit();
+    var identity = try verifyDormantCopyEvidenceFromHeldRoot(
+        allocator,
+        io,
+        fixture.dir,
+        evidence_path,
+        &evidence_sha256,
+        dormant_exact_real_copy_evidence_max_bytes,
+    );
+    identity.deinit(allocator);
+    var after = try captureDormantExactObserverFixture(
+        allocator,
+        io,
+        fixture.dir,
+        &specs,
+        "copy-evidence-logical-state",
+    );
+    defer after.deinit();
+    const effects = try expectDormantExactObserverEffects(&before, &after, .{});
+    try std.testing.expect(effects.isUnchanged());
+    try std.testing.expectEqualSlices(u8, &before.identity.sha256, &after.identity.sha256);
+}
+
+test "dormant exact-real acceptance receipt encoding is canonical" {
+    const allocator = std.testing.allocator;
+    const evidence = dormantSyntheticExactAcceptanceEvidence();
+    const first = try encodeDormantExactAcceptanceReceipt(allocator, evidence);
+    defer allocator.free(first);
+    const second = try encodeDormantExactAcceptanceReceipt(allocator, evidence);
+    defer allocator.free(second);
+    try std.testing.expectEqualSlices(u8, first, second);
+    _ = try parseDormantExactAcceptanceReceipt(allocator, first);
+    try validateDormantExactAcceptanceReceipt(allocator, first, evidence);
+
+    const wrong_schema = try allocator.dupe(u8, first);
+    defer allocator.free(wrong_schema);
+    wrong_schema[0] = 'x';
+    try std.testing.expectError(
+        error.NonCanonicalExactAcceptanceReceipt,
+        parseDormantExactAcceptanceReceipt(allocator, wrong_schema),
+    );
+
+    var wrong_identity = evidence;
+    wrong_identity.source_manifest_sha256 = dormant_acceptance_synthetic_hash_f;
+    const wrong_identity_receipt = try encodeDormantExactAcceptanceReceipt(
+        allocator,
+        wrong_identity,
+    );
+    defer allocator.free(wrong_identity_receipt);
+    try std.testing.expectError(
+        error.DormantAcceptanceReceiptEvidenceMismatch,
+        validateDormantExactAcceptanceReceipt(
+            allocator,
+            wrong_identity_receipt,
+            evidence,
+        ),
+    );
+}
+
+test "dormant exact-real observer detects finite path and logical controls" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var fixture = std.testing.tmpDir(.{ .iterate = true });
+    defer fixture.cleanup();
+    const specs = [_]DormantExactObserverFixtureSpec{
+        .{ .label = "path:created", .path = "created" },
+        .{ .label = "path:removed", .path = "removed" },
+        .{ .label = "path:content", .path = "content" },
+        .{ .label = "path:mode", .path = "mode" },
+        .{ .label = "path:type", .path = "type" },
+        .{
+            .label = "unexpected-publication:synthetic",
+            .path = "unexpected-publication",
+            .unexpected_publication = true,
+        },
+    };
+    try writeDormantFixtureRelative(io, fixture.dir, "removed", "removed\n", 0o644);
+    try writeDormantFixtureRelative(io, fixture.dir, "content", "before\n", 0o644);
+    try writeDormantFixtureRelative(io, fixture.dir, "mode", "mode\n", 0o644);
+    try writeDormantFixtureRelative(io, fixture.dir, "type", "type\n", 0o644);
+    var baseline = try captureDormantExactObserverFixture(
+        allocator,
+        io,
+        fixture.dir,
+        &specs,
+        "logical-before",
+    );
+    defer baseline.deinit();
+
+    try writeDormantFixtureRelative(io, fixture.dir, "created", "created\n", 0o644);
+    var created = try captureDormantExactObserverFixture(
+        allocator,
+        io,
+        fixture.dir,
+        &specs,
+        "logical-before",
+    );
+    defer created.deinit();
+    _ = try expectDormantExactObserverEffects(
+        &baseline,
+        &created,
+        .{ .created_paths = 1 },
+    );
+    try deleteDormantFixtureRelative(io, fixture.dir, "created");
+
+    try deleteDormantFixtureRelative(io, fixture.dir, "removed");
+    var removed = try captureDormantExactObserverFixture(
+        allocator,
+        io,
+        fixture.dir,
+        &specs,
+        "logical-before",
+    );
+    defer removed.deinit();
+    _ = try expectDormantExactObserverEffects(
+        &baseline,
+        &removed,
+        .{ .removed_paths = 1 },
+    );
+    try writeDormantFixtureRelative(io, fixture.dir, "removed", "removed\n", 0o644);
+
+    try replaceDormantFixtureRelative(io, fixture.dir, "content", "after\n", 0o644);
+    var content = try captureDormantExactObserverFixture(
+        allocator,
+        io,
+        fixture.dir,
+        &specs,
+        "logical-before",
+    );
+    defer content.deinit();
+    _ = try expectDormantExactObserverEffects(
+        &baseline,
+        &content,
+        .{ .modified_paths = 1 },
+    );
+    try replaceDormantFixtureRelative(io, fixture.dir, "content", "before\n", 0o644);
+
+    try fixture.dir.setFilePermissions(
+        io,
+        "mode",
+        .fromMode(0o600),
+        .{ .follow_symlinks = false },
+    );
+    var mode = try captureDormantExactObserverFixture(
+        allocator,
+        io,
+        fixture.dir,
+        &specs,
+        "logical-before",
+    );
+    defer mode.deinit();
+    _ = try expectDormantExactObserverEffects(
+        &baseline,
+        &mode,
+        .{ .modified_paths = 1 },
+    );
+    try fixture.dir.setFilePermissions(
+        io,
+        "mode",
+        .fromMode(0o644),
+        .{ .follow_symlinks = false },
+    );
+
+    try fixture.dir.deleteFile(io, "type");
+    try fixture.dir.createDir(io, "type", .default_dir);
+    var kind = try captureDormantExactObserverFixture(
+        allocator,
+        io,
+        fixture.dir,
+        &specs,
+        "logical-before",
+    );
+    defer kind.deinit();
+    _ = try expectDormantExactObserverEffects(
+        &baseline,
+        &kind,
+        .{ .modified_paths = 1 },
+    );
+    try fixture.dir.deleteDir(io, "type");
+    try writeDormantFixtureRelative(io, fixture.dir, "type", "type\n", 0o644);
+
+    var logical = try captureDormantExactObserverFixture(
+        allocator,
+        io,
+        fixture.dir,
+        &specs,
+        "logical-after",
+    );
+    defer logical.deinit();
+    _ = try expectDormantExactObserverEffects(
+        &baseline,
+        &logical,
+        .{ .logical_state_modified = true },
+    );
+
+    try writeDormantFixtureRelative(
+        io,
+        fixture.dir,
+        "unexpected-publication",
+        "unexpected\n",
+        0o644,
+    );
+    var publication = try captureDormantExactObserverFixture(
+        allocator,
+        io,
+        fixture.dir,
+        &specs,
+        "logical-before",
+    );
+    defer publication.deinit();
+    _ = try expectDormantExactObserverEffects(
+        &baseline,
+        &publication,
+        .{ .created_paths = 1, .publication_path_changes = 1 },
+    );
+
+    try writeDormantFixtureRelative(io, fixture.dir, "created", "created\n", 0o644);
+    try deleteDormantFixtureRelative(io, fixture.dir, "removed");
+    try replaceDormantFixtureRelative(io, fixture.dir, "content", "after\n", 0o644);
+    try fixture.dir.setFilePermissions(
+        io,
+        "mode",
+        .fromMode(0o600),
+        .{ .follow_symlinks = false },
+    );
+    try fixture.dir.deleteFile(io, "type");
+    try fixture.dir.createDir(io, "type", .default_dir);
+    var combined = try captureDormantExactObserverFixture(
+        allocator,
+        io,
+        fixture.dir,
+        &specs,
+        "logical-after",
+    );
+    defer combined.deinit();
+    const combined_effects = try expectDormantExactObserverEffects(
+        &baseline,
+        &combined,
+        .{
+            .created_paths = 2,
+            .removed_paths = 1,
+            .modified_paths = 3,
+            .publication_path_changes = 1,
+            .logical_state_modified = true,
+        },
+    );
+
+    var evidence = dormantSyntheticExactAcceptanceEvidence();
+    evidence.effects = combined_effects;
+    const receipt = try encodeDormantExactAcceptanceReceipt(allocator, evidence);
+    defer allocator.free(receipt);
+    const parsed = try parseDormantExactAcceptanceReceipt(allocator, receipt);
+    try std.testing.expectEqual(
+        @as(u64, combined_effects.created_paths),
+        try parseDormantExactAcceptanceInteger(parsed.fields[25]),
+    );
+    try std.testing.expectEqual(
+        @as(u64, combined_effects.removed_paths),
+        try parseDormantExactAcceptanceInteger(parsed.fields[26]),
+    );
+    try std.testing.expectEqual(
+        @as(u64, combined_effects.modified_paths),
+        try parseDormantExactAcceptanceInteger(parsed.fields[27]),
+    );
+    try std.testing.expectEqual(
+        @as(u64, combined_effects.publication_path_changes),
+        try parseDormantExactAcceptanceInteger(parsed.fields[28]),
+    );
+    try std.testing.expectEqualStrings("true", parsed.fields[29]);
+}
+
+test "dormant exact-real acceptance receipt publication is durable and no-replace" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    const evidence = dormantSyntheticExactAcceptanceEvidence();
+    const receipt = try encodeDormantExactAcceptanceReceipt(allocator, evidence);
+    defer allocator.free(receipt);
+
+    var partial = std.testing.tmpDir(.{ .iterate = true });
+    defer partial.cleanup();
+    try std.testing.expectError(
+        error.DormantAcceptanceSyntheticPublicationFailure,
+        publishDormantExactAcceptanceReceipt(
+            allocator,
+            io,
+            partial.dir,
+            receipt,
+            evidence,
+            .before_link,
+        ),
+    );
+    try expectDormantAcceptanceDirectoryEmpty(io, partial.dir);
+
+    var success = std.testing.tmpDir(.{ .iterate = true });
+    defer success.cleanup();
+    try publishDormantExactAcceptanceReceipt(
+        allocator,
+        io,
+        success.dir,
+        receipt,
+        evidence,
+        .none,
+    );
+    const readback = try readDormantExactAcceptanceReceipt(
+        allocator,
+        io,
+        success.dir,
+        dormant_exact_real_acceptance_receipt_basename,
+    );
+    defer allocator.free(readback);
+    try std.testing.expectEqualSlices(u8, receipt, readback);
+
+    var collision = std.testing.tmpDir(.{ .iterate = true });
+    defer collision.cleanup();
+    const retained = "retained collision\n";
+    try writeCollisionFixtureAtomic(
+        io,
+        collision.dir,
+        dormant_exact_real_acceptance_receipt_basename,
+        retained,
+        0o644,
+    );
+    try std.testing.expectError(
+        error.DormantAcceptanceReceiptCollision,
+        publishDormantExactAcceptanceReceipt(
+            allocator,
+            io,
+            collision.dir,
+            receipt,
+            evidence,
+            .none,
+        ),
+    );
+    const collision_readback = try readDormantExactAcceptanceReceipt(
+        allocator,
+        io,
+        collision.dir,
+        dormant_exact_real_acceptance_receipt_basename,
+    );
+    defer allocator.free(collision_readback);
+    try std.testing.expectEqualStrings(retained, collision_readback);
+}
+
+test "INBOX-206CQ exact-real acceptance one-shot" {
+    const allocator = std.testing.allocator;
+    const token = std.testing.environ.getAlloc(
+        allocator,
+        dormant_exact_real_acceptance_environment,
+    ) catch |err| switch (err) {
+        error.EnvironmentVariableMissing => null,
+        else => return err,
+    };
+    defer if (token) |value| allocator.free(value);
+    try runDormantExactRealAcceptanceForTest(std.testing.allocator, std.testing.io, token);
+}
+
+test "dormant readiness snapshot ownership unwinds later allocation failure" {
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{
+        .fail_index = 4,
+    });
+    var appended_entries: usize = 0;
+    try std.testing.expectError(
+        error.OutOfMemory,
+        exerciseDormantReadinessOwnershipFailure(failing.allocator(), &appended_entries),
+    );
+    try std.testing.expect(failing.has_induced_failure);
+    try std.testing.expectEqual(@as(usize, 1), appended_entries);
+    try std.testing.expectEqual(failing.allocated_bytes, failing.freed_bytes);
 }
 
 test "dormant authority candidate validates only closed synthetic state" {
@@ -5313,7 +7855,8 @@ test "dormant authority candidate validates only closed synthetic state" {
     );
     defer config.deinit();
 
-    const positive = try validateDormantAuthorityCandidate(&config);
+    try testDormantReadinessObserverControls(&fixture, &config);
+    const positive = try expectDormantReadinessSuccess(&fixture, &config);
     try std.testing.expectEqual(@as(u64, 3), positive.payload_files);
     try std.testing.expectEqual(
         @as(u64, fixture.payload.len + fixture.constituent.len + fixture.snapshot.len),
@@ -5324,10 +7867,7 @@ test "dormant authority candidate validates only closed synthetic state" {
     try std.testing.expectEqualStrings(&sha256Hex(fixture.manifest), &positive.manifest_sha256);
 
     std.mem.swap([]u8, &config.payload_root, &config.source_root);
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     std.mem.swap([]u8, &config.payload_root, &config.source_root);
 
     const previous_payload_root = try replaceDormantTestOwnedBytes(
@@ -5335,10 +7875,7 @@ test "dormant authority candidate validates only closed synthetic state" {
         &config.payload_root,
         fixture.root,
     );
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     restoreDormantTestOwnedBytes(
         allocator,
         &config.payload_root,
@@ -5346,31 +7883,19 @@ test "dormant authority candidate validates only closed synthetic state" {
     );
 
     try setDormantAbsoluteDirectoryMode(io, fixture.control_root, 0o755);
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     try setDormantAbsoluteDirectoryMode(io, fixture.control_root, 0o775);
 
     try setDormantAbsoluteDirectoryMode(io, config.authority_root, 0o775);
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     try setDormantAbsoluteDirectoryMode(io, config.authority_root, 0o755);
 
     try setDormantAbsoluteDirectoryMode(io, fixture.payload_root, 0o775);
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     try setDormantAbsoluteDirectoryMode(io, fixture.payload_root, 0o755);
 
     try setDormantAbsoluteDirectoryMode(io, fixture.source_root, 0o755);
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     try setDormantAbsoluteDirectoryMode(io, fixture.source_root, 0o775);
 
     var fixture_root = try std.Io.Dir.openDirAbsolute(io, fixture.root, .{
@@ -5391,10 +7916,7 @@ test "dormant authority candidate validates only closed synthetic state" {
         &config.root_policy.source_root,
         source_link,
     );
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     restoreDormantTestOwnedBytes(
         allocator,
         &config.root_policy.source_root,
@@ -5422,10 +7944,7 @@ test "dormant authority candidate validates only closed synthetic state" {
         &config.root_policy.non_main_roots[0],
         fixture.payload_root,
     );
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     restoreDormantTestOwnedBytes(
         allocator,
         &config.root_policy.non_main_roots[0],
@@ -5437,10 +7956,7 @@ test "dormant authority candidate validates only closed synthetic state" {
         &config.root_policy.supplemental_control_root,
         fixture.payload_root,
     );
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     restoreDormantTestOwnedBytes(
         allocator,
         &config.root_policy.supplemental_control_root,
@@ -5448,24 +7964,15 @@ test "dormant authority candidate validates only closed synthetic state" {
     );
 
     config.root_policy.observed_control.commit[0] = 'c';
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     config.root_policy.observed_control.commit[0] = 'a';
 
     config.root_policy.observed_control.tree[0] = 'c';
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     config.root_policy.observed_control.tree[0] = 'b';
 
     config.root_policy.observed_control.branch[0] = 'x';
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     config.root_policy.observed_control.branch[0] = 'm';
 
     const previous_status = try replaceDormantTestOwnedBytes(
@@ -5473,10 +7980,7 @@ test "dormant authority candidate validates only closed synthetic state" {
         &config.root_policy.observed_control.status,
         " M candidate.tsv\n",
     );
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     restoreDormantTestOwnedBytes(
         allocator,
         &config.root_policy.observed_control.status,
@@ -5488,10 +7992,7 @@ test "dormant authority candidate validates only closed synthetic state" {
         &config.root_policy.observed_control.remotes,
         "origin\n",
     );
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     restoreDormantTestOwnedBytes(
         allocator,
         &config.root_policy.observed_control.remotes,
@@ -5499,27 +8000,22 @@ test "dormant authority candidate validates only closed synthetic state" {
     );
 
     config.root_policy.observed_control.entries[0].object_id[0] = '5';
-    try std.testing.expectError(
-        error.DormantUnsafeRoot,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantUnsafeRoot);
     config.root_policy.observed_control.entries[0].object_id[0] = '1';
 
     config.root_policy.kind = .exact_real;
     config.root_policy.control_files[0].sha256[0] =
         if (candidate_sha[0] == '0') '1' else '0';
-    try std.testing.expectError(
+    try expectDormantReadinessRejection(
+        &fixture,
+        &config,
         error.DormantCandidateMismatched,
-        validateDormantAuthorityCandidate(&config),
     );
     config.root_policy.control_files[0].sha256[0] = candidate_sha[0];
     config.root_policy.kind = .synthetic_test;
 
     try fixture.deleteControl(dormant_candidate_key);
-    try std.testing.expectError(
-        error.DormantCandidateMissing,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantCandidateMissing);
     try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
 
     const mismatched_candidate = try fixture.candidateFor(
@@ -5531,24 +8027,23 @@ test "dormant authority candidate validates only closed synthetic state" {
     );
     defer allocator.free(mismatched_candidate);
     try fixture.replaceControl(dormant_candidate_key, mismatched_candidate);
-    try std.testing.expectError(
+    try expectDormantReadinessRejection(
+        &fixture,
+        &config,
         error.DormantCandidateMismatched,
-        validateDormantAuthorityCandidate(&config),
     );
     try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
 
     try fixture.deleteControl(dormant_generation_key);
-    try std.testing.expectError(
-        error.DormantGenerationMissing,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantGenerationMissing);
     try fixture.replaceControl(dormant_generation_key, fixture.manifest);
 
     const bad_generation = "not-a-manifest\n";
     try fixture.replaceControl(dormant_generation_key, bad_generation);
-    try std.testing.expectError(
+    try expectDormantReadinessRejection(
+        &fixture,
+        &config,
         error.DormantGenerationMismatched,
-        validateDormantAuthorityCandidate(&config),
     );
     try fixture.replaceControl(dormant_generation_key, fixture.manifest);
 
@@ -5562,43 +8057,32 @@ test "dormant authority candidate validates only closed synthetic state" {
     defer allocator.free(bad_generation_candidate);
     try fixture.replaceControl(dormant_generation_key, bad_generation);
     try fixture.replaceControl(dormant_candidate_key, bad_generation_candidate);
-    try std.testing.expectError(
+    try expectDormantReadinessRejection(
+        &fixture,
+        &config,
         error.DormantGenerationMalformed,
-        validateDormantAuthorityCandidate(&config),
     );
     try fixture.replaceControl(dormant_generation_key, fixture.manifest);
     try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
 
     try fixture.deleteControl(dormant_generation_key);
     try fixture.symlinkControl(dormant_generation_key, "candidate.tsv");
-    try std.testing.expectError(
-        error.DormantGenerationUnsafe,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantGenerationUnsafe);
     try fixture.deleteControl(dormant_generation_key);
     try fixture.replaceControl(dormant_generation_key, fixture.manifest);
 
     const malformed_candidate = dormant_candidate_magic ++ "\nwrong-header\nrow\n";
     try fixture.replaceControl(dormant_candidate_key, malformed_candidate);
-    try std.testing.expectError(
-        error.DormantCandidateMalformed,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantCandidateMalformed);
     try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
 
     try fixture.deleteControl(dormant_lineage_key);
-    try std.testing.expectError(
-        error.DormantLineageMissing,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantLineageMissing);
     try fixture.replaceControl(dormant_lineage_key, fixture.lineage);
 
     const wrong_lineage = fixture.lineage[0 .. fixture.lineage.len - 1];
     try fixture.replaceControl(dormant_lineage_key, wrong_lineage);
-    try std.testing.expectError(
-        error.DormantLineageMismatched,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantLineageMismatched);
     try fixture.replaceControl(dormant_lineage_key, fixture.lineage);
 
     const bad_lineage = dormant_lineage_magic ++ "\nwrong-header\nrow\n";
@@ -5612,35 +8096,23 @@ test "dormant authority candidate validates only closed synthetic state" {
     defer allocator.free(bad_lineage_candidate);
     try fixture.replaceControl(dormant_lineage_key, bad_lineage);
     try fixture.replaceControl(dormant_candidate_key, bad_lineage_candidate);
-    try std.testing.expectError(
-        error.DormantLineageMalformed,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantLineageMalformed);
     try fixture.replaceControl(dormant_lineage_key, fixture.lineage);
     try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
 
     try fixture.deleteControl(dormant_lineage_key);
     try fixture.symlinkControl(dormant_lineage_key, "../manifests/candidate.tsv");
-    try std.testing.expectError(
-        error.DormantLineageUnsafe,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantLineageUnsafe);
     try fixture.deleteControl(dormant_lineage_key);
     try fixture.replaceControl(dormant_lineage_key, fixture.lineage);
 
     try fixture.deleteControl(dormant_receipt_key);
-    try std.testing.expectError(
-        error.DormantReceiptMissing,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantReceiptMissing);
     try fixture.replaceControl(dormant_receipt_key, fixture.receipt);
 
     const wrong_receipt = fixture.receipt[0 .. fixture.receipt.len - 1];
     try fixture.replaceControl(dormant_receipt_key, wrong_receipt);
-    try std.testing.expectError(
-        error.DormantReceiptMismatched,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantReceiptMismatched);
     try fixture.replaceControl(dormant_receipt_key, fixture.receipt);
 
     const receipt_mismatch_sha =
@@ -5731,50 +8203,36 @@ test "dormant authority candidate validates only closed synthetic state" {
     defer allocator.free(bad_receipt_candidate);
     try fixture.replaceControl(dormant_receipt_key, bad_receipt);
     try fixture.replaceControl(dormant_candidate_key, bad_receipt_candidate);
-    try std.testing.expectError(
-        error.DormantReceiptMalformed,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantReceiptMalformed);
     try fixture.replaceControl(dormant_receipt_key, fixture.receipt);
     try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
 
     try fixture.deleteControl(dormant_receipt_key);
     try fixture.symlinkControl(dormant_receipt_key, "../../manifests/candidate.tsv");
-    try std.testing.expectError(
-        error.DormantReceiptUnsafe,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantReceiptUnsafe);
     try fixture.deleteControl(dormant_receipt_key);
     try fixture.replaceControl(dormant_receipt_key, fixture.receipt);
 
     config.expected_registration_path_hash[0] =
         if (config.expected_registration_path_hash[0] == '0') '1' else '0';
-    try std.testing.expectError(
-        error.DormantRegistrationStale,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantRegistrationStale);
     config.expected_registration_path_hash = config.guard.frozen.path_hash;
 
     try fixture.deletePayload(fixture.payload_key);
-    try std.testing.expectError(
-        error.DormantDestinationPartial,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantDestinationPartial);
     try fixture.replacePayload(fixture.payload_key, fixture.payload);
 
     try fixture.replacePayload(fixture.payload_key, "wrong payload\n");
-    try std.testing.expectError(
+    try expectDormantReadinessRejection(
+        &fixture,
+        &config,
         error.DormantDestinationMismatched,
-        validateDormantAuthorityCandidate(&config),
     );
     try fixture.replacePayload(fixture.payload_key, fixture.payload);
 
     try fixture.deletePayload(fixture.payload_key);
     try fixture.symlinkPayload(fixture.payload_key, "/dev/null");
-    try std.testing.expectError(
-        error.DormantDestinationUnsafe,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantDestinationUnsafe);
     try fixture.deletePayload(fixture.payload_key);
     try fixture.replacePayload(fixture.payload_key, fixture.payload);
 
@@ -5784,10 +8242,7 @@ test "dormant authority candidate validates only closed synthetic state" {
         .follow_symlinks = false,
     });
     try writeDormantFixtureRelative(io, payload_dir, "unexpected", "extra\n", 0o444);
-    try std.testing.expectError(
-        error.DormantDestinationExtra,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantDestinationExtra);
     try deleteDormantFixtureRelative(io, payload_dir, "unexpected");
 
     try fixture.deleteControl(dormant_candidate_key);
@@ -5803,17 +8258,14 @@ test "dormant authority candidate validates only closed synthetic state" {
         false,
     );
     try manifests.symLink(io, "generation-00000001.tsv", "candidate.tsv", .{});
-    try std.testing.expectError(
-        error.DormantCandidateUnsafe,
-        validateDormantAuthorityCandidate(&config),
-    );
+    try expectDormantReadinessRejection(&fixture, &config, error.DormantCandidateUnsafe);
     try manifests.deleteFile(io, "candidate.tsv");
     manifests.close(io);
     control_dir.close(io);
     try fixture.replaceControl(dormant_candidate_key, fixture.candidate);
     payload_dir.close(io);
 
-    _ = try validateDormantAuthorityCandidate(&config);
+    _ = try expectDormantReadinessSuccess(&fixture, &config);
     try fixture.deinitAfterSuccess();
     completed = true;
 }
