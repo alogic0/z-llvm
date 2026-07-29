@@ -7,6 +7,7 @@ const canonical_source = @import("zllvm_artifact_store/canonical_source.zig");
 const digest_model = @import("zllvm_artifact_store/digest.zig");
 const exact_real_observer = @import("zllvm_artifact_store/exact_real_observer.zig");
 const exact_real_receipt = @import("zllvm_artifact_store/exact_real_receipt.zig");
+const exact_real_runner = @import("zllvm_artifact_store/exact_real_runner.zig");
 const filesystem = @import("zllvm_artifact_store/filesystem.zig");
 const identity_model = @import("zllvm_artifact_store/identity.zig");
 const manifest_model = @import("zllvm_artifact_store/manifest.zig");
@@ -135,10 +136,6 @@ const dormant_real_source_root = authority_control.API.real_source_root;
 const dormant_git_executable = authority_control.API.git_executable;
 const dormant_git_bytes = authority_control.API.git_bytes;
 const dormant_git_sha256 = authority_control.API.git_sha256;
-const dormant_exact_real_copy_evidence_path =
-    authority_control.API.exact_real_copy_evidence_path;
-const dormant_exact_real_copy_evidence_sha256 =
-    authority_control.API.exact_real_copy_evidence_sha256;
 const dormant_exact_real_copy_evidence_max_bytes =
     authority_control.API.exact_real_copy_evidence_max_bytes;
 const ControlGitObservation = authority_control.API.ControlObservation;
@@ -149,7 +146,6 @@ const DormantAuthorityValidation = authority_control.API.AuthorityValidation;
 const readDormantControlFile = authority_control.API.readControlFile;
 const verifyDormantCopyEvidenceFromHeldRoot =
     authority_control.API.verifyCopyEvidenceFromHeldRoot;
-const validateDormantAuthorityCandidate = authority_control.API.validateCandidate;
 const validateAuthorityAncestry = authority_control.API.validateAncestry;
 const DormantReadinessNetEffects = exact_real_observer.API.NetEffects;
 const DormantExactAcceptanceSnapshotIdentity = exact_real_observer.API.SnapshotIdentity;
@@ -162,7 +158,9 @@ const captureDormantExactObserverRowFromDir = exact_real_observer.API.captureRow
 const appendDormantExactObserverLogicalRow = exact_real_observer.API.appendLogicalRow;
 const finishDormantExactObservation = exact_real_observer.API.finishObservation;
 const compareDormantExactRealObservations = exact_real_observer.API.compareObservations;
-const captureDormantExactRealObservation = exact_real_observer.API.captureObservation;
+const dormant_exact_real_acceptance_environment = exact_real_runner.acceptance_environment;
+const callDormantValidationReadinessForTest = exact_real_runner.callValidationReadiness;
+const runDormantExactRealAcceptanceForTest = exact_real_runner.runAcceptanceForTest;
 const dormant_exact_real_acceptance_receipt_directory =
     exact_real_receipt.API.receipt_directory;
 const dormant_exact_real_acceptance_receipt_basename =
@@ -277,64 +275,6 @@ fn prepareStoreRoot(
         root_path,
         createAbsoluteDirectorySynced,
     );
-}
-
-const dormant_exact_real_source_manifest_sha256 =
-    "61b7426bd52a3a139999f17f36d91ecaab954e6132fe36eca541480cdf31104d";
-const dormant_exact_real_source_inventory_sha256 =
-    "3234fb508d370878efe082cf1accb5af3b488372bf3f1ee7e9e87408a37a2d7c";
-const dormant_exact_real_source_file_ledger_sha256 =
-    "a06c48e1549d16b9f924cc2b5f0404e60d7755a785bf3a4a23311c2383279a65";
-const dormant_exact_real_source_destination_ledger_sha256 =
-    "4c29709b9ef9242dd799ab52d346cdf302f5728d35e37e0d78063e892a6cf9e8";
-const dormant_exact_real_acceptance_environment =
-    "ZLLVM_INBOX206CQ_EXACT_REAL_ACCEPTANCE";
-const dormant_exact_real_acceptance_token =
-    "INBOX-206CQ-EXACT-REAL-ACCEPTANCE-V1";
-const DormantExactRealValidationInput = struct {
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    source_manifest_sha256: []const u8,
-    source_inventory_sha256: []const u8,
-    source_file_ledger_sha256: []const u8,
-    source_destination_ledger_sha256: []const u8,
-    copy_evidence_path: []const u8,
-    copy_evidence_sha256: []const u8,
-};
-
-const DormantValidationReadinessInput = union(enum) {
-    exact_real: DormantExactRealValidationInput,
-    synthetic: *const DormantAuthorityConfig,
-};
-
-fn invokeDormantValidationReadinessForTest(
-    input: DormantValidationReadinessInput,
-) !DormantAuthorityValidation {
-    if (!builtin.is_test) return error.TestOnlyOperation;
-    return switch (input) {
-        .exact_real => |exact| blk: {
-            var config = try DormantAuthorityConfig.initExactRealCandidate(
-                exact.allocator,
-                exact.io,
-                exact.source_manifest_sha256,
-                exact.source_inventory_sha256,
-                exact.source_file_ledger_sha256,
-                exact.source_destination_ledger_sha256,
-                exact.copy_evidence_path,
-                exact.copy_evidence_sha256,
-            );
-            defer config.deinit();
-            break :blk try validateDormantAuthorityCandidate(&config);
-        },
-        .synthetic => |config| validateDormantAuthorityCandidate(config),
-    };
-}
-
-fn callDormantValidationReadinessForTest(
-    input: DormantValidationReadinessInput,
-) !DormantAuthorityValidation {
-    if (!builtin.is_test) return error.TestOnlyOperation;
-    return invokeDormantValidationReadinessForTest(input);
 }
 
 pub fn resolveAuthority(
@@ -525,92 +465,6 @@ fn testDormantReadinessObserverControls(
     defer publication_restored.deinit();
     try std.testing.expect(
         compareDormantReadinessStates(&baseline, &publication_restored).isUnchanged(),
-    );
-}
-
-fn requireDormantExactRealAcceptanceGate(token: ?[]const u8) !void {
-    if (!builtin.is_test) return error.TestOnlyOperation;
-    const value = token orelse return error.SkipZigTest;
-    if (!std.mem.eql(u8, value, dormant_exact_real_acceptance_token)) {
-        return error.SkipZigTest;
-    }
-}
-
-fn requireDormantExactAcceptanceValidation(
-    validation: DormantAuthorityValidation,
-) !void {
-    if (!std.mem.eql(
-        u8,
-        &validation.manifest_sha256,
-        dormant_exact_real_source_manifest_sha256,
-    ) or
-        validation.payload_files != 20 or
-        validation.payload_bytes != 9_970_364 or
-        validation.objects != 18 or
-        validation.snapshots != 2)
-    {
-        return error.DormantAcceptanceValidationMismatch;
-    }
-}
-
-fn runDormantExactRealAcceptanceForTest(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    token: ?[]const u8,
-) !void {
-    if (!builtin.is_test) return error.TestOnlyOperation;
-    try requireDormantExactRealAcceptanceGate(token);
-
-    var config = try DormantAuthorityConfig.initExactRealCandidate(
-        allocator,
-        io,
-        dormant_exact_real_source_manifest_sha256,
-        dormant_exact_real_source_inventory_sha256,
-        dormant_exact_real_source_file_ledger_sha256,
-        dormant_exact_real_source_destination_ledger_sha256,
-        dormant_exact_real_copy_evidence_path,
-        dormant_exact_real_copy_evidence_sha256,
-    );
-    defer config.deinit();
-    var before = try captureDormantExactRealObservation(&config);
-    defer before.deinit();
-    const validation = try validateDormantAuthorityCandidate(&config);
-    try requireDormantExactAcceptanceValidation(validation);
-    var after = try captureDormantExactRealObservation(&config);
-    defer after.deinit();
-    const effects = compareDormantExactRealObservations(&before, &after);
-    if (!effects.isUnchanged()) return error.DormantAcceptanceObservedMutation;
-    const evidence: DormantExactAcceptanceEvidence = .{
-        .control_root = config.control_root,
-        .authority_root = config.authority_root,
-        .payload_root = config.payload_root,
-        .source_root = config.source_root,
-        .source_manifest_sha256 = &config.source_manifest_sha256,
-        .source_inventory_sha256 = &config.expected_source_inventory_sha256,
-        .source_file_ledger_sha256 = &config.expected_source_file_ledger_sha256,
-        .source_destination_ledger_sha256 = &config.expected_source_destination_ledger_sha256,
-        .copy_evidence_path = config.expected_copy_evidence_path,
-        .copy_evidence_sha256 = &config.expected_copy_evidence_sha256,
-        .registration_full_sha256 = &config.expected_registration_full_hash,
-        .registration_path_sha256 = &config.expected_registration_path_hash,
-        .registration_topology_sha256 = &config.expected_registration_topology_hash,
-        .registration_non_main_sha256 = &config.expected_registration_non_main_hash,
-        .before_snapshot = before.identity,
-        .after_snapshot = after.identity,
-        .validation = validation,
-        .effects = effects,
-    };
-    const receipt = try encodeDormantExactAcceptanceReceipt(allocator, evidence);
-    defer allocator.free(receipt);
-    var receipt_directory = try openDormantExactAcceptanceReceiptDirectory(io);
-    defer receipt_directory.close(io);
-    try publishDormantExactAcceptanceReceipt(
-        allocator,
-        io,
-        receipt_directory,
-        receipt,
-        evidence,
-        .none,
     );
 }
 
