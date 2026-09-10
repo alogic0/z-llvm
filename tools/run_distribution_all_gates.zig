@@ -111,6 +111,13 @@ pub fn main(init: std.process.Init) !void {
     const target = target_env orelse "x86_64-unknown-linux-gnu";
     if (options.mode == .inventory) return writeInventory(io, target);
     _ = try real_rows_parallel.validateRoots(io, options.real_rows_validation_root.?, options.real_rows_cache_root.?);
+    real_rows_parallel.validateCacheSelection(io, options.real_rows_cache_root.?, if (options.fresh_real_rows) .fresh else .require_hit) catch |err| {
+        if (err == error.RealRowsFreshCacheAlreadyExists) std.debug.print(
+            "fresh real-row cache already exists under {s}; select an unused cache generation or run without --fresh-real-rows to require a cache hit\n",
+            .{options.real_rows_cache_root.?},
+        );
+        return err;
+    };
     const target_assignment = try std.fmt.allocPrint(allocator, "TARGET={s}", .{target});
     defer allocator.free(target_assignment);
     if (options.mode == .serial) {

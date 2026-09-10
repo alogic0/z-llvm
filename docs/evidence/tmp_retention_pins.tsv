@@ -6,6 +6,5 @@ tmp/o2_calls_perf	current-consumer	tools/o2_compiler_rt_v1_calls_performance.zig
 ../ziglang	compiler-dependency	bdee02bc0c7f227c0f11bc9a449df673fe803540	Required patched source, stage4 emitter and build state; outside blanket cleanup
 .zig-cache	current-build-cache	.zigversion=0.16.0	Current unit, compiler and integration builds; reuse during this development state
 zig-out	current-build-output	project-improvement source-files.sha256	Current z_llvm executable used by native and integration checks
-local-state/validations/project-improvement	active-validation	2026-09-10 fresh/cache pair	Fresh retry running after authorized external cleanup; compact after acceptance
-local-state/caches/project-improvement	current-air-cache	generation schema 3	Currently empty: export blocked at external preflight; selected root for fresh/cache comparison
-tmp/project-improvement-tier3-fresh-clean.log	active-validation-log	fresh-clean retry	Mutable fresh Tier-3 output; retain completed log in subsequent evidence commit
+local-state/validations/project-improvement	validation-root	completed fresh/cache pair	Empty root reserved for next runs; completed logs are versioned in docs/evidence/project_improvement
+local-state/caches/project-improvement	current-air-cache	generation schema 3; retry-source-files.sha256	One verified generation used by the passing full fresh/cache pair; retain for near-term required-hit reuse

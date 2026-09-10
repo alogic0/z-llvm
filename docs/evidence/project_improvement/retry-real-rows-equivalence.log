@@ -1,0 +1,1 @@
+summary real-rows-equivalence schema_version=4 expected=/tmp/zllvm-retry-real-rows-fresh.log actual=/tmp/zllvm-retry-real-rows-cached.log modes=3 canonical_records=21 semantic_match=true local_fail=0

@@ -20,8 +20,16 @@ the patched emitter. The [current keep-list](evidence/tmp_retention_pins.tsv)
 replaces historical retention pins. Every new cache or failure capture needs a
 current consumer or a bounded diagnostic reason.
 
-The external checkout prerequisite is resolved. Remaining completion work:
-finish the running fresh validation, complete its cached Tier-3 comparison, and close one
-named recurring real-function family through shared lowering. The standalone
-behavioral suite passes, but does not fulfill that last real-family requirement.
-The recorded failed integration attempt is not acceptance evidence.
+The cache retry fix is validated: full fresh and cached Tier-3 runs each passed
+17/17 subgates, and their 1,315 canonical records match. Completed logs, focused
+regressions and per-subgate timings are in the implementation evidence. The
+external checkout is clean; no validation run remains active.
+
+Next: close one named recurring real-function failure family through shared
+lowering. The retained discovery report identifies four pointer-return failures
+(`__memset`, `memset`, `ssp.__memset_chk`, `ssp.__strncpy_chk`) as a candidate;
+these also require composed memory intrinsic support. Select the bounded family,
+reproduce its failures, and add executable and nearby rejection cases before
+claiming closure. The passing standalone behavioral suite does not fulfill this
+remaining Phase-5 requirement. Keep accepted counters unchanged until an explicit
+evidence-backed migration is recorded.

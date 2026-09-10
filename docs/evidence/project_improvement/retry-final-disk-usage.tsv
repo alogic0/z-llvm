@@ -1,0 +1,8 @@
+allocated_bytes	path
+45821952	tmp
+4691501056	local-state
+680366080	local-state/artifacts
+4096	local-state/validations/project-improvement
+4011089920	local-state/caches/project-improvement
+1412059136	.zig-cache
+93741056	zig-out

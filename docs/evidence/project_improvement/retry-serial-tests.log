@@ -1,0 +1,44 @@
+1/43 run_distribution_all_gates.test.cache status classifies hit miss mixed and absent output...OK
+2/43 run_distribution_all_gates.test.slowest measurements sort by descending duration...OK
+3/43 run_distribution_all_gates.test.cache contracts distinguish explicit telemetry from unreported gates...OK
+4/43 run_distribution_all_gates.test.artifact contracts identify the producer and three consumers...OK
+5/43 run_distribution_all_gates.test.tracked parallel activation is bounded to real-row gates ten through twelve...OK
+6/43 run_distribution_all_gates.test.default and serial cohort paths compose the same explicit shared-runner contract...OK
+7/43 run_distribution_all_gates.test.distribution all emits one constant os-managed non-gating memory label...OK
+8/43 run_distribution_all_gates.test.filesystem sample parser reads df size and available bytes...OK
+9/43 run_distribution_all_gates.test.bounded fake serial orchestration uses all 17 authoritative subgates in order...OK
+10/43 run_distribution_all_gates.test.generated serial paths are unique across repeated invocations...OK
+11/43 run_distribution_all_gates.test.explicit pre-existing serial path is refused without mutation...OK
+12/43 run_distribution_all_gates.test.partial bundle publication is cleaned only with its run-owned scratch...OK
+13/43 run_distribution_all_gates.test.published run-owned bundle refuses a second publisher...OK
+14/43 run_distribution_all_gates.test.bundle evidence rejects consumer identity movement...OK
+15/43 release_source_object_bundle.test.bundle publisher and consumer preserve row and content identity...OK
+16/43 distribution_headroom_policy.test.policy derives the accepted serial threshold from filesystem size...OK
+17/43 distribution_headroom_policy.test.tracker initializes minimum from the first sample without a sentinel...OK
+18/43 distribution_headroom_policy.test.sharding policy derives the ten-percent floor plus projected peak...OK
+19/43 run_distribution_real_rows_parallel.test.fixed group contains exactly fast safe small in manifest order...OK
+20/43 run_distribution_real_rows_parallel.test.available memory parser requires one bounded checked MemAvailable kB field...OK
+21/43 run_distribution_real_rows_parallel.test.load average parser accepts one bounded decimal token and rejects malformed input...OK
+22/43 run_distribution_real_rows_parallel.test.production argv construction covers every actual mode and isolated path...OK
+23/43 run_distribution_real_rows_parallel.test.cache policy admits only explicit fresh or authenticated hit operation...OK
+24/43 run_distribution_real_rows_parallel.test.root selections reject missing absolute escape symlink owner and mode drift before execution...OK
+25/43 run_distribution_real_rows_parallel.test.fixed capacity admits exact start boundary emits schema two and rejects insufficient capacity...OK
+26/43 run_distribution_real_rows_parallel.test.normalization removes only frozen volatile scheduling fields...OK
+27/43 run_distribution_real_rows_parallel.test.resource state records os-managed memory and fails closed below disk floor...OK
+28/43 run_distribution_real_rows_parallel.test.os-managed memory records low samples without launch block or policy termination...OK
+29/43 run_distribution_real_rows_parallel.test.os-managed memory keeps child failure fail closed...OK
+30/43 run_distribution_real_rows_parallel.test.failure manifest binds os-managed memory diagnostics and explicit child states...OK
+31/43 run_distribution_real_rows_parallel.test.required cache miss fails closed before any worker launch...OK
+32/43 run_distribution_real_rows_parallel.test.successful fixed group buffers and returns outputs in manifest order...OK
+33/43 run_distribution_real_rows_parallel.test.fresh population and authenticated hit reuse share exact mode-owned roots without fallback...OK
+34/43 run_distribution_real_rows_parallel.test.fresh cache preflight rejects every existing mode before creating run state...OK
+35/43 run_distribution_real_rows_parallel.test.fresh cache preflight preserves files and rejects dangling mode symlinks...OK
+36/43 run_distribution_real_rows_parallel.test.partial wait-future setup reaps every worker before closing descriptors...OK
+37/43 run_distribution_real_rows_parallel.test.injected child failure preserves bounded stdout and stderr after reap without obscuring the primary failure...OK
+38/43 run_distribution_real_rows_parallel.cohort_output.test.summary rejects substring counters duplicate keys and malformed tokens...OK
+39/43 run_distribution_real_rows_parallel.cohort_output.test.field lookup matches a complete key and parser rejects malformed hashes...OK
+40/43 run_distribution_real_rows_parallel.cohort_output.test.four-member cohort output is exact and fails closed on drift...OK
+41/43 distribution_real_rows_parallel_policy.test.real-row parallel policy uses exact fixed floor projected peak and checked start...OK
+42/43 distribution_real_rows_parallel_policy.test.real-row parallel policy admits exact filesystem boundary and rejects smaller filesystems...OK
+43/43 distribution_real_rows_parallel_policy.test.real-row parallel policy checked addition fails closed on overflow...OK
+All 43 tests passed.

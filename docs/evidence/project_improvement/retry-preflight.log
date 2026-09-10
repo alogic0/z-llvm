@@ -1,0 +1,19 @@
+fresh real-row cache already exists under local-state/caches/project-improvement; select an unused cache generation or run without --fresh-real-rows to require a cache hit
+error: RealRowsFreshCacheAlreadyExists
+/home/oleg/prog/z_llvm/tools/run_distribution_real_rows_parallel.zig:238:52: 0x11f2269 in validateCacheSelection (run_distribution_all_gates.zig)
+            if (std.mem.eql(u8, entry.name, mode)) return error.RealRowsFreshCacheAlreadyExists;
+                                                   ^
+/home/oleg/prog/z_llvm/tools/run_distribution_all_gates.zig:119:9: 0x1222573 in main (run_distribution_all_gates.zig)
+        return err;
+        ^
+distribution-all
++- run /home/oleg/.zig/0.16.0/files/zig failure
+error: process exited with error code 1
+failed command: /home/oleg/.zig/0.16.0/files/zig run tools/run_distribution_all_gates.zig -- --serial --fresh-real-rows --serial-root=local-state/validations/project-improvement/retry-negative --real-rows-validation-root=local-state/validations/project-improvement --real-rows-cache-root=local-state/caches/project-improvement --zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig
+
+Build Summary: 0/2 steps succeeded (1 failed)
+distribution-all transitive failure
++- run /home/oleg/.zig/0.16.0/files/zig failure
+
+error: the following build command failed with exit code 1:
+.zig-cache/o/8cc0f3551a30abfe62ec37e1f6177ef5/build /home/oleg/.zig/0.16.0/files/zig /home/oleg/.zig/0.16.0/files/lib /home/oleg/prog/z_llvm .zig-cache /home/oleg/.cache/zig --seed 0xdab3886f -Z40a891781cd807a4 distribution-all -- --serial --fresh-real-rows --serial-root=local-state/validations/project-improvement/retry-negative --real-rows-validation-root=local-state/validations/project-improvement --real-rows-cache-root=local-state/caches/project-improvement --zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig

@@ -1,6 +1,7 @@
 const std = @import("std");
 
-const schema_version = 3;
+const schema_version = 4;
+const cohort_output = @import("run_distribution_real_rows_parallel/cohort_output.zig");
 
 const CanonicalLog = struct {
     records: [][]u8,
@@ -13,7 +14,9 @@ pub fn main(init: std.process.Init) !void {
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
     defer args.deinit();
     _ = args.skip();
-    const expected_path = args.next() orelse return error.MissingExpectedLog;
+    const first_arg = args.next() orelse return error.MissingExpectedLog;
+    const real_rows_only = std.mem.eql(u8, first_arg, "--real-rows");
+    const expected_path = if (real_rows_only) args.next() orelse return error.MissingExpectedLog else first_arg;
     const actual_path = args.next() orelse return error.MissingActualLog;
     if (args.next() != null) return error.UnexpectedArgument;
 
@@ -21,9 +24,9 @@ pub fn main(init: std.process.Init) !void {
     const repo_path_len = try std.Io.Dir.cwd().realPathFile(io, ".", &repo_path_buffer);
     const repo_path = repo_path_buffer[0..repo_path_len];
 
-    const expected = try canonicalLog(allocator, io, expected_path, repo_path);
+    const expected = try canonicalLog(allocator, io, expected_path, repo_path, real_rows_only);
     defer freeLog(allocator, expected);
-    const actual = try canonicalLog(allocator, io, actual_path, repo_path);
+    const actual = try canonicalLog(allocator, io, actual_path, repo_path, real_rows_only);
     defer freeLog(allocator, actual);
 
     var stderr_buffer: [4096]u8 = undefined;
@@ -48,7 +51,10 @@ pub fn main(init: std.process.Init) !void {
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
-    try stdout_writer.interface.print(
+    if (real_rows_only) try stdout_writer.interface.print(
+        "summary real-rows-equivalence schema_version={} expected={s} actual={s} modes=3 canonical_records={} semantic_match=true local_fail=0\n",
+        .{ schema_version, expected_path, actual_path, expected.records.len },
+    ) else try stdout_writer.interface.print(
         "summary distribution-all-equivalence schema_version={} expected={s} actual={s} gates={} canonical_records={} semantic_match=true local_fail=0\n",
         .{ schema_version, expected_path, actual_path, expected.gate_count, expected.records.len },
     );
@@ -60,9 +66,12 @@ fn canonicalLog(
     io: std.Io,
     path: []const u8,
     repo_path: []const u8,
+    real_rows_only: bool,
 ) !CanonicalLog {
     const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(512 * 1024 * 1024));
     defer allocator.free(contents);
+    const real_rows_modes = try validateRealRowsRecords(contents);
+    if (real_rows_only and real_rows_modes != 3) return error.IncompleteRealRowsModes;
     // Serial roots are explicitly selected and need not contain a numeric PID.
     // Normalize only the root declared by this log's preflight record.
     var serial_root: ?[]const u8 = null;
@@ -90,8 +99,44 @@ fn canonicalLog(
     errdefer freeRecords(allocator, owned_records);
     return .{
         .records = owned_records,
-        .gate_count = try validateStructure(allocator, owned_records),
+        .gate_count = if (real_rows_only) 0 else try validateStructure(allocator, owned_records),
     };
+}
+
+fn validateRealRowsRecords(contents: []const u8) !usize {
+    const modes = [_][]const u8{ "ReleaseFast", "ReleaseSafe", "ReleaseSmall" };
+    var seen = [_]bool{false} ** modes.len;
+    var start: ?usize = null;
+    var offset: usize = 0;
+    var cache_mode: ?cohort_output.CacheMode = null;
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        const line_start = offset;
+        offset += line.len + 1;
+        if (std.mem.startsWith(u8, line, "distribution-real-rows ")) {
+            if (start != null) return error.IncompleteRealRowsRecords;
+            start = line_start;
+            cache_mode = null;
+        } else if (start != null and std.mem.startsWith(u8, line, "air-export-cache ")) {
+            const status = fieldValue(line, "status") orelse return error.MissingRealRowsCacheStatus;
+            cache_mode = if (std.mem.eql(u8, status, "fresh-export")) .fresh else if (std.mem.eql(u8, status, "hit")) .require_hit else return error.InvalidRealRowsCacheStatus;
+        } else if (std.mem.startsWith(u8, line, "execution-cohort-row ")) {
+            if (start == null) return error.OrphanedCohortRecord;
+        } else if (std.mem.startsWith(u8, line, "summary distribution-real-rows ")) {
+            const block_start = start orelse return error.OrphanedRealRowsSummary;
+            const mode = fieldValue(line, "mode") orelse return error.MissingRealRowsMode;
+            try cohort_output.validate(contents[block_start .. line_start + line.len], mode, cache_mode orelse return error.MissingRealRowsCacheStatus);
+            for (modes, 0..) |expected, index| {
+                if (!std.mem.eql(u8, mode, expected)) continue;
+                if (seen[index]) return error.DuplicateRealRowsMode;
+                seen[index] = true;
+            }
+            start = null;
+        }
+    }
+    if (start != null) return error.IncompleteRealRowsRecords;
+    if ((seen[0] or seen[1] or seen[2]) and !(seen[0] and seen[1] and seen[2])) return error.IncompleteRealRowsModes;
+    return if (seen[0]) 3 else 0;
 }
 
 fn canonicalRecord(
@@ -118,6 +163,10 @@ fn canonicalRecord(
         try removeFields(allocator, line, &.{"cache_mode"})
     else if (std.mem.startsWith(u8, line, "air-export-cache "))
         try removeFields(allocator, line, &.{ "status", "duration_ms" })
+    else if (std.mem.startsWith(u8, line, "execution-cohort-row "))
+        // These independently built wrappers embed the unique run path in debug
+        // metadata. Raw records are validated above and retain both hashes.
+        try removeFields(allocator, line, &.{ "reference_sha256", "linked_sha256" })
     else if (std.mem.startsWith(u8, line, "summary distribution-all-serial-run "))
         try removeFields(allocator, line, &.{ "run_id", "fresh_real_rows" })
     else if (std.mem.startsWith(u8, line, "summary distribution-all-serial "))
@@ -381,4 +430,41 @@ test "serial normalization removes run observations but retains semantic counter
     try std.testing.expect(std.mem.indexOf(u8, first, "subgates=17") != null);
     try std.testing.expect(std.mem.indexOf(u8, first, "local_fail=0") != null);
     try std.testing.expectError(error.RealRowsParallelEvidenceSchemaMismatch, canonicalRecord(allocator, "real-rows-mode-parallel schema_version=1 normalization_schema=1", "/repo"));
+}
+
+test "cohort wrapper hashes normalize only after strict complete mode validation" {
+    const allocator = std.testing.allocator;
+    const fast = try cohort_output.syntheticOutputForTest("ReleaseFast", "fresh-export", allocator);
+    defer allocator.free(fast);
+    const safe = try cohort_output.syntheticOutputForTest("ReleaseSafe", "fresh-export", allocator);
+    defer allocator.free(safe);
+    const small = try cohort_output.syntheticOutputForTest("ReleaseSmall", "fresh-export", allocator);
+    defer allocator.free(small);
+    const all = try std.mem.concat(allocator, u8, &.{ fast, safe, small });
+    defer allocator.free(all);
+    try std.testing.expectEqual(@as(usize, 3), try validateRealRowsRecords(all));
+    try std.testing.expectError(error.IncompleteRealRowsModes, validateRealRowsRecords(fast));
+    const malformed = try std.mem.replaceOwned(u8, allocator, all, "reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reference_sha256=bad");
+    defer allocator.free(malformed);
+    try std.testing.expectError(error.RealRowsOutputInvalidHash, validateRealRowsRecords(malformed));
+    var lines = std.mem.splitScalar(u8, fast, '\n');
+    while (lines.next()) |line| {
+        if (!std.mem.startsWith(u8, line, "execution-cohort-row ")) continue;
+        const changed = try std.mem.replaceOwned(u8, allocator, line, "reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "reference_sha256=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        defer allocator.free(changed);
+        const first = (try canonicalRecord(allocator, line, "/repo")).?;
+        defer allocator.free(first);
+        const second = (try canonicalRecord(allocator, changed, "/repo")).?;
+        defer allocator.free(second);
+        try std.testing.expectEqualStrings(first, second);
+        try std.testing.expect(std.mem.indexOf(u8, first, "object_sha256=") != null);
+        try std.testing.expect(std.mem.indexOf(u8, first, "result_sha256=") != null);
+        try std.testing.expect(std.mem.indexOf(u8, first, "reference_bytes=1") != null);
+        const different_object = try std.mem.replaceOwned(u8, allocator, line, "object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "object_sha256=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        defer allocator.free(different_object);
+        const third = (try canonicalRecord(allocator, different_object, "/repo")).?;
+        defer allocator.free(third);
+        try std.testing.expect(!std.mem.eql(u8, first, third));
+        break;
+    }
 }

@@ -41,10 +41,32 @@ zig build distribution-all -- --serial --fresh-real-rows \
   --real-rows-cache-root=local-state/caches/current
 ```
 
+A fresh run requires a cache root without any `ReleaseFast`, `ReleaseSafe`, or
+`ReleaseSmall` entries. The runner checks this before launching subgates. After
+a failed fresh run, inspect the retained cache before choosing a new generation;
+remove only verified disposable state. Existing generations are never overwritten.
+
 For a cached comparison, reuse the same roots and omit `--fresh-real-rows`.
 The runner allocates unique run directories. All three root/emitter selections
 are required. Validation/cache roots must exist, be relative, and have the same
 final component (`current` above); see [the recorded command](docs/evidence/project_improvement/implementation.md).
+
+To reproduce only the real-row group, use the project compiler on PATH and run:
+
+```sh
+zig run tools/run_distribution_real_rows_parallel.zig -- --fresh-export \
+  --scratch-root=local-state/validations/current \
+  --export-cache-root=local-state/caches/current \
+  --zig-emitter=/absolute/path/to/ziglang/build/stage4/bin/zig
+```
+
+Omit `--fresh-export` for the required-hit run; cached execution still reruns all
+real-row and cohort checks. The same root restrictions apply.
+
+Compare focused logs with `zig run tools/compare_distribution_all_logs.zig -- --real-rows fresh.log cached.log`.
+For full Tier-3 logs, omit `--real-rows`. Both modes validate the raw cohort records
+before normalizing the independently built wrapper hashes; selected object hashes,
+byte counts, results and counters must still match.
 
 ## Artifacts and project status
 

@@ -1,5 +1,10 @@
 # Project improvement implementation evidence
 
+Current result: the cache retry fix passed focused validation and the full fresh/
+cached Tier-3 pair, with 17/17 subgates passing in each and 1,315 matching canonical
+records. The original plan's named real-function failure-family closure remains
+open. Accepted baseline counters are unchanged.
+
 Started 2026-09-10 from HEAD `52e538c5` with an existing uncommitted store
 replacement, parser/build edits, and migrated evidence. Those changes were
 preserved and reviewed. The four-member cohort belongs to that development
@@ -80,9 +85,11 @@ Zig compiles identical driver sources for both object sets. Legal inputs use
 wrapping arithmetic, positive power-of-two divisors, bounded shifts and loop
 counts, and initialized stack memory. Seeds and boundary inputs are fixed.
 
-## Final acceptance runs
+## Initial validation and failed integration attempts
 
-Focused validation passed. The external checkout blocker has been resolved and a fresh Tier-3 retry is running; fresh/cache acceptance remains pending. Accepted baseline counters are unchanged.
+The following records describe validation before checkpoint `44a87146`. The
+completed fresh retry and its cached comparison are recorded in the cache retry
+section below. Accepted baseline counters are unchanged.
 
 Tier-3 preflight: changed gate-output parsing, build compiler propagation, mandatory
 behavioral canaries, and shared signed-immediate lowering. These trigger the
@@ -164,22 +171,23 @@ remaining manifests. Abandoned output trees from the intentionally stopped
 integration attempt and the empty legacy AIR cache directory were also removed.
 
 
-## Final observed integration state
+## Historical integration failure before checkpoint
 
 The corrected fresh run passed all nine subgates through
 `integrated-object-release`. The three real-row children then exited with
 `ExternalRepositoryDirty` before AIR export or cohort execution. Their raw stdout,
 stderr and failure manifest are retained as `tier3-child-*` beside the complete
-`tier3-fresh.log`. This is a failed acceptance attempt, not a passing Tier-3 run.
-No cached acceptance run or fresh/cache equivalence is claimed.
+`tier3-fresh.log`. This was a failed acceptance attempt, not a passing Tier-3 run.
+It provided no cached acceptance or fresh/cache equivalence evidence.
 
 The pinned checkout has exactly one reported untracked file:
 `/home/oleg/prog/ziglang/doc/langref_to_markdown.py` (`external-status.txt`).
 `src/distribution_execution_cohort_v1.zig:requireExternalRepositoryClean` checks
 `git status --porcelain=v1 --untracked-files=all`. The unrelated file was left
-untouched. This historical failure was resolved by the user-authorized deletion recorded below; the cleanliness requirement was not weakened. Resume with the documented
-fresh command after that prerequisite is resolved, then run the cached command
-and compare with `tools/compare_distribution_all_logs.zig` (28 tests passed).
+untouched at that point. The user-authorized deletion recorded below resolved
+this historical failure; the cleanliness requirement was preserved. The next
+required checks were the fresh/cached pair and log comparison (the comparator
+then passed 28 tests).
 
 An additional composed-only discovery used the currently retained compiler-rt
 input `tmp/o2_calls_perf/compiler_rt_v1/compiler_rt_v1.ll`, SHA-256
@@ -193,11 +201,11 @@ return failures (`__memset`, `memset`, `ssp.__memset_chk`, `ssp.__strncpy_chk`),
 which also need composed memory intrinsic support; no admission-only change was
 made or closure claimed. Phase 5's real-family requirement remains unfinished.
 
-Final allocated sizes are recorded in `final-disk-usage.tsv`: tmp 45,821,952 bytes,
+Checkpoint allocated sizes are recorded in `final-disk-usage.tsv`: tmp 45,821,952 bytes,
 local-state 680,484,864 bytes, current Zig build cache 1,289,961,472 bytes and
 current installed build 93,741,056 bytes. Failed real-row captures are small and
-retained for the blocker; the selected AIR cache root is empty because export
-was never reached. No validation processes remain active. The final current-doc
+retained for the blocker; the selected AIR cache root was empty because export
+was never reached. No validation processes were active at that checkpoint. The current-doc
 check passed for 14 documents, 50 internal file links and two generated status
 blocks; `git diff --check` passed. Source file hashes accompany this report.
 
@@ -218,7 +226,7 @@ candidate contract and project source state.
 
 The user requested committing the current implementation. This is an intermediate
 checkpoint, not yet milestone-green under `docs/validation_tiers.md`. The fresh
-retry has passed the first six subgates and is running `integrated-object-preopt`
+retry had passed the first six subgates and was running `integrated-object-preopt`
 at this checkpoint. Its live log was moved to
 `tmp/project-improvement-tier3-fresh-clean.log`; the open writer continues using
 that same file. The mutable log is excluded from this commit. Retain the completed
@@ -228,3 +236,133 @@ real-function family requirement remains open and accepted counters do not move.
 Source, tests, docs, completed focused logs and retention manifests are committed
 together. No generated artifact objects, build cache or active validation tree
 are included. The recorded source hashes still match the implemented files.
+
+
+## Cache retry correction
+
+After checkpoint `44a87146`, the fresh retry passed nine subgates and failed
+with `PathAlreadyExists` when creating its first mode-cache root. Its completed
+log is `tier3-fresh-clean-failed.log`. The previous child failure had left three
+empty `MODE/export` directory pairs. Inspection found no files or symlinks;
+`rmdir` removed only those six empty directories and would have failed on content.
+
+The shared cache-selection preflight now rejects any existing mode entry before
+creating run state. The full runner calls it before the first subgate and reports
+`RealRowsFreshCacheAlreadyExists` with a cache-selection remedy. Files and dangling
+symlinks also reject without being modified. This preserves the unused-generation
+contract; it does not silently overwrite a retained or active cache. The standalone
+parallel runner now exposes `--fresh-export` for reproducing the same production
+fresh path directly, with required-hit reuse as its default.
+
+Tests: 25 parallel-runner and 43 serial-runner tests passed. A full-runner negative
+using the actual leftover directories rejected before any `gate-start` or scratch
+allocation (`retry-preflight.log`). A direct fresh/cached pair uses isolated roots
+ending in `project-improvement-probe` before the full retry. Gate/cache changes
+require a new fresh/cache Tier-3 pair; the earlier failing runs cannot prove it.
+The full pair used unchanged source, target, emitter, candidate pin and
+expected counters, roots ending in `project-improvement`, and serial run roots
+`retry-fresh`/`retry-cached`. Its completed results are recorded below.
+
+The direct fresh group passed (exit 0) in 1,359,404 ms. Each mode reported
+100 lowered, 100 objects, 100 native links, 4 cohort functions and 4 paired
+harnesses, with zero failures. Fresh cache export took 587,837 ms (Fast),
+608,037 ms (Safe) and 474,448 ms (Small). `retry-real-rows-fresh.log` retains the
+complete strict records and parent cache verification evidence. The required-hit
+run against those same caches subsequently passed, as recorded below. The final
+comparator plus imported runner tests passed (31 tests).
+
+
+### Comparison schema 4
+
+The direct cached run exposed a pre-existing comparison limitation: Fast harness
+executables embed the unique run directory in debug information, so their whole
+file hashes change across identical executions. Extracted `.text` hashes of both
+the reference and linked Fast binaries are equal across fresh/cache runs. Both
+sampled Small binaries are byte-identical. Hashes and sizes are recorded in
+`retry-wrapper-binary-check.tsv`; `strings` confirms the unique work path in the
+Fast reference executable. All twelve completed cohort rows match in every field
+except `reference_sha256` and `linked_sha256`.
+
+The comparator schema is now 4. It validates complete raw real-row records in all
+three modes using the production strict parser before dropping those two wrapper
+hash fields from comparison. Raw logs retain their per-run hashes. Descriptor and
+selected-object hashes, byte counts, results, witnesses, stdout hashes, exit
+statuses and counters remain exact comparisons. Malformed hashes and incomplete
+mode sets reject before normalization. A `--real-rows` comparison entrypoint uses
+this same logic for standalone focused logs without claiming a 17-subgate run.
+This utility-only change does not alter the running native gates or their inputs.
+
+The direct required-hit group passed (exit 0), wall_ms=766130.
+All three cache statuses were hit; every mode again reported 100/100/100 and
+4/4 with zero failures. The schema-4 comparator reports 21 canonical records
+matching across all three modes (`retry-real-rows-equivalence.log`).
+
+Starting the authoritative full fresh run:
+`/home/oleg/.zig/0.16.0/files/zig build distribution-all -- --serial --fresh-real-rows --serial-root=local-state/validations/project-improvement/retry-fresh --real-rows-validation-root=local-state/validations/project-improvement --real-rows-cache-root=local-state/caches/project-improvement --zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig`.
+Live output: `tmp/project-improvement-tier3-retry-fresh.log`. The source snapshot
+`retry-source-files.sha256` now includes the comparator schema-4 change. The
+external checkout is clean and the selected fresh cache generation is empty.
+
+
+The full fresh Tier-3 run passed all 17 subgates (exit 0), wall_ms=2726375.
+Each real-row mode passed 100 lowered/emitted/linked rows and 4/4 cohort execution;
+the seven original integrated-executable cases and all 24 behavioral program
+pairs (6,528 observations, 10 composed functions, zero fallbacks) passed. The
+release bundle was produced once and reused by three consumers with identity
+`a5dcce564ade761f3cf47c9767f69615cdadbe0d6c2cc88419efaaf52e9518fa`.
+The completed log is `tier3-retry-fresh.log`. The strict comparator parses its
+17 complete gate lifecycles and 1,315 canonical records successfully.
+
+The full cached run used the same command, omitting `--fresh-real-rows`, setting
+serial root to `retry-cached`, and retaining the same validation/cache roots and
+emitter. Both completed logs are retained in this directory; their temporary
+copies were removed after comparison.
+
+
+## Completed cache retry acceptance
+
+Both full runs exited 0 with all 17 subgates passing. Fresh wall time was
+2,726,375 ms (45m 26s); cached wall time was 2,036,697 ms (33m 57s).
+`tier3-retry-timings.tsv` records each subgate's elapsed time and cache status;
+the three real-row modes execute in parallel, so their times must not be added
+to estimate wall time. All three fresh cache statuses were miss, all three cached
+statuses were hit, and each mode retained the same cache key and descriptor size.
+
+The final comparison command was:
+
+```sh
+/home/oleg/.zig/0.16.0/files/zig run tools/compare_distribution_all_logs.zig -- \
+  docs/evidence/project_improvement/tier3-retry-fresh.log \
+  docs/evidence/project_improvement/tier3-retry-cached.log
+```
+
+`tier3-retry-equivalence.log` reports schema 4, 17 gates, 1,315 canonical records,
+`semantic_match=true` and `local_fail=0`. Raw cohort records validate before the
+two documented wrapper hashes are normalized. Each mode again passed 100 lowered,
+100 emitted and 100 linked rows, four executed cohort functions and four paired
+harnesses. The integrated executable gate passed all seven original cases and
+24 behavioral program/mode pairs, 6,528 observations across 10 composed function
+identities, with no structural fallback. Both runs produced the same release
+bundle identity once and reused it in three consumers.
+
+Relevant source hashes matched `retry-source-files.sha256` before and after the
+pair; the patched emitter checkout remained clean at the recorded pin. The live
+child compiler observation in `retry-child-compiler.txt` confirms Zig 0.16.0 even
+with the other Zig version on the original PATH. Focused checks passed 25 parallel
+runner tests, 43 serial runner tests and 31 comparator/imported tests. The actual
+leftover-cache negative rejected before the first subgate (`retry-preflight.log`).
+
+The separate focused fresh/cached pair also passed all three modes and matched
+21 canonical records. Its duplicate cache and scratch trees were removed after
+preserving complete logs and wrapper binary/text hashes. Full-run scratch trees
+were removed by their runners. Historical failure copies were checked against
+versioned evidence before deletion, and the old empty mode/work directories were
+removed using `rmdir`. `retry-cleanup.txt` records those removals;
+`retry-final-disk-usage.tsv` records remaining allocated sizes. One AIR generation
+(4,011,089,920 allocated bytes) remains for near-term required-hit reuse. The
+validation root is empty and no validation process remains running.
+
+This completes cache/gate infrastructure acceptance for this implementation state.
+It does not close the original plan's named recurring real-function family or
+migrate the inherited three-member accepted baseline to the four-member development
+cohort. That family remains the next implementation task.

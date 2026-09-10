@@ -126,6 +126,7 @@ const OwnedPaths = struct {
 
     fn init(allocator: std.mem.Allocator, io: std.Io, scratch_path: []const u8, export_cache_path: []const u8, cache_mode: CacheMode) !OwnedPaths {
         const scratch_owner = try validateRoots(io, scratch_path, export_cache_path);
+        try validateCacheSelection(io, export_cache_path, cache_mode);
         const cache_owner = scratch_owner;
         var random_bytes: [16]u8 = undefined;
         var cwd = std.Io.Dir.cwd();
@@ -222,6 +223,21 @@ pub fn validateRoots(io: std.Io, scratch_path: []const u8, export_cache_path: []
     const cache_owner = try requireCanonicalContractBase(io, export_cache_path);
     if (!std.mem.eql(u8, scratch_owner, cache_owner)) return error.RealRowsRootSelectionMismatch;
     return scratch_owner;
+}
+
+/// Fresh exports require an unused generation. Check every mode before creating
+/// any runner paths; even an empty mode directory may belong to another run.
+pub fn validateCacheSelection(io: std.Io, export_cache_path: []const u8, cache_mode: CacheMode) !void {
+    _ = try requireCanonicalContractBase(io, export_cache_path);
+    if (cache_mode != .fresh) return;
+    var root = try std.Io.Dir.cwd().openDir(io, export_cache_path, .{ .iterate = true, .follow_symlinks = false });
+    defer root.close(io);
+    var entries = root.iterate();
+    while (try entries.next(io)) |entry| {
+        for (modes) |mode| {
+            if (std.mem.eql(u8, entry.name, mode)) return error.RealRowsFreshCacheAlreadyExists;
+        }
+    }
 }
 
 fn requireCanonicalContractBase(io: std.Io, path: []const u8) ![]const u8 {
@@ -1307,11 +1323,15 @@ pub fn main(init: std.process.Init) !void {
     var scratch_root: ?[]const u8 = null;
     var export_cache_root: ?[]const u8 = null;
     var zig_emitter: ?[]const u8 = null;
+    var cache_mode: CacheMode = .require_hit;
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
     defer args.deinit();
     _ = args.skip();
     while (args.next()) |arg| {
-        if (std.mem.startsWith(u8, arg, "--concurrency=")) {
+        if (std.mem.eql(u8, arg, "--fresh-export")) {
+            if (cache_mode == .fresh) return error.DuplicateFreshExport;
+            cache_mode = .fresh;
+        } else if (std.mem.startsWith(u8, arg, "--concurrency=")) {
             concurrency = try std.fmt.parseUnsigned(u8, arg["--concurrency=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--scratch-root=")) {
             if (scratch_root != null) return error.DuplicateRealRowsScratchRoot;
@@ -1339,6 +1359,7 @@ pub fn main(init: std.process.Init) !void {
         .scratch_path = selected_scratch_root,
         .export_cache_path = selected_export_cache_root,
         .concurrency = concurrency,
+        .cache_mode = cache_mode,
     });
     defer result.deinit(allocator);
     var buffer: [4096]u8 = undefined;
@@ -1820,6 +1841,48 @@ const FixtureRoots = struct {
         roots.* = undefined;
     }
 };
+
+test "fresh cache preflight rejects every existing mode before creating run state" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+    var roots = try fixtureRootsWithCaches(allocator, io, &temp, false);
+    defer roots.deinit(allocator);
+    const cwd = std.Io.Dir.cwd();
+    for (modes) |mode| {
+        const path = try std.fs.path.join(allocator, &.{ roots.cache, mode });
+        defer allocator.free(path);
+        try cwd.createDir(io, path, .default_dir);
+        try std.testing.expectError(error.RealRowsFreshCacheAlreadyExists, OwnedPaths.init(allocator, io, roots.scratch, roots.cache, .fresh));
+        var scratch = try cwd.openDir(io, roots.scratch, .{ .iterate = true });
+        defer scratch.close(io);
+        var entries = scratch.iterate();
+        try std.testing.expectEqual(@as(?std.Io.Dir.Entry, null), try entries.next(io));
+        try cwd.deleteDir(io, path);
+    }
+    try validateCacheSelection(io, roots.cache, .fresh);
+}
+
+test "fresh cache preflight preserves files and rejects dangling mode symlinks" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+    var roots = try fixtureRootsWithCaches(allocator, io, &temp, false);
+    defer roots.deinit(allocator);
+    const path = try std.fs.path.join(allocator, &.{ roots.cache, modes[0] });
+    defer allocator.free(path);
+    const cwd = std.Io.Dir.cwd();
+    try cwd.writeFile(io, .{ .sub_path = path, .data = "retained generation" });
+    try std.testing.expectError(error.RealRowsFreshCacheAlreadyExists, validateCacheSelection(io, roots.cache, .fresh));
+    const content = try cwd.readFileAlloc(io, path, allocator, .limited(100));
+    defer allocator.free(content);
+    try std.testing.expectEqualStrings("retained generation", content);
+    try cwd.deleteFile(io, path);
+    try cwd.symLink(io, "missing-generation", path, .{ .is_directory = true });
+    try std.testing.expectError(error.RealRowsFreshCacheAlreadyExists, validateCacheSelection(io, roots.cache, .fresh));
+}
 
 fn fixtureRoots(allocator: std.mem.Allocator, io: std.Io, temp: *std.testing.TmpDir) !FixtureRoots {
     return fixtureRootsWithCaches(allocator, io, temp, true);

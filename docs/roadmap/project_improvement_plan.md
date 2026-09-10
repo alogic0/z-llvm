@@ -1,7 +1,7 @@
 # Project Improvement Plan
 
 Date: 2026-09-10
-Status: implementation in progress; focused work complete, final integration and real-family closure tracked below.
+Status: integration and fresh/cache equivalence passed; named real-function family closure remains open.
 Revision: artifact-store simplification first, maximum justified cleanup second.
 Review baseline: `48ae01be97c6ade57aeaea5fdf21d738914b497c`, plus the four
 working-tree changes listed below.
@@ -88,7 +88,7 @@ acceptance. Exact commands and limitations are in the
 | --- | --- |
 | 1 | Compact store and migration verified; isolated storage tests pass in two locations. |
 | 2 | Historical roots/worktrees and obsolete code removed; source duplicates moved to ordinary Git lookup; exact current keep-list recorded. |
-| 3 | Exact parser and runner tests pass; external checkout blocker resolved; fresh Tier-3 retry running, fresh/cache acceptance pending. |
+| 3 | Exact parser and runner tests pass; full fresh and cached Tier-3 runs each pass 17/17 subgates, with 1,315 matching canonical records. |
 | 4 | Zig 0.16 pin, selected children, filtered independent unit tests; two full isolated test runs pass. |
 | 5 | Eight composed behavioral programs, 24 paired runs, 6,528 observations; signed power-of-two lowering and rejection fixtures. Named real-function failure-family closure remains open. |
 | 6 | Structured accepted status, generated current tables, setup README and documentation checks implemented; accepted counters unchanged. |

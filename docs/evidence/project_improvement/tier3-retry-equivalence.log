@@ -1,0 +1,1 @@
+summary distribution-all-equivalence schema_version=4 expected=docs/evidence/project_improvement/tier3-retry-fresh.log actual=docs/evidence/project_improvement/tier3-retry-cached.log gates=17 canonical_records=1315 semantic_match=true local_fail=0

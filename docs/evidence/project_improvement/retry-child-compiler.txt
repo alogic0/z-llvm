@@ -1,0 +1,3 @@
+pid=2147449
+executable=/home/oleg/.zig/0.16.0/files/zig
+command=zig build-exe test/behavioral/harness.zig tmp/behavioral_diff_2138168/generated_1-ReleaseFast.reference.o -O ReleaseFast -femit-bin=tmp/behavioral_diff_2138168/generated_1-ReleaseFast.reference

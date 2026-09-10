@@ -1,0 +1,24 @@
+Completed run scratch trees were removed by their runners.
+Removed the following duplicates only after comparison with tracked evidence,
+and removed empty directories using rmdir:
+local-state/validations/project-improvement/failures/0fc3f052a6d590958a8accf395d9b36c.ReleaseFast.log
+local-state/validations/project-improvement/failures/0fc3f052a6d590958a8accf395d9b36c.ReleaseFast.result
+local-state/validations/project-improvement/failures/0fc3f052a6d590958a8accf395d9b36c.ReleaseSafe.log
+local-state/validations/project-improvement/failures/0fc3f052a6d590958a8accf395d9b36c.ReleaseSafe.result
+local-state/validations/project-improvement/failures/0fc3f052a6d590958a8accf395d9b36c.ReleaseSmall.log
+local-state/validations/project-improvement/failures/0fc3f052a6d590958a8accf395d9b36c.ReleaseSmall.result
+local-state/validations/project-improvement/failures/0fc3f052a6d590958a8accf395d9b36c.manifest
+local-state/validations/project-improvement/ReleaseFast/work_bcaa1bfb8754f5157b1c50e9a14b1018
+local-state/validations/project-improvement/ReleaseSmall
+local-state/validations/project-improvement/ReleaseSafe
+local-state/validations/project-improvement/ReleaseFast
+local-state/validations/project-improvement/failures
+tmp/project-improvement-tier3-fresh-clean.log
+tmp/project-improvement-tier3-retry-fresh.log
+tmp/project-improvement-tier3-retry-cached.log
+
+Earlier focused probe cleanup in this continuation:
+local-state/caches/project-improvement-probe: 4,011,081,728 allocated bytes
+local-state/validations/project-improvement-probe: 16,384 allocated bytes
+/tmp/zllvm-retry-binary-comparison: 22,794,240 allocated bytes
+Focused logs and binary/text hashes remain in this evidence directory.
