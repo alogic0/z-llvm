@@ -1,0 +1,13 @@
+build.zig:6:9: error: z_llvm requires Zig 0.16.0; invoke that compiler explicitly (see README.md)
+        @compileError("z_llvm requires Zig 0.16.0; invoke that compiler explicitly (see README.md)");
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+referenced by:
+    root: /home/oleg/.zig/0.17.0-dev.2015+3fdcbc03d/files/lib/compiler/configurer.zig:16:26
+    main: /home/oleg/.zig/0.17.0-dev.2015+3fdcbc03d/files/lib/compiler/configurer.zig:138:30
+    5 reference(s) hidden; use '-freference-trace=7' to see all references
+build.zig:31:11: error: no field named 'args' in struct 'Build'
+    if (b.args) |args| run_cmd.addArgs(args);
+          ^~~~
+/home/oleg/.zig/0.17.0-dev.2015+3fdcbc03d/files/lib/std/Build.zig:1:1: note: struct declared here
+const Build = @This();
+^~~~~

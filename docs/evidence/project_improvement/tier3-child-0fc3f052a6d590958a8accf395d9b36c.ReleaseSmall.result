@@ -1,0 +1,1 @@
+distribution-real-rows selector_version=real-candidate-selector-v2 candidate_file=docs/evidence/real_candidates_release_v2.tsv candidate_file_hash=83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d limit=100 strict=true

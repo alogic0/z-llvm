@@ -29,3 +29,6 @@ docs/worker_inbox.md
 
 /local-state/
 /.claude/settings.local.json
+
+# Durable improvement-plan acceptance logs.
+!docs/evidence/project_improvement/*.log

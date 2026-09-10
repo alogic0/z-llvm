@@ -2501,6 +2501,8 @@ test "generic cfg selector keeps other signed division forms fail closed" {
     const Case = struct { bits: u16, lhs: ir.Value, rhs: ir.Value };
     const cases = [_]Case{
         .{ .bits = 32, .lhs = .{ .named = "value" }, .rhs = .{ .int = 3 } },
+        .{ .bits = 32, .lhs = .{ .named = "value" }, .rhs = .{ .int = -4 } },
+        .{ .bits = 32, .lhs = .{ .named = "value" }, .rhs = .{ .int = 0 } },
         .{ .bits = 64, .lhs = .{ .named = "value" }, .rhs = .{ .int = 2 } },
         .{ .bits = 32, .lhs = .{ .int = 8 }, .rhs = .{ .named = "value" } },
         .{ .bits = 32, .lhs = .{ .named = "value" }, .rhs = .{ .named = "divisor" } },
@@ -2520,5 +2522,36 @@ test "generic cfg selector keeps other signed division forms fail closed" {
         })).?;
         try std.testing.expect(std.mem.startsWith(u8, diagnostic.detail(), "composed-block-"));
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
+test "generic cfg selector executes signed power of two division with live source" {
+    const allocator = std.testing.allocator;
+    for ([_]i32{ 4, 8, 16, 256, 1 << 30 }) |divisor| {
+        const input = try std.fmt.allocPrint(allocator,
+            \\define i32 @divide(i32 %value) {{
+            \\entry:
+            \\  %q = sdiv i32 %value, {}
+            \\  %result = xor i32 %q, %value
+            \\  ret i32 %result
+            \\}}
+        , .{divisor});
+        defer allocator.free(input);
+        var module = try ir.Module.parse(allocator, input);
+        defer module.deinit();
+        try module.verify();
+        var machine = MachineFunction.init("divide", .{ .int = 32 });
+        defer machine.deinit(allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(allocator, &machine, module.functions.items[0]));
+        try x86_64_verify.verifyFunction(machine);
+        const bytes = try encoding.encodeFunction(allocator, machine);
+        defer allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        const divide: *const fn (i32) callconv(.c) i32 = @ptrCast(mapping.ptr);
+        for ([_]i32{ std.math.minInt(i32), -1025, -257, -17, -9, -8, -7, -1, 0, 1, 7, 8, 9, 17, 257, 1025, std.math.maxInt(i32) }) |value| {
+            try std.testing.expectEqual(@divTrunc(value, divisor) ^ value, divide(value));
+        }
     }
 }

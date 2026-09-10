@@ -1,0 +1,11 @@
+schema=2 run_id=0fc3f052a6d590958a8accf395d9b36c failure=RealRowsParallelChildFailed success_summary_emitted=false
+resource_state memory_policy=os-managed-non-gating samples=5 starting_free_bytes=131963551744 minimum_free_bytes=131526242304 final_free_bytes=131526242304 peak_disk_bytes=473876473 peak_aggregate_rss_bytes=1225781248 minimum_available_memory_bytes=16309059584 last_free_bytes=131526242304 last_disk_bytes=473876473 last_aggregate_rss_bytes=10915840 last_available_memory_bytes=16877559808
+mode=ReleaseFast child_state=reaped max_rss_bytes=467668992 term=.{ .exited = 1 } duration_ms=4154
+mode=ReleaseSafe child_state=reaped max_rss_bytes=457715712 term=.{ .exited = 1 } duration_ms=4130
+mode=ReleaseSmall child_state=reaped max_rss_bytes=466776064 term=.{ .exited = 1 } duration_ms=4131
+mode=ReleaseFast failure_evidence_stream=stdout status=preserved bytes=234
+mode=ReleaseFast failure_evidence_stream=stderr status=preserved bytes=1106
+mode=ReleaseSafe failure_evidence_stream=stdout status=preserved bytes=234
+mode=ReleaseSafe failure_evidence_stream=stderr status=preserved bytes=1106
+mode=ReleaseSmall failure_evidence_stream=stdout status=preserved bytes=234
+mode=ReleaseSmall failure_evidence_stream=stderr status=preserved bytes=1106

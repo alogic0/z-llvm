@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "run_id": "diagnostic-udivmoddi4-20260910",
+  "command": [
+    "retain",
+    "captured compiler-rt IR and compiler configuration"
+  ],
+  "source_revision": "52e538c5",
+  "compiler": "capture: 0.17.0-dev.364+bdee02bc0; retention: 0.16.0",
+  "inputs": [
+    {
+      "name": "ziglang",
+      "identity": "bdee02bc0c7f227c0f11bc9a449df673fe803540"
+    },
+    {
+      "name": "historical-capture-md5",
+      "identity": "b0eda7a6427c3084fdf096a68696f19c"
+    }
+  ],
+  "result": "Preserved original unresolved diagnostic input; no new compiler acceptance",
+  "artifacts": [
+    {
+      "name": "tmp/udivmoddi4_ptr_null_cache/b/078194fc0734d9a06e6f2fba74135936/builtin.zig",
+      "sha256": "633a438ccff6e1fb44be374ec95f2ae9301106d879b68253527b7255d951e641",
+      "bytes": 2259
+    },
+    {
+      "name": "tmp/udivmoddi4_ptr_null_cache/b/a29666078cc3cef6ce69e1828ea5f0fe/builtin.zig",
+      "sha256": "cfcbdc90f635e4212e2ff97dc5a71760ef8bc8294b27be8731b2f69a559c76f5",
+      "bytes": 2266
+    },
+    {
+      "name": "tmp/udivmoddi4_ptr_null_cache/o/8c6b4a5e45095cb98b30ca8d3f251feb/libcompiler_rt_zcu.o.zllvm.ll",
+      "sha256": "7be46e0b88c96fce0ce527407672843c43d3416ce56257d53a286603bd533e06",
+      "bytes": 7231014
+    }
+  ]
+}

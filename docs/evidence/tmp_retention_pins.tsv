@@ -1,20 +1,11 @@
-# Live retention pins. Documentation references do not imply retention.
-# Remove or replace a row only in an explicitly authorized retention-policy cycle.
+# Current keep-list, 2026-09-10. Historical pins retired by the authorized improvement plan.
 path	class	pin_or_key	reason
-tools/clean_tmp.zig	active-cycle	INBOX-59	retention reporter implementation
-test/tools/clean_tmp_report_only_fixture	active-cycle	INBOX-59	report-only non-deletion fixture
-docs/retention_headroom_policy.md	active-cycle	INBOX-59	retention and headroom contract
-docs/evidence/inbox59_cache_inventory.md	active-cycle	INBOX-59	cache inventory evidence
-docs/evidence/inbox59_report_only_fixture.summary	active-cycle	INBOX-59	report-only non-deletion proof
-tmp/clean_tmp_inbox59	active-cycle	INBOX-59	compiled report-only reporter used for this cycle
-tmp/inbox56_phase1_install	latest-accepted-checkpoint	INBOX-56	accepted fma phase-1 install prefix
-tmp/inbox56_phase2_probe	latest-accepted-checkpoint	INBOX-56	accepted fma phase-2 proof cache
-tmp/udivmoddi4_ptr_null_cache	frozen-diagnostic	b0eda7a6427c3084fdf096a68696f19c	INBOX-57 ADR captured-IR source
-tmp/inbox69_evidence_protected	acceptance-review-evidence	INBOX-69/95014fff0902e59d7827521c85d7ef46449830c73d61c02a8f9a2e5b42bbd076	recovered final Tier-3 raw log and focused equivalence streams retained through review
-tmp/inbox80_evidence_protected/tier3_cdd95cb0.raw.log	acceptance-review-evidence	INBOX-80/27b455d6f293ce93f85aebff3b6d818fe1e12f760fe8e1b306942e43138273ff	O1 closeout single serial Tier-3 raw log retained through Supervisor and Reviewer acceptance
-tmp/real_rows_air_export_cache/196f53065eb715990b6e24d04afcb875285675e5adb675a6a30bae4de6873192.meta	real-rows-air-export	bdee02bc0c7f227c0f11bc9a449df673fe803540/ReleaseSafe/3553582a0269368c84c6bbb3273c28fc307c7edcde0a02096d57f9fdeb1451de	current complete ReleaseSafe pair
-tmp/real_rows_air_export_cache/283ed9184522c06666973850c5c3a8158e1743a7076d17962281c70fcf34e8d8.meta	real-rows-air-export	bdee02bc0c7f227c0f11bc9a449df673fe803540/ReleaseSmall/3553582a0269368c84c6bbb3273c28fc307c7edcde0a02096d57f9fdeb1451de	current complete ReleaseSmall pair
-tmp/real_rows_air_export_cache/92de5d7dc23761e92d01694ca13470b6d3c34da543554791dfbe70fd15d6cb61.meta	real-rows-air-export	bdee02bc0c7f227c0f11bc9a449df673fe803540/ReleaseFast/3553582a0269368c84c6bbb3273c28fc307c7edcde0a02096d57f9fdeb1451de	current complete ReleaseFast pair
-../ziglang/.zig-cache	patched-zig-build-cache	bdee02bc0c7f227c0f11bc9a449df673fe803540	current accepted patched-Zig build generation
-tmp/inbox184_o2_compiler_rt_v1	compiler-rt-v1-reproduction	INBOX-186/o2-calls-compiler-rt-v1-releasefast-x86_64-linux-gnu-baseline-zig-bdee02bc-sha256-9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1	complete three-generation reproduction bundle retained through baseline validation
-tmp/o2_calls_perf	compiler-rt-v1-adopted-input	INBOX-186/o2-calls-compiler-rt-v1-releasefast-x86_64-linux-gnu-baseline-zig-bdee02bc-sha256-9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1	read-only adopted compiler-rt v1 input and manifest retained through baseline validation
+local-state/artifacts	retained-evidence	manifests/*.json + docs/evidence/artifacts/*.json	Verified legacy payloads, accepted evidence, unique source and unresolved diagnostics; collect only with versioned pins
+local-state/inputs/o2-calls	current-input	compiler-rt-v1	Small adopted performance input metadata
+tmp/o2_calls_perf	current-consumer	tools/o2_compiler_rt_v1_calls_performance.zig	Adopted compiler-rt workload and baseline checkout; migrate this consumer before removal
+../ziglang	compiler-dependency	bdee02bc0c7f227c0f11bc9a449df673fe803540	Required patched source, stage4 emitter and build state; outside blanket cleanup
+.zig-cache	current-build-cache	.zigversion=0.16.0	Current unit, compiler and integration builds; reuse during this development state
+zig-out	current-build-output	project-improvement source-files.sha256	Current z_llvm executable used by native and integration checks
+local-state/validations/project-improvement	active-validation	2026-09-10 fresh/cache pair	Fresh retry running after authorized external cleanup; compact after acceptance
+local-state/caches/project-improvement	current-air-cache	generation schema 3	Currently empty: export blocked at external preflight; selected root for fresh/cache comparison
+tmp/project-improvement-tier3-fresh-clean.log	active-validation-log	fresh-clean retry	Mutable fresh Tier-3 output; retain completed log in subsequent evidence commit

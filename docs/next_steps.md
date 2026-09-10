@@ -1,29 +1,27 @@
-# Active Direction
+# Active direction
 
-Baseline authority is HEAD
-`3ef5b07c00959b260d6b8ae6a886d9c91f0bfd82`, tree
-`c32a050427055a2b67de49fcee657dd33a014716`.
+The user's 2026-09-10 instruction authorizes implementation of the entire
+[project improvement plan](roadmap/project_improvement_plan.md), in its stated
+priority order. It supersedes the former three-file housekeeping stop,
+43-worktree protection, and further artifact-authority decomposition directives.
 
-## Standing boundaries
+Finish and validate the store replacement and cleanup, exact summary parser,
+compiler selection, behavioral coverage, and current documentation. Track exact
+commands, source/input identities, and remaining limitations in the
+[implementation evidence](evidence/project_improvement/implementation.md).
 
-- All substantive project implementation, generators, validators, codecs,
-  hashing, tests, harnesses, process handling, and tooling must be pure Zig
-  0.16. Bash is limited to tiny transparent fixed-command orchestration.
-- All 43 registered worktrees and `local-state/control` are protected from
-  traversal, mutation, cleanup, publication, or use as project state without
-  exact user authority.
-- DEVELOPMENT remains unstaged. ACCEPTANCE stages and commits only its exact
-  reviewed path scope after identity and closure checks.
+Use [validation tiers](validation_tiers.md) to select checks. Keep the accepted
+record in [accepted_status.json](accepted_status.json) separate from development
+expectations and newly collected evidence. A source change or passing focused
+test never advances accepted counters automatically.
 
-## Current housekeeping
+Project implementation and new tools use Zig 0.16.0. Keep unique source work and
+the patched emitter. The [current keep-list](evidence/tmp_retention_pins.tsv)
+replaces historical retention pins. Every new cache or failure capture needs a
+current consumer or a bounded diagnostic reason.
 
-Replace the two operating ledgers and retire `scripts/inbox_watch.sh`. Stop
-after the exact three-path commit and clean tracked-worktree verification.
-
-## Ordered successors
-
-1. Retire inactive Python tooling with a Zig-only replacement or deletion
-   proof.
-2. Finish cohesive CQ decomposition.
-3. Port active ABI shell, C, and assembly project logic to Zig.
-4. Review exact inactive roots for bounded cleanup.
+The external checkout prerequisite is resolved. Remaining completion work:
+finish the running fresh validation, complete its cached Tier-3 comparison, and close one
+named recurring real-function family through shared lowering. The standalone
+behavioral suite passes, but does not fulfill that last real-family requirement.
+The recorded failed integration attempt is not acceptance evidence.

@@ -1,0 +1,3 @@
+23456692	tmp
+29127708	local-state
+121648	/home/oleg/prog/zllvm-inbox45-p0

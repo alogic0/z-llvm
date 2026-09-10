@@ -4,10 +4,10 @@ Current environment used for `z_llvm` development and LLVM comparison testing:
 
 ```text
 OS: Ubuntu 24.04.4 LTS (noble)
-Local z_llvm build/test Zig: zig on PATH, currently 0.16.0
+Local z_llvm build/test Zig: exactly 0.16.0 (tracked .zigversion)
 LLVM tools: 22.1.3
 LLVM source checkout: llvm-project-22/
-Zig source checkout for inventory work: ../ziglang (currently 9787df9421 for new corpus captures)
+Zig source checkout for inventory work: ../ziglang (pin: docs/evidence/ziglang_pin.txt)
 Authoritative Zig fixture emitter: ../ziglang/build/stage4/bin/zig
 Project checkout: z_llvm/
 ```
@@ -18,7 +18,7 @@ Use different Zig executables for different jobs:
 
 | Task | Compiler | Reason |
 | --- | --- | --- |
-| Build and test `z_llvm` itself | `zig` on `PATH` | This project is currently developed against the local stable/dev toolchain recorded above. |
+| Build and test `z_llvm` itself | Zig 0.16.0, explicitly selected | Build tools inherit the selected executable directory; PATH may contain another version. |
 | Emit authoritative Zig LLVM IR fixtures | `../ziglang/build/stage4/bin/zig` | Fixtures must come from the same `../ziglang` source checkout used by inventory and roadmap source anchors. |
 | Inspect current upstream Zig behavior | `../ziglang/build/stage4/bin/zig` plus `../ziglang` sources | Stage4 currently matches the checked-out Zig source revision. |
 | Bootstrap/debug the Zig compiler build | `../ziglang/build/stage3/bin/zig` only when explicitly needed | Stage3 can lag behind the source checkout and must not be used for authoritative fixture generation. |

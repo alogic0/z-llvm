@@ -1,4 +1,8 @@
 const std = @import("std");
+
+pub fn isPositivePowerOfTwoDivisor(literal: i128) bool {
+    return literal >= 2 and literal <= (1 << 30) and (literal & (literal - 1)) == 0;
+}
 const ir = @import("../../../ir.zig");
 const sysv_abi = @import("../sysv_abi.zig");
 const x86_64_types = @import("../types.zig");

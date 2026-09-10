@@ -18,7 +18,7 @@ const Types = model;
 const composition = @import("../composition.zig");
 
 const ImmediateScalarPlan = enum {
-    r00_signed_divide_by_two,
+    r00_signed_divide_by_power_of_two,
     r01_logical_shift_right_scratch,
     r01_logical_shift_right_accumulator,
     r02_shift_left_accumulator,
@@ -46,13 +46,15 @@ const ImmediateDisplacementAuthority = enum {
     hardcoded,
 };
 
+const isPositivePowerOfTwoDivisor = @import("../../composed_helpers.zig").isPositivePowerOfTwoDivisor;
+
 pub fn isImmediateRhsScalar(binary: ir.BinaryInst) bool {
     if (binary.lhs != .named or binary.rhs != .int) return false;
     const bits = integerBits(binary.ty) orelse return false;
     if (bits == 0 or bits > 64) return false;
     const literal = binary.rhs.int;
     return switch (binary.op) {
-        .sdiv => bits == 32 and literal == 2,
+        .sdiv => bits == 32 and isPositivePowerOfTwoDivisor(literal),
         .lshr => bits == 16 or bits == 32 or bits == 64,
         .shl, .ashr => bits <= 32 or bits == 64,
         .@"and", .@"or", .add, .sub, .xor => bits <= 32 or bits == 64,
@@ -109,7 +111,7 @@ pub fn executeImmediateRhsScalar(
     );
 
     switch (semantic_plan) {
-        .r00_signed_divide_by_two => try executeImmediateR00(
+        .r00_signed_divide_by_power_of_two => try executeImmediateR00(
             Authority,
             transaction,
             source_index,
@@ -258,8 +260,8 @@ fn classifyImmediateRhsSemantic(
         return error.ValueUseImmediateScalarWidthUnsupported;
     if (bits == 0 or bits > 64) return error.ValueUseImmediateScalarWidthUnsupported;
     return switch (action.operation) {
-        .sdiv => if (bits == 32 and action.literal == 2)
-            .r00_signed_divide_by_two
+        .sdiv => if (bits == 32 and isPositivePowerOfTwoDivisor(action.literal))
+            .r00_signed_divide_by_power_of_two
         else
             error.ValueUseImmediateScalarFormUnsupported,
         .lshr => if (bits == 16 or bits == 32 or bits == 64)
@@ -326,7 +328,7 @@ fn immediateAccumulatorPreamble(
         .r04_narrow_accumulator_immediate,
         => .scratch_preferred,
         .r05_wide_accumulator_immediate => .spill_source,
-        .r00_signed_divide_by_two,
+        .r00_signed_divide_by_power_of_two,
         .r01_logical_shift_right_scratch,
         .r01_logical_shift_right_accumulator,
         .r02_shift_left_scratch32_writeback,
@@ -451,11 +453,15 @@ fn executeImmediateR00(
         .{ .mov_eax_to_arg = .rcx },
     );
     try failImmediateScalarForTest(transaction, .after_first_instruction);
-    try emitImmediateWrite(transaction, .{ .shr_eax_imm5 = 31 });
+    // Truncation toward zero needs a bias of divisor-1 for negative inputs.
+    // Keep the divide-by-two stream unchanged for existing canary identities.
+    const shift: u5 = @intCast(@ctz(@as(u32, @intCast(action.literal))));
+    if (shift > 1) try emitImmediateWrite(transaction, .{ .sar_eax_imm5 = 31 });
+    try emitImmediateWrite(transaction, .{ .shr_eax_imm5 = @intCast(@as(u6, 32) - shift) });
     try failImmediateScalarForTest(transaction, .after_second_instruction);
     try emitImmediateWrite(transaction, .add_ecx_eax);
     try failImmediateScalarForTest(transaction, .after_third_instruction);
-    try emitImmediateWrite(transaction, .{ .sar_eax_imm5 = 1 });
+    try emitImmediateWrite(transaction, .{ .sar_eax_imm5 = shift });
     try finishImmediateAccumulatorResult(
         Authority,
         transaction,
@@ -1015,7 +1021,7 @@ fn immediateDisplacementAuthority(
     bits: u16,
 ) ImmediateDisplacementAuthority {
     return switch (plan) {
-        .r00_signed_divide_by_two,
+        .r00_signed_divide_by_power_of_two,
         .r03_arithmetic_shift_right_accumulator,
         .r04_narrow_accumulator_immediate,
         => .liveness_aware,

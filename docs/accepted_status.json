@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "accepted_revision": "3ef5b07c00959b260d6b8ae6a886d9c91f0bfd82",
+  "accepted_tree": "c32a050427055a2b67de49fcee657dd33a014716",
+  "source_pin": "bdee02bc0c7f227c0f11bc9a449df673fe803540",
+  "candidate_sha256": "83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d",
+  "modes": ["ReleaseFast", "ReleaseSafe", "ReleaseSmall"],
+  "candidate_rows": 100,
+  "lowered": 100,
+  "objects": 100,
+  "native_linked": 100,
+  "executed_functions": 3,
+  "paired_harnesses_ok": 3,
+  "local_fail": 0,
+  "compiler_rt_bypass_ratchet": 130,
+  "declaration_revision": "52e538c5",
+  "evidence": [
+    "docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary",
+    "docs/evidence/artifacts/retained-validations-20260910-minimal.json",
+    "docs/evidence/project_improvement/implementation.md"
+  ]
+}

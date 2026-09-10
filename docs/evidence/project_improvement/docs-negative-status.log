@@ -1,0 +1,5 @@
+status disagrees with docs/accepted_status.json: docs/current_state.md; run zig build check-docs -- --write
+error: StatusDrift
+/home/oleg/prog/z_llvm/tools/check_project_docs.zig:70:13: 0x11ed15d in main (check_project_docs.zig)
+            return error.StatusDrift;
+            ^

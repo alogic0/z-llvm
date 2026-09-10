@@ -60,7 +60,9 @@ those slices):
 ## Tier 3 — full integration (`distribution-all`)
 
 The authoritative serial Tier-3 command is
-`zig build distribution-all -- --serial`. It uses the tracked 17-subgate
+`zig build distribution-all -- --serial` with explicit `--zig-emitter`,
+`--real-rows-validation-root`, and `--real-rows-cache-root` selections (see the
+[root setup example](../README.md)). It uses the tracked 17-subgate
 inventory, exclusive runner-owned paths, immutable bundle identity checks, and
 durable headroom reporting. The earlier ignored
 `tmp/inbox66c_serial_tier3_fresh.sh` wrapper is obsolete historical evidence;
@@ -170,3 +172,11 @@ For gate/cache infrastructure measurement, the required comparison is exactly:
 
 Do not repeat either full run unless the gate/cache implementation or another
 relevant input changes after the measurement.
+
+### Behavioral canaries (2026-09-10)
+
+`zig build behavioral-diff` runs the additional standalone IR program population
+against LLVM 22. The integrated-executable subgate invokes the same implementation.
+Its case/mode, distinct-function, and input-observation counts are separate from
+both the fixed compiler-core cohort and the original seven integrated cases.
+Focused reproduction uses `zig build behavioral-diff -- --case CASE_ID`.

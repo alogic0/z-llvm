@@ -1,0 +1,13 @@
+error: ExternalRepositoryDirty
+/home/oleg/prog/z_llvm/src/distribution_execution_cohort_v1.zig:603:59: 0x1260eda in requireExternalRepositoryClean (distribution_real_rows_gate.zig)
+    if (status.stdout.len != 0 or status.stderr.len != 0) return error.ExternalRepositoryDirty;
+                                                          ^
+/home/oleg/prog/z_llvm/src/distribution_real_rows_gate.zig:671:5: 0x126222f in observeCohortSourceIdentity (distribution_real_rows_gate.zig)
+    try execution_cohort.requireExternalRepositoryClean(allocator, io, &environment);
+    ^
+/home/oleg/prog/z_llvm/src/distribution_real_rows_gate.zig:611:39: 0x1a3e6e0 in runMode (distribution_real_rows_gate.zig)
+    const generation_source_initial = try observeCohortSourceIdentity(allocator, io, temp.path);
+                                      ^
+/home/oleg/prog/z_llvm/src/distribution_real_rows_gate.zig:179:24: 0x1a41b27 in main (distribution_real_rows_gate.zig)
+        var counters = try runMode(allocator, io, init, &stdout_writer.interface, mode, options, candidates.items, &candidate_hash);
+                       ^

@@ -4498,18 +4498,29 @@ One line per completed cycle, append-only, newest last. This is the
 
 ## Ratchet State
 
-Latest recorded counters. Update in the same commit as the change; the
-authoritative history with denominator metadata lives in the cited evidence
-summaries.
+Current values are generated from [the accepted record](../accepted_status.json).
+Historical discovery tables above retain their original populations and dates.
 
-| Counter | Value | Modes | Evidence | Denominator (candidate hash / selector / pin) |
-| --- | ---: | --- | --- | --- |
-| real_functions_lowered | 100 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
-| real_objects_emitted | 100 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
-| real_native_linked | 100 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
-| real_executed | 0 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary` | candidate=`83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`; selector=`real-candidate-selector-v2`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
-| real_programs_ok | 1 | ReleaseFast, ReleaseSafe, ReleaseSmall | `docs/evidence/zig_integrated_exe_syscall_hello.summary` | enforcement=`distribution-zig-integrated-exe`; pin=`bdee02bc0c7f227c0f11bc9a449df673fe803540` |
-| unsupported_functions (ReleaseFast, compiler-core-module) | 55479 | ReleaseFast | `docs/evidence/real_candidates_releasefast_v1.summary` | candidate=`eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`; selector=`real-candidate-selector-v1`; pin=`141bfce0883017ff7ebe03e3af3db07fff0c5dc3` |
+<!-- accepted-status:start -->
+
+Accepted revision: `3ef5b07c00959b260d6b8ae6a886d9c91f0bfd82`; tree: `c32a050427055a2b67de49fcee657dd33a014716`.
+
+Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v2`.
+Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `bdee02bc0c7f227c0f11bc9a449df673fe803540`.
+Candidate SHA-256: `83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`.
+
+| Metric | Accepted value per mode | Scope |
+| --- | ---: | --- |
+| Functions lowered | 100 | Compiler-core prefix |
+| Objects emitted | 100 | Compiler-core prefix |
+| Native links | 100 | Compiler-core prefix |
+| Functions executed | 3 | Fixed execution cohort |
+| Paired harnesses accepted | 3 | Legacy real_programs_ok cohort metric |
+| Local failures | 0 | Compiler-core gate |
+
+Compiler-rt bypass ratchet: 130 (separate 285-function population).
+
+<!-- accepted-status:end -->
 
 Fixture-frontier counters (`generic_cfg_functions=753`,
 `executable_ok_rows=14`) remain tracked by the family checklist and gate

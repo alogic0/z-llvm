@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const schema_version = 2;
+const schema_version = 3;
 
 const CanonicalLog = struct {
     records: [][]u8,
@@ -63,12 +63,24 @@ fn canonicalLog(
 ) !CanonicalLog {
     const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(512 * 1024 * 1024));
     defer allocator.free(contents);
+    // Serial roots are explicitly selected and need not contain a numeric PID.
+    // Normalize only the root declared by this log's preflight record.
+    var serial_root: ?[]const u8 = null;
+    var preflight_lines = std.mem.splitScalar(u8, contents, '\n');
+    while (preflight_lines.next()) |line| {
+        if (!std.mem.startsWith(u8, line, "summary distribution-all-serial-run ")) continue;
+        if (serial_root != null) return error.DuplicateSerialPreflight;
+        serial_root = fieldValue(line, "scratch_path") orelse return error.MissingSerialRoot;
+        if (serial_root.?.len == 0) return error.MissingSerialRoot;
+    }
+    const normalized = if (serial_root) |root| try std.mem.replaceOwned(u8, allocator, contents, root, "tmp/serial_<run>") else try allocator.dupe(u8, contents);
+    defer allocator.free(normalized);
     var records: std.ArrayList([]u8) = .empty;
     errdefer {
         for (records.items) |record| allocator.free(record);
         records.deinit(allocator);
     }
-    var lines = std.mem.splitScalar(u8, contents, '\n');
+    var lines = std.mem.splitScalar(u8, normalized, '\n');
     while (lines.next()) |line| {
         const record = try canonicalRecord(allocator, line, repo_path) orelse continue;
         errdefer allocator.free(record);
@@ -88,8 +100,17 @@ fn canonicalRecord(
     repo_path: []const u8,
 ) !?[]u8 {
     if (line.len == 0 or
+        std.mem.startsWith(u8, line, "headroom-") or
         std.mem.startsWith(u8, line, "summary distribution-all-slowest ") or
         std.mem.startsWith(u8, line, "summary distribution-all-timing ")) return null;
+
+    if (std.mem.startsWith(u8, line, "real-rows-mode-parallel ")) {
+        // Use the runner's versioned telemetry contract rather than dropping an
+        // arbitrary record merely because it contains volatile fields.
+        var discarded: std.Io.Writer.Discarding = .init(&.{});
+        try @import("run_distribution_real_rows_parallel.zig").writeNormalizedOutput(line, &discarded.writer);
+        return null;
+    }
 
     const semantic = if (std.mem.startsWith(u8, line, "gate-end "))
         try removeFields(allocator, line, &.{ "duration_ms", "cache_status" })
@@ -97,6 +118,10 @@ fn canonicalRecord(
         try removeFields(allocator, line, &.{"cache_mode"})
     else if (std.mem.startsWith(u8, line, "air-export-cache "))
         try removeFields(allocator, line, &.{ "status", "duration_ms" })
+    else if (std.mem.startsWith(u8, line, "summary distribution-all-serial-run "))
+        try removeFields(allocator, line, &.{ "run_id", "fresh_real_rows" })
+    else if (std.mem.startsWith(u8, line, "summary distribution-all-serial "))
+        try removeFields(allocator, line, &.{ "run_id", "wall_ms", "starting_free_bytes", "minimum_observed_free_bytes", "final_free_bytes", "observed_peak_bytes" })
     else
         try allocator.dupe(u8, line);
     defer allocator.free(semantic);
@@ -344,4 +369,16 @@ test "structure validation requires complete unique gate lifecycles" {
         error.IncompleteGateLifecycle,
         validateStructure(std.testing.allocator, &incomplete),
     );
+}
+
+test "serial normalization removes run observations but retains semantic counters" {
+    const allocator = std.testing.allocator;
+    const first = (try canonicalRecord(allocator, "summary distribution-all-serial schema_version=1 run_id=abc scratch_path=tmp/same bundle_path=tmp/same/b target=x86_64 mode=serial real_rows_concurrency=1 subgates=17 wall_ms=100 starting_free_bytes=90 minimum_observed_free_bytes=80 final_free_bytes=85 observed_peak_bytes=10 reserve_bytes=50 required_start_bytes=60 local_fail=0", "/repo")).?;
+    defer allocator.free(first);
+    const second = (try canonicalRecord(allocator, "summary distribution-all-serial schema_version=1 run_id=def scratch_path=tmp/same bundle_path=tmp/same/b target=x86_64 mode=serial real_rows_concurrency=1 subgates=17 wall_ms=20 starting_free_bytes=85 minimum_observed_free_bytes=75 final_free_bytes=80 observed_peak_bytes=10 reserve_bytes=50 required_start_bytes=60 local_fail=0", "/repo")).?;
+    defer allocator.free(second);
+    try std.testing.expectEqualStrings(first, second);
+    try std.testing.expect(std.mem.indexOf(u8, first, "subgates=17") != null);
+    try std.testing.expect(std.mem.indexOf(u8, first, "local_fail=0") != null);
+    try std.testing.expectError(error.RealRowsParallelEvidenceSchemaMismatch, canonicalRecord(allocator, "real-rows-mode-parallel schema_version=1 normalization_schema=1", "/repo"));
 }

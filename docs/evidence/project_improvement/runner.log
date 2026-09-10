@@ -1,0 +1,24 @@
+1/23 run_distribution_real_rows_parallel.test.fixed group contains exactly fast safe small in manifest order...OK
+2/23 run_distribution_real_rows_parallel.test.available memory parser requires one bounded checked MemAvailable kB field...OK
+3/23 run_distribution_real_rows_parallel.test.load average parser accepts one bounded decimal token and rejects malformed input...OK
+4/23 run_distribution_real_rows_parallel.test.production argv construction covers every actual mode and isolated path...OK
+5/23 run_distribution_real_rows_parallel.test.cache policy admits only explicit fresh or authenticated hit operation...OK
+6/23 run_distribution_real_rows_parallel.test.root selections reject missing absolute escape symlink owner and mode drift before execution...OK
+7/23 run_distribution_real_rows_parallel.test.fixed capacity admits exact start boundary emits schema two and rejects insufficient capacity...OK
+8/23 run_distribution_real_rows_parallel.test.normalization removes only frozen volatile scheduling fields...OK
+9/23 run_distribution_real_rows_parallel.test.resource state records os-managed memory and fails closed below disk floor...OK
+10/23 run_distribution_real_rows_parallel.test.os-managed memory records low samples without launch block or policy termination...OK
+11/23 run_distribution_real_rows_parallel.test.os-managed memory keeps child failure fail closed...OK
+12/23 run_distribution_real_rows_parallel.test.failure manifest binds os-managed memory diagnostics and explicit child states...OK
+13/23 run_distribution_real_rows_parallel.test.required cache miss fails closed before any worker launch...OK
+14/23 run_distribution_real_rows_parallel.test.successful fixed group buffers and returns outputs in manifest order...OK
+15/23 run_distribution_real_rows_parallel.test.fresh population and authenticated hit reuse share exact mode-owned roots without fallback...OK
+16/23 run_distribution_real_rows_parallel.test.partial wait-future setup reaps every worker before closing descriptors...OK
+17/23 run_distribution_real_rows_parallel.test.injected child failure preserves bounded stdout and stderr after reap without obscuring the primary failure...OK
+18/23 run_distribution_real_rows_parallel.cohort_output.test.summary rejects substring counters duplicate keys and malformed tokens...OK
+19/23 run_distribution_real_rows_parallel.cohort_output.test.field lookup matches a complete key and parser rejects malformed hashes...OK
+20/23 run_distribution_real_rows_parallel.cohort_output.test.four-member cohort output is exact and fails closed on drift...OK
+21/23 distribution_real_rows_parallel_policy.test.real-row parallel policy uses exact fixed floor projected peak and checked start...OK
+22/23 distribution_real_rows_parallel_policy.test.real-row parallel policy admits exact filesystem boundary and rejects smaller filesystems...OK
+23/23 distribution_real_rows_parallel_policy.test.real-row parallel policy checked addition fails closed on overflow...OK
+All 23 tests passed.

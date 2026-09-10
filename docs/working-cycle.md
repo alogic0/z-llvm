@@ -6,6 +6,14 @@ ownership explicit so later targets are not blocked by hidden x86_64 shortcuts.
 Worker cycles should therefore move x86_64 Zig codegen replacement evidence
 forward while preserving target boundaries.
 
+## Current plan exception
+
+The 2026-09-10 user instruction authorizes the complete project improvement plan.
+Its ordered phases supersede historical one-item stop rules and frozen retention
+boundaries during this implementation. Preserve existing working-tree ownership;
+record phase results without requiring a commit between dependent edits. Use
+`docs/validation_tiers.md` for acceptance and `docs/next_steps.md` for current work.
+
 ## Cycle Mode
 
 Work in short goal cycles only while an Active worker-inbox directive or the

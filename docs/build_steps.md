@@ -1,5 +1,14 @@
 # Build Steps
 
+Use Zig 0.16.0, as pinned in `.zigversion`. `test-unit` (with optional
+`-Dtest-filter=NAME`), `structural-smoke`, and `artifact-store-test` need no external
+compiler or historical local state. `test` also runs the mandatory ABI gate.
+`behavioral-diff` requires clang-22; `check-docs` verifies current status and links.
+Full distribution runs require the explicit emitter/root selections shown in
+[the root setup guide](../README.md). Older tables below describe their named
+fixture populations and must not be read as compiler-core acceptance counters.
+
+
 This file summarizes the project-specific `zig build` steps and what each one
 is for. Use `zig build --help` to see the authoritative current list.
 

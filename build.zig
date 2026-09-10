@@ -1,6 +1,18 @@
 const std = @import("std");
+const builtin = @import("builtin");
+
+comptime {
+    if (!std.mem.eql(u8, builtin.zig_version_string, std.mem.trim(u8, @embedFile(".zigversion"), "\r\n")))
+        @compileError("z_llvm requires Zig 0.16.0; invoke that compiler explicitly (see README.md)");
+}
 
 pub fn build(b: *std.Build) void {
+    // Nested tool invocations inherit the same project compiler. The patched
+    // emitter remains independently selected through ZIG_EMITTER/ZIG_SOURCE_DIR.
+    b.graph.environ_map.put("PATH", b.fmt("{s}:{s}", .{
+        std.fs.path.dirname(b.graph.zig_exe) orelse ".",
+        b.graph.environ_map.get("PATH") orelse "/usr/bin:/bin",
+    })) catch @panic("out of memory");
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -22,6 +34,7 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const unit_tests = b.addTest(.{
+        .filters = b.option([]const []const u8, "test-filter", "Run matching unit tests") orelse &.{},
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tests.zig"),
             .target = target,
@@ -30,7 +43,10 @@ pub fn build(b: *std.Build) void {
     });
 
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&b.addRunArtifact(unit_tests).step);
+    const unit_run = b.addRunArtifact(unit_tests);
+    test_step.dependOn(&unit_run.step);
+    const test_unit_step = b.step("test-unit", "Run isolated compiler unit tests without external integration tools");
+    test_unit_step.dependOn(&unit_run.step);
 
     const abi_diff_run = b.addSystemCommand(&.{ "bash", "tools/run_abi_differential.sh" });
     abi_diff_run.step.dependOn(b.getInstallStep());
@@ -66,6 +82,8 @@ pub fn build(b: *std.Build) void {
     addToolStepWithArgs(b, "lint-zig-ir-manifest", "Lint the Zig IR fixture manifest; pass optional args after --", "tools/lint_zig_ir_manifest.zig");
     addToolStepWithArgs(b, "zig-corpus", "Run accepted Zig IR corpus rows; pass optional manifest after --", "tools/run_zig_corpus.zig");
     addToolStep(b, "generated-scalar-diff", "Run generated scalar differential checks", "tools/run_generated_scalar_diff.zig");
+    addToolStepWithArgs(b, "behavioral-diff", "Execute composed programs against an independent LLVM reference", "tools/run_behavioral_diff.zig");
+    addToolStepWithArgs(b, "check-docs", "Validate current documentation links and accepted status", "tools/check_project_docs.zig");
     addToolStep(b, "check-zig-stage4-emitter", "Check the authoritative Zig stage4 emitter", "tools/check_zig_stage4_emitter.zig");
     addToolStep(b, "focused-codegen-canaries", "Run procedural fma and __multi3 codegen canaries (non-gating)", "tools/run_focused_codegen_canaries.zig");
     addToolStepWithArgs(b, "real-candidates-v2", "Build the mode-stable real-row candidate denominator", "tools/build_real_candidates_v2.zig");
@@ -167,7 +185,6 @@ pub fn build(b: *std.Build) void {
         "Run focused synthetic execution-oracle-v1 tests",
     );
     execution_oracle_v1_test_step.dependOn(&b.addRunArtifact(execution_oracle_v1_tests).step);
-    addToolStepWithArgs(b, "clean-tmp", "Report, dry-run, or explicitly delete retention-classified tmp entries", "tools/clean_tmp.zig");
     const artifact_store_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("tools/zllvm_artifact_store.zig"),
@@ -177,9 +194,10 @@ pub fn build(b: *std.Build) void {
     });
     const artifact_store_test_step = b.step(
         "artifact-store-test",
-        "Run dormant synthetic artifact-store tests",
+        "Run isolated artifact-store integrity tests",
     );
     artifact_store_test_step.dependOn(&b.addRunArtifact(artifact_store_tests).step);
+    addToolStepWithArgs(b, "artifact-store", "Publish, verify, retrieve, or collect artifacts", "tools/zllvm_artifact_store.zig");
     const inbox206_descriptor_identity_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("tools/zllvm_inbox206_materialize.zig"),
@@ -395,7 +413,7 @@ pub fn build(b: *std.Build) void {
 }
 
 fn addToolStep(b: *std.Build, name: []const u8, description: []const u8, tool: []const u8) void {
-    const run_cmd = b.addSystemCommand(&.{ "zig", "run", tool });
+    const run_cmd = b.addSystemCommand(&.{ b.graph.zig_exe, "run", tool });
     const step = b.step(name, description);
     step.dependOn(&run_cmd.step);
 }
@@ -407,14 +425,14 @@ fn addToolStepWithFixedArgs(
     tool: []const u8,
     args: []const []const u8,
 ) void {
-    const run_cmd = b.addSystemCommand(&.{ "zig", "run", tool, "--" });
+    const run_cmd = b.addSystemCommand(&.{ b.graph.zig_exe, "run", tool, "--" });
     run_cmd.addArgs(args);
     const step = b.step(name, description);
     step.dependOn(&run_cmd.step);
 }
 
 fn addToolStepWithArgs(b: *std.Build, name: []const u8, description: []const u8, tool: []const u8) void {
-    const run_cmd = b.addSystemCommand(&.{ "zig", "run", tool, "--" });
+    const run_cmd = b.addSystemCommand(&.{ b.graph.zig_exe, "run", tool, "--" });
     if (b.args) |args| run_cmd.addArgs(args);
     const step = b.step(name, description);
     step.dependOn(&run_cmd.step);
@@ -427,7 +445,7 @@ fn addToolStepWithFixedAndUserArgs(
     tool: []const u8,
     fixed_args: []const []const u8,
 ) void {
-    const run_cmd = b.addSystemCommand(&.{ "zig", "run", tool, "--" });
+    const run_cmd = b.addSystemCommand(&.{ b.graph.zig_exe, "run", tool, "--" });
     run_cmd.addArgs(fixed_args);
     if (b.args) |args| run_cmd.addArgs(args);
     const step = b.step(name, description);

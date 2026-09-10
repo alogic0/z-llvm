@@ -125,9 +125,8 @@ const OwnedPaths = struct {
     mode_paths: [mode_count]ModePaths,
 
     fn init(allocator: std.mem.Allocator, io: std.Io, scratch_path: []const u8, export_cache_path: []const u8, cache_mode: CacheMode) !OwnedPaths {
-        const scratch_owner = try requireCanonicalContractBase(io, scratch_path);
-        const cache_owner = try requireCanonicalContractBase(io, export_cache_path);
-        if (!std.mem.eql(u8, scratch_owner, cache_owner)) return error.RealRowsRootSelectionMismatch;
+        const scratch_owner = try validateRoots(io, scratch_path, export_cache_path);
+        const cache_owner = scratch_owner;
         var random_bytes: [16]u8 = undefined;
         var cwd = std.Io.Dir.cwd();
         var root: []u8 = undefined;
@@ -216,6 +215,14 @@ const OwnedPaths = struct {
         paths.* = undefined;
     }
 };
+
+/// Validate the explicit selection before running unrelated integration gates.
+pub fn validateRoots(io: std.Io, scratch_path: []const u8, export_cache_path: []const u8) ![]const u8 {
+    const scratch_owner = try requireCanonicalContractBase(io, scratch_path);
+    const cache_owner = try requireCanonicalContractBase(io, export_cache_path);
+    if (!std.mem.eql(u8, scratch_owner, cache_owner)) return error.RealRowsRootSelectionMismatch;
+    return scratch_owner;
+}
 
 fn requireCanonicalContractBase(io: std.Io, path: []const u8) ![]const u8 {
     if (path.len == 0 or std.fs.path.isAbsolute(path) or path[path.len - 1] == '/') return error.RealRowsRootSelectionInvalid;

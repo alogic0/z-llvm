@@ -1,15 +1,47 @@
-# Current State
+# Current state
 
-- Accepted baseline HEAD: `3ef5b07c00959b260d6b8ae6a886d9c91f0bfd82`.
-- Accepted baseline tree: `c32a050427055a2b67de49fcee657dd33a014716`.
-- Production counters for ReleaseFast, ReleaseSafe, and ReleaseSmall:
-  `100/100/100/3/3`, `local_fail=0`.
-- Bypass ratchet: `130`.
-- CQ is an inert baseline decomposed through Store extraction. Its public facade
-  remains 7,203 lines; it has no activation, authoritative receipt, real
-  external-state, performance, or ratchet credit.
-- All 43 registered worktrees and `local-state/control` remain protected.
-- Current objective: reset the operating ledgers and retire
-  `scripts/inbox_watch.sh`.
-- Immediate successor: retire inactive Python tooling through a Zig-only
-  replacement or deletion proof.
+The accepted record is [accepted_status.json](accepted_status.json). The block
+below is generated and checked by `zig build check-docs`; regenerate it with
+`zig build check-docs -- --write` after an explicitly accepted evidence update.
+
+<!-- accepted-status:start -->
+
+Accepted revision: `3ef5b07c00959b260d6b8ae6a886d9c91f0bfd82`; tree: `c32a050427055a2b67de49fcee657dd33a014716`.
+
+Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v2`.
+Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `bdee02bc0c7f227c0f11bc9a449df673fe803540`.
+Candidate SHA-256: `83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`.
+
+| Metric | Accepted value per mode | Scope |
+| --- | ---: | --- |
+| Functions lowered | 100 | Compiler-core prefix |
+| Objects emitted | 100 | Compiler-core prefix |
+| Native links | 100 | Compiler-core prefix |
+| Functions executed | 3 | Fixed execution cohort |
+| Paired harnesses accepted | 3 | Legacy real_programs_ok cohort metric |
+| Local failures | 0 | Compiler-core gate |
+
+Compiler-rt bypass ratchet: 130 (separate 285-function population).
+
+<!-- accepted-status:end -->
+
+The accepted values above carry forward the declaration in `docs/current_state.md`
+at `52e538c5`. The older strict-prefix evidence proves lowering/object/link counts;
+it predates the execution cohort. The preserved run manifests contain historical
+execution diagnostics. This migration does not claim a new acceptance run or
+reinterpret older whole-program counters as cohort counters.
+
+Current development starts at `52e538c5` and includes a four-member execution
+cohort. Its expected `4/4` execution counters remain development expectations
+until the applicable integration evidence is accepted. The independent behavioral
+suite has its own population and does not increase the 100-row compiler-core
+counters or the 285-function compiler-rt ABI population.
+
+The artifact authority protocol has been replaced by a small local store. The
+fixed worktree inventory, supplemental control repository, historical INBOX
+fixtures, and installed-system-binary hashes are retired. Migration and cleanup
+are recorded in the [implementation evidence](evidence/project_improvement/implementation.md).
+
+See [next steps](next_steps.md), the [improvement plan](roadmap/project_improvement_plan.md),
+and the root [setup instructions](../README.md). Historical milestones remain
+under the roadmap and evidence directories; they do not select current work.

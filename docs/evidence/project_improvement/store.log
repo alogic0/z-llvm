@@ -1,0 +1,10 @@
+1/9 zllvm_artifact_store.test_0...OK
+2/9 zllvm_artifact_store.tests.test.manifest rejects ambiguity unsafe paths unknown fields and conflicting sizes...OK
+3/9 zllvm_artifact_store.tests.test.publish verifies content reuses objects and never replaces conflicting manifests...OK
+4/9 zllvm_artifact_store.tests.test.missing objects never publish a manifest and GC collects interrupted publication...OK
+5/9 zllvm_artifact_store.tests.test.invalid manifest and corrupt pinned objects prevent every GC deletion...OK
+6/9 zllvm_artifact_store.tests.test.store lock excludes a second publisher or collector...OK
+7/9 zllvm_artifact_store.tests.test.source directory symlinks and store symlinks cannot escape...OK
+8/9 zllvm_artifact_store.tests.test.versioned pins survive a missing local manifest and fail closed on missing content...OK
+9/9 zllvm_artifact_store.tests.test.publication rejects intermediate directory symlinks and size mismatches...OK
+All 9 tests passed.

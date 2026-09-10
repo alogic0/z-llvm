@@ -1,7 +1,7 @@
 # Project Improvement Plan
 
 Date: 2026-09-10
-Status: user-prioritized plan; implementation and cleanup remain pending.
+Status: implementation in progress; focused work complete, final integration and real-family closure tracked below.
 Revision: artifact-store simplification first, maximum justified cleanup second.
 Review baseline: `48ae01be97c6ade57aeaea5fdf21d738914b497c`, plus the four
 working-tree changes listed below.
@@ -14,11 +14,11 @@ Retain the minimum data needed for current work, accepted evidence, and
 irreplaceable inputs. Follow with exact validation, reproducible builds, and
 broader executable coverage through shared compiler lowering.
 
-This revision sets the user's requested priority order. The current task writes
-the plan; it does not execute cleanup, accept the pending working-tree changes,
-or advance counters. During implementation, reconcile the operating documents
-with this order and use [Validation Tiers](../validation_tiers.md) for relevant
-acceptance checks. Historical frozen-path rules are requirements to retire,
+This revision sets the user's requested priority order. The user authorized implementation on 2026-09-10. Changes, cleanup measurements,
+source identities, and exact validation results are recorded in the
+[implementation evidence](../evidence/project_improvement/implementation.md).
+Use [Validation Tiers](../validation_tiers.md) for acceptance; source changes
+and focused results do not automatically advance counters. Historical frozen-path rules are requirements to retire,
 not permanent constraints to reproduce in the replacement design.
 
 ## Review baseline and evidence
@@ -78,6 +78,21 @@ precedence over further artifact-framework decomposition or new compiler
 capability work. Use the installed Zig 0.16 compiler explicitly for focused
 storage tests; the broader build-system work in phase 4 is not a prerequisite.
 
+## Implementation progress (2026-09-10)
+
+Checkboxes below describe implemented deliverables, not automatic milestone
+acceptance. Exact commands and limitations are in the
+[completion evidence](../evidence/project_improvement/implementation.md).
+
+| Phase | Current result |
+| --- | --- |
+| 1 | Compact store and migration verified; isolated storage tests pass in two locations. |
+| 2 | Historical roots/worktrees and obsolete code removed; source duplicates moved to ordinary Git lookup; exact current keep-list recorded. |
+| 3 | Exact parser and runner tests pass; external checkout blocker resolved; fresh Tier-3 retry running, fresh/cache acceptance pending. |
+| 4 | Zig 0.16 pin, selected children, filtered independent unit tests; two full isolated test runs pass. |
+| 5 | Eight composed behavioral programs, 24 paired runs, 6,528 observations; signed power-of-two lowering and rejection fixtures. Named real-function failure-family closure remains open. |
+| 6 | Structured accepted status, generated current tables, setup README and documentation checks implemented; accepted counters unchanged. |
+
 ## Phase 1: Replace the historical artifact-authority system
 
 Primary owners: `tools/zllvm_artifact_store.zig`, its component directory,
@@ -118,51 +133,51 @@ all large caches or implement a second permanent store.
 
 ### Remove or replace
 
-- [ ] Remove the exact 43-worktree requirement and frozen topology hashes.
-- [ ] Remove repeated global Git scans from ordinary object operations; confine
+- [x] Remove the exact 43-worktree requirement and frozen topology hashes.
+- [x] Remove repeated global Git scans from ordinary object operations; confine
       operations to an opened, explicitly selected store root.
-- [ ] Remove hard-coded local paths and exact hashes of installed Git, tar,
+- [x] Remove hard-coded local paths and exact hashes of installed Git, tar,
       zstd, sha256sum, and install executables from normal storage checks.
       Record tool versions/encoding metadata only where relevant to reproduction.
-- [ ] Replace exact ancestor permission-bit requirements with practical access
+- [x] Replace exact ancestor permission-bit requirements with practical access
       checks. Read-only objects may prevent accidental edits without making
       every directory mode part of artifact identity.
-- [ ] Replace the supplemental control Git repository and dormant candidate,
+- [x] Replace the supplemental control Git repository and dormant candidate,
       authority, lineage, observer, and acceptance-receipt protocols with the
       run-manifest model. Audit callers before retiring their modules and tests.
-- [ ] Replace tests that require failed INBOX directories with temporary
+- [x] Replace tests that require failed INBOX directories with temporary
       test-owned fixtures. Routine store tests must not inspect real stores,
       historical worktree registrations, or retained failure directories.
-- [ ] Consolidate overlapping manifest/ledger data. Preserve meaningful source,
+- [x] Consolidate overlapping manifest/ledger data. Preserve meaningful source,
       result, and content identities; remove historical ceremony fields that
       have no current consumer.
-- [ ] Update storage and retention contracts as these requirements are retired;
+- [x] Update storage and retention contracts as these requirements are retired;
       do not leave documents directing future work to recreate them.
 
 ### Retain these integrity guarantees
 
-- [ ] Verify object hashes and sizes, reject corrupt existing objects, and never
+- [x] Verify object hashes and sizes, reject corrupt existing objects, and never
       silently overwrite different content under the same identity.
-- [ ] Publish objects and manifests atomically. Synchronize durable evidence at
+- [x] Publish objects and manifests atomically. Synchronize durable evidence at
       publication boundaries; disposable caches may use cheaper durability.
-- [ ] Parse manifests strictly and reject ambiguous keys, invalid references,
+- [x] Parse manifests strictly and reject ambiguous keys, invalid references,
       malformed hashes, and unsafe relative paths.
-- [ ] Prevent symlink/path escapes during writes, extraction, and deletion.
-- [ ] Serialize publication and garbage collection with one store lock; publish
+- [x] Prevent symlink/path escapes during writes, extraction, and deletion.
+- [x] Serialize publication and garbage collection with one store lock; publish
       a manifest only after all its referenced objects are complete.
-- [ ] Keep pins for currently required inputs and accepted evidence. An extra
+- [x] Keep pins for currently required inputs and accepted evidence. An extra
       unreferenced object is a cleanup candidate, not an invalid store.
 
 ### Migration and acceptance
 
-- [ ] Identify active readers/writers and map retained inputs/evidence to the
+- [x] Identify active readers/writers and map retained inputs/evidence to the
       new manifests. Explicitly record any data with no remaining consumer.
-- [ ] Switch consumers to the simplified interface and verify the retained
+- [x] Switch consumers to the simplified interface and verify the retained
       payloads before retiring the old source location. Keep a bounded rollback
       path during verification, then remove migration-only duplicates in phase 2.
-- [ ] Test publication/reuse, malformed manifests, corruption, interrupted
+- [x] Test publication/reuse, malformed manifests, corruption, interrupted
       publication, unsafe paths, and publisher/collector coordination.
-- [ ] Run the isolated suite from two differently located checkouts without
+- [x] Run the isolated suite from two differently located checkouts without
       historical sibling stores or the supplemental control repository.
 
 Acceptance: current consumers can retrieve their required artifacts through the
@@ -188,32 +203,32 @@ consumers and regeneration requirements are understood.
 
 Deliverables:
 
-- [ ] Delete unused authority/migration code, obsolete test helpers, build
+- [x] Delete unused authority/migration code, obsolete test helpers, build
       entries, scripts, schemas, and redundant operating documentation after
       checking their callers and references. Use Git history for retired source;
       do not create another archive directory of dead code.
-- [ ] Inventory generated roots by physical size, live use, unique data,
+- [x] Inventory generated roots by physical size, live use, unique data,
       regeneration cost, and current consumer. Consolidate historical pins into
       a small current keep-list and retire pins whose purpose has ended.
-- [ ] Preserve the minimal evidence needed to support accepted results and
+- [x] Preserve the minimal evidence needed to support accepted results and
       reproduce unresolved failures before deleting their bulky run trees.
       Keep full logs or original inputs when summaries cannot replace them.
-- [ ] Remove superseded validation runs, old build/install trees, duplicate AIR
+- [x] Remove superseded validation runs, old build/install trees, duplicate AIR
       exports, abandoned migration copies, unused snapshots, and failed-test
       directories whose required diagnostics have been retained.
-- [ ] Remove obsolete worktrees through Git after preserving unique commits on
+- [x] Remove obsolete worktrees through Git after preserving unique commits on
       a named ref and checking uncommitted/untracked work. Remove stale worktree
       metadata once no remaining consumer relies on it.
-- [ ] Remove the supplemental control repository and legacy sibling store after
+- [x] Remove the supplemental control repository and legacy sibling store after
       consumer migration and unique-content checks. Avoid indefinite duplicate
       stores or quarantine copies that merely relocate the clutter.
-- [ ] Add a small dry-run/apply collector. Live manifests and explicit pins mark
+- [x] Add a small dry-run/apply collector. Live manifests and explicit pins mark
       retained objects; unreferenced objects and abandoned incoming files become
       deletion candidates under the store lock. Exclude active runs.
-- [ ] For regenerable caches, retain only generations justified by active work
+- [x] For regenerable caches, retain only generations justified by active work
       and near-term rebuild cost. Remove the rest; do not preserve every older
       known-good generation by default.
-- [ ] Execute the classified cleanup, check remaining consumers, and record
+- [x] Execute the classified cleanup, check remaining consumers, and record
       physical space reclaimed and the exact remaining keep-list.
 
 Initial cleanup scope, subject to fresh inspection:
@@ -249,15 +264,15 @@ Primary owner: `tools/run_distribution_real_rows_parallel/cohort_output.zig`.
 
 Deliverables:
 
-- [ ] Parse complete space-delimited key/value fields, matching keys exactly.
-- [ ] Reject duplicate keys, missing required fields, invalid numeric values,
+- [x] Parse complete space-delimited key/value fields, matching keys exactly.
+- [x] Reject duplicate keys, missing required fields, invalid numeric values,
       trailing junk, and schema-incompatible fields according to an explicit
       record contract.
-- [ ] Parse counters into bounded integer types and compare exact expected
+- [x] Parse counters into bounded integer types and compare exact expected
       values. Define canonical numeric encoding, including leading-zero rules.
-- [ ] Apply the parser consistently to headers, cache records, cohort rows,
+- [x] Apply the parser consistently to headers, cache records, cohort rows,
       and summaries; preserve mode, denominator, multiplicity, and cohort checks.
-- [ ] Add focused negative coverage for the demonstrated failures and for
+- [x] Add focused negative coverage for the demonstrated failures and for
       substring keys in `fieldValue`.
 
 Required regression cases include:
@@ -286,15 +301,15 @@ Primary owners: `build.zig`, shared tool invocation helpers, and setup docs.
 
 Deliverables:
 
-- [ ] Record the supported build compiler version in a small tracked source of
+- [x] Record the supported build compiler version in a small tracked source of
       configuration and fail early with an actionable mismatch diagnostic.
-- [ ] Replace literal `zig` subprocess selection in build helpers with
+- [x] Replace literal `zig` subprocess selection in build helpers with
       `b.graph.zig_exe` or compiled build artifacts.
-- [ ] Audit nested tool invocations so they preserve the selected compiler.
+- [x] Audit nested tool invocations so they preserve the selected compiler.
       Keep the patched stage4 emitter identity separate from the compiler used
       to build this project.
-- [ ] Add `zig build test-unit` with a supported focused-test filter.
-- [ ] Keep the mandatory ABI and integration gates available and required at
+- [x] Add `zig build test-unit` with a supported focused-test filter.
+- [x] Keep the mandatory ABI and integration gates available and required at
       their existing acceptance boundaries; adding an inner-loop command must
       not weaken acceptance.
 
@@ -314,21 +329,21 @@ Primary owners: execution cohorts, `tools/run_generated_scalar_diff.zig`,
 
 Deliverables:
 
-- [ ] Separate executed-function counts from whole-program success counts.
+- [x] Separate executed-function counts from whole-program success counts.
       Publish denominator, mode, source pin, and harness scope for each metric.
-- [ ] Preserve existing smoke cases and add a first bounded program suite
+- [x] Preserve existing smoke cases and add a first bounded program suite
       covering arguments and branches, loops and memory, nested calls, and
       register-pressure/spill interactions.
-- [ ] Compare observable results with an independently compiled reference over
+- [x] Compare observable results with an independently compiled reference over
       deterministic input sets. Define legal input domains to avoid undefined
       behavior producing misleading differential failures.
-- [ ] Extend generated tests beyond arithmetic identities to interacting
+- [x] Extend generated tests beyond arithmetic identities to interacting
       operations, signedness, widths, control flow, and memory where supported.
       Record seeds and minimize failures into stable regression fixtures.
 - [ ] Select one recurring real-function failure family and extend shared
       composed lowering to cover several members, with representative executable
       cases and nearby rejection cases.
-- [ ] Record which rows use composed lowering and which use structural
+- [x] Record which rows use composed lowering and which use structural
       fallbacks. Retire a fallback only after equivalent semantic coverage exists.
 
 Acceptance: each selected program executes through z_llvm and agrees with its
@@ -348,16 +363,16 @@ Primary owners: `docs/current_state.md`, `docs/next_steps.md`,
 
 Deliverables:
 
-- [ ] Reconcile completed watcher/tooling work and replace stale active tasks.
-- [ ] Distinguish accepted baseline, current source revision, pending work, and
+- [x] Reconcile completed watcher/tooling work and replace stale active tasks.
+- [x] Distinguish accepted baseline, current source revision, pending work, and
       historical milestones.
-- [ ] Store current accepted counters and evidence references in one small
+- [x] Store current accepted counters and evidence references in one small
       structured record; generate or validate repeated status tables from it.
       Keep next-action selection explicit rather than inferring it from Git HEAD.
-- [ ] Label every reported counter with its population and evidence scope.
-- [ ] Add a concise root README covering purpose, supported scope, compiler
+- [x] Label every reported counter with its population and evidence scope.
+- [x] Add a concise root README covering purpose, supported scope, compiler
       setup, unit tests, integration prerequisites, and the current-state link.
-- [ ] Add documentation checks for broken internal links and disagreement with
+- [x] Add documentation checks for broken internal links and disagreement with
       the accepted status record.
 
 Acceptance: a reader can identify what is proven, what is pending, and how to

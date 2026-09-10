@@ -1,0 +1,11 @@
+broken internal link: README.md -> does-not-exist.md
+error: FileNotFound
+/home/oleg/.zig/0.16.0/files/lib/std/Io/Threaded.zig:4092:31: 0x11aa9a1 in dirAccessPosix (std.zig)
+                    .NOENT => return error.FileNotFound,
+                              ^
+/home/oleg/.zig/0.16.0/files/lib/std/Io/Dir.zig:439:5: 0x1200b2b in access (std.zig)
+    return io.vtable.dirAccess(io.userdata, dir, sub_path, options);
+    ^
+/home/oleg/prog/z_llvm/tools/check_project_docs.zig:88:17: 0x11ee039 in main (check_project_docs.zig)
+                return err;
+                ^

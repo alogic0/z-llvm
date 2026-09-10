@@ -52,6 +52,7 @@ pub fn main(init: std.process.Init) !void {
         try stdout_writer.interface.writeAll("skip generated execution lli-22 unavailable\n");
     }
     try stdout_writer.interface.flush();
+    try @import("run_behavioral_diff.zig").run(init);
 }
 
 fn writeScalarCase(allocator: std.mem.Allocator, io: std.Io, temp: common.TempDir, case: Case) ![]const u8 {

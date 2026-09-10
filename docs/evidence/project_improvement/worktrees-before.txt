@@ -1,0 +1,179 @@
+worktree /home/oleg/prog/z_llvm
+HEAD 52e538c5aaf4046f6eceb83a9c1e213973aab2c7
+branch refs/heads/x86_64-codegen-expanded-frontier
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox100_base_tree
+HEAD 2b9ec55859135aa25ea41dd12c82a44c0634318e
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox102_base_tree
+HEAD 0ef5a3247ff18c72f8e286eed82879697b5dbed5
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox112_icmp_scratch_perf/worktrees/A
+HEAD bd223c83c30ee865450d5a54d6dfb8fa5afa2bfc
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox114_icmp_scratch_perf/worktrees/A
+HEAD d6d9efc82360819db9653dc059c58f809b738f7c
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox116_icmp_scratch_perf/worktrees/A
+HEAD ffd716431686e836bb2249131c50c90f9ccfe479
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox116_icmp_scratch_perf/worktrees/B
+HEAD ffd716431686e836bb2249131c50c90f9ccfe479
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox118_icmp_eq0_perf/worktrees/A
+HEAD aa4305917ad4a2cd0496bf0a67ffe3f74683a5a8
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox118_icmp_eq0_perf/worktrees/B
+HEAD aa4305917ad4a2cd0496bf0a67ffe3f74683a5a8
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox120_icmp_setcc_perf/worktrees/A
+HEAD ba3967f674013a26ed107f1110158626244c2e87
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox120_icmp_setcc_perf/worktrees/B
+HEAD ba3967f674013a26ed107f1110158626244c2e87
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox122_icmp_signbit_perf/worktrees/A
+HEAD c7ff1984a742015728fedb2fb7f94b8afcd705ee
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox122_icmp_signbit_perf/worktrees/B
+HEAD c7ff1984a742015728fedb2fb7f94b8afcd705ee
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox124_icmp_pair_perf/worktrees/A
+HEAD 72981e88a8de03438a04c0c05c8a0896deac4c5a
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox128_o2_r1/worktrees/B
+HEAD 80198d402f5ce0168b6b2db366d93e22c534e688
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox128_r0_worktree
+HEAD 4c0a69f730975fed988274c4f54e434676e94b1e
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox133_cast_wiring/perf/worktrees/A
+HEAD 83110e82d1cb973d5e299357351890f462959a0b
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox133_cast_wiring/perf/worktrees/B
+HEAD 3d829cd4f353e2a86a28648a62296a290b681e95
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox135_immediate_wiring/baseline_tree
+HEAD 49fcc04dde83f947513e6869cf4556f3b4155524
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox152_o2_scalar_named_wiring/perf/worktree_A
+HEAD eb1ad794fe243613b6dce4f4fff4d297e08088a7
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox152_o2_scalar_named_wiring/perf/worktree_B
+HEAD e048ff5cb7818f0b1e99d6971b9542562ffcf086
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox157_o2_scalar_named_wiring2/perf/worktree_A
+HEAD 16222bf2c67a7918655b23e27e26fc691e3ca8c2
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox157_o2_scalar_named_wiring2/perf/worktree_B
+HEAD 6b478652108ee431acb2ffdc216c7d383c0c0794
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox160_o2_b07_wiring/perf/worktree_A
+HEAD ee2ac4d7a56d811484cd6b9c6bb99ba1d4b936db
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox160_o2_b07_wiring/perf/worktree_B
+HEAD 19c4c3b86a0f604cb5e566b4a776c95843fdcce0
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox166_o2_m64_wiring/perf/worktree_A
+HEAD 842a8a224b3545f221a0a6f009f79f69b181bc87
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox166_o2_m64_wiring/perf/worktree_B
+HEAD 50acec11e5fc257a6add7e74646237f64ccbdd7d
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox172_o2_quotient_wiring/perf/worktree_A
+HEAD 7af7f0700d0abf976f1e63ead29217b095f11934
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox172_o2_quotient_wiring/perf/worktree_B
+HEAD dc96b63d7ef25e651f0dc16d9df3309c9371871f
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox74_commit5_fma_diagnosis/commit4_tree
+HEAD 6b74acea13ada849787eae221ea05b15345dafb0
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox77_scalar_reconstruction
+HEAD b0873b5b087c9e0e54342ba0715a4345a311f6d2
+branch refs/heads/scratch/inbox77-scalar-reconstruction
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox78_accepted5c_tree
+HEAD 4cb867b5737fd6d95ac662eab8e1af16a9114dcc
+detached
+
+worktree /home/oleg/prog/z_llvm/tmp/inbox78_call_results
+HEAD 697c3bd4c443367247a7092425e606def7d56bea
+branch refs/heads/scratch/inbox78-call-results
+
+worktree /home/oleg/prog/z_llvm/tmp/o2_calls_perf/compiler_rt_v1/baseline_validation_v2/canonical/source
+HEAD 43de59b06ca3a687368bfaf0595c5759c8ab3a57
+detached
+
+worktree /home/oleg/prog/zllvm-inbox45-p0
+HEAD b93e2d578bf35423488d4ac44aedd701bed83d9c
+detached
+
+worktree /tmp/z_llvm_clean_tmp_update
+HEAD 6804846c951625450eef547035243524b91f6a11
+branch refs/heads/clean-tmp-retention-delete
+prunable gitdir file points to non-existent location
+
+worktree /tmp/zllvm-inbox104-before
+HEAD 94ab402b2c11aa6f39167dd2ad5f79734bb87fc4
+detached
+prunable gitdir file points to non-existent location
+
+worktree /tmp/zllvm-inbox107-before
+HEAD 79f69f192c4c3ae3ecdf142fd609578e369acd55
+detached
+prunable gitdir file points to non-existent location
+
+worktree /tmp/zllvm-inbox108-a
+HEAD 79f69f192c4c3ae3ecdf142fd609578e369acd55
+detached
+prunable gitdir file points to non-existent location
+
+worktree /tmp/zllvm-inbox108-b
+HEAD 79f69f192c4c3ae3ecdf142fd609578e369acd55
+detached
+prunable gitdir file points to non-existent location
+
+worktree /tmp/zllvm-inbox109-a
+HEAD 55efa5019dc0a7cc4d8cc60f0740143cc64a87f8
+detached
+prunable gitdir file points to non-existent location
+
+worktree /tmp/zllvm-inbox109-b
+HEAD 55efa5019dc0a7cc4d8cc60f0740143cc64a87f8
+detached
+prunable gitdir file points to non-existent location
+
+worktree /tmp/zllvm_check
+HEAD b28210b5bb2267f520d43dd7e795bc85ea236a52
+detached
+prunable gitdir file points to non-existent location

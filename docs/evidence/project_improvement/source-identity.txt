@@ -1,0 +1,6 @@
+52e538c5aaf4046f6eceb83a9c1e213973aab2c7
+0.16.0
+2317bbb91798556d9d0f38aabdac23db83f0979b25f767259ae474546724087c  /home/oleg/.zig/0.16.0/files/zig
+dcea3478273d7ffe3895709c8eed4ccc0724548869cdb86183fc7356164410b7  ../ziglang/build/stage4/bin/zig
+addebfc419954a039711d03dac09349253522094b79824cc15db023921b62196  docs/evidence/ziglang_pin.txt
+83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d  docs/evidence/real_candidates_release_v2.tsv

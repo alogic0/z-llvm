@@ -1,145 +1,94 @@
-# Dormant artifact authority validation contract
+# Local artifact storage
 
-This document defines the private Phase-2 validation boundary added by
-INBOX-205. It is normative design documentation, not a production input.
-The production artifact-store command line, environment, authority
-derivation, and call graph do not read this file.
+The artifact store is a local data-integrity component. The user and local tools
+are trusted. Its contract covers partial writes, corruption, concurrent storage
+operations, and accidental filesystem escapes. Historical INBOX authority,
+worktree-topology, system-binary-hash, permission-bit, and supplemental-control
+repository requirements are retired by the 2026-09-10 simplification.
 
-## Status and authority
+## Layout and commands
 
-The accepted source store remains authoritative. The local-state payload is
-non-authoritative and control generation `00000001` remains an inert
-candidate. Successful synthetic validation does not select that candidate,
-activate an authority, create live metadata, or authorize real-candidate
-validation.
-
-The validator is private and dormant. Its only current caller is a test in
-`tools/zllvm_artifact_store.zig`. It accepts an owned configuration containing
-canonical absolute synthetic control, payload, and source roots plus the
-expected source-manifest and registered-worktree identities. It owns every
-path and identity retained beyond initialization. It exposes no public type,
-function, CLI verb, environment variable, selector, callback, or generic
-authority API.
-
-## Closed metadata
-
-The following four relative paths are the complete candidate input:
+The default root is `local-state/artifacts`; `ZLLVM_ARTIFACT_STORE` overrides it.
+Paths are resolved from the invoking working directory. The root contains:
 
 ```text
-authority/zllvm/v1/manifests/candidate.tsv
-authority/zllvm/v1/manifests/generation-00000001.tsv
-authority/zllvm/v1/lineage/generation-00000001.tsv
-authority/zllvm/v1/receipts/publication/generation-00000001-payload-copy.tsv
-```
-
-Each control file must be a no-follow regular file with mode `0644`. The
-candidate, lineage, and receipt formats have one exact magic line, one exact
-ordered header, one exact field-count row, ASCII-safe canonical fields, LF
-termination, and parse/re-encode byte equality. The generation manifest uses
-the existing closed v1 manifest parser, relationship validator, and encoder,
-and must re-encode byte-for-byte.
-
-The candidate must name generation `00000001`, state `candidate`, the three
-exact relative keys, the configured payload and source roots, and exact
-hash/size/mode identities. Lineage and receipt identities must match the
-candidate before their contents are accepted. Lineage must bind the same
-generation manifest and source identity. The receipt must bind the same
-source and destination, immutable `0444` payload mode, the verified-copy
-result, and payload counts that exactly reconcile to the manifest. The owned
-configuration also closes these five receipt identities independently:
-
-```text
-source_inventory_sha256
-source_file_ledger_sha256
-source_destination_ledger_sha256
-copy_evidence_path
-copy_evidence_sha256
-```
-
-The four SHA-256 values are copied into fixed-size owned storage and the
-evidence path is allocator-owned. A syntactically valid receipt with any one
-of these five fields changed fails as `DormantReceiptMismatched`.
-
-## Root, registration, and destination checks
-
-Dormant admission validates four private roles in fixed order: control,
-authority, payload, then source. The exact real-candidate policy owns the
-literal paths, role modes, inter-role relations, registered-worktree
-snapshot, and control identities for its lifetime:
-
-| Role | Exact path | Mode | Admission |
-|---|---|---:|---|
-| control | `/home/oleg/prog/z_llvm/local-state/control` | `0775` | exact clean supplemental Git repository; only the four named `0644` files |
-| authority | `control/authority/zllvm/v1` | `0755` | intentional containment within control and main; disjoint from every non-main registration |
-| payload | `/home/oleg/prog/z_llvm/local-state/artifacts/zllvm-authority-v1` | `0755` | the sole reviewed main-contained payload path; disjoint from non-main registrations and supplemental control |
-| source | `/home/oleg/prog/z_llvm-artifacts` | `0775` | external identity-only root; disjoint from every main and supplemental registration and every other role |
-
-Before any control-file open, bounded closed-environment `/usr/bin/git`
-observations prove the exact control commit, tree, `main` branch, empty
-status, empty remotes, and the four-entry NUL-delimited
-`authority/zllvm/v1` tree allowlist. Each later control read matches one
-allowlisted component and is no-follow with its exact Git mode and accepted
-SHA-256/byte/mode identity. No directory discovery supplies an admitted
-control key.
-
-Every role requires normalized absolute equality, no-follow ancestry, its
-exact mode, and the narrow containment or disjointness rule above. There is
-no generic main-descendant exception. Synthetic tests use a distinct
-allocator-owned, `builtin.is_test`-closed policy with injected owned control
-observations; it cannot select real control, authority, payload, or source
-paths. Its negative matrix closes wrong roles and escapes, every root mode,
-symlinked ancestry, an unlisted fifth control key, injected non-main or
-supplemental-control intersections, and commit/tree/branch/status/remotes/
-tree-entry drift. Failures never write, chmod, repair, normalize, discover,
-or fall back. Registration full, path, topology, and non-main identities are
-captured at configuration creation and revalidated before and after
-validation.
-
-The payload root is a closed tree consisting only of:
-
-```text
+objects/<sha256>
+manifests/<run-id>.json
 incoming/
-objects/sha256/<two-hex>/<62-hex>
-snapshots/sha256/<two-hex>/<62-hex>.tar.zst
+store.lock
 ```
 
-`incoming/` must be empty. Every directory is no-follow mode `0755`. Every
-manifest object and snapshot is present exactly once as a no-follow regular
-file with mode `0444`, exact SHA-256, exact byte count, and a traversal-safe
-key bound to its digest. Missing entries are partial state; undeclared entries
-are extra state; symlinks and non-regular entries are unsafe; identity or mode
-differences are mismatches.
+Use the pinned project compiler:
 
-## Failure and rollback policy
-
-Validation is read-only. A failure never falls back to another candidate,
-mirror, destination, source, or production authority. Errors preserve first
-attribution:
-
-```text
-DormantCandidate{Missing,Malformed,Mismatched,Unsafe}
-DormantGeneration{Missing,Malformed,Mismatched,Unsafe}
-DormantLineage{Missing,Malformed,Mismatched,Unsafe}
-DormantReceipt{Missing,Malformed,Mismatched,Unsafe}
-DormantRegistrationStale
-DormantDestination{Partial,Extra,Mismatched,Unsafe}
-DormantUnsafeRoot
+```sh
+zig build artifact-store -- publish manifest.json source-directory
+zig build artifact-store -- pin manifest.json  # restore a manifest for existing objects
+zig build artifact-store -- verify
+zig build artifact-store -- get SHA256 output-file
+zig build artifact-store -- gc --pins docs/evidence/artifacts
+zig build artifact-store -- gc --delete --pins docs/evidence/artifacts
+zig build artifact-store-test
 ```
 
-The INBOX-205A synthetic proof deliberately mutates only its fresh private
-test root `/tmp/zllvm-inbox205a-authority-dormant-synthetic` and restores each
-case before the next assertion. The test-private replacement helper treats
-only `FileNotFound` from its replacement-delete as an absent old fixture;
-every other deletion error propagates. Explicit deletion remains strict. On
-an unexpected test failure, the fresh synthetic roots are retained for
-review. On complete success, only roots created by that successful suite are
-removed. The retained failed INBOX-205 root and records are never touched.
+`get` never overwrites an existing output. The former `resolve-authority` and
+`materialize-spec` commands are retired. Existing snapshots are retained
+as ordinary immutable objects; storing new artifacts does not require tar/zstd.
 
-## Frozen production boundary
+## Manifest
 
-`resolveAuthority`, `main`, the `resolve-authority` and `materialize-spec`
-command set, `ZLLVM_ARTIFACT_STORE`, the production store selector, all
-production callsites, and `build.zig` remain unchanged. No tracked manifest
-mirror is required: tests construct a canonical in-memory generation and
-synthetic payload tree. Real control and store paths are never passed to the
-dormant validator.
+A version-1 JSON manifest contains `schema`, `run_id`, `command` (an argv array),
+`source_revision`, `compiler`, `result`, and `artifacts`. Optional `inputs`
+contains unique named input identities (source pins, target, mode, corpus or
+encoding versions); old manifests omit it. Every artifact has a
+relative `name`, lowercase SHA-256, and byte count. Names identify source files
+under the publication source directory and allow reconstruction of retained runs.
+Duplicate JSON fields, duplicate artifact names, conflicting sizes, unknown
+fields, invalid identities, and traversal paths are errors.
+
+All local manifests pin their referenced objects. Preserve accepted manifests
+in `docs/evidence/artifacts/` as well; the store copy and tracked copy use the
+same schema. Pass `--pins docs/evidence/artifacts` during collection to protect tracked
+manifests even if a local manifest was accidentally removed. The pins directory
+is opened explicitly and checked under the same lock; it may contain non-JSON
+evidence files. Missing or corrupt pinned objects abort collection. Without
+`--pins`, only local manifests protect objects. Removing the last referencing
+manifest from both locations makes an object collectible.
+
+## Integrity and collection
+
+A nonblocking exclusive OS lock serializes publication, verification, retrieval,
+and collection. A busy store reports `WouldBlock`; no stale lock-file removal is
+needed after a crashed process. The lock is released by closing its file handle.
+
+Objects are streamed into atomic files, checked against their expected content,
+synchronized, and published without replacement. Existing objects must verify.
+A manifest is published only after all referenced objects verify. Published
+objects are read-only to discourage accidental changes; exact ancestor modes
+are not part of identity. Directory traversal uses no-follow component opens.
+
+Collection first validates all manifests and pinned objects and constructs its
+complete candidate list. Malformed state aborts before deletion. Extra
+unreferenced objects and abandoned regular files in `incoming/` are candidates;
+symlinks and unexpected entries are errors. Dry-run is the default. Application
+uses the same store lock and synchronizes changed directories.
+
+Only the store's owned object/incoming directories are collected. Project
+worktrees, source files, validation directories, and unrelated caches are not
+recursively discovered or deleted by the store.
+
+## Migration record
+
+The original 20 objects/snapshots and generation ledger were imported and
+content-verified under `legacy-generation-00000001`. The tracked JSON manifest
+preserves their original source-relative names. Legacy Git control history and
+old development worktrees are retained on `preserved/cleanup-20260910/*` refs.
+The cleanup evidence report records removed roots and remaining consumers.
+Historical evidence documents describe old operations and do not reinstate the
+retired authority protocol.
+
+Source snapshots already reachable through ordinary Git refs are listed in
+`docs/evidence/artifacts/git-backed-sources-20260910.tsv`. Retrieve those with
+`git cat-file blob GIT_BLOB_ID`; the map retains the original name, SHA-256 and
+byte count. The two `retained-*-minimal` manifests supersede the initial retention
+manifests and pin only payloads that still need object storage. No supplemental
+Git repository or duplicate archive is involved.

@@ -1,0 +1,10 @@
+Build Summary: 9/9 steps succeeded; 1425/1425 tests passed
+test-unit success
++- run test 1408 pass (1408 total) 7s MaxRSS:46M
+   +- compile test Debug native success 3s MaxRSS:395M
+structural-smoke success
++- run test 8 pass (8 total) 8ms MaxRSS:5M
+   +- compile test Debug native success 785ms MaxRSS:177M
+artifact-store-test success
++- run test 9 pass (9 total) 274ms MaxRSS:5M
+   +- compile test Debug native success 904ms MaxRSS:158M

@@ -1292,7 +1292,7 @@ pub fn validateScalarDisplacementAuthorityDistinction(source: [:0]const u8) !voi
         return error.ValueUseScalarDisplacementAuthorityMismatch;
     }
     const plan_required = [_][]const u8{
-        ".r00_signed_divide_by_two,",
+        ".r00_signed_divide_by_power_of_two,",
         ".r03_arithmetic_shift_right_accumulator,",
         ".r04_narrow_accumulator_immediate,",
         "=> .liveness_aware",
