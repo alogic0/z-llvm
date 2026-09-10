@@ -1558,7 +1558,7 @@ test "normalization removes only frozen volatile scheduling fields" {
     const input =
         "distribution-real-rows selector_version=real-candidate-selector-v2 candidate_file=x candidate_file_hash=abc limit=100 strict=true\n" ++
         "air-export-cache mode=ReleaseFast status=hit duration_ms=12 cache_key=key-fast descriptor_bytes=44\n" ++
-        "summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode=ReleaseFast candidate_file_hash=abc real_native_linked=100 real_programs_ok=3 local_fail=0\n" ++
+        "summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode=ReleaseFast candidate_file_hash=abc real_native_linked=100 real_programs_ok=4 local_fail=0\n" ++
         "real-rows-mode-parallel schema_version=2 normalization_schema=2 wall_ms=9 root=owned/run local_fail=0\n" ++
         "air-export-cache mode=ReleaseSafe status=hit duration_ms=13 cache_key=key-safe descriptor_bytes=45\n" ++
         "air-export-cache mode=ReleaseSmall status=hit duration_ms=14 cache_key=key-small descriptor_bytes=46\n";
@@ -1569,7 +1569,7 @@ test "normalization removes only frozen volatile scheduling fields" {
     try std.testing.expect(std.mem.indexOf(u8, normalized, "real-rows-mode-parallel") == null);
     try std.testing.expectEqual(@as(usize, 3), std.mem.count(u8, normalized, "duration_ms=<volatile>"));
     try std.testing.expect(std.mem.indexOf(u8, normalized, "candidate_file_hash=abc") != null);
-    try std.testing.expect(std.mem.indexOf(u8, normalized, "real_native_linked=100 real_programs_ok=3 local_fail=0") != null);
+    try std.testing.expect(std.mem.indexOf(u8, normalized, "real_native_linked=100 real_programs_ok=4 local_fail=0") != null);
     const fast = std.mem.indexOf(u8, normalized, "mode=ReleaseFast").?;
     const safe = std.mem.indexOf(u8, normalized, "mode=ReleaseSafe").?;
     const small = std.mem.indexOf(u8, normalized, "mode=ReleaseSmall").?;
@@ -1764,7 +1764,7 @@ test "successful fixed group buffers and returns outputs in manifest order" {
         defer result.deinit(allocator);
         for (result.completed, modes) |completed, mode| {
             try std.testing.expect(std.mem.indexOf(u8, completed.result.stdout, mode) != null);
-            try std.testing.expect(std.mem.indexOf(u8, completed.result.stdout, "real_executed=3 real_programs_ok=3") != null);
+            try std.testing.expect(std.mem.indexOf(u8, completed.result.stdout, "real_executed=4 real_programs_ok=4") != null);
         }
         for (0..mode_count) |index| {
             try std.testing.expectEqual(@as(usize, 1), audit.reaped[index]);

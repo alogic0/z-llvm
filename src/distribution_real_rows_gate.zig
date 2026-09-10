@@ -416,6 +416,7 @@ test "execution cohort denominator is exact rank independent and atomic" {
     var candidates = [_]Candidate{syntheticCohortCandidate("other", "other")} ** 100;
     candidates[17] = syntheticCohortCandidate("../ziglang/src/main.zig", "coff.Symbol.sizeOf");
     candidates[42] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Requirements.size");
+    candidates[61] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Requirements.slotType");
     candidates[83] = syntheticCohortCandidate("../ziglang/src/main.zig", "coff.WeakExternalDefinition.sizeOf");
     var digest: [64]u8 = undefined;
     @memcpy(&digest, cohort_denominator_sha256);
@@ -436,9 +437,11 @@ test "execution cohort denominator is exact rank independent and atomic" {
     try tracker.record(.weak_external_definition_size_of, .{ .real_executed = 1, .real_programs_ok = 1 });
     try std.testing.expectError(error.ExecutionCohortPartialCredit, tracker.finalize(&counters));
     try tracker.record(.requirements_size, .{ .real_executed = 1, .real_programs_ok = 1 });
+    try std.testing.expectError(error.ExecutionCohortPartialCredit, tracker.finalize(&counters));
+    try tracker.record(.requirements_slot_type, .{ .real_executed = 1, .real_programs_ok = 1 });
     try tracker.finalize(&counters);
-    try std.testing.expectEqual(@as(usize, 3), counters.real_executed);
-    try std.testing.expectEqual(@as(usize, 3), counters.real_programs_ok);
+    try std.testing.expectEqual(@as(usize, 4), counters.real_executed);
+    try std.testing.expectEqual(@as(usize, 4), counters.real_programs_ok);
 }
 
 fn airGenerationCacheKeyForTest(identity: DescriptorCacheIdentity) ![64]u8 {

@@ -29,12 +29,14 @@ pub const Program = enum {
     symbol_size_of,
     weak_external_definition_size_of,
     requirements_size,
+    requirements_slot_type,
 
     pub fn functionName(program: Program) []const u8 {
         return switch (program) {
             .symbol_size_of => "coff.Symbol.sizeOf",
             .weak_external_definition_size_of => "coff.WeakExternalDefinition.sizeOf",
             .requirements_size => "link.MachO.CodeSignature.Requirements.size",
+            .requirements_slot_type => "link.MachO.CodeSignature.Requirements.slotType",
         };
     }
 
@@ -48,6 +50,7 @@ pub const Program = enum {
             .symbol_size_of => symbol_linked_harness_source,
             .weak_external_definition_size_of => weak_external_linked_harness_source,
             .requirements_size => requirements_linked_harness_source,
+            .requirements_slot_type => requirements_slot_type_linked_harness_source,
         };
     }
 
@@ -55,6 +58,7 @@ pub const Program = enum {
         return switch (program) {
             .symbol_size_of, .weak_external_definition_size_of => reference_harness_source,
             .requirements_size => requirements_reference_harness_source,
+            .requirements_slot_type => requirements_slot_type_reference_harness_source,
         };
     }
 
@@ -62,6 +66,7 @@ pub const Program = enum {
         return switch (program) {
             .symbol_size_of, .weak_external_definition_size_of => 18,
             .requirements_size => 12,
+            .requirements_slot_type => 2,
         };
     }
 
@@ -73,25 +78,31 @@ pub const Program = enum {
         return switch (program) {
             .symbol_size_of, .weak_external_definition_size_of => expected_stdout,
             .requirements_size => requirements_expected_stdout,
+            .requirements_slot_type => requirements_slot_type_expected_stdout,
         };
     }
 
     fn descriptorType(program: Program) []const u8 {
         return switch (program) {
             .symbol_size_of, .weak_external_definition_size_of => "fn () usize",
-            .requirements_size => "fn (link.MachO.CodeSignature.Requirements) u32",
+            .requirements_size, .requirements_slot_type => "fn (link.MachO.CodeSignature.Requirements) u32",
         };
     }
 
     fn descriptorReturnType(program: Program) []const u8 {
         return switch (program) {
             .symbol_size_of, .weak_external_definition_size_of => "usize",
-            .requirements_size => "u32",
+            .requirements_size, .requirements_slot_type => "u32",
         };
     }
 };
 
-pub const programs = [_]Program{ .symbol_size_of, .weak_external_definition_size_of, .requirements_size };
+pub const programs = [_]Program{
+    .symbol_size_of,
+    .weak_external_definition_size_of,
+    .requirements_size,
+    .requirements_slot_type,
+};
 
 pub const reference_harness_source =
     \\const std = @import("std");
@@ -152,6 +163,36 @@ pub const requirements_reference_harness_source =
 pub const requirements_linked_harness_source =
     \\const std = @import("std");
     \\const size_of = @extern(*const fn () callconv(.{ .x86_64_sysv = .{} }) u32, .{ .name = "link.MachO.CodeSignature.Requirements.size" });
+    \\pub fn main(init: std.process.Init) !void {
+    \\    const result = size_of();
+    \\    const witness = result *% 3 +% 7;
+    \\    var buffer: [128]u8 = undefined;
+    \\    var writer = std.Io.File.stdout().writer(init.io, &buffer);
+    \\    try writer.interface.print("execution-oracle-v1 result={} witness={}\n", .{ result, witness });
+    \\    try writer.interface.flush();
+    \\}
+    \\
+;
+
+pub const requirements_slot_type_expected_stdout =
+    "execution-oracle-v1 result=2 witness=13\n";
+
+pub const requirements_slot_type_reference_harness_source =
+    \\const std = @import("std");
+    \\pub fn main(init: std.process.Init) !void {
+    \\    const result: u32 = 2;
+    \\    const witness = result *% 3 +% 7;
+    \\    var buffer: [128]u8 = undefined;
+    \\    var writer = std.Io.File.stdout().writer(init.io, &buffer);
+    \\    try writer.interface.print("execution-oracle-v1 result={} witness={}\n", .{ result, witness });
+    \\    try writer.interface.flush();
+    \\}
+    \\
+;
+
+pub const requirements_slot_type_linked_harness_source =
+    \\const std = @import("std");
+    \\const size_of = @extern(*const fn () callconv(.{ .x86_64_sysv = .{} }) u32, .{ .name = "link.MachO.CodeSignature.Requirements.slotType" });
     \\pub fn main(init: std.process.Init) !void {
     \\    const result = size_of();
     \\    const witness = result *% 3 +% 7;
@@ -296,6 +337,12 @@ fn validateRequirementsSources(definition: []const u8, import_source: []const u8
         \\        return 3 * @sizeOf(u32);
         \\    }
     ;
+    const slot_type_block =
+        \\    fn slotType(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return macho.CSSLOT_REQUIREMENTS;
+        \\    }
+    ;
     const write_block =
         \\    fn write(self: Requirements, writer: anytype) !void {
         \\        try writer.writeInt(u32, macho.CSMAGIC_REQUIREMENTS, .big);
@@ -305,6 +352,7 @@ fn validateRequirementsSources(definition: []const u8, import_source: []const u8
     ;
     const import_line = "const CodeSignature = @import(\"MachO/CodeSignature.zig\");";
     if (std.mem.count(u8, definition, definition_block) != 1 or
+        std.mem.count(u8, definition, slot_type_block) != 1 or
         std.mem.count(u8, definition, size_block) != 1 or
         std.mem.count(u8, definition, write_block) != 1 or
         std.mem.count(u8, import_source, import_line) != 1)
@@ -324,6 +372,7 @@ pub fn validateHarnesses(program: Program) !void {
     const reference_result = switch (program) {
         .symbol_size_of, .weak_external_definition_size_of => "const result: usize = 18;",
         .requirements_size => "const result: u32 = 12;",
+        .requirements_slot_type => "const result: u32 = 2;",
     };
     if (std.mem.count(u8, reference, reference_result) != 1 or
         std.mem.count(u8, reference, "witness={}\\n") != 1 or
@@ -852,22 +901,32 @@ fn semanticDescriptorForTest(allocator: std.mem.Allocator, fixture: SemanticDesc
 }
 
 test "fixed cohort identities and harnesses are exact" {
-    try std.testing.expectEqual(@as(usize, 3), programs.len);
+    try std.testing.expectEqual(@as(usize, 4), programs.len);
     try std.testing.expectEqualStrings("coff.Symbol.sizeOf", programs[0].functionName());
     try std.testing.expectEqualStrings("coff.WeakExternalDefinition.sizeOf", programs[1].functionName());
     try std.testing.expectEqualStrings("link.MachO.CodeSignature.Requirements.size", programs[2].functionName());
+    try std.testing.expectEqualStrings(
+        "link.MachO.CodeSignature.Requirements.slotType",
+        programs[3].functionName(),
+    );
     for (programs) |program| try validateHarnesses(program);
     for (programs, 0..) |program, index| for (programs, 0..) |other, other_index| {
         if (index != other_index) try std.testing.expectEqual(@as(usize, 0), std.mem.count(u8, program.linkedHarness(), other.functionName()));
     };
     try std.testing.expectEqual(@as(usize, 12), programs[2].expectedResult());
     try std.testing.expectEqual(@as(usize, 43), programs[2].expectedWitness());
+    try std.testing.expectEqual(@as(usize, 2), programs[3].expectedResult());
+    try std.testing.expectEqual(@as(usize, 13), programs[3].expectedWitness());
 }
 
 test "requirements source and bridge admission are exact" {
     const definition =
         \\const Requirements = struct {
         \\    fn deinit(self: *Requirements, allocator: Allocator) void {
+        \\    }
+        \\    fn slotType(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return macho.CSSLOT_REQUIREMENTS;
         \\    }
         \\    fn size(self: Requirements) u32 {
         \\        _ = self;
@@ -887,6 +946,10 @@ test "requirements source and bridge admission are exact" {
         \\
         \\    fn deinit(self: *Requirements, allocator: Allocator) void {
         \\    }
+        \\    fn slotType(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return macho.CSSLOT_REQUIREMENTS;
+        \\    }
         \\    fn size(self: Requirements) u32 {
         \\        _ = self;
         \\        return 3 * @sizeOf(u32);
@@ -903,6 +966,10 @@ test "requirements source and bridge admission are exact" {
         \\const Requirements = struct {
         \\    fn deinit(self: *Requirements, allocator: Allocator) void {
         \\    }
+        \\    fn slotType(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return macho.CSSLOT_REQUIREMENTS;
+        \\    }
         \\    fn size(self: Requirements) u32 {
         \\        _ = self;
         \\        return 3 * @sizeOf(u32);
@@ -914,6 +981,10 @@ test "requirements source and bridge admission are exact" {
     const other_owner_write_definition =
         \\const Requirements = struct {
         \\    fn deinit(self: *Requirements, allocator: Allocator) void {
+        \\    }
+        \\    fn slotType(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return macho.CSSLOT_REQUIREMENTS;
         \\    }
         \\    fn size(self: Requirements) u32 {
         \\        _ = self;
@@ -931,6 +1002,10 @@ test "requirements source and bridge admission are exact" {
         \\const Requirements = struct {
         \\    fn deinit(self: *Requirements, allocator: Allocator) void {
         \\    }
+        \\    fn slotType(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return macho.CSSLOT_REQUIREMENTS;
+        \\    }
         \\    fn size(self: Requirements) u32 {
         \\        _ = self;
         \\        return 3 * @sizeOf(u32);
@@ -943,6 +1018,29 @@ test "requirements source and bridge admission are exact" {
         \\};
     ;
     try std.testing.expectError(error.CohortSourceBindingMismatch, validateRequirementsSources(drifted_write_definition, import_source));
+    const drifted_slot_type_definition =
+        \\const Requirements = struct {
+        \\    fn deinit(self: *Requirements, allocator: Allocator) void {
+        \\    }
+        \\    fn slotType(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return macho.CSSLOT_SIGNATURESLOT;
+        \\    }
+        \\    fn size(self: Requirements) u32 {
+        \\        _ = self;
+        \\        return 3 * @sizeOf(u32);
+        \\    }
+        \\    fn write(self: Requirements, writer: anytype) !void {
+        \\        try writer.writeInt(u32, macho.CSMAGIC_REQUIREMENTS, .big);
+        \\        try writer.writeInt(u32, self.size(), .big);
+        \\        try writer.writeInt(u32, 0, .big);
+        \\    }
+        \\};
+    ;
+    try std.testing.expectError(
+        error.CohortSourceBindingMismatch,
+        validateRequirementsSources(drifted_slot_type_definition, import_source),
+    );
     const drifted_definition =
         \\const Requirements = struct {
         \\    fn size(self: Requirements) u32 {
@@ -969,6 +1067,13 @@ test "semantic cohort descriptor binding accepts Fast and Safe shapes" {
     });
     defer allocator.free(safe);
     try validateDescriptor(allocator, .requirements_size, safe);
+
+    const slot_type = try semanticDescriptorForTest(allocator, .{
+        .program = .requirements_slot_type,
+        .mode = "ReleaseSmall",
+    });
+    defer allocator.free(slot_type);
+    try validateDescriptor(allocator, .requirements_slot_type, slot_type);
 }
 
 test "semantic cohort descriptor binding rejects function signature return multiplicity and malformed drift" {
