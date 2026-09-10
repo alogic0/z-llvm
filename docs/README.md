@@ -176,6 +176,11 @@ work should be selected from the backlog or a new source-backed blocker.
 The sole authoritative current-action entry is kept short in
 [next_steps.md](next_steps.md); roadmap queues are proposals and history.
 
+The [Project Improvement Plan](roadmap/project_improvement_plan.md) prioritizes
+artifact-store simplification and maximum justified cleanup, followed by
+validation correctness, reproducible builds and tests, executable coverage,
+and current project status.
+
 ## Completed Tooling Cycles
 
 - [x] [Completed Tooling Cycles](roadmap/historical/completed_tooling_cycles/README.md)
