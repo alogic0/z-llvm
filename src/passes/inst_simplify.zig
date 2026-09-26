@@ -161,9 +161,9 @@ fn simplifyBinaryConstants(binary: ir.BinaryInst) ?ir.Value {
     const rhs = binary.rhs.int;
     return switch (binary.op) {
         .fadd, .fsub, .fmul, .fdiv, .frem => null,
-        .add => foldCheckedAddSubMul(binary, lhs + rhs),
-        .sub => foldCheckedAddSubMul(binary, lhs - rhs),
-        .mul => foldCheckedAddSubMul(binary, lhs * rhs),
+        .add => foldCheckedAddSubMul(binary, lhs +% rhs),
+        .sub => foldCheckedAddSubMul(binary, lhs -% rhs),
+        .mul => foldCheckedAddSubMul(binary, lhs *% rhs),
         .@"and" => if (!binary.flags.any()) .{ .int = lhs & rhs } else null,
         .@"or" => if (!binary.flags.any()) .{ .int = lhs | rhs } else null,
         .xor => if (!binary.flags.any()) .{ .int = lhs ^ rhs } else null,
@@ -295,12 +295,14 @@ fn foldUnsignedDivRem(binary: ir.BinaryInst, mode: DivRem) ?ir.Value {
 }
 
 fn foldSignedDivRem(binary: ir.BinaryInst, mode: DivRem) ?ir.Value {
-    if (binary.rhs.int == 0) return null;
-    if (isSignedMin(binary.lhs.int, binary.ty) and binary.rhs.int == -1) return null;
-    if (binary.flags.exact and @rem(binary.lhs.int, binary.rhs.int) != 0) return null;
+    const lhs = canonicalIntegerConstant(binary.lhs.int, binary.ty) orelse return null;
+    const rhs = canonicalIntegerConstant(binary.rhs.int, binary.ty) orelse return null;
+    if (rhs == 0) return null;
+    if (isSignedMin(lhs, binary.ty) and rhs == -1) return null;
+    if (binary.flags.exact and @rem(lhs, rhs) != 0) return null;
     return .{ .int = switch (mode) {
-        .div => @divTrunc(binary.lhs.int, binary.rhs.int),
-        .rem => @rem(binary.lhs.int, binary.rhs.int),
+        .div => @divTrunc(lhs, rhs),
+        .rem => @rem(lhs, rhs),
     } };
 }
 
@@ -553,15 +555,12 @@ fn signedResultInRange(ty: ir.Type, result: i128) bool {
 
 fn canonicalIntegerConstant(value: i128, ty: ir.Type) ?i128 {
     const bits = intBits(ty) orelse return null;
-    if (bits == 0 or bits >= 128) return null;
-    const modulus = @as(i128, 1) << @intCast(bits);
-    const sign_bit = @as(i128, 1) << @intCast(bits - 1);
-    var wrapped = @mod(value, modulus);
-    if (wrapped >= sign_bit) wrapped -= modulus;
-    return wrapped;
+    if (bits == 0 or bits > 128) return null;
+    return signedFromUnsignedBits(unsignedLowBits(value, bits), bits);
 }
 
 fn signedFromUnsignedBits(value: u128, bits: u16) i128 {
+    if (bits == 128) return @bitCast(value);
     const sign_bit = @as(u128, 1) << @intCast(bits - 1);
     if ((value & sign_bit) == 0) return @intCast(value);
     const modulus = @as(u128, 1) << @intCast(bits);
@@ -569,7 +568,7 @@ fn signedFromUnsignedBits(value: u128, bits: u16) i128 {
 }
 
 fn unsignedLowBits(value: i128, bits: u16) u128 {
-    const mask = (@as(u128, 1) << @intCast(bits)) - 1;
+    const mask = if (bits == 128) std.math.maxInt(u128) else (@as(u128, 1) << @intCast(bits)) - 1;
     const raw: u128 = @bitCast(value);
     return raw & mask;
 }
@@ -599,6 +598,7 @@ fn signedRange(ty: ir.Type) ?SignedRange {
 
 fn isSignedMin(value: i128, ty: ir.Type) bool {
     const bits = intBits(ty) orelse return false;
+    if (bits == 128) return value == std.math.minInt(i128);
     if (bits == 0 or bits >= 128) return false;
     return value == -(@as(i128, 1) << @intCast(bits - 1));
 }

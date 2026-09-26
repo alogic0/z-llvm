@@ -1,5 +1,6 @@
 const std = @import("std");
 const cfg = @import("../analysis/cfg.zig");
+const def_use = @import("../analysis/def_use.zig");
 const memory_ssa = @import("../analysis/memory_ssa.zig");
 const dominator = @import("../analysis/dominator.zig");
 const loop_info = @import("../analysis/loop_info.zig");
@@ -86,6 +87,8 @@ fn sinkLoopExitComputations(module: *ir.Module, function: *ir.Function, graph: c
 }
 
 fn sinkExitOnlyBinary(module: *ir.Module, function: *ir.Function, graph: cfg.Graph, natural_loop: loop_info.NaturalLoop, exit_index: usize) !bool {
+    var uses = try def_use.UseCounts.collectFunction(module.allocator, function.*);
+    defer uses.deinit();
     for (natural_loop.blocks.items) |block_index| {
         if (block_index >= function.blocks.items.len) continue;
         var instruction_index: usize = 0;
@@ -99,6 +102,8 @@ fn sinkExitOnlyBinary(module: *ir.Module, function: *ir.Function, graph: cfg.Gra
             if (isFpBinary(binary.op)) continue;
             if (!memory_effect.isSafeToSpeculativelyExecute(instruction)) continue;
             if (!outsideUseIsOnlyExitRet(function.*, natural_loop, exit_index, result)) continue;
+            // Moving the definition must not strand any loop-local users.
+            if ((uses.counts.get(result) orelse 0) != 1) continue;
 
             var map = try buildExitLcssaMap(module, function, graph, natural_loop, exit_index, &.{ binary.lhs, binary.rhs });
             defer map.deinit(module.allocator);
@@ -119,6 +124,8 @@ fn sinkExitOnlyBinary(module: *ir.Module, function: *ir.Function, graph: cfg.Gra
 }
 
 fn sinkExitOnlyGepLoad(module: *ir.Module, function: *ir.Function, graph: cfg.Graph, natural_loop: loop_info.NaturalLoop, exit_index: usize) !bool {
+    var uses = try def_use.UseCounts.collectFunction(module.allocator, function.*);
+    defer uses.deinit();
     for (natural_loop.blocks.items) |block_index| {
         if (block_index >= function.blocks.items.len) continue;
         var instruction_index: usize = 0;
@@ -138,6 +145,8 @@ fn sinkExitOnlyGepLoad(module: *ir.Module, function: *ir.Function, graph: cfg.Gr
             if (!valueMatchesName(load.ptr, gep_result)) continue;
             if (load.attrs.isBarrier()) continue;
             if (!outsideUseIsOnlyExitRet(function.*, natural_loop, exit_index, load_result)) continue;
+            if ((uses.counts.get(load_result) orelse 0) != 1 or
+                (uses.counts.get(gep_result) orelse 0) != 1) continue;
             if (hasMemoryClobberInLoop(module.*, function.*, natural_loop, load_instruction, load)) continue;
 
             var values: std.ArrayList(ir.Value) = .empty;
@@ -156,7 +165,14 @@ fn sinkExitOnlyGepLoad(module: *ir.Module, function: *ir.Function, graph: cfg.Gr
                 });
             }
             const sunk_gep_name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.le", .{gep_result}));
-            try function.blocks.items[exit_index].instructions.append(module.allocator, .{
+            // Place the pair immediately after the LCSSA phis, before any
+            // exit-block memory effects. Only loop clobbers were ruled out.
+            const exit_block = &function.blocks.items[exit_index];
+            var insertion_index: usize = 0;
+            while (insertion_index < exit_block.instructions.items.len and
+                exit_block.instructions.items[insertion_index].kind == .phi) : (insertion_index += 1)
+            {}
+            try exit_block.instructions.insert(module.allocator, insertion_index, .{
                 .result = sunk_gep_name,
                 .kind = .{ .gep = .{
                     .source_ty = gep.source_ty,
@@ -166,7 +182,7 @@ fn sinkExitOnlyGepLoad(module: *ir.Module, function: *ir.Function, graph: cfg.Gr
                 } },
             });
             const sunk_load_name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.le", .{load_result}));
-            try function.blocks.items[exit_index].instructions.append(module.allocator, .{
+            try exit_block.instructions.insert(module.allocator, insertion_index + 1, .{
                 .result = sunk_load_name,
                 .kind = .{ .load = .{
                     .ty = load.ty,

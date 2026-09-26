@@ -93,13 +93,22 @@ fn visitBlock(
     walker: memory_ssa.Walker,
     aliases: *std.StringHashMap(ir.Value),
     available: *std.ArrayList(AvailableInstruction),
-    stores: *std.ArrayList(AvailableStore),
+    incoming_stores: *const std.ArrayList(AvailableStore),
     block_index: usize,
 ) !bool {
     const old_available_len = available.items.len;
     defer available.shrinkRetainingCapacity(old_available_len);
-    const old_store_len = stores.items.len;
-    defer stores.shrinkRetainingCapacity(old_store_len);
+    // Stores are pruned and overwritten, so restoring only the length cannot
+    // undo a child's mutations. Keep each dominator subtree's facts independent.
+    var block_stores: std.ArrayList(AvailableStore) = .empty;
+    defer block_stores.deinit(allocator);
+    const predecessors = graph.predecessors(block_index);
+    // A dominator's stores need not reach a join or loop header unchanged.
+    // Inherit only across a direct, single-predecessor edge.
+    if (predecessors.len == 1 and dom.immediateDominator(block_index) == predecessors[0]) {
+        try block_stores.appendSlice(allocator, incoming_stores.items);
+    }
+    const stores = &block_stores;
 
     var changed = false;
     const block = &function.blocks.items[block_index];

@@ -4,6 +4,7 @@ const common = @import("tool_common.zig");
 const commands = [_]Command{
     .{ .label = "zig build test", .argv = &.{ "zig", "build", "test" } },
     .{ .label = "tools/compare_opt.zig", .argv = &.{ "zig", "run", "tools/compare_opt.zig" } },
+    .{ .label = "tools/run_optimizer_correctness.zig", .argv = &.{ "zig", "run", "tools/run_optimizer_correctness.zig" } },
     .{ .label = "tools/lint_zig_ir_manifest.zig", .argv = &.{ "zig", "run", "tools/lint_zig_ir_manifest.zig" } },
     .{ .label = "tools/run_zig_corpus.zig", .argv = &.{ "zig", "run", "tools/run_zig_corpus.zig" } },
     .{ .label = "tools/run_handoff_validation.zig", .argv = &.{ "zig", "run", "tools/run_handoff_validation.zig" } },

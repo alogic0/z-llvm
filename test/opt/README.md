@@ -72,6 +72,12 @@ Run all metadata-backed comparisons:
 zig build compare-opt
 ```
 
+`zig build optimizer-correctness` also executes 11 regression functions after
+the focused optimizer passes and `release-o3`, comparing with an independent
+LLVM 22 build. It covers branch and loop store facts, signed narrow constants,
+wrapping wide arithmetic, and LICM sinking. The runner is included in readiness;
+it requires `clang-22` and `opt-22`. Isolated unit tests remain tool-independent.
+
 `opt-equivalent` rows are compared against normalized `opt` output.
 `local-conservative` and `parse-preserve-only` rows are compared only against
 their checked-in `z_llvm` expected output because LLVM intentionally does more

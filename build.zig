@@ -76,6 +76,7 @@ pub fn build(b: *std.Build) void {
     release_pipeline_policy_step.dependOn(&b.addRunArtifact(release_pipeline_policy_report).step);
 
     addToolStepWithArgs(b, "compare-opt", "Run optimizer fixture comparison; pass optional fixture args after --", "tools/compare_opt.zig");
+    addToolStep(b, "optimizer-correctness", "Execute optimizer regressions against LLVM 22", "tools/run_optimizer_correctness.zig");
     addToolStepWithFixedArgs(b, "compare-codegen-asm", "Compare generated x86_64 assembly fixtures", "tools/compare_codegen.zig", &.{"--mode=asm"});
     addToolStepWithFixedArgs(b, "compare-codegen-objdump", "Compare generated x86_64 object disassembly fixtures", "tools/compare_codegen.zig", &.{"--mode=objdump"});
     addToolStepWithFixedArgs(b, "compare-codegen-readelf", "Compare generated x86_64 object symbol and relocation fixtures", "tools/compare_codegen.zig", &.{"--mode=readelf"});
