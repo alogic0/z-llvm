@@ -2,8 +2,9 @@
 
 The [current architecture](architecture.md) describes implemented routes and
 ownership. The [architecture refactor plan](roadmap/architecture_refactor_plan.md)
-proposes bounded shared-IR and lowering work; only its documentation correction
-is completed. Its implementation steps do not supersede the named capability
+records the completed operand traversal, ownership, integer-semantics, and
+module-reference slices, including GlobalOpt and GlobalDCE migrations. Shared
+lowering remains next. These refactors do not supersede the named capability
 objective below or advance accepted counters.
 
 The user's 2026-09-10 instruction authorizes implementation of the entire

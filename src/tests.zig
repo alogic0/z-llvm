@@ -10,4 +10,5 @@ comptime {
     _ = @import("tests/optimizer_correctness.zig");
     _ = @import("tests/integer_semantics.zig");
     _ = @import("tests/module_references.zig");
+    _ = @import("tests/globaldce_references.zig");
 }

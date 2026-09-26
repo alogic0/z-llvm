@@ -103,8 +103,11 @@ Standalone behavioral and compiler-rt counts are separate populations.
   distinguishes global `@name` from local `%name` and reports opaque regions
   explicitly; absence requires both zero direct uses and complete coverage.
   Assembly, raw call fields, metadata, and unrecognized attributes conservatively
-  remain unknown. GlobalOpt uses this API for eligibility and deletion checks;
-  GlobalDCE and other reference consumers have not yet migrated.
+  remain unknown. GlobalOpt uses this API for eligibility and deletion checks.
+  GlobalDCE uses definition-scoped walks to build function/global/alias edges:
+  an unknown in a live definition or module scope blocks deletion, while an
+  unreachable definition containing unknown text can still be removed. Other
+  reference consumers remain separate.
 - `Instruction.clone` copies instruction-owned PHI, GEP, and call lists plus
   the synthesized `cmpxchg` result-type string. Other strings remain borrowed
   from the module/source. SCCP uses a temporary clone with explicit cleanup;

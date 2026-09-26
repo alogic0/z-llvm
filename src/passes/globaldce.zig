@@ -1,5 +1,5 @@
 const std = @import("std");
-const call_graph = @import("../analysis/call_graph.zig");
+const references = @import("../analysis/module_references.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 
@@ -21,6 +21,7 @@ const NodeRef = struct {
 const Node = struct {
     ref: NodeRef,
     edges: std.ArrayList(NodeRef),
+    has_unknown: bool = false,
 
     fn deinit(node: *Node, allocator: std.mem.Allocator) void {
         node.edges.deinit(allocator);
@@ -31,6 +32,7 @@ const GlobalDependencyGraph = struct {
     allocator: std.mem.Allocator,
     nodes: std.ArrayList(Node),
     roots: std.ArrayList(NodeRef),
+    has_unknown_roots: bool = false,
 
     fn build(allocator: std.mem.Allocator, module: ir.Module) !GlobalDependencyGraph {
         var graph: GlobalDependencyGraph = .{
@@ -40,44 +42,31 @@ const GlobalDependencyGraph = struct {
         };
         errdefer graph.deinit();
 
-        var calls = try call_graph.CallGraph.build(allocator, module);
-        defer calls.deinit();
-
-        for (module.functions.items) |function| {
+        for (module.functions.items) |*function| {
             const ref: NodeRef = .{ .kind = .function, .name = function.name };
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
             if (!isLocal(function.linkage)) try graph.roots.append(allocator, ref);
-            const callees = calls.calleesOf(function.name) orelse &.{};
-            for (callees) |callee| {
-                if (!hasFunctionDefinition(module, callee)) continue;
-                try appendUniqueEdge(allocator, &node.edges, .{ .kind = .function, .name = callee });
-            }
-            try addFunctionGlobalEdges(allocator, module, &node.edges, function);
+            try references.walkFunction(function, EdgeVisitor{ .allocator = allocator, .module = &module, .edges = &node.edges, .has_unknown = &node.has_unknown });
             try graph.nodes.append(allocator, node);
         }
-
-        for (module.globals.items) |global| {
+        for (module.globals.items) |*global| {
             const ref: NodeRef = .{ .kind = .global, .name = global.name };
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
             if (!isLocal(global.linkage)) try graph.roots.append(allocator, ref);
-            try addInitializerEdges(allocator, module, &node.edges, global.initializer);
+            try references.walkGlobal(global, EdgeVisitor{ .allocator = allocator, .module = &module, .edges = &node.edges, .has_unknown = &node.has_unknown });
             try graph.nodes.append(allocator, node);
         }
-
-        for (module.aliases.items) |alias| {
+        for (module.aliases.items) |*alias| {
             const ref: NodeRef = .{ .kind = .alias, .name = alias.name };
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
             if (!isLocal(alias.linkage)) try graph.roots.append(allocator, ref);
-            if (hasFunctionDefinition(module, alias.target)) {
-                try appendUniqueEdge(allocator, &node.edges, .{ .kind = .function, .name = alias.target });
-            } else if (hasGlobalDefinition(module, alias.target)) {
-                try appendUniqueEdge(allocator, &node.edges, .{ .kind = .global, .name = alias.target });
-            }
+            try references.walkAlias(alias, EdgeVisitor{ .allocator = allocator, .module = &module, .edges = &node.edges, .has_unknown = &node.has_unknown });
             try graph.nodes.append(allocator, node);
         }
+        try references.walkModuleScope(&module, EdgeVisitor{ .allocator = allocator, .module = &module, .edges = &graph.roots, .has_unknown = &graph.has_unknown_roots });
 
         return graph;
     }
@@ -88,111 +77,51 @@ const GlobalDependencyGraph = struct {
         graph.roots.deinit(graph.allocator);
     }
 
-    fn edgesOf(graph: GlobalDependencyGraph, ref: NodeRef) []const NodeRef {
-        for (graph.nodes.items) |node| {
-            if (sameRef(node.ref, ref)) return node.edges.items;
+    fn nodeOf(graph: GlobalDependencyGraph, ref: NodeRef) ?*const Node {
+        for (graph.nodes.items) |*node| {
+            if (sameRef(node.ref, ref)) return node;
         }
-        return &.{};
+        return null;
     }
 };
 
-fn addInitializerEdges(
+const EdgeVisitor = struct {
+    pub const Error = std.mem.Allocator.Error;
     allocator: std.mem.Allocator,
-    module: ir.Module,
+    module: *const ir.Module,
     edges: *std.ArrayList(NodeRef),
-    initializer: ir.GlobalInitializer,
-) !void {
-    switch (initializer) {
-        .none, .c_string, .@"opaque" => {},
-        .scalar => |value| try addValueEdge(allocator, module, edges, value),
-        .array => |array| for (array.values.items) |value| try addValueEdge(allocator, module, edges, value),
-    }
-}
+    has_unknown: *bool,
 
-fn addValueEdge(allocator: std.mem.Allocator, module: ir.Module, edges: *std.ArrayList(NodeRef), value: ir.Value) !void {
-    const raw_name = switch (value) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return,
-    };
-    const name = if (std.mem.startsWith(u8, raw_name, "@")) raw_name[1..] else raw_name;
-    if (hasFunctionDefinition(module, name)) {
-        try appendUniqueEdge(allocator, edges, .{ .kind = .function, .name = name });
-    } else if (hasGlobalDefinition(module, name)) {
-        try appendUniqueEdge(allocator, edges, .{ .kind = .global, .name = name });
-    }
-}
-
-fn addFunctionGlobalEdges(allocator: std.mem.Allocator, module: ir.Module, edges: *std.ArrayList(NodeRef), function: ir.Function) !void {
-    for (function.blocks.items) |block| {
-        for (block.instructions.items) |instruction| {
-            switch (instruction.kind) {
-                .binary => |binary| {
-                    try addValueEdge(allocator, module, edges, binary.lhs);
-                    try addValueEdge(allocator, module, edges, binary.rhs);
-                },
-                .cast => |cast| try addValueEdge(allocator, module, edges, cast.value),
-                .freeze => |freeze| try addValueEdge(allocator, module, edges, freeze.value),
-                .icmp => |icmp| {
-                    try addValueEdge(allocator, module, edges, icmp.lhs);
-                    try addValueEdge(allocator, module, edges, icmp.rhs);
-                },
-                .fcmp => |fcmp| {
-                    try addValueEdge(allocator, module, edges, fcmp.lhs);
-                    try addValueEdge(allocator, module, edges, fcmp.rhs);
-                },
-                .select => |select| {
-                    try addValueEdge(allocator, module, edges, select.cond);
-                    try addValueEdge(allocator, module, edges, select.true_value);
-                    try addValueEdge(allocator, module, edges, select.false_value);
-                },
-                .phi => |phi| for (phi.incoming.items) |incoming| try addValueEdge(allocator, module, edges, incoming.value),
-                .alloca => {},
-                .load => |load| try addValueEdge(allocator, module, edges, load.ptr),
-                .store => |store| {
-                    try addValueEdge(allocator, module, edges, store.value);
-                    try addValueEdge(allocator, module, edges, store.ptr);
-                },
-                .atomicrmw => |atomicrmw| {
-                    try addValueEdge(allocator, module, edges, atomicrmw.ptr);
-                    try addValueEdge(allocator, module, edges, atomicrmw.value);
-                },
-                .cmpxchg => |cmpxchg| {
-                    try addValueEdge(allocator, module, edges, cmpxchg.ptr);
-                    try addValueEdge(allocator, module, edges, cmpxchg.expected);
-                    try addValueEdge(allocator, module, edges, cmpxchg.replacement);
-                },
-                .fence, .extractelement, .insertelement, .shufflevector => {},
-                .extractvalue => |extract| try addValueEdge(allocator, module, edges, extract.aggregate),
-                .insertvalue => |insert| {
-                    try addValueEdge(allocator, module, edges, insert.aggregate);
-                    try addValueEdge(allocator, module, edges, insert.value);
-                },
-                .gep => |gep| {
-                    try addValueEdge(allocator, module, edges, gep.ptr);
-                    for (gep.indices.items) |index| try addValueEdge(allocator, module, edges, index.value);
-                },
-                .call => |call| {
-                    if (call.callee_value) |value| try addValueEdge(allocator, module, edges, value);
-                    for (call.args.items) |arg| try addValueEdge(allocator, module, edges, arg.value);
-                },
-            }
-        }
-        if (block.terminator) |terminator| switch (terminator) {
-            .ret => |ret| if (ret.value) |value| try addValueEdge(allocator, module, edges, value),
-            .condbr => |condbr| try addValueEdge(allocator, module, edges, condbr.cond),
-            .@"switch" => |switch_term| {
-                try addValueEdge(allocator, module, edges, switch_term.cond);
-                for (switch_term.cases.items) |case| try addValueEdge(allocator, module, edges, case.value);
+    pub fn visit(visitor: EdgeVisitor, _: references.Site, event: references.Event) Error!void {
+        switch (event) {
+            .unknown => visitor.has_unknown.* = true,
+            .symbol => |name| if (definition(visitor.module, name)) |ref| {
+                try appendUniqueEdge(visitor.allocator, visitor.edges, ref);
             },
-            .indirectbr => |indirectbr| try addValueEdge(allocator, module, edges, indirectbr.addr),
-            .br, .@"unreachable" => {},
-        };
+        }
     }
+};
+
+fn definition(module: *const ir.Module, name: []const u8) ?NodeRef {
+    for (module.functions.items) |function| {
+        if (std.mem.eql(u8, function.name, name)) return .{ .kind = .function, .name = name };
+    }
+    for (module.globals.items) |global| {
+        if (std.mem.eql(u8, global.name, name)) return .{ .kind = .global, .name = name };
+    }
+    for (module.aliases.items) |alias| {
+        if (std.mem.eql(u8, alias.name, name)) return .{ .kind = .alias, .name = name };
+    }
+    return null;
 }
 
 fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassResult {
     var graph = try GlobalDependencyGraph.build(context.allocator, module.*);
     defer graph.deinit();
+
+    // Unknown module-scope references can name any definition. Unknowns in
+    // unreachable definitions do not root anything; those definitions vanish.
+    if (graph.has_unknown_roots) return .unchanged;
 
     var live = std.ArrayList(NodeRef).empty;
     defer live.deinit(context.allocator);
@@ -202,7 +131,11 @@ fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassRes
 
     for (graph.roots.items) |root| try markLive(context.allocator, &live, &worklist, root);
     while (worklist.pop()) |ref| {
-        for (graph.edgesOf(ref)) |edge| try markLive(context.allocator, &live, &worklist, edge);
+        const node = graph.nodeOf(ref) orelse continue;
+        // A live opaque region may refer to any node, including aliases and
+        // COMDAT members. Preserve the entire module before any mutation.
+        if (node.has_unknown) return .unchanged;
+        for (node.edges.items) |edge| try markLive(context.allocator, &live, &worklist, edge);
     }
 
     const removed_functions = removeDeadFunctions(module, live.items);
@@ -333,28 +266,6 @@ fn sameRef(a: NodeRef, b: NodeRef) bool {
     return a.kind == b.kind and std.mem.eql(u8, a.name, b.name);
 }
 
-fn hasFunctionDefinition(module: ir.Module, name: []const u8) bool {
-    for (module.functions.items) |function| {
-        if (std.mem.eql(u8, function.name, name)) return true;
-    }
-    return false;
-}
-
-fn hasGlobalDefinition(module: ir.Module, name: []const u8) bool {
-    for (module.globals.items) |global| {
-        if (std.mem.eql(u8, global.name, name)) return true;
-    }
-    return false;
-}
-
 fn isLocal(linkage: ir.FunctionLinkage) bool {
     return linkage == .internal or linkage == .private;
-}
-
-fn hasComdat(attrs: ?[]const u8) bool {
-    return if (attrs) |text| std.mem.indexOf(u8, text, "comdat") != null else false;
-}
-
-fn isThreadLocal(global: ir.Global) bool {
-    return if (global.address_attrs) |text| std.mem.indexOf(u8, text, "thread_local") != null else false;
 }

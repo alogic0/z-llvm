@@ -137,38 +137,51 @@ pub fn walkTerminator(term: *const ir.Terminator, visitor: anytype) @TypeOf(visi
     }
 }
 
-pub fn walkModule(module: *const ir.Module, visitor: anytype) @TypeOf(visitor).Error!void {
+/// References that remain even after dead definitions are removed.
+pub fn walkModuleScope(module: *const ir.Module, visitor: anytype) @TypeOf(visitor).Error!void {
     for (module.module_asm.items) |_| try visitor.visit(.module, .{ .unknown = .assembly });
     for (module.attribute_groups.items) |text| try opaqueText(text, .attributes, .module, visitor);
     for (module.metadata.items) |text| try opaqueText(text, .metadata, .module, visitor);
-    for (module.aliases.items) |*alias| try visitor.visit(.{ .alias = alias }, .{ .symbol = alias.target });
-    for (module.globals.items) |*global| {
-        const site: Site = .{ .global = global };
-        switch (global.initializer) {
-            .none, .c_string => {}, // A parsed byte string is data, not IR syntax.
-            .scalar => |value| try valueReference(value, site, visitor),
-            .array => |array| for (array.values.items) |value| try valueReference(value, site, visitor),
-            .@"opaque" => try visitor.visit(site, .{ .unknown = .initializer }),
-        }
-        try attributes(global.attrs, site, visitor);
-        try attributes(global.address_attrs, site, visitor);
-    }
     for (module.declarations.items) |*decl| {
         const site: Site = .{ .declaration = decl };
         try attributes(decl.attrs, site, visitor);
         try attributes(decl.ret_attrs, site, visitor);
         for (decl.params.items) |param| try attributes(param.attrs, site, visitor);
     }
-    for (module.functions.items) |*function| {
-        const site: Site = .{ .function = function };
-        try attributes(function.attrs, site, visitor);
-        try attributes(function.ret_attrs, site, visitor);
-        for (function.params.items) |param| try attributes(param.attrs, site, visitor);
-        for (function.blocks.items) |*block| {
-            for (block.instructions.items) |*inst| try walkInstruction(inst, visitor);
-            if (block.terminator) |*term| try walkTerminator(term, visitor);
-        }
+}
+
+pub fn walkAlias(alias: *const ir.GlobalAlias, visitor: anytype) @TypeOf(visitor).Error!void {
+    try visitor.visit(.{ .alias = alias }, .{ .symbol = alias.target });
+}
+
+pub fn walkGlobal(global: *const ir.Global, visitor: anytype) @TypeOf(visitor).Error!void {
+    const site: Site = .{ .global = global };
+    switch (global.initializer) {
+        .none, .c_string => {}, // A parsed byte string is data, not IR syntax.
+        .scalar => |value| try valueReference(value, site, visitor),
+        .array => |array| for (array.values.items) |value| try valueReference(value, site, visitor),
+        .@"opaque" => try visitor.visit(site, .{ .unknown = .initializer }),
     }
+    try attributes(global.attrs, site, visitor);
+    try attributes(global.address_attrs, site, visitor);
+}
+
+pub fn walkFunction(function: *const ir.Function, visitor: anytype) @TypeOf(visitor).Error!void {
+    const site: Site = .{ .function = function };
+    try attributes(function.attrs, site, visitor);
+    try attributes(function.ret_attrs, site, visitor);
+    for (function.params.items) |param| try attributes(param.attrs, site, visitor);
+    for (function.blocks.items) |*block| {
+        for (block.instructions.items) |*inst| try walkInstruction(inst, visitor);
+        if (block.terminator) |*term| try walkTerminator(term, visitor);
+    }
+}
+
+pub fn walkModule(module: *const ir.Module, visitor: anytype) @TypeOf(visitor).Error!void {
+    try walkModuleScope(module, visitor);
+    for (module.aliases.items) |*alias| try walkAlias(alias, visitor);
+    for (module.globals.items) |*global| try walkGlobal(global, visitor);
+    for (module.functions.items) |*function| try walkFunction(function, visitor);
 }
 
 pub const Summary = struct {

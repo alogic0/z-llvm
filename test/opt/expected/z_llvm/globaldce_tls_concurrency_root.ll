@@ -1,20 +1,27 @@
 @tls_concurrency.tls_counter = private thread_local unnamed_addr global i32 1, align 4
+@unused_tls = private thread_local unnamed_addr global i32 2, align 4
+@unused_plain = private global i32 3, align 4
 
 @bump_tls = alias i32 (i32), ptr @tls_concurrency.bump_tls
 @read_tls = alias i32 (), ptr @tls_concurrency.read_tls
 
 define private i32 @tls_concurrency.bump_tls(i32 %0) unnamed_addr #0 align 1 {
 entry:
-  %1 = load i32, ptr @tls_concurrency.tls_counter, align 4
-  %2 = add nsw i32 %1, %0
-  store i32 %2, ptr @tls_concurrency.tls_counter, align 4
-  ret i32 %2
+  %2 = load i32, ptr @tls_concurrency.tls_counter, align 4
+  %3 = add nsw i32 %2, %0
+  store i32 %3, ptr @tls_concurrency.tls_counter, align 4
+  ret i32 %3
 }
 
 define private i32 @tls_concurrency.read_tls() unnamed_addr #1 align 1 {
 entry:
-  %0 = load i32, ptr @tls_concurrency.tls_counter, align 4
-  ret i32 %0
+  %1 = load i32, ptr @tls_concurrency.tls_counter, align 4
+  ret i32 %1
+}
+
+define private i32 @unused(i32 %x) {
+entry:
+  ret i32 %x
 }
 
 attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(readwrite, argmem: none, inaccessiblemem: none, target_mem0: none, target_mem1: none) uwtable }

@@ -1,10 +1,12 @@
 const std = @import("std");
 const common = @import("tool_common.zig");
 
-const fixture = "test/opt/inputs/optimizer_correctness.ll";
-const harness = "test/opt/optimizer_correctness_harness.c";
-
 pub fn main(init: std.process.Init) !void {
+    try runCase(init, "test/opt/inputs/optimizer_correctness.ll", "test/opt/optimizer_correctness_harness.c", &.{ "early-cse,instcombine,licm,sccp,globalopt", "release-o3" }, "optimizer correctness", "functions=17");
+    try runCase(init, "test/opt/inputs/globaldce_references.ll", "test/opt/globaldce_references_harness.c", &.{"globaldce"}, "GlobalDCE references", "entry_points=5");
+}
+
+fn runCase(init: std.process.Init, fixture: []const u8, harness: []const u8, pipelines: []const []const u8, label: []const u8, count: []const u8) !void {
     const a = init.gpa;
     const io = init.io;
     const temp = try common.TempDir.init(a, io, "optimizer_correctness");
@@ -22,7 +24,7 @@ pub fn main(init: std.process.Init) !void {
 
     var buffer: [4096]u8 = undefined;
     var out = std.Io.File.stdout().writer(io, &buffer);
-    for ([_][]const u8{ "early-cse,instcombine,licm,sccp,globalopt", "release-o3" }) |pipeline| {
+    for (pipelines) |pipeline| {
         const optimized = try common.allocTempFile(a, temp, pipeline, ".ll");
         defer a.free(optimized);
         const executable = try common.allocTempFile(a, temp, pipeline, ".exe");
@@ -37,7 +39,7 @@ pub fn main(init: std.process.Init) !void {
         defer common.freeRunResult(a, actual);
         if (!std.mem.eql(u8, expected.stdout, actual.stdout) or
             !std.mem.eql(u8, expected.stderr, actual.stderr)) return error.OptimizerExecutionMismatch;
-        try out.interface.print("ok optimizer correctness pipeline={s} functions=17\n", .{pipeline});
+        try out.interface.print("ok {s} pipeline={s} {s}\n", .{ label, pipeline, count });
         try out.interface.flush();
     }
     success = true;
