@@ -55,6 +55,7 @@ fn eligibleInitializer(global: ir.Global) ?ir.Value {
 }
 
 fn allUsesAreDirectLoads(module: ir.Module, global: ir.Global) bool {
+    if (hasModuleReference(module, global.name)) return false;
     var uses: usize = 0;
     for (module.functions.items) |function| {
         for (function.blocks.items) |block| {
@@ -101,6 +102,7 @@ fn replaceDirectLoads(module: *ir.Module, global: ir.Global, initializer: ir.Val
 }
 
 fn globalHasRemainingUses(module: ir.Module, global: ir.Global) bool {
+    if (hasModuleReference(module, global.name)) return true;
     for (module.functions.items) |function| {
         for (function.blocks.items) |block| {
             for (block.instructions.items) |instruction| {
@@ -113,6 +115,31 @@ fn globalHasRemainingUses(module: ir.Module, global: ir.Global) bool {
         }
     }
     return false;
+}
+
+fn hasModuleReference(module: ir.Module, name: []const u8) bool {
+    // Assembly can reference symbols without the IR's @ spelling.
+    if (module.module_asm.items.len != 0) return true;
+    for (module.aliases.items) |alias| {
+        if (std.mem.eql(u8, alias.target, name)) return true;
+    }
+    for (module.globals.items) |global| {
+        switch (global.initializer) {
+            .none, .c_string => {},
+            .scalar => |value| if (valueIsGlobal(value, name)) return true,
+            .array => |array| for (array.values.items) |value| {
+                if (valueIsGlobal(value, name)) return true;
+            },
+            .@"opaque" => |text| if (opaqueMayReferenceGlobal(text)) return true,
+        }
+    }
+    return false;
+}
+
+fn opaqueMayReferenceGlobal(text: []const u8) bool {
+    // These expressions are retained as text. Without a parsed use graph,
+    // conservatively retain globals whenever they may contain a symbol use.
+    return std.mem.indexOfScalar(u8, text, '@') != null;
 }
 
 fn instructionUsesGlobal(instruction: ir.Instruction, name: []const u8) bool {
@@ -289,13 +316,14 @@ fn isLoadFoldableScalar(value: ir.Value) bool {
 }
 
 fn isGlobalValue(value: ir.Value, name: []const u8) bool {
-    return valueIsGlobal(value, name);
+    return value == .named and valueIsGlobal(value, name);
 }
 
 fn valueIsGlobal(value: ir.Value, name: []const u8) bool {
     const value_name = switch (value) {
         .named => |value_name| value_name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        .vector, .constant_expr => |text| return opaqueMayReferenceGlobal(text),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer => return false,
     };
     if (std.mem.eql(u8, value_name, name)) return true;
     return value_name.len == name.len + 1 and value_name[0] == '@' and std.mem.eql(u8, value_name[1..], name);

@@ -22,7 +22,7 @@ pub fn main(init: std.process.Init) !void {
 
     var buffer: [4096]u8 = undefined;
     var out = std.Io.File.stdout().writer(io, &buffer);
-    for ([_][]const u8{ "early-cse,instcombine,licm", "release-o3" }) |pipeline| {
+    for ([_][]const u8{ "early-cse,instcombine,licm,sccp,globalopt", "release-o3" }) |pipeline| {
         const optimized = try common.allocTempFile(a, temp, pipeline, ".ll");
         defer a.free(optimized);
         const executable = try common.allocTempFile(a, temp, pipeline, ".exe");
@@ -37,7 +37,7 @@ pub fn main(init: std.process.Init) !void {
         defer common.freeRunResult(a, actual);
         if (!std.mem.eql(u8, expected.stdout, actual.stdout) or
             !std.mem.eql(u8, expected.stderr, actual.stderr)) return error.OptimizerExecutionMismatch;
-        try out.interface.print("ok optimizer correctness pipeline={s} functions=11\n", .{pipeline});
+        try out.interface.print("ok optimizer correctness pipeline={s} functions=16\n", .{pipeline});
         try out.interface.flush();
     }
     success = true;

@@ -240,3 +240,133 @@ test "optimizer regression: licm preserves other users of sunk loads and geps" {
         try std.testing.expect(loop.instructions.items[2].kind == .load);
     }
 }
+
+test "optimizer review: sccp preserves changing loop call arguments" {
+    var module = try optimize(
+        \\declare i32 @observe(i32, i32)
+        \\define i32 @f() {
+        \\entry:
+        \\  br label %loop
+        \\loop:
+        \\  %i = phi i32 [ 0, %entry ], [ %next, %loop ]
+        \\  %v = call i32 @observe(i32 %i, i32 7)
+        \\  %next = add i32 %i, 1
+        \\  %done = icmp eq i32 %next, 3
+        \\  br i1 %done, label %exit, label %loop
+        \\exit:
+        \\  ret i32 %v
+        \\}
+    , "sccp");
+    defer module.deinit();
+    const call = module.functions.items[0].blocks.items[1].instructions.items[1].kind.call;
+    try std.testing.expect(call.args.items[0].value.eql(.{ .named = "i" }));
+    try std.testing.expect(call.args.items[1].value.eql(.{ .int = 7 }));
+}
+
+test "optimizer review: sccp still folds calls with proven constant arguments" {
+    var module = try optimize(
+        \\declare i32 @llvm.umin.i32(i32, i32)
+        \\define i32 @f() {
+        \\entry:
+        \\  %n = add i32 3, 4
+        \\  %v = call i32 @llvm.umin.i32(i32 %n, i32 9)
+        \\  ret i32 %v
+        \\}
+    , "sccp");
+    defer module.deinit();
+    try expectReturn(module, 0, 7);
+}
+
+test "optimizer review: comparisons use integer bitpatterns and signedness" {
+    const Case = struct { pred: []const u8, bits: u16, lhs: i128, rhs: i128, expected: i128 };
+    for ([_]Case{
+        .{ .pred = "slt", .bits = 8, .lhs = 255, .rhs = 0, .expected = 1 },
+        .{ .pred = "sgt", .bits = 8, .lhs = 0, .rhs = 255, .expected = 1 },
+        .{ .pred = "sle", .bits = 8, .lhs = 255, .rhs = -1, .expected = 1 },
+        .{ .pred = "sge", .bits = 8, .lhs = -1, .rhs = 255, .expected = 1 },
+        .{ .pred = "eq", .bits = 8, .lhs = 255, .rhs = -1, .expected = 1 },
+        .{ .pred = "ne", .bits = 8, .lhs = 255, .rhs = -1, .expected = 0 },
+        .{ .pred = "slt", .bits = 1, .lhs = 1, .rhs = 0, .expected = 1 },
+        .{ .pred = "eq", .bits = 1, .lhs = 1, .rhs = -1, .expected = 1 },
+        .{ .pred = "slt", .bits = 16, .lhs = 32768, .rhs = 32767, .expected = 1 },
+        .{ .pred = "slt", .bits = 64, .lhs = std.math.maxInt(u64), .rhs = 0, .expected = 1 },
+        .{ .pred = "slt", .bits = 127, .lhs = std.math.maxInt(i128), .rhs = 0, .expected = 1 },
+        .{ .pred = "slt", .bits = 128, .lhs = std.math.minInt(i128), .rhs = 0, .expected = 1 },
+        .{ .pred = "ult", .bits = 8, .lhs = 255, .rhs = 0, .expected = 0 },
+        .{ .pred = "uge", .bits = 8, .lhs = -1, .rhs = 255, .expected = 1 },
+        .{ .pred = "ugt", .bits = 128, .lhs = -1, .rhs = std.math.maxInt(i128), .expected = 1 },
+        .{ .pred = "ule", .bits = 128, .lhs = 0, .rhs = -1, .expected = 1 },
+    }) |case| {
+        const input = try std.fmt.allocPrint(std.testing.allocator, "define i1 @f() {{\nentry:\n  %v = icmp {s} i{d} {d}, {d}\n  ret i1 %v\n}}\n", .{ case.pred, case.bits, case.lhs, case.rhs });
+        defer std.testing.allocator.free(input);
+        for ([_][]const u8{ "instcombine", "sccp" }) |passes| {
+            var module = try optimize(input, passes);
+            defer module.deinit();
+            try expectReturn(module, 0, case.expected);
+        }
+    }
+}
+
+test "optimizer review: globalopt preserves globals referenced outside functions" {
+    for ([_][]const u8{
+        "@p = global ptr @g",
+        "@p = global [1 x ptr] [ptr @g]",
+        "@p = global { ptr } { ptr @g }",
+        "@p = global ptr getelementptr (i32, ptr @g, i64 0)",
+        "@p = alias i32, ptr @g",
+        "module asm \".quad g\"",
+    }) |reference| {
+        const input = try std.fmt.allocPrint(std.testing.allocator,
+            \\@g = internal global i32 1
+            \\{s}
+            \\define i32 @f() {{
+            \\entry:
+            \\  %v = load i32, ptr @g
+            \\  ret i32 %v
+            \\}}
+        , .{reference});
+        defer std.testing.allocator.free(input);
+        var module = try optimize(input, "globalopt");
+        defer module.deinit();
+        try std.testing.expectEqualStrings("g", module.globals.items[0].name);
+        try std.testing.expect(module.functions.items[0].blocks.items[0].terminator.?.ret.value.?.eql(.{ .named = "v" }));
+    }
+}
+
+test "optimizer review: globalopt still folds globals without escaping references" {
+    var module = try optimize(
+        \\@g = internal global i32 7
+        \\@other = global i32 2
+        \\@p = global ptr @other
+        \\define i32 @f() {
+        \\entry:
+        \\  %v = load i32, ptr @g
+        \\  ret i32 %v
+        \\}
+    , "globalopt");
+    defer module.deinit();
+    try expectReturn(module, 0, 7);
+    try std.testing.expectEqual(@as(usize, 2), module.globals.items.len);
+}
+
+test "optimizer review: globalopt treats opaque instruction references as escapes" {
+    for ([_][]const u8{
+        "store i32 9, ptr getelementptr (i32, ptr @g, i64 0)",
+        "%other = load i32, ptr getelementptr (i32, ptr @g, i64 0)",
+    }) |reference| {
+        const input = try std.fmt.allocPrint(std.testing.allocator,
+            \\@g = internal global i32 1
+            \\define i32 @f() {{
+            \\entry:
+            \\  {s}
+            \\  %v = load i32, ptr @g
+            \\  ret i32 %v
+            \\}}
+        , .{reference});
+        defer std.testing.allocator.free(input);
+        var module = try optimize(input, "globalopt");
+        defer module.deinit();
+        try std.testing.expectEqual(@as(usize, 1), module.globals.items.len);
+        try std.testing.expect(module.functions.items[0].blocks.items[0].terminator.?.ret.value.?.eql(.{ .named = "v" }));
+    }
+}

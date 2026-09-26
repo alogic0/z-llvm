@@ -102,3 +102,51 @@ exit:
   store i32 99, ptr %p
   ret i32 %x
 }
+
+
+declare i32 @optimizer_observe(i32, i32)
+
+define i32 @sccp_loop_argument(i32 %n) {
+entry:
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %next, %loop ]
+  %v = call i32 @optimizer_observe(i32 %i, i32 7)
+  %next = add i32 %i, 1
+  %done = icmp eq i32 %next, %n
+  br i1 %done, label %exit, label %loop
+exit:
+  ret i32 %v
+}
+
+define i32 @signed_compare_bitpattern() {
+entry:
+  %c = icmp slt i8 255, 0
+  %r = zext i1 %c to i32
+  ret i32 %r
+}
+
+define i32 @equal_compare_bitpattern() {
+entry:
+  %c = icmp eq i8 255, -1
+  %r = zext i1 %c to i32
+  ret i32 %r
+}
+
+define i32 @unsigned_compare_wide() {
+entry:
+  %c = icmp ugt i128 -1, 170141183460469231731687303715884105727
+  %r = zext i1 %c to i32
+  ret i32 %r
+}
+
+@escaped_cell = internal global i32 1
+@escaped_pointer = global ptr @escaped_cell
+
+define i32 @global_indirect_write(i32 %new) {
+entry:
+  %p = load ptr, ptr @escaped_pointer
+  store i32 %new, ptr %p
+  %v = load i32, ptr @escaped_cell
+  ret i32 %v
+}

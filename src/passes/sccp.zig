@@ -147,7 +147,7 @@ const Solver = struct {
                     const lattice = if (instruction.kind == .phi)
                         solver.visitPhi(block_index, instruction)
                     else
-                        solver.visitInstruction(instruction);
+                        try solver.visitInstruction(instruction);
                     changed = try solver.mergeValue(instruction.result.?, lattice) or changed;
                 }
                 if (block.terminator) |terminator| {
@@ -223,15 +223,24 @@ const Solver = struct {
         return if (saw_executable_incoming) result else .unknown;
     }
 
-    fn visitInstruction(solver: Solver, instruction: ir.Instruction) Lattice {
+    fn visitInstruction(solver: Solver, instruction: ir.Instruction) !Lattice {
         if (simplifyCall(solver.module, instruction)) |replacement| return Lattice.fromValue(replacement);
 
-        const folded = solver.foldInstruction(instruction);
+        const folded = try solver.foldInstruction(instruction);
         return folded orelse instructionFallback(instruction);
     }
 
-    fn foldInstruction(solver: Solver, instruction: ir.Instruction) ?Lattice {
+    fn foldInstruction(solver: Solver, instruction: ir.Instruction) !?Lattice {
         var mapped = instruction;
+        // The instruction copy still shares a call's argument buffer with the
+        // live IR. Lattice constants can become overdefined on later visits,
+        // so speculative substitutions must never overwrite that buffer.
+        const call_args = if (instruction.kind == .call)
+            try solver.allocator.dupe(ir.CallArg, instruction.kind.call.args.items)
+        else
+            null;
+        defer if (call_args) |args| solver.allocator.free(args);
+        if (call_args) |args| mapped.kind.call.args = .{ .items = args, .capacity = args.len };
         var unresolved = false;
         var overdefined = false;
         solver.mapInstructionOperands(&mapped, &unresolved, &overdefined);

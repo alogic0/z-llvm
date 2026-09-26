@@ -371,8 +371,12 @@ fn simplifyIcmp(icmp: ir.IcmpInst) ?ir.Value {
 }
 
 fn simplifyIcmpConstants(icmp: ir.IcmpInst) ?ir.Value {
-    const lhs = icmp.lhs.int;
-    const rhs = icmp.rhs.int;
+    const bits = intBits(icmp.operand_ty) orelse return null;
+    if (bits == 0 or bits > 128) return null;
+    const lhs_bits = unsignedLowBits(icmp.lhs.int, bits);
+    const rhs_bits = unsignedLowBits(icmp.rhs.int, bits);
+    const lhs = signedFromUnsignedBits(lhs_bits, bits);
+    const rhs = signedFromUnsignedBits(rhs_bits, bits);
     const result = switch (icmp.predicate) {
         .eq => lhs == rhs,
         .ne => lhs != rhs,
@@ -380,17 +384,10 @@ fn simplifyIcmpConstants(icmp: ir.IcmpInst) ?ir.Value {
         .sge => lhs >= rhs,
         .slt => lhs < rhs,
         .sle => lhs <= rhs,
-        .ugt, .uge, .ult, .ule => blk: {
-            const lhs_unsigned = unsignedInt(lhs, icmp.operand_ty) orelse return null;
-            const rhs_unsigned = unsignedInt(rhs, icmp.operand_ty) orelse return null;
-            break :blk switch (icmp.predicate) {
-                .ugt => lhs_unsigned > rhs_unsigned,
-                .uge => lhs_unsigned >= rhs_unsigned,
-                .ult => lhs_unsigned < rhs_unsigned,
-                .ule => lhs_unsigned <= rhs_unsigned,
-                .eq, .ne, .sgt, .sge, .slt, .sle => unreachable,
-            };
-        },
+        .ugt => lhs_bits > rhs_bits,
+        .uge => lhs_bits >= rhs_bits,
+        .ult => lhs_bits < rhs_bits,
+        .ule => lhs_bits <= rhs_bits,
     };
     return .{ .int = @intFromBool(result) };
 }
