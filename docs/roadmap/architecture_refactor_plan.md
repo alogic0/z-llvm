@@ -1,8 +1,9 @@
 # Architecture corrections and refactor plan
 
-Baseline: `629e2ee7`, 2026-09-26. Scope authorized for this change: correct the
-architecture documentation and plan refactors. Compiler behavior, selector
-defaults, public CLI behavior, and acceptance counters are unchanged.
+Initial baseline: `629e2ee7`, 2026-09-26. Documentation and planning were committed
+as `56e66794`. The next authorized change implements the first bounded refactor
+slice below. Selector defaults, public CLI behavior, and acceptance counters
+remain unchanged.
 
 ## Corrected assessment
 
@@ -32,14 +33,15 @@ need to replace the entire IR or add an analysis-cache framework immediately.
 
 ## Proposed implementation sequence
 
-The following steps are pending implementation. They are recommendations, not
-new capability or completion claims. Keep the named real-function failure family
-in [next steps](../next_steps.md) as the capability objective; introduce helpers
+Slice 1 has a focused implementation recorded below; slices 2–5 remain pending.
+These steps do not claim new compiler capability. Keep the named real-function
+failure family in [next steps](../next_steps.md) as the capability objective; introduce helpers
 in bounded slices where they support that work or reproduced correctness gaps.
 
 ### 1. Shared operand traversal and replacement
 
-Owners: `src/ir/core.zig`, `src/analysis/def_use.zig`, and the first migrated pass.
+Owners: `src/ir/core.zig`, `src/ir/operands.zig`, `src/analysis/def_use.zig`,
+and `src/passes/globalopt.zig`.
 
 - Inventory existing `mapOperands`, use-count, and pass-local replacement
   implementations before choosing an API.
@@ -56,6 +58,31 @@ Exit criteria: all supported operand kinds have traversal/replacement coverage;
 CFG/SSA verification and the migrated pass's fixtures remain unchanged; native
 regressions agree with the pre-refactor behavior. No wholesale value-ID migration
 is required for this step.
+
+Implementation (2026-09-26, focused refactor):
+
+- Inventoried `Instruction.mapOperands`, the three UseCounts walks, and
+  GlobalOpt's instruction/terminator replacement switches. They enumerated the
+  same structured values. Other pass-local walkers, including vector-combine,
+  SCCP terminators, and GlobalOpt's escape scans, remain for later migrations.
+- Added `ir.operands.instruction` and `terminator`. Visitors receive a value
+  pointer and its IR type. Const input guarantees const value pointers even
+  through list storage; mutable input borrows the actual operand storage.
+- Added `replaceAllUses`, returning the replacement count and coverage. It
+  performs exact name substitution, skips removed instructions, and leaves
+  definitions, replacement bookkeeping, PHI labels, and branch targets intact.
+  Mapping still does one alias lookup per operand; it does not chase chains.
+- `Coverage.has_opaque_references` marks opaque values and unparsed syntax;
+  clients cannot infer complete absence of references from an empty walk.
+  Direct call symbols are outside this value API. GlobalOpt's eligibility and
+  opaque escape policy are unchanged; its replacement walk alone is migrated.
+- Added six tests covering all 20 instruction and six terminator kinds, typed
+  const access, mutable list operands, CFG/SSA verification after replacement,
+  one-step/cyclic alias maps, removed instructions, opaque boundaries, use-count
+  balance, and allocation-failure cleanup.
+
+Validation is recorded at the end of this page. This is an intermediate shared
+IR refactor, with no capability/ratchet closure or Tier-3 milestone claim.
 
 ### 2. Explicit ownership for speculative instructions
 
@@ -135,13 +162,40 @@ wrong-code repairs, ABI/verifier changes, and milestone closure require Tier 3.
 Any CLI behavior change also requires the linker-boundary gate. Record the exact
 source/input state before a full run and reuse only matching evidence.
 
-This documentation change needs documentation validation only. It does not
-justify rerunning the 17 integration gates, changing selector defaults, removing
-fallbacks, advancing counters, or claiming that any planned refactor is done.
+The original documentation-only change needed documentation validation only.
 
-Validation (Zig 0.16.0): `zig build check-docs` passed for its 14 current
-documents, 59 internal links, and two accepted-status blocks. A separate link
+Documentation baseline validation (Zig 0.16.0): `zig build check-docs` passed for
+its 14 current documents, 59 internal links, and two accepted-status blocks. A separate link
 check covered all 11 changed/new Markdown files and verified 108 local links,
 including the new architecture and plan pages outside the checker's fixed list.
-`git diff --check` passed. All changes are Markdown documentation; no compiler,
-runner, build configuration, or accepted-status JSON was modified.
+`git diff --check` passed. That commit changed only Markdown documentation.
+
+Slice 1 validation (Zig 0.16.0): focused operand tests passed. Saved the clean
+`56e66794` compiler before editing and compared all 243 optimizer fixture rows;
+raw printed IR is byte-identical before and after. The 16-function native
+regression program agrees between the old compiler, new compiler, and LLVM 22
+for both the focused pass list and `release-o3`. The migrated GlobalOpt's
+positive direct-load fixture also executes identically (`read_h() == 7`).
+Evidence and the comparison script are in
+`local-state/validations/operand-refactor-20260926/` (ignored local artifacts).
+
+`zig build readiness` passed, including unit tests, pass fixtures/compare-opt,
+optimizer native checks, parser corpus, handoff, generated differential tests,
+and release pipeline policy. Its behavioral suite passed 24 case/mode runs and
+6,528 observations. `zig build check-docs`, a separate check of 24 local links
+in both touched Markdown files, formatting, and `git diff --check` passed.
+
+Additional ReleaseFast validation: `zig test src/tests.zig -O ReleaseFast`
+passed 1,427 of 1,428 tests, including all six new operand tests. The existing
+`generic cfg selector executes bit-exact widened half addition` test failed
+with NaN bits `0x7e00` expected, `0xfe00` observed. Running the identical command
+in a clean archive of `56e66794` reproduced that failure (1,421 passed, one
+failed). This is a pre-existing ReleaseFast limitation; the suite is not
+reported as green and no backend/test expectation was changed in this slice.
+Both full logs are retained alongside the readiness and equivalence logs.
+
+This follows the optimizer/shared-IR focused validation route. No ABI, verifier
+invariant, CLI, acceptance counter, or gate infrastructure is changed. Full
+Tier 3 remains required for a subsequent milestone or capability closure under
+the validation policy; previous full-run evidence is not claimed for these
+changed sources.

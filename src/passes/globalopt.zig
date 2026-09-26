@@ -93,7 +93,9 @@ fn replaceDirectLoads(module: *ir.Module, global: ir.Global, initializer: ir.Val
                 const result = instruction.result orelse continue;
                 instruction.removed = true;
                 instruction.replacement = initializer;
-                replaceValue(function, result, initializer);
+                // Preserve the pass's structured-use replacement policy. Global
+                // escape eligibility is still decided by the scans above.
+                _ = ir.operands.replaceAllUses(function, result, initializer);
                 removed_loads += 1;
             }
         }
@@ -196,115 +198,6 @@ fn terminatorUsesGlobal(terminator: ir.Terminator, name: []const u8) bool {
             break :blk false;
         },
         .br, .@"unreachable" => false,
-    };
-}
-
-fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value) void {
-    for (function.blocks.items) |*block| {
-        for (block.instructions.items) |*instruction| {
-            if (instruction.removed) continue;
-            replaceInstructionOperand(instruction, name, replacement);
-        }
-        if (block.terminator) |*terminator| replaceTerminatorOperand(terminator, name, replacement);
-    }
-}
-
-fn replaceInstructionOperand(instruction: *ir.Instruction, name: []const u8, replacement: ir.Value) void {
-    switch (instruction.kind) {
-        .binary => |*binary| {
-            binary.lhs = replaceOperand(binary.lhs, name, replacement);
-            binary.rhs = replaceOperand(binary.rhs, name, replacement);
-        },
-        .cast => |*cast| cast.value = replaceOperand(cast.value, name, replacement),
-        .freeze => |*freeze| freeze.value = replaceOperand(freeze.value, name, replacement),
-        .icmp => |*icmp| {
-            icmp.lhs = replaceOperand(icmp.lhs, name, replacement);
-            icmp.rhs = replaceOperand(icmp.rhs, name, replacement);
-        },
-        .fcmp => |*fcmp| {
-            fcmp.lhs = replaceOperand(fcmp.lhs, name, replacement);
-            fcmp.rhs = replaceOperand(fcmp.rhs, name, replacement);
-        },
-        .select => |*select| {
-            select.cond = replaceOperand(select.cond, name, replacement);
-            select.true_value = replaceOperand(select.true_value, name, replacement);
-            select.false_value = replaceOperand(select.false_value, name, replacement);
-        },
-        .phi => |*phi| for (phi.incoming.items) |*incoming| {
-            incoming.value = replaceOperand(incoming.value, name, replacement);
-        },
-        .alloca => {},
-        .load => |*load| load.ptr = replaceOperand(load.ptr, name, replacement),
-        .store => |*store| {
-            store.value = replaceOperand(store.value, name, replacement);
-            store.ptr = replaceOperand(store.ptr, name, replacement);
-        },
-        .atomicrmw => |*atomicrmw| {
-            atomicrmw.ptr = replaceOperand(atomicrmw.ptr, name, replacement);
-            atomicrmw.value = replaceOperand(atomicrmw.value, name, replacement);
-        },
-        .cmpxchg => |*cmpxchg| {
-            cmpxchg.ptr = replaceOperand(cmpxchg.ptr, name, replacement);
-            cmpxchg.expected = replaceOperand(cmpxchg.expected, name, replacement);
-            cmpxchg.replacement = replaceOperand(cmpxchg.replacement, name, replacement);
-        },
-        .fence => {},
-        .extractelement => |*extract| {
-            extract.vector = replaceOperand(extract.vector, name, replacement);
-            extract.index = replaceOperand(extract.index, name, replacement);
-        },
-        .insertelement => |*insert| {
-            insert.vector = replaceOperand(insert.vector, name, replacement);
-            insert.value = replaceOperand(insert.value, name, replacement);
-            insert.index = replaceOperand(insert.index, name, replacement);
-        },
-        .shufflevector => |*shuffle| {
-            shuffle.lhs = replaceOperand(shuffle.lhs, name, replacement);
-            shuffle.rhs = replaceOperand(shuffle.rhs, name, replacement);
-            shuffle.mask = replaceOperand(shuffle.mask, name, replacement);
-        },
-        .extractvalue => |*extract| extract.aggregate = replaceOperand(extract.aggregate, name, replacement),
-        .insertvalue => |*insert| {
-            insert.aggregate = replaceOperand(insert.aggregate, name, replacement);
-            insert.value = replaceOperand(insert.value, name, replacement);
-        },
-        .gep => |*gep| {
-            gep.ptr = replaceOperand(gep.ptr, name, replacement);
-            for (gep.indices.items) |*index| {
-                index.value = replaceOperand(index.value, name, replacement);
-            }
-        },
-        .call => |*call| {
-            if (call.callee_value) |value| call.callee_value = replaceOperand(value, name, replacement);
-            for (call.args.items) |*arg| {
-                arg.value = replaceOperand(arg.value, name, replacement);
-            }
-        },
-    }
-}
-
-fn replaceTerminatorOperand(terminator: *ir.Terminator, name: []const u8, replacement: ir.Value) void {
-    switch (terminator.*) {
-        .ret => |*ret| {
-            if (ret.value) |value| ret.value = replaceOperand(value, name, replacement);
-        },
-        .br => {},
-        .@"unreachable" => {},
-        .condbr => |*condbr| condbr.cond = replaceOperand(condbr.cond, name, replacement),
-        .indirectbr => |*indirectbr| indirectbr.addr = replaceOperand(indirectbr.addr, name, replacement),
-        .@"switch" => |*switch_term| {
-            switch_term.cond = replaceOperand(switch_term.cond, name, replacement);
-            for (switch_term.cases.items) |*case| {
-                case.value = replaceOperand(case.value, name, replacement);
-            }
-        },
-    }
-}
-
-fn replaceOperand(value: ir.Value, name: []const u8, replacement: ir.Value) ir.Value {
-    return switch (value) {
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => value,
-        .named => |value_name| if (std.mem.eql(u8, value_name, name)) replacement else value,
     };
 }
 

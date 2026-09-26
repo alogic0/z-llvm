@@ -35,159 +35,38 @@ pub const UseCounts = struct {
         return uses.counts.contains(name);
     }
 
+    // Counts retain their historical structured-value scope. Opaque references
+    // are not counted; clients requiring completeness should use ir.operands
+    // and inspect Coverage before making a deletion/escape decision.
     pub fn addInstructionOperands(uses: *UseCounts, instruction: ir.Instruction) !void {
-        switch (instruction.kind) {
-            .binary => |binary| {
-                try uses.addValue(binary.lhs);
-                try uses.addValue(binary.rhs);
-            },
-            .cast => |cast| try uses.addValue(cast.value),
-            .freeze => |freeze| try uses.addValue(freeze.value),
-            .icmp => |icmp| {
-                try uses.addValue(icmp.lhs);
-                try uses.addValue(icmp.rhs);
-            },
-            .fcmp => |fcmp| {
-                try uses.addValue(fcmp.lhs);
-                try uses.addValue(fcmp.rhs);
-            },
-            .select => |select| {
-                try uses.addValue(select.cond);
-                try uses.addValue(select.true_value);
-                try uses.addValue(select.false_value);
-            },
-            .phi => |phi| for (phi.incoming.items) |incoming| {
-                try uses.addValue(incoming.value);
-            },
-            .alloca => {},
-            .load => |load| try uses.addValue(load.ptr),
-            .store => |store| {
-                try uses.addValue(store.value);
-                try uses.addValue(store.ptr);
-            },
-            .atomicrmw => |atomicrmw| {
-                try uses.addValue(atomicrmw.ptr);
-                try uses.addValue(atomicrmw.value);
-            },
-            .cmpxchg => |cmpxchg| {
-                try uses.addValue(cmpxchg.ptr);
-                try uses.addValue(cmpxchg.expected);
-                try uses.addValue(cmpxchg.replacement);
-            },
-            .fence => {},
-            .extractelement => |extract| {
-                try uses.addValue(extract.vector);
-                try uses.addValue(extract.index);
-            },
-            .insertelement => |insert| {
-                try uses.addValue(insert.vector);
-                try uses.addValue(insert.value);
-                try uses.addValue(insert.index);
-            },
-            .shufflevector => |shuffle| {
-                try uses.addValue(shuffle.lhs);
-                try uses.addValue(shuffle.rhs);
-                try uses.addValue(shuffle.mask);
-            },
-            .extractvalue => |extract| try uses.addValue(extract.aggregate),
-            .insertvalue => |insert| {
-                try uses.addValue(insert.aggregate);
-                try uses.addValue(insert.value);
-            },
-            .gep => |gep| {
-                try uses.addValue(gep.ptr);
-                for (gep.indices.items) |index| try uses.addValue(index.value);
-            },
-            .call => |call| {
-                if (call.callee_value) |value| try uses.addValue(value);
-                for (call.args.items) |arg| try uses.addValue(arg.value);
-            },
-        }
+        _ = try ir.operands.instruction(&instruction, Adder{ .uses = uses });
     }
 
     pub fn removeInstructionOperands(uses: *UseCounts, instruction: ir.Instruction) void {
-        switch (instruction.kind) {
-            .binary => |binary| {
-                uses.removeValue(binary.lhs);
-                uses.removeValue(binary.rhs);
-            },
-            .cast => |cast| uses.removeValue(cast.value),
-            .freeze => |freeze| uses.removeValue(freeze.value),
-            .icmp => |icmp| {
-                uses.removeValue(icmp.lhs);
-                uses.removeValue(icmp.rhs);
-            },
-            .fcmp => |fcmp| {
-                uses.removeValue(fcmp.lhs);
-                uses.removeValue(fcmp.rhs);
-            },
-            .select => |select| {
-                uses.removeValue(select.cond);
-                uses.removeValue(select.true_value);
-                uses.removeValue(select.false_value);
-            },
-            .phi => |phi| for (phi.incoming.items) |incoming| {
-                uses.removeValue(incoming.value);
-            },
-            .alloca => {},
-            .load => |load| uses.removeValue(load.ptr),
-            .store => |store| {
-                uses.removeValue(store.value);
-                uses.removeValue(store.ptr);
-            },
-            .atomicrmw => |atomicrmw| {
-                uses.removeValue(atomicrmw.ptr);
-                uses.removeValue(atomicrmw.value);
-            },
-            .cmpxchg => |cmpxchg| {
-                uses.removeValue(cmpxchg.ptr);
-                uses.removeValue(cmpxchg.expected);
-                uses.removeValue(cmpxchg.replacement);
-            },
-            .fence => {},
-            .extractelement => |extract| {
-                uses.removeValue(extract.vector);
-                uses.removeValue(extract.index);
-            },
-            .insertelement => |insert| {
-                uses.removeValue(insert.vector);
-                uses.removeValue(insert.value);
-                uses.removeValue(insert.index);
-            },
-            .shufflevector => |shuffle| {
-                uses.removeValue(shuffle.lhs);
-                uses.removeValue(shuffle.rhs);
-                uses.removeValue(shuffle.mask);
-            },
-            .extractvalue => |extract| uses.removeValue(extract.aggregate),
-            .insertvalue => |insert| {
-                uses.removeValue(insert.aggregate);
-                uses.removeValue(insert.value);
-            },
-            .gep => |gep| {
-                uses.removeValue(gep.ptr);
-                for (gep.indices.items) |index| uses.removeValue(index.value);
-            },
-            .call => |call| {
-                if (call.callee_value) |value| uses.removeValue(value);
-                for (call.args.items) |arg| uses.removeValue(arg.value);
-            },
-        }
+        _ = ir.operands.instruction(&instruction, Remover{ .uses = uses }) catch unreachable;
     }
 
     pub fn addTerminator(uses: *UseCounts, terminator: ir.Terminator) !void {
-        switch (terminator) {
-            .ret => |ret| if (ret.value) |value| try uses.addValue(value),
-            .br => {},
-            .@"unreachable" => {},
-            .condbr => |condbr| try uses.addValue(condbr.cond),
-            .@"switch" => |switch_term| {
-                try uses.addValue(switch_term.cond);
-                for (switch_term.cases.items) |case| try uses.addValue(case.value);
-            },
-            .indirectbr => |indirectbr| try uses.addValue(indirectbr.addr),
-        }
+        _ = try ir.operands.terminator(&terminator, Adder{ .uses = uses });
     }
+
+    const Adder = struct {
+        pub const Error = std.mem.Allocator.Error;
+        uses: *UseCounts,
+
+        pub fn visit(visitor: Adder, value: *const ir.Value, _: ir.Type) Error!void {
+            try visitor.uses.addValue(value.*);
+        }
+    };
+
+    const Remover = struct {
+        pub const Error = error{};
+        uses: *UseCounts,
+
+        pub fn visit(visitor: Remover, value: *const ir.Value, _: ir.Type) Error!void {
+            visitor.uses.removeValue(value.*);
+        }
+    };
 
     fn addValue(uses: *UseCounts, value: ir.Value) !void {
         switch (value) {

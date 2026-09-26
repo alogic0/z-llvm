@@ -1,7 +1,8 @@
 # Current architecture
 
-Source baseline: `629e2ee7` (2026-09-26). This page describes the implementation;
-the [refactor plan](roadmap/architecture_refactor_plan.md) records proposed work.
+Source baseline: `629e2ee7` (2026-09-26), updated for the shared operand traversal
+slice. This page describes the implementation; the
+[refactor plan](roadmap/architecture_refactor_plan.md) records its status and remaining work.
 The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
 backend for selected Zig inputs. It does not yet provide a complete LLVM
 replacement or a self-hosting Zig backend.
@@ -83,9 +84,14 @@ Standalone behavioral and compiler-rt counts are separate populations.
 
 - Values use string names; integer literals use `i128` with width held in the
   surrounding instruction/type. Some values and attributes remain opaque text.
-- `Instruction.mapOperands`, use counting, and CFG-update helpers already
-  provide shared operations. Several passes also maintain independent operand
-  replacement and reference-discovery code.
+- [Operand traversal](../src/ir/operands.zig) provides typed const/mutable walks
+  and function-wide replacement. `Instruction.mapOperands`, use counting, and
+  GlobalOpt replacement share those walks. CFG-update helpers handle labels
+  separately. Other passes still have independent replacement/reference scans.
+- Operand traversal reports opaque values, attributes, metadata, and call text
+  as an incomplete reference boundary. It does not parse or rewrite that text
+  or enumerate direct call symbols. Existing use-count and mapping wrappers
+  retain their structured-value scope; complete module references remain planned.
 - Instructions can contain allocated operand lists. A plain struct copy shares
   those lists; speculative mutation requires separate storage or a read-only
   view. The SCCP repair addresses its specific instance of this problem.

@@ -53,3 +53,4 @@ pub const BasicBlock = core.BasicBlock;
 pub const Function = core.Function;
 pub const Module = core.Module;
 pub const vector_constant = @import("ir/vector_constant.zig");
+pub const operands = @import("ir/operands.zig");

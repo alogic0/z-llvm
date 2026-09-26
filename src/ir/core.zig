@@ -855,77 +855,8 @@ pub const Instruction = struct {
     }
 
     pub fn mapOperands(instruction: *Instruction, aliases: std.StringHashMap(Value)) void {
-        switch (instruction.kind) {
-            .binary => |*binary| {
-                binary.lhs = resolveValue(aliases, binary.lhs);
-                binary.rhs = resolveValue(aliases, binary.rhs);
-            },
-            .cast => |*cast| cast.value = resolveValue(aliases, cast.value),
-            .freeze => |*freeze| freeze.value = resolveValue(aliases, freeze.value),
-            .icmp => |*icmp| {
-                icmp.lhs = resolveValue(aliases, icmp.lhs);
-                icmp.rhs = resolveValue(aliases, icmp.rhs);
-            },
-            .fcmp => |*fcmp| {
-                fcmp.lhs = resolveValue(aliases, fcmp.lhs);
-                fcmp.rhs = resolveValue(aliases, fcmp.rhs);
-            },
-            .select => |*select| {
-                select.cond = resolveValue(aliases, select.cond);
-                select.true_value = resolveValue(aliases, select.true_value);
-                select.false_value = resolveValue(aliases, select.false_value);
-            },
-            .phi => |*phi| for (phi.incoming.items) |*incoming| {
-                incoming.value = resolveValue(aliases, incoming.value);
-            },
-            .alloca => {},
-            .load => |*load| load.ptr = resolveValue(aliases, load.ptr),
-            .store => |*store| {
-                store.value = resolveValue(aliases, store.value);
-                store.ptr = resolveValue(aliases, store.ptr);
-            },
-            .atomicrmw => |*atomicrmw| {
-                atomicrmw.ptr = resolveValue(aliases, atomicrmw.ptr);
-                atomicrmw.value = resolveValue(aliases, atomicrmw.value);
-            },
-            .cmpxchg => |*cmpxchg| {
-                cmpxchg.ptr = resolveValue(aliases, cmpxchg.ptr);
-                cmpxchg.expected = resolveValue(aliases, cmpxchg.expected);
-                cmpxchg.replacement = resolveValue(aliases, cmpxchg.replacement);
-            },
-            .fence => {},
-            .extractelement => |*extract| {
-                extract.vector = resolveValue(aliases, extract.vector);
-                extract.index = resolveValue(aliases, extract.index);
-            },
-            .insertelement => |*insert| {
-                insert.vector = resolveValue(aliases, insert.vector);
-                insert.value = resolveValue(aliases, insert.value);
-                insert.index = resolveValue(aliases, insert.index);
-            },
-            .shufflevector => |*shuffle| {
-                shuffle.lhs = resolveValue(aliases, shuffle.lhs);
-                shuffle.rhs = resolveValue(aliases, shuffle.rhs);
-                shuffle.mask = resolveValue(aliases, shuffle.mask);
-            },
-            .extractvalue => |*extract| extract.aggregate = resolveValue(aliases, extract.aggregate),
-            .insertvalue => |*insert| {
-                insert.aggregate = resolveValue(aliases, insert.aggregate);
-                insert.value = resolveValue(aliases, insert.value);
-            },
-            .gep => |*gep| {
-                gep.ptr = resolveValue(aliases, gep.ptr);
-                for (gep.indices.items) |*index| {
-                    index.value = resolveValue(aliases, index.value);
-                }
-            },
-            .call => |*call| {
-                if (call.callee_value) |value| call.callee_value = resolveValue(aliases, value);
-                for (call.args.items) |*arg| {
-                    arg.value = resolveValue(aliases, arg.value);
-                }
-            },
-        }
+        // Compatibility wrapper: callers historically ignore opaque references.
+        _ = @import("operands.zig").mapInstruction(instruction, aliases);
     }
 
     pub fn deinit(instruction: *Instruction, allocator: std.mem.Allocator) void {
@@ -946,13 +877,6 @@ fn compareResultType(operand_ty: Type) Type {
             .elem_ty = .{ .int = 1 },
         } },
         else => .{ .int = 1 },
-    };
-}
-
-fn resolveValue(aliases: std.StringHashMap(Value), value: Value) Value {
-    return switch (value) {
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => value,
-        .named => |name| aliases.get(name) orelse value,
     };
 }
 

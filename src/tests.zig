@@ -5,5 +5,6 @@ comptime {
     _ = @import("tests/codegen_x86_64.zig");
     _ = @import("tests/codegen_x86_64_generic_cfg_selector.zig");
     _ = @import("tests/ir.zig");
+    _ = @import("tests/ir_operands.zig");
     _ = @import("tests/optimizer_correctness.zig");
 }
