@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../ir.zig");
 const fast_math = @import("../analysis/fast_math.zig");
+const integer_semantics = @import("../analysis/integer_semantics.zig");
 const fp_semantics = @import("../analysis/fp_semantics.zig");
 
 pub fn canonicalizeCommutativeConstantRhs(binary: *ir.BinaryInst) bool {
@@ -190,14 +191,15 @@ fn foldShiftConstant(binary: ir.BinaryInst) ?ir.Value {
 
     const mask = (@as(u128, 1) << @intCast(bits)) - 1;
     const shift: u7 = @intCast(binary.rhs.int);
-    const lhs_bits = unsignedLowBits(binary.lhs.int, bits);
+    const integer = integer_semantics.Integer.initBits(bits).?;
+    const lhs_bits = integer.unsigned(binary.lhs.int);
     const shifted = switch (binary.op) {
         .shl => (lhs_bits << shift) & mask,
         .lshr => lhs_bits >> shift,
         .ashr => arithmeticShiftRight(lhs_bits, bits, shift),
         .fadd, .fsub, .fmul, .fdiv, .frem, .add, .sub, .mul, .@"and", .@"or", .xor, .udiv, .sdiv, .urem, .srem => return null,
     };
-    return .{ .int = signedFromUnsignedBits(shifted, bits) };
+    return .{ .int = integer.normalize(@bitCast(shifted)) };
 }
 
 fn canSimplifyFlaggedBinary(binary: ir.BinaryInst) bool {
@@ -280,7 +282,7 @@ fn isNonNegativeFiniteNonZero(classification: fp_semantics.Classification) bool 
     };
 }
 
-const DivRem = enum { div, rem };
+const DivRem = integer_semantics.DivRem;
 
 fn foldUnsignedDivRem(binary: ir.BinaryInst, mode: DivRem) ?ir.Value {
     if (binary.rhs.int == 0) return null;
@@ -295,15 +297,9 @@ fn foldUnsignedDivRem(binary: ir.BinaryInst, mode: DivRem) ?ir.Value {
 }
 
 fn foldSignedDivRem(binary: ir.BinaryInst, mode: DivRem) ?ir.Value {
-    const lhs = canonicalIntegerConstant(binary.lhs.int, binary.ty) orelse return null;
-    const rhs = canonicalIntegerConstant(binary.rhs.int, binary.ty) orelse return null;
-    if (rhs == 0) return null;
-    if (isSignedMin(lhs, binary.ty) and rhs == -1) return null;
-    if (binary.flags.exact and @rem(lhs, rhs) != 0) return null;
-    return .{ .int = switch (mode) {
-        .div => @divTrunc(lhs, rhs),
-        .rem => @rem(lhs, rhs),
-    } };
+    const integer = integer_semantics.Integer.init(binary.ty) orelse return null;
+    const value = integer.signedDivRem(mode, binary.lhs.int, binary.rhs.int, binary.flags.exact) catch return null;
+    return .{ .int = value };
 }
 
 fn simplifyCast(cast: ir.CastInst) ?ir.Value {
@@ -371,25 +367,8 @@ fn simplifyIcmp(icmp: ir.IcmpInst) ?ir.Value {
 }
 
 fn simplifyIcmpConstants(icmp: ir.IcmpInst) ?ir.Value {
-    const bits = intBits(icmp.operand_ty) orelse return null;
-    if (bits == 0 or bits > 128) return null;
-    const lhs_bits = unsignedLowBits(icmp.lhs.int, bits);
-    const rhs_bits = unsignedLowBits(icmp.rhs.int, bits);
-    const lhs = signedFromUnsignedBits(lhs_bits, bits);
-    const rhs = signedFromUnsignedBits(rhs_bits, bits);
-    const result = switch (icmp.predicate) {
-        .eq => lhs == rhs,
-        .ne => lhs != rhs,
-        .sgt => lhs > rhs,
-        .sge => lhs >= rhs,
-        .slt => lhs < rhs,
-        .sle => lhs <= rhs,
-        .ugt => lhs_bits > rhs_bits,
-        .uge => lhs_bits >= rhs_bits,
-        .ult => lhs_bits < rhs_bits,
-        .ule => lhs_bits <= rhs_bits,
-    };
-    return .{ .int = @intFromBool(result) };
+    const integer = integer_semantics.Integer.init(icmp.operand_ty) orelse return null;
+    return .{ .int = @intFromBool(integer.compare(icmp.predicate, icmp.lhs.int, icmp.rhs.int)) };
 }
 
 fn simplifyFcmp(fcmp: ir.FcmpInst) ?ir.Value {
@@ -551,23 +530,8 @@ fn signedResultInRange(ty: ir.Type, result: i128) bool {
 }
 
 fn canonicalIntegerConstant(value: i128, ty: ir.Type) ?i128 {
-    const bits = intBits(ty) orelse return null;
-    if (bits == 0 or bits > 128) return null;
-    return signedFromUnsignedBits(unsignedLowBits(value, bits), bits);
-}
-
-fn signedFromUnsignedBits(value: u128, bits: u16) i128 {
-    if (bits == 128) return @bitCast(value);
-    const sign_bit = @as(u128, 1) << @intCast(bits - 1);
-    if ((value & sign_bit) == 0) return @intCast(value);
-    const modulus = @as(u128, 1) << @intCast(bits);
-    return -@as(i128, @intCast(modulus - value));
-}
-
-fn unsignedLowBits(value: i128, bits: u16) u128 {
-    const mask = if (bits == 128) std.math.maxInt(u128) else (@as(u128, 1) << @intCast(bits)) - 1;
-    const raw: u128 = @bitCast(value);
-    return raw & mask;
+    const integer = integer_semantics.Integer.init(ty) orelse return null;
+    return integer.normalize(value);
 }
 
 fn arithmeticShiftRight(value: u128, bits: u16, shift: u7) u128 {
@@ -591,13 +555,6 @@ fn signedRange(ty: ir.Type) ?SignedRange {
         .min = -(@as(i128, 1) << @intCast(bits - 1)),
         .max = (@as(i128, 1) << @intCast(bits - 1)) - 1,
     };
-}
-
-fn isSignedMin(value: i128, ty: ir.Type) bool {
-    const bits = intBits(ty) orelse return false;
-    if (bits == 128) return value == std.math.minInt(i128);
-    if (bits == 0 or bits >= 128) return false;
-    return value == -(@as(i128, 1) << @intCast(bits - 1));
 }
 
 fn intBits(ty: ir.Type) ?u16 {

@@ -1,7 +1,7 @@
 # Architecture corrections and refactor plan
 
 Initial baseline: `629e2ee7`, 2026-09-26. Documentation and planning were committed
-as `56e66794`. The first two bounded refactor slices are implemented below.
+as `56e66794`. The first three bounded refactor slices are implemented below.
 Selector defaults, public CLI behavior, and acceptance counters remain unchanged.
 
 ## Corrected assessment
@@ -32,7 +32,7 @@ need to replace the entire IR or add an analysis-cache framework immediately.
 
 ## Proposed implementation sequence
 
-Slices 1 and 2 have focused implementations recorded below; slices 3–5 remain
+Slices 1–3 have focused implementations recorded below; slices 4–5 remain
 pending.
 These steps do not claim new compiler capability. Keep the named real-function
 failure family in [next steps](../next_steps.md) as the capability objective; introduce helpers
@@ -146,6 +146,36 @@ i64, i127, and i128; overflow, exactness, and shift boundaries preserve the
 supported semantics; LLVM execution comparisons pass. A new arbitrary-precision
 integer implementation is not a prerequisite.
 
+Implementation (2026-09-26, based on `307a3688`):
+
+- Added `analysis/integer_semantics.zig` with a checked scalar width descriptor,
+  modulo-width normalization, signed/unsigned interpretation, all ten integer
+  comparison predicates, and signed division/remainder. Division reports zero,
+  signed overflow, and inexactness separately. Unsupported widths/types return
+  no descriptor; poison, undef, and symbolic operands stay with the caller.
+- Migrated constant comparisons and signed div/rem in `inst_simplify`, which is
+  also consumed by SCCP and other optimizer passes. Existing arithmetic result
+  normalization and shift input/output normalization use the same helper.
+- Kept the migration narrow: `samesign`, algebraic identities, poison/undef
+  policies, arithmetic flags, casts, unsigned div/rem, and i128 shift-folding
+  limits retain their previous behavior. Other integer-family migrations and
+  their operation-specific overflow/flag policies remain follow-up work.
+- Added five tests, including all operand pairs for widths i1 through i8, an
+  independent i256 mathematical oracle, and signed/unsigned spellings through
+  i127. i128 exercises the full bit pattern through signed i128 storage; positive
+  decimal literals above maxInt(i128) remain outside the parser's representation.
+- Boundary tests cover min/-1, normalized zero divisors, exact/inexact results,
+  wrapping normalization, shift limits, unsupported widths, poison/undef, and
+  `samesign`. Undefined/poison-producing cases are structural tests and are not
+  executed as native correctness probes.
+
+The operation contract follows LLVM's
+[integer comparisons](https://llvm.org/docs/LangRef.html#icmp-instruction),
+[signed division](https://llvm.org/docs/LangRef.html#sdiv-instruction), and
+[signed remainder](https://llvm.org/docs/LangRef.html#srem-instruction).
+This extraction preserves existing optimizer behavior; it does not claim a
+complete migration of integer folding or a Tier-3 capability milestone.
+
 ### 4. Module reference discovery
 
 Owners: GlobalOpt, GlobalDCE, alias/constant handling, and a shared reference API.
@@ -252,3 +282,30 @@ behavioral comparisons, and release pipeline policy. Validation follows the
 focused optimizer/shared-IR route; the allocation-cleanup repairs do not alter
 successful-program semantics or verifier invariants. No Tier-3 milestone is
 claimed. The source hashes in the evidence directory identify the tested files.
+
+Slice 3 validation (Zig 0.16.0): five new integer-semantics tests and the existing
+comparison/division regressions passed in Debug and ReleaseFast. Exhaustive
+narrow-width checks use an independent i256 model. All 243 optimizer fixture
+outputs are byte-identical to the saved clean `307a3688` compiler, and the
+16-function native regression program agrees before/after and with LLVM 22
+under the focused pipeline and `release-o3`.
+
+A separate deterministic native matrix covers 1,037 defined probes across i1,
+i2, i7, i8, i16, i64, i127, and i128: 830 comparisons, 87 divisions, 87 remainders,
+and 33 exact divisions. Both InstCombine and SCCP agree with the LLVM 22
+reference execution and retain identical before/after IR. LLVM verifies the
+source and every transformed module. The generator, harness, binaries, logs,
+and source hashes are retained under
+`local-state/validations/integer-semantics-20260926/`.
+
+The previously recorded ReleaseFast half-add NaN-bit failure remains tracked
+separately; this slice does not modify its backend or test. Additional integer
+families and the remaining architecture slices remain pending.
+
+`zig build readiness` passed for slice 3, including the full Debug unit suite,
+compare-opt, native optimizer checks, corpus/handoff checks, generated behavioral
+comparisons, and release pipeline policy. Documentation validation passed for
+14 current documents, 59 links, and two status blocks; the separate touched-page
+check covered 25 local links. Formatting and `git diff --check` passed. This is
+a focused optimizer refactor with no ABI, verifier, CLI, capability, or ratchet
+change; it does not claim Tier-3 milestone validation.

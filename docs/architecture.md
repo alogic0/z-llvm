@@ -1,7 +1,8 @@
 # Current architecture
 
-Source baseline: `629e2ee7` (2026-09-26), updated for shared operand traversal
-and instruction ownership. This page describes the implementation; the
+Source baseline: `629e2ee7` (2026-09-26), updated for shared operand traversal,
+instruction ownership, and scalar integer semantics. This page describes the
+implementation; the
 [refactor plan](roadmap/architecture_refactor_plan.md) records its status and remaining work.
 The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
 backend for selected Zig inputs. It does not yet provide a complete LLVM
@@ -84,6 +85,11 @@ Standalone behavioral and compiler-rt counts are separate populations.
 
 - Values use string names; integer literals use `i128` with width held in the
   surrounding instruction/type. Some values and attributes remain opaque text.
+- [Integer semantics](../src/analysis/integer_semantics.zig) validates scalar
+  widths 1–128, normalizes literal bit patterns, and provides comparisons and
+  signed division/remainder with explicit failure reasons. The simplifier uses
+  it while retaining its existing flags, poison/undef, and unsupported-case
+  policies. Other integer families still have pass-local rules.
 - [Operand traversal](../src/ir/operands.zig) provides typed const/mutable walks
   and function-wide replacement. `Instruction.mapOperands`, use counting, and
   GlobalOpt replacement share those walks. CFG-update helpers handle labels
