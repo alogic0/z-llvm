@@ -2068,20 +2068,33 @@ pub fn validateMemcpyActionProductionSites(source_name: []const u8, source: [:0]
     if (std.mem.indexOf(u8, source, ".setMemcpyTestFailure(") != null)
         return error.ValueUseMemcpyTestHookInProduction;
     if (!std.mem.eql(u8, source_name, "composed_selector_calls.zig")) {
-        if (pointer_total != 0 or length_total != 0 or action_total != 0)
+        if (pointer_total != 0 or length_total != 0 or action_total != 0 or countPattern(source, ".inline_memset =") != 0)
             return error.ValueUseMemcpyActionOutsideAllowlist;
         return;
     }
 
     var body_storage: [max_function_bodies]FunctionBody = undefined;
     const bodies = try collectFunctionBodies(source, &body_storage);
+    const fill_body = functionBodyNamed(bodies, "lowerMemset");
+    const fill_count: usize = if (fill_body) |fill| blk: {
+        const text = source[fill.start..fill.end];
+        if (countPattern(text, pointer_pattern) != 1 or countPattern(text, length_pattern) != 1 or
+            countPattern(text, ".inline_memset =") != 1 or
+            countPattern(text, "ValueUseTransaction.begin(selector)") != 1 or
+            countPattern(text, "spillLiveCallerClobbersForCall(") != 0 or
+            countPattern(text, "emitValueIntoScratch(") != 0)
+            return error.ValueUseMemcpyActionAllowlistMismatch;
+        break :blk 1;
+    } else 0;
+    if (countPattern(source, ".inline_memset =") != fill_count)
+        return error.ValueUseMemcpyActionOutsideAllowlist;
     const body = functionBodyNamed(bodies, "lowerInlineMemcpy") orelse
         return error.ValueUseMemcpyActionAllowlistMismatch;
     const function_source = source[body.start..body.end];
     if (countPattern(function_source, pointer_pattern) != 2 or
         countPattern(function_source, length_pattern) != 1 or
         countPattern(function_source, action_pattern) != 1 or
-        pointer_total != 2 or length_total != 1 or action_total != 1)
+        pointer_total != 2 + fill_count or length_total != 1 + fill_count or action_total != 1)
     {
         return error.ValueUseMemcpyActionAllowlistMismatch;
     }

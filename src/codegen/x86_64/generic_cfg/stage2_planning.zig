@@ -582,7 +582,8 @@ fn isSimpleScalarSelfLoopPhi(block: ir.BasicBlock, phi: ir.PhiInst) bool {
 fn callRequiresPreservationFrame(call: ir.CallInst) bool {
     if (call.isDebugVariableLocation()) return false;
     if (!std.mem.startsWith(u8, call.callee, "llvm.")) return true;
-    return std.mem.eql(u8, call.callee, "llvm.abs.i32") or
+    return std.mem.eql(u8, call.callee, "llvm.memset.p0.i64") or
+        std.mem.eql(u8, call.callee, "llvm.abs.i32") or
         std.mem.eql(u8, call.callee, "llvm.abs.i64") or
         std.mem.eql(u8, call.callee, "llvm.abs.i128");
 }

@@ -739,6 +739,19 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
         },
         .branch_condition => {},
         .switch_compare_chain => |*switch_action| try switch_action.validate(),
+        .inline_memset => |fill| {
+            if (fill.fill) |handle| {
+                const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
+                const operand = &transaction.requests[index];
+                if (operand.form != .gpr32 or !operand.expected.ty.eql(.{ .int = 8 }) or
+                    operand.expected.register_class != .gpr32 or operand.destination != .prepared_source)
+                    return error.ValueUsePreparedActionFormMismatch;
+            }
+            if (fill.length) |handle| {
+                const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
+                try validateMemcpyLengthOperand(&transaction.requests[index]);
+            }
+        },
         .inline_memcpy => |memcpy| {
             const source = try Authority.validateRegisteredOperandHandle(Authority, transaction, memcpy.source);
             const length = try Authority.validateRegisteredOperandHandle(Authority, transaction, memcpy.length);
@@ -817,6 +830,10 @@ fn core_validateActionDependenciesCanonical(comptime Authority: type, transactio
         .store_scalar => |store| try Authority.validateOperandCanonical(Authority, transaction, store.pointer),
         .store_i64 => |store| try Authority.validateOperandCanonical(Authority, transaction, store.value),
         .store_stack_pointer => |store| try Authority.validateOperandCanonical(Authority, transaction, store.destination),
+        .inline_memset => |fill| {
+            if (fill.fill) |handle| try Authority.validateOperandCanonical(Authority, transaction, handle);
+            if (fill.length) |handle| try Authority.validateOperandCanonical(Authority, transaction, handle);
+        },
         .inline_memcpy => |memcpy| {
             try Authority.validateOperandCanonical(Authority, transaction, memcpy.source);
             try Authority.validateOperandCanonical(Authority, transaction, memcpy.length);
@@ -976,6 +993,7 @@ fn executePreparedActionInternal(
         .branch_condition => try control_compare_module.executeBranchCondition(Authority, transaction, view),
         .switch_compare_chain => |switch_action| try control_compare_module.executeSwitchCompareChain(Authority, transaction, view, &switch_action),
         .inline_memcpy => |memcpy| try calls.executeInlineMemcpy(Authority, transaction, request_index, memcpy),
+        .inline_memset => |fill| try calls.executeInlineMemset(Authority, transaction, request_index, fill),
         .load_scalar => |load| try address_memory.executeScalarLoad(Authority, transaction, request_index, view, load),
         .load_readonly_pair => |load| try address_memory.executeReadOnlyPairLoad(Authority, transaction, request_index, view, &load),
         .load_stack_i128_alias => |load| try address_memory.executeStackI128AliasLoad(Authority, transaction, view, &load),
@@ -1107,6 +1125,7 @@ fn actionSecondaryOperand(
         .store_i64 => |store| try Authority.validateRegisteredOperandHandle(Authority, transaction, store.value),
         .store_stack_pointer => |store| try Authority.validateRegisteredOperandHandle(Authority, transaction, store.destination),
         .inline_memcpy => |memcpy| try Authority.validateRegisteredOperandHandle(Authority, transaction, memcpy.source),
+        .inline_memset => |fill| if (fill.fill orelse fill.length) |handle| try Authority.validateRegisteredOperandHandle(Authority, transaction, handle) else null,
         .scratch_compare => |compare| switch (compare.rhs) {
             .named => |handle| try Authority.validateRegisteredOperandHandle(Authority, transaction, handle),
             .immediate, .null_pointer => null,
@@ -1164,6 +1183,7 @@ fn actionTertiaryOperand(
 ) !?u8 {
     return switch (action) {
         .inline_memcpy => |memcpy| try Authority.validateRegisteredOperandHandle(Authority, transaction, memcpy.length),
+        .inline_memset => |fill| if (fill.fill != null) (if (fill.length) |handle| try Authority.validateRegisteredOperandHandle(Authority, transaction, handle) else null) else null,
         .validate_shape,
         .emit_copy_to,
         .form_byte_address,

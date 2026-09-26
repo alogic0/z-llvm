@@ -640,6 +640,43 @@ pub fn executeInlineMemcpy(
     );
     try failMemcpyForTest(Authority, transaction, .after_call_append);
 }
+pub fn executeInlineMemset(
+    comptime Authority: type,
+    transaction: anytype,
+    destination_index: u8,
+    action: Types.MemsetAction,
+) !void {
+    var next_eflags = transaction.selector.eflags;
+    try next_eflags.apply(.clobber);
+    if (try selector_state.spillLiveCallerClobbersForCall(transaction.selector)) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+    try refreshMemcpyPreparedOperand(Authority, transaction, destination_index);
+    if (action.fill) |handle| try refreshMemcpyPreparedOperand(Authority, transaction, handle.index);
+    if (action.length) |handle| try refreshMemcpyPreparedOperand(Authority, transaction, handle.index);
+    try failMemcpyForTest(Authority, transaction, .after_preservation);
+    try materializeMemcpyRequest(Authority, transaction, destination_index, .rdi);
+    try failMemcpyForTest(Authority, transaction, .after_destination);
+    if (action.fill) |handle| {
+        const current = try Authority.registeredOperandCurrent(Authority, transaction, handle);
+        try materialization.materializeScalar32(transaction.selector, current, .{ .gpr32 = .rsi });
+    } else {
+        try selector_state.clobberArgReg(transaction.selector, .rsi);
+        try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{ .mov_imm_rsi = action.fill_immediate });
+    }
+    try failMemcpyForTest(Authority, transaction, .after_source);
+    if (action.length) |handle| {
+        try materializeMemcpyHandle(Authority, transaction, handle, .rdx);
+    } else {
+        try selector_state.clobberArgReg(transaction.selector, .rdx);
+        try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{ .mov_imm_rdx = @bitCast(action.length_immediate) });
+    }
+    try failMemcpyForTest(Authority, transaction, .after_length);
+    try selector_state.emitEflagsInstruction(transaction.selector, .memset_rdi_sil_rdx_rax, .clobber);
+    try failMemcpyForTest(Authority, transaction, .after_call_append);
+}
+
 fn refreshMemcpyPreparedOperand(comptime Authority: type, transaction: anytype, index: u8) !void {
     if (!transaction.prepared_view_valid[index]) {
         Authority.recordRequestFailure(Authority, transaction, index);

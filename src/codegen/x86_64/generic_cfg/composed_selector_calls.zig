@@ -120,6 +120,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.ucmp.i32.i128")) return try lowerI128Compare(selector, result, call, false);
     if (std.mem.eql(u8, call.callee, "llvm.scmp.i32.i128")) return try lowerI128Compare(selector, result, call, true);
     if (std.mem.eql(u8, call.callee, "llvm.fshl.i32")) return try lowerFshlI32(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.memset.p0.i64")) return try lowerMemset(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64")) return try lowerInlineMemcpy(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .add);
     if (std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .sub);
@@ -506,6 +507,93 @@ pub fn lowerExtractValue(selector: *ComposedBlockSelector, result: ?[]const u8, 
     try selector_state.bindResultLoc(selector, result_name, loc);
     if (overflow.value_extracted and overflow.overflow_extracted) _ = selector.overflow_results.remove(aggregate_name);
     return null;
+}
+
+fn lowerMemset(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    if (result != null or call.ret_ty != .void or call.args.items.len != 4)
+        return .{ .no_emitter = "composed-block-memset-signature" };
+    if (call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or
+        call.calling_conv != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null)
+        return .{ .no_emitter = "composed-block-memset-call-form" };
+    if (call.tail_kind) |tail| if (!std.mem.eql(u8, tail, "tail") and !std.mem.eql(u8, tail, "notail"))
+        return .{ .no_emitter = "composed-block-memset-tail-kind" };
+    const dst = call.args.items[0];
+    const fill = call.args.items[1];
+    const len = call.args.items[2];
+    const vol = call.args.items[3];
+    if (dst.ty != .ptr or !fill.ty.eql(.{ .int = 8 }) or !len.ty.eql(.{ .int = 64 }) or
+        !vol.ty.eql(.{ .int = 1 }) or !vol.value.eql(.{ .int = 0 }))
+        return .{ .no_emitter = "composed-block-memset-args" };
+    // Pointer address spaces and ABI-changing argument attributes are opaque
+    // in CallArg. Admit only the alignment annotation used by this intrinsic.
+    if (!memsetAlignmentAttribute(dst.attrs) or fill.attrs != null or len.attrs != null or vol.attrs != null)
+        return .{ .no_emitter = "composed-block-memset-attrs" };
+    if (dst.value != .named or (fill.value != .named and fill.value != .int) or
+        (len.value != .named and len.value != .int))
+        return .{ .unsupported_value = "composed-block-memset-value" };
+    const fill_immediate: u8 = if (fill.value == .int) blk: {
+        if (fill.value.int < -128 or fill.value.int > 255) return .{ .unsupported_value = "composed-block-memset-fill" };
+        break :blk @truncate(@as(u128, @bitCast(fill.value.int)));
+    } else 0;
+    const length_immediate: u64 = if (len.value == .int) std.math.cast(u64, len.value.int) orelse
+        return .{ .unsupported_value = "composed-block-memset-length" } else 0;
+    var authority = try ValueUseTransaction.begin(selector);
+    defer authority.deinit();
+    const fill_request = if (fill.value == .named) try authority.register(.{
+        .source = fill.value,
+        .expected = .{ .ty = .{ .int = 8 }, .register_class = .gpr32 },
+        .form = .gpr32,
+        .destination = .prepared_source,
+    }) else null;
+    const length_request = if (len.value == .named) try authority.register(.{
+        .source = len.value,
+        .expected = .{ .ty = .{ .int = 64 }, .register_class = .gpr64 },
+        .form = .memcpy_length,
+        .destination = .prepared_source,
+    }) else null;
+    const action = try authority.register(.{
+        .source = dst.value,
+        .expected = .{ .ty = .ptr, .register_class = .gpr64, .pointer_address_space = 0 },
+        .form = .memcpy_pointer,
+        .destination = .prepared_view,
+        .prepared_action = .{ .inline_memset = .{
+            .fill = fill_request,
+            .fill_immediate = fill_immediate,
+            .length = length_request,
+            .length_immediate = length_immediate,
+        } },
+    });
+    authority.seal() catch |err| return memsetDiagnostic(&authority, err) orelse return err;
+    authority.prepare() catch |err| return memsetDiagnostic(&authority, err) orelse return err;
+    authority.materializeAll() catch |err| return memsetDiagnostic(&authority, err) orelse return err;
+    authority.executePreparedAction(try authority.preparedView(action)) catch |err|
+        return memsetDiagnostic(&authority, err) orelse return err;
+    try authority.commit();
+    return null;
+}
+
+fn memsetAlignmentAttribute(attrs: ?[]const u8) bool {
+    const text = attrs orelse return true;
+    if (!std.mem.startsWith(u8, text, "align ")) return false;
+    const alignment = std.fmt.parseUnsigned(u32, text[6..], 10) catch return false;
+    return std.math.isPowerOfTwo(alignment);
+}
+
+fn memsetDiagnostic(authority: *const ValueUseTransaction, err: anyerror) ?Diagnostic {
+    if (err == error.ValueUseActionDiagnostic) return authority.actionDiagnostic();
+    return switch (err) {
+        error.ValueUseUnresolvedSource,
+        error.ValueUseExpiredSource,
+        error.ValueUseSourceViewMismatch,
+        error.ValueUseRegisterClassMismatch,
+        error.ValueUseTypeMismatch,
+        error.ValueUseMemcpyPointerHomeUnsupported,
+        error.ValueUseMemcpyPointerWidthMismatch,
+        error.ValueUseMemcpyLengthHomeUnsupported,
+        error.ValueUseMemcpyLengthWidthMismatch,
+        => .{ .unsupported_value = "composed-block-memset-value" },
+        else => null,
+    };
 }
 
 pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {

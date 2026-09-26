@@ -169,7 +169,7 @@ pub fn validateFormAndDestination(request: *const Types.StoredRequest) !void {
                 error.ValueUsePreparedActionFormMismatch,
             .switch_compare_chain => if (request.form != .switch_condition)
                 error.ValueUsePreparedActionFormMismatch,
-            .inline_memcpy => if (request.form != .memcpy_pointer or
+            .inline_memcpy, .inline_memset => if (request.form != .memcpy_pointer or
                 request.expected.ty != .ptr or request.expected.register_class != .gpr64)
                 error.ValueUsePreparedActionFormMismatch,
             .load_scalar,

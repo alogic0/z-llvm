@@ -174,6 +174,24 @@ pub fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic 
         try emitReturnEpilogue(selector);
         return null;
     }
+    if (ret.ty == .ptr) {
+        if (ret.ptr_addrspace != null) return .{ .no_emitter = "composed-block-pointer-ret-addrspace" };
+        const value = ret.value orelse return .{ .unsupported_value = "composed-block-missing-ret-value" };
+        var authority = try ValueUseTransaction.begin(selector);
+        defer authority.deinit();
+        _ = try authority.register(.{
+            .source = value,
+            .expected = .{ .ty = .ptr, .register_class = .gpr64, .pointer_address_space = 0 },
+            .form = .pointer,
+            .destination = .rax,
+        });
+        authority.seal() catch |err| return pointerReturnDiagnostic(err) orelse return err;
+        authority.prepare() catch |err| return pointerReturnDiagnostic(err) orelse return err;
+        authority.materializeAll() catch |err| return pointerReturnDiagnostic(err) orelse return err;
+        try authority.commit();
+        try emitReturnEpilogue(selector);
+        return null;
+    }
     if (ret.ty == .half or ret.ty == .float or ret.ty == .double) {
         const value = ret.value orelse return .{ .unsupported_value = "composed-block-missing-ret-value" };
         const bits: u16 = if (ret.ty == .half) 16 else if (ret.ty == .float) 32 else 64;
@@ -209,6 +227,20 @@ pub fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic 
     }
     try emitReturnEpilogue(selector);
     return null;
+}
+
+fn pointerReturnDiagnostic(err: anyerror) ?Diagnostic {
+    return switch (err) {
+        error.ValueUseUnsupportedSource,
+        error.ValueUseUnresolvedSource,
+        error.ValueUseExpiredSource,
+        error.ValueUseSourceViewMismatch,
+        error.ValueUseRegisterClassMismatch,
+        error.ValueUseTypeMismatch,
+        error.ValueUseUnsupportedAddressForm,
+        => .{ .unsupported_value = "composed-block-pointer-ret-value" },
+        else => null,
+    };
 }
 
 pub fn emitReturnEpilogue(selector: *ComposedBlockSelector) !void {

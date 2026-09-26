@@ -199,6 +199,13 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
         } else {
             const bits = intBits(param.ty) orelse return .{ .no_emitter = "composed-block-param-not-scalar" };
             switch (bits) {
+                // SysV zeroext guarantees a canonical low byte. Other narrow
+                // ABI forms remain outside this composed entry envelope.
+                8 => {
+                    if (param.attrs == null or !hasAttrToken(param.attrs.?, "zeroext"))
+                        return .{ .no_emitter = "composed-block-param-i8-extension" };
+                    try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg });
+                },
                 32 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
                 64 => try selector_state.bindValueLoc(selector, param.name, .{ .arg64 = reg }),
                 128 => {

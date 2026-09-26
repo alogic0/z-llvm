@@ -129,8 +129,9 @@ live original source. The divide-by-two instruction stream is preserved.
 
 Limitation: these new division cases prove shared lowering and composed standalone
 behavior. They do not close a named real-function failure cluster in the pinned
-compiler-core corpus. That distinct Phase-5 requirement remains open; no real-row
-counter is advanced or fallback retired on this evidence alone.
+compiler-core corpus. That distinct Phase-5 requirement remained open at this checkpoint; no real-row
+counter was advanced or fallback retired on the division evidence alone. The
+[later memset slice](../composed_memset_family.md) records the separate real-family work.
 
 The remaining udivmoddi4 cache was then minimized: the original 7,231,014-byte IR
 (SHA-256 `7be46e0b88c96fce0ce527407672843c43d3416ce56257d53a286603bd533e06`,
@@ -199,7 +200,9 @@ not comparable to the accepted 285-function population. The new division forms
 do not close a family in this report. A concrete candidate is the four pointer
 return failures (`__memset`, `memset`, `ssp.__memset_chk`, `ssp.__strncpy_chk`),
 which also need composed memory intrinsic support; no admission-only change was
-made or closure claimed. Phase 5's real-family requirement remains unfinished.
+made or closure claimed in that discovery. The later
+[bounded memset slice](../composed_memset_family.md) implements three of these
+functions; string-copy semantics remain outside that slice.
 
 Checkpoint allocated sizes are recorded in `final-disk-usage.tsv`: tmp 45,821,952 bytes,
 local-state 680,484,864 bytes, current Zig build cache 1,289,961,472 bytes and
@@ -366,3 +369,12 @@ This completes cache/gate infrastructure acceptance for this implementation stat
 It does not close the original plan's named recurring real-function family or
 migrate the inherited three-member accepted baseline to the four-member development
 cohort. That family remains the next implementation task.
+
+
+The 2026-09-26 [composed memset family](../composed_memset_family.md) closes the
+remaining Phase-5 named-family deliverable. Three byte-identical retained
+definitions execute through shared lowering, with six additional compositions,
+8,652 native observations and 12 checked traps across two routes and three modes.
+The final corrected source passes 17/17 integration subgates. The 443-function
+discovery report improves from 264 to 267 emitted functions with no new failures;
+accepted population counters and denominators are unchanged.

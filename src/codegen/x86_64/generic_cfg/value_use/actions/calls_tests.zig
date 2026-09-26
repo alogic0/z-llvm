@@ -1496,3 +1496,71 @@ test "value-use attached call revalidates after construction refresh and before 
         try expectCallRollbackStorageCleared(&transaction);
     }
 }
+
+test "value-use inline memset rolls back preservation every stage and call append" {
+    inline for (std.meta.tags(Transaction.MemcpyTestFailure)) |failure| {
+        var machine = MachineFunction.init("value-use-inline-memset-rollback", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "dst", "src", "len" }) |name| try addAtCurrent(&plan, name);
+        try addLive(&plan, "live-rcx");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "dst", .{ .arg64 = .r8 });
+        try selector_state.bindValueLoc(&selector, "src", .{ .arg32 = .r9 });
+        try selector_state.bindValueLoc(&selector, "len", .rax);
+        try selector_state.bindValueLoc(&selector, "live-rcx", .{ .arg64 = .rcx });
+        const dst_binding = selector.values.get("dst").?;
+        const src_binding = selector.values.get("src").?;
+        const len_binding = selector.values.get("len").?;
+        const live_binding = selector.values.get("live-rcx").?;
+        const saved_next_vreg = selector.next_virtual_reg;
+        const saved_next_spill = selector.next_spill_slot;
+        const saved_domain = selector.address_dependencies;
+        const saved_eflags = selector.eflags.snapshot();
+
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const fill = try transaction.register(.{
+            .source = .{ .named = "src" },
+            .expected = .{ .ty = .{ .int = 8 }, .register_class = .gpr32 },
+            .form = .gpr32,
+            .destination = .prepared_source,
+        });
+        const length = try transaction.register(.{
+            .source = .{ .named = "len" },
+            .expected = .{ .ty = .{ .int = 64 }, .register_class = .gpr64 },
+            .form = .memcpy_length,
+            .destination = .prepared_source,
+        });
+        const destination = try transaction.register(.{
+            .source = .{ .named = "dst" },
+            .expected = .{ .ty = .ptr, .register_class = .gpr64, .pointer_address_space = 0 },
+            .form = .memcpy_pointer,
+            .destination = .prepared_view,
+            .prepared_action = .{ .inline_memset = .{ .fill = fill, .length = length } },
+        });
+        try transaction.setMemcpyTestFailure(failure);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try std.testing.expectError(error.ValueUseMemcpyTestFailure, transaction.executePreparedAction(try transaction.preparedView(destination)));
+        try std.testing.expect(!transaction.failedRequestIs(destination));
+        try std.testing.expect(!transaction.failedRequestIs(fill));
+        try std.testing.expect(!transaction.failedRequestIs(length));
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(dst_binding, selector.values.get("dst").?);
+        try std.testing.expectEqual(src_binding, selector.values.get("src").?);
+        try std.testing.expectEqual(len_binding, selector.values.get("len").?);
+        try std.testing.expectEqual(live_binding, selector.values.get("live-rcx").?);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+        try std.testing.expectEqual(saved_next_vreg, selector.next_virtual_reg);
+        try std.testing.expectEqual(saved_next_spill, selector.next_spill_slot);
+        try std.testing.expect(selector.address_dependencies.eql(&saved_domain));
+        try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+        try selector.eflags.validateSnapshot(saved_eflags);
+    }
+}

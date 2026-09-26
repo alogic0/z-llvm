@@ -180,3 +180,12 @@ against LLVM 22. The integrated-executable subgate invokes the same implementati
 Its case/mode, distinct-function, and input-observation counts are separate from
 both the fixed compiler-core cohort and the original seven integrated cases.
 Focused reproduction uses `zig build behavioral-diff -- --case CASE_ID`.
+
+### Retained memset family canary
+
+`zig build memset-diff` executes three retained real-function definitions and six
+compositions through direct and release-o3 routes in three harness modes. It
+checks bytes, returned pointers, preservation of live values, and bounds traps;
+every function must have composed ownership. The integrated-executable subgate
+runs the same implementation. Its counts remain separate from accepted corpus
+counters; see [the family evidence](evidence/composed_memset_family.md).

@@ -32,11 +32,12 @@ need to replace the entire IR or add an analysis-cache framework immediately.
 
 ## Proposed implementation sequence
 
-Slices 1–4 have bounded implementations recorded below; slice 5 remains
-pending.
-These steps do not claim new compiler capability. Keep the named real-function
-failure family in [next steps](../next_steps.md) as the capability objective; introduce helpers
-in bounded slices where they support that work or reproduced correctness gaps.
+Slices 1–4 have bounded implementations recorded below. Slice 5 now closes the
+three-function memset family through shared lowering; further memory families
+and fixed-program performance measurements remain separate follow-ups.
+The earlier helper refactors did not claim new compiler capability. Continue
+with the next named failure family in [next steps](../next_steps.md), adding
+shared operations where they support that work or reproduced correctness gaps.
 
 ### 1. Shared operand traversal and replacement
 
@@ -300,6 +301,15 @@ Owners: AIR lowering, composed selector, relevant runners, and capability docs.
 Exit criteria: unseen combinations of the newly supported operations execute
 correctly, the named family closes through shared lowering, unsupported neighbors
 fail explicitly, and results identify which route and population they prove.
+
+The first implementation is the bounded memset family: shared pointer returns,
+`i8 zeroext` entry parameters, and transaction-owned nonvolatile byte fills.
+Three unchanged retained definitions and six additional compositions execute
+through composed lowering under direct and release-o3 routes. Focused, native, and full integration
+validation pass. See the
+[family evidence](../evidence/composed_memset_family.md) for exact input identities,
+rejected neighbors, and counter scope. Copy/string support and fixed-program
+performance measurements remain separate follow-ups.
 
 ## Validation and sequencing
 

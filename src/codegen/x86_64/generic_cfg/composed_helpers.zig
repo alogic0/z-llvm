@@ -179,7 +179,7 @@ pub fn stack128FrameBytes() u32 {
 }
 
 pub fn isComposedReturnType(ty: ir.Type) bool {
-    if (ty == .void or ty == .half or ty == .float or ty == .double) return true;
+    if (ty == .ptr or ty == .void or ty == .half or ty == .float or ty == .double) return true;
     if (sysv_abi.sseAggregateReturnKind(ty) != null) return true;
     const bits = intBits(ty) orelse return false;
     return bits == 32 or bits == 64 or bits == 128;

@@ -191,7 +191,7 @@ pub fn requestDestinationNodes(
                 else => {},
             },
             .switch_compare_chain => try result.append(.accumulator),
-            .inline_memcpy => {
+            .inline_memcpy, .inline_memset => {
                 try result.append(.rdi);
                 try result.append(.rsi);
                 try result.append(.rdx);
@@ -611,6 +611,23 @@ pub fn requestMappings(
                 else => {},
             },
             .switch_compare_chain => return mappings,
+            .inline_memset => |fill| {
+                mappings.append(.{
+                    .source = scalarSourceNode(current orelse return error.ValueUseUnresolvedSource),
+                    .destination = .rdi,
+                    .source_request_index = request_index,
+                });
+                mappings.append(.{
+                    .source = if (fill.fill) |handle| scalarSourceNode(try Authority.registeredOperandCurrent(Authority, transaction, handle)) else null,
+                    .destination = .rsi,
+                    .source_request_index = if (fill.fill) |handle| handle.index else null,
+                });
+                mappings.append(.{
+                    .source = if (fill.length) |handle| scalarSourceNode(try Authority.registeredOperandCurrent(Authority, transaction, handle)) else null,
+                    .destination = .rdx,
+                    .source_request_index = if (fill.length) |handle| handle.index else null,
+                });
+            },
             .inline_memcpy => |memcpy| {
                 mappings.append(.{
                     .source = scalarSourceNode(current orelse return error.ValueUseUnresolvedSource),

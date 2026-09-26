@@ -5,8 +5,9 @@ ownership. The [architecture refactor plan](roadmap/architecture_refactor_plan.m
 records the completed operand traversal, ownership, integer-semantics, and
 module-reference slices, including GlobalOpt, GlobalDCE, and ADCE migrations.
 The ADCE dependency and verifier allocation-cleanup follow-ups are repaired.
-Shared lowering remains next. These refactors do not supersede the named
-capability objective below or advance accepted counters.
+The first shared-lowering slice implements the bounded memset family; see
+[its validation evidence](evidence/composed_memset_family.md). Accepted counters
+remain unchanged.
 
 The user's 2026-09-10 instruction authorizes implementation of the entire
 [project improvement plan](roadmap/project_improvement_plan.md), in its stated
@@ -31,13 +32,16 @@ current consumer or a bounded diagnostic reason.
 The cache retry fix is validated: full fresh and cached Tier-3 runs each passed
 17/17 subgates, and their 1,315 canonical records match. Completed logs, focused
 regressions and per-subgate timings are in the implementation evidence. The
-external checkout is clean; no validation run remains active.
+external checkout was clean for those acceptance runs.
 
-Next: close one named recurring real-function failure family through shared
-lowering. The retained discovery report identifies four pointer-return failures
-(`__memset`, `memset`, `ssp.__memset_chk`, `ssp.__strncpy_chk`) as a candidate;
-these also require composed memory intrinsic support. Select the bounded family,
-reproduce its failures, and add executable and nearby rejection cases before
-claiming closure. The passing standalone behavioral suite does not fulfill this
-remaining Phase-5 requirement. Keep accepted counters unchanged until an explicit
-evidence-backed migration is recorded.
+Current checkpoint: shared pointer returns, `i8 zeroext` entry parameters, and
+nonvolatile `llvm.memset.p0.i64` emit the three retained functions `__memset`,
+`memset`, and `ssp.__memset_chk` through composed lowering. Native differential
+checks pass in both direct and release-o3 routes and all three harness modes.
+Full integration passes all 17 subgates, closing the Phase-5 named-family item.
+
+Next: reproduce the next bounded memory family from the same report,
+starting with `ssp.__memcpy_chk`. Identify its typed-call and intrinsic blockers
+before choosing the implementation scope. `ssp.__strncpy_chk` remains outside
+the memset slice and now reports a load-width blocker. Keep accepted counters
+unchanged until an explicit evidence-backed migration is recorded.

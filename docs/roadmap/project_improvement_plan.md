@@ -340,7 +340,7 @@ Deliverables:
 - [x] Extend generated tests beyond arithmetic identities to interacting
       operations, signedness, widths, control flow, and memory where supported.
       Record seeds and minimize failures into stable regression fixtures.
-- [ ] Select one recurring real-function failure family and extend shared
+- [x] Select one recurring real-function failure family and extend shared
       composed lowering to cover several members, with representative executable
       cases and nearby rejection cases.
 - [x] Record which rows use composed lowering and which use structural
@@ -350,6 +350,13 @@ Acceptance: each selected program executes through z_llvm and agrees with its
 reference in the applicable modes. Each new lowering capability has a runtime
 regression that detects the wrong result. Coverage improvement must come from
 new behavior or shared lowering, not counter renaming or case-specific admission.
+
+The named-family deliverable is satisfied by the retained `__memset`, `memset`,
+and `ssp.__memset_chk` definitions through shared composed lowering. Native
+comparison covers direct and release-o3 routes in all three harness modes;
+full integration passes 17/17 subgates. See the
+[bounded family evidence](../evidence/composed_memset_family.md). The separate
+string-copy candidate and accepted-counter migration are outside this closure.
 
 Counter-schema or denominator changes require an explicit migration record;
 do not reinterpret historical `real_programs_ok` evidence in place. Use the

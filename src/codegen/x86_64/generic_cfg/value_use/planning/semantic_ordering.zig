@@ -62,6 +62,7 @@ fn actionSecondaryOperand(
         .store_i64 => |store| try Authority.validateRegisteredOperandHandle(Authority, transaction, store.value),
         .store_stack_pointer => |store| try Authority.validateRegisteredOperandHandle(Authority, transaction, store.destination),
         .inline_memcpy => |memcpy| try Authority.validateRegisteredOperandHandle(Authority, transaction, memcpy.source),
+        .inline_memset => |fill| if (fill.fill orelse fill.length) |handle| try Authority.validateRegisteredOperandHandle(Authority, transaction, handle) else null,
         .scratch_compare => |compare| switch (compare.rhs) {
             .named => |handle| try Authority.validateRegisteredOperandHandle(Authority, transaction, handle),
             .immediate, .null_pointer => null,
@@ -103,6 +104,7 @@ fn actionTertiaryOperand(
 ) !?u8 {
     return switch (action) {
         .inline_memcpy => |memcpy| try Authority.validateRegisteredOperandHandle(Authority, transaction, memcpy.length),
+        .inline_memset => |fill| if (fill.fill != null) (if (fill.length) |handle| try Authority.validateRegisteredOperandHandle(Authority, transaction, handle) else null) else null,
         .validate_shape,
         .emit_copy_to,
         .form_byte_address,
@@ -434,6 +436,7 @@ pub fn actionOwnsOrderedWrites(action: Types.PreparedAction) bool {
         .branch_condition,
         .switch_compare_chain,
         .inline_memcpy,
+        .inline_memset,
         .load_scalar,
         .load_readonly_pair,
         .load_stack_i128_alias,

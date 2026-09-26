@@ -123,7 +123,10 @@ Standalone behavioral and compiler-rt counts are separate populations.
 - The backend supports multiple blocks, memory, calls, and bounded spill
   planning. Older descriptions of an i32-only, memory-free bootstrap no longer
   describe the whole backend. General target/ABI/pressure coverage is still
-  limited and must be established by specific evidence.
+  limited and must be established by specific evidence. Composed lowering now
+  includes pointer returns, `i8 zeroext` entry parameters, and nonvolatile
+  `llvm.memset.p0.i64` through a transaction-owned byte-fill action; see the
+  [bounded family evidence](evidence/composed_memset_family.md).
 
 These constraints motivate the refactor plan; they are not claims that shared
 IR or shared lowering is absent. Linker ownership and accepted support boundaries

@@ -268,6 +268,15 @@ pub const MemcpyAction = struct {
     length: RequestHandle,
 };
 
+/// Byte fill with named operands or typed immediate values. The destination
+/// request owns the action; physical staging stays inside the authority.
+pub const MemsetAction = struct {
+    fill: ?RequestHandle = null,
+    fill_immediate: u8 = 0,
+    length: ?RequestHandle = null,
+    length_immediate: u64 = 0,
+};
+
 pub const MemcpyTestFailure = enum {
     after_preservation,
     after_destination,
@@ -798,6 +807,7 @@ pub const PreparedAction = union(enum) {
     branch_condition,
     switch_compare_chain: SwitchCompareChainAction,
     inline_memcpy: MemcpyAction,
+    inline_memset: MemsetAction,
     load_scalar: ScalarLoadAction,
     load_readonly_pair: ReadOnlyPairLoadAction,
     load_stack_i128_alias: StackI128AliasLoadAction,

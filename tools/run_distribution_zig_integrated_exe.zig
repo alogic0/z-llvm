@@ -292,6 +292,7 @@ pub fn main(init: std.process.Init) !void {
     // Separate population: these programs extend the mandatory executable
     // canaries without reinterpreting the original seven integrated cases.
     try @import("run_behavioral_diff.zig").run(init);
+    try @import("run_memset_diff.zig").run(init);
 }
 
 fn emitAggregateSseSemanticObject(
