@@ -91,13 +91,15 @@ Standalone behavioral and compiler-rt counts are separate populations.
   it while retaining its existing flags, poison/undef, and unsupported-case
   policies. Other integer families still have pass-local rules.
 - [Operand traversal](../src/ir/operands.zig) provides typed const/mutable walks
-  and function-wide replacement. `Instruction.mapOperands`, use counting, and
-  GlobalOpt replacement share those walks. CFG-update helpers handle labels
-  separately. Other passes still have independent replacement/reference scans.
+  and function-wide replacement. `Instruction.mapOperands`, use counting,
+  GlobalOpt replacement, and ADCE liveness share those walks. CFG-update helpers
+  handle labels separately. Other passes still have independent replacement/reference scans.
 - Operand traversal reports opaque values, attributes, metadata, and call text
   as an incomplete reference boundary. It does not parse or rewrite that text
   or enumerate direct call symbols. Existing use-count and mapping wrappers
-  retain their structured-value scope.
+  retain their structured-value scope. ADCE skips a function before CFG or
+  instruction deletion if active operands/raw fields have incomplete coverage;
+  removed instructions do not block the pass.
 - [Module reference discovery](../src/analysis/module_references.zig) combines
   structured operands, direct callees, aliases, and global initializers. It
   distinguishes global `@name` from local `%name` and reports opaque regions
@@ -114,6 +116,8 @@ Standalone behavioral and compiler-rt counts are separate populations.
   both inlining passes share the same clone API and transfer ownership only
   after reserving caller storage. Plain struct copies still share storage and
   are appropriate only for reads or deliberate ownership transfers.
+- Verifier context initialization registers each allocation for cleanup before
+  the next allocation can fail; its accepted IR invariants are unchanged.
 - The pass manager has no shared analysis cache/preservation contract. Passes
   construct their own analyses and must keep them valid across local mutation.
 - The backend supports multiple blocks, memory, calls, and bounded spill

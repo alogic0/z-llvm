@@ -59,18 +59,23 @@ start from dead branch regions whose successors reconverge at an immediate postd
 rewrite branch control when all outgoing regions are acyclic and side-effect free
 rewrite dead switch control to the default successor when all outgoing regions
 are acyclic and side-effect free
-reject phi joins and non-linear regions for now
+reject PHI joins and cyclic regions during control-flow rewriting
 repair PHI incoming lists through the shared CFG update helper after supported edge deletion
-start from current def-use counts
-walk instructions backward
-remove unused side-effect-free instructions
-repeat until dependent dead instruction chains disappear
+build a definition-to-instruction map and instruction liveness worklist
+seed observable instructions and terminator operands
+propagate dependencies through shared typed instruction/terminator operand walks
+include indirect callees, vector values/indices, PHIs, GEPs, and aggregates
+remove unmarked side-effect-free instructions after propagation
 rerun dead control-flow cleanup after dead instruction removal so a dead PHI at
 a join can stop blocking the accepted diamond rewrite
 preserve stores, volatile/atomic memory barriers, unknown memory effects, and terminators
 use the shared `isSafeToDelete` helper for the local removal boundary
 remove unused side-effect-free FP instructions through the same liveness path as
 integer scalar instructions
+preflight active operand coverage before any CFG or instruction mutation
+preserve a function unchanged when opaque values, raw attributes/call fields,
+assembly, bundles, or metadata prevent complete operand discovery
+ignore removed instructions and replacement bookkeeping during coverage checks
 ```
 
 This now covers a small LLVM-equivalent control-flow slice: if a conditional
@@ -80,8 +85,8 @@ same live successor shape observed from `opt-22 -passes=adce`, then the
 existing instruction cleanup removes the now-dead scalar chain.
 
 Do not treat this as full LLVM ADCE yet. The local implementation is still a
-conservative accepted-CFG subset and does not model LLVM's complete optimistic
-worklist, block-info lattice, or full CFG update machinery.
+conservative accepted-CFG subset and does not model LLVM's complete block-info
+lattice, control-dependence propagation, or full CFG update machinery.
 
 Fixture coverage:
 
@@ -103,19 +108,29 @@ opt-22 equivalent:
 local-only conservative:
   none currently
 
-unit-test only:
-  none currently
+focused unit tests:
+  live indirect-callee producer chains with nearby dead instructions
+  vector insertion, shuffle, extraction, and index dependencies
+  terminator and PHI operand dependencies
+  opaque coverage preserves instructions and branch structure
+  removed opaque instructions do not block dead-code removal
+
+native LLVM-22 comparisons:
+  globaldce_references under globaldce, adce, and release-o3
+  adce_operands under adce and release-o3 (156 defined scalar observations)
 ```
 
 Known gaps:
 
 ```text
-no full optimistic block/instruction liveness worklist
+no full optimistic block liveness/control-dependence model
 no live-terminator propagation through arbitrary control dependence
 no live PHI-aware deletion beyond shared stale-incoming pruning after supported
 edge deletion and the dead-PHI cleanup that unlocks the accepted diamond rewrite
 no general loop/cyclic dead-region rewriting beyond the opt-equivalent
 preservation boundary covered by `adce_infinite_loop_reject`
+opaque coverage conservatively inhibits optimization even for reference-free
+raw attributes or literal vector text; structured parsing is not expanded here
 no debug info salvage
 no musttail, EH, calls, or volatile/atomic removal
 ```

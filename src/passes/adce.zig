@@ -23,6 +23,9 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 }
 
 fn eliminateFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
+    // Opaque text can hide value dependencies. Check before either CFG or
+    // instruction deletion; an empty structured walk is not proof of no uses.
+    if (hasOpaqueOperands(function)) return false;
     var changed = false;
     while (try removeDeadControlFlow(allocator, function)) {
         changed = true;
@@ -34,6 +37,26 @@ fn eliminateFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool
         }
     }
     return changed;
+}
+
+const CoverageVisitor = struct {
+    pub const Error = error{};
+    pub fn visit(_: CoverageVisitor, _: *const ir.Value, _: ir.Type) Error!void {}
+};
+
+fn hasOpaqueOperands(function: *const ir.Function) bool {
+    for (function.blocks.items) |*block| {
+        for (block.instructions.items) |*instruction| {
+            if (instruction.removed) continue;
+            const coverage = ir.operands.instruction(@as(*const ir.Instruction, instruction), CoverageVisitor{}) catch unreachable;
+            if (coverage.has_opaque_references) return true;
+        }
+        if (block.terminator) |*terminator| {
+            const coverage = ir.operands.terminator(@as(*const ir.Terminator, terminator), CoverageVisitor{}) catch unreachable;
+            if (coverage.has_opaque_references) return true;
+        }
+    }
+    return false;
 }
 
 const InstRef = struct {
@@ -122,73 +145,21 @@ const LiveInstructions = struct {
         }
     }
 
-    fn markInstructionOperands(liveness: *LiveInstructions, instruction: ir.Instruction) !void {
-        switch (instruction.kind) {
-            .binary => |binary| {
-                try liveness.markValue(binary.lhs);
-                try liveness.markValue(binary.rhs);
-            },
-            .cast => |cast| try liveness.markValue(cast.value),
-            .freeze => |freeze| try liveness.markValue(freeze.value),
-            .icmp => |icmp| {
-                try liveness.markValue(icmp.lhs);
-                try liveness.markValue(icmp.rhs);
-            },
-            .fcmp => |fcmp| {
-                try liveness.markValue(fcmp.lhs);
-                try liveness.markValue(fcmp.rhs);
-            },
-            .select => |select| {
-                try liveness.markValue(select.cond);
-                try liveness.markValue(select.true_value);
-                try liveness.markValue(select.false_value);
-            },
-            .phi => |phi| for (phi.incoming.items) |incoming| {
-                try liveness.markValue(incoming.value);
-            },
-            .alloca => {},
-            .load => |load| try liveness.markValue(load.ptr),
-            .store => |store| {
-                try liveness.markValue(store.value);
-                try liveness.markValue(store.ptr);
-            },
-            .atomicrmw => |atomicrmw| {
-                try liveness.markValue(atomicrmw.ptr);
-                try liveness.markValue(atomicrmw.value);
-            },
-            .cmpxchg => |cmpxchg| {
-                try liveness.markValue(cmpxchg.ptr);
-                try liveness.markValue(cmpxchg.expected);
-                try liveness.markValue(cmpxchg.replacement);
-            },
-            .fence, .extractelement, .insertelement, .shufflevector => {},
-            .extractvalue => |extract| try liveness.markValue(extract.aggregate),
-            .insertvalue => |insert| {
-                try liveness.markValue(insert.aggregate);
-                try liveness.markValue(insert.value);
-            },
-            .gep => |gep| {
-                try liveness.markValue(gep.ptr);
-                for (gep.indices.items) |index| try liveness.markValue(index.value);
-            },
-            .call => |call| for (call.args.items) |arg| {
-                try liveness.markValue(arg.value);
-            },
+    const OperandVisitor = struct {
+        pub const Error = std.mem.Allocator.Error;
+        liveness: *LiveInstructions,
+        pub fn visit(visitor: OperandVisitor, value: *const ir.Value, _: ir.Type) Error!void {
+            try visitor.liveness.markValue(value.*);
         }
+    };
+
+    fn markInstructionOperands(liveness: *LiveInstructions, instruction: ir.Instruction) !void {
+        // Coverage was checked before any mutation in eliminateFunction.
+        _ = try ir.operands.instruction(&instruction, OperandVisitor{ .liveness = liveness });
     }
 
     fn markTerminatorOperands(liveness: *LiveInstructions, terminator: ir.Terminator) !void {
-        switch (terminator) {
-            .ret => |ret| if (ret.value) |value| try liveness.markValue(value),
-            .br => {},
-            .@"unreachable" => {},
-            .condbr => |condbr| try liveness.markValue(condbr.cond),
-            .indirectbr => |indirectbr| try liveness.markValue(indirectbr.addr),
-            .@"switch" => |switch_term| {
-                try liveness.markValue(switch_term.cond);
-                for (switch_term.cases.items) |case| try liveness.markValue(case.value);
-            },
-        }
+        _ = try ir.operands.terminator(&terminator, OperandVisitor{ .liveness = liveness });
     }
 
     fn getInstruction(liveness: LiveInstructions, ref: InstRef) *ir.Instruction {

@@ -3,7 +3,8 @@ const common = @import("tool_common.zig");
 
 pub fn main(init: std.process.Init) !void {
     try runCase(init, "test/opt/inputs/optimizer_correctness.ll", "test/opt/optimizer_correctness_harness.c", &.{ "early-cse,instcombine,licm,sccp,globalopt", "release-o3" }, "optimizer correctness", "functions=17");
-    try runCase(init, "test/opt/inputs/globaldce_references.ll", "test/opt/globaldce_references_harness.c", &.{"globaldce"}, "GlobalDCE references", "entry_points=5");
+    try runCase(init, "test/opt/inputs/globaldce_references.ll", "test/opt/globaldce_references_harness.c", &.{ "globaldce", "adce", "release-o3" }, "GlobalDCE references", "entry_points=5");
+    try runCase(init, "test/opt/inputs/adce_operands.ll", "test/opt/adce_operands_harness.c", &.{ "adce", "release-o3" }, "ADCE vector operands", "observations=156");
 }
 
 fn runCase(init: std.process.Init, fixture: []const u8, harness: []const u8, pipelines: []const []const u8, label: []const u8, count: []const u8) !void {

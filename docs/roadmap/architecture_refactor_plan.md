@@ -255,6 +255,32 @@ GlobalDCE follow-up (2026-09-26, based on `f635ac44`):
   trades some dead-definition removal for soundness until structured parsing
   justifies narrower reference coverage.
 
+ADCE and verifier follow-up (2026-09-26, based on `1c0a60bc`):
+
+- Reproduced missing indirect-callee and vector dependencies as post-ADCE
+  `UnknownValue` failures. Replaced both instruction and terminator operand
+  switches with the shared typed traversal, keeping liveness seeds, worklist,
+  memory-effect rules, and accepted CFG rewrites unchanged.
+- Preflight active operand coverage before any CFG or instruction deletion.
+  Opaque values, attributes, metadata, assembly, raw arguments, or bundles
+  conservatively preserve their containing function. Removed instructions and
+  replacement bookkeeping do not contribute coverage. This intentionally also
+  preserves literal vector text and reference-free raw attributes until more
+  precise structured coverage is available.
+- Initialize `VerifyContext` with empty storage and register cleanup before
+  allocating its arrays. Register and initialize each list array before the
+  next allocation can fail. This repairs partial-initialization leaks without
+  changing verifier acceptance rules or diagnostics for invalid IR.
+- Added six ADCE tests for indirect-callee producer chains, all three vector
+  operations and dynamic indices, PHIs/terminators, opaque boundaries before
+  CFG mutation, and removed opaque instructions. Nearby dead computations still
+  disappear. Two exhaustive allocation-failure tests cover multi-function
+  verification and invalid IR, including cleanup after the first context succeeds.
+- Enabled the five-entry-point callback/alias fixture under `adce` and
+  `release-o3` as well as `globaldce`. Added a permanent vector native fixture
+  with 156 defined observations under `adce` and `release-o3`. The existing
+  17-function optimizer checks remain enabled in both their original pipelines.
+
 ### 5. Shared lowering and validation scope
 
 Owners: AIR lowering, composed selector, relevant runners, and capability docs.
@@ -418,13 +444,14 @@ an exported alias and an indirect callback. Its unrelated dead global is removed
 Evidence and the saved baseline are under
 `local-state/validations/globaldce-references-20260926/`.
 
-Two unrelated issues surfaced during test development and remain follow-up work:
+Two unrelated issues surfaced during GlobalDCE test development (subsequently
+repaired in the ADCE/verifier follow-up below):
 ADCE drops a live indirect-callee dependency (`UnknownValue`), reproduced on the
 saved clean `f635ac44` compiler under both `adce` and `release-o3`; and the unchanged
 `VerifyContext.init` leaks an earlier allocation when a later initialization
 allocation fails. The latter was observed when injecting failures across the
 verifier as well as the pass; the permanent GlobalDCE failure test isolates the
-pass allocator. No ADCE or verifier semantics are changed. The earlier full
+pass allocator. That migration changed no ADCE or verifier semantics. The earlier full
 ReleaseFast half-add NaN-bit limitation also remains separate.
 
 `zig build readiness` passed for the GlobalDCE migration, including the full
@@ -444,3 +471,36 @@ object consumers, executable canaries, and distribution boundaries passed.
 Readiness's generated behavioral suite passed 24 case/mode runs and 6,528
 observations. These populations remain separate; accepted counters, selector
 defaults, CLI behavior, and capability ratchets are unchanged.
+
+ADCE/verifier focused validation (Zig 0.16.0): all eight new tests pass in Debug
+and ReleaseFast. The pre-change run failed six of those tests, including two
+allocation-leak cases. The saved clean `1c0a60bc` compiler reproduces both the
+callback and vector `UnknownValue` failures. The updated native callback and
+vector programs agree with LLVM 22 under ADCE and `release-o3`, and LLVM verifies
+every transformed module. All 243 existing optimizer fixture outputs are
+byte-identical before and after. Evidence, baseline binaries, failure logs,
+comparison scripts, and source/input hashes are retained under
+`local-state/validations/adce-operands-20260926/`.
+
+The existing full ReleaseFast half-add NaN-bit limitation remains separate.
+Direct alias calls remain outside the verifier's accepted call surface. This
+slice does not expand parsing, alter verifier invariants, or advance capability
+or accepted-status counters.
+
+`zig build readiness` passed for the ADCE/verifier repair, including the full
+Debug unit suite, optimizer fixtures and native programs, corpus/handoff checks,
+generated behavioral checks, and release-pipeline policy. Documentation checks
+passed for 14 current documents, 59 links, and two status blocks; the separate
+check covered 33 local links across all five touched pages. Formatting and
+`git diff --check` passed.
+
+ADCE/verifier Tier 3 passed: the pinned Zig 0.16.0 `distribution-all -- --serial`
+run completed all 17 subgates with `local_fail=0` in 2,213,207 ms
+(36m53s). The evidence directory records the exact command, emitter/cache
+selections, correctness trigger, and source/input hashes. Compiler, test, tool,
+and build files still match the starting snapshot. Each release mode lowered,
+emitted, and linked 100 compiler-core rows and executed four cohort cases.
+Release object consumers, executable canaries, and distribution boundaries
+passed. Readiness's behavioral suite passed 24 case/mode runs and 6,528
+observations. These populations remain separate; accepted counters, selector
+defaults, public CLI behavior, and capability ratchets are unchanged.

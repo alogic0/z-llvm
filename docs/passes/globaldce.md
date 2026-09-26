@@ -91,7 +91,7 @@ local-conservative:
 
 native execution compared with LLVM 22:
   globaldce_references: alias export, alias pointer, indirect callback,
-  pointer array, and constant-expression load, under GlobalDCE alone
+  pointer array, and constant-expression load, under globaldce, adce, and release-o3
 
 unit-test only:
   globaldce removes unreferenced local functions and globals
@@ -107,9 +107,8 @@ unit-test only:
   allocation-failure cleanup with no partial deletion
 ```
 
-The new callback fixture exposes an existing ADCE `UnknownValue` failure under
-`release-o3`, also reproduced with the saved pre-migration compiler. Its native
-check therefore exercises GlobalDCE alone; the existing 17-function optimizer
-harness still checks `release-o3`. Direct calls to aliases also remain outside
-the verifier's accepted call surface; the native fixture calls through pointers
-and an exported alias from C. Neither limitation is changed by this migration.
+The callback fixture initially exposed an ADCE `UnknownValue` failure under
+`release-o3`. The subsequent shared-operand migration repaired that failure;
+the native check now runs under `globaldce`, `adce`, and `release-o3`. Direct
+calls to aliases remain outside the verifier's accepted call surface; this
+fixture calls through pointers and an exported alias from C.

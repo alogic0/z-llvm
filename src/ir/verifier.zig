@@ -56,20 +56,27 @@ const VerifyContext = struct {
             .allocator = allocator,
             .function = function,
             .defs = std.StringHashMap(Definition).init(allocator),
-            .predecessors = try allocator.alloc(bool, block_count * block_count),
-            .predecessor_lists = try allocator.alloc(std.ArrayList(usize), block_count),
-            .successor_lists = try allocator.alloc(std.ArrayList(usize), block_count),
-            .reachable = try allocator.alloc(bool, block_count),
-            .dominators = try allocator.alloc(u64, block_count * dominator_word_count),
+            .predecessors = &.{},
+            .predecessor_lists = &.{},
+            .successor_lists = &.{},
+            .reachable = &.{},
+            .dominators = &.{},
             .block_count = block_count,
             .dominator_word_count = dominator_word_count,
         };
         errdefer ctx.deinit();
 
+        // Register each allocation with ctx before the next can fail. List
+        // elements must be initialized immediately so partial cleanup is valid.
+        ctx.predecessors = try allocator.alloc(bool, block_count * block_count);
         @memset(ctx.predecessors, false);
+        ctx.predecessor_lists = try allocator.alloc(std.ArrayList(usize), block_count);
         @memset(ctx.predecessor_lists, .empty);
+        ctx.successor_lists = try allocator.alloc(std.ArrayList(usize), block_count);
         @memset(ctx.successor_lists, .empty);
+        ctx.reachable = try allocator.alloc(bool, block_count);
         @memset(ctx.reachable, false);
+        ctx.dominators = try allocator.alloc(u64, block_count * dominator_word_count);
         @memset(ctx.dominators, 0);
 
         try ctx.verifyBlockNames();
