@@ -116,7 +116,7 @@ fn buildInternal(function: ir.Function, layout: ?datalayout.DataLayout, ptr: ir.
                     .root = result,
                     .root_kind = .stack,
                     .offset = 0,
-                    .size = access_size orelse typeSizeMaybeLayout(layout, alloca.allocated_ty),
+                    .size = access_size orelse if (alloca.isSingleObject()) typeSizeMaybeLayout(layout, alloca.allocated_ty) else null,
                 },
                 .gep => |gep| {
                     var base = buildInternal(function, layout, gep.ptr, null) orelse return null;

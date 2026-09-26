@@ -362,7 +362,7 @@ fn instructionUsesValue(instruction: ir.Instruction, value_name: []const u8) boo
             }
             return false;
         },
-        .alloca => false,
+        .alloca => |alloca| if (alloca.count) |count| valueMatchesName(count.value, value_name) else false,
         .load => |load| valueMatchesName(load.ptr, value_name),
         .store => |store| valueMatchesName(store.value, value_name) or valueMatchesName(store.ptr, value_name),
         .atomicrmw => |atomicrmw| valueMatchesName(atomicrmw.ptr, value_name) or valueMatchesName(atomicrmw.value, value_name),
@@ -426,7 +426,9 @@ fn replaceInstructionUse(instruction: *ir.Instruction, value_name: []const u8, r
         .phi => |*phi| for (phi.incoming.items) |*incoming| {
             incoming.value = replaceValue(incoming.value, value_name, replacement);
         },
-        .alloca => {},
+        .alloca => |*alloca| if (alloca.count) |*count| {
+            count.value = replaceValue(count.value, value_name, replacement);
+        },
         .load => |*load| load.ptr = replaceValue(load.ptr, value_name, replacement),
         .store => |*store| {
             store.value = replaceValue(store.value, value_name, replacement);
@@ -555,7 +557,7 @@ fn outsideInstructionUsesAreLcssa(
         .icmp => |icmp| !valuesUseLoopDefinition(loop_defs, &.{ icmp.lhs, icmp.rhs }),
         .fcmp => |fcmp| !valuesUseLoopDefinition(loop_defs, &.{ fcmp.lhs, fcmp.rhs }),
         .select => |select| !valuesUseLoopDefinition(loop_defs, &.{ select.cond, select.true_value, select.false_value }),
-        .alloca => true,
+        .alloca => |alloca| if (alloca.count) |count| !valueNamesLoopDefinition(count.value, loop_defs) else true,
         .load => |load| !valueNamesLoopDefinition(load.ptr, loop_defs),
         .store => |store| !valuesUseLoopDefinition(loop_defs, &.{ store.value, store.ptr }),
         .atomicrmw => |atomicrmw| !valuesUseLoopDefinition(loop_defs, &.{ atomicrmw.ptr, atomicrmw.value }),

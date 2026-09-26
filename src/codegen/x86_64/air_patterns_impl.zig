@@ -254,6 +254,12 @@ pub fn lowerFunctionWithOptions(
     const parsed_triple = try target.Triple.parse(triple_text);
     if (!parsed_triple.isX86_64() or !parsed_triple.isLinux()) return error.UnsupportedTarget;
 
+    // All local frame paths currently reserve one statically sized object.
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (!inst.removed and inst.kind == .alloca and !inst.kind.alloca.isSingleObject())
+            return error.UnsupportedAllocaCount;
+    };
+
     var machine = MachineFunction.init(symbolName(function.name), function.ret_ty);
     machine.entry_xmm_defined_bits = sysv_abi.entryXmmDefinedBits(function);
     errdefer machine.deinit(allocator);

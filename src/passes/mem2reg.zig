@@ -49,6 +49,7 @@ fn promoteOneFunctionSlot(module: *ir.Module, function_index: usize) !bool {
     while (instruction_index < entry_block.instructions.items.len) : (instruction_index += 1) {
         const instruction = entry_block.instructions.items[instruction_index];
         if (instruction.removed or instruction.kind != .alloca) continue;
+        if (!instruction.kind.alloca.isSingleObject()) continue;
         const slot = instruction.result orelse continue;
         if (!isPromotableSingleBlockSlot(function.*, entry_block_index, slot)) continue;
 
@@ -61,6 +62,7 @@ fn promoteOneFunctionSlot(module: *ir.Module, function_index: usize) !bool {
     while (instruction_index < entry_block.instructions.items.len) : (instruction_index += 1) {
         const instruction = entry_block.instructions.items[instruction_index];
         if (instruction.removed or instruction.kind != .alloca) continue;
+        if (!instruction.kind.alloca.isSingleObject()) continue;
         const slot = instruction.result orelse continue;
         if (!isPromotableStackSlot(function.*, slot)) continue;
         const single_store = findSingleStore(function.*, slot) orelse continue;
@@ -77,6 +79,7 @@ fn promoteOneFunctionSlot(module: *ir.Module, function_index: usize) !bool {
     while (instruction_index < entry_block.instructions.items.len) : (instruction_index += 1) {
         const instruction = entry_block.instructions.items[instruction_index];
         if (instruction.removed or instruction.kind != .alloca) continue;
+        if (!instruction.kind.alloca.isSingleObject()) continue;
         const slot = instruction.result orelse continue;
         if (!isPromotableStackSlot(function.*, slot)) continue;
 
@@ -627,7 +630,9 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 .phi => |*phi| for (phi.incoming.items) |*incoming| {
                     incoming.value = replaceOperand(incoming.value, name, replacement);
                 },
-                .alloca => {},
+                .alloca => |*alloca| if (alloca.count) |*count| {
+                    count.value = replaceOperand(count.value, name, replacement);
+                },
                 .load => |*load| load.ptr = replaceOperand(load.ptr, name, replacement),
                 .store => |*store| {
                     store.value = replaceOperand(store.value, name, replacement);

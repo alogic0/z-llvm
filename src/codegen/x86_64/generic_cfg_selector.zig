@@ -31,6 +31,10 @@ pub fn tryLowerWithContext(
     function: ir.Function,
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
 ) !SelectionResult {
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (!inst.removed and inst.kind == .alloca and !inst.kind.alloca.isSingleObject())
+            return .{ .unsupported = .{ .no_emitter = "alloca-count" } };
+    };
     const inspected = inspection.inspectFunctionWithContext(function, module_context);
     if (try legacy_lowering.tryLower(allocator, machine, function)) {
         if (machine.selection_owner != .unassigned) return error.SelectionOwnerAlreadyAssigned;

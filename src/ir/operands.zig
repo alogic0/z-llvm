@@ -76,7 +76,10 @@ pub fn instruction(inst: anytype, visitor: anytype) @TypeOf(visitor).Error!Cover
         .phi => |*x| for (x.incoming.items) |*incoming| {
             try w.value(&incoming.value, x.ty);
         },
-        .alloca => |*x| w.opaqueText(x.attrs),
+        .alloca => |*x| {
+            if (x.count) |*count| try w.value(&count.value, count.ty);
+            w.opaqueText(x.attrs);
+        },
         .load => |*x| try w.value(&x.ptr, .ptr),
         .store => |*x| {
             try w.value(&x.value, x.ty);

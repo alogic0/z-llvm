@@ -40,6 +40,13 @@ nonvolatile `llvm.memset.p0.i64` emit the three retained functions `__memset`,
 checks pass in both direct and release-o3 routes and all three harness modes.
 Full integration passes all 17 subgates, closing the Phase-5 named-family item.
 
+The project-review repairs are complete: signed min/max and unsigned folds use
+width-aware semantics, and explicit alloca sizes are typed operands preserved
+by optimizer use/replacement walks. All 1,496 unit/structural/storage tests,
+focused ReleaseFast checks, native comparisons, readiness, and all 17 integration
+subgates passed; see [the repair record](roadmap/optimizer_boundary_repairs.md).
+Dynamic local stack codegen remains unsupported. Accepted counters are unchanged.
+
 Next: reproduce the next bounded memory family from the same report,
 starting with `ssp.__memcpy_chk`. Identify its typed-call and intrinsic blockers
 before choosing the implementation scope. `ssp.__strncpy_chk` remains outside

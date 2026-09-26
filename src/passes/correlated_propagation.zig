@@ -72,7 +72,9 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 .phi => |*phi| for (phi.incoming.items) |*incoming| {
                     incoming.value = replaceOperand(incoming.value, name, replacement);
                 },
-                .alloca => {},
+                .alloca => |*alloca| if (alloca.count) |*count| {
+                    count.value = replaceOperand(count.value, name, replacement);
+                },
                 .load => |*load| load.ptr = replaceOperand(load.ptr, name, replacement),
                 .store => |*store| {
                     store.value = replaceOperand(store.value, name, replacement);

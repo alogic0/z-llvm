@@ -407,11 +407,22 @@ pub fn parseAlloca(text: []const u8) !core.AllocaInst {
     const ty_text = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
     if (ty_text.len == 0) return error.InvalidInstruction;
     const allocated_ty = try parseAddressSpaceQualifiedType(ty_text);
-    return .{
+    var alloca: core.AllocaInst = .{
         .allocated_ty = allocated_ty.ty,
         .allocated_ty_addrspace = allocated_ty.addrspace_text,
         .attrs = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else null,
     };
+    if (alloca.attrs) |attrs| {
+        const end = findTopLevelComma(attrs) orelse attrs.len;
+        const first = std.mem.trim(u8, attrs[0..end], " \t");
+        if (!std.mem.eql(u8, firstToken(first) orelse "", "align") and !std.mem.startsWith(u8, first, "addrspace(")) {
+            const count = try types_values.parseTypedValue(first);
+            if (count.ty != .int or count.ty.int == 0) return error.InvalidAllocaCount;
+            alloca.count = .{ .ty = count.ty, .value = count.value };
+            alloca.attrs = if (end < attrs.len) std.mem.trim(u8, attrs[end + 1 ..], " \t") else null;
+        }
+    }
+    return alloca;
 }
 
 pub fn parseGep(allocator: std.mem.Allocator, text: []const u8) !core.GepInst {

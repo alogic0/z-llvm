@@ -583,9 +583,13 @@ pub fn verify(module: core.Module) !void {
                             try ctx.verifyPhiIncomingValue(phi.ty, incoming.value, predecessor_index);
                         }
                     },
-                    .alloca => {
+                    .alloca => |alloca| {
                         saw_non_phi = true;
                         if (instruction.result == null) return error.InstructionNeedsResult;
+                        if (alloca.count) |count| {
+                            if (count.ty != .int or count.ty.int == 0) return error.InvalidAllocaCount;
+                            try ctx.verifyValue(count.ty, count.value, block_index, instruction_index);
+                        }
                     },
                     .load => |load| {
                         saw_non_phi = true;

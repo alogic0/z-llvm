@@ -614,7 +614,14 @@ pub const PhiInst = struct {
 pub const AllocaInst = struct {
     allocated_ty: Type,
     allocated_ty_addrspace: ?[]const u8 = null,
+    /// An explicit element count is an SSA operand, not an attribute string.
+    count: ?struct { ty: Type, value: Value } = null,
     attrs: ?[]const u8 = null,
+
+    pub fn isSingleObject(alloca: AllocaInst) bool {
+        const count = alloca.count orelse return true;
+        return count.value.eql(.{ .int = 1 });
+    }
 };
 
 pub const MemoryAttrs = struct {

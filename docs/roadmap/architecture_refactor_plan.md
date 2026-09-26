@@ -313,6 +313,12 @@ performance measurements remain separate follow-ups.
 
 ## Validation and sequencing
 
+The subsequent [optimizer boundary repairs](optimizer_boundary_repairs.md)
+extend width-aware semantics to signed min/max and unsigned div/rem, and make
+alloca element counts structured operands across traversal, verification,
+replacement, and loop-use checks. They repair reproduced failures without
+claiming arbitrary dynamic stack lowering or complete opaque-reference coverage.
+
 Apply [validation tiers](../validation_tiers.md) to each implementation slice.
 Optimizer changes require pass fixtures, compare-opt, and readiness. Changes to
 shared lowering require the relevant AIR/codegen tests and real rows. Confirmed

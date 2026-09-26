@@ -530,7 +530,8 @@ fn instructionUsesValue(instruction: ir.Instruction, result: []const u8) bool {
             }
             return false;
         },
-        .alloca, .fence, .extractelement, .insertelement, .shufflevector => false,
+        .alloca => |alloca| if (alloca.count) |count| valueMatchesName(count.value, result) else false,
+        .fence, .extractelement, .insertelement, .shufflevector => false,
     };
 }
 
@@ -586,7 +587,9 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 .phi => |*phi| for (phi.incoming.items) |*incoming| {
                     incoming.value = replaceOperand(incoming.value, name, replacement);
                 },
-                .alloca => {},
+                .alloca => |*alloca| if (alloca.count) |*count| {
+                    count.value = replaceOperand(count.value, name, replacement);
+                },
                 .load => |*load| load.ptr = replaceOperand(load.ptr, name, replacement),
                 .store => |*store| {
                     store.value = replaceOperand(store.value, name, replacement);
@@ -713,7 +716,7 @@ fn instructionUsesAreDominated(
         .icmp => |icmp| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ icmp.lhs, icmp.rhs }),
         .fcmp => |fcmp| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ fcmp.lhs, fcmp.rhs }),
         .select => |select| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ select.cond, select.true_value, select.false_value }),
-        .alloca => return true,
+        .alloca => |alloca| return if (alloca.count) |count| regularUsesAreDominated(dom, destination_block, use_block, result, &.{count.value}) else true,
         .load => |load| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{load.ptr}),
         .store => |store| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ store.value, store.ptr }),
         .atomicrmw => |atomicrmw| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ atomicrmw.ptr, atomicrmw.value }),

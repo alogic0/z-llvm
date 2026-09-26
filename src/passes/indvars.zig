@@ -236,7 +236,7 @@ fn instructionUsesName(instruction: ir.Instruction, name: []const u8) bool {
             }
             return false;
         },
-        .alloca => false,
+        .alloca => |alloca| if (alloca.count) |count| valueMatchesName(count.value, name) else false,
         .load => |load| valueMatchesName(load.ptr, name),
         .store => |store| valueMatchesName(store.value, name) or valueMatchesName(store.ptr, name),
         .atomicrmw => |atomicrmw| valueMatchesName(atomicrmw.ptr, name) or valueMatchesName(atomicrmw.value, name),

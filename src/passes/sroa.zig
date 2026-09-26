@@ -38,6 +38,7 @@ fn scalarizeOneAggregateAlloca(module: *ir.Module, function: *ir.Function) !bool
     const entry_block = &function.blocks.items[0];
     for (entry_block.instructions.items, 0..) |instruction, instruction_index| {
         if (instruction.removed or instruction.kind != .alloca) continue;
+        if (!instruction.kind.alloca.isSingleObject()) continue;
         if (instruction.kind.alloca.allocated_ty != .aggregate) continue;
         const slot = instruction.result orelse continue;
         if (!try tryScalarizeAggregateAlloca(module, function, 0, instruction_index, slot, instruction.kind.alloca.allocated_ty)) continue;
@@ -1049,7 +1050,9 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 .phi => |*phi| for (phi.incoming.items) |*incoming| {
                     incoming.value = replaceOperand(incoming.value, name, replacement);
                 },
-                .alloca => {},
+                .alloca => |*alloca| if (alloca.count) |*count| {
+                    count.value = replaceOperand(count.value, name, replacement);
+                },
                 .load => |*load| load.ptr = replaceOperand(load.ptr, name, replacement),
                 .store => |*store| {
                     store.value = replaceOperand(store.value, name, replacement);

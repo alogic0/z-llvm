@@ -183,6 +183,12 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     .alloca => |alloca| {
                         try writer.writeAll("alloca ");
                         try printTypeWithAddressSpace(alloca.allocated_ty, alloca.allocated_ty_addrspace, writer);
+                        if (alloca.count) |count| {
+                            try writer.writeAll(", ");
+                            try count.ty.format(writer);
+                            try writer.writeByte(' ');
+                            try count.value.format(writer);
+                        }
                         if (alloca.attrs) |attrs| try writer.print(", {s}", .{attrs});
                         try printInstructionMetadata(instruction.metadata, writer);
                     },

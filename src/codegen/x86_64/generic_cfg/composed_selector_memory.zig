@@ -73,6 +73,7 @@ const i64Value = composed_helpers.i64Value;
 pub const ComposedBlockSelector = selector_state.ComposedBlockSelector;
 
 pub fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca: ir.AllocaInst) !?Diagnostic {
+    if (!alloca.isSingleObject()) return .{ .no_emitter = "composed-block-alloca-count" };
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     const loc = selector_state.valueLoc(selector, result_name) orelse return .{ .no_emitter = "composed-block-alloca-unplanned" };
     switch (loc) {

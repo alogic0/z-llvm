@@ -1,7 +1,7 @@
 # Project Improvement Plan
 
 Date: 2026-09-10
-Status: integration and fresh/cache equivalence passed; named real-function family closure remains open.
+Status: all six phases implemented; integration, fresh/cache equivalence, and the named memset family closure passed. Follow-up correctness repairs are tracked separately.
 Revision: artifact-store simplification first, maximum justified cleanup second.
 Review baseline: `48ae01be97c6ade57aeaea5fdf21d738914b497c`, plus the four
 working-tree changes listed below.
@@ -78,7 +78,7 @@ precedence over further artifact-framework decomposition or new compiler
 capability work. Use the installed Zig 0.16 compiler explicitly for focused
 storage tests; the broader build-system work in phase 4 is not a prerequisite.
 
-## Implementation progress (2026-09-10)
+## Implementation progress (updated 2026-09-26)
 
 Checkboxes below describe implemented deliverables, not automatic milestone
 acceptance. Exact commands and limitations are in the
@@ -90,7 +90,7 @@ acceptance. Exact commands and limitations are in the
 | 2 | Historical roots/worktrees and obsolete code removed; source duplicates moved to ordinary Git lookup; exact current keep-list recorded. |
 | 3 | Exact parser and runner tests pass; full fresh and cached Tier-3 runs each pass 17/17 subgates, with 1,315 matching canonical records. |
 | 4 | Zig 0.16 pin, selected children, filtered independent unit tests; two full isolated test runs pass. |
-| 5 | Eight composed behavioral programs, 24 paired runs, 6,528 observations; signed power-of-two lowering and rejection fixtures. Named real-function failure-family closure remains open. |
+| 5 | Eight composed behavioral programs, 24 paired runs, 6,528 observations; signed power-of-two lowering and rejection fixtures. The three-member memset family also closes through shared composed lowering, with 8,652 observations across two routes and three modes. |
 | 6 | Structured accepted status, generated current tables, setup README and documentation checks implemented; accepted counters unchanged. |
 
 ## Phase 1: Replace the historical artifact-authority system

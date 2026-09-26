@@ -146,7 +146,9 @@ fn replaceInstructionOperand(instruction: *ir.Instruction, replacement: Replacem
         .phi => |*phi| for (phi.incoming.items) |*incoming| {
             incoming.value = replaceValue(incoming.value, replacement);
         },
-        .alloca => {},
+        .alloca => |*alloca| if (alloca.count) |*count| {
+            count.value = replaceValue(count.value, replacement);
+        },
         .load => |*load| load.ptr = replaceValue(load.ptr, replacement),
         .store => |*store| {
             store.value = replaceValue(store.value, replacement);

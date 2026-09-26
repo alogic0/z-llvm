@@ -1,7 +1,7 @@
 # Current architecture
 
-Source baseline: `629e2ee7` (2026-09-26), updated for shared operand traversal,
-instruction ownership, and scalar integer semantics. This page describes the
+Source baseline: `465f3bbc` (2026-09-26), updated for width-aware integer folding
+and explicit allocation-count operands. This page describes the
 implementation; the
 [refactor plan](roadmap/architecture_refactor_plan.md) records its status and remaining work.
 The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
@@ -71,7 +71,7 @@ An aggregate `generic_codegen` counter is not a substitute for that assertion.
 | --- | --- | --- |
 | Compiler-core real-row gate | Selected AIR functions, direct lowering/object emission and native linking; a fixed execution cohort. | The gate does not run the local module pass manager. Linking 100 functions does not mean executing 100 functions. |
 | Standalone behavioral suite | Composed local codegen from unoptimized LLVM IR, paired with independently optimized LLVM references. | Harness/reference release modes do not select local `release-o3`; this is primarily codegen evidence. |
-| Optimizer correctness runner | 16 regression functions, focused optimizer pipeline and `release-o3`; transformed IR verified and compiled by LLVM at `-O0`. | This tests optimizer semantics independently of local codegen. It is not a 16-function proof of local object emission. |
+| Optimizer correctness runner | The original 17-function suite, five alias/reference entry points, vector operands, and seven integer/allocation boundary functions; fixture-specific pipelines plus `release-o3`, with transformed IR verified and compiled by LLVM at `-O0`. | This tests optimizer semantics independently of local codegen; these populations do not establish local object-emission coverage. |
 | Integrated preopt/postopt/writer gates | The selected route and wrappers declared by each runner. | Different routes exercise different optimization owners and selector paths. |
 | `distribution-all` | The tracked 17-subgate inventory and its declared populations. | Success does not cover every development pass, input shape, or separate frontier gate. |
 
@@ -83,12 +83,16 @@ Standalone behavioral and compiler-rt counts are separate populations.
 
 ## Current design constraints
 
+- Alloca element counts are typed operands and participate in traversal,
+  replacement, verification, and loop-use checks. Local frame codegen accepts
+  only a single object; dynamic and multi-element counts are explicit rejections.
 - Values use string names; integer literals use `i128` with width held in the
   surrounding instruction/type. Some values and attributes remain opaque text.
 - [Integer semantics](../src/analysis/integer_semantics.zig) validates scalar
   widths 1–128, normalizes literal bit patterns, and provides comparisons and
-  signed division/remainder with explicit failure reasons. The simplifier uses
-  it while retaining its existing flags, poison/undef, and unsupported-case
+  signed division/remainder with explicit failure reasons. The simplifier also
+  uses width-aware signed min/max and unsigned div/rem interpretation while
+  retaining its existing flags, poison/undef, and unsupported-case
   policies. Other integer families still have pass-local rules.
 - [Operand traversal](../src/ir/operands.zig) provides typed const/mutable walks
   and function-wide replacement. `Instruction.mapOperands`, use counting,

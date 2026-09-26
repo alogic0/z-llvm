@@ -290,7 +290,7 @@ fn foldUnsignedDivRem(binary: ir.BinaryInst, mode: DivRem) ?ir.Value {
     const rhs = unsignedInt(binary.rhs.int, binary.ty) orelse return null;
     if (rhs == 0) return null;
     if (binary.flags.exact and lhs % rhs != 0) return null;
-    return .{ .int = @intCast(switch (mode) {
+    return .{ .int = @bitCast(switch (mode) {
         .div => lhs / rhs,
         .rem => lhs % rhs,
     }) };
@@ -446,8 +446,11 @@ fn simplifyCall(call: ir.CallInst) ?ir.Value {
     if (lhs != .int or rhs != .int) return null;
 
     return switch (intrinsicMinMaxKind(call.callee) orelse return null) {
-        .smin => .{ .int = @min(lhs.int, rhs.int) },
-        .smax => .{ .int = @max(lhs.int, rhs.int) },
+        .smin, .smax => |kind| blk: {
+            const integer = integer_semantics.Integer.init(call.ret_ty) orelse return null;
+            const predicate: ir.IcmpPredicate = if (kind == .smin) .sle else .sge;
+            break :blk if (integer.compare(predicate, lhs.int, rhs.int)) lhs else rhs;
+        },
         .umin => blk: {
             const lhs_unsigned = unsignedInt(lhs.int, call.ret_ty) orelse return null;
             const rhs_unsigned = unsignedInt(rhs.int, call.ret_ty) orelse return null;
@@ -492,11 +495,8 @@ fn isFpBinary(op: ir.BinaryOp) bool {
 }
 
 fn unsignedInt(value: i128, ty: ir.Type) ?u128 {
-    const bits = intBits(ty) orelse return null;
-    if (bits >= 128) return null;
-    if (value >= 0) return @intCast(value);
-    const modulus: i128 = @as(i128, 1) << @intCast(bits);
-    return @intCast(modulus + value);
+    const integer = integer_semantics.Integer.init(ty) orelse return null;
+    return integer.unsigned(value);
 }
 
 fn unsignedOperationInRange(binary: ir.BinaryInst) bool {

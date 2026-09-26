@@ -20,9 +20,10 @@ const Status = struct {
 const begin = "<!-- accepted-status:start -->";
 const end = "<!-- accepted-status:end -->";
 const docs = [_][]const u8{
-    "README.md",                                           "docs/README.md",            "docs/current_state.md",             "docs/next_steps.md",
-    "docs/roadmap/project_improvement_plan.md",            "docs/validation_tiers.md",  "docs/retention_headroom_policy.md", "docs/zllvm_artifact_retention_contract.md",
-    "docs/evidence/project_improvement/implementation.md", "docs/environment.md",       "docs/build_steps.md",               "docs/working-cycle.md",
+    "docs/architecture.md",                                "docs/roadmap/architecture_refactor_plan.md", "docs/roadmap/optimizer_boundary_repairs.md", "docs/evidence/composed_memset_family.md",
+    "README.md",                                           "docs/README.md",                             "docs/current_state.md",                      "docs/next_steps.md",
+    "docs/roadmap/project_improvement_plan.md",            "docs/validation_tiers.md",                   "docs/retention_headroom_policy.md",          "docs/zllvm_artifact_retention_contract.md",
+    "docs/evidence/project_improvement/implementation.md", "docs/environment.md",                        "docs/build_steps.md",                        "docs/working-cycle.md",
     "docs/roadmap/convergence_progress.md",                "test/behavioral/README.md",
 };
 

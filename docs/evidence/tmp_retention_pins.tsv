@@ -8,3 +8,4 @@ tmp/o2_calls_perf	current-consumer	tools/o2_compiler_rt_v1_calls_performance.zig
 zig-out	current-build-output	project-improvement source-files.sha256	Current z_llvm executable used by native and integration checks
 local-state/validations/project-improvement	validation-root	completed fresh/cache pair	Empty root reserved for next runs; completed logs are versioned in docs/evidence/project_improvement
 local-state/caches/project-improvement	current-air-cache	generation schema 3; retry-source-files.sha256	One verified generation used by the passing full fresh/cache pair; retain for near-term required-hit reuse
+local-state/validations/optimizer-boundaries-20260926	validation-evidence	docs/roadmap/optimizer_boundary_repairs.md	Current integer/allocation repair regressions, source identities and integration evidence; review retention when superseded
