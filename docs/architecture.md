@@ -97,7 +97,14 @@ Standalone behavioral and compiler-rt counts are separate populations.
 - Operand traversal reports opaque values, attributes, metadata, and call text
   as an incomplete reference boundary. It does not parse or rewrite that text
   or enumerate direct call symbols. Existing use-count and mapping wrappers
-  retain their structured-value scope; complete module references remain planned.
+  retain their structured-value scope.
+- [Module reference discovery](../src/analysis/module_references.zig) combines
+  structured operands, direct callees, aliases, and global initializers. It
+  distinguishes global `@name` from local `%name` and reports opaque regions
+  explicitly; absence requires both zero direct uses and complete coverage.
+  Assembly, raw call fields, metadata, and unrecognized attributes conservatively
+  remain unknown. GlobalOpt uses this API for eligibility and deletion checks;
+  GlobalDCE and other reference consumers have not yet migrated.
 - `Instruction.clone` copies instruction-owned PHI, GEP, and call lists plus
   the synthesized `cmpxchg` result-type string. Other strings remain borrowed
   from the module/source. SCCP uses a temporary clone with explicit cleanup;

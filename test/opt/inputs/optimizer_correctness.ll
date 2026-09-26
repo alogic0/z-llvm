@@ -150,3 +150,14 @@ entry:
   %v = load i32, ptr @escaped_cell
   ret i32 %v
 }
+
+; Local SSA names and module symbols occupy distinct namespaces.
+@reference_collision = internal global i32 1
+
+define i32 @global_local_name_collision(ptr %reference_collision) {
+entry:
+  %local = load i32, ptr %reference_collision
+  %global = load i32, ptr @reference_collision
+  %sum = add i32 %local, %global
+  ret i32 %sum
+}

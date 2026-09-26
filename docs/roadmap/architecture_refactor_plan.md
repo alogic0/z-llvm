@@ -1,7 +1,7 @@
 # Architecture corrections and refactor plan
 
 Initial baseline: `629e2ee7`, 2026-09-26. Documentation and planning were committed
-as `56e66794`. The first three bounded refactor slices are implemented below.
+as `56e66794`. The first four bounded refactor slices are implemented below.
 Selector defaults, public CLI behavior, and acceptance counters remain unchanged.
 
 ## Corrected assessment
@@ -32,7 +32,7 @@ need to replace the entire IR or add an analysis-cache framework immediately.
 
 ## Proposed implementation sequence
 
-Slices 1–3 have focused implementations recorded below; slices 4–5 remain
+Slices 1–4 have bounded implementations recorded below; slice 5 remains
 pending.
 These steps do not claim new compiler capability. Keep the named real-function
 failure family in [next steps](../next_steps.md) as the capability objective; introduce helpers
@@ -193,6 +193,37 @@ Exit criteria: escaping references survive folding/deletion; unescaped globals
 still optimize; arrays, aggregates, aliases, and nested expressions are covered;
 native indirect-write tests and nearby rejection cases pass.
 
+Implementation (2026-09-26, based on `8dad9cd6`):
+
+- Added `analysis/module_references.zig`, a read-only, allocation-free visitor
+  over module symbol uses. Events distinguish direct symbols from unknown
+  regions and identify their containing site. A summary can contain both known
+  uses and unknown coverage; only zero uses with no unknowns proves absence.
+- Structured operands reuse the shared IR walker. Direct callees and alias
+  targets follow their symbol-field contracts; definition names, block labels,
+  removed instructions, and replacement bookkeeping are not uses. Alias edges
+  are enumerated directly without claiming transitive alias resolution.
+- Scalar and structured array initializers are inspected. Opaque initializers,
+  constant expressions, vector text, metadata, assembly, raw arguments, and
+  operand bundles remain unknown even when their text contains no `@`. A small
+  explicit grammar accepts reference-free attributes; all other attributes
+  remain unknown. Parsed byte strings are literal data. Pointer arrays that
+  the parser retains as opaque stay unknown; this slice does not expand parsing.
+- Migrated GlobalOpt's eligibility and remaining-use checks, removing its
+  duplicate instruction/terminator/module scans. Unknown regions block folding;
+  directly loaded local scalar globals still optimize. GlobalDCE and other
+  deletion/merging consumers remain follow-up migrations requiring their own
+  reference-policy audit.
+- Found and repaired a namespace collision: the old GlobalOpt matched local
+  `%g` against global `@g`, folding both loads to the global initializer. The
+  new API matches only explicit global values. A native probe with global 1
+  and local pointee 9 returned 2 before the fix and 10 after, matching LLVM 22.
+  The permanent optimizer native harness now contains 17 functions.
+- Added six tests for namespace separation, positive folding, alias chains,
+  arrays, call/terminator references, nested opaque expressions, raw fields,
+  assembly, metadata, attribute coverage, volatile/atomic loads, removed
+  instructions, and visitor error propagation.
+
 ### 5. Shared lowering and validation scope
 
 Owners: AIR lowering, composed selector, relevant runners, and capability docs.
@@ -309,3 +340,37 @@ comparisons, and release pipeline policy. Documentation validation passed for
 check covered 25 local links. Formatting and `git diff --check` passed. This is
 a focused optimizer refactor with no ABI, verifier, CLI, capability, or ratchet
 change; it does not claim Tier-3 milestone validation.
+
+Slice 4 focused validation (Zig 0.16.0): six new reference-discovery tests and
+existing GlobalOpt regressions passed in Debug and ReleaseFast. All 243
+optimizer fixtures produce byte-identical output to the saved clean `8dad9cd6`
+compiler. The expanded 17-function native optimizer harness agrees with LLVM 22
+under both the focused pass list and `release-o3`. The separately retained
+namespace-collision probe records old/new/reference outputs of 2/10/10.
+
+Evidence, source hashes, and the immediate Tier-3 wrong-code trigger are under
+`local-state/validations/module-references-20260926/`. Immutable AIR input caches
+are reused with runner identity checks; earlier full-run results are not reused
+for the changed optimizer sources. The previously recorded full ReleaseFast
+half-add NaN-bit limitation remains separate and unchanged.
+
+`zig build readiness` passed for slice 4, including the full Debug unit suite,
+compare-opt, native optimizer checks, corpus/handoff checks, and release
+pipeline policy. Generated behavioral checks passed 24 case/mode runs and
+6,528 observations. Documentation validation passed for 14 current documents,
+59 links, and two status blocks; the separate touched-page check covered 26
+local links. Formatting and `git diff --check` passed.
+
+Slice 4 Tier 3 passed: `zig build distribution-all -- --serial` completed all
+17 subgates with `local_fail=0` in 2,190,811 ms (36m31s). The exact pinned-Zig
+command, emitter selection, cache/evidence roots, trigger, and source hashes
+are retained in the evidence directory above. Compiler, test, tool, and build
+sources still match the recorded starting snapshot. The gate checked the
+release object bundle and all three consuming link/inspection checks, native
+executable canaries, and distribution boundaries.
+
+Each release mode lowered/emitted/linked 100 compiler-core rows and executed
+four cohort cases. These remain distinct from the integrated fixture and
+standalone optimizer populations. No accepted-status counter, selector default,
+public CLI, or capability ratchet changes in this slice. GlobalDCE migration,
+additional opaque-syntax parsing, and slice 5 remain follow-up work.

@@ -22,6 +22,8 @@ extern int32_t unsigned_compare_wide(void);
 extern int32_t global_indirect_write(int32_t);
 extern int32_t *escaped_pointer;
 
+extern int32_t global_local_name_collision(int32_t *);
+
 static int observer_calls;
 int32_t optimizer_observe(int32_t value, int32_t bias) {
     ++observer_calls;
@@ -29,6 +31,8 @@ int32_t optimizer_observe(int32_t value, int32_t bias) {
 }
 
 int main(void) {
+    int32_t collision_value = 9;
+    assert(global_local_name_collision(&collision_value) == 10);
     for (int condition = 0; condition <= 1; ++condition) {
         int32_t p = -1;
         assert(cse_sibling(&p, condition) == (condition ? 2 : 1));
@@ -61,6 +65,6 @@ int main(void) {
         assert(licm_load(values, n) == (n == 1 ? 7 : values[n - 1]));
         assert(values[0] == 99);
     }
-    puts("ok optimizer correctness: 16 functions");
+    puts("ok optimizer correctness: 17 functions");
     return 0;
 }
