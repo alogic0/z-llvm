@@ -37,6 +37,14 @@ until the applicable integration evidence is accepted. The independent behaviora
 suite has its own population and does not increase the 100-row compiler-core
 counters or the 285-function compiler-rt ABI population.
 
+The [optimizer review repairs](roadmap/optimizer_review_repairs.md), committed as
+`629e2ee7`, have newer development validation: 1,439 unit/structural/storage tests,
+readiness, and all 17 distribution subgates passed. That run lowered, emitted,
+and linked 100 compiler-core functions and executed four cohort members per
+release mode. These results have not migrated the accepted record above.
+The [architecture map](architecture.md) explains which optimizer and codegen
+routes each suite exercises; gate success is not general pass or backend parity.
+
 The artifact authority protocol has been replaced by a small local store. The
 fixed worktree inventory, supplemental control repository, historical INBOX
 fixtures, and installed-system-binary hashes are retired. Migration and cleanup

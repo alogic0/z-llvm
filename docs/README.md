@@ -1,5 +1,12 @@
 # Zig LLVM Removal Roadmap
 
+Start with [current architecture](architecture.md) for the implemented components,
+input routes, selector ownership, and validation limits. The
+[architecture refactor plan](roadmap/architecture_refactor_plan.md) records
+proposed consolidation work. [Current state](current_state.md) owns status and
+[next steps](next_steps.md) owns active direction. The long roadmap and completion
+lists below are historical context, not proof of current general capability.
+
 This document is the main roadmap entrypoint for replacing the LLVM library
 dependency that Zig uses in its distribution. The local replacement is scoped
 around the LLVM IR, optimizer, target, and backend handoff behavior Zig

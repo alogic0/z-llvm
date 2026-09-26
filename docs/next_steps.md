@@ -1,5 +1,11 @@
 # Active direction
 
+The [current architecture](architecture.md) describes implemented routes and
+ownership. The [architecture refactor plan](roadmap/architecture_refactor_plan.md)
+proposes bounded shared-IR and lowering work; only its documentation correction
+is completed. Its implementation steps do not supersede the named capability
+objective below or advance accepted counters.
+
 The user's 2026-09-10 instruction authorizes implementation of the entire
 [project improvement plan](roadmap/project_improvement_plan.md), in its stated
 priority order. It supersedes the former three-file housekeeping stop,

@@ -5,6 +5,9 @@ code-generation behavior needed by the Zig compiler. Selected fixtures and
 compiler-core rows are supported; this is not a complete LLVM replacement or a
 self-hosting Zig backend.
 
+See the [current architecture](docs/architecture.md) for input routes, optimizer
+invocation, selector ownership, and the scope of validation evidence.
+
 ## Build and isolated tests
 
 Use **Zig 0.16.0**, pinned in `.zigversion`. If PATH selects another compiler,

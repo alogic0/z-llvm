@@ -1,5 +1,15 @@
 # AIR-Like Lowering Bridge
 
+This page describes the synthetic test/helper API in
+[src/air_bridge.zig](../../src/air_bridge.zig). Its limitations below apply to
+that helper only. The project also has a separate real exported-AIR parser and
+lowerer in [zig_air_export.zig](../../src/zig_air_export.zig) and
+[zig_air_lowering_impl.zig](../../src/zig_air_lowering_impl.zig), including typed
+operands and explicit unsupported/fallback reporting. See the
+[architecture map](../architecture.md) for both adapters and their actual
+optimization/emission routes. The synthetic bridge's lack of an AIR text parser
+does not imply that the project lacks real AIR input.
+
 LLVM and Zig references:
 
 ```text
