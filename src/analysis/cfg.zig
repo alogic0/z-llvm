@@ -62,6 +62,7 @@ pub const Graph = struct {
 
     pub fn reachableFromEntry(graph: Graph, allocator: std.mem.Allocator) ![]bool {
         const reachable = try allocator.alloc(bool, graph.edges.items.len);
+        errdefer allocator.free(reachable);
         @memset(reachable, false);
         if (reachable.len == 0) return reachable;
 

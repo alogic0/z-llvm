@@ -778,6 +778,11 @@ pub const CallInst = struct {
     }
 };
 
+/// Instructions own PHI incoming, GEP index and call argument list storage,
+/// and the synthesized aggregate result-type string of cmpxchg. All other
+/// strings/types/values borrow module source, module-owned strings or caller
+/// storage. A struct copy shares these resources; use clone before independent
+/// mutation or destruction, or explicitly transfer ownership when moving IR.
 pub const Instruction = struct {
     result: ?[]const u8,
     kind: union(enum) {
@@ -857,6 +862,29 @@ pub const Instruction = struct {
     pub fn mapOperands(instruction: *Instruction, aliases: std.StringHashMap(Value)) void {
         // Compatibility wrapper: callers historically ignore opaque references.
         _ = @import("operands.zig").mapInstruction(instruction, aliases);
+    }
+
+    /// Copy all instruction-owned storage; borrowed strings retain their
+    /// original lifetime. Preserves every field, including removed/replacement.
+    /// The caller owns the result and must deinit it with this allocator or
+    /// transfer it into an owner using the same allocator. Failure leaves the
+    /// source unchanged. This is not a clone into a different module lifetime.
+    pub fn clone(instruction: Instruction, allocator: std.mem.Allocator) !Instruction {
+        var copy = instruction;
+        // Each variant owns at most one allocation. Assign only after a
+        // successful copy, so failure never deinitializes borrowed source data.
+        switch (instruction.kind) {
+            .phi => |phi| copy.kind.phi.incoming = try phi.incoming.clone(allocator),
+            .gep => |gep| copy.kind.gep.indices = try gep.indices.clone(allocator),
+            .call => |call| copy.kind.call.args = try call.args.clone(allocator),
+            .cmpxchg => |cmpxchg| {
+                if (cmpxchg.result_ty == .aggregate) {
+                    copy.kind.cmpxchg.result_ty = .{ .aggregate = try allocator.dupe(u8, cmpxchg.result_ty.aggregate) };
+                }
+            },
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => {},
+        }
+        return copy;
     }
 
     pub fn deinit(instruction: *Instruction, allocator: std.mem.Allocator) void {

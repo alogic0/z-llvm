@@ -118,7 +118,9 @@ pub fn inlineCall(module: *ir.Module, caller_index: usize, site: CallSite) !void
     const callee_block = callee.blocks.items[0];
     for (callee_block.instructions.items) |instruction| {
         if (instruction.removed) continue;
-        var cloned = try cloneInstruction(module.allocator, instruction);
+        var cloned = try instruction.clone(module.allocator);
+        cloned.removed = false;
+        cloned.replacement = null;
         var cloned_owned = true;
         errdefer if (cloned_owned) cloned.deinit(module.allocator);
         cloned.mapOperands(aliases);
@@ -131,17 +133,18 @@ pub fn inlineCall(module: *ir.Module, caller_index: usize, site: CallSite) !void
         cloned_owned = false;
     }
 
+    // Reserve before rewriting uses or transferring any owned instruction.
+    // After this point insertion cannot fail halfway through the transfer.
+    try module.functions.items[caller_index].blocks.items[site.block_index].instructions.ensureUnusedCapacity(module.allocator, clones.items.len);
+
     if (call_instruction.result) |call_result| {
         const replacement = inlinedReturnValue(callee_block.terminator.?, aliases) orelse .undef;
         replaceValue(&module.functions.items[caller_index], call_result, replacement);
     }
 
     module.functions.items[caller_index].blocks.items[site.block_index].instructions.items[site.instruction_index].removed = true;
-    var insert_at = site.instruction_index;
-    for (clones.items) |cloned| {
-        try module.functions.items[caller_index].blocks.items[site.block_index].instructions.insert(module.allocator, insert_at, cloned);
-        insert_at += 1;
-    }
+    module.functions.items[caller_index].blocks.items[site.block_index].instructions.insertSliceAssumeCapacity(site.instruction_index, clones.items);
+    // The caller now owns the instructions; only release the staging array.
     clones.deinit(module.allocator);
 }
 
@@ -152,52 +155,6 @@ fn inlinedReturnValue(terminator: ir.Terminator, aliases: std.StringHashMap(ir.V
     };
 }
 
-fn cloneInstruction(allocator: std.mem.Allocator, instruction: ir.Instruction) !ir.Instruction {
-    var cloned = instruction;
-    cloned.removed = false;
-    cloned.replacement = null;
-    switch (instruction.kind) {
-        .phi => |phi| {
-            var incoming: std.ArrayList(ir.PhiIncoming) = .empty;
-            errdefer incoming.deinit(allocator);
-            try incoming.appendSlice(allocator, phi.incoming.items);
-            cloned.kind = .{ .phi = .{ .ty = phi.ty, .incoming = incoming } };
-        },
-        .gep => |gep| {
-            var indices: std.ArrayList(ir.GepIndex) = .empty;
-            errdefer indices.deinit(allocator);
-            try indices.appendSlice(allocator, gep.indices.items);
-            cloned.kind = .{ .gep = .{
-                .source_ty = gep.source_ty,
-                .ptr = gep.ptr,
-                .ptr_addrspace = gep.ptr_addrspace,
-                .indices = indices,
-            } };
-        },
-        .call => |call| {
-            var args: std.ArrayList(ir.CallArg) = .empty;
-            errdefer args.deinit(allocator);
-            try args.appendSlice(allocator, call.args.items);
-            cloned.kind = .{ .call = .{
-                .ret_ty = call.ret_ty,
-                .callee = call.callee,
-                .callee_value = call.callee_value,
-                .callee_function_ty = call.callee_function_ty,
-                .calling_conv = call.calling_conv,
-                .ret_attrs = call.ret_attrs,
-                .tail_kind = call.tail_kind,
-                .inline_asm = call.inline_asm,
-                .attrs = call.attrs,
-                .operand_bundle = call.operand_bundle,
-                .raw_args = call.raw_args,
-                .args = args,
-            } };
-        },
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => {},
-    }
-    return cloned;
-}
-
 fn uniqueInlineResultName(module: *ir.Module, caller: ir.Function, base: []const u8) ![]const u8 {
     var suffix: usize = 0;
     while (true) : (suffix += 1) {
@@ -205,7 +162,7 @@ fn uniqueInlineResultName(module: *ir.Module, caller: ir.Function, base: []const
             try std.fmt.allocPrint(module.allocator, "{s}.i", .{base})
         else
             try std.fmt.allocPrint(module.allocator, "{s}.i{}", .{ base, suffix });
-        errdefer module.allocator.free(candidate);
+        // ownString consumes candidate on both success and failure.
         if (!hasResultName(caller, candidate)) return try module.ownString(candidate);
         module.allocator.free(candidate);
     }

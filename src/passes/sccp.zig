@@ -231,16 +231,8 @@ const Solver = struct {
     }
 
     fn foldInstruction(solver: Solver, instruction: ir.Instruction) !?Lattice {
-        var mapped = instruction;
-        // The instruction copy still shares a call's argument buffer with the
-        // live IR. Lattice constants can become overdefined on later visits,
-        // so speculative substitutions must never overwrite that buffer.
-        const call_args = if (instruction.kind == .call)
-            try solver.allocator.dupe(ir.CallArg, instruction.kind.call.args.items)
-        else
-            null;
-        defer if (call_args) |args| solver.allocator.free(args);
-        if (call_args) |args| mapped.kind.call.args = .{ .items = args, .capacity = args.len };
+        var mapped = try instruction.clone(solver.allocator);
+        defer mapped.deinit(solver.allocator);
         var unresolved = false;
         var overdefined = false;
         solver.mapInstructionOperands(&mapped, &unresolved, &overdefined);

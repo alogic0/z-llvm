@@ -1,7 +1,7 @@
 # Current architecture
 
-Source baseline: `629e2ee7` (2026-09-26), updated for the shared operand traversal
-slice. This page describes the implementation; the
+Source baseline: `629e2ee7` (2026-09-26), updated for shared operand traversal
+and instruction ownership. This page describes the implementation; the
 [refactor plan](roadmap/architecture_refactor_plan.md) records its status and remaining work.
 The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
 backend for selected Zig inputs. It does not yet provide a complete LLVM
@@ -92,9 +92,12 @@ Standalone behavioral and compiler-rt counts are separate populations.
   as an incomplete reference boundary. It does not parse or rewrite that text
   or enumerate direct call symbols. Existing use-count and mapping wrappers
   retain their structured-value scope; complete module references remain planned.
-- Instructions can contain allocated operand lists. A plain struct copy shares
-  those lists; speculative mutation requires separate storage or a read-only
-  view. The SCCP repair addresses its specific instance of this problem.
+- `Instruction.clone` copies instruction-owned PHI, GEP, and call lists plus
+  the synthesized `cmpxchg` result-type string. Other strings remain borrowed
+  from the module/source. SCCP uses a temporary clone with explicit cleanup;
+  both inlining passes share the same clone API and transfer ownership only
+  after reserving caller storage. Plain struct copies still share storage and
+  are appropriate only for reads or deliberate ownership transfers.
 - The pass manager has no shared analysis cache/preservation contract. Passes
   construct their own analyses and must keep them valid across local mutation.
 - The backend supports multiple blocks, memory, calls, and bounded spill

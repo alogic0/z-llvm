@@ -1,9 +1,8 @@
 # Architecture corrections and refactor plan
 
 Initial baseline: `629e2ee7`, 2026-09-26. Documentation and planning were committed
-as `56e66794`. The next authorized change implements the first bounded refactor
-slice below. Selector defaults, public CLI behavior, and acceptance counters
-remain unchanged.
+as `56e66794`. The first two bounded refactor slices are implemented below.
+Selector defaults, public CLI behavior, and acceptance counters remain unchanged.
 
 ## Corrected assessment
 
@@ -33,7 +32,8 @@ need to replace the entire IR or add an analysis-cache framework immediately.
 
 ## Proposed implementation sequence
 
-Slice 1 has a focused implementation recorded below; slices 2–5 remain pending.
+Slices 1 and 2 have focused implementations recorded below; slices 3–5 remain
+pending.
 These steps do not claim new compiler capability. Keep the named real-function
 failure family in [next steps](../next_steps.md) as the capability objective; introduce helpers
 in bounded slices where they support that work or reproduced correctness gaps.
@@ -98,6 +98,36 @@ Owners: IR instruction storage, SCCP, and inlining/clone consumers.
 Exit criteria: mutating speculative operands cannot change the source IR; call,
 PHI, and GEP list storage is covered; allocation failure/leak checks pass; the
 changing-loop-argument regression and positive constant-call folds still pass.
+
+Implementation (2026-09-26, based on `b44ace9e`):
+
+- Chose an owning `Instruction.clone` because SCCP and the inliner both consume
+  mutable instructions. A mapped view would require changing the simplifier's
+  interface while leaving the inliner in need of a separate clone mechanism.
+- The ownership inventory found three allocated operand lists (PHI incoming
+  values, GEP indices, call arguments) and one owned text allocation
+  (`cmpxchg.result_ty.aggregate`). The clone copies those resources and preserves
+  all other fields, including removed/replacement bookkeeping. Other strings
+  remain borrowed; cloning does not extend their module/source lifetime.
+- Migrated SCCP's speculative instruction and the common inliner used by both
+  `always-inline` and `inline`. SCCP retains its selective lattice mapping rules;
+  the inliner explicitly clears clone bookkeeping as before.
+- The inliner reserves caller capacity before rewriting uses and transferring
+  the staged clones. Name creation delegates cleanup to `Module.ownString`,
+  avoiding duplicate frees when ownership registration fails.
+- Allocation-failure testing exposed a missing `errdefer` in CFG reachability
+  allocation, reached during SCCP cleanup. Added it without changing CFG or
+  verifier semantics.
+- Reviewed GVN scalar instruction copies (limited to binary operations) and CFG
+  block-merging copies (ownership transfers). They are outside this bounded
+  migration; this slice does not claim a repository-wide ownership conversion.
+- Added six tests covering clone mutation isolation, both destruction orders,
+  borrowed call fields and bookkeeping, inlining GEP storage, and exhaustive
+  allocation-failure injection through clone and consumer cleanup. Borrowed
+  strings deliberately remain valid only while their original owner lives.
+
+This is an intermediate ownership refactor. It does not advance a compiler
+capability, acceptance counter, or Tier-3 milestone.
 
 ### 3. Shared integer constant semantics
 
@@ -199,3 +229,26 @@ invariant, CLI, acceptance counter, or gate infrastructure is changed. Full
 Tier 3 remains required for a subsequent milestone or capability closure under
 the validation policy; previous full-run evidence is not claimed for these
 changed sources.
+
+Slice 2 validation (Zig 0.16.0): all six ownership tests and both existing SCCP
+changing-loop-argument/positive-call-fold regressions passed in Debug and
+ReleaseFast. The full ReleaseFast half-add NaN-bit failure recorded for slice 1
+remains tracked separately; this slice does not change that backend or test.
+Evidence is retained under
+`local-state/validations/instruction-ownership-20260926/`.
+
+The saved clean `b44ace9e` compiler and the updated compiler produce identical
+raw IR for all 243 optimizer fixtures. The 16-function optimizer regression
+program agrees before/after and with LLVM 22 for the focused pipeline and
+`release-o3`. A native inliner check also agrees before/after and with LLVM 22
+when copying eight GEP instructions into a caller; LLVM verifies the resulting
+IR. The local comparison script and outputs are retained with the evidence.
+Documentation checks passed (14 current documents, 59 links, two status blocks),
+as did the separate check of 24 links in both touched pages and formatting.
+
+`zig build readiness` passed for slice 2, including the full Debug unit suite,
+compare-opt, native optimizer regressions, corpus/handoff checks, generated
+behavioral comparisons, and release pipeline policy. Validation follows the
+focused optimizer/shared-IR route; the allocation-cleanup repairs do not alter
+successful-program semantics or verifier invariants. No Tier-3 milestone is
+claimed. The source hashes in the evidence directory identify the tested files.
