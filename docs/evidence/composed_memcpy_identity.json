@@ -1,0 +1,68 @@
+{
+  "git_head": "a36393b8e0c38e43b29524ecb89e91d4433f9478",
+  "compiler_build": "zig 0.16.0 build -Doptimize=ReleaseFast --prefix OUTPUT/compiler (outside measurement)",
+  "cpu_affinity": [
+    2
+  ],
+  "frequency_policy": {
+    "scaling_driver": "amd-pstate-epp",
+    "scaling_governor": "performance",
+    "scaling_max_freq": "5137904",
+    "scaling_min_freq": "1100980"
+  },
+  "manifest_sha256": "483d28f53a7db63f4e66fc51c54ecb30666a8a22e6408a9875699939d0e588a7",
+  "runner_sha256": "60b48bf402664a3239a841436bada809335aeecf5b3e0789b121b80c456c8f2c",
+  "tools": {
+    "clang-22": {
+      "path": "/usr/lib/llvm-22/bin/clang",
+      "sha256": "9dff149140cff7484c1efd85a5cfe0e3f046edcf71c63b42b5501c4a2ee462ae",
+      "version": "Ubuntu clang version 22.1.8 (++20260714014902+ca7933e47d3a-1~exp1~20260714135019.80)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-22/bin"
+    },
+    "opt-22": {
+      "path": "/usr/lib/llvm-22/bin/opt",
+      "sha256": "0839c639826ed254370706964abcffbfe901ad40c5bae1593e2772f29b5c97a1",
+      "version": "Ubuntu LLVM version 22.1.8\n  Optimized build.\n  Default target: x86_64-pc-linux-gnu\n  Host CPU: znver4"
+    },
+    "readelf": {
+      "path": "/usr/bin/x86_64-linux-gnu-readelf",
+      "sha256": "64c58e15274bbbb5153f31078e455e9e77ee5f51489e709bba5bb788ce9df2b0",
+      "version": "GNU readelf (GNU Binutils for Ubuntu) 2.42\nCopyright (C) 2024 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty."
+    },
+    "z_llvm": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/composed-memcpy-20260926/compiler/bin/z_llvm",
+      "sha256": "261b77701a8a15203db6ee8108b6a614cb63b068deedb6d2f0daa02567f86f73",
+      "version": null
+    },
+    "zig": {
+      "path": "/home/oleg/.zig/0.16.0/files/zig",
+      "sha256": "2317bbb91798556d9d0f38aabdac23db83f0979b25f767259ae474546724087c",
+      "version": "0.16.0"
+    }
+  },
+  "invocation": [
+    "/usr/bin/python3",
+    "tools/fixed_program_baseline.py",
+    "--compiler",
+    "local-state/validations/composed-memcpy-20260926/compiler/bin/z_llvm",
+    "--zig",
+    "/home/oleg/.zig/0.16.0/files/zig",
+    "--cpu",
+    "2",
+    "--output",
+    "local-state/validations/composed-memcpy-20260926/performance-after"
+  ],
+  "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+  "started_utc": "2026-09-27T01:42:01Z",
+  "target": "x86_64-unknown-linux-gnu",
+  "samples": 9,
+  "warmups": 2,
+  "source_manifest": "source-before-tier3.json",
+  "source_manifest_sha256": "43fcda087a678f9a95b7d573ec80d85e6ab43c12c5bf1476d81eead51ca2cf47",
+  "report_sha256": "e4c9226aa6cb941e7e131e363bc500cf45679b68e98f5a90bef3496f064baef6",
+  "input_identities": {
+    "source_sha256": "9b8d6993d8378bc3df5c559d5492d311bb2395024097dd42c8905647947b5ae1",
+    "definition_sha256": "0f16b4dcaaafc82023bfd1e451838251e13450242c7c24dc6061d9011e23e338",
+    "fixture_sha256": "675d7f03229e349318640815f5f4d0e213fcce81961a3536a937d19eac52b0e0",
+    "memcpy_fast_definition_sha256": "e80a2cf2aafce20cb63734b7304f32e5fe4ec235ccb97b361cea947965f4a2ea"
+  }
+}

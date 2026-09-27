@@ -9,14 +9,23 @@ with semantic checks and all three metrics for 14 supported pairs. The loop-memo
 `release-o3` pair rejects with `TypeMismatch`; that optimizer limitation is
 recorded separately and does not acquire invented performance results.
 
-## Next: investigate `ssp.__memcpy_chk`
+The [checked memcpy family](evidence/composed_memcpy_family.md) is now complete
+for the retained `ssp.__memcpy_chk` and `memcpyFast` definitions. Shared composed
+lowering, native comparisons, the ABI differential gate and all 17 integration
+subgates pass. The frozen performance matrix retains its supported outcomes and
+semantic results; two local memset code sections grow by 11 bytes for the
+byte-GEP preservation repair. Timing differences do not establish a speedup.
 
-Reproduce the next bounded memory family from the retained compiler-rt report,
-starting with `ssp.__memcpy_chk`. Identify its typed-call and intrinsic blockers
-before selecting an implementation slice. `ssp.__strncpy_chk` remains outside
-the memset slice and reports a load-width blocker. Broader pass migrations,
-opaque parsing and integer families remain deferred until a concrete consumer
-or reproduced correctness issue justifies them.
+## Next: cyclic byte-memory lowering
+
+Investigate the CFG and return-register proof needed for cyclic byte-memory
+transfers before extending to `ssp.__strncpy_chk`. It currently rejects with
+`composed-block-byte-transfer-cyclic-cfg`; broader admission exposed
+`ReturnRegisterUndefined` in composed `bcmp`/`memcmp`, whose structural fallbacks
+remain supported. Reproduce and bound that issue before extending admission.
+The loop-memory `release-o3` optimizer rejection remains an independent follow-up.
+Broader pass migrations, opaque parsing and integer families remain deferred
+until a concrete consumer or reproduced correctness issue justifies them.
 
 Use the frozen baseline for future measured comparisons; it establishes neither
 a speedup nor general optimizer/backend parity. Reuse matching correctness

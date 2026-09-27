@@ -711,7 +711,7 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
             if (address.scale != address.shape.stride()) return error.ValueUseAddressScaleMismatch;
         },
         .store_scalar => |store| {
-            if (store.bits != 1 and store.bits != 32) return error.ValueUseStoreWidthUnsupported;
+            if (store.bits != 1 and store.bits != 8 and store.bits != 32) return error.ValueUseStoreWidthUnsupported;
             const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, store.pointer);
             validateStorePointerOperand(&transaction.requests[index], true) catch |err| {
                 Authority.noteRequestBoundaryError(Authority, transaction, index, err);
@@ -719,7 +719,7 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
             };
         },
         .store_immediate => |store| {
-            if (store.bits != 1 and store.bits != 32) return error.ValueUseStoreWidthUnsupported;
+            if (store.bits != 1 and store.bits != 8 and store.bits != 32) return error.ValueUseStoreWidthUnsupported;
             if (store.bits == 1 and store.value != 0 and store.value != 1)
                 return error.ValueUseStoreImmediateOutOfRange;
         },

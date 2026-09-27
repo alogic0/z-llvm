@@ -189,3 +189,11 @@ checks bytes, returned pointers, preservation of live values, and bounds traps;
 every function must have composed ownership. The integrated-executable subgate
 runs the same implementation. Its counts remain separate from accepted corpus
 counters; see [the family evidence](evidence/composed_memset_family.md).
+
+### Retained memcpy family canary
+
+`zig build memcpy-diff` executes two retained definitions and seven compositions
+through direct and release-o3 routes in three harness modes. It checks bytes,
+source preservation, returned pointers, live scalar/vector values and bounds
+traps. The integrated-executable subgate runs the same implementation. Counts
+remain separate from accepted corpus counters; see [the family evidence](evidence/composed_memcpy_family.md).

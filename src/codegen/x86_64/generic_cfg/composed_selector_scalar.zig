@@ -831,7 +831,10 @@ pub fn lowerBinaryImmediateLhs(selector: *ComposedBlockSelector, result_name: []
 
 pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir.CastInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
-    const from_bits = intBits(cast.from_ty) orelse return .{ .no_emitter = "composed-block-cast-from-not-int" };
+    const pointer_bits = cast.op == .ptrtoint and cast.from_ty == .ptr;
+    if (cast.op == .ptrtoint and (!pointer_bits or !cast.to_ty.eql(.{ .int = 64 }) or cast.value != .named or cast.flags.any()))
+        return .{ .no_emitter = "composed-block-ptrtoint-form" };
+    const from_bits = if (pointer_bits) @as(u16, 64) else intBits(cast.from_ty) orelse return .{ .no_emitter = "composed-block-cast-from-not-int" };
     const to_bits = intBits(cast.to_ty) orelse return .{ .no_emitter = "composed-block-cast-to-not-int" };
     if (from_bits == 52 or to_bits == 52) {
         if (ValueUseTransaction.isAccumulatorScalarCast(cast, false))
@@ -844,7 +847,7 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
     }
 
     switch (cast.op) {
-        .trunc, .bitcast => {
+        .trunc, .bitcast, .ptrtoint => {
             if (ValueUseTransaction.isPairLowScalarCast(cast))
                 return lowerPairLowScalarCast(selector, result_name, cast, from_bits, to_bits);
             const loc = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-unknown-cast" };

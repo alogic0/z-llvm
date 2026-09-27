@@ -703,12 +703,14 @@ pub const Instruction = union(enum) {
     load_f128_arg_ptr_xmm0: struct {
         reg: ArgReg,
         offset: u8,
+        unaligned: bool = false,
     },
     load_f128_const_xmm0: []const u8,
     load_f128_const_xmm1: []const u8,
     store_f128_xmm0_arg_ptr: struct {
         reg: ArgReg,
         offset: u8,
+        unaligned: bool = false,
     },
     volatile_roundtrip_rdi_esi_eax,
     load_global_i32_eax: []const u8,

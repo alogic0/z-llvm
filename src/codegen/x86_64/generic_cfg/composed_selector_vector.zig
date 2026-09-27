@@ -510,6 +510,16 @@ fn bindVectorResult(selector: *ComposedBlockSelector, name: []const u8, reg: Xmm
     } });
 }
 
+// A byte-vector memory transfer uses the same shape-aware owner as vector
+// arithmetic, but admits only named values with all sixteen byte lanes defined.
+pub fn materializeByteVector(selector: *ComposedBlockSelector, value: ir.Value, shape: VectorShape) !?Diagnostic {
+    if (value != .named) return .{ .no_emitter = "composed-block-byte-vector-store-value" };
+    const operand = describeVectorValue(selector, value, .{ .vector = .{ .len = 16, .elem_ty = .{ .int = 8 } } }) orelse
+        return .{ .unsupported_value = "composed-block-byte-vector-store-value" };
+    if (!operand.shape.eql(shape)) return .{ .no_emitter = "composed-block-byte-vector-store-shape" };
+    return materializeVectorValue(selector, value, operand, .xmm0, null);
+}
+
 fn describeVectorValue(selector: *ComposedBlockSelector, value: ir.Value, ty: ir.Type) ?VectorOperand {
     return switch (value) {
         .named => switch (selector_state.resolveValue(selector, value) orelse return null) {

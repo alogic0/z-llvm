@@ -692,3 +692,42 @@ test "value-use GEP actions preserve accepted descriptor preconditions" {
     );
     try std.testing.expect(selector.values.get("wrong-table-result") == null);
 }
+
+test "value-use byte-address preserves a live source already in the result register" {
+    for ([_]bool{ false, true }) |dynamic| {
+        var machine = MachineFunction.init("byte-address-live-rcx", .ptr);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "base", "index", "derived" }) |name| try addLive(&plan, name);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        const base: ValueLoc = .{ .arg64 = if (dynamic) .rdi else .rcx };
+        try selector_state.bindValueLoc(&selector, "base", base);
+        try selector_state.bindValueLoc(&selector, "index", .{ .arg64 = .rcx });
+        const original_next_spill = selector.next_spill_slot;
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const index = if (dynamic) try transaction.register(preparedSourceRequest("index", .{ .int = 64 }, .gpr64, .gpr64)) else null;
+        const address = try transaction.register(preparedRequest("base", .ptr, .gpr64, .pointer, .{ .form_byte_address = .{
+            .result = try actionIdentity("derived"),
+            .offset = if (index) |handle| .{ .request = handle } else .{ .constant = 3 },
+        } }));
+        try transaction.seal();
+        try transaction.prepare();
+        const preserved_name = if (dynamic) "index" else "base";
+        try std.testing.expect(selector.values.get(preserved_name).?.loc == .spill64);
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(address));
+        try std.testing.expect(selector.values.get(preserved_name).?.loc == .spill64);
+        try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.values.get("derived").?.loc);
+        try transaction.rollback();
+        try std.testing.expectEqual(base, selector.values.get("base").?.loc);
+        try std.testing.expectEqual(ValueLoc{ .arg64 = .rcx }, selector.values.get("index").?.loc);
+        try std.testing.expectEqual(original_next_spill, selector.next_spill_slot);
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expect(selector.values.get("derived") == null);
+    }
+}

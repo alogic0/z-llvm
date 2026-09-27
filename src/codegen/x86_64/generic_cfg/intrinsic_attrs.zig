@@ -1,4 +1,22 @@
 const std = @import("std");
+const ir = @import("../../../ir.zig");
+
+// Alias scopes constrain optimization, not machine execution. Only the exact
+// metadata-only declaration form can be discarded during instruction selection.
+pub fn isNoAliasScopeDecl(call: ir.CallInst) bool {
+    if (!std.mem.eql(u8, call.callee, "llvm.experimental.noalias.scope.decl") or
+        call.ret_ty != .void or call.args.items.len != 1 or call.inline_asm != null or
+        call.callee_value != null or call.callee_function_ty != null or
+        call.calling_conv != null or call.ret_attrs != null or call.raw_args != null or
+        call.operand_bundle != null) return false;
+    if (call.tail_kind) |tail| if (!std.mem.eql(u8, tail, "tail") and !std.mem.eql(u8, tail, "notail")) return false;
+    const arg = call.args.items[0];
+    if (arg.ty != .metadata or arg.attrs != null or arg.value != .named) return false;
+    const name = arg.value.named;
+    if (name.len < 2 or name[0] != '!') return false;
+    for (name[1..]) |ch| if (!std.ascii.isDigit(ch)) return false;
+    return true;
+}
 
 pub const IntegerRange = struct {
     bits: u16,

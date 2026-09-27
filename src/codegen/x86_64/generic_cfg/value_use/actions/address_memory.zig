@@ -187,26 +187,22 @@ fn executeOrdinaryScalarLoad(
         },
         .address_descriptor => |descriptor| try appendPreparedLoadStackI32(Authority, transaction, descriptor),
         .register => |prepared| {
-            if (bits != 32) return error.ValueUseLoadOrdinaryPointerWidth;
+            if (bits != 8 and bits != 32) return error.ValueUseLoadOrdinaryPointerWidth;
             const reg = switch (prepared.register) {
                 .gpr64 => |reg| reg,
                 else => return error.ValueUseLoadOrdinaryPointerRejected,
             };
-            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
-                .load_arg_ptr_eax = reg,
-            });
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, if (bits == 8) .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = reg, .offset = 0 } } else .{ .load_arg_ptr_eax = reg });
         },
         .spill => |spill| {
-            if (bits != 32 or spill.bits < 64) return error.ValueUseLoadOrdinaryPointerWidth;
+            if ((bits != 8 and bits != 32) or spill.bits < 64) return error.ValueUseLoadOrdinaryPointerWidth;
             try materialization.materializeScalar64(
                 transaction.selector,
                 .{ .spill64 = spill.frame_index },
                 .{ .gpr64 = .rcx },
             );
             try failLoadForTest(Authority, transaction, .after_pointer_staging);
-            try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
-                .load_arg_ptr_eax = .rcx,
-            });
+            try transaction.selector.machine.instructions.append(transaction.selector.allocator, if (bits == 8) .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = .rcx, .offset = 0 } } else .{ .load_arg_ptr_eax = .rcx });
         },
         else => return error.ValueUseLoadOrdinaryPointerRejected,
     }
@@ -566,7 +562,7 @@ fn executeStoreEaxToPointer(
     const pointer = try materialization.preparedViewLoc(pointer_view);
     switch (pointer) {
         .stack_scalar => |stack| {
-            if (bits != 1 or stack.kind != .integer or stack.bits != 8)
+            if ((bits != 1 and bits != 8) or stack.kind != .integer or stack.bits != 8)
                 return error.ValueUseStorePointerFormUnsupported;
             try transaction.selector.machine.instructions.append(
                 transaction.selector.allocator,
@@ -577,18 +573,18 @@ fn executeStoreEaxToPointer(
             );
         },
         .arg64, .scratch64 => |reg| {
-            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            if (bits != 8 and bits != 32) return error.ValueUseStorePointerFormUnsupported;
             try transaction.selector.machine.instructions.append(
                 transaction.selector.allocator,
-                .{ .store_eax_arg_ptr = reg },
+                if (bits == 8) .{ .store_al_arg_ptr_disp8 = .{ .reg = reg, .offset = 0 } } else .{ .store_eax_arg_ptr = reg },
             );
         },
         .spill64 => {
-            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            if (bits != 8 and bits != 32) return error.ValueUseStorePointerFormUnsupported;
             try materializeActionPointer(Authority, transaction, pointer, .rcx);
             try transaction.selector.machine.instructions.append(
                 transaction.selector.allocator,
-                .{ .store_eax_arg_ptr = .rcx },
+                if (bits == 8) .{ .store_al_arg_ptr_disp8 = .{ .reg = .rcx, .offset = 0 } } else .{ .store_eax_arg_ptr = .rcx },
             );
         },
         .stack_i32_ptr => |stack_ptr| {

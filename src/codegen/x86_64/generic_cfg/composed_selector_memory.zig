@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
+const cfg = @import("../../../analysis/cfg.zig");
 const constant_table = @import("../constant_table.zig");
 const x86_64_machine = @import("../machine.zig");
 const x86_64_types = @import("../types.zig");
@@ -10,6 +11,7 @@ const composed_helpers = @import("composed_helpers.zig");
 const selector_state = @import("composed_selector_state.zig");
 const selector_scalar = @import("composed_selector_scalar.zig");
 const selector_fp = @import("composed_selector_fp.zig");
+const selector_vector = @import("composed_selector_vector.zig");
 const aggregate_object = @import("aggregate_object.zig");
 const value_use = @import("composed_selector_value_use_transaction.zig");
 
@@ -98,6 +100,8 @@ pub fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca
 pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir.LoadInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (load.attrs.isBarrier()) return .{ .no_emitter = "composed-block-load-barrier" };
+    if (load.ty.eql(.{ .int = 8 }) and (load.ty_addrspace != null or load.ptr_addrspace != null)) return .{ .no_emitter = "composed-block-byte-load-addrspace" };
+    if (inspection.isByteVector128(load.ty)) return lowerLoadByteVector(selector, result_name, load);
     if (selector_state.resolveValue(selector, load.ptr)) |ptr| if (ptr == .readonly_table_ptr)
         return lowerReadOnlyTableLoad(selector, result_name, load, ptr.readonly_table_ptr);
     if (load.ptr == .named and selector.readonly_pointer_params.contains(load.ptr.named)) {
@@ -107,6 +111,8 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
                 return lowerReadOnlyPointerIntegerLoad(selector, result_name, load, bits);
         }
     }
+    if (load.ty.eql(.{ .int = 8 }) and selector_state.valueRegisterClass(selector, load.ptr) == .gpr64 and
+        !try byteTransfersAreAcyclic(selector)) return .{ .no_emitter = "composed-block-byte-transfer-cyclic-cfg" };
     if (isF32x2(load.ty)) return lowerLoadF32Pair(selector, result_name, load);
     if (scalarFpBits(load.ty)) |bits| return lowerLoadFp(selector, result_name, load, bits);
     if (!load.ty.eql(.{ .int = 8 }) and !load.ty.eql(.{ .int = 16 }) and !load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-load-width" };
@@ -169,11 +175,14 @@ fn ordinaryLoadValueUseDiagnostic(
 
 pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
     if (store.attrs.isBarrier()) return .{ .no_emitter = "composed-block-store-barrier" };
+    if (store.ty.eql(.{ .int = 8 }) and (store.ty_addrspace != null or store.ptr_addrspace != null)) return .{ .no_emitter = "composed-block-byte-store-addrspace" };
     if (store.ptr == .named and selector.readonly_pointer_params.contains(store.ptr.named))
         return .{ .no_emitter = "composed-block-store-readonly-param" };
+    if (store.ty.eql(.{ .int = 8 }) and !try byteTransfersAreAcyclic(selector)) return .{ .no_emitter = "composed-block-byte-transfer-cyclic-cfg" };
+    if (inspection.isByteVector128(store.ty)) return lowerStoreByteVector(selector, store);
     if (scalarFpStoreBits(store.ty)) |bits| return lowerStoreFp(selector, store, bits);
     if (store.ty == .ptr) return lowerStoreStackPointer(selector, store);
-    if (!store.ty.eql(.{ .int = 1 }) and !store.ty.eql(.{ .int = 32 }) and !store.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-store-width" };
+    if (!store.ty.eql(.{ .int = 1 }) and !store.ty.eql(.{ .int = 8 }) and !store.ty.eql(.{ .int = 32 }) and !store.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-store-width" };
     const pointer_class = selector_state.storePointerDiagnosticClass(selector, store.ptr) orelse
         return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
     if (store.ty.eql(.{ .int = 64 })) return lowerStoreI64Transactional(selector, store, pointer_class);
@@ -302,6 +311,78 @@ fn scalarFpBits(ty: ir.Type) ?u16 {
 
 fn scalarFpStoreBits(ty: ir.Type) ?u16 {
     return if (ty == .half) 16 else scalarFpBits(ty);
+}
+
+// This capability admits acyclic byte transfers. Comparison/string loops need
+// separate CFG/return-register proof before taking ownership from old fallbacks.
+fn byteTransfersAreAcyclic(selector: *ComposedBlockSelector) !bool {
+    const function = selector.function orelse return false;
+    if (function.blocks.items.len > stage2_max_blocks) return false;
+    var graph = try cfg.Graph.build(selector.allocator, function.*);
+    defer graph.deinit();
+    var remaining: [stage2_max_blocks]usize = undefined;
+    var queue: [stage2_max_blocks]usize = undefined;
+    var end: usize = 0;
+    for (graph.edges.items, 0..) |edges, index| {
+        remaining[index] = edges.predecessors.items.len;
+        if (remaining[index] == 0) {
+            queue[end] = index;
+            end += 1;
+        }
+    }
+    var cursor: usize = 0;
+    while (cursor < end) : (cursor += 1) {
+        for (graph.successors(queue[cursor])) |successor| {
+            remaining[successor] -= 1;
+            if (remaining[successor] == 0) {
+                queue[end] = successor;
+                end += 1;
+            }
+        }
+    }
+    return end == function.blocks.items.len;
+}
+
+fn byteVectorShape() selector_types.VectorShape {
+    return .{ .lane_type = .integer, .lane_count = 16, .lane_bits = 8, .defined_lanes = 0xffff };
+}
+
+// Raw byte vectors have no arithmetic interpretation here. Reuse the existing
+// XMM preservation/spill machinery and move all 128 bits without alignment claims.
+fn stageByteVectorPointer(selector: *ComposedBlockSelector, value: ir.Value) !?Diagnostic {
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    _ = transaction.register(.{
+        .source = value,
+        .expected = .{ .ty = .ptr, .register_class = .gpr64, .pointer_address_space = 0 },
+        .form = .pointer,
+        .destination = .{ .gpr64 = .rcx },
+    }) catch return .{ .unsupported_value = "composed-block-byte-vector-pointer" };
+    transaction.seal() catch return .{ .unsupported_value = "composed-block-byte-vector-pointer" };
+    try transaction.prepare();
+    try transaction.materializeAll();
+    try transaction.commit();
+    return null;
+}
+
+fn lowerLoadByteVector(selector: *ComposedBlockSelector, name: []const u8, load: ir.LoadInst) !?Diagnostic {
+    if (load.ty_addrspace != null or load.ptr_addrspace != null) return .{ .no_emitter = "composed-block-byte-vector-addrspace" };
+    if (!try byteTransfersAreAcyclic(selector)) return .{ .no_emitter = "composed-block-byte-transfer-cyclic-cfg" };
+    if (try stageByteVectorPointer(selector, load.ptr)) |diagnostic| return diagnostic;
+    try selector_state.clobberXmmReg(selector, .xmm0);
+    try selector.machine.instructions.append(selector.allocator, .{ .load_f128_arg_ptr_xmm0 = .{ .reg = .rcx, .offset = 0, .unaligned = true } });
+    try selector_state.bindResultLoc(selector, name, .{ .xmm = .{ .reg = .xmm0, .bits = 128, .shape = .{ .vector = byteVectorShape() } } });
+    return null;
+}
+
+fn lowerStoreByteVector(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
+    if (store.ty_addrspace != null or store.ptr_addrspace != null) return .{ .no_emitter = "composed-block-byte-vector-addrspace" };
+    if (!try byteTransfersAreAcyclic(selector)) return .{ .no_emitter = "composed-block-byte-transfer-cyclic-cfg" };
+    if (store.value != .named) return .{ .no_emitter = "composed-block-byte-vector-store-value" };
+    if (try stageByteVectorPointer(selector, store.ptr)) |diagnostic| return diagnostic;
+    if (try selector_vector.materializeByteVector(selector, store.value, byteVectorShape())) |diagnostic| return diagnostic;
+    try selector.machine.instructions.append(selector.allocator, .{ .store_f128_xmm0_arg_ptr = .{ .reg = .rcx, .offset = 0, .unaligned = true } });
+    return null;
 }
 
 fn lowerLoadFp(selector: *ComposedBlockSelector, result_name: []const u8, load: ir.LoadInst, bits: u16) !?Diagnostic {
@@ -536,11 +617,15 @@ fn scalarStorePointerDiagnostic(
     bits: u8,
 ) ?Diagnostic {
     return switch (pointer_class) {
-        .stack_scalar => |stack| if (bits == 1 and stack.bits == 8 and stack.kind == .integer)
+        .stack_scalar => |stack| if ((bits == 1 or bits == 8) and stack.bits == 8 and stack.kind == .integer)
             null
         else
             .{ .no_emitter = "composed-block-store-stack-width" },
-        .register64, .spill64, .stack_i32_ptr, .stack_i32_array => if (bits == 32)
+        .register64, .spill64 => if (bits == 8 or bits == 32)
+            null
+        else
+            .{ .no_emitter = "composed-block-store-ptr-width" },
+        .stack_i32_ptr, .stack_i32_array => if (bits == 32)
             null
         else
             .{ .no_emitter = "composed-block-store-ptr-width" },

@@ -720,9 +720,9 @@ pub fn encodeRaxPtrDisp8Tail(bytes: *std.ArrayList(u8), allocator: std.mem.Alloc
     }
 }
 
-pub fn encodeF128ArgPtrToXmm0(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8) !void {
+pub fn encodeF128ArgPtrToXmm0(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8, unaligned: bool) !void {
     if (reg.rexB()) try bytes.append(allocator, 0x41);
-    try bytes.appendSlice(allocator, &.{ 0x0f, 0x28 });
+    try bytes.appendSlice(allocator, &.{ 0x0f, if (unaligned) 0x10 else @as(u8, 0x28) });
     if (offset == 0) {
         try bytes.append(allocator, @as(u8, reg.lowCode()));
     } else {
@@ -731,9 +731,9 @@ pub fn encodeF128ArgPtrToXmm0(bytes: *std.ArrayList(u8), allocator: std.mem.Allo
     }
 }
 
-pub fn encodeF128Xmm0ToArgPtr(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8) !void {
+pub fn encodeF128Xmm0ToArgPtr(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8, unaligned: bool) !void {
     if (reg.rexB()) try bytes.append(allocator, 0x41);
-    try bytes.appendSlice(allocator, &.{ 0x0f, 0x29 });
+    try bytes.appendSlice(allocator, &.{ 0x0f, if (unaligned) 0x11 else @as(u8, 0x29) });
     if (offset == 0) {
         try bytes.append(allocator, @as(u8, reg.lowCode()));
     } else {

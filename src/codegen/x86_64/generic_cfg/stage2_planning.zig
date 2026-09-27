@@ -583,6 +583,8 @@ fn callRequiresPreservationFrame(call: ir.CallInst) bool {
     if (call.isDebugVariableLocation()) return false;
     if (!std.mem.startsWith(u8, call.callee, "llvm.")) return true;
     return std.mem.eql(u8, call.callee, "llvm.memset.p0.i64") or
+        std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64") or
+        std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64") or
         std.mem.eql(u8, call.callee, "llvm.abs.i32") or
         std.mem.eql(u8, call.callee, "llvm.abs.i64") or
         std.mem.eql(u8, call.callee, "llvm.abs.i128");
@@ -602,6 +604,7 @@ fn recordPreservationDemands(plan: *SelectorAllocationPlan, intervals: []const S
 
 pub fn selectorValueMetadata(ty: ir.Type) ?VirtualRegMetadata {
     if (ty == .ptr) return .{ .class = .gpr64, .bits = 64 };
+    if (@import("inspection.zig").isByteVector128(ty)) return .{ .class = .vector_xmm, .bits = 128 };
     return switch (ty) {
         .half => .{ .class = .fp16, .bits = 16 },
         .float => .{ .class = .fp32, .bits = 32 },

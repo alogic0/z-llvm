@@ -172,5 +172,6 @@ the matching correctness checkpoint supplies the existing Tier-3 evidence.
 One preliminary attempt was stopped during driver preparation to replace
 Python timeout polling with blocking process waits. It produced no accepted
 samples; `preflight-interrupted/` retains that bounded diagnostic. Only the two
-completed runs above establish this baseline. Section 5b is complete; the next
-capability investigation remains `ssp.__memcpy_chk`.
+completed runs above establish this baseline. Section 5b is complete. The
+subsequent [checked memcpy slice](composed_memcpy_family.md) records its completed
+capability and comparison against this unchanged baseline.

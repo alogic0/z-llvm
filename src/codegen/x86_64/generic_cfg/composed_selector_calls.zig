@@ -85,6 +85,8 @@ fn isColdAssumeBundle(bundle: []const u8) bool {
 
 pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     if (call.isDebugVariableLocation()) return null;
+    if (std.mem.eql(u8, call.callee, "llvm.experimental.noalias.scope.decl"))
+        return if (result == null and intrinsic_attrs.isNoAliasScopeDecl(call)) null else .{ .no_emitter = "composed-block-noalias-scope-decl" };
     if (call.inline_asm != null) return lowerFpBarrier(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.lifetime.start.p0") or std.mem.eql(u8, call.callee, "llvm.lifetime.end.p0")) return lowerLifetimeMarker(result, call);
     if (std.mem.eql(u8, call.callee, "llvm.assume")) return lowerAssume(selector, result, call);
@@ -121,7 +123,8 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.scmp.i32.i128")) return try lowerI128Compare(selector, result, call, true);
     if (std.mem.eql(u8, call.callee, "llvm.fshl.i32")) return try lowerFshlI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.memset.p0.i64")) return try lowerMemset(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64")) return try lowerInlineMemcpy(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64") or
+        std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64")) return try lowerInlineMemcpy(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .add);
     if (std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .sub);
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64")) return try lowerSmulOverflowI64(selector, result, call);
@@ -614,6 +617,14 @@ pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, 
     {
         return .{ .no_emitter = "composed-block-memcpy-args" };
     }
+    // Keep the pre-existing inline intrinsic contract; the newly admitted
+    // ordinary intrinsic accepts only the exact retained pointer annotations.
+    if (std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64")) {
+        if (call.callee_function_ty != null or call.calling_conv != null or
+            !memsetAlignmentAttribute(dst.attrs) or !memcpySourceAttributes(src.attrs) or
+            len.attrs != null or is_volatile.attrs != null)
+            return .{ .no_emitter = "composed-block-memcpy-attrs" };
+    }
 
     var authority = try ValueUseTransaction.begin(selector);
     defer authority.deinit();
@@ -678,6 +689,13 @@ pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, 
         ) orelse return err;
     try authority.commit();
     return null;
+}
+
+fn memcpySourceAttributes(attrs: ?[]const u8) bool {
+    const text = attrs orelse return true;
+    if (std.mem.eql(u8, text, "readonly")) return true;
+    if (std.mem.startsWith(u8, text, "readonly ")) return memsetAlignmentAttribute(text[9..]);
+    return memsetAlignmentAttribute(text);
 }
 
 fn inlineMemcpyValueUseDiagnostic(

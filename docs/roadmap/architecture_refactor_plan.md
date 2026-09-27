@@ -21,8 +21,11 @@ Selector defaults, public CLI behavior, and acceptance counters remain unchanged
 | Subsequent correctness checkpoint | Complete | `eab54c12`; 1,503 tests, native comparisons, readiness and all 17 integration subgates passed. |
 
 The [fixed-program baseline](../evidence/fixed_program_baseline.md) closes 5b
-and this bounded plan. The next memory family is `ssp.__memcpy_chk`. Further
-memory families extend capability beyond the memset deliverable. The recorded
+and this bounded plan. The subsequent
+[checked memcpy family](../evidence/composed_memcpy_family.md) is also complete
+for the retained `ssp.__memcpy_chk` and `memcpyFast` definitions, extending
+capability beyond the memset deliverable. Cyclic byte-memory lowering remains
+a separate investigation in [next steps](../next_steps.md). The recorded
 loop-memory `release-o3` rejection is a separate optimizer follow-up; baseline
 completion does not claim that every route supports every workload.
 
@@ -392,8 +395,9 @@ Exit criteria: the frozen matrix has explicit supported/unsupported outcomes,
 every supported pair has passing semantic checks and all three metrics, and a
 second execution of the recorded command reproduces the measurement procedure.
 Explain observed variability and missing support; unsupported pairs have no
-invented runtime values. Then record 5b as complete and move `ssp.__memcpy_chk`
-to the active queue. The existing calls-performance tool has a separate frozen
+invented runtime values. Completing 5b enabled the subsequent
+[`ssp.__memcpy_chk` slice](../evidence/composed_memcpy_family.md).
+The existing calls-performance tool has a separate frozen
 compiler-rt report population and does not establish this baseline.
 
 Completion (2026-09-26): the [protocol and results](../evidence/fixed_program_baseline.md)

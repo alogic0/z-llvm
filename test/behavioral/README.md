@@ -44,3 +44,13 @@ release-o3-plus-codegen and independent LLVM routes with prebuilt compilers.
 The two `performance_*.zig` drivers repeat deterministic inputs for timing;
 the existing full semantic drivers remain the correctness oracle. The runner
 is separate from acceptance gates and records unsupported pairs explicitly.
+
+## Retained memcpy family
+
+`zig build memcpy-diff` exercises the exact retained `ssp.__memcpy_chk` and
+`memcpyFast` definitions plus seven compositions. It checks 8,967 observations
+per route/mode, including unaligned offsets, zero/boundary lengths, surrounding
+bytes, source preservation, return pointers and live scalar/vector values.
+Direct and release-o3 routes run in three harness modes, always with composed
+ownership and an independent LLVM reference. Bounds violations must trap.
+See [the evidence and admission boundaries](../../docs/evidence/composed_memcpy_family.md).

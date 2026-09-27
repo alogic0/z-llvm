@@ -293,6 +293,7 @@ pub fn main(init: std.process.Init) !void {
     // canaries without reinterpreting the original seven integrated cases.
     try @import("run_behavioral_diff.zig").run(init);
     try @import("run_memset_diff.zig").run(init);
+    try @import("run_memcpy_diff.zig").run(init);
 }
 
 fn emitAggregateSseSemanticObject(

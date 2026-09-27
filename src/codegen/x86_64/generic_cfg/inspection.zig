@@ -72,8 +72,8 @@ fn inspectInstruction(instruction: ir.Instruction, context: ?*const x86_64_types
         .icmp => |icmp| inspectIcmp(icmp),
         .select => |select| inspectSelect(select),
         .alloca => |alloca| if (isSelectorScalarType(alloca.allocated_ty) or parseI32ArrayType(alloca.allocated_ty) != null or aggregate_object.isF32PairType(context, alloca.allocated_ty)) null else .{ .unsupported_type = "alloca" },
-        .load => |load| if (isSelectorScalarType(load.ty) or isPackedF32x2(load.ty)) null else .{ .unsupported_type = "load" },
-        .store => |store| if (isSelectorScalarType(store.ty)) null else .{ .unsupported_type = "store" },
+        .load => |load| if (isSelectorScalarType(load.ty) or isPackedF32x2(load.ty) or isByteVector128(load.ty)) null else .{ .unsupported_type = "load" },
+        .store => |store| if (isSelectorScalarType(store.ty) or isByteVector128(store.ty)) null else .{ .unsupported_type = "store" },
         .gep => null,
         .call => |call| inspectCall(call),
         .phi => |phi| if (isSelectorScalarType(phi.ty)) null else .{ .unsupported_type = "phi" },
@@ -92,6 +92,10 @@ fn inspectInstruction(instruction: ir.Instruction, context: ?*const x86_64_types
 
 fn isPackedF32x2(ty: ir.Type) bool {
     return ty == .vector and ty.vector.len == 2 and ty.vector.elem_ty == .float;
+}
+
+pub fn isByteVector128(ty: ir.Type) bool {
+    return ty.eql(.{ .vector = .{ .len = 16, .elem_ty = .{ .int = 8 } } });
 }
 
 fn inspectFcmp(fcmp: ir.FcmpInst) ?Diagnostic {
@@ -294,6 +298,8 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
     if (call.callee_value != null) return .{ .unsupported_value = "indirect-call" };
     if (call.raw_args != null) return .{ .unsupported_instruction = "raw-call-args" };
     if (call.isDebugVariableLocation()) return null;
+    if (std.mem.eql(u8, call.callee, "llvm.experimental.noalias.scope.decl"))
+        return if (intrinsic_attrs.isNoAliasScopeDecl(call)) null else .{ .unsupported_instruction = "llvm.experimental.noalias.scope.decl" };
     if (std.mem.eql(u8, call.callee, "llvm.assume")) {
         if (call.ret_ty != .void or call.args.items.len != 1) return .{ .unsupported_instruction = "llvm.assume" };
         if (call.operand_bundle) |bundle| {

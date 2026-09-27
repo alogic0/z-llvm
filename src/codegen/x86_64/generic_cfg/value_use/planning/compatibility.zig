@@ -300,7 +300,7 @@ fn validateOrdinaryLoadHome(
                 return error.ValueUseLoadOrdinaryStackArrayWidth;
         },
         .arg64, .scratch64, .spill64 => {
-            if (alias_i128 or binding.vreg.class != .gpr64 or binding.vreg.bits < 64 or bits != 32)
+            if (alias_i128 or binding.vreg.class != .gpr64 or binding.vreg.bits < 64 or (bits != 8 and bits != 32))
                 return error.ValueUseLoadOrdinaryPointerWidth;
         },
         else => return error.ValueUseLoadOrdinaryPointerRejected,

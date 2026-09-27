@@ -95,7 +95,19 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
                 continue;
             }
             const source = mapping.source.?;
-            if (source == mapping.destination) continue;
+            if (source == mapping.destination) {
+                // Byte GEP changes rcx even when staging its base/index is a
+                // no-op. Preserve that canonical source before exposing views.
+                if (mapping.destination == .rcx) if (request.prepared_action) |action| {
+                    if (action == .form_byte_address) switch (action.form_byte_address.offset) {
+                        .constant => |offset| if (offset != 0) {
+                            writes[@intFromEnum(mapping.destination)] = true;
+                        },
+                        .request => writes[@intFromEnum(mapping.destination)] = true,
+                    };
+                };
+                continue;
+            }
             graph[@intFromEnum(source)][@intFromEnum(mapping.destination)] = true;
             if (!deferred_writes) writes[@intFromEnum(mapping.destination)] = true;
         }
@@ -849,12 +861,12 @@ fn appendStorePointerDestinationNodes(
     bits: u8,
 ) !void {
     switch (pointer) {
-        .stack_scalar => |stack| if (bits != 1 or stack.kind != .integer or stack.bits != 8)
+        .stack_scalar => |stack| if ((bits != 1 and bits != 8) or stack.kind != .integer or stack.bits != 8)
             return error.ValueUseStorePointerFormUnsupported,
-        .arg64, .scratch64 => if (bits != 32)
+        .arg64, .scratch64 => if (bits != 8 and bits != 32)
             return error.ValueUseStorePointerFormUnsupported,
         .spill64 => {
-            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            if (bits != 8 and bits != 32) return error.ValueUseStorePointerFormUnsupported;
             try nodes.append(.rcx);
         },
         .stack_i32_ptr => |ptr| {
@@ -877,12 +889,12 @@ fn appendStorePointerMappings(
     bits: u8,
 ) !void {
     switch (pointer) {
-        .stack_scalar => |stack| if (bits != 1 or stack.kind != .integer or stack.bits != 8)
+        .stack_scalar => |stack| if ((bits != 1 and bits != 8) or stack.kind != .integer or stack.bits != 8)
             return error.ValueUseStorePointerFormUnsupported,
-        .arg64, .scratch64 => if (bits != 32)
+        .arg64, .scratch64 => if (bits != 8 and bits != 32)
             return error.ValueUseStorePointerFormUnsupported,
         .spill64 => {
-            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            if (bits != 8 and bits != 32) return error.ValueUseStorePointerFormUnsupported;
             mappings.append(.{ .source = null, .destination = .rcx, .source_request_index = source_request_index });
         },
         .stack_i32_ptr => |ptr| {

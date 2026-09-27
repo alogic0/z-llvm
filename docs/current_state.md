@@ -60,8 +60,14 @@ The [architecture refactor plan](roadmap/architecture_refactor_plan.md) is compl
 for its bounded scope. The [fixed-program baseline](evidence/fixed_program_baseline.md)
 records two runs with compile-time, runtime and object/code-section sizes for
 14 supported workload/route pairs, plus the explicit loop-memory `release-o3`
-optimizer rejection. Next investigate `ssp.__memcpy_chk`; broader consumer
-migrations remain deferred. Measurements do not advance accepted counters.
+optimizer rejection. The subsequent
+[checked memcpy family](evidence/composed_memcpy_family.md) supports the retained
+`ssp.__memcpy_chk` and `memcpyFast` definitions through shared composed lowering.
+Native comparisons, ABI differential checks and all 17 integration subgates pass;
+the unchanged performance matrix retains its outcomes and semantic results.
+The next bounded investigation is cyclic byte-memory CFG/return-register support
+toward `ssp.__strncpy_chk`. Broader consumer migrations remain deferred.
+These development results and measurements do not advance accepted counters.
 
 See [next steps](next_steps.md), the [improvement plan](roadmap/project_improvement_plan.md),
 and the root [setup instructions](../README.md). Historical milestones remain

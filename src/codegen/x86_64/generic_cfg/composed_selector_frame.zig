@@ -120,7 +120,10 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
                 (std.mem.eql(u8, instruction.kind.call.callee, "llvm.bswap.i128") or
                     std.mem.eql(u8, instruction.kind.call.callee, "llvm.bitreverse.i128") or
                     std.mem.eql(u8, instruction.kind.call.callee, "llvm.ctpop.i128"))) saw_pair_intrinsic = true;
-            if (instruction.kind == .call and std.mem.eql(u8, instruction.kind.call.callee, "llvm.memset.p0.i64")) saw_memory_fill = true;
+            if (instruction.kind == .call and
+                (std.mem.eql(u8, instruction.kind.call.callee, "llvm.memset.p0.i64") or
+                    std.mem.eql(u8, instruction.kind.call.callee, "llvm.memcpy.p0.p0.i64") or
+                    std.mem.eql(u8, instruction.kind.call.callee, "llvm.memcpy.inline.p0.p0.i64"))) saw_memory_fill = true;
             if (instruction.kind == .call and sysv_abi.callHasScalarSseType(instruction.kind.call)) saw_scalar_sse_call = true;
             if (instruction.kind == .cast) {
                 const cast = instruction.kind.cast;
