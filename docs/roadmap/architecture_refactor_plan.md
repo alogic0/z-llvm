@@ -1,13 +1,52 @@
 # Architecture corrections and refactor plan
 
 Initial baseline: `629e2ee7`, 2026-09-26. Documentation and planning were committed
-as `56e66794`. The first four bounded refactor slices are implemented below.
+as `56e66794`. Reconciled against `eab54c12` on 2026-09-26.
+Status: implementation and correctness work complete for the bounded slices;
+the fixed-program performance baseline in section 5 remains open.
 Selector defaults, public CLI behavior, and acceptance counters remain unchanged.
 
-The [correctness checkpoint](correctness_checkpoint.md) is complete and precedes
-the next memory family. It extends the bounded migrations to InstCombine's final
-alias rewrite, ConstMerge's reference/deletion checks, typed vector lanes and
-shift-count normalization, with individual-pass and release-o3 regressions.
+## Current completion status
+
+| Deliverable | Status | Completion scope |
+| --- | --- | --- |
+| Architecture documentation | Complete | Execution routes, ownership and evidence populations documented. |
+| 1. Shared operand traversal | Complete | Typed walkers, replacement API and bounded consumer migrations. |
+| 2. Speculative instruction ownership | Complete | Owning clone, SCCP/inliner migration and allocation-failure coverage. |
+| 3. Integer semantics | Complete for the selected families | Comparisons, signed/unsigned div/rem, signed min/max, wrapping normalization, shift counts and vector lane indices. |
+| 4. Module references | Complete for the selected consumers | Shared discovery; GlobalOpt, GlobalDCE and ConstMerge migrations with explicit opaque boundaries. |
+| 5a. Shared lowering and behavioral proof | Complete | Three-function memset family, six compositions, separate direct/release-o3 routes and composed ownership checks. |
+| 5b. Fixed-program performance baseline | **Open — next task** | Reproducible compile-time, runtime and object-size measurements for fixed programs and explicit routes. |
+| Subsequent correctness checkpoint | Complete | `eab54c12`; 1,503 tests, native comparisons, readiness and all 17 integration subgates passed. |
+
+The plan is not fully closed until 5b has recorded evidence. Complete that
+baseline before starting the next memory family, `ssp.__memcpy_chk`. Further
+memory families extend capability beyond the memset deliverable; they are not
+unfinished work required to close this plan.
+
+The [correctness checkpoint](correctness_checkpoint.md) extends the earlier
+migrations to InstCombine's final alias rewrite, ConstMerge's reference/deletion
+checks, typed vector lanes and shift-count normalization. Its acceptance evidence
+does not provide a program-performance baseline. Full-gate wall times measure
+validation cost, not compiled-program runtime or object-size quality.
+
+### Deferred work outside this bounded closure
+
+- Migrate additional pass-local operand/reference walkers when a concrete
+  consumer or reproduced bug justifies the change. Repository-wide conversion
+  was not an exit criterion for slices 1 or 4.
+- Extend integer-family, flag and cast handling beyond the migrated operations;
+  unsupported widths and poison/undef policies remain explicit boundaries.
+- Parse more opaque expressions/attributes and extend copy/string lowering as
+  separate capability work. A unified optimize-and-emit API remains a separate
+  CLI/architecture decision.
+- Investigate the previously recorded full ReleaseFast half-add NaN-bit test
+  failure separately. Focused ReleaseFast results do not claim that the complete
+  ReleaseFast suite passes.
+
+The implementation and validation records below are chronological. Statements
+about intermediate scope and validation refer to their named source checkpoints;
+this status table and [next steps](../next_steps.md) select current work.
 
 ## Corrected assessment
 
@@ -35,14 +74,13 @@ need to replace the entire IR or add an analysis-cache framework immediately.
 - [x] Link current guidance from the setup and documentation entrypoints.
 - [x] Validate current-document and touched-document links; record the result.
 
-## Proposed implementation sequence
+## Implementation sequence and historical records
 
-Slices 1–4 have bounded implementations recorded below. Slice 5 now closes the
-three-function memset family through shared lowering; further memory families
-and fixed-program performance measurements remain separate follow-ups.
-The earlier helper refactors did not claim new compiler capability. Continue
-with the next named failure family in [next steps](../next_steps.md), adding
-shared operations where they support that work or reproduced correctness gaps.
+Slices 1–4 and the shared-lowering portion of slice 5 are implemented below.
+The performance portion of slice 5 remains a required deliverable of this plan.
+The earlier helper refactors did not claim new compiler capability. Their
+bounded scope is preserved; completing this plan does not require migrating
+every pass or closing additional memory families.
 
 ### 1. Shared operand traversal and replacement
 
@@ -70,7 +108,9 @@ Implementation (2026-09-26, focused refactor):
 - Inventoried `Instruction.mapOperands`, the three UseCounts walks, and
   GlobalOpt's instruction/terminator replacement switches. They enumerated the
   same structured values. Other pass-local walkers, including vector-combine,
-  SCCP terminators, and GlobalOpt's escape scans, remain for later migrations.
+  SCCP terminators, and GlobalOpt's then-separate escape scans were outside this
+  initial migration. GlobalOpt reference discovery was subsequently migrated in
+  slice 4; other consumers remain deferred as listed above.
 - Added `ir.operands.instruction` and `terminator`. Visitors receive a value
   pointer and its IR type. Const input guarantees const value pointers even
   through list storage; mutable input borrows the actual operand storage.
@@ -87,8 +127,9 @@ Implementation (2026-09-26, focused refactor):
   one-step/cyclic alias maps, removed instructions, opaque boundaries, use-count
   balance, and allocation-failure cleanup.
 
-Validation is recorded at the end of this page. This is an intermediate shared
-IR refactor, with no capability/ratchet closure or Tier-3 milestone claim.
+Validation is recorded at the end of this page. This initial commit was an
+intermediate shared-IR refactor with no capability/ratchet closure or Tier-3
+milestone claim; subsequent correctness acceptance is recorded separately.
 
 ### 2. Explicit ownership for speculative instructions
 
@@ -132,8 +173,8 @@ Implementation (2026-09-26, based on `b44ace9e`):
   allocation-failure injection through clone and consumer cleanup. Borrowed
   strings deliberately remain valid only while their original owner lives.
 
-This is an intermediate ownership refactor. It does not advance a compiler
-capability, acceptance counter, or Tier-3 milestone.
+This initial ownership-refactor commit did not advance a compiler capability,
+acceptance counter, or Tier-3 milestone.
 
 ### 3. Shared integer constant semantics
 
@@ -164,8 +205,11 @@ Implementation (2026-09-26, based on `307a3688`):
   normalization and shift input/output normalization use the same helper.
 - Kept the migration narrow: `samesign`, algebraic identities, poison/undef
   policies, arithmetic flags, casts, unsigned div/rem, and i128 shift-folding
-  limits retain their previous behavior. Other integer-family migrations and
-  their operation-specific overflow/flag policies remain follow-up work.
+  limits retained their previous behavior at this checkpoint. Unsigned div/rem,
+  signed min/max, shift-count normalization and vector lane interpretation were
+  subsequently migrated by the boundary repairs and correctness checkpoint.
+  Other integer-family migrations and their operation-specific overflow/flag
+  policies remain deferred work.
 - Added five tests, including all operand pairs for widths i1 through i8, an
   independent i256 mathematical oracle, and signed/unsigned spellings through
   i127. i128 exercises the full bit pattern through signed i128 storage; positive
@@ -179,7 +223,7 @@ The operation contract follows LLVM's
 [integer comparisons](https://llvm.org/docs/LangRef.html#icmp-instruction),
 [signed division](https://llvm.org/docs/LangRef.html#sdiv-instruction), and
 [signed remainder](https://llvm.org/docs/LangRef.html#srem-instruction).
-This extraction preserves existing optimizer behavior; it does not claim a
+This initial extraction preserved existing optimizer behavior; it did not claim a
 complete migration of integer folding or a Tier-3 capability milestone.
 
 ### 4. Module reference discovery
@@ -217,9 +261,9 @@ Implementation (2026-09-26, based on `8dad9cd6`):
   the parser retains as opaque stay unknown; this slice does not expand parsing.
 - Migrated GlobalOpt's eligibility and remaining-use checks, removing its
   duplicate instruction/terminator/module scans. Unknown regions block folding;
-  directly loaded local scalar globals still optimize. GlobalDCE and other
-  deletion/merging consumers remain follow-up migrations requiring their own
-  reference-policy audit.
+  directly loaded local scalar globals still optimize. GlobalDCE and ConstMerge
+  were subsequently migrated after their own reference-policy audits, as
+  recorded below and in the correctness checkpoint.
 - Found and repaired a namespace collision: the old GlobalOpt matched local
   `%g` against global `@g`, folding both loads to the global initializer. The
   new API matches only explicit global values. A native probe with global 1
@@ -291,21 +335,22 @@ ADCE and verifier follow-up (2026-09-26, based on `1c0a60bc`):
 
 Owners: AIR lowering, composed selector, relevant runners, and capability docs.
 
-- Reproduce the named pointer-return/memory-intrinsic failure family before
+- [x] Reproduce the named pointer-return/memory-intrinsic failure family before
   selecting its implementation slice. Implement reusable operations and require
   composed ownership for the new executable cases.
-- Keep direct lowering, accepted optimization, and development optimization as
+- [x] Keep direct lowering, accepted optimization, and development optimization as
   explicit routes. Any later unified optimize-and-emit API must preserve route
   behavior until a separately reviewed CLI change is intended.
-- Add generated compositions with defined semantics and minimized failure
+- [x] Add generated compositions with defined semantics and minimized failure
   retention. Cover optimizer-only, codegen-only, and composed execution paths
   separately; report their pipeline and selector ownership.
-- Establish fixed-program measurements for compile time, runtime, and object
+- [ ] Establish fixed-program measurements for compile time, runtime, and object
   size before making optimization-quality or performance claims.
 
 Exit criteria: unseen combinations of the newly supported operations execute
 correctly, the named family closes through shared lowering, unsupported neighbors
 fail explicitly, and results identify which route and population they prove.
+Full section-5 closure also requires the reproducible performance baseline below.
 
 The first implementation is the bounded memset family: shared pointer returns,
 `i8 zeroext` entry parameters, and transaction-owned nonvolatile byte fills.
@@ -313,8 +358,46 @@ Three unchanged retained definitions and six additional compositions execute
 through composed lowering under direct and release-o3 routes. Focused, native, and full integration
 validation pass. See the
 [family evidence](../evidence/composed_memset_family.md) for exact input identities,
-rejected neighbors, and counter scope. Copy/string support and fixed-program
-performance measurements remain separate follow-ups.
+rejected neighbors, and counter scope. Copy/string support is deferred capability
+work; fixed-program performance measurements are the remaining deliverable here.
+
+### Remaining deliverable: fixed-program performance baseline
+
+Owners: a focused measurement runner, retained behavioral fixtures, and its
+versioned protocol/results. This work establishes a baseline; it does not promise
+a speedup or change acceptance counters.
+
+- Freeze a small workload list from the existing argument/branch, loop/memory,
+  nested-call, register-pressure and memset fixtures before timing. Record source
+  and input hashes, target/features, host CPU, project and reference compiler
+  versions, commands, modes, deterministic inputs and selector ownership.
+- Report direct local codegen, local `release-o3` followed by codegen, and the
+  independent LLVM reference separately. Start with ReleaseFast harnesses and
+  the declared LLVM optimization level; do not label harness modes as local
+  optimizer modes. Record unsupported route/workload pairs explicitly.
+- Measure IR-to-object compile time using prebuilt compiler executables;
+  report optimizer and codegen stages for the two-step local route. Define cache
+  conditions, warmups and repeated samples. Keep project builds, linking and
+  validation-runner overhead outside that metric or report them separately.
+- Measure native runtime with identical driver work and inputs across routes,
+  preserving observable results so the work cannot disappear. Require semantic
+  agreement before treating a timing sample as valid. Record repetitions and
+  dispersion, not only a single wall-clock observation.
+- Record emitted object bytes and executable code-section bytes with the exact
+  artifacts/commands. Separate this from linked harness size. Retain raw samples
+  and a summary tying every metric to its workload, route and source identity.
+
+Exit criteria: the frozen matrix has explicit supported/unsupported outcomes,
+every supported pair has passing semantic checks and all three metrics, and a
+second execution of the recorded command reproduces the measurement procedure.
+Explain observed variability and missing support; unsupported pairs have no
+invented runtime values. Then record 5b as complete and move `ssp.__memcpy_chk`
+to the active queue. The existing calls-performance tool has a separate frozen
+compiler-rt report population and does not establish this baseline.
+
+Follow validation tiers for the actual changes. Reuse the completed correctness
+checkpoint only when its relevant inputs match; documentation reconciliation or
+reading historical timing logs is not a reason to rerun Tier 3.
 
 ## Validation and sequencing
 
@@ -330,6 +413,12 @@ shared lowering require the relevant AIR/codegen tests and real rows. Confirmed
 wrong-code repairs, ABI/verifier changes, and milestone closure require Tier 3.
 Any CLI behavior change also requires the linker-boundary gate. Record the exact
 source/input state before a full run and reuse only matching evidence.
+
+### Historical validation records
+
+The entries below retain their original commands, counts, limitations and source
+checkpoints. Their former pending work is resolved by later entries and the
+current completion table; they are not an active task queue.
 
 The original documentation-only change needed documentation validation only.
 
@@ -365,9 +454,9 @@ Both full logs are retained alongside the readiness and equivalence logs.
 
 This follows the optimizer/shared-IR focused validation route. No ABI, verifier
 invariant, CLI, acceptance counter, or gate infrastructure is changed. Full
-Tier 3 remains required for a subsequent milestone or capability closure under
-the validation policy; previous full-run evidence is not claimed for these
-changed sources.
+At the slice-1 checkpoint, Tier 3 remained required for a subsequent milestone
+or capability closure; previous full-run evidence was not claimed for those
+changed sources. Later acceptance runs are recorded below.
 
 Slice 2 validation (Zig 0.16.0): all six ownership tests and both existing SCCP
 changing-loop-argument/positive-call-fold regressions passed in Debug and
@@ -409,7 +498,8 @@ and source hashes are retained under
 
 The previously recorded ReleaseFast half-add NaN-bit failure remains tracked
 separately; this slice does not modify its backend or test. Additional integer
-families and the remaining architecture slices remain pending.
+families and the later architecture slices were pending at that checkpoint;
+the current completion table records their subsequent disposition.
 
 `zig build readiness` passed for slice 3, including the full Debug unit suite,
 compare-opt, native optimizer checks, corpus/handoff checks, generated behavioral
@@ -451,7 +541,8 @@ Each release mode lowered/emitted/linked 100 compiler-core rows and executed
 four cohort cases. These remain distinct from the integrated fixture and
 standalone optimizer populations. No accepted-status counter, selector default,
 public CLI, or capability ratchet changes in that slice. GlobalDCE migration is
-recorded below; additional opaque-syntax parsing and slice 5 remain follow-ups.
+recorded below. Slice 5's memset capability subsequently passed; additional
+opaque-syntax parsing remains deferred and the performance baseline remains open.
 
 GlobalDCE follow-up validation and limitations:
 

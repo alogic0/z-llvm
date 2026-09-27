@@ -1,59 +1,61 @@
 # Active direction
 
-The [current architecture](architecture.md) describes implemented routes and
-ownership. The [architecture refactor plan](roadmap/architecture_refactor_plan.md)
-records the completed operand traversal, ownership, integer-semantics, and
-module-reference slices, including GlobalOpt, GlobalDCE, and ADCE migrations.
-The ADCE dependency and verifier allocation-cleanup follow-ups are repaired.
-The first shared-lowering slice implements the bounded memset family; see
-[its validation evidence](evidence/composed_memset_family.md). Accepted counters
-remain unchanged.
+The [architecture refactor plan](roadmap/architecture_refactor_plan.md) is
+partially complete: its four bounded refactors, the memset shared-lowering
+capability, and the subsequent correctness checkpoint are done. The remaining
+required deliverable is section 5's fixed-program performance baseline.
+The plan's current completion table separates that work from deferred migrations
+and historical validation records.
 
-The user's 2026-09-10 instruction authorizes implementation of the entire
-[project improvement plan](roadmap/project_improvement_plan.md), in its stated
-priority order. It supersedes the former three-file housekeeping stop,
-43-worktree protection, and further artifact-authority decomposition directives.
+## Next: establish the fixed-program baseline
 
-Finish and validate the store replacement and cleanup, exact summary parser,
-compiler selection, behavioral coverage, and current documentation. Track exact
-commands, source/input identities, and remaining limitations in the
-[implementation evidence](evidence/project_improvement/implementation.md).
+Freeze a small set of existing behavioral/memset workloads and document the
+measurement protocol before collecting results. Measure compile time, native
+runtime and object/code-section size for explicit direct-local, local
+`release-o3`-plus-codegen and independent LLVM routes. Pin compiler/source/input
+identities, target, modes, cache conditions, warmups and repetitions. Check
+semantic agreement and composed ownership for supported local routes, and record
+unsupported pairs explicitly. The [plan's baseline exit criteria](roadmap/architecture_refactor_plan.md#remaining-deliverable-fixed-program-performance-baseline)
+define the completion evidence.
 
-Use [validation tiers](validation_tiers.md) to select checks. Keep the accepted
-record in [accepted_status.json](accepted_status.json) separate from development
-expectations and newly collected evidence. A source change or passing focused
-test never advances accepted counters automatically.
+Full-gate timings and the historical calls-performance population do not satisfy
+this program baseline. Reuse matching correctness evidence under
+[validation tiers](validation_tiers.md); select new checks from the actual
+implementation changes. Do not rerun full integration for this documentation
+reconciliation.
 
-Project implementation and new tools use Zig 0.16.0. Keep unique source work and
-the patched emitter. The [current keep-list](evidence/tmp_retention_pins.tsv)
-replaces historical retention pins. Every new cache or failure capture needs a
-current consumer or a bounded diagnostic reason.
+## After the baseline
 
-The cache retry fix is validated: full fresh and cached Tier-3 runs each passed
-17/17 subgates, and their 1,315 canonical records match. Completed logs, focused
-regressions and per-subgate timings are in the implementation evidence. The
-external checkout was clean for those acceptance runs.
-
-Current checkpoint: shared pointer returns, `i8 zeroext` entry parameters, and
-nonvolatile `llvm.memset.p0.i64` emit the three retained functions `__memset`,
-`memset`, and `ssp.__memset_chk` through composed lowering. Native differential
-checks pass in both direct and release-o3 routes and all three harness modes.
-Full integration passes all 17 subgates, closing the Phase-5 named-family item.
-
-The project-review repairs are complete: signed min/max and unsigned folds use
-width-aware semantics, and explicit alloca sizes are typed operands preserved
-by optimizer use/replacement walks. All 1,496 unit/structural/storage tests,
-focused ReleaseFast checks, native comparisons, readiness, and all 17 integration
-subgates passed; see [the repair record](roadmap/optimizer_boundary_repairs.md).
-Dynamic local stack codegen remains unsupported. Accepted counters are unchanged.
-
-The [correctness checkpoint](roadmap/correctness_checkpoint.md) now passes before
-the next memory family: all four review repairs, seven permanent unit regressions,
-11 native regression functions, readiness and all 17 integration subgates are
-validated against an unchanged source snapshot. Accepted counters remain fixed.
-
-Next: reproduce the next bounded memory family from the same report,
+Record the baseline and close the remaining architecture-plan deliverable, then
+reproduce the next bounded memory family from the retained compiler-rt report,
 starting with `ssp.__memcpy_chk`. Identify its typed-call and intrinsic blockers
-before choosing the implementation scope. `ssp.__strncpy_chk` remains outside
-the memset slice and now reports a load-width blocker. Keep accepted counters
-unchanged until an explicit evidence-backed migration is recorded.
+before selecting an implementation slice. `ssp.__strncpy_chk` remains outside
+the memset slice and reports a load-width blocker. Broader pass migrations,
+opaque parsing and integer families remain deferred until a concrete consumer
+or reproduced correctness issue justifies them.
+
+## Completed prerequisites and operating rules
+
+The [project improvement plan](roadmap/project_improvement_plan.md) completed its
+six phases, including storage replacement/cleanup, exact summary validation,
+compiler selection, behavioral coverage and current documentation. Its
+[implementation evidence](evidence/project_improvement/implementation.md) includes
+the passing fresh/cached 17-subgate pair and matching canonical records.
+Those phases are not reopened by the remaining architecture baseline.
+
+The [memset family](evidence/composed_memset_family.md),
+[integer/allocation repairs](roadmap/optimizer_boundary_repairs.md), and
+[correctness checkpoint](roadmap/correctness_checkpoint.md) are complete.
+The checkpoint was committed as `eab54c12`: 1,503 unit/structural/storage tests,
+focused ReleaseFast tests, native LLVM comparisons, readiness and all 17
+integration subgates passed against an unchanged source snapshot. It does not
+establish program performance or claim a full ReleaseFast unit-suite pass.
+
+Use Zig 0.16.0, retain the patched emitter and unique source work, and follow the
+[current keep-list](evidence/tmp_retention_pins.tsv). Historical worktree and
+artifact-authority requirements retired by the improvement plan remain retired.
+Every new cache or failure capture needs a current consumer or bounded diagnostic
+reason. The [architecture map](architecture.md) describes implemented routes.
+Keep [accepted counters](accepted_status.json) unchanged until an explicit,
+evidence-backed migration; passing tests or collecting timings never advances
+them automatically.

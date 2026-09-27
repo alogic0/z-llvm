@@ -85,6 +85,10 @@ The next capability family is gated by the completed
 findings are repaired, individual passes and `release-o3` have native validation,
 and full integration passes before starting `ssp.__memcpy_chk`. This follow-up
 does not reopen the six completed improvement phases or advance accepted counters.
+The [architecture refactor plan](architecture_refactor_plan.md) separately retains
+an open fixed-program performance baseline. That is the next deliverable before
+the next memory family; the completed correctness checkpoint does not supply
+compile-time, program-runtime or object-size baseline evidence.
 
 Checkboxes below describe implemented deliverables, not automatic milestone
 acceptance. Exact commands and limitations are in the
