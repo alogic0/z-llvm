@@ -47,6 +47,11 @@ focused ReleaseFast checks, native comparisons, readiness, and all 17 integratio
 subgates passed; see [the repair record](roadmap/optimizer_boundary_repairs.md).
 Dynamic local stack codegen remains unsupported. Accepted counters are unchanged.
 
+The [correctness checkpoint](roadmap/correctness_checkpoint.md) now passes before
+the next memory family: all four review repairs, seven permanent unit regressions,
+11 native regression functions, readiness and all 17 integration subgates are
+validated against an unchanged source snapshot. Accepted counters remain fixed.
+
 Next: reproduce the next bounded memory family from the same report,
 starting with `ssp.__memcpy_chk`. Identify its typed-call and intrinsic blockers
 before choosing the implementation scope. `ssp.__strncpy_chk` remains outside

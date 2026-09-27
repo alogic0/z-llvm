@@ -9,6 +9,16 @@ const ir = @import("../ir.zig");
 pub const DivRem = enum { div, rem };
 pub const DivisionError = error{ DivisionByZero, SignedOverflow, Inexact };
 
+/// A lane is unsigned in the index operand's width, independent of spelling.
+/// Out-of-bounds and unsupported indices are not permission to fold a lane.
+pub fn vectorLane(vector_ty: ir.Type, index_ty: ir.Type, index: ir.Value) ?u32 {
+    if (vector_ty != .vector or index != .int) return null;
+    const integer = Integer.init(index_ty) orelse return null;
+    const lane = integer.unsigned(index.int);
+    if (lane >= vector_ty.vector.len) return null;
+    return @intCast(lane);
+}
+
 pub const Integer = struct {
     bits: u16,
 

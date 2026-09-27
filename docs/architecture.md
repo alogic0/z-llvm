@@ -1,7 +1,8 @@
 # Current architecture
 
-Source baseline: `465f3bbc` (2026-09-26), updated for width-aware integer folding
-and explicit allocation-count operands. This page describes the
+Source baseline: `230a30ef` (2026-09-26), updated for the completed correctness
+checkpoint covering aliases, module references, vector lanes and shift counts.
+This page describes the
 implementation; the
 [refactor plan](roadmap/architecture_refactor_plan.md) records its status and remaining work.
 The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
@@ -94,6 +95,8 @@ Standalone behavioral and compiler-rt counts are separate populations.
   uses width-aware signed min/max and unsigned div/rem interpretation while
   retaining its existing flags, poison/undef, and unsupported-case
   policies. Other integer families still have pass-local rules.
+  Vector lane verification and folding share unsigned index normalization;
+  scalar constant shifts normalize their counts before poison checks.
 - [Operand traversal](../src/ir/operands.zig) provides typed const/mutable walks
   and function-wide replacement. `Instruction.mapOperands`, use counting,
   GlobalOpt replacement, and ADCE liveness share those walks. CFG-update helpers
@@ -114,6 +117,11 @@ Standalone behavioral and compiler-rt counts are separate populations.
   an unknown in a live definition or module scope blocks deletion, while an
   unreachable definition containing unknown text can still be removed. Other
   reference consumers remain separate.
+  ConstMerge now preflights shared reference coverage, rewrites structured
+  operands through the shared traversal, and rechecks references before deletion.
+  InstCombine resolves aliases over the complete live function after folding,
+  including earlier PHIs and non-topologically ordered blocks. See the
+  [correctness checkpoint](roadmap/correctness_checkpoint.md) for validation.
 - `Instruction.clone` copies instruction-owned PHI, GEP, and call lists plus
   the synthesized `cmpxchg` result-type string. Other strings remain borrowed
   from the module/source. SCCP uses a temporary clone with explicit cleanup;

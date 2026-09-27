@@ -104,3 +104,21 @@ local-only conservative:
 unit-test only:
   placeholder pass dispatch for the remaining global cleanup passes
 ```
+
+## ConstMerge correctness checkpoint mapping (2026-09-26)
+
+The [completed checkpoint](../roadmap/correctness_checkpoint.md) maps the reference
+rewrite/deletion contract to `ConstantMergePass::run` and its
+`Old->replaceAllUsesWith(NewConstant)` operation in
+`llvm/lib/Transforms/IPO/ConstantMerge.cpp`. LLVM rewrites structured constant
+expression users; the local IR still stores some of those users as opaque text.
+The local-conservative boundary therefore retains candidates whenever shared
+reference discovery reports unknown coverage, and checks remaining references
+before deletion. Structured scalar, array, instruction and alias uses remain
+rewritable. This repairs invalid optimizer output without adding a parser
+surface, removing a Zig fallback or claiming full LLVM ConstantMerge parity.
+
+Comparison: `test/opt/inputs/optimizer_checkpoint.ll` under `constmerge` and
+`release-o3`, LLVM 22 verification and native execution through
+`zig build optimizer-correctness`; unit tests also require positive structured
+merges and alias rewriting to remain enabled.

@@ -50,6 +50,12 @@ fixed worktree inventory, supplemental control repository, historical INBOX
 fixtures, and installed-system-binary hashes are retired. Migration and cleanup
 are recorded in the [implementation evidence](evidence/project_improvement/implementation.md).
 
+The [correctness checkpoint](roadmap/correctness_checkpoint.md) follows the
+latest review at `230a30ef`. Four optimizer repairs and permanent regressions
+pass 1,503 unit/structural/storage tests, native LLVM comparisons, readiness and
+all 17 integration subgates. The checkpoint before the next memory family is
+complete; these development results do not change the accepted record.
+
 See [next steps](next_steps.md), the [improvement plan](roadmap/project_improvement_plan.md),
 and the root [setup instructions](../README.md). Historical milestones remain
 under the roadmap and evidence directories; they do not select current work.

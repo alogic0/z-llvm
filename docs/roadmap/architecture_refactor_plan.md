@@ -4,6 +4,11 @@ Initial baseline: `629e2ee7`, 2026-09-26. Documentation and planning were commit
 as `56e66794`. The first four bounded refactor slices are implemented below.
 Selector defaults, public CLI behavior, and acceptance counters remain unchanged.
 
+The [correctness checkpoint](correctness_checkpoint.md) is complete and precedes
+the next memory family. It extends the bounded migrations to InstCombine's final
+alias rewrite, ConstMerge's reference/deletion checks, typed vector lanes and
+shift-count normalization, with individual-pass and release-o3 regressions.
+
 ## Corrected assessment
 
 The project already has a shared IR, analyses, operand mapping, CFG helpers,

@@ -1,6 +1,7 @@
 const std = @import("std");
 const core = @import("core.zig");
 const fp_semantics = @import("../analysis/fp_semantics.zig");
+const integer_semantics = @import("../analysis/integer_semantics.zig");
 const target = @import("../target.zig");
 
 const InstructionLocation = struct {
@@ -1586,7 +1587,7 @@ fn verifyLaneIndex(vector_ty: core.Type, index_ty: core.Type, index: core.Value)
     if (vector_ty != .vector) return error.TypeMismatch;
     if (index_ty != .int) return error.TypeMismatch;
     switch (index) {
-        .int => |lane| if (lane < 0 or lane >= vector_ty.vector.len) return error.TypeMismatch,
+        .int => if (integer_semantics.vectorLane(vector_ty, index_ty, index) == null) return error.TypeMismatch,
         .named, .undef, .poison => {},
         .fp, .null_value, .zero_initializer, .vector, .constant_expr => return error.TypeMismatch,
     }

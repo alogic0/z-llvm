@@ -1,5 +1,24 @@
 # instcombine
 
+## Correctness checkpoint mapping (2026-09-26)
+
+The [completed checkpoint](../roadmap/correctness_checkpoint.md) repairs whole-function
+alias replacement, typed vector lane folding and constant shift-count normalization.
+Reference entry points are `Value::replaceAllUsesWith` in
+`llvm/lib/IR/Value.cpp`, `InstCombinerImpl::visitExtractElementInst` in
+`llvm/lib/Transforms/InstCombine/InstCombineVectorOps.cpp`, and
+`ConstantFoldBinaryInstruction` in `llvm/lib/IR/ConstantFold.cpp`.
+LLVM's typed integer constants supply the width-normalized values; the local
+implementation uses the shared integer helper and a final typed operand walk.
+
+`test/opt/inputs/optimizer_checkpoint.ll` compares individual passes and
+`release-o3` through `zig build optimizer-correctness`, with LLVM verification
+and native execution. The affected boundary is local optimization before x86_64
+object emission; no Zig fallback is removed. General vector codegen, unsupported
+wide shifts and opaque operand rewriting remain outside this repair. Local
+verification still rejects out-of-bounds vector indices instead of representing
+LLVM's full poison-producing index surface.
+
 LLVM reference:
 
 ```text

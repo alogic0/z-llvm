@@ -80,6 +80,12 @@ storage tests; the broader build-system work in phase 4 is not a prerequisite.
 
 ## Implementation progress (updated 2026-09-26)
 
+The next capability family is gated by the completed
+[correctness checkpoint](correctness_checkpoint.md): the four subsequent review
+findings are repaired, individual passes and `release-o3` have native validation,
+and full integration passes before starting `ssp.__memcpy_chk`. This follow-up
+does not reopen the six completed improvement phases or advance accepted counters.
+
 Checkboxes below describe implemented deliverables, not automatic milestone
 acceptance. Exact commands and limitations are in the
 [completion evidence](../evidence/project_improvement/implementation.md).

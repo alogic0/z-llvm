@@ -2,13 +2,16 @@ const std = @import("std");
 const common = @import("tool_common.zig");
 
 pub fn main(init: std.process.Init) !void {
-    try runCase(init, "test/opt/inputs/optimizer_review_boundaries.ll", "test/opt/optimizer_review_boundaries_harness.c", &.{ "instcombine,dce", "release-o3" }, "optimizer review boundaries", "functions=7 observations=134");
-    try runCase(init, "test/opt/inputs/optimizer_correctness.ll", "test/opt/optimizer_correctness_harness.c", &.{ "early-cse,instcombine,licm,sccp,globalopt", "release-o3" }, "optimizer correctness", "functions=17");
-    try runCase(init, "test/opt/inputs/globaldce_references.ll", "test/opt/globaldce_references_harness.c", &.{ "globaldce", "adce", "release-o3" }, "GlobalDCE references", "entry_points=5");
-    try runCase(init, "test/opt/inputs/adce_operands.ll", "test/opt/adce_operands_harness.c", &.{ "adce", "release-o3" }, "ADCE vector operands", "observations=156");
+    var buffer: [4096]u8 = undefined;
+    var out = std.Io.File.stdout().writer(init.io, &buffer);
+    try runCase(init, &out.interface, "test/opt/inputs/optimizer_checkpoint.ll", "test/opt/optimizer_checkpoint_harness.c", &.{ "instcombine", "constmerge", "vector-combine", "release-o3" }, "correctness checkpoint", "functions=11 observations=1640 seed=5eed1234");
+    try runCase(init, &out.interface, "test/opt/inputs/optimizer_review_boundaries.ll", "test/opt/optimizer_review_boundaries_harness.c", &.{ "instcombine,dce", "release-o3" }, "optimizer review boundaries", "functions=7 observations=134");
+    try runCase(init, &out.interface, "test/opt/inputs/optimizer_correctness.ll", "test/opt/optimizer_correctness_harness.c", &.{ "early-cse,instcombine,licm,sccp,globalopt", "release-o3" }, "optimizer correctness", "functions=17");
+    try runCase(init, &out.interface, "test/opt/inputs/globaldce_references.ll", "test/opt/globaldce_references_harness.c", &.{ "globaldce", "adce", "release-o3" }, "GlobalDCE references", "entry_points=5");
+    try runCase(init, &out.interface, "test/opt/inputs/adce_operands.ll", "test/opt/adce_operands_harness.c", &.{ "adce", "release-o3" }, "ADCE vector operands", "observations=156");
 }
 
-fn runCase(init: std.process.Init, fixture: []const u8, harness: []const u8, pipelines: []const []const u8, label: []const u8, count: []const u8) !void {
+fn runCase(init: std.process.Init, out: *std.Io.Writer, fixture: []const u8, harness: []const u8, pipelines: []const []const u8, label: []const u8, count: []const u8) !void {
     const a = init.gpa;
     const io = init.io;
     const temp = try common.TempDir.init(a, io, "optimizer_correctness");
@@ -24,8 +27,6 @@ fn runCase(init: std.process.Init, fixture: []const u8, harness: []const u8, pip
     const expected = try common.runCapture(a, io, &.{reference}, "optimizer reference execution");
     defer common.freeRunResult(a, expected);
 
-    var buffer: [4096]u8 = undefined;
-    var out = std.Io.File.stdout().writer(io, &buffer);
     for (pipelines) |pipeline| {
         const optimized = try common.allocTempFile(a, temp, pipeline, ".ll");
         defer a.free(optimized);
@@ -41,8 +42,8 @@ fn runCase(init: std.process.Init, fixture: []const u8, harness: []const u8, pip
         defer common.freeRunResult(a, actual);
         if (!std.mem.eql(u8, expected.stdout, actual.stdout) or
             !std.mem.eql(u8, expected.stderr, actual.stderr)) return error.OptimizerExecutionMismatch;
-        try out.interface.print("ok {s} pipeline={s} {s}\n", .{ label, pipeline, count });
-        try out.interface.flush();
+        try out.print("ok {s} pipeline={s} {s}\n", .{ label, pipeline, count });
+        try out.flush();
     }
     success = true;
 }

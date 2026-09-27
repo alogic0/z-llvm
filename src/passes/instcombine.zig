@@ -4,6 +4,7 @@ const memory_effect = @import("../analysis/memory_effect.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 const inst_simplify = @import("inst_simplify.zig");
+const integer_semantics = @import("../analysis/integer_semantics.zig");
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "instcombine",
@@ -87,6 +88,16 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
                     }
                 },
             };
+        }
+        // PHI backedges and non-topological block order can refer to a fold
+        // discovered later. Rewrite the complete live function after collecting
+        // aliases, resolving chains before use counting or verification.
+        const mapper = AliasResolver{ .aliases = aliases };
+        for (function.blocks.items) |*block| {
+            for (block.instructions.items) |*instruction| {
+                if (!instruction.removed) _ = try ir.operands.instruction(instruction, mapper);
+            }
+            if (block.terminator) |*term| _ = try ir.operands.terminator(term, mapper);
         }
         changed = try removeTriviallyDeadInstructions(module.allocator, function) or changed;
     }
@@ -225,11 +236,21 @@ fn canonicalizeStrictSelfFcmp(fcmp: *ir.FcmpInst) bool {
 }
 
 fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value {
-    return switch (value) {
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => value,
-        .named => |name| aliases.get(name) orelse value,
-    };
+    var result = value;
+    var remaining = aliases.count();
+    while (result == .named and remaining != 0) : (remaining -= 1) {
+        result = aliases.get(result.named) orelse break;
+    }
+    return result;
 }
+
+const AliasResolver = struct {
+    pub const Error = error{};
+    aliases: std.StringHashMap(ir.Value),
+    pub fn visit(resolver: AliasResolver, value: *ir.Value, _: ir.Type) Error!void {
+        value.* = resolveValue(resolver.aliases, value.*);
+    }
+};
 
 fn fold(instruction: ir.Instruction) ?ir.Value {
     return inst_simplify.simplify(instruction);
@@ -258,8 +279,9 @@ fn foldWithContext(instruction: ir.Instruction, inserted_vectors: std.StringHash
 fn foldExtractAfterInsert(extract: ir.ExtractElementInst, inserted_vectors: std.StringHashMap(InsertRecord)) ?ir.Value {
     if (extract.vector != .named) return null;
     const insert = (inserted_vectors.get(extract.vector.named) orelse return null).insert;
-    if (extract.index != .int or insert.index != .int) return null;
-    if (extract.index.int != insert.index.int) return null;
+    const extract_lane = integer_semantics.vectorLane(extract.vector_ty, extract.index_ty, extract.index) orelse return null;
+    const insert_lane = integer_semantics.vectorLane(insert.vector_ty, insert.index_ty, insert.index) orelse return null;
+    if (extract_lane != insert_lane) return null;
     if (!extract.vector_ty.eql(insert.vector_ty)) return null;
     const vector_ty = switch (extract.vector_ty) {
         .vector => |vector_ty| vector_ty,
@@ -287,8 +309,7 @@ fn rewriteExtractAfterShuffle(
     shuffled_vectors: std.StringHashMap(ShuffleRecord),
 ) bool {
     if (extract.vector != .named) return false;
-    if (extract.index != .int) return false;
-    if (extract.index.int < 0) return false;
+    const extract_lane = integer_semantics.vectorLane(extract.vector_ty, extract.index_ty, extract.index) orelse return false;
     const record = shuffled_vectors.get(extract.vector.named) orelse return false;
     const shuffle = record.shuffle;
     const extract_vector_ty = switch (extract.vector_ty) {
@@ -307,8 +328,7 @@ fn rewriteExtractAfterShuffle(
     if (!extract_vector_ty.elem_ty.toType().eql(lhs_vector_ty.elem_ty.toType())) return false;
     if (!shuffle.lhs_ty.eql(shuffle.rhs_ty)) return false;
     if (shuffle.rhs != .poison and shuffle.rhs != .undef) return false;
-    if (extract.index.int > std.math.maxInt(usize)) return false;
-    const target_lane = shuffleMaskLane(shuffle.mask, @intCast(extract.index.int)) orelse return false;
+    const target_lane = shuffleMaskLane(shuffle.mask, extract_lane) orelse return false;
     if (target_lane >= lhs_vector_ty.len) return false;
     extract.vector_ty = shuffle.lhs_ty;
     extract.vector = shuffle.lhs;
@@ -343,8 +363,9 @@ fn rewriteExtractAfterInsert(
     if (extract.vector != .named) return false;
     const record = inserted_vectors.get(extract.vector.named) orelse return false;
     const insert = record.insert;
-    if (extract.index != .int or insert.index != .int) return false;
-    if (extract.index.int == insert.index.int) return false;
+    const extract_lane = integer_semantics.vectorLane(extract.vector_ty, extract.index_ty, extract.index) orelse return false;
+    const insert_lane = integer_semantics.vectorLane(insert.vector_ty, insert.index_ty, insert.index) orelse return false;
+    if (extract_lane == insert_lane) return false;
     if (!extract.vector_ty.eql(insert.vector_ty)) return false;
     const vector_ty = switch (extract.vector_ty) {
         .vector => |vector_ty| vector_ty,
@@ -354,6 +375,7 @@ fn rewriteExtractAfterInsert(
 
     extract.vector = insert.vector;
     extract.index_ty = .{ .int = 64 };
+    extract.index = .{ .int = extract_lane };
     try removeInsertIfDead(allocator, function, record);
     return true;
 }

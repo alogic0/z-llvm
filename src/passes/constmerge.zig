@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
+const references = @import("../analysis/module_references.zig");
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "constmerge",
@@ -17,6 +18,9 @@ const Replacement = struct {
 };
 
 fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassResult {
+    // The replacement walk cannot rewrite opaque expressions, metadata or
+    // assembly. Incomplete reference coverage forbids deleting any candidate.
+    if (references.query(module, "").has_unknown) return .unchanged;
     var replacements: std.ArrayList(Replacement) = .empty;
     defer replacements.deinit(context.allocator);
 
@@ -85,9 +89,10 @@ fn replaceGlobalUses(module: *ir.Module, replacement: Replacement) void {
         for (function.blocks.items) |*block| {
             for (block.instructions.items) |*instruction| {
                 if (instruction.removed) continue;
-                replaceInstructionOperand(instruction, replacement);
+                _ = ir.operands.instruction(instruction, OperandReplacer{ .replacement = replacement }) catch unreachable;
             }
-            if (block.terminator) |*terminator| replaceTerminatorOperand(terminator, replacement);
+            if (block.terminator) |*terminator|
+                _ = ir.operands.terminator(terminator, OperandReplacer{ .replacement = replacement }) catch unreachable;
         }
     }
 }
@@ -106,7 +111,7 @@ fn removeMergedGlobals(module: *ir.Module, replacements: []const Replacement) vo
     var index: usize = 0;
     while (index < module.globals.items.len) {
         const global = module.globals.items[index];
-        if (!isRemovedGlobal(global.name, replacements)) {
+        if (!isRemovedGlobal(global.name, replacements) or references.query(module, global.name).mayReference()) {
             index += 1;
             continue;
         }
@@ -122,99 +127,13 @@ fn isRemovedGlobal(name: []const u8, replacements: []const Replacement) bool {
     return false;
 }
 
-fn replaceInstructionOperand(instruction: *ir.Instruction, replacement: Replacement) void {
-    switch (instruction.kind) {
-        .binary => |*binary| {
-            binary.lhs = replaceValue(binary.lhs, replacement);
-            binary.rhs = replaceValue(binary.rhs, replacement);
-        },
-        .cast => |*cast| cast.value = replaceValue(cast.value, replacement),
-        .freeze => |*freeze| freeze.value = replaceValue(freeze.value, replacement),
-        .icmp => |*icmp| {
-            icmp.lhs = replaceValue(icmp.lhs, replacement);
-            icmp.rhs = replaceValue(icmp.rhs, replacement);
-        },
-        .fcmp => |*fcmp| {
-            fcmp.lhs = replaceValue(fcmp.lhs, replacement);
-            fcmp.rhs = replaceValue(fcmp.rhs, replacement);
-        },
-        .select => |*select| {
-            select.cond = replaceValue(select.cond, replacement);
-            select.true_value = replaceValue(select.true_value, replacement);
-            select.false_value = replaceValue(select.false_value, replacement);
-        },
-        .phi => |*phi| for (phi.incoming.items) |*incoming| {
-            incoming.value = replaceValue(incoming.value, replacement);
-        },
-        .alloca => |*alloca| if (alloca.count) |*count| {
-            count.value = replaceValue(count.value, replacement);
-        },
-        .load => |*load| load.ptr = replaceValue(load.ptr, replacement),
-        .store => |*store| {
-            store.value = replaceValue(store.value, replacement);
-            store.ptr = replaceValue(store.ptr, replacement);
-        },
-        .atomicrmw => |*atomicrmw| {
-            atomicrmw.ptr = replaceValue(atomicrmw.ptr, replacement);
-            atomicrmw.value = replaceValue(atomicrmw.value, replacement);
-        },
-        .cmpxchg => |*cmpxchg| {
-            cmpxchg.ptr = replaceValue(cmpxchg.ptr, replacement);
-            cmpxchg.expected = replaceValue(cmpxchg.expected, replacement);
-            cmpxchg.replacement = replaceValue(cmpxchg.replacement, replacement);
-        },
-        .fence => {},
-        .extractelement => |*extract| {
-            extract.vector = replaceValue(extract.vector, replacement);
-            extract.index = replaceValue(extract.index, replacement);
-        },
-        .insertelement => |*insert| {
-            insert.vector = replaceValue(insert.vector, replacement);
-            insert.value = replaceValue(insert.value, replacement);
-            insert.index = replaceValue(insert.index, replacement);
-        },
-        .shufflevector => |*shuffle| {
-            shuffle.lhs = replaceValue(shuffle.lhs, replacement);
-            shuffle.rhs = replaceValue(shuffle.rhs, replacement);
-            shuffle.mask = replaceValue(shuffle.mask, replacement);
-        },
-        .extractvalue => |*extract| extract.aggregate = replaceValue(extract.aggregate, replacement),
-        .insertvalue => |*insert| {
-            insert.aggregate = replaceValue(insert.aggregate, replacement);
-            insert.value = replaceValue(insert.value, replacement);
-        },
-        .gep => |*gep| {
-            gep.ptr = replaceValue(gep.ptr, replacement);
-            for (gep.indices.items) |*index| {
-                index.value = replaceValue(index.value, replacement);
-            }
-        },
-        .call => |*call| {
-            if (call.callee_value) |value| call.callee_value = replaceValue(value, replacement);
-            for (call.args.items) |*arg| {
-                arg.value = replaceValue(arg.value, replacement);
-            }
-        },
+const OperandReplacer = struct {
+    pub const Error = error{};
+    replacement: Replacement,
+    pub fn visit(replacer: OperandReplacer, value: *ir.Value, _: ir.Type) Error!void {
+        value.* = replaceValue(value.*, replacer.replacement);
     }
-}
-
-fn replaceTerminatorOperand(terminator: *ir.Terminator, replacement: Replacement) void {
-    switch (terminator.*) {
-        .ret => |*ret| {
-            if (ret.value) |value| ret.value = replaceValue(value, replacement);
-        },
-        .br => {},
-        .@"unreachable" => {},
-        .condbr => |*condbr| condbr.cond = replaceValue(condbr.cond, replacement),
-        .indirectbr => |*indirectbr| indirectbr.addr = replaceValue(indirectbr.addr, replacement),
-        .@"switch" => |*switch_term| {
-            switch_term.cond = replaceValue(switch_term.cond, replacement);
-            for (switch_term.cases.items) |*case| {
-                case.value = replaceValue(case.value, replacement);
-            }
-        },
-    }
-}
+};
 
 fn replaceValue(value: ir.Value, replacement: Replacement) ir.Value {
     const name = switch (value) {

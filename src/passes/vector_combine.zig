@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
+const integer_semantics = @import("../analysis/integer_semantics.zig");
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "vector-combine",
@@ -53,7 +54,8 @@ fn foldExtractAfterInsert(
     if (extract.vector != .named) return false;
     const record = inserted_vectors.get(extract.vector.named) orelse return false;
     const insert = record.insert;
-    if (extract.index != .int or insert.index != .int) return false;
+    const extract_lane = integer_semantics.vectorLane(extract.vector_ty, extract.index_ty, extract.index) orelse return false;
+    const insert_lane = integer_semantics.vectorLane(insert.vector_ty, insert.index_ty, insert.index) orelse return false;
     if (!extract.vector_ty.eql(insert.vector_ty)) return false;
     const vector_ty = switch (extract.vector_ty) {
         .vector => |vector_ty| vector_ty,
@@ -61,7 +63,7 @@ fn foldExtractAfterInsert(
     };
     if (!vector_ty.elem_ty.toType().eql(insert.value_ty)) return false;
 
-    if (extract.index.int == insert.index.int) {
+    if (extract_lane == insert_lane) {
         instruction.removed = true;
         instruction.replacement = insert.value;
         const result = instruction.result orelse return error.InstructionWithoutResult;
@@ -69,6 +71,7 @@ fn foldExtractAfterInsert(
     } else {
         extract.vector = insert.vector;
         extract.index_ty = .{ .int = 64 };
+        extract.index = .{ .int = extract_lane };
     }
 
     removeInsertIfDead(function, record);

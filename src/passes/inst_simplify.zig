@@ -187,11 +187,12 @@ fn foldShiftConstant(binary: ir.BinaryInst) ?ir.Value {
     if (binary.flags.disjoint) return null;
     const bits = intBits(binary.ty) orelse return null;
     if (bits == 0 or bits >= 128) return null;
-    if (binary.rhs.int < 0 or binary.rhs.int >= bits) return .poison;
+    const integer = integer_semantics.Integer.initBits(bits).?;
+    const count = integer.unsigned(binary.rhs.int);
+    if (count >= bits) return .poison;
 
     const mask = (@as(u128, 1) << @intCast(bits)) - 1;
-    const shift: u7 = @intCast(binary.rhs.int);
-    const integer = integer_semantics.Integer.initBits(bits).?;
+    const shift: u7 = @intCast(count);
     const lhs_bits = integer.unsigned(binary.lhs.int);
     const shifted = switch (binary.op) {
         .shl => (lhs_bits << shift) & mask,
