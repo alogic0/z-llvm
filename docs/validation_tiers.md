@@ -197,3 +197,12 @@ through direct and release-o3 routes in three harness modes. It checks bytes,
 source preservation, returned pointers, live scalar/vector values and bounds
 traps. The integrated-executable subgate runs the same implementation. Counts
 remain separate from accepted corpus counters; see [the family evidence](evidence/composed_memcpy_family.md).
+
+### Scalar byte-loop canary
+
+`zig build byte-loops-diff` executes retained checked strncpy, bcmp and memcmp
+plus four scalar byte-loop compositions through direct/release-o3 routes in
+three harness modes. It requires composed ownership and checks bytes, scalar
+results, protected-page boundaries and paired bounds traps. The integrated
+executable gate invokes the same implementation; its population is separate
+from accepted corpus counters. See [the evidence](evidence/composed_byte_loops.md).

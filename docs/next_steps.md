@@ -16,16 +16,25 @@ subgates pass. The frozen performance matrix retains its supported outcomes and
 semantic results; two local memset code sections grow by 11 bytes for the
 byte-GEP preservation repair. Timing differences do not establish a speedup.
 
-## Next: cyclic byte-memory lowering
+The subsequent [scalar byte-loop slice](evidence/composed_byte_loops.md) closes
+the retained `ssp.__strncpy_chk` definition and moves retained `bcmp`/`memcmp`
+to composed lowering. A bounded shared-return proof fixes their verifier
+rejection. Native comparisons, protected-page checks, ABI checks and all 17
+integration subgates pass. The frozen performance matrix retains all outcomes,
+semantic results and object hashes from the memcpy checkpoint.
 
-Investigate the CFG and return-register proof needed for cyclic byte-memory
-transfers before extending to `ssp.__strncpy_chk`. It currently rejects with
-`composed-block-byte-transfer-cyclic-cfg`; broader admission exposed
-`ReturnRegisterUndefined` in composed `bcmp`/`memcmp`, whose structural fallbacks
-remain supported. Reproduce and bound that issue before extending admission.
-The loop-memory `release-o3` optimizer rejection remains an independent follow-up.
-Broader pass migrations, opaque parsing and integer families remain deferred
-until a concrete consumer or reproduced correctness issue justifies them.
+## Next: loop-memory optimizer rejection
+
+Reproduce and repair the frozen `loops_memory/release-o3` optimizer
+`TypeMismatch`, with a focused regression and semantic comparison against the
+original program. Once support is proven, version the matrix's support
+expectations and record measurements for the newly supported pair; preserve
+the original frozen manifest and baseline evidence.
+
+Cyclic byte-vector transfers still require separate loop-carried XMM ownership
+proof. Further string families, broader pass migrations, opaque parsing and
+integer families remain deferred until a concrete consumer or reproduced
+correctness issue justifies them.
 
 Use the frozen baseline for future measured comparisons; it establishes neither
 a speedup nor general optimizer/backend parity. Reuse matching correctness

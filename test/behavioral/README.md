@@ -54,3 +54,17 @@ bytes, source preservation, return pointers and live scalar/vector values.
 Direct and release-o3 routes run in three harness modes, always with composed
 ownership and an independent LLVM reference. Bounds violations must trap.
 See [the evidence and admission boundaries](../../docs/evidence/composed_memcpy_family.md).
+
+## Scalar byte loops and checked strncpy
+
+`zig build byte-loops-diff` exercises the exact retained `ssp.__strncpy_chk`,
+`bcmp` and `memcmp` definitions plus four scalar byte-loop compositions. Each
+direct/release-o3 route runs in three harness modes against the original IR
+compiled by clang-22. All seven functions must use composed lowering.
+
+The harness checks zero padding, truncation, returned pointers, high-bit byte
+comparisons, loop-carried values, early exits, source preservation and unchanged
+surrounding bytes. Protected pages detect source overreads and zero-length
+accesses; paired SIGILL checks cover bounds violations. Native loop executions
+have a 30-second timeout. The integrated-executable gate runs the same canary.
+See [the evidence](../../docs/evidence/composed_byte_loops.md).

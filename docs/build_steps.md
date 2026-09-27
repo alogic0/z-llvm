@@ -3,7 +3,8 @@
 Use Zig 0.16.0, as pinned in `.zigversion`. `test-unit` (with optional
 `-Dtest-filter=NAME`), `structural-smoke`, and `artifact-store-test` need no external
 compiler or historical local state. `test` also runs the mandatory ABI gate.
-`behavioral-diff`, `memset-diff` and `memcpy-diff` require clang-22; the two memory-family gates also use opt-22.
+`behavioral-diff`, `memset-diff`, `memcpy-diff` and `byte-loops-diff` require clang-22;
+the memory-family gates also use opt-22. `byte-loops-diff` uses `timeout` to bound native loop execution.
 `check-docs` verifies current status and links.
 Full distribution runs require the explicit emitter/root selections shown in
 [the root setup guide](../README.md). Older tables below describe their named
@@ -27,6 +28,7 @@ is for. Use `zig build --help` to see the authoritative current list.
 | --- | --- |
 | `zig build memset-diff` | Execute three retained memset definitions and six compositions against LLVM in three harness modes, through direct and release-o3 routes; require composed ownership and check bounds traps. |
 | `zig build memcpy-diff` | Execute two retained memcpy definitions and seven compositions against LLVM in three harness modes, through direct and release-o3 routes; require composed ownership and check bounds traps. |
+| `zig build byte-loops-diff` | Execute retained checked strncpy, bcmp and memcmp plus four scalar byte-loop compositions through direct/release-o3 routes in three harness modes; require composed ownership and check protected-page accesses and bounds traps. |
 | `zig build readiness` | Run the full readiness gate: unit tests, optimizer comparison, manifest linting, Zig corpus validation, handoff validation, and generated scalar differential checks. Use for parser, verifier, pass-manager, manifest, or broad evidence changes. |
 | `zig build check-zig-stage4-emitter` | Check that the authoritative stage4 Zig emitter version matches the tracked build pin in `docs/evidence/ziglang_pin.txt`, not live `../ziglang` HEAD. `ZIG_EMITTER` overrides the binary path, `ZIG_SOURCE_DIR` still supplies the default emitter path, and `ZIGLANG_PIN_FILE` may point at a temporary fixture when validating mismatch diagnostics. |
 | `zig build structural-smoke` | Run focused structural invariants that should stay cheap: split x86_64 module boundaries, structured-direct surface registry checks, and other architecture/debt smoke tests. Use after code-layout refactors and before broader release gates. |

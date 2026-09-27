@@ -84,6 +84,7 @@ pub fn build(b: *std.Build) void {
     addToolStepWithArgs(b, "zig-corpus", "Run accepted Zig IR corpus rows; pass optional manifest after --", "tools/run_zig_corpus.zig");
     addToolStep(b, "generated-scalar-diff", "Run generated scalar differential checks", "tools/run_generated_scalar_diff.zig");
     addToolStep(b, "memset-diff", "Execute retained memset family and compositions against LLVM", "tools/run_memset_diff.zig");
+    addToolStep(b, "byte-loops-diff", "Execute checked strncpy and scalar byte loops against LLVM", "tools/run_byte_loops_diff.zig");
     addToolStep(b, "memcpy-diff", "Execute retained checked memcpy and compositions against LLVM", "tools/run_memcpy_diff.zig");
     addToolStepWithArgs(b, "behavioral-diff", "Execute composed programs against an independent LLVM reference", "tools/run_behavioral_diff.zig");
     addToolStepWithArgs(b, "check-docs", "Validate current documentation links and accepted status", "tools/check_project_docs.zig");

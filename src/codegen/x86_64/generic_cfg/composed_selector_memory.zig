@@ -111,8 +111,6 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
                 return lowerReadOnlyPointerIntegerLoad(selector, result_name, load, bits);
         }
     }
-    if (load.ty.eql(.{ .int = 8 }) and selector_state.valueRegisterClass(selector, load.ptr) == .gpr64 and
-        !try byteTransfersAreAcyclic(selector)) return .{ .no_emitter = "composed-block-byte-transfer-cyclic-cfg" };
     if (isF32x2(load.ty)) return lowerLoadF32Pair(selector, result_name, load);
     if (scalarFpBits(load.ty)) |bits| return lowerLoadFp(selector, result_name, load, bits);
     if (!load.ty.eql(.{ .int = 8 }) and !load.ty.eql(.{ .int = 16 }) and !load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-load-width" };
@@ -178,7 +176,6 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
     if (store.ty.eql(.{ .int = 8 }) and (store.ty_addrspace != null or store.ptr_addrspace != null)) return .{ .no_emitter = "composed-block-byte-store-addrspace" };
     if (store.ptr == .named and selector.readonly_pointer_params.contains(store.ptr.named))
         return .{ .no_emitter = "composed-block-store-readonly-param" };
-    if (store.ty.eql(.{ .int = 8 }) and !try byteTransfersAreAcyclic(selector)) return .{ .no_emitter = "composed-block-byte-transfer-cyclic-cfg" };
     if (inspection.isByteVector128(store.ty)) return lowerStoreByteVector(selector, store);
     if (scalarFpStoreBits(store.ty)) |bits| return lowerStoreFp(selector, store, bits);
     if (store.ty == .ptr) return lowerStoreStackPointer(selector, store);
@@ -313,8 +310,8 @@ fn scalarFpStoreBits(ty: ir.Type) ?u16 {
     return if (ty == .half) 16 else scalarFpBits(ty);
 }
 
-// This capability admits acyclic byte transfers. Comparison/string loops need
-// separate CFG/return-register proof before taking ownership from old fallbacks.
+// Scalar byte loops use the existing framed CFG/phi machinery. Raw byte vectors
+// remain acyclic until their loop-carried XMM ownership has separate proof.
 fn byteTransfersAreAcyclic(selector: *ComposedBlockSelector) !bool {
     const function = selector.function orelse return false;
     if (function.blocks.items.len > stage2_max_blocks) return false;

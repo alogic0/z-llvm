@@ -131,11 +131,9 @@ test "composed memcpy unaligned vector encoding and assembly preserve aligned de
     try std.testing.expect(std.mem.indexOf(u8, output.written(), "movaps 0(%rsi), %xmm0") != null);
 }
 
-test "composed memcpy leaves cyclic byte transfers outside the admitted scope" {
+test "composed memcpy leaves cyclic byte vector transfers outside the admitted scope" {
     for ([_][]const u8{
-        "%v = load i8, ptr %s, align 1",
         "%v = load <16 x i8>, ptr %s, align 1",
-        "store i8 42, ptr %d, align 1",
     }) |body| {
         const text = try std.fmt.allocPrint(std.testing.allocator, "define void @copy(ptr %d, ptr %s, i32 %flag) {{\nentry:\n %again = icmp ne i32 %flag, 0\n br label %loop\nloop:\n {s}\n br i1 %again, label %loop, label %done\ndone:\n ret void\n}}\n", .{body});
         defer std.testing.allocator.free(text);

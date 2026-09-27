@@ -24,9 +24,11 @@ The [fixed-program baseline](../evidence/fixed_program_baseline.md) closes 5b
 and this bounded plan. The subsequent
 [checked memcpy family](../evidence/composed_memcpy_family.md) is also complete
 for the retained `ssp.__memcpy_chk` and `memcpyFast` definitions, extending
-capability beyond the memset deliverable. Cyclic byte-memory lowering remains
-a separate investigation in [next steps](../next_steps.md). The recorded
-loop-memory `release-o3` rejection is a separate optimizer follow-up; baseline
+capability beyond the memset deliverable. The subsequent
+[scalar byte-loop slice](../evidence/composed_byte_loops.md) closes retained
+`ssp.__strncpy_chk` and composes the retained byte comparisons. Cyclic byte
+vectors remain deferred. The recorded loop-memory `release-o3` rejection is
+the separate optimizer follow-up in [next steps](../next_steps.md); baseline
 completion does not claim that every route supports every workload.
 
 The [correctness checkpoint](correctness_checkpoint.md) extends the earlier

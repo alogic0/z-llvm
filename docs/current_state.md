@@ -65,8 +65,13 @@ optimizer rejection. The subsequent
 `ssp.__memcpy_chk` and `memcpyFast` definitions through shared composed lowering.
 Native comparisons, ABI differential checks and all 17 integration subgates pass;
 the unchanged performance matrix retains its outcomes and semantic results.
-The next bounded investigation is cyclic byte-memory CFG/return-register support
-toward `ssp.__strncpy_chk`. Broader consumer migrations remain deferred.
+The subsequent [scalar byte-loop slice](evidence/composed_byte_loops.md) closes
+retained `ssp.__strncpy_chk` and composes retained `bcmp`/`memcmp`, with a bounded
+return-join verification repair. All 17 integration subgates, native and ABI
+comparisons pass. The fixed-program matrix retains its supported outcomes,
+semantic results and object hashes. Next investigate its loop-memory
+`release-o3` optimizer rejection. Cyclic byte vectors and broader consumer
+migrations remain deferred.
 These development results and measurements do not advance accepted counters.
 
 See [next steps](next_steps.md), the [improvement plan](roadmap/project_improvement_plan.md),

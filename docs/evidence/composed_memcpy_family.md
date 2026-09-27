@@ -41,6 +41,11 @@ admission exposed `ReturnRegisterUndefined` for composed `bcmp`/`memcmp`; those
 CFG/return-register proofs are a separate follow-up. Existing readonly integer
 load families keep their prior admission.
 
+Subsequent work in the [scalar byte-loop slice](composed_byte_loops.md) resolves
+this scalar CFG/return-register boundary and closes retained `ssp.__strncpy_chk`.
+The acyclic restriction remains for byte-vector transfers. The counts and
+measurements on this page describe the earlier memcpy checkpoint.
+
 Volatile/atomic accesses, other vector shapes, nondefault address spaces,
 non-i64 pointer casts, malformed alias markers, unsupported intrinsic attributes,
 constant copy lengths, other length widths and memmove remain outside the newly

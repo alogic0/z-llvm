@@ -454,14 +454,33 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var saw_terminator = false;
     var preserve_eax_at_next_label = false;
     var rsp_mod16: u4 = 8;
-    for (function.instructions.items) |instruction| {
+    const return_join = finalReturnJoin(function);
+    var join_definitions: ReturnDefinitions = .{};
+    for (function.instructions.items, 0..) |instruction, instruction_index| {
+        if (return_join) |join| {
+            const target: ?[]const u8 = switch (instruction) {
+                .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => |name| name,
+                else => null,
+            };
+            if (target) |name| if (std.mem.eql(u8, name, function.instructions.items[join].label)) {
+                join_definitions.include(eax_defined, xmm0_defined, xmm_defined_bits);
+            };
+        }
         recordXmmDefinitions(instruction, &xmm_defined_bits);
         switch (instruction) {
             .label => |label| {
                 eax_defined_before_label = eax_defined;
                 xmm0_defined_before_label = xmm0_defined;
                 xmm_defined_bits_before_label = xmm_defined_bits;
-                if (preserve_eax_at_next_label) {
+                if (return_join == instruction_index and join_definitions.incoming != 0) {
+                    if (instruction_index == 0 or fallsThrough(function.instructions.items[instruction_index - 1])) {
+                        join_definitions.include(eax_defined, xmm0_defined, xmm_defined_bits);
+                    }
+                    eax_defined = join_definitions.eax;
+                    xmm0_defined = join_definitions.xmm0;
+                    xmm_defined_bits = join_definitions.xmm_bits;
+                    preserve_eax_at_next_label = false;
+                } else if (preserve_eax_at_next_label) {
                     preserve_eax_at_next_label = false;
                 } else if (!std.mem.endsWith(u8, label, "generic_cfg_select_end") and
                     !std.mem.endsWith(u8, label, "generic_cfg_pointer_select_end") and
@@ -691,6 +710,46 @@ pub fn verifyFunction(function: MachineFunction) !void {
     }
     if (!saw_terminator) return error.MissingMachineReturn;
 }
+
+// Prove the incoming return-register definitions for a final shared epilogue.
+// Its suffix only restores rsp and returns, so all incoming branches precede
+// it. Other joins keep their existing conservative block-local checks; this is
+// not a general CFG dataflow analysis or an exemption based on a label name.
+fn finalReturnJoin(function: MachineFunction) ?usize {
+    const instructions = function.instructions.items;
+    if (instructions.len == 0 or instructions[instructions.len - 1] != .ret) return null;
+    var index = instructions.len - 1;
+    while (index > 0) {
+        index -= 1;
+        switch (instructions[index]) {
+            .label => return index,
+            .add_rsp_8, .add_rsp_24, .add_rsp_40, .add_rsp_56, .add_rsp_imm8, .add_rsp_imm32 => {},
+            else => return null,
+        }
+    }
+    return null;
+}
+
+fn fallsThrough(instruction: machine_ir.Instruction) bool {
+    return switch (instruction) {
+        .jmp, .ret, .ud2, .direct_jump, .noreturn_direct_call => false,
+        else => true,
+    };
+}
+
+const ReturnDefinitions = struct {
+    incoming: usize = 0,
+    eax: bool = true,
+    xmm0: bool = true,
+    xmm_bits: [8]u16 = @splat(std.math.maxInt(u16)),
+
+    fn include(self: *ReturnDefinitions, eax: bool, xmm0: bool, xmm_bits: [8]u16) void {
+        self.incoming += 1;
+        self.eax = self.eax and eax;
+        self.xmm0 = self.xmm0 and xmm0;
+        for (&self.xmm_bits, xmm_bits) |*bits, incoming| bits.* = @min(bits.*, incoming);
+    }
+};
 
 fn recordXmmDefinitions(instruction: machine_ir.Instruction, defined_bits: *[8]u16) void {
     switch (instruction) {

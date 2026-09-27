@@ -294,6 +294,7 @@ pub fn main(init: std.process.Init) !void {
     try @import("run_behavioral_diff.zig").run(init);
     try @import("run_memset_diff.zig").run(init);
     try @import("run_memcpy_diff.zig").run(init);
+    try @import("run_byte_loops_diff.zig").run(init);
 }
 
 fn emitAggregateSseSemanticObject(
