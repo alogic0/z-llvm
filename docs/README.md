@@ -3,7 +3,7 @@
 Start with [current architecture](architecture.md) for the implemented components,
 input routes, selector ownership, and validation limits. The
 [architecture refactor plan](roadmap/architecture_refactor_plan.md) records
-proposed consolidation work. [Current state](current_state.md) owns status and
+the completed bounded consolidation and performance baseline. [Current state](current_state.md) owns status and
 [next steps](next_steps.md) owns active direction. The long roadmap and completion
 lists below are historical context, not proof of current general capability.
 

@@ -1,0 +1,1301 @@
+{
+  "complete": true,
+  "rows": [
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 23539751,
+          "total_ns": 23539751
+        },
+        {
+          "codegen_ns": 22963605,
+          "total_ns": 22963605
+        },
+        {
+          "codegen_ns": 24874439,
+          "total_ns": 24874439
+        },
+        {
+          "codegen_ns": 23429857,
+          "total_ns": 23429857
+        },
+        {
+          "codegen_ns": 24346778,
+          "total_ns": 24346778
+        },
+        {
+          "codegen_ns": 23164418,
+          "total_ns": 23164418
+        },
+        {
+          "codegen_ns": 26026050,
+          "total_ns": 26026050
+        },
+        {
+          "codegen_ns": 21375381,
+          "total_ns": 21375381
+        },
+        {
+          "codegen_ns": 21787808,
+          "total_ns": 21787808
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 916921,
+          "max": 26026050,
+          "median": 23429857,
+          "min": 21375381
+        },
+        "total_ns": {
+          "mad": 916921,
+          "max": 26026050,
+          "median": 23429857,
+          "min": 21375381
+        }
+      },
+      "executable_section_bytes": 22,
+      "input_sha256": "8337fd92f392a2ce07da140b136000e678c15d3ea9b8c8e83fdbd38220068ecc",
+      "linked_harness_bytes": 3791528,
+      "object_bytes": 616,
+      "object_sha256": "87eed5ce784fc000c805236f6c29c82c1c417f6489d08a90e3b5d199df2b17d4",
+      "route": "llvm-O3",
+      "runtime_executable_sha256": "385c605510490d7f01b07304bed65a83785d2c2098eacd77aeab57a5dd44b91d",
+      "runtime_ns": [
+        54121022,
+        51601639,
+        54772325,
+        61347704,
+        53090809,
+        55707553,
+        52633045,
+        52982838,
+        51402990
+      ],
+      "runtime_stats_ns": {
+        "mad": 1489170,
+        "max": 61347704,
+        "median": 53090809,
+        "min": 51402990
+      },
+      "runtime_stdout_sha256": "e3a871a295d50eaa2dd4a8a69e10ac69d451077613ecafa8e8c9f6eb250f1894",
+      "semantic_stdout_sha256": "465b1aeed36b80f1cd1eada3fb888abd9882c15d5096a873fb5f5d1f7cad264b",
+      "stage_input_sha256": "8337fd92f392a2ce07da140b136000e678c15d3ea9b8c8e83fdbd38220068ecc",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "arguments_branches"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 2706118,
+          "total_ns": 2706118
+        },
+        {
+          "codegen_ns": 2729043,
+          "total_ns": 2729043
+        },
+        {
+          "codegen_ns": 2471299,
+          "total_ns": 2471299
+        },
+        {
+          "codegen_ns": 3081261,
+          "total_ns": 3081261
+        },
+        {
+          "codegen_ns": 3099928,
+          "total_ns": 3099928
+        },
+        {
+          "codegen_ns": 3095509,
+          "total_ns": 3095509
+        },
+        {
+          "codegen_ns": 3034249,
+          "total_ns": 3034249
+        },
+        {
+          "codegen_ns": 2436471,
+          "total_ns": 2436471
+        },
+        {
+          "codegen_ns": 2828989,
+          "total_ns": 2828989
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 252272,
+          "max": 3099928,
+          "median": 2828989,
+          "min": 2436471
+        },
+        "total_ns": {
+          "mad": 252272,
+          "max": 3099928,
+          "median": 2828989,
+          "min": 2436471
+        }
+      },
+      "executable_section_bytes": 116,
+      "input_sha256": "8337fd92f392a2ce07da140b136000e678c15d3ea9b8c8e83fdbd38220068ecc",
+      "linked_harness_bytes": 3791592,
+      "object_bytes": 816,
+      "object_sha256": "d8d114efd17f3a19129cbfb0d1f12341caa5027348eea50bea858d5a5f1d40f1",
+      "ownership": {
+        "probe": "composed_cfg"
+      },
+      "route": "direct",
+      "runtime_executable_sha256": "8fdecde8450c90618c0fcc0534db105cd5279a097ff71ca099adca371783d838",
+      "runtime_ns": [
+        69132798,
+        67459799,
+        68996552,
+        70236996,
+        68109509,
+        66534831,
+        82212758,
+        66246899,
+        65200584
+      ],
+      "runtime_stats_ns": {
+        "mad": 1574678,
+        "max": 82212758,
+        "median": 68109509,
+        "min": 65200584
+      },
+      "runtime_stdout_sha256": "e3a871a295d50eaa2dd4a8a69e10ac69d451077613ecafa8e8c9f6eb250f1894",
+      "semantic_stdout_sha256": "465b1aeed36b80f1cd1eada3fb888abd9882c15d5096a873fb5f5d1f7cad264b",
+      "stage_input_sha256": "8337fd92f392a2ce07da140b136000e678c15d3ea9b8c8e83fdbd38220068ecc",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "arguments_branches"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 2705968,
+          "optimizer_ns": 901812,
+          "total_ns": 3607780
+        },
+        {
+          "codegen_ns": 2801084,
+          "optimizer_ns": 863918,
+          "total_ns": 3665002
+        },
+        {
+          "codegen_ns": 2350584,
+          "optimizer_ns": 869058,
+          "total_ns": 3219642
+        },
+        {
+          "codegen_ns": 2394729,
+          "optimizer_ns": 795384,
+          "total_ns": 3190113
+        },
+        {
+          "codegen_ns": 2835060,
+          "optimizer_ns": 1087315,
+          "total_ns": 3922375
+        },
+        {
+          "codegen_ns": 2836693,
+          "optimizer_ns": 900650,
+          "total_ns": 3737343
+        },
+        {
+          "codegen_ns": 2450498,
+          "optimizer_ns": 1006407,
+          "total_ns": 3456905
+        },
+        {
+          "codegen_ns": 2685117,
+          "optimizer_ns": 1102394,
+          "total_ns": 3787511
+        },
+        {
+          "codegen_ns": 2189959,
+          "optimizer_ns": 788110,
+          "total_ns": 2978069
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 151576,
+          "max": 2836693,
+          "median": 2685117,
+          "min": 2189959
+        },
+        "optimizer_ns": {
+          "mad": 105266,
+          "max": 1102394,
+          "median": 900650,
+          "min": 788110
+        },
+        "total_ns": {
+          "mad": 179731,
+          "max": 3922375,
+          "median": 3607780,
+          "min": 2978069
+        }
+      },
+      "executable_section_bytes": 116,
+      "input_sha256": "8337fd92f392a2ce07da140b136000e678c15d3ea9b8c8e83fdbd38220068ecc",
+      "linked_harness_bytes": 3791592,
+      "object_bytes": 816,
+      "object_sha256": "d8d114efd17f3a19129cbfb0d1f12341caa5027348eea50bea858d5a5f1d40f1",
+      "ownership": {
+        "probe": "composed_cfg"
+      },
+      "route": "release-o3",
+      "runtime_executable_sha256": "8fdecde8450c90618c0fcc0534db105cd5279a097ff71ca099adca371783d838",
+      "runtime_ns": [
+        66546724,
+        63703237,
+        66961094,
+        71922009,
+        68910694,
+        66208794,
+        63882749,
+        64373698,
+        63181979
+      ],
+      "runtime_stats_ns": {
+        "mad": 2326045,
+        "max": 71922009,
+        "median": 66208794,
+        "min": 63181979
+      },
+      "runtime_stdout_sha256": "e3a871a295d50eaa2dd4a8a69e10ac69d451077613ecafa8e8c9f6eb250f1894",
+      "semantic_stdout_sha256": "465b1aeed36b80f1cd1eada3fb888abd9882c15d5096a873fb5f5d1f7cad264b",
+      "stage_input_sha256": "4d9a8c0be0c769d31212300a40b0e1a082f7622345d259c6ad10cdc19e76f041",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "arguments_branches"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 25692999,
+          "total_ns": 25692999
+        },
+        {
+          "codegen_ns": 26576185,
+          "total_ns": 26576185
+        },
+        {
+          "codegen_ns": 24404481,
+          "total_ns": 24404481
+        },
+        {
+          "codegen_ns": 27481473,
+          "total_ns": 27481473
+        },
+        {
+          "codegen_ns": 26358770,
+          "total_ns": 26358770
+        },
+        {
+          "codegen_ns": 25371311,
+          "total_ns": 25371311
+        },
+        {
+          "codegen_ns": 25585088,
+          "total_ns": 25585088
+        },
+        {
+          "codegen_ns": 24228357,
+          "total_ns": 24228357
+        },
+        {
+          "codegen_ns": 25980792,
+          "total_ns": 25980792
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 665771,
+          "max": 27481473,
+          "median": 25692999,
+          "min": 24228357
+        },
+        "total_ns": {
+          "mad": 665771,
+          "max": 27481473,
+          "median": 25692999,
+          "min": 24228357
+        }
+      },
+      "executable_section_bytes": 124,
+      "input_sha256": "27c80e903db475180f050e2e1d7c7e8af9c0633fad2a107260c9b64adfc54473",
+      "linked_harness_bytes": 3791624,
+      "object_bytes": 720,
+      "object_sha256": "243ada0d5bd5d39c8c2e19c56a3fb07db1fdcf96098c84ef06026204f9d7465e",
+      "route": "llvm-O3",
+      "runtime_executable_sha256": "7ac73ad0337c7a2db154642852c1ef50fb8663796cc9877439402ab00f27b570",
+      "runtime_ns": [
+        79939006,
+        79958685,
+        79369583,
+        79195032,
+        89714679,
+        78401822,
+        78847262,
+        79521911,
+        81378038
+      ],
+      "runtime_stats_ns": {
+        "mad": 436774,
+        "max": 89714679,
+        "median": 79521911,
+        "min": 78401822
+      },
+      "runtime_stdout_sha256": "cdc56f0f02d87ab771b3b0728dd62cee3885ff03ad8b3ec03628805e83dbfaaa",
+      "semantic_stdout_sha256": "d9bd50bd8633a7bae9552b9a0c84f6b73a43a0a731b94a250b442d91d3f65cbc",
+      "stage_input_sha256": "27c80e903db475180f050e2e1d7c7e8af9c0633fad2a107260c9b64adfc54473",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "loops_memory"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 3782672,
+          "total_ns": 3782672
+        },
+        {
+          "codegen_ns": 4095183,
+          "total_ns": 4095183
+        },
+        {
+          "codegen_ns": 2927931,
+          "total_ns": 2927931
+        },
+        {
+          "codegen_ns": 2756747,
+          "total_ns": 2756747
+        },
+        {
+          "codegen_ns": 3995198,
+          "total_ns": 3995198
+        },
+        {
+          "codegen_ns": 2943672,
+          "total_ns": 2943672
+        },
+        {
+          "codegen_ns": 2955335,
+          "total_ns": 2955335
+        },
+        {
+          "codegen_ns": 3048838,
+          "total_ns": 3048838
+        },
+        {
+          "codegen_ns": 3123354,
+          "total_ns": 3123354
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 120907,
+          "max": 4095183,
+          "median": 3048838,
+          "min": 2756747
+        },
+        "total_ns": {
+          "mad": 120907,
+          "max": 4095183,
+          "median": 3048838,
+          "min": 2756747
+        }
+      },
+      "executable_section_bytes": 127,
+      "input_sha256": "27c80e903db475180f050e2e1d7c7e8af9c0633fad2a107260c9b64adfc54473",
+      "linked_harness_bytes": 3791592,
+      "object_bytes": 816,
+      "object_sha256": "e8ea4eead07ade77a22f1c5345e70feaa348e27f2808f78a752de1926b89da03",
+      "ownership": {
+        "probe": "composed_cfg"
+      },
+      "route": "direct",
+      "runtime_executable_sha256": "ed3b97da0a798c306557a06842becc66c5a1639d2cc364a0de1d94e6bc548814",
+      "runtime_ns": [
+        268983175,
+        263876665,
+        259834226,
+        253216524,
+        299877698,
+        247878001,
+        260566868,
+        265184652,
+        271847582
+      ],
+      "runtime_stats_ns": {
+        "mad": 5106510,
+        "max": 299877698,
+        "median": 263876665,
+        "min": 247878001
+      },
+      "runtime_stdout_sha256": "cdc56f0f02d87ab771b3b0728dd62cee3885ff03ad8b3ec03628805e83dbfaaa",
+      "semantic_stdout_sha256": "d9bd50bd8633a7bae9552b9a0c84f6b73a43a0a731b94a250b442d91d3f65cbc",
+      "stage_input_sha256": "27c80e903db475180f050e2e1d7c7e8af9c0633fad2a107260c9b64adfc54473",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "loops_memory"
+    },
+    {
+      "compile_samples": [],
+      "diagnostic": "error: TypeMismatch\n",
+      "input_sha256": "27c80e903db475180f050e2e1d7c7e8af9c0633fad2a107260c9b64adfc54473",
+      "route": "release-o3",
+      "runtime_ns": [],
+      "stage": "optimizer",
+      "status": "unsupported",
+      "workload": "loops_memory"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 22304558,
+          "total_ns": 22304558
+        },
+        {
+          "codegen_ns": 25077366,
+          "total_ns": 25077366
+        },
+        {
+          "codegen_ns": 23783678,
+          "total_ns": 23783678
+        },
+        {
+          "codegen_ns": 23357816,
+          "total_ns": 23357816
+        },
+        {
+          "codegen_ns": 24450401,
+          "total_ns": 24450401
+        },
+        {
+          "codegen_ns": 22729318,
+          "total_ns": 22729318
+        },
+        {
+          "codegen_ns": 23432040,
+          "total_ns": 23432040
+        },
+        {
+          "codegen_ns": 26945036,
+          "total_ns": 26945036
+        },
+        {
+          "codegen_ns": 23485506,
+          "total_ns": 23485506
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 756188,
+          "max": 26945036,
+          "median": 23485506,
+          "min": 22304558
+        },
+        "total_ns": {
+          "mad": 756188,
+          "max": 26945036,
+          "median": 23485506,
+          "min": 22304558
+        }
+      },
+      "executable_section_bytes": 59,
+      "input_sha256": "dfa56dbb401735a06d8d9a646db924a252cb5a0a72addd7d846d87b25f5b3234",
+      "linked_harness_bytes": 3791624,
+      "object_bytes": 712,
+      "object_sha256": "28bff983012ca945eda9ae109d23b537d35b9da690f61c588e2c24afd3fdce3a",
+      "route": "llvm-O3",
+      "runtime_executable_sha256": "e4e401bd92ed66cae49ba0173fbb29efeafac36ddcf369a2c54ddeffd84df727",
+      "runtime_ns": [
+        44854645,
+        42261778,
+        41566570,
+        41833712,
+        44609275,
+        42105262,
+        43207015,
+        42025948,
+        42337035
+      ],
+      "runtime_stats_ns": {
+        "mad": 428066,
+        "max": 44854645,
+        "median": 42261778,
+        "min": 41566570
+      },
+      "runtime_stdout_sha256": "44d501490abd3eb8c5483ed5ec3832a94998bc28cec219f32bba0818e1793f37",
+      "semantic_stdout_sha256": "45018a709ff2c56fcf00438dd3db0b161871f641683fd43ad7870bfd45ac555a",
+      "stage_input_sha256": "dfa56dbb401735a06d8d9a646db924a252cb5a0a72addd7d846d87b25f5b3234",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "nested_calls"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 2556986,
+          "total_ns": 2556986
+        },
+        {
+          "codegen_ns": 2485357,
+          "total_ns": 2485357
+        },
+        {
+          "codegen_ns": 2124442,
+          "total_ns": 2124442
+        },
+        {
+          "codegen_ns": 2446260,
+          "total_ns": 2446260
+        },
+        {
+          "codegen_ns": 4242791,
+          "total_ns": 4242791
+        },
+        {
+          "codegen_ns": 2516968,
+          "total_ns": 2516968
+        },
+        {
+          "codegen_ns": 2731809,
+          "total_ns": 2731809
+        },
+        {
+          "codegen_ns": 2519985,
+          "total_ns": 2519985
+        },
+        {
+          "codegen_ns": 2320324,
+          "total_ns": 2320324
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 70708,
+          "max": 4242791,
+          "median": 2516968,
+          "min": 2124442
+        },
+        "total_ns": {
+          "mad": 70708,
+          "max": 4242791,
+          "median": 2516968,
+          "min": 2124442
+        }
+      },
+      "executable_section_bytes": 88,
+      "input_sha256": "dfa56dbb401735a06d8d9a646db924a252cb5a0a72addd7d846d87b25f5b3234",
+      "linked_harness_bytes": 3791624,
+      "object_bytes": 920,
+      "object_sha256": "ebf0a9e3034d9694cc5372cc0265e04def6f25f449fd13629faa7d7e07ef2b7c",
+      "ownership": {
+        "leaf": "composed_block",
+        "middle": "composed_block",
+        "probe": "composed_block"
+      },
+      "route": "direct",
+      "runtime_executable_sha256": "9ccf65174bd1f7fe277bdadba5553f8ed4e45abe1f3e2e6b91a6147cf002b1f6",
+      "runtime_ns": [
+        149860628,
+        148867197,
+        154197253,
+        149388536,
+        149903241,
+        158318837,
+        148932835,
+        148634222,
+        148891063
+      ],
+      "runtime_stats_ns": {
+        "mad": 514705,
+        "max": 158318837,
+        "median": 149388536,
+        "min": 148634222
+      },
+      "runtime_stdout_sha256": "44d501490abd3eb8c5483ed5ec3832a94998bc28cec219f32bba0818e1793f37",
+      "semantic_stdout_sha256": "45018a709ff2c56fcf00438dd3db0b161871f641683fd43ad7870bfd45ac555a",
+      "stage_input_sha256": "dfa56dbb401735a06d8d9a646db924a252cb5a0a72addd7d846d87b25f5b3234",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "nested_calls"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 2226019,
+          "optimizer_ns": 1021857,
+          "total_ns": 3247876
+        },
+        {
+          "codegen_ns": 2495928,
+          "optimizer_ns": 878066,
+          "total_ns": 3373994
+        },
+        {
+          "codegen_ns": 1838443,
+          "optimizer_ns": 742091,
+          "total_ns": 2580534
+        },
+        {
+          "codegen_ns": 2777448,
+          "optimizer_ns": 1373875,
+          "total_ns": 4151323
+        },
+        {
+          "codegen_ns": 2012974,
+          "optimizer_ns": 820844,
+          "total_ns": 2833818
+        },
+        {
+          "codegen_ns": 2518241,
+          "optimizer_ns": 870681,
+          "total_ns": 3388922
+        },
+        {
+          "codegen_ns": 1919101,
+          "optimizer_ns": 767139,
+          "total_ns": 2686240
+        },
+        {
+          "codegen_ns": 2546366,
+          "optimizer_ns": 825864,
+          "total_ns": 3372230
+        },
+        {
+          "codegen_ns": 2296879,
+          "optimizer_ns": 778421,
+          "total_ns": 3075300
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 249487,
+          "max": 2777448,
+          "median": 2296879,
+          "min": 1838443
+        },
+        "optimizer_ns": {
+          "mad": 52202,
+          "max": 1373875,
+          "median": 825864,
+          "min": 742091
+        },
+        "total_ns": {
+          "mad": 172576,
+          "max": 4151323,
+          "median": 3247876,
+          "min": 2580534
+        }
+      },
+      "executable_section_bytes": 88,
+      "input_sha256": "dfa56dbb401735a06d8d9a646db924a252cb5a0a72addd7d846d87b25f5b3234",
+      "linked_harness_bytes": 3791624,
+      "object_bytes": 920,
+      "object_sha256": "ebf0a9e3034d9694cc5372cc0265e04def6f25f449fd13629faa7d7e07ef2b7c",
+      "ownership": {
+        "leaf": "composed_block",
+        "middle": "composed_block",
+        "probe": "composed_block"
+      },
+      "route": "release-o3",
+      "runtime_executable_sha256": "9ccf65174bd1f7fe277bdadba5553f8ed4e45abe1f3e2e6b91a6147cf002b1f6",
+      "runtime_ns": [
+        153622630,
+        152436822,
+        156012259,
+        148396346,
+        157408618,
+        162026122,
+        155327331,
+        162845394,
+        151247157
+      ],
+      "runtime_stats_ns": {
+        "mad": 2890509,
+        "max": 162845394,
+        "median": 155327331,
+        "min": 148396346
+      },
+      "runtime_stdout_sha256": "44d501490abd3eb8c5483ed5ec3832a94998bc28cec219f32bba0818e1793f37",
+      "semantic_stdout_sha256": "45018a709ff2c56fcf00438dd3db0b161871f641683fd43ad7870bfd45ac555a",
+      "stage_input_sha256": "824f76714be69d2df2c0758ac8ff851e2ddab7ed91ee29de4677381f1d42cf13",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "nested_calls"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 24422772,
+          "total_ns": 24422772
+        },
+        {
+          "codegen_ns": 24012098,
+          "total_ns": 24012098
+        },
+        {
+          "codegen_ns": 22698371,
+          "total_ns": 22698371
+        },
+        {
+          "codegen_ns": 26785283,
+          "total_ns": 26785283
+        },
+        {
+          "codegen_ns": 24072666,
+          "total_ns": 24072666
+        },
+        {
+          "codegen_ns": 25073085,
+          "total_ns": 25073085
+        },
+        {
+          "codegen_ns": 29259247,
+          "total_ns": 29259247
+        },
+        {
+          "codegen_ns": 23094059,
+          "total_ns": 23094059
+        },
+        {
+          "codegen_ns": 25352349,
+          "total_ns": 25352349
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 929577,
+          "max": 29259247,
+          "median": 24422772,
+          "min": 22698371
+        },
+        "total_ns": {
+          "mad": 929577,
+          "max": 29259247,
+          "median": 24422772,
+          "min": 22698371
+        }
+      },
+      "executable_section_bytes": 74,
+      "input_sha256": "2095b3b83986def5781e024247b0735aa1010fd5de0951b94ee1a5dadc0c258c",
+      "linked_harness_bytes": 3791624,
+      "object_bytes": 1040,
+      "object_sha256": "eaeb10f3ba3608f4c93c6fda9573298488f666619a62cb11be516c9e4308b904",
+      "route": "llvm-O3",
+      "runtime_executable_sha256": "effee745a9069cee38d710a0a9081360427daa46c62f822974945c8e65161753",
+      "runtime_ns": [
+        51883642,
+        50037529,
+        49401295,
+        49967960,
+        50153353,
+        52883193,
+        49717315,
+        51376933,
+        50421960
+      ],
+      "runtime_stats_ns": {
+        "mad": 436038,
+        "max": 52883193,
+        "median": 50153353,
+        "min": 49401295
+      },
+      "runtime_stdout_sha256": "6f041b609496ccd2fb9642dda5534f307831c70b7ac1d2578b396fcdbf6bca55",
+      "semantic_stdout_sha256": "175b65d8374beb47e2d679d0fddbf251ab0089df75412203689308d30f98997f",
+      "stage_input_sha256": "2095b3b83986def5781e024247b0735aa1010fd5de0951b94ee1a5dadc0c258c",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "register_pressure"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 2595062,
+          "total_ns": 2595062
+        },
+        {
+          "codegen_ns": 2630370,
+          "total_ns": 2630370
+        },
+        {
+          "codegen_ns": 2374322,
+          "total_ns": 2374322
+        },
+        {
+          "codegen_ns": 2755560,
+          "total_ns": 2755560
+        },
+        {
+          "codegen_ns": 2422834,
+          "total_ns": 2422834
+        },
+        {
+          "codegen_ns": 2535750,
+          "total_ns": 2535750
+        },
+        {
+          "codegen_ns": 2752113,
+          "total_ns": 2752113
+        },
+        {
+          "codegen_ns": 2746102,
+          "total_ns": 2746102
+        },
+        {
+          "codegen_ns": 2359734,
+          "total_ns": 2359734
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 157051,
+          "max": 2755560,
+          "median": 2595062,
+          "min": 2359734
+        },
+        "total_ns": {
+          "mad": 157051,
+          "max": 2755560,
+          "median": 2595062,
+          "min": 2359734
+        }
+      },
+      "executable_section_bytes": 199,
+      "input_sha256": "2095b3b83986def5781e024247b0735aa1010fd5de0951b94ee1a5dadc0c258c",
+      "linked_harness_bytes": 3791672,
+      "object_bytes": 896,
+      "object_sha256": "f6f1a1832999983044c8876a6239ce7b725570db2ae351b99075b76086075259",
+      "ownership": {
+        "probe": "composed_block"
+      },
+      "route": "direct",
+      "runtime_executable_sha256": "96ffc8b440e5ce6bea87de176e4a6ce27637129b81b8937f11a64a378d932992",
+      "runtime_ns": [
+        98232771,
+        97395062,
+        99489588,
+        136236454,
+        129083380,
+        111643070,
+        99011803,
+        100053482,
+        99281448
+      ],
+      "runtime_stats_ns": {
+        "mad": 1256817,
+        "max": 136236454,
+        "median": 99489588,
+        "min": 97395062
+      },
+      "runtime_stdout_sha256": "6f041b609496ccd2fb9642dda5534f307831c70b7ac1d2578b396fcdbf6bca55",
+      "semantic_stdout_sha256": "175b65d8374beb47e2d679d0fddbf251ab0089df75412203689308d30f98997f",
+      "stage_input_sha256": "2095b3b83986def5781e024247b0735aa1010fd5de0951b94ee1a5dadc0c258c",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "register_pressure"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 2309929,
+          "optimizer_ns": 872906,
+          "total_ns": 3182835
+        },
+        {
+          "codegen_ns": 2414959,
+          "optimizer_ns": 894417,
+          "total_ns": 3309376
+        },
+        {
+          "codegen_ns": 2514238,
+          "optimizer_ns": 766963,
+          "total_ns": 3281201
+        },
+        {
+          "codegen_ns": 2996830,
+          "optimizer_ns": 1023043,
+          "total_ns": 4019873
+        },
+        {
+          "codegen_ns": 2448413,
+          "optimizer_ns": 910989,
+          "total_ns": 3359402
+        },
+        {
+          "codegen_ns": 2211421,
+          "optimizer_ns": 825165,
+          "total_ns": 3036586
+        },
+        {
+          "codegen_ns": 2633497,
+          "optimizer_ns": 1159554,
+          "total_ns": 3793051
+        },
+        {
+          "codegen_ns": 2225578,
+          "optimizer_ns": 912902,
+          "total_ns": 3138480
+        },
+        {
+          "codegen_ns": 2700183,
+          "optimizer_ns": 736155,
+          "total_ns": 3436338
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 185084,
+          "max": 2996830,
+          "median": 2448413,
+          "min": 2211421
+        },
+        "optimizer_ns": {
+          "mad": 69252,
+          "max": 1159554,
+          "median": 894417,
+          "min": 736155
+        },
+        "total_ns": {
+          "mad": 126962,
+          "max": 4019873,
+          "median": 3309376,
+          "min": 3036586
+        }
+      },
+      "executable_section_bytes": 199,
+      "input_sha256": "2095b3b83986def5781e024247b0735aa1010fd5de0951b94ee1a5dadc0c258c",
+      "linked_harness_bytes": 3791672,
+      "object_bytes": 896,
+      "object_sha256": "f6f1a1832999983044c8876a6239ce7b725570db2ae351b99075b76086075259",
+      "ownership": {
+        "probe": "composed_block"
+      },
+      "route": "release-o3",
+      "runtime_executable_sha256": "96ffc8b440e5ce6bea87de176e4a6ce27637129b81b8937f11a64a378d932992",
+      "runtime_ns": [
+        101556334,
+        112891357,
+        100873849,
+        100270618,
+        98727944,
+        122970904,
+        98388484,
+        97884852,
+        100380553
+      ],
+      "runtime_stats_ns": {
+        "mad": 1652609,
+        "max": 122970904,
+        "median": 100380553,
+        "min": 97884852
+      },
+      "runtime_stdout_sha256": "6f041b609496ccd2fb9642dda5534f307831c70b7ac1d2578b396fcdbf6bca55",
+      "semantic_stdout_sha256": "175b65d8374beb47e2d679d0fddbf251ab0089df75412203689308d30f98997f",
+      "stage_input_sha256": "b205a67d90641750ccaee93687acf80ed37897b7519cbd20371ee2668e9d1ea4",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "register_pressure"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 27127249,
+          "total_ns": 27127249
+        },
+        {
+          "codegen_ns": 28557876,
+          "total_ns": 28557876
+        },
+        {
+          "codegen_ns": 27082714,
+          "total_ns": 27082714
+        },
+        {
+          "codegen_ns": 27782605,
+          "total_ns": 27782605
+        },
+        {
+          "codegen_ns": 27184650,
+          "total_ns": 27184650
+        },
+        {
+          "codegen_ns": 27564748,
+          "total_ns": 27564748
+        },
+        {
+          "codegen_ns": 27233674,
+          "total_ns": 27233674
+        },
+        {
+          "codegen_ns": 27123876,
+          "total_ns": 27123876
+        },
+        {
+          "codegen_ns": 25647560,
+          "total_ns": 25647560
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 101936,
+          "max": 28557876,
+          "median": 27184650,
+          "min": 25647560
+        },
+        "total_ns": {
+          "mad": 101936,
+          "max": 28557876,
+          "median": 27184650,
+          "min": 25647560
+        }
+      },
+      "executable_section_bytes": 275,
+      "input_sha256": "23e8b061eb8b2b5a50039788bd762c1f1853fdf3e53ca45f9ad644fcdef6ef71",
+      "linked_harness_bytes": 3793424,
+      "object_bytes": 1832,
+      "object_sha256": "d3bd48fca26e5fb29e17a5fd4b64584b161da89de877400c0b07876610960c4a",
+      "route": "llvm-O3",
+      "runtime_executable_sha256": "fdca5bdbc058277bc3c5b0a5841e892668a683a473a8face068647326e619885",
+      "runtime_ns": [
+        34845260,
+        32999487,
+        36361723,
+        33058713,
+        39735622,
+        34299928,
+        32640113,
+        32865866,
+        32967501
+      ],
+      "runtime_stats_ns": {
+        "mad": 418600,
+        "max": 39735622,
+        "median": 33058713,
+        "min": 32640113
+      },
+      "runtime_stdout_sha256": "76463dd5a599c9842424ce467b68ac31b168c406e407900dd029680de12c7ff9",
+      "semantic_stdout_sha256": "9968d86cbede136cdfb2f2be42f61e58d4329f8b783e08c83ae85d06efd4266b",
+      "stage_input_sha256": "23e8b061eb8b2b5a50039788bd762c1f1853fdf3e53ca45f9ad644fcdef6ef71",
+      "status": "supported",
+      "undefined_symbols": [
+        "memset"
+      ],
+      "workload": "memset"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 4806008,
+          "total_ns": 4806008
+        },
+        {
+          "codegen_ns": 4812150,
+          "total_ns": 4812150
+        },
+        {
+          "codegen_ns": 4727517,
+          "total_ns": 4727517
+        },
+        {
+          "codegen_ns": 4767625,
+          "total_ns": 4767625
+        },
+        {
+          "codegen_ns": 5113066,
+          "total_ns": 5113066
+        },
+        {
+          "codegen_ns": 4761914,
+          "total_ns": 4761914
+        },
+        {
+          "codegen_ns": 4663626,
+          "total_ns": 4663626
+        },
+        {
+          "codegen_ns": 4579556,
+          "total_ns": 4579556
+        },
+        {
+          "codegen_ns": 4658106,
+          "total_ns": 4658106
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 50236,
+          "max": 5113066,
+          "median": 4761914,
+          "min": 4579556
+        },
+        "total_ns": {
+          "mad": 50236,
+          "max": 5113066,
+          "median": 4761914,
+          "min": 4579556
+        }
+      },
+      "executable_section_bytes": 787,
+      "input_sha256": "23e8b061eb8b2b5a50039788bd762c1f1853fdf3e53ca45f9ad644fcdef6ef71",
+      "linked_harness_bytes": 3793904,
+      "object_bytes": 1944,
+      "object_sha256": "2b7cb1cd7b4f7cd41b3e67b969460e460eb172b410ed457ba35c71eadb88aa3a",
+      "ownership": {
+        "compiler_rt.__memset": "composed_cfg",
+        "compiler_rt.memset": "composed_cfg",
+        "compiler_rt.ssp.__memset_chk": "composed_cfg",
+        "fill_constants": "composed_block",
+        "fill_offset": "composed_block",
+        "fill_pressure": "composed_block",
+        "fill_twice": "composed_block",
+        "pointer_identity": "composed_block",
+        "pointer_null": "composed_block"
+      },
+      "route": "direct",
+      "runtime_executable_sha256": "6350b20e2cf8b799bfadb5b643aa446a427adf97d37ba07418dd9a6e1b951c85",
+      "runtime_ns": [
+        75136493,
+        77425966,
+        75874426,
+        107798303,
+        84000955,
+        75591589,
+        75552134,
+        75493537,
+        75204053
+      ],
+      "runtime_stats_ns": {
+        "mad": 387536,
+        "max": 107798303,
+        "median": 75591589,
+        "min": 75136493
+      },
+      "runtime_stdout_sha256": "76463dd5a599c9842424ce467b68ac31b168c406e407900dd029680de12c7ff9",
+      "semantic_stdout_sha256": "9968d86cbede136cdfb2f2be42f61e58d4329f8b783e08c83ae85d06efd4266b",
+      "stage_input_sha256": "23e8b061eb8b2b5a50039788bd762c1f1853fdf3e53ca45f9ad644fcdef6ef71",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "memset"
+    },
+    {
+      "compile_samples": [
+        {
+          "codegen_ns": 4473192,
+          "optimizer_ns": 1168897,
+          "total_ns": 5642089
+        },
+        {
+          "codegen_ns": 4541932,
+          "optimizer_ns": 1217430,
+          "total_ns": 5759362
+        },
+        {
+          "codegen_ns": 4394421,
+          "optimizer_ns": 1087091,
+          "total_ns": 5481512
+        },
+        {
+          "codegen_ns": 4901170,
+          "optimizer_ns": 1170199,
+          "total_ns": 6071369
+        },
+        {
+          "codegen_ns": 5027453,
+          "optimizer_ns": 1534607,
+          "total_ns": 6562060
+        },
+        {
+          "codegen_ns": 5705841,
+          "optimizer_ns": 1410199,
+          "total_ns": 7116040
+        },
+        {
+          "codegen_ns": 4898175,
+          "optimizer_ns": 1157225,
+          "total_ns": 6055400
+        },
+        {
+          "codegen_ns": 4592330,
+          "optimizer_ns": 1338302,
+          "total_ns": 5930632
+        },
+        {
+          "codegen_ns": 4799517,
+          "optimizer_ns": 1162425,
+          "total_ns": 5961942
+        }
+      ],
+      "compile_stats_ns": {
+        "codegen_ns": {
+          "mad": 227936,
+          "max": 5705841,
+          "median": 4799517,
+          "min": 4394421
+        },
+        "optimizer_ns": {
+          "mad": 47231,
+          "max": 1534607,
+          "median": 1170199,
+          "min": 1087091
+        },
+        "total_ns": {
+          "mad": 202580,
+          "max": 7116040,
+          "median": 5961942,
+          "min": 5481512
+        }
+      },
+      "executable_section_bytes": 787,
+      "input_sha256": "23e8b061eb8b2b5a50039788bd762c1f1853fdf3e53ca45f9ad644fcdef6ef71",
+      "linked_harness_bytes": 3793904,
+      "object_bytes": 1944,
+      "object_sha256": "2b7cb1cd7b4f7cd41b3e67b969460e460eb172b410ed457ba35c71eadb88aa3a",
+      "ownership": {
+        "compiler_rt.__memset": "composed_cfg",
+        "compiler_rt.memset": "composed_cfg",
+        "compiler_rt.ssp.__memset_chk": "composed_cfg",
+        "fill_constants": "composed_block",
+        "fill_offset": "composed_block",
+        "fill_pressure": "composed_block",
+        "fill_twice": "composed_block",
+        "pointer_identity": "composed_block",
+        "pointer_null": "composed_block"
+      },
+      "route": "release-o3",
+      "runtime_executable_sha256": "6350b20e2cf8b799bfadb5b643aa446a427adf97d37ba07418dd9a6e1b951c85",
+      "runtime_ns": [
+        78943149,
+        75396662,
+        75222308,
+        91782899,
+        75831218,
+        75360136,
+        75530252,
+        75672670,
+        76735905
+      ],
+      "runtime_stats_ns": {
+        "mad": 312534,
+        "max": 91782899,
+        "median": 75672670,
+        "min": 75222308
+      },
+      "runtime_stdout_sha256": "76463dd5a599c9842424ce467b68ac31b168c406e407900dd029680de12c7ff9",
+      "semantic_stdout_sha256": "9968d86cbede136cdfb2f2be42f61e58d4329f8b783e08c83ae85d06efd4266b",
+      "stage_input_sha256": "6bcc2971d2e61dcbbfe30fc75b0c781a539810af52e990c818913a3374f1afc1",
+      "status": "supported",
+      "undefined_symbols": [],
+      "workload": "memset"
+    }
+  ],
+  "schema": 1
+}

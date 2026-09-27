@@ -4,9 +4,10 @@ Source baseline: `230a30ef` (2026-09-26), updated for the completed correctness
 checkpoint covering aliases, module references, vector lanes and shift counts.
 This page describes the
 implementation; the
-[refactor plan](roadmap/architecture_refactor_plan.md) records its status and remaining work.
-The bounded refactors and memset capability are complete; the fixed-program
-performance baseline remains open and precedes the next memory family.
+[refactor plan](roadmap/architecture_refactor_plan.md) records its completed scope.
+The bounded refactors, memset capability and
+[fixed-program performance baseline](evidence/fixed_program_baseline.md) are complete.
+The next memory family is `ssp.__memcpy_chk`.
 The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
 backend for selected Zig inputs. It does not yet provide a complete LLVM
 replacement or a self-hosting Zig backend.

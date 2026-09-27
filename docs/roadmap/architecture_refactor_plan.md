@@ -1,9 +1,10 @@
 # Architecture corrections and refactor plan
 
 Initial baseline: `629e2ee7`, 2026-09-26. Documentation and planning were committed
-as `56e66794`. Reconciled against `eab54c12` on 2026-09-26.
-Status: implementation and correctness work complete for the bounded slices;
-the fixed-program performance baseline in section 5 remains open.
+as `56e66794`. Reconciled against `eab54c12` on 2026-09-26; the performance
+baseline measures the unchanged compiler sources at `fe6f1a0e`.
+Status: complete for the bounded refactors, correctness checkpoint, memset
+capability and fixed-program performance baseline.
 Selector defaults, public CLI behavior, and acceptance counters remain unchanged.
 
 ## Current completion status
@@ -16,13 +17,14 @@ Selector defaults, public CLI behavior, and acceptance counters remain unchanged
 | 3. Integer semantics | Complete for the selected families | Comparisons, signed/unsigned div/rem, signed min/max, wrapping normalization, shift counts and vector lane indices. |
 | 4. Module references | Complete for the selected consumers | Shared discovery; GlobalOpt, GlobalDCE and ConstMerge migrations with explicit opaque boundaries. |
 | 5a. Shared lowering and behavioral proof | Complete | Three-function memset family, six compositions, separate direct/release-o3 routes and composed ownership checks. |
-| 5b. Fixed-program performance baseline | **Open — next task** | Reproducible compile-time, runtime and object-size measurements for fixed programs and explicit routes. |
+| 5b. Fixed-program performance baseline | Complete | Two executions of five workloads × three routes; 14 supported pairs with all metrics, one explicit optimizer rejection. |
 | Subsequent correctness checkpoint | Complete | `eab54c12`; 1,503 tests, native comparisons, readiness and all 17 integration subgates passed. |
 
-The plan is not fully closed until 5b has recorded evidence. Complete that
-baseline before starting the next memory family, `ssp.__memcpy_chk`. Further
-memory families extend capability beyond the memset deliverable; they are not
-unfinished work required to close this plan.
+The [fixed-program baseline](../evidence/fixed_program_baseline.md) closes 5b
+and this bounded plan. The next memory family is `ssp.__memcpy_chk`. Further
+memory families extend capability beyond the memset deliverable. The recorded
+loop-memory `release-o3` rejection is a separate optimizer follow-up; baseline
+completion does not claim that every route supports every workload.
 
 The [correctness checkpoint](correctness_checkpoint.md) extends the earlier
 migrations to InstCombine's final alias rewrite, ConstMerge's reference/deletion
@@ -76,8 +78,7 @@ need to replace the entire IR or add an analysis-cache framework immediately.
 
 ## Implementation sequence and historical records
 
-Slices 1–4 and the shared-lowering portion of slice 5 are implemented below.
-The performance portion of slice 5 remains a required deliverable of this plan.
+Slices 1–4 and both portions of slice 5 are complete as recorded below.
 The earlier helper refactors did not claim new compiler capability. Their
 bounded scope is preserved; completing this plan does not require migrating
 every pass or closing additional memory families.
@@ -344,13 +345,13 @@ Owners: AIR lowering, composed selector, relevant runners, and capability docs.
 - [x] Add generated compositions with defined semantics and minimized failure
   retention. Cover optimizer-only, codegen-only, and composed execution paths
   separately; report their pipeline and selector ownership.
-- [ ] Establish fixed-program measurements for compile time, runtime, and object
+- [x] Establish fixed-program measurements for compile time, runtime, and object
   size before making optimization-quality or performance claims.
 
 Exit criteria: unseen combinations of the newly supported operations execute
 correctly, the named family closes through shared lowering, unsupported neighbors
 fail explicitly, and results identify which route and population they prove.
-Full section-5 closure also requires the reproducible performance baseline below.
+The reproducible performance baseline below completes section 5's exit criteria.
 
 The first implementation is the bounded memset family: shared pointer returns,
 `i8 zeroext` entry parameters, and transaction-owned nonvolatile byte fills.
@@ -359,9 +360,9 @@ through composed lowering under direct and release-o3 routes. Focused, native, a
 validation pass. See the
 [family evidence](../evidence/composed_memset_family.md) for exact input identities,
 rejected neighbors, and counter scope. Copy/string support is deferred capability
-work; fixed-program performance measurements are the remaining deliverable here.
+work; fixed-program performance measurements are recorded below.
 
-### Remaining deliverable: fixed-program performance baseline
+### Fixed-program performance baseline (complete)
 
 Owners: a focused measurement runner, retained behavioral fixtures, and its
 versioned protocol/results. This work establishes a baseline; it does not promise
@@ -394,6 +395,17 @@ Explain observed variability and missing support; unsupported pairs have no
 invented runtime values. Then record 5b as complete and move `ssp.__memcpy_chk`
 to the active queue. The existing calls-performance tool has a separate frozen
 compiler-rt report population and does not establish this baseline.
+
+Completion (2026-09-26): the [protocol and results](../evidence/fixed_program_baseline.md)
+freeze five existing workloads and three routes. Two executions of the recorded
+command pass semantic checks and reproduce ownership, object hashes and sizes
+for all 14 supported pairs. The loop-memory optimizer route rejects with
+`TypeMismatch`; it has no fabricated timing or size. Raw samples, stage timings,
+dispersion, compiler/source/input identities and exact commands are retained.
+Local optimized objects equal their direct counterparts for these supported
+workloads. The observed timing variation is reported without a speedup claim.
+The matching correctness checkpoint is reused; new measurement drivers and the
+standalone runner are validated independently. No accepted counter advances.
 
 Follow validation tiers for the actual changes. Reuse the completed correctness
 checkpoint only when its relevant inputs match; documentation reconciliation or

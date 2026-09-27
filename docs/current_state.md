@@ -56,11 +56,12 @@ pass 1,503 unit/structural/storage tests, native LLVM comparisons, readiness and
 all 17 integration subgates. The checkpoint before the next memory family is
 complete; these development results do not change the accepted record.
 
-The [architecture refactor plan](roadmap/architecture_refactor_plan.md) is still
-open for section 5's fixed-program compile-time, runtime and object-size baseline.
-Its bounded refactors and memset capability are complete. Establish that baseline
-next, then investigate `ssp.__memcpy_chk`; broader consumer migrations are deferred
-work, not additional requirements for this plan's bounded closure.
+The [architecture refactor plan](roadmap/architecture_refactor_plan.md) is complete
+for its bounded scope. The [fixed-program baseline](evidence/fixed_program_baseline.md)
+records two runs with compile-time, runtime and object/code-section sizes for
+14 supported workload/route pairs, plus the explicit loop-memory `release-o3`
+optimizer rejection. Next investigate `ssp.__memcpy_chk`; broader consumer
+migrations remain deferred. Measurements do not advance accepted counters.
 
 See [next steps](next_steps.md), the [improvement plan](roadmap/project_improvement_plan.md),
 and the root [setup instructions](../README.md). Historical milestones remain

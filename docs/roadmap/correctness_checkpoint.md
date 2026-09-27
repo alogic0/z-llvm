@@ -112,9 +112,10 @@ native link/probe and boundary checks passed. The release bundle identity remain
 emitter checkout. LLVM tools report 22.1.8. Documentation and formatting checks
 pass. The evidence root is listed in the current retention keep-list.
 
-The correctness prerequisite is complete. The reconciled
-[architecture plan](architecture_refactor_plan.md) schedules its remaining
-fixed-program performance baseline before the next memory-family investigation.
+The correctness prerequisite is complete. The
+[architecture plan](architecture_refactor_plan.md) subsequently completed its
+[fixed-program performance baseline](../evidence/fixed_program_baseline.md),
+so the next memory-family investigation can begin.
 ConstMerge's conservative opaque-reference boundary, the limited local
 vector backend and unsupported wide shift folding remain explicit limitations.
 This is correctness acceptance for this source state, not an accepted-counter

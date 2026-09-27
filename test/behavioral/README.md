@@ -34,3 +34,13 @@ reproducers, not additional passing programs. The positive generated suite uses
 an arithmetic shift before truncation and does not retain the narrow alias's
 source across zero extension. Unit regressions separately reject non-power-of-two,
 negative, zero, i64 and variable signed divisors near the new lowering boundary.
+
+## Fixed-program measurements
+
+The standalone [performance protocol](../../docs/evidence/fixed_program_baseline.md)
+freezes these four fixed modules and the combined memset module in
+[performance_manifest.json](performance_manifest.json). It measures direct,
+release-o3-plus-codegen and independent LLVM routes with prebuilt compilers.
+The two `performance_*.zig` drivers repeat deterministic inputs for timing;
+the existing full semantic drivers remain the correctness oracle. The runner
+is separate from acceptance gates and records unsupported pairs explicitly.
