@@ -698,10 +698,10 @@ const DescriptorCacheIdentity = struct {
 
 fn sourceAuthoritySha256(identity: execution_cohort.SourceIdentity) [64]u8 {
     var hasher = std.crypto.hash.sha2.Sha256.init(.{});
-    inline for (@typeInfo(execution_cohort.SourceIdentity).@"struct".fields) |field| {
-        hasher.update(field.name);
+    inline for (@typeInfo(execution_cohort.SourceIdentity).@"struct".field_names) |field_name| {
+        hasher.update(field_name);
         hasher.update("\x00");
-        hasher.update(&@field(identity, field.name));
+        hasher.update(&@field(identity, field_name));
     }
     var digest: [32]u8 = undefined;
     hasher.final(&digest);

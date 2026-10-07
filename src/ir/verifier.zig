@@ -1145,12 +1145,19 @@ fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
     var saw_sret = false;
     var saw_byval = false;
     var saw_addrspace = false;
+    var saw_dead_on_unwind = false;
 
     while (rest.len != 0) {
         const token = firstAttrToken(rest);
         if (token.len == 0) return error.UnsupportedCallAttribute;
         rest = std.mem.trim(u8, rest[token.len..], " \t");
 
+        if (std.mem.eql(u8, token, "dead_on_unwind")) {
+            if (saw_dead_on_unwind) return error.UnsupportedCallAttribute;
+            saw_dead_on_unwind = true;
+            if (ty != .ptr) return error.UnsupportedCallAttribute;
+            continue;
+        }
         if (std.mem.eql(u8, token, "nonnull")) {
             if (saw_nonnull) return error.UnsupportedCallAttribute;
             saw_nonnull = true;

@@ -72,8 +72,11 @@ comparisons pass. The fixed-program matrix retains its supported outcomes,
 The subsequent [loop-memory repair slice](evidence/loops_memory_repair.md) repairs
 the `release-o3` optimizer `TypeMismatch`, scalarizing single-element aggregates in
 SROA, enforcing alloca-type safety in mem2reg, and recording baseline v2 measurements
-across all 15 supported pairs. Cyclic byte vectors and broader consumer migrations
-remain deferred.
+across all 15 supported pairs.
+The subsequent [cyclic byte-vector transfer slice](evidence/cyclic_byte_transfers.md)
+admits cyclic `<16 x i8>` vector loads and stores with a verified loop-carried XMM
+ownership proof, adds focused regression tests, and passes 14 integration subgates
+and all differential canaries.
 These development results and measurements do not advance accepted counters.
 
 See [next steps](next_steps.md), the [improvement plan](roadmap/project_improvement_plan.md),

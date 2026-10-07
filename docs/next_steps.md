@@ -32,12 +32,20 @@ observations. The matrix is versioned to `fixed-architecture-programs-v2` with a
 15 pairs supported, and repeated measurements are recorded while preserving the
 original frozen manifest and baseline evidence.
 
-## Next: cyclic byte-vector transfers and deferred capabilities
+The [cyclic byte-vector transfer slice](evidence/cyclic_byte_transfers.md) admits
+cyclic `<16 x i8>` vector loads and stores in composed x86-64 loops with a verified
+loop-carried XMM ownership proof. Invariants enforce block-local vector life cycle,
+sequential single-register ownership, absence of loop-carried XMM phi values, and
+no external vector escapes. Machine structure, assembly (`movups`), and bit-exact
+runtime execution pass across 0, 32, and 64 byte inputs.
 
-Cyclic byte-vector transfers still require separate loop-carried XMM ownership
-proof. Further string families, broader pass migrations, opaque parsing and
-integer families remain deferred until a concrete consumer or reproduced
-correctness issue justifies them.
+## Next: real-rows Zig 0.17.0 migration and deferred capabilities
+
+The compiler-core real-rows denominator migration to tracked Zig 0.17.0 remains
+the active integration frontier (closing the remaining 67 unsupported opcodes and
+rebuilding the mode-stable denominator). Further string families, broader pass
+migrations, opaque parsing and integer families remain deferred until a concrete
+consumer or reproduced correctness issue justifies them.
 
 Use the frozen baseline for future measured comparisons; it establishes neither
 a speedup nor general optimizer/backend parity. Reuse matching correctness

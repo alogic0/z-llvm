@@ -894,3 +894,55 @@ test "verifier accepts source-backed naked function register-argument calls" {
     defer bad_module.deinit();
     try std.testing.expectError(error.CallSignatureMismatch, bad_module.verify());
 }
+
+test "verifier accepts dead_on_unwind on pointer parameters and rejects invalid usage" {
+    const valid =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @takes_dead_on_unwind(ptr dead_on_unwind)
+        \\
+        \\define void @caller(ptr dead_on_unwind noalias %p) {
+        \\entry:
+        \\  call void @takes_dead_on_unwind(ptr dead_on_unwind %p)
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, valid);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqualStrings("dead_on_unwind", module.declarations.items[0].params.items[0].attrs.?);
+    try std.testing.expectEqualStrings("dead_on_unwind noalias", module.functions.items[0].params.items[0].attrs.?);
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqualStrings("dead_on_unwind", call.args.items[0].attrs.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(valid, output.writer.buffered());
+
+    const bad_non_ptr =
+        \\define void @bad(i32 dead_on_unwind %x) {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+    ;
+    var bad_non_ptr_module = try ir.Module.parse(std.testing.allocator, bad_non_ptr);
+    defer bad_non_ptr_module.deinit();
+    try std.testing.expectError(error.UnsupportedCallAttribute, bad_non_ptr_module.verify());
+
+    const bad_duplicate =
+        \\define void @bad(ptr dead_on_unwind dead_on_unwind %p) {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+    ;
+    var bad_dup_module = try ir.Module.parse(std.testing.allocator, bad_duplicate);
+    defer bad_dup_module.deinit();
+    try std.testing.expectError(error.UnsupportedCallAttribute, bad_dup_module.verify());
+}

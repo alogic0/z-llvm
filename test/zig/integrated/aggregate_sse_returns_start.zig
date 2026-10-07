@@ -4,7 +4,8 @@ const DoublePair = extern struct {
 };
 
 const FloatVectorPair = extern struct {
-    value: @Vector(2, f32),
+    first: f32,
+    second: f32,
 };
 
 extern fn zllvm_return_f64_pair(f64, f64) callconv(.c) DoublePair;
@@ -37,9 +38,9 @@ pub export fn _start() callconv(.c) noreturn {
         bad += @intFromBool(@as(u64, @bitCast(result.second)) != case[1]);
     }
     for (f32_cases) |case| {
-        const result = zllvm_return_f32x2(@bitCast(case[0]), @bitCast(case[1])).value;
-        bad += @intFromBool(@as(u32, @bitCast(result[0])) != case[0]);
-        bad += @intFromBool(@as(u32, @bitCast(result[1])) != case[1]);
+        const result = zllvm_return_f32x2(@bitCast(case[0]), @bitCast(case[1]));
+        bad += @intFromBool(@as(u32, @bitCast(result.first)) != case[0]);
+        bad += @intFromBool(@as(u32, @bitCast(result.second)) != case[1]);
     }
     exit(bad);
 }

@@ -6,7 +6,7 @@ const Sha256 = std.crypto.hash.sha2.Sha256;
 pub const schema = "distribution-execution-cohort-v1";
 pub const repository_root = "/home/oleg/prog/z_llvm";
 pub const external_repository_root = "/home/oleg/prog/ziglang";
-pub const external_revision = "bdee02bc0c7f227c0f11bc9a449df673fe803540";
+pub const external_revision = "1c08b09d1c847f4f02c8216e3b62df323861a437";
 pub const definition_path = "lib/std/coff.zig";
 pub const import_path = "lib/std/std.zig";
 pub const use_path = "src/libs/mingw/implib.zig";
@@ -16,13 +16,13 @@ pub const expected_result: usize = 18;
 pub const expected_witness: usize = 61;
 pub const expected_stdout = "execution-oracle-v1 result=18 witness=61\n";
 pub const process_output_max: usize = 16 * 1024 * 1024;
-pub const selector_version = "0.17.0-dev.364+bdee02bc0";
-pub const selector_length: u64 = 530_327_885;
+pub const selector_version = "0.17.0-dev.11+1c08b09d1";
+pub const selector_length: u64 = 149_918_648;
 pub const selector_sha256 = [_]u8{
-    0xdc, 0xea, 0x34, 0x78, 0x27, 0x3d, 0x7f, 0xfe,
-    0x38, 0x95, 0x70, 0x9c, 0x8e, 0xed, 0x4c, 0xcc,
-    0x07, 0x24, 0x54, 0x88, 0x69, 0xcd, 0xb8, 0x61,
-    0x83, 0xfc, 0x73, 0x56, 0x16, 0x44, 0x10, 0xb7,
+    0xd5, 0x05, 0xfc, 0x64, 0xb5, 0xb4, 0x2b, 0xa1,
+    0xbf, 0x38, 0xa4, 0x6d, 0x44, 0xa6, 0x88, 0x99,
+    0xe4, 0x78, 0x30, 0x6d, 0x18, 0xfd, 0xc8, 0x60,
+    0x51, 0x26, 0xa9, 0xc2, 0xc3, 0x04, 0x98, 0x2e,
 };
 
 pub const Program = enum {
