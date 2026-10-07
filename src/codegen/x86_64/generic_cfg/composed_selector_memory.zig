@@ -311,7 +311,11 @@ fn scalarFpStoreBits(ty: ir.Type) ?u16 {
 }
 
 // Scalar byte loops use the existing framed CFG/phi machinery. Raw byte vectors
-// remain acyclic until their loop-carried XMM ownership has separate proof.
+// require verified loop-carried XMM ownership proof in cyclic CFGs:
+// 1. Zero other XMM values in the function (no FP/vector params, return, phis, or instructions).
+// 2. Intra-block transient ownership: every byte-vector load has an intra-block store
+//    with no intervening byte-vector load, and exactly 1 use across the function.
+// 3. Every byte-vector store consumes a byte-vector loaded earlier in the same block.
 fn byteTransfersAreAcyclic(selector: *ComposedBlockSelector) !bool {
     const function = selector.function orelse return false;
     if (function.blocks.items.len > stage2_max_blocks) return false;
@@ -340,6 +344,210 @@ fn byteTransfersAreAcyclic(selector: *ComposedBlockSelector) !bool {
     return end == function.blocks.items.len;
 }
 
+fn valueUsesName(value: ir.Value, name: []const u8) bool {
+    return switch (value) {
+        .named => |n| std.mem.eql(u8, n, name),
+        else => false,
+    };
+}
+
+fn countInstructionUsesOfName(instruction: ir.Instruction, name: []const u8) usize {
+    if (instruction.removed) return 0;
+    var count: usize = 0;
+    switch (instruction.kind) {
+        .binary => |b| {
+            if (valueUsesName(b.lhs, name)) count += 1;
+            if (valueUsesName(b.rhs, name)) count += 1;
+        },
+        .cast => |c| {
+            if (valueUsesName(c.value, name)) count += 1;
+        },
+        .icmp => |i| {
+            if (valueUsesName(i.lhs, name)) count += 1;
+            if (valueUsesName(i.rhs, name)) count += 1;
+        },
+        .fcmp => |f| {
+            if (valueUsesName(f.lhs, name)) count += 1;
+            if (valueUsesName(f.rhs, name)) count += 1;
+        },
+        .select => |s| {
+            if (valueUsesName(s.cond, name)) count += 1;
+            if (valueUsesName(s.true_value, name)) count += 1;
+            if (valueUsesName(s.false_value, name)) count += 1;
+        },
+        .load => |l| {
+            if (valueUsesName(l.ptr, name)) count += 1;
+        },
+        .store => |s| {
+            if (valueUsesName(s.ptr, name)) count += 1;
+            if (valueUsesName(s.value, name)) count += 1;
+        },
+        .gep => |g| {
+            if (valueUsesName(g.ptr, name)) count += 1;
+            for (g.indices.items) |idx| {
+                if (valueUsesName(idx.value, name)) count += 1;
+            }
+        },
+        .call => |c| {
+            for (c.args.items) |arg| {
+                if (valueUsesName(arg.value, name)) count += 1;
+            }
+        },
+        .phi => |p| {
+            for (p.incoming.items) |inc| {
+                if (valueUsesName(inc.value, name)) count += 1;
+            }
+        },
+        .freeze => |f| {
+            if (valueUsesName(f.value, name)) count += 1;
+        },
+        .extractelement => |e| {
+            if (valueUsesName(e.vector, name)) count += 1;
+            if (valueUsesName(e.index, name)) count += 1;
+        },
+        .insertelement => |i| {
+            if (valueUsesName(i.vector, name)) count += 1;
+            if (valueUsesName(i.value, name)) count += 1;
+            if (valueUsesName(i.index, name)) count += 1;
+        },
+        .shufflevector => |s| {
+            if (valueUsesName(s.lhs, name)) count += 1;
+            if (valueUsesName(s.rhs, name)) count += 1;
+        },
+        .extractvalue => |e| {
+            if (valueUsesName(e.aggregate, name)) count += 1;
+        },
+        .insertvalue => |i| {
+            if (valueUsesName(i.aggregate, name)) count += 1;
+            if (valueUsesName(i.value, name)) count += 1;
+        },
+        .alloca, .atomicrmw, .cmpxchg, .fence => {},
+    }
+    return count;
+}
+
+fn countTerminatorUsesOfName(terminator: ir.Terminator, name: []const u8) usize {
+    var count: usize = 0;
+    switch (terminator) {
+        .ret => |r| if (r.value) |v| if (valueUsesName(v, name)) { count += 1; },
+        .condbr => |c| if (valueUsesName(c.cond, name)) { count += 1; },
+        .@"switch" => |s| {
+            if (valueUsesName(s.cond, name)) count += 1;
+            for (s.cases.items) |case| if (valueUsesName(case.value, name)) { count += 1; };
+        },
+        .indirectbr => |i| if (valueUsesName(i.addr, name)) { count += 1; },
+        .br, .@"unreachable" => {},
+    }
+    return count;
+}
+
+fn countFunctionUsesOfName(function: ir.Function, name: []const u8) usize {
+    var count: usize = 0;
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |inst| {
+            count += countInstructionUsesOfName(inst, name);
+        }
+        if (block.terminator) |term| {
+            count += countTerminatorUsesOfName(term, name);
+        }
+    }
+    return count;
+}
+
+fn isOtherXmmType(ty: ir.Type) bool {
+    if (inspection.isByteVector128(ty)) return false;
+    return switch (ty) {
+        .half, .float, .double, .x86_fp80, .fp128, .vector => true,
+        else => false,
+    };
+}
+
+fn functionHasConflictingXmmState(function: ir.Function) bool {
+    if (isOtherXmmType(function.ret_ty)) return true;
+    for (function.params.items) |param| {
+        if (isOtherXmmType(param.ty)) return true;
+    }
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |inst| {
+            if (inst.removed) continue;
+            switch (inst.kind) {
+                .binary => |b| if (isOtherXmmType(b.ty)) return true,
+                .cast => |c| if (isOtherXmmType(c.from_ty) or isOtherXmmType(c.to_ty)) return true,
+                .fcmp => return true,
+                .select => |s| if (isOtherXmmType(s.ty)) return true,
+                .phi => |p| if (isOtherXmmType(p.ty) or inspection.isByteVector128(p.ty)) return true,
+                .alloca => |a| if (isOtherXmmType(a.allocated_ty) or inspection.isByteVector128(a.allocated_ty)) return true,
+                .load => |l| if (isOtherXmmType(l.ty)) return true,
+                .store => |s| if (isOtherXmmType(s.ty)) return true,
+                .call => |c| {
+                    if (isOtherXmmType(c.ret_ty)) return true;
+                    for (c.args.items) |arg| if (isOtherXmmType(arg.ty)) return true;
+                },
+                .extractelement, .insertelement, .shufflevector => return true,
+                .extractvalue => |e| if (isOtherXmmType(e.result_ty)) return true,
+                .insertvalue => |i| if (isOtherXmmType(i.aggregate_ty)) return true,
+                .gep, .freeze, .icmp, .atomicrmw, .cmpxchg, .fence => {},
+            }
+        }
+    }
+    return false;
+}
+
+fn cyclicByteVectorTransfersAreSafe(selector: *ComposedBlockSelector) bool {
+    const function = selector.function orelse return false;
+    if (function.blocks.items.len > stage2_max_blocks) return false;
+    if (functionHasConflictingXmmState(function.*)) return false;
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items, 0..) |inst, inst_idx| {
+            if (inst.removed) continue;
+            if (inst.kind == .load and inspection.isByteVector128(inst.kind.load.ty)) {
+                const def_name = inst.result orelse return false;
+                if (countFunctionUsesOfName(function.*, def_name) != 1) return false;
+
+                var store_found = false;
+                for (block.instructions.items[inst_idx + 1 ..]) |later_inst| {
+                    if (later_inst.removed) continue;
+                    if (later_inst.kind == .load and inspection.isByteVector128(later_inst.kind.load.ty)) {
+                        return false;
+                    }
+                    if (later_inst.kind == .store and inspection.isByteVector128(later_inst.kind.store.ty)) {
+                        if (later_inst.kind.store.value == .named and
+                            std.mem.eql(u8, later_inst.kind.store.value.named, def_name))
+                        {
+                            store_found = true;
+                            break;
+                        }
+                    }
+                }
+                if (!store_found) return false;
+            } else if (inst.kind == .store and inspection.isByteVector128(inst.kind.store.ty)) {
+                if (inst.kind.store.value != .named) return false;
+                const val_name = inst.kind.store.value.named;
+                var def_found = false;
+                for (block.instructions.items[0..inst_idx]) |prior_inst| {
+                    if (prior_inst.removed) continue;
+                    if (prior_inst.kind == .load and inspection.isByteVector128(prior_inst.kind.load.ty)) {
+                        if (prior_inst.result) |res| {
+                            if (std.mem.eql(u8, res, val_name)) {
+                                def_found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (!def_found) return false;
+            }
+        }
+    }
+    return true;
+}
+
+fn byteVectorTransferIsAdmissible(selector: *ComposedBlockSelector) !bool {
+    if (try byteTransfersAreAcyclic(selector)) return true;
+    return cyclicByteVectorTransfersAreSafe(selector);
+}
+
 fn byteVectorShape() selector_types.VectorShape {
     return .{ .lane_type = .integer, .lane_count = 16, .lane_bits = 8, .defined_lanes = 0xffff };
 }
@@ -364,7 +572,7 @@ fn stageByteVectorPointer(selector: *ComposedBlockSelector, value: ir.Value) !?D
 
 fn lowerLoadByteVector(selector: *ComposedBlockSelector, name: []const u8, load: ir.LoadInst) !?Diagnostic {
     if (load.ty_addrspace != null or load.ptr_addrspace != null) return .{ .no_emitter = "composed-block-byte-vector-addrspace" };
-    if (!try byteTransfersAreAcyclic(selector)) return .{ .no_emitter = "composed-block-byte-transfer-cyclic-cfg" };
+    if (!try byteVectorTransferIsAdmissible(selector)) return .{ .no_emitter = "composed-block-byte-transfer-cyclic-cfg" };
     if (try stageByteVectorPointer(selector, load.ptr)) |diagnostic| return diagnostic;
     try selector_state.clobberXmmReg(selector, .xmm0);
     try selector.machine.instructions.append(selector.allocator, .{ .load_f128_arg_ptr_xmm0 = .{ .reg = .rcx, .offset = 0, .unaligned = true } });
@@ -374,7 +582,7 @@ fn lowerLoadByteVector(selector: *ComposedBlockSelector, name: []const u8, load:
 
 fn lowerStoreByteVector(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
     if (store.ty_addrspace != null or store.ptr_addrspace != null) return .{ .no_emitter = "composed-block-byte-vector-addrspace" };
-    if (!try byteTransfersAreAcyclic(selector)) return .{ .no_emitter = "composed-block-byte-transfer-cyclic-cfg" };
+    if (!try byteVectorTransferIsAdmissible(selector)) return .{ .no_emitter = "composed-block-byte-transfer-cyclic-cfg" };
     if (store.value != .named) return .{ .no_emitter = "composed-block-byte-vector-store-value" };
     if (try stageByteVectorPointer(selector, store.ptr)) |diagnostic| return diagnostic;
     if (try selector_vector.materializeByteVector(selector, store.value, byteVectorShape())) |diagnostic| return diagnostic;
