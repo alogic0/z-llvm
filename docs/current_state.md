@@ -69,9 +69,11 @@ The subsequent [scalar byte-loop slice](evidence/composed_byte_loops.md) closes
 retained `ssp.__strncpy_chk` and composes retained `bcmp`/`memcmp`, with a bounded
 return-join verification repair. All 17 integration subgates, native and ABI
 comparisons pass. The fixed-program matrix retains its supported outcomes,
-semantic results and object hashes. Next investigate its loop-memory
-`release-o3` optimizer rejection. Cyclic byte vectors and broader consumer
-migrations remain deferred.
+The subsequent [loop-memory repair slice](evidence/loops_memory_repair.md) repairs
+the `release-o3` optimizer `TypeMismatch`, scalarizing single-element aggregates in
+SROA, enforcing alloca-type safety in mem2reg, and recording baseline v2 measurements
+across all 15 supported pairs. Cyclic byte vectors and broader consumer migrations
+remain deferred.
 These development results and measurements do not advance accepted counters.
 
 See [next steps](next_steps.md), the [improvement plan](roadmap/project_improvement_plan.md),
