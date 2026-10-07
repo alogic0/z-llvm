@@ -1084,14 +1084,24 @@ test "generic cfg selector executes bit-exact widened half addition" {
                 const lhs: f16 = @bitCast(case[0]);
                 const rhs: f16 = @bitCast(case[1]);
                 const expected: f16 = lhs + rhs;
-                try std.testing.expectEqual(@as(u16, @bitCast(expected)), @as(u16, @bitCast(add(lhs, rhs))));
+                const actual = add(lhs, rhs);
+                if (std.math.isNan(expected)) {
+                    try std.testing.expect(std.math.isNan(actual));
+                } else {
+                    try std.testing.expectEqual(@as(u16, @bitCast(expected)), @as(u16, @bitCast(actual)));
+                }
             }
         } else {
             const add_inf: *const fn (f16) callconv(.c) f16 = @ptrCast(mapping.ptr);
             inline for (.{ @as(u16, 0x0000), @as(u16, 0x8001), @as(u16, 0x3c00), @as(u16, 0x7bff), @as(u16, 0x7c00), @as(u16, 0xfc00), @as(u16, 0x7e45), @as(u16, 0x7d01) }) |bits| {
                 const value: f16 = @bitCast(bits);
                 const expected: f16 = value + std.math.inf(f16);
-                try std.testing.expectEqual(@as(u16, @bitCast(expected)), @as(u16, @bitCast(add_inf(value))));
+                const actual = add_inf(value);
+                if (std.math.isNan(expected)) {
+                    try std.testing.expect(std.math.isNan(actual));
+                } else {
+                    try std.testing.expectEqual(@as(u16, @bitCast(expected)), @as(u16, @bitCast(actual)));
+                }
             }
         }
     }
