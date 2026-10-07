@@ -51,7 +51,8 @@ fn promoteOneFunctionSlot(module: *ir.Module, function_index: usize) !bool {
         if (instruction.removed or instruction.kind != .alloca) continue;
         if (!instruction.kind.alloca.isSingleObject()) continue;
         const slot = instruction.result orelse continue;
-        if (!isPromotableSingleBlockSlot(function.*, entry_block_index, slot)) continue;
+        const allocated_ty = instruction.kind.alloca.allocated_ty;
+        if (!isPromotableSingleBlockSlot(function.*, entry_block_index, slot, allocated_ty)) continue;
 
         promoteSingleBlockSlot(function, entry_block_index, slot);
         changed = true;
@@ -64,7 +65,8 @@ fn promoteOneFunctionSlot(module: *ir.Module, function_index: usize) !bool {
         if (instruction.removed or instruction.kind != .alloca) continue;
         if (!instruction.kind.alloca.isSingleObject()) continue;
         const slot = instruction.result orelse continue;
-        if (!isPromotableStackSlot(function.*, slot)) continue;
+        const allocated_ty = instruction.kind.alloca.allocated_ty;
+        if (!isPromotableStackSlot(function.*, slot, allocated_ty)) continue;
         const single_store = findSingleStore(function.*, slot) orelse continue;
 
         var dom = try dominator.Dominators.build(module.allocator, function.*);
@@ -81,15 +83,16 @@ fn promoteOneFunctionSlot(module: *ir.Module, function_index: usize) !bool {
         if (instruction.removed or instruction.kind != .alloca) continue;
         if (!instruction.kind.alloca.isSingleObject()) continue;
         const slot = instruction.result orelse continue;
-        if (!isPromotableStackSlot(function.*, slot)) continue;
+        const allocated_ty = instruction.kind.alloca.allocated_ty;
+        if (!isPromotableStackSlot(function.*, slot, allocated_ty)) continue;
 
-        try promoteMultiBlockSlot(module, function_index, entry_block_index, instruction_index, slot, instruction.kind.alloca.allocated_ty);
+        try promoteMultiBlockSlot(module, function_index, entry_block_index, instruction_index, slot, allocated_ty);
         return true;
     }
     return changed;
 }
 
-fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
+fn isPromotableStackSlot(function: ir.Function, slot: []const u8, allocated_ty: ir.Type) bool {
     for (function.blocks.items) |block| {
         for (block.instructions.items) |instruction| {
             if (instruction.removed) continue;
@@ -101,11 +104,13 @@ fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
                 .load => |load| {
                     if (!isNamed(load.ptr, slot)) continue;
                     if (load.attrs.isBarrier()) return false;
+                    if (!load.ty.eql(allocated_ty)) return false;
                 },
                 .store => |store| {
                     if (isNamed(store.value, slot)) return false;
                     if (!isNamed(store.ptr, slot)) continue;
                     if (store.attrs.isBarrier()) return false;
+                    if (!store.ty.eql(allocated_ty)) return false;
                 },
                 .atomicrmw => |atomicrmw| {
                     if (isNamed(atomicrmw.ptr, slot) or isNamed(atomicrmw.value, slot)) return false;
@@ -466,7 +471,7 @@ fn addPhiIncoming(allocator: std.mem.Allocator, function: *ir.Function, block_in
     }
 }
 
-fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, slot: []const u8) bool {
+fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, slot: []const u8, allocated_ty: ir.Type) bool {
     for (function.blocks.items, 0..) |block, block_index| {
         for (block.instructions.items) |instruction| {
             if (instruction.removed) continue;
@@ -478,12 +483,14 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
                 .load => |load| {
                     if (!isNamed(load.ptr, slot)) continue;
                     if (load.attrs.isBarrier()) return false;
+                    if (!load.ty.eql(allocated_ty)) return false;
                     if (block_index != slot_block_index) return false;
                 },
                 .store => |store| {
                     if (isNamed(store.value, slot)) return false;
                     if (!isNamed(store.ptr, slot)) continue;
                     if (store.attrs.isBarrier()) return false;
+                    if (!store.ty.eql(allocated_ty)) return false;
                     if (block_index != slot_block_index) return false;
                 },
                 .atomicrmw => |atomicrmw| {

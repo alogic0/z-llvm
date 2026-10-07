@@ -108,7 +108,7 @@ fn tryScalarizeAggregateAlloca(
             if (inst.removed) continue;
             switch (inst.kind) {
                 .load => |*load| {
-                    const partition = partitionForPointer(partitions.items, load.ptr) orelse continue;
+                    const partition = partitionForPointerAndType(partitions.items, load.ptr, load.ty) orelse continue;
                     const replacement = fieldReplacementFor(replacements.items, partition.field_index orelse continue) orelse continue;
                     const old_result = inst.result;
                     load.ptr = .{ .named = replacement.alloca_name };
@@ -119,7 +119,7 @@ fn tryScalarizeAggregateAlloca(
                     }
                 },
                 .store => |*store| {
-                    const partition = partitionForPointer(partitions.items, store.ptr) orelse continue;
+                    const partition = partitionForPointerAndType(partitions.items, store.ptr, store.ty) orelse continue;
                     const replacement = fieldReplacementFor(replacements.items, partition.field_index orelse continue) orelse continue;
                     store.ptr = .{ .named = replacement.alloca_name };
                 },
@@ -178,15 +178,21 @@ fn aggregateAllocaOnlyUsesPartitions(
                 },
                 .load => |load| {
                     if (isNamed(load.ptr, slot)) {
-                        if (!load.ty.eql(aggregate_ty) or load.attrs.isBarrier()) return false;
+                        if (load.attrs.isBarrier()) return false;
+                        const matches_aggregate = load.ty.eql(aggregate_ty);
+                        const matches_field = directFieldAccessMatches(partitions, slot, load.ty);
+                        if (!matches_aggregate and !matches_field) return false;
                     } else if (instructionUsesName(instruction, slot)) {
                         return false;
                     }
                 },
                 .store => |store| {
                     if (isNamed(store.ptr, slot)) {
-                        if (!store.ty.eql(aggregate_ty) or store.attrs.isBarrier()) return false;
+                        if (store.attrs.isBarrier()) return false;
                         if (isNamed(store.value, slot)) return false;
+                        const matches_aggregate = store.ty.eql(aggregate_ty);
+                        const matches_field = directFieldAccessMatches(partitions, slot, store.ty);
+                        if (!matches_aggregate and !matches_field) return false;
                     } else if (instructionUsesName(instruction, slot)) {
                         return false;
                     }
@@ -196,6 +202,17 @@ fn aggregateAllocaOnlyUsesPartitions(
         }
     }
     return true;
+}
+
+fn directFieldAccessMatches(partitions: []const SlicePartition, slot: []const u8, ty: ir.Type) bool {
+    for (partitions) |partition| {
+        if (!std.mem.eql(u8, partition.value, slot)) continue;
+        if (partition.offset != 0) continue;
+        if (partition.field_ty) |field_ty| {
+            if (field_ty.eql(ty)) return true;
+        }
+    }
+    return false;
 }
 
 fn gepResultFeedsOnlyPartitions(
@@ -338,6 +355,7 @@ fn validateAggregatePartitionConsumers(function: ir.Function, slot: []const u8, 
                     if (std.mem.eql(u8, result, partition.value)) continue;
                 }
                 if (!instructionUsesName(instruction, partition.value)) continue;
+                if (std.mem.eql(u8, partition.value, slot) and instruction.kind == .gep) continue;
                 switch (instruction.kind) {
                     .load => |load| {
                         if (std.mem.eql(u8, partition.value, slot) and isNamed(load.ptr, slot) and load.ty.eql(aggregate_ty) and !load.attrs.isBarrier()) {
@@ -732,13 +750,18 @@ fn pointerLocation(layout: ?target.DataLayout, function: ir.Function, ptr: ir.Va
     return memory_location.forPointer(function, ptr);
 }
 
-fn partitionForPointer(partitions: []const SlicePartition, ptr: ir.Value) ?SlicePartition {
+fn partitionForPointerAndType(partitions: []const SlicePartition, ptr: ir.Value, access_ty: ir.Type) ?SlicePartition {
     const name = switch (ptr) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
     for (partitions) |partition| {
-        if (std.mem.eql(u8, partition.value, name)) return partition;
+        if (!std.mem.eql(u8, partition.value, name)) continue;
+        if (partition.field_ty) |field_ty| {
+            if (field_ty.eql(access_ty)) return partition;
+        } else {
+            return partition;
+        }
     }
     return null;
 }
@@ -846,27 +869,61 @@ const AllocaSlices = struct {
 
         for (function.blocks.items) |block| {
             for (block.instructions.items) |instruction| {
-                if (instruction.removed or instruction.kind != .gep) continue;
-                const result = instruction.result orelse continue;
-                const gep = instruction.kind.gep;
-                const base = gepAllocaRoot(function, gep) orelse continue;
-                if (rootAllocaType(function, base)) |root_ty| {
-                    if (root_ty == .aggregate) {
-                        if (aggregateFieldSlice(layout, function, result, base, root_ty, gep)) |slice| {
-                            try slices.append(allocator, slice);
+                if (instruction.removed) continue;
+                if (instruction.kind == .gep) {
+                    const result = instruction.result orelse continue;
+                    const gep = instruction.kind.gep;
+                    const base = gepAllocaRoot(function, gep) orelse continue;
+                    if (rootAllocaType(function, base)) |root_ty| {
+                        if (root_ty == .aggregate) {
+                            if (aggregateFieldSlice(layout, function, result, base, root_ty, gep)) |slice| {
+                                try slices.append(allocator, slice);
+                            }
                         }
                     }
-                }
-                if (memory_location.forPointer(function, .{ .named = result })) |location| {
-                    try slices.append(allocator, .{
-                        .kind = .pointer_gep,
-                        .alloca_root = base,
-                        .value = result,
-                        .source_ty = gep.source_ty,
-                        .offset = location.offset orelse continue,
-                        .size = location.size,
-                        .zero_offset_compatible = allIndicesAreZero(gep),
-                    });
+                    if (memory_location.forPointer(function, .{ .named = result })) |location| {
+                        try slices.append(allocator, .{
+                            .kind = .pointer_gep,
+                            .alloca_root = base,
+                            .value = result,
+                            .source_ty = gep.source_ty,
+                            .offset = location.offset orelse continue,
+                            .size = location.size,
+                            .zero_offset_compatible = allIndicesAreZero(gep),
+                        });
+                    }
+                } else if (instruction.kind == .load or instruction.kind == .store) {
+                    const ptr_val = if (instruction.kind == .load) instruction.kind.load.ptr else instruction.kind.store.ptr;
+                    const access_ty = if (instruction.kind == .load) instruction.kind.load.ty else instruction.kind.store.ty;
+                    const base = switch (ptr_val) {
+                        .named => |name| name,
+                        else => continue,
+                    };
+                    if (rootAllocaType(function, base)) |root_ty| {
+                        if (root_ty == .aggregate) {
+                            if (memory_location.aggregateFieldType(root_ty, 0)) |field_0_ty| {
+                                if (access_ty.eql(field_0_ty) and isScalarizableAggregateField(field_0_ty, layout != null)) {
+                                    if (!hasAggregateFieldSlice(slices.items, base, base, 0)) {
+                                        const size_0 = if (layout) |target_layout|
+                                            memory_location.typeSizeWithLayout(target_layout, field_0_ty)
+                                        else
+                                            memory_location.typeSize(field_0_ty);
+                                        try slices.append(allocator, .{
+                                            .kind = .aggregate_field,
+                                            .alloca_root = base,
+                                            .value = base,
+                                            .source_ty = root_ty,
+                                            .offset = 0,
+                                            .size = size_0,
+                                            .zero_offset_compatible = true,
+                                            .field_index = 0,
+                                            .field_ty = field_0_ty,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -905,6 +962,19 @@ const AllocaSlices = struct {
         return partitions;
     }
 };
+
+fn hasAggregateFieldSlice(slices: []const AllocaSlice, root: []const u8, value: []const u8, field_index: usize) bool {
+    for (slices) |slice| {
+        if (slice.kind == .aggregate_field and
+            std.mem.eql(u8, slice.alloca_root, root) and
+            std.mem.eql(u8, slice.value, value) and
+            slice.field_index == field_index)
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
 fn partitionFromSlice(slice: AllocaSlice) SlicePartition {
     return .{

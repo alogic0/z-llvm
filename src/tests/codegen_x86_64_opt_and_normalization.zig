@@ -186,6 +186,109 @@ test "sroa preserves volatile aggregate field accesses during scalarization" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "sroa scalarizes single-element array with direct load and store accesses" {
+    const input =
+        \\define i32 @probe(i32 %x, i32 %y) {
+        \\entry:
+        \\  %slot = alloca [1 x i32], align 4
+        \\  store i32 %x, ptr %slot, align 4
+        \\  br label %loop
+        \\loop:
+        \\  %i = phi i32 [ 0, %entry ], [ %next, %body ]
+        \\  %done = icmp eq i32 %i, %y
+        \\  br i1 %done, label %exit, label %body
+        \\body:
+        \\  %old = load i32, ptr %slot, align 4
+        \\  %mixed = xor i32 %old, %i
+        \\  %new = add i32 %mixed, 7
+        \\  store i32 %new, ptr %slot, align 4
+        \\  %next = add i32 %i, 1
+        \\  br label %loop
+        \\exit:
+        \\  %result = load i32, ptr %slot, align 4
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(sroa.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @probe(i32 %x, i32 %y) {
+        \\entry:
+        \\  br label %loop
+        \\loop:
+        \\  %slot.sroa.0.0 = phi i32 [ %x, %entry ], [ %new, %body ]
+        \\  %i = phi i32 [ 0, %entry ], [ %next, %body ]
+        \\  %done = icmp eq i32 %i, %y
+        \\  br i1 %done, label %exit, label %body
+        \\body:
+        \\  %mixed = xor i32 %slot.sroa.0.0, %i
+        \\  %new = add i32 %mixed, 7
+        \\  %next = add i32 %i, 1
+        \\  br label %loop
+        \\exit:
+        \\  ret i32 %slot.sroa.0.0
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "mem2reg leaves mismatched alloca and load/store types intact" {
+    const input =
+        \\define i32 @probe(i32 %x, i32 %y) {
+        \\entry:
+        \\  %slot = alloca [1 x i32], align 4
+        \\  store i32 %x, ptr %slot, align 4
+        \\  br label %loop
+        \\loop:
+        \\  %i = phi i32 [ 0, %entry ], [ %next, %body ]
+        \\  %done = icmp eq i32 %i, %y
+        \\  br i1 %done, label %exit, label %body
+        \\body:
+        \\  %old = load i32, ptr %slot, align 4
+        \\  %mixed = xor i32 %old, %i
+        \\  %new = add i32 %mixed, 7
+        \\  store i32 %new, ptr %slot, align 4
+        \\  %next = add i32 %i, 1
+        \\  br label %loop
+        \\exit:
+        \\  %result = load i32, ptr %slot, align 4
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(mem2reg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "normalization preserves canonical LLVM-compatible fixture output" {
     const input = @embedFile("../testdata/instcombine.ll");
     const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);

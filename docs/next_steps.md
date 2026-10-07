@@ -23,13 +23,16 @@ rejection. Native comparisons, protected-page checks, ABI checks and all 17
 integration subgates pass. The frozen performance matrix retains all outcomes,
 semantic results and object hashes from the memcpy checkpoint.
 
-## Next: loop-memory optimizer rejection
+The [loop-memory repair slice](evidence/loops_memory_repair.md) repairs the
+frozen `loops_memory/release-o3` optimizer `TypeMismatch`. SROA scalarizes single-element
+aggregates with direct field loads/stores, and `mem2reg` enforces alloca-type
+safety. Focused regressions and the behavioral differential suite pass. Semantic
+and runtime driver outputs match Clang-22 -O3 byte-for-byte across all 272
+observations. The matrix is versioned to `fixed-architecture-programs-v2` with all
+15 pairs supported, and repeated measurements are recorded while preserving the
+original frozen manifest and baseline evidence.
 
-Reproduce and repair the frozen `loops_memory/release-o3` optimizer
-`TypeMismatch`, with a focused regression and semantic comparison against the
-original program. Once support is proven, version the matrix's support
-expectations and record measurements for the newly supported pair; preserve
-the original frozen manifest and baseline evidence.
+## Next: cyclic byte-vector transfers and deferred capabilities
 
 Cyclic byte-vector transfers still require separate loop-carried XMM ownership
 proof. Further string families, broader pass migrations, opaque parsing and

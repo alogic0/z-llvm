@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "population": "fixed-architecture-programs-v1",
+  "population": "fixed-architecture-programs-v2",
   "workloads": [
     {
       "id": "arguments_branches",
@@ -56,11 +56,5 @@
     "test/behavioral/performance_scalar.zig": "3fb676662c340cedfaa3fbc8fedb4b39ed7541ae7452445f276fd010f547b4c1",
     "test/behavioral/register_pressure.ll": "2095b3b83986def5781e024247b0735aa1010fd5de0951b94ee1a5dadc0c258c"
   },
-  "unsupported": {
-    "loops_memory/release-o3": {
-      "stage": "optimizer",
-      "returncode": 1,
-      "stderr": "error: TypeMismatch\n"
-    }
-  }
+  "unsupported": {}
 }
