@@ -611,12 +611,12 @@ fn core_rollbackInternal(comptime Authority: type, transaction: anytype) void {
     transaction.call_action_executed = false;
     transaction.request_count = 0;
     transaction.request_phase = .registering;
-    transaction.write_nodes = [_]bool{false} ** physical_node_count;
-    transaction.early_plans = [_]EarlyPlan{.{}} ** max_requests;
+    transaction.write_nodes = @splat(false);
+    transaction.early_plans = @splat(.{});
     resetSemanticOrderPlan(Authority, transaction);
-    transaction.early_home_valid = [_]bool{false} ** max_requests;
-    transaction.prepared_view_valid = [_]bool{false} ** max_requests;
-    transaction.switch_boundary_applied = [_]bool{false} ** max_requests;
+    transaction.early_home_valid = @splat(false);
+    transaction.prepared_view_valid = @splat(false);
+    transaction.switch_boundary_applied = @splat(false);
     transaction.lifetime_context = .{};
     transaction.view_generation +%= 1;
     if (transaction.view_generation == 0) transaction.view_generation = 1;
@@ -1160,8 +1160,7 @@ fn actionSecondaryOperand(
     };
 }
 fn resetSemanticOrderPlan(comptime _: type, transaction: anytype) void {
-    transaction.semantic_order_edges =
-        [_][max_requests]bool{[_]bool{false} ** max_requests} ** max_requests;
+    transaction.semantic_order_edges = @splat(@splat(false));
     transaction.ordered_operand_count = 0;
 }
 fn core_registeredOperandView(

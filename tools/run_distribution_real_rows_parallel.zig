@@ -1647,7 +1647,7 @@ test "os-managed memory records low samples without launch block or policy termi
     var roots = try fixtureRootsWithCaches(allocator, io, &temp, false);
     defer roots.deinit(allocator);
     var audit: LifecycleAudit = .{};
-    const low_memory_samples = [_]u64{1024} ** 16;
+    const low_memory_samples: [16]u64 = @splat(1024);
     var test_options: TestOptions = .{
         .worker_fixture = .success,
         .filesystem_sample = .{ .total_bytes = 100 * 1024 * 1024 * 1024, .free_bytes = 90 * 1024 * 1024 * 1024 },
@@ -1732,7 +1732,7 @@ test "failure manifest binds os-managed memory diagnostics and explicit child st
         .{ .state = .not_reaped },
     };
     const waits: [mode_count]?WorkerWait = .{ null, null, null };
-    const run_id = [_]u8{'a'} ** 32;
+    const run_id: [32]u8 = @splat('a');
     var buffer: [4096]u8 = undefined;
     var writer = std.Io.Writer.fixed(&buffer);
     try writeFailureManifest(&writer, &resource, children, waits, error.RealRowsParallelChildFailed, &run_id);

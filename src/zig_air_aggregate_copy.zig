@@ -70,7 +70,7 @@ pub fn validateSretAggregateMakeRecords(
     if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return false;
     const layout = x86_64SysVDataLayout() orelse return false;
     const ret_ptr_index = air_model.typedRetPtrIndex(structured_air_v2) orelse return false;
-    var seen: [max_mechanical_leaf_validation]bool = .{false} ** max_mechanical_leaf_validation;
+    var seen: [max_mechanical_leaf_validation]bool = @splat(false);
     if (leaves.len > seen.len) return false;
     for (structured_air_v2.instructions) |instruction| {
         if (!std.mem.eql(u8, instruction.opcode, "store") and !std.mem.eql(u8, instruction.opcode, "store_safe")) continue;

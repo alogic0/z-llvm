@@ -150,7 +150,7 @@ pub fn canonicalRepositoryPath(input: []const u8) ProvenanceError!CanonicalRepos
     }
     var result = CanonicalRepositoryPath{
         .length = @intCast(input.len),
-        .bytes = [_]u8{0} ** canonical_repository_path_max,
+        .bytes = @splat(0),
     };
     @memcpy(result.bytes[0..input.len], input);
     try validateCanonicalRepositoryPath(&result);

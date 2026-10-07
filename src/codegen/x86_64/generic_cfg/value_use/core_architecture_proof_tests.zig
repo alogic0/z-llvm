@@ -103,13 +103,13 @@ test "value-use generic transaction layout matches frozen R0" {
 }
 test "value-use facade methods retain finite reachable error sets" {
     inline for (comptime std.meta.declarations(Transaction)) |declaration| {
-        const declaration_type = @TypeOf(@field(Transaction, declaration.name));
+        const declaration_type = @TypeOf(@field(Transaction, declaration));
         switch (@typeInfo(declaration_type)) {
             .@"fn" => |function| {
                 const return_type = function.return_type orelse continue;
                 switch (@typeInfo(return_type)) {
                     .error_union => |error_union| try std.testing.expect(
-                        @typeInfo(error_union.error_set).error_set != null,
+                        @typeInfo(error_union.error_set).error_set.error_names != null,
                     ),
                     else => {},
                 }

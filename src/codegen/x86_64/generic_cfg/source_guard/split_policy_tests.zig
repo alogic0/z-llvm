@@ -255,7 +255,10 @@ test "value-use split guard rejects reverse imports and control-compare budget g
             "fn reverse(comptime Authority: type) void { _ = Authority.planning; }",
         ),
     );
-    const oversized = "// line\n" ** 2001;
+    var oversized_buf: [8 * 2001:0]u8 = undefined;
+    for (0..2001) |i| @memcpy(oversized_buf[i * 8 .. (i + 1) * 8], "// line\n");
+    oversized_buf[8 * 2001] = 0;
+    const oversized: [:0]const u8 = &oversized_buf;
     try std.testing.expectError(
         error.ValueUseControlCompareLineBudgetExceeded,
         validateValueUseLeaf(

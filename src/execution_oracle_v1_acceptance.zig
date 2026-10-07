@@ -59,7 +59,7 @@ pub const SelectorIdentity = struct {
             return error.SelectorEvidenceInvalid;
         }
         var result: SelectorIdentity = .{
-            .version = [_]u8{0} ** selector_version_max_bytes,
+            .version = @splat(0),
             .version_length = @intCast(version.len),
             .length = length,
             .sha256 = .{ .bytes = digest },
@@ -269,7 +269,7 @@ fn splitStatusRecord(record: []const u8) ![9][]const u8 {
 fn parseStagedListing(bytes: []const u8) ![source_count]StagedChange {
     if (bytes.len == 0) return error.EmptyStagedSet;
     var result: [source_count]StagedChange = undefined;
-    var seen = [_]bool{false} ** source_count;
+    var seen: [source_count]bool = @splat(false);
     var record_index: usize = 0;
     var offset: usize = 0;
     while (offset < bytes.len) {
@@ -458,8 +458,8 @@ fn observeClosureAt(
         .follow_symlinks = false,
     });
     defer root.close(io);
-    var staged_owned: [source_count]?[]u8 = [_]?[]u8{null} ** source_count;
-    var worktree_owned: [source_count]?[]u8 = [_]?[]u8{null} ** source_count;
+    var staged_owned: [source_count]?[]u8 = @splat(null);
+    var worktree_owned: [source_count]?[]u8 = @splat(null);
     defer {
         var index: usize = source_count;
         while (index > 0) {
@@ -837,21 +837,21 @@ pub fn finalizeAndPublish(
 
 fn syntheticEvidence(seed: u8) RunEvidence {
     const source = SourceEvidence{
-        .definition_sha256 = .{ .bytes = [_]u8{seed} ** 32 },
-        .import_sha256 = .{ .bytes = [_]u8{seed +% 1} ** 32 },
-        .use_sha256 = .{ .bytes = [_]u8{seed +% 2} ** 32 },
+        .definition_sha256 = .{ .bytes = @splat(seed) },
+        .import_sha256 = .{ .bytes = @splat(seed +% 1) },
+        .use_sha256 = .{ .bytes = @splat(seed +% 2) },
         .definition_count = 1,
         .use_count = 1,
     };
     const descriptor = DescriptorEvidence{
-        .descriptor_sha256 = .{ .bytes = [_]u8{seed +% 3} ** 32 },
-        .function_type_sha256 = .{ .bytes = [_]u8{seed +% 4} ** 32 },
+        .descriptor_sha256 = .{ .bytes = @splat(seed +% 3) },
+        .function_type_sha256 = .{ .bytes = @splat(seed +% 4) },
         .instruction_count = 2,
         .parameter_count = 0,
         .return_bits = 64,
         .calling_convention = .default,
     };
-    const selector = SelectorIdentity.init("0.17.0-dev.synthetic", 1234, [_]u8{seed +% 5} ** 32) catch unreachable;
+    const selector = SelectorIdentity.init("0.17.0-dev.synthetic", 1234, @as([32]u8, @splat(seed +% 5))) catch unreachable;
     const record = expectedExecutionRecord();
     return .{
         .external_revision = expectedExternalRevision(),
@@ -890,21 +890,21 @@ fn syntheticEvidence(seed: u8) RunEvidence {
 fn syntheticClosure(seed: u8) StructuredClosure {
     var sources: [source_count]SourceIdentity = undefined;
     for (&sources, 0..) |*source, index| {
-        var bytes = [_]u8{seed} ** 16;
+        var bytes: [16]u8 = @splat(seed);
         bytes[0] +%= @intCast(index);
         source.* = sourceIdentity(&bytes) catch unreachable;
     }
     return .{
         .sources = sources,
         .statuses = expected_status,
-        .staged_tree = .{ .bytes = [_]u8{seed +% 10} ** 20 },
+        .staged_tree = .{ .bytes = @splat(seed +% 10) },
     };
 }
 
 fn makeStatusListing(output: *[8192]u8, closure: *const StructuredClosure) ![]const u8 {
     var stream = std.Io.Writer.fixed(output);
     const writer = &stream;
-    var zero = [_]u8{'0'} ** 40;
+    var zero: [40]u8 = @splat('0');
     for (listing_order) |path_index| {
         const source = closure.sources[path_index];
         var blob: [40]u8 = undefined;
@@ -994,7 +994,7 @@ test "source binding rejects worktree bytes blob length and tree drift" {
     var staged: [source_count][]const u8 = undefined;
     var worktree: [source_count][]const u8 = undefined;
     for (0..source_count) |index| {
-        staged_storage[index] = [_]u8{0x41} ** 16;
+        staged_storage[index] = @splat(0x41);
         staged_storage[index][0] +%= @intCast(index);
         worktree_storage[index] = staged_storage[index];
         staged[index] = &staged_storage[index];
@@ -1021,7 +1021,7 @@ test "source binding rejects worktree bytes blob length and tree drift" {
     malformed.sources[1].length = 0;
     try std.testing.expectError(error.StructuredClosureInvalid, encodeReceipt(&output, &malformed, &evidence));
     malformed = closure;
-    malformed.staged_tree.bytes = [_]u8{0} ** 20;
+    malformed.staged_tree.bytes = @splat(0);
     try std.testing.expectError(error.StructuredClosureInvalid, encodeReceipt(&output, &malformed, &evidence));
 }
 

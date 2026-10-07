@@ -505,20 +505,20 @@ test "same authority context completes exact prepared and published receipt tran
 
 test "driver authenticated types and phase machine reject shortcuts and reordering" {
     comptime {
-        const repository_parameters = @typeInfo(@TypeOf(AcceptanceDriver.acceptRepository)).@"fn".params;
-        if (repository_parameters[1].type.? != AuthenticatedRepositoryScope) {
+        const repository_parameters = @typeInfo(@TypeOf(AcceptanceDriver.acceptRepository)).@"fn".param_types;
+        if (repository_parameters[1].? != AuthenticatedRepositoryScope) {
             @compileError("repository phase must require authenticated input");
         }
-        const staged_parameters = @typeInfo(@TypeOf(AcceptanceDriver.acceptStagedSource)).@"fn".params;
-        if (staged_parameters[1].type.? != AuthenticatedStagedSource) {
+        const staged_parameters = @typeInfo(@TypeOf(AcceptanceDriver.acceptStagedSource)).@"fn".param_types;
+        if (staged_parameters[1].? != AuthenticatedStagedSource) {
             @compileError("staged-source phase must require authenticated input");
         }
-        const validation_parameters = @typeInfo(@TypeOf(AcceptanceDriver.acceptValidationDirectory)).@"fn".params;
-        if (validation_parameters[1].type.? != AuthenticatedValidationDirectory) {
+        const validation_parameters = @typeInfo(@TypeOf(AcceptanceDriver.acceptValidationDirectory)).@"fn".param_types;
+        if (validation_parameters[1].? != AuthenticatedValidationDirectory) {
             @compileError("validation phase must require authenticated input");
         }
-        const publication_parameters = @typeInfo(@TypeOf(AcceptanceDriver.acceptPublishedReceipt)).@"fn".params;
-        if (publication_parameters[1].type.? != PublishedReceipt) {
+        const publication_parameters = @typeInfo(@TypeOf(AcceptanceDriver.acceptPublishedReceipt)).@"fn".param_types;
+        if (publication_parameters[1].? != PublishedReceipt) {
             @compileError("publication phase must require a bound published receipt");
         }
     }
@@ -598,7 +598,7 @@ test "structurally identical contexts remain distinct immutable cohorts" {
         ),
     );
     wrong_launch.driver_launch_identity = context_a.driver_launch_identity;
-    wrong_launch.zig_toolchain_identity = try canonicalReceiptToken("zig-0.16.0-other");
+    wrong_launch.zig_toolchain_identity = try canonicalReceiptToken("zig-0.17.0-other");
     try std.testing.expectError(
         error.ToolchainMismatch,
         authenticateValidatedBootstrap(
@@ -679,7 +679,7 @@ test "bootstrap receipt-token bounds fail closed before driver mutation" {
         validateObservedBootstrap(malformed_observed),
     );
 
-    const exact_token_input = [_]u8{'a'} ** receipt.receipt_toolchain_identity_max;
+    const exact_token_input: [receipt.receipt_toolchain_identity_max]u8 = @splat('a');
     malformed_observed = valid_observed;
     malformed_observed.zig_toolchain_identity = try canonicalReceiptToken(&exact_token_input);
     _ = try validateObservedBootstrap(malformed_observed);
@@ -788,7 +788,7 @@ test "fixed process results reject drift nonzero signals truncation and unbounde
                 .specification_id = .git_object_format,
                 .executable_identity = bootstrap.git_executable_identity,
                 .stdout = "",
-                .stderr = &([_]u8{'x'} ** 4097),
+                .stderr = &@as([4097]u8, @splat('x')),
             },
             .git_object_format,
             bootstrap,

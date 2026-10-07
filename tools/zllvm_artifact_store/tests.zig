@@ -11,7 +11,7 @@ fn manifest(artifacts: []const storage.Artifact) ![]u8 {
         .run_id = "test-run",
         .command = &.{ "zig", "test" },
         .source_revision = "test",
-        .compiler = "0.16.0",
+        .compiler = "0.17.0",
         .result = "passed",
         .artifacts = artifacts,
     }, .{});

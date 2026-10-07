@@ -22,7 +22,7 @@ pub fn validate(output: []const u8, mode: []const u8, cache_mode: CacheMode) !vo
     var header_count: usize = 0;
     var cache_count: usize = 0;
     var cohort_row_count: usize = 0;
-    var cohort_seen = [_]bool{false} ** members.len;
+    var cohort_seen: [members.len]bool = @splat(false);
     var summary_count: usize = 0;
     var lines = std.mem.splitScalar(u8, output, '\n');
     while (lines.next()) |line| {

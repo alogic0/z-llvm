@@ -419,7 +419,7 @@ pub const StorageBudgetLedger = struct {
         if (self.cap_source == .minimum_headroom_policy)
             return error.MinimumHeadroomSubstitution;
 
-        var seen = [_]bool{false} ** storage_families.len;
+        var seen: [storage_families.len]bool = @splat(false);
         for (self.entries) |entry| {
             _ = storageFamilyFromId(entry.family_id) orelse
                 return error.UnknownStorageFamily;
@@ -655,10 +655,10 @@ pub fn validateCompleteEnforcementEvidence(
 
     if (evidence.identity_count != closed_identities.len or
         evidence.compatibility_key_count != compatibility_keys.len or
-        evidence.v3_path_count != @typeInfo(V3Path).@"enum".fields.len or
+        evidence.v3_path_count != @typeInfo(V3Path).@"enum".field_names.len or
         evidence.repetition_count != canonical_repetition_count or
         evidence.actual_successful_functions == 0 or
-        evidence.phase_count != @typeInfo(Phase).@"enum".fields.len or
+        evidence.phase_count != @typeInfo(Phase).@"enum".field_names.len or
         evidence.stdout_capture_bytes != accepted_process_capture_bytes or
         evidence.stderr_capture_bytes != accepted_process_capture_bytes)
     {
@@ -708,11 +708,11 @@ pub const PhaseMachine = struct {
     next: usize,
     first_failure: ?Phase,
 
-    const phase_count = @typeInfo(Phase).@"enum".fields.len;
+    const phase_count = @typeInfo(Phase).@"enum".field_names.len;
 
     pub fn init() PhaseMachine {
         return .{
-            .statuses = [_]PhaseStatus{.pending} ** phase_count,
+            .statuses = @splat(.pending),
             .next = 0,
             .first_failure = null,
         };
@@ -935,7 +935,7 @@ fn sameSemanticIdentity(a: SemanticIdentity, b: SemanticIdentity) bool {
 }
 
 fn testDigest(byte: u8) Digest {
-    return [_]u8{byte} ** 32;
+    return @splat(byte);
 }
 
 const test_actual_successful_functions: u16 = 7;
@@ -960,7 +960,7 @@ fn testCanonicalRepetitions() [canonical_repetition_count]CanonicalRepetition {
         .function_count = test_actual_successful_functions,
         .accepted_subset_produced = false,
     };
-    var result = [_]CanonicalRepetition{identity} ** canonical_repetition_count;
+    var result: [canonical_repetition_count]CanonicalRepetition = @splat(identity);
     result[0].accepted_subset_produced = true;
     return result;
 }
@@ -1279,10 +1279,10 @@ test "baseline validation complete typed enforcement evidence alone admits readi
         .available_bytes = minimum_available_bytes,
         .identity_count = closed_identities.len,
         .compatibility_key_count = compatibility_keys.len,
-        .v3_path_count = @typeInfo(V3Path).@"enum".fields.len,
+        .v3_path_count = @typeInfo(V3Path).@"enum".field_names.len,
         .repetition_count = canonical_repetition_count,
         .actual_successful_functions = test_actual_successful_functions,
-        .phase_count = @typeInfo(Phase).@"enum".fields.len,
+        .phase_count = @typeInfo(Phase).@"enum".field_names.len,
         .stdout_capture_bytes = accepted_process_capture_bytes,
         .stderr_capture_bytes = accepted_process_capture_bytes,
     };
@@ -1301,10 +1301,10 @@ test "baseline validation typed enforcement evidence rejects omission drift and 
         .available_bytes = minimum_available_bytes,
         .identity_count = closed_identities.len,
         .compatibility_key_count = compatibility_keys.len,
-        .v3_path_count = @typeInfo(V3Path).@"enum".fields.len,
+        .v3_path_count = @typeInfo(V3Path).@"enum".field_names.len,
         .repetition_count = canonical_repetition_count,
         .actual_successful_functions = test_actual_successful_functions,
-        .phase_count = @typeInfo(Phase).@"enum".fields.len,
+        .phase_count = @typeInfo(Phase).@"enum".field_names.len,
         .stdout_capture_bytes = accepted_process_capture_bytes,
         .stderr_capture_bytes = accepted_process_capture_bytes,
     };

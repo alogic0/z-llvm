@@ -749,8 +749,8 @@ fn selectorIntervalLessThan(_: void, lhs: SelectorValueInterval, rhs: SelectorVa
 }
 
 const SelectorRegisterOccupancy = struct {
-    gpr: [6]bool = [_]bool{false} ** 6,
-    xmm: [8]bool = [_]bool{false} ** 8,
+    gpr: [6]bool = @splat(false),
+    xmm: [8]bool = @splat(false),
 };
 
 fn expireSelectorIntervals(active: *std.ArrayList(ActiveAllocation), occupied: *SelectorRegisterOccupancy, position: usize) void {
@@ -1154,7 +1154,7 @@ fn setEquals(lhs: NameSet, rhs: NameSet) bool {
 }
 
 const BlockSuccessors = struct {
-    names: [16][]const u8 = .{""} ** 16,
+    names: [16][]const u8 = @splat(""),
     len: usize = 0,
 
     fn add(successors_list: *BlockSuccessors, name: []const u8) !void {

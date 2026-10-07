@@ -543,6 +543,7 @@ test "value-use i128 eq-min rolls back after the first spill reload" {
     // The first reload fits. Growing for the second reload fails, so the
     // transaction must roll the already-appended low-limb reload back.
     try machine.instructions.ensureTotalCapacityPrecise(allocator, 1);
+    failing.resize_fail_index = failing.resize_index;
     failing.fail_index = failing.alloc_index;
     try std.testing.expectError(
         error.OutOfMemory,

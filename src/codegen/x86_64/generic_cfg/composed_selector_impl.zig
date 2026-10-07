@@ -229,7 +229,7 @@ fn hasAttrToken(attrs: []const u8, expected: []const u8) bool {
 
 fn bindPhiResults(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
     for (function.blocks.items) |block| {
-        var used_in_block = [_]bool{false} ** phi_regs.len;
+        var used_in_block: [phi_regs.len]bool = @splat(false);
         for (block.instructions.items) |instruction| {
             if (instruction.removed or instruction.kind != .phi) continue;
             const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };

@@ -17,8 +17,8 @@ const PreparedAction = Types.PreparedAction;
 const OperandPhase = Types.OperandPhase;
 const SemanticRole = Types.SemanticRole;
 pub fn validateSemanticOrderTopology(comptime Authority: type, transaction: anytype) !void {
-    var owners = [_]?u8{null} ** max_requests;
-    var edges = [_][max_requests]bool{[_]bool{false} ** max_requests} ** max_requests;
+    var owners: [max_requests]?u8 = @splat(null);
+    var edges: [max_requests][max_requests]bool = @splat(@splat(false));
     for (transaction.requests[0..transaction.request_count], 0..) |*request, index_usize| {
         const action = request.prepared_action orelse continue;
         const index: u8 = @intCast(index_usize);
@@ -141,13 +141,12 @@ fn actionTertiaryOperand(
     };
 }
 pub fn resetSemanticOrderPlan(comptime _: type, transaction: anytype) void {
-    transaction.semantic_order_edges =
-        [_][max_requests]bool{[_]bool{false} ** max_requests} ** max_requests;
+    transaction.semantic_order_edges = @splat(@splat(false));
     transaction.ordered_operand_count = 0;
 }
 pub fn planEarlyMaterializations(comptime Authority: type, transaction: anytype, mappings: []const Mapping) !void {
-    var source_counts = [_]u8{0} ** max_requests;
-    var source_nodes = [_]bool{false} ** physical_node_count;
+    var source_counts: [max_requests]u8 = @splat(0);
+    var source_nodes: [physical_node_count]bool = @splat(false);
     for (mappings) |mapping| {
         if (mapping.source) |source| source_nodes[@intFromEnum(source)] = true;
         if (mapping.source_request_index) |mapped_index| {
@@ -160,7 +159,7 @@ pub fn planEarlyMaterializations(comptime Authority: type, transaction: anytype,
         }
     }
 
-    var owners = [_]?u8{null} ** max_requests;
+    var owners: [max_requests]?u8 = @splat(null);
     var roots: [max_requests]u8 = undefined;
     var root_count: u8 = 0;
     resetSemanticOrderPlan(Authority, transaction);
@@ -471,7 +470,7 @@ fn rejectSemanticOrderCycles(
     graph: [Types.max_requests][Types.max_requests]bool,
     request_count: u8,
 ) !void {
-    var states = [_]CopyVisitState{.unseen} ** Types.max_requests;
+    var states: [Types.max_requests]CopyVisitState = @splat(.unseen);
     for (0..request_count) |node| try visitSemanticOrderNode(graph, node, request_count, &states);
 }
 fn visitSemanticOrderNode(

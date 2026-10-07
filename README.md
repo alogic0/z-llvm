@@ -10,8 +10,8 @@ invocation, selector ownership, and the scope of validation evidence.
 
 ## Build and isolated tests
 
-Use **Zig 0.16.0**, pinned in `.zigversion`. If PATH selects another compiler,
-invoke the 0.16.0 executable explicitly. Build-tool subprocesses inherit that
+Use **Zig 0.17.0**, pinned in `.zigversion`. If PATH selects another compiler,
+invoke the 0.17.0 executable explicitly. Build-tool subprocesses inherit that
 same compiler; the patched integration emitter is selected separately.
 
 ```sh

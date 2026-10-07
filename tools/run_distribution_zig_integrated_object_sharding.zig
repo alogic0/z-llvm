@@ -932,7 +932,7 @@ test "partition covers exactly 146 cases once with stable contiguous assignment"
     try std.testing.expectEqual(@as(usize, 2), ranges.len);
     try std.testing.expectEqual(Range{ .start = 0, .end = 73 }, ranges[0]);
     try std.testing.expectEqual(Range{ .start = 73, .end = 146 }, ranges[1]);
-    var seen = [_]bool{false} ** expected_case_count;
+    var seen: [expected_case_count]bool = @splat(false);
     for (ranges) |range| for (range.start..range.end) |index| {
         try std.testing.expect(!seen[index]);
         seen[index] = true;

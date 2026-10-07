@@ -107,7 +107,7 @@ const OracleError = error{
 };
 
 const BoundPath = struct {
-    bytes: [std.Io.Dir.max_path_bytes]u8 = [_]u8{0} ** std.Io.Dir.max_path_bytes,
+    bytes: [std.Io.Dir.max_path_bytes]u8 = @splat(0),
     length: usize = 0,
 
     fn init(path: []const u8) OracleError!BoundPath {
@@ -1279,8 +1279,8 @@ fn requireWeakExternalExecutionDispatch(
 }
 
 comptime {
-    if (builtin.zig_version.major != 0 or builtin.zig_version.minor != 16 or builtin.zig_version.patch != 0) {
-        @compileError("execution-oracle-v1 controller requires exact Zig 0.16.0");
+    if (builtin.zig_version.major != 0 or builtin.zig_version.minor != 17 or builtin.zig_version.patch != 0) {
+        @compileError("execution-oracle-v1 controller requires exact Zig 0.17.0");
     }
 }
 
@@ -1733,7 +1733,7 @@ fn observeZigWithEnvironment(
     try requireExitedZero(version);
     try validateExactVersionOutput(expected_version, version.stdout, version.stderr);
     var identity: ZigIdentity = .{
-        .version = [_]u8{0} ** version_max_bytes,
+        .version = @splat(0),
         .version_length = @intCast(expected_version.len),
         .length = metadata.size,
         .sha256 = sha256(bytes),
@@ -1823,9 +1823,9 @@ fn deriveExternalVersion(build_source: []const u8, describe_untrimmed: []const u
         if (!std.ascii.isHex(byte) or std.ascii.isUpper(byte)) return error.ExternalVersionUnavailable;
     }
     const ancestor = std.SemanticVersion.parse(ancestor_text) catch return error.ExternalVersionUnavailable;
-    if (source_version.order(ancestor) != .gt) return error.ExternalVersionUnavailable;
+    if (source_version.order(ancestor) == .lt) return error.ExternalVersionUnavailable;
 
-    var result: ExpectedExternalVersion = .{ .bytes = [_]u8{0} ** version_max_bytes, .length = 0 };
+    var result: ExpectedExternalVersion = .{ .bytes = @splat(0), .length = 0 };
     const rendered = std.fmt.bufPrint(&result.bytes, "{}.{}.{}-dev.{s}+{s}", .{
         source_version.major,
         source_version.minor,
@@ -1892,9 +1892,9 @@ fn proveWeakExternalSourceBytes(
 }
 
 fn proveWeakExternalSizeOfAst(allocator: std.mem.Allocator, source: []const u8) !void {
-    const sentinel = try allocator.dupeZ(u8, source);
+    const sentinel = try allocator.dupeSentinel(u8, source, 0);
     defer allocator.free(sentinel);
-    var tree = try std.zig.Ast.parse(allocator, sentinel, .zig);
+    var tree = try std.zig.Ast.parse(allocator, sentinel, .{});
     defer tree.deinit(allocator);
     if (tree.errors.len != 0) return error.InvalidSourceDefinition;
 
@@ -1941,9 +1941,9 @@ fn proveWeakExternalSizeOfAst(allocator: std.mem.Allocator, source: []const u8) 
 }
 
 fn proveSymbolSizeOfAst(allocator: std.mem.Allocator, source: []const u8) !void {
-    const sentinel = try allocator.dupeZ(u8, source);
+    const sentinel = try allocator.dupeSentinel(u8, source, 0);
     defer allocator.free(sentinel);
-    var tree = try std.zig.Ast.parse(allocator, sentinel, .zig);
+    var tree = try std.zig.Ast.parse(allocator, sentinel, .{});
     defer tree.deinit(allocator);
     if (tree.errors.len != 0) return error.InvalidSourceDefinition;
 
@@ -2222,9 +2222,9 @@ fn proveWeakExternalObservableCallSource(allocator: std.mem.Allocator, source: [
     {
         return error.CallOccurrenceMissing;
     }
-    const sentinel = try allocator.dupeZ(u8, source);
+    const sentinel = try allocator.dupeSentinel(u8, source, 0);
     defer allocator.free(sentinel);
-    var tree = try std.zig.Ast.parse(allocator, sentinel, .zig);
+    var tree = try std.zig.Ast.parse(allocator, sentinel, .{});
     defer tree.deinit(allocator);
     if (tree.errors.len != 0) return error.CallOccurrenceMissing;
 }
@@ -2521,7 +2521,7 @@ fn encodeWeakExternalAuditDiagnostic(
     const bytes = try std.fmt.allocPrint(
         allocator,
         "weak-external-definition-sizeof-audit-v1\n" ++
-            "controller_version=0.16.0\n" ++
+            "controller_version=0.17.0\n" ++
             "external_revision={s}\n" ++
             "external_selector_version={s}\n" ++
             "external_selector_bytes={}\n" ++
@@ -2712,16 +2712,16 @@ fn proveWeakExternalLinkedHarness(allocator: std.mem.Allocator, source: []const 
         return error.CallOccurrenceMissing;
     }
     try proveHarnessNewlineAst(allocator, source);
-    const sentinel = try allocator.dupeZ(u8, source);
+    const sentinel = try allocator.dupeSentinel(u8, source, 0);
     defer allocator.free(sentinel);
-    var tree = try std.zig.Ast.parse(allocator, sentinel, .zig);
+    var tree = try std.zig.Ast.parse(allocator, sentinel, .{});
     defer tree.deinit(allocator);
     if (tree.errors.len != 0) return error.CandidateBindingMismatch;
 }
 
 fn requireWeakExternalSelectorIdentity(identity: ZigIdentity) OracleError!void {
     var shared: execution_cohort.SelectorIdentity = .{
-        .version = [_]u8{0} ** 128,
+        .version = @splat(0),
         .version_length = identity.version_length,
         .length = identity.length,
         .sha256 = identity.sha256,
@@ -3089,9 +3089,9 @@ const reference_harness_source = execution_cohort.reference_harness_source;
 const linked_harness_source = execution_cohort.symbol_linked_harness_source;
 
 fn proveHarnessNewlineAst(allocator: std.mem.Allocator, source: []const u8) !void {
-    const sentinel = try allocator.dupeZ(u8, source);
+    const sentinel = try allocator.dupeSentinel(u8, source, 0);
     defer allocator.free(sentinel);
-    var tree = try std.zig.Ast.parse(allocator, sentinel, .zig);
+    var tree = try std.zig.Ast.parse(allocator, sentinel, .{});
     defer tree.deinit(allocator);
     if (tree.errors.len != 0 or
         countExact(source, "witness={}\\n") != 1 or
@@ -3111,9 +3111,9 @@ fn proveLinkedHarnessAst(allocator: std.mem.Allocator, source: []const u8) !void
     try execution_cohort.validateHarnesses(.symbol_size_of);
     if (!std.mem.eql(u8, source, linked_harness_source)) return error.CandidateBindingMismatch;
     try proveHarnessNewlineAst(allocator, source);
-    const sentinel = try allocator.dupeZ(u8, source);
+    const sentinel = try allocator.dupeSentinel(u8, source, 0);
     defer allocator.free(sentinel);
-    var tree = try std.zig.Ast.parse(allocator, sentinel, .zig);
+    var tree = try std.zig.Ast.parse(allocator, sentinel, .{});
     defer tree.deinit(allocator);
     if (tree.errors.len != 0) return error.CandidateBindingMismatch;
 
@@ -3416,7 +3416,7 @@ test "external version derivation is exact and rejects source Git disagreement" 
     const source = "const zig_version: std.SemanticVersion = .{ .major = 0, .minor = 17, .patch = 0 };\n";
     const expected = try deriveExternalVersion(source, "0.16.0-364-gbdee02bc0\n");
     try std.testing.expectEqualStrings("0.17.0-dev.364+bdee02bc0", expected.slice());
-    try std.testing.expectError(error.ExternalVersionUnavailable, deriveExternalVersion(source, "0.17.0-1-gbdee02bc0\n"));
+    try std.testing.expectError(error.ExternalVersionUnavailable, deriveExternalVersion(source, "0.18.0-1-gbdee02bc0\n"));
     try std.testing.expectError(error.ExternalVersionUnavailable, deriveExternalVersion(source, "0.16.0-364-gbdee02bc\n"));
     try std.testing.expectError(error.ExternalVersionUnavailable, deriveExternalVersion(source ++ source, "0.16.0-364-gbdee02bc0\n"));
 }
@@ -3429,7 +3429,7 @@ test "selector version is exact and measured identity drift is rejected" {
     try std.testing.expectError(error.ZigVersionMismatch, validateExactVersionOutput(selector_version, selector_version ++ "\n", "warning"));
 
     var first: ZigIdentity = .{
-        .version = [_]u8{0} ** version_max_bytes,
+        .version = @splat(0),
         .version_length = selector_version.len,
         .length = 100,
         .sha256 = sha256("selector"),
@@ -4332,7 +4332,7 @@ test "weak external descriptor and claim reject binding ABI and semantic drift" 
     try std.testing.expectError(error.AuditBindingMismatch, requireWeakExternalAuditClaim(claim, source, descriptor));
 
     var selector: ZigIdentity = .{
-        .version = [_]u8{0} ** version_max_bytes,
+        .version = @splat(0),
         .version_length = 6,
         .length = 123,
         .sha256 = sha256("external selector"),
@@ -4367,7 +4367,7 @@ test "weak external audit layout and diagnostic are fixed bounded and execution-
     );
 
     var selector: ZigIdentity = .{
-        .version = [_]u8{0} ** version_max_bytes,
+        .version = @splat(0),
         .version_length = 6,
         .length = 123,
         .sha256 = sha256("selector"),
@@ -4436,7 +4436,7 @@ test "weak external execution dispatch roots and compiler identities are exact" 
     try std.testing.expectError(error.GenerationLayoutInvalid, escaped.validate());
 
     var identity: ZigIdentity = .{
-        .version = [_]u8{0} ** version_max_bytes,
+        .version = @splat(0),
         .version_length = weak_external_expected_selector_version.len,
         .length = weak_external_expected_selector_length,
         .sha256 = weak_external_expected_selector_sha256,

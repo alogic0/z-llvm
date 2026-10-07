@@ -56,9 +56,9 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
     // Validate the action-owned role graph before destination planning can
     // obscure a semantic ownership contradiction with a physical conflict.
     try semantic_ordering.validateSemanticOrderTopology(Authority, transaction);
-    var destinations = [_]bool{false} ** physical_node_count;
-    var graph = [_][physical_node_count]bool{[_]bool{false} ** physical_node_count} ** physical_node_count;
-    var writes = [_]bool{false} ** physical_node_count;
+    var destinations: [physical_node_count]bool = @splat(false);
+    var graph: [physical_node_count][physical_node_count]bool = @splat(@splat(false));
+    var writes: [physical_node_count]bool = @splat(false);
     var mappings: [max_mappings]Mapping = undefined;
     var mapping_count: usize = 0;
 
@@ -919,7 +919,7 @@ fn appendStorePointerMappings(
     }
 }
 fn rejectCopyCycles(graph: [Types.physical_node_count][Types.physical_node_count]bool) !void {
-    var states = [_]CopyVisitState{.unseen} ** Types.physical_node_count;
+    var states: [Types.physical_node_count]CopyVisitState = @splat(.unseen);
     for (0..Types.physical_node_count) |node| try visitCopyNode(graph, node, &states);
 }
 fn visitCopyNode(

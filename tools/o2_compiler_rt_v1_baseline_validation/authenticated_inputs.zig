@@ -4,7 +4,7 @@ const process = @import("process.zig");
 
 pub const maximum_input_bytes: u64 = 64 * 1024 * 1024;
 pub const maximum_artifact_bytes: u64 = 1024 * 1024 * 1024;
-pub const expected_zig_version = "0.16.0";
+pub const expected_zig_version = "0.17.0";
 pub const accepted_registered_worktree_count: usize = 43;
 
 pub const FileIdentity = struct {
@@ -387,12 +387,13 @@ fn sha256(bytes: []const u8) contract.Digest {
 }
 
 test "manifest parser rejects malformed and escaping identities" {
-    const valid = "00" ** 32 ++ "  src/a.zig";
+    const zero64 = "0000000000000000000000000000000000000000000000000000000000000000";
+    const valid = zero64 ++ "  src/a.zig";
     const parsed = try parseManifestLine(valid);
     try std.testing.expectEqualStrings("src/a.zig", parsed.path);
     try std.testing.expectError(error.ManifestMismatch, parseManifestLine("00  src/a.zig"));
-    try std.testing.expectError(error.ManifestMismatch, parseManifestLine("00" ** 32 ++ "  ../escape"));
-    try std.testing.expectError(error.ManifestMismatch, parseManifestLine("00" ** 32 ++ "  /absolute"));
+    try std.testing.expectError(error.ManifestMismatch, parseManifestLine(zero64 ++ "  ../escape"));
+    try std.testing.expectError(error.ManifestMismatch, parseManifestLine(zero64 ++ "  /absolute"));
 }
 
 test "bundle manifest namespace requires exact accepted prefix" {

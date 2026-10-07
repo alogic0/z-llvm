@@ -14,7 +14,7 @@ const DoublePair = extern struct {
 };
 
 const FloatVectorPair = extern struct {
-    value: @Vector(2, f32),
+    value: [2]f32,
 };
 
 test "generic cfg selector returns exact SSE aggregate leaves" {

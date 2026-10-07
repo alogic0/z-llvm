@@ -697,7 +697,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
                 saw_terminator = true;
                 eax_defined = function.ret_ty == .void;
                 xmm0_defined = false;
-                xmm_defined_bits = [_]u16{0} ** 8;
+                xmm_defined_bits = @splat(0);
             },
             .ud2 => {
                 saw_terminator = true;

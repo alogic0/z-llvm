@@ -168,7 +168,7 @@ pub const PreparedViewLease = struct {
 /// Inline-owned semantic identity for a sealed action. Callers provide a
 /// name, never storage discovered from selector state.
 pub const ActionIdentity = struct {
-    bytes: [max_identity_bytes]u8 = [_]u8{0} ** max_identity_bytes,
+    bytes: [max_identity_bytes]u8 = @splat(0),
     len: u8 = 0,
 
     pub fn init(name: []const u8) !ActionIdentity {
@@ -739,8 +739,8 @@ pub const SwitchCaseIntent = struct {
 pub const SwitchCompareChainAction = struct {
     bits: u8,
     case_count: u8,
-    case_values: [max_switch_cases]i32 = [_]i32{0} ** max_switch_cases,
-    case_targets: [max_switch_cases]ActionIdentity = [_]ActionIdentity{.{}} ** max_switch_cases,
+    case_values: [max_switch_cases]i32 = @splat(0),
+    case_targets: [max_switch_cases]ActionIdentity = @splat(.{}),
     default_target: ActionIdentity,
     exhaustive_case: ?u8 = null,
 
@@ -1257,9 +1257,9 @@ const LifetimePin = struct {
 };
 
 const LifetimeContext = struct {
-    pins: [max_requests]?LifetimePin = [_]?LifetimePin{null} ** max_requests,
+    pins: [max_requests]?LifetimePin = @splat(null),
     forward_snapshots: [max_requests]?ForwardAdmissionSnapshot =
-        [_]?ForwardAdmissionSnapshot{null} ** max_requests,
+        @splat(null),
 };
 
 pub const PhysicalNode = enum(u8) {
@@ -1315,7 +1315,7 @@ pub const PhysicalNode = enum(u8) {
         };
     }
 };
-pub const physical_node_count = std.meta.fields(PhysicalNode).len;
+pub const physical_node_count = @typeInfo(PhysicalNode).@"enum".field_names.len;
 pub const max_mappings = max_requests * 3;
 
 const Model = @This();
@@ -1434,17 +1434,17 @@ pub fn Transaction(comptime Impl: type) type {
         request_count: u8 = 0,
         request_phase: Self.RequestPhase = .registering,
         lifecycle: Self.Lifecycle = .active,
-        write_nodes: [Self.physical_node_count]bool = [_]bool{false} ** Self.physical_node_count,
-        early_plans: [Self.max_requests]Self.EarlyPlan = [_]Self.EarlyPlan{.{}} ** Self.max_requests,
+        write_nodes: [Self.physical_node_count]bool = @splat(false),
+        early_plans: [Self.max_requests]Self.EarlyPlan = @splat(.{}),
         semantic_order_edges: [Self.max_requests][Self.max_requests]bool =
-            [_][Self.max_requests]bool{[_]bool{false} ** Self.max_requests} ** Self.max_requests,
+            @splat(@splat(false)),
         ordered_operands: [Self.max_requests]Self.OrderedOperand = undefined,
         ordered_operand_count: u8 = 0,
         early_homes: [Self.max_requests]Self.EarlyPreparedHome = undefined,
-        early_home_valid: [Self.max_requests]bool = [_]bool{false} ** Self.max_requests,
+        early_home_valid: [Self.max_requests]bool = @splat(false),
         prepared_views: [Self.max_requests]Self.PreparedRecord = undefined,
-        prepared_view_valid: [Self.max_requests]bool = [_]bool{false} ** Self.max_requests,
-        switch_boundary_applied: [Self.max_requests]bool = [_]bool{false} ** Self.max_requests,
+        prepared_view_valid: [Self.max_requests]bool = @splat(false),
+        switch_boundary_applied: [Self.max_requests]bool = @splat(false),
         view_generation: u32 = 1,
         action_diagnostic: ?Diagnostic = null,
         lifetime_context: Self.LifetimeContext = .{},

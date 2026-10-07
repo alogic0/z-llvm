@@ -6,7 +6,7 @@ const verify = @import("../verify.zig");
 const selector = @import("composed_selector_impl.zig");
 
 const FloatVectorPair = extern struct {
-    value: @Vector(2, f32),
+    value: [2]f32,
 };
 
 test "exact f32 aggregate objects execute stores pointer phis and packed loads" {

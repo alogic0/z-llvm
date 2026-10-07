@@ -1912,7 +1912,7 @@ pub fn validateAccumulatorCompositionProductionSites(source_name: []const u8, so
     };
     var body_storage: [max_function_bodies]FunctionBody = undefined;
     const bodies = try collectFunctionBodies(source, &body_storage);
-    var seen = [_]bool{false} ** allowed_functions.len;
+    var seen: [allowed_functions.len]bool = @splat(false);
     for (bodies) |body| {
         const function_source = source[body.start..body.end];
         var contains_api = false;

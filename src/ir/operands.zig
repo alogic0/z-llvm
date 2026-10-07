@@ -27,7 +27,7 @@ fn Walker(comptime Pointer: type, comptime Visitor: type) type {
 
         // Explicitly propagate constness through ArrayList slices, whose items
         // would otherwise remain mutable through a const instruction pointer.
-        fn value(w: *@This(), slot: if (@typeInfo(Pointer).pointer.is_const) *const ir.Value else *ir.Value, ty: ir.Type) Visitor.Error!void {
+        fn value(w: *@This(), slot: if (@typeInfo(Pointer).pointer.attrs.@"const") *const ir.Value else *ir.Value, ty: ir.Type) Visitor.Error!void {
             switch (slot.*) {
                 .vector, .constant_expr => w.coverage.has_opaque_references = true,
                 else => {},

@@ -119,7 +119,7 @@ pub fn validateCurrentTree(allocator: std.mem.Allocator) !void {
     var dir = try std.Io.Dir.cwd().openDir(io, source_dir, .{ .iterate = true });
     defer dir.close(io);
 
-    var seen = [_]bool{false} ** classified_sources.len;
+    var seen: [classified_sources.len]bool = @splat(false);
     var iterator = dir.iterate();
     while (try iterator.next(io)) |entry| {
         if (entry.kind != .file or

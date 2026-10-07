@@ -515,7 +515,7 @@ const GprArgCopyPlan = struct {
 };
 
 fn analyzeGprArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCallPlan) !GprArgCopyPlan {
-    var overwritten = [_]bool{false} ** 6;
+    var overwritten: [6]bool = @splat(false);
     var copy_plan = GprArgCopyPlan{};
     var needs_parallel = false;
     for (call.args.items, 0..) |arg, index| {
@@ -591,7 +591,7 @@ const XmmArgCopyPlan = struct {
 };
 
 fn analyzeXmmArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCallPlan) !XmmArgCopyPlan {
-    var overwritten = [_]bool{false} ** max_xmm_parallel_copies;
+    var overwritten: [max_xmm_parallel_copies]bool = @splat(false);
     var copy_plan = XmmArgCopyPlan{};
     var needs_parallel = false;
     for (call.args.items, 0..) |arg, index| {

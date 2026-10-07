@@ -128,8 +128,8 @@ const Counters = struct {
 };
 
 const CohortTracker = struct {
-    executed: [execution_cohort.programs.len]bool = [_]bool{false} ** execution_cohort.programs.len,
-    accepted: [execution_cohort.programs.len]bool = [_]bool{false} ** execution_cohort.programs.len,
+    executed: [execution_cohort.programs.len]bool = @splat(false),
+    accepted: [execution_cohort.programs.len]bool = @splat(false),
 
     fn record(tracker: *CohortTracker, program: execution_cohort.Program, pair: execution_cohort.PairCounters) !void {
         const index = @intFromEnum(program);
@@ -268,7 +268,7 @@ fn requireCohortDenominator(candidates: []const Candidate, candidate_hash: *cons
     if (candidates.len != 100 or !std.mem.eql(u8, candidate_hash, cohort_denominator_sha256)) {
         return error.ExecutionCohortDenominatorDrift;
     }
-    var counts = [_]usize{0} ** execution_cohort.programs.len;
+    var counts: [execution_cohort.programs.len]usize = @splat(0);
     for (candidates) |candidate| if (cohortProgram(candidate)) |program| {
         counts[@intFromEnum(program)] += 1;
     };
@@ -413,7 +413,7 @@ fn syntheticCohortCandidate(source: []const u8, function: []const u8) Candidate 
 }
 
 test "execution cohort denominator is exact rank independent and atomic" {
-    var candidates = [_]Candidate{syntheticCohortCandidate("other", "other")} ** 100;
+    var candidates: [100]Candidate = @splat(syntheticCohortCandidate("other", "other"));
     candidates[17] = syntheticCohortCandidate("../ziglang/src/main.zig", "coff.Symbol.sizeOf");
     candidates[42] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Requirements.size");
     candidates[61] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Requirements.slotType");
@@ -460,10 +460,10 @@ test "causal AIR generation cache identity excludes admission parser bytes and b
         .generation = .{
             .ziglang_pin = "pin-a",
             .external_revision = "revision-a",
-            .source_authority_sha256 = [_]u8{'a'} ** 64,
+            .source_authority_sha256 = @splat('a'),
             .selector_version = "selector-a",
             .selector_length = 100,
-            .selector_sha256 = [_]u8{'b'} ** 64,
+            .selector_sha256 = @splat('b'),
             .target = air_export_target,
             .mode = "ReleaseSafe",
             .pruning = air_export_pruning,

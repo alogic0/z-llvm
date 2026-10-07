@@ -125,7 +125,7 @@ pub const CanonicalAcceptanceReceipt = struct {
 
 pub const CanonicalReceiptBytes = struct {
     length: u16 = 0,
-    bytes: [receipt_max_bytes]u8 = [_]u8{0} ** receipt_max_bytes,
+    bytes: [receipt_max_bytes]u8 = @splat(0),
 
     // Compatibility for already-encoded, internally owned values only. Every
     // authentication and publication boundary uses canonicalReceiptBytesSlice.
@@ -201,7 +201,7 @@ pub fn canonicalReceiptToken(input: []const u8) ReceiptError!CanonicalReceiptTok
     }
     var result = CanonicalReceiptToken{
         .length = @intCast(input.len),
-        .bytes = [_]u8{0} ** receipt_toolchain_identity_max,
+        .bytes = @splat(0),
     };
     for (input, 0..) |byte, index| {
         const accepted = std.ascii.isAlphanumeric(byte) or
@@ -519,7 +519,7 @@ pub fn syntheticAcceptanceReceipt() !CanonicalAcceptanceReceipt {
         .source_set = try provenance.canonicalSourceSetFromBytes(source_bytes),
         .staged_tree_hash_algorithm = canonical_git_sha1_algorithm,
         .staged_tree_identity = .{ .bytes = fixedIdentity(20, 0x77) },
-        .zig_toolchain_identity = try canonicalReceiptToken("zig-0.16.0-x86_64-linux"),
+        .zig_toolchain_identity = try canonicalReceiptToken("zig-0.17.0-x86_64-linux"),
         .format_status = 0,
         .focused_test_status = 0,
         .semantic_gate_bits = receipt_required_semantic_bits,
@@ -695,7 +695,7 @@ pub fn validatePublicationTarget(bytes: []const u8) ReceiptBindingError!Validate
     }
     var target = ValidatedPublicationTarget{
         .length = @intCast(bytes.len),
-        .bytes = [_]u8{0} ** publication_target_max,
+        .bytes = @splat(0),
     };
     @memcpy(target.bytes[0..bytes.len], bytes);
     return target;
@@ -947,7 +947,7 @@ test "fixed receipt buffers validate bounds and zero tails before slicing" {
     const one_token = try canonicalReceiptToken("x");
     try std.testing.expectEqualStrings("x", try one_token.slice());
 
-    const exact_token_input = [_]u8{'a'} ** receipt_toolchain_identity_max;
+    const exact_token_input: [receipt_toolchain_identity_max]u8 = @splat('a');
     const exact_token = try canonicalReceiptToken(&exact_token_input);
     try std.testing.expectEqual(
         @as(usize, receipt_toolchain_identity_max),
@@ -969,13 +969,17 @@ test "fixed receipt buffers validate bounds and zero tails before slicing" {
 
     const one_bytes = CanonicalReceiptBytes{
         .length = 1,
-        .bytes = [_]u8{'x'} ++ [_]u8{0} ** (receipt_max_bytes - 1),
+        .bytes = blk: {
+            var b: [receipt_max_bytes]u8 = @splat(0);
+            b[0] = 'x';
+            break :blk b;
+        },
     };
     try std.testing.expectEqualStrings("x", try canonicalReceiptBytesSlice(&one_bytes));
 
     const exact_bytes = CanonicalReceiptBytes{
         .length = receipt_max_bytes,
-        .bytes = [_]u8{'x'} ** receipt_max_bytes,
+        .bytes = @splat('x'),
     };
     try std.testing.expectEqual(
         @as(usize, receipt_max_bytes),
@@ -1029,7 +1033,7 @@ test "fixed receipt buffers validate bounds and zero tails before slicing" {
 
     const one_target = try validatePublicationTarget("x");
     try std.testing.expectEqualStrings("x", try one_target.slice());
-    const exact_target_input = [_]u8{'a'} ** publication_target_max;
+    const exact_target_input: [publication_target_max]u8 = @splat('a');
     const exact_target = try validatePublicationTarget(&exact_target_input);
     try std.testing.expectEqual(
         @as(usize, publication_target_max),
@@ -1074,7 +1078,7 @@ test "canonical receipt rejects unknown duplicate missing reordered oversized an
         error.ReceiptFieldReordered,
         decodeCanonicalReceipt("capability_version=1\nschema_version=1\n"),
     );
-    var oversized: [receipt_max_bytes + 1]u8 = [_]u8{'x'} ** (receipt_max_bytes + 1);
+    var oversized: [receipt_max_bytes + 1]u8 = @splat('x');
     oversized[oversized.len - 1] = '\n';
     try std.testing.expectError(
         error.ReceiptOversized,
@@ -1204,8 +1208,8 @@ test "canonical receipt rejects malformed path identities algorithms and gate ID
     );
 
     changed = try encodeCanonicalReceipt(&receipt);
-    var invalid_toolchain: ["zig-0.16.0-x86_64-linux".len]u8 = undefined;
-    @memcpy(&invalid_toolchain, "zig-0.16.0-x86_64-linux");
+    var invalid_toolchain: ["zig-0.17.0-x86_64-linux".len]u8 = undefined;
+    @memcpy(&invalid_toolchain, "zig-0.17.0-x86_64-linux");
     invalid_toolchain[0] = ' ';
     try mutateReceiptFieldValue(&changed, "zig_toolchain_identity", &invalid_toolchain);
     try std.testing.expectError(

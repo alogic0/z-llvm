@@ -210,7 +210,7 @@ pub const git_staged_tree_argv = [_][]const u8{
 };
 
 pub const zig_format_argv = [_][]const u8{
-    "/home/oleg/.zig/0.16.0/files/zig",
+    "/home/oleg/.zig/0.17.0/files/zig",
     "fmt",
     "--check",
     capability_source_paths[0],
@@ -221,7 +221,7 @@ pub const zig_format_argv = [_][]const u8{
 };
 
 pub const zig_focused_test_argv = [_][]const u8{
-    "/home/oleg/.zig/0.16.0/files/zig",
+    "/home/oleg/.zig/0.17.0/files/zig",
     "build",
     "test-inbox206-descriptor-identity",
 };
@@ -256,7 +256,7 @@ pub const driver_process_specs = [_]FixedProcessSpecification{
     },
     .{
         .id = .zig_format_check,
-        .executable = "/home/oleg/.zig/0.16.0/files/zig",
+        .executable = "/home/oleg/.zig/0.17.0/files/zig",
         .argv = &zig_format_argv,
         .environment = &zig_environment,
         .environment_mode = .closed_allowlist,
@@ -265,7 +265,7 @@ pub const driver_process_specs = [_]FixedProcessSpecification{
     },
     .{
         .id = .zig_focused_test,
-        .executable = "/home/oleg/.zig/0.16.0/files/zig",
+        .executable = "/home/oleg/.zig/0.17.0/files/zig",
         .argv = &zig_focused_test_argv,
         .environment = &zig_environment,
         .environment_mode = .closed_allowlist,
@@ -1101,7 +1101,7 @@ pub fn parseStagedListing(
     bytes: []const u8,
 ) DriverError![capability_source_count]StagedChange {
     var result: [capability_source_count]StagedChange = undefined;
-    var seen = [_]bool{false} ** capability_source_count;
+    var seen: [capability_source_count]bool = @splat(false);
     var record_index: usize = 0;
     var offset: usize = 0;
     while (offset < bytes.len) {
@@ -1203,8 +1203,8 @@ pub fn normalizeAuthenticatedStagedSource(
         if (!equalCanonicalPath(&source.path, &expected_path)) return error.StagedPathMismatch;
     }
 
-    var process_stdout = [_]?[]u8{null} ** process_observations.len;
-    var process_stderr = [_]?[]u8{null} ** process_observations.len;
+    var process_stdout: [process_observations.len]?[]u8 = @splat(null);
+    var process_stderr: [process_observations.len]?[]u8 = @splat(null);
     defer {
         var index = process_observations.len;
         while (index > 0) {
@@ -1226,8 +1226,8 @@ pub fn normalizeAuthenticatedStagedSource(
         );
     }
 
-    var staged_sources = [_]?[]u8{null} ** capability_source_count;
-    var worktree_sources = [_]?[]u8{null} ** capability_source_count;
+    var staged_sources: [capability_source_count]?[]u8 = @splat(null);
+    var worktree_sources: [capability_source_count]?[]u8 = @splat(null);
     defer {
         var index: usize = capability_source_count;
         while (index > 0) {
@@ -1433,14 +1433,14 @@ pub fn isRecursivelySafeAcceptanceValue(comptime T: type) bool {
         .array => |array| isRecursivelySafeAcceptanceValue(array.child),
         .optional => |optional| isRecursivelySafeAcceptanceValue(optional.child),
         .@"struct" => |structure| block: {
-            inline for (structure.fields) |field| {
-                if (!isRecursivelySafeAcceptanceValue(field.type)) break :block false;
+            inline for (structure.field_types) |field_type| {
+                if (!isRecursivelySafeAcceptanceValue(field_type)) break :block false;
             }
             break :block true;
         },
         .@"union" => |union_info| block: {
-            inline for (union_info.fields) |field| {
-                if (!isRecursivelySafeAcceptanceValue(field.type)) break :block false;
+            inline for (union_info.field_types) |field_type| {
+                if (!isRecursivelySafeAcceptanceValue(field_type)) break :block false;
             }
             break :block true;
         },
@@ -1750,7 +1750,7 @@ pub fn syntheticAuthorityContext(
         .driver_launch_identity = .{ .bytes = fixedIdentity(32, 0x81) },
         .zig_executable_identity = .{ .bytes = fixedIdentity(32, 0x82) },
         .git_executable_identity = .{ .bytes = fixedIdentity(32, 0x83) },
-        .zig_toolchain_identity = try canonicalReceiptToken("zig-0.16.0-x86_64-linux"),
+        .zig_toolchain_identity = try canonicalReceiptToken("zig-0.17.0-x86_64-linux"),
         .source_set = try canonicalSourceSetFromBytes(source_bytes),
         .tree_identity = .{ .bytes = fixedIdentity(20, 0x85) },
     };
@@ -2291,7 +2291,7 @@ fn runPrivateProcessScenario(id: PrivateProcessScenarioId) !PrivateProcessOutcom
         .{ .eof = .stderr },
     };
     const incomplete_events = [_]SyntheticProcessReadEvent{.{ .eof = .stdout }};
-    const oversized = [_]u8{'x'} ** 17;
+    const oversized: [17]u8 = @splat('x');
     const oversized_events = [_]SyntheticProcessReadEvent{
         .{ .chunk = .{ .stream = .stdout, .bytes = &oversized } },
         .{ .eof = .stdout },
@@ -3153,7 +3153,7 @@ fn runPathBChild(init: std.process.Init, scenario_name: []const u8) !void {
         try stderr_writer.interface.flush();
         std.process.exit(7);
     } else if (std.mem.eql(u8, scenario_name, PathBScenario.oversized_stdout.name())) {
-        const oversized = [_]u8{'x'} ** 512;
+        const oversized: [512]u8 = @splat('x');
         try stdout_writer.interface.writeAll(&oversized);
         try stderr_writer.interface.writeAll(path_b_success_stderr);
     } else if (std.mem.eql(u8, scenario_name, PathBScenario.inconsistent_output.name())) {

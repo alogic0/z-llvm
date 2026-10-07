@@ -72,7 +72,7 @@ test "operand traversal: every instruction kind has typed read and replacement c
     const instructions = function.blocks.items[1].instructions.items;
     try std.testing.expectEqual(expected.len, instructions.len);
     const Kind = std.meta.Tag(@FieldType(ir.Instruction, "kind"));
-    var seen = std.EnumSet(Kind).initEmpty();
+    var seen: std.EnumSet(Kind) = .{};
     for (instructions, expected) |*inst, text| {
         seen.insert(std.meta.activeTag(inst.kind));
         var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
@@ -82,7 +82,7 @@ test "operand traversal: every instruction kind has typed read and replacement c
         try std.testing.expectEqual(inst.kind == .shufflevector, coverage.has_opaque_references);
     }
     // Adding a new instruction kind requires extending this fixture.
-    try std.testing.expectEqual(@typeInfo(Kind).@"enum".fields.len, seen.count());
+    try std.testing.expectEqual(@typeInfo(Kind).@"enum".field_names.len, seen.count());
 
     var counts = try UseCounts.collectFunction(std.testing.allocator, function.*);
     defer counts.deinit();
@@ -107,13 +107,13 @@ test "operand traversal: all terminators exclude block labels and include switch
         .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "x" } } },
         .{ .br = .{ .target = "x" } },
         .{ .condbr = .{ .cond_ty = .{ .int = 1 }, .cond = .{ .named = "x" }, .then_target = "x", .else_target = "x" } },
-        .{ .@"switch" = .{ .cond_ty = .{ .int = 32 }, .cond = .{ .named = "x" }, .default_target = "x", .cases = .{ .items = &cases, .capacity = cases.len } } },
-        .{ .indirectbr = .{ .addr_ty = .ptr, .addr = .{ .named = "x" }, .targets = .{ .items = &targets, .capacity = targets.len } } },
+        .{ .@"switch" = .{ .cond_ty = .{ .int = 32 }, .cond = .{ .named = "x" }, .default_target = "x", .cases = .{ .items = &cases, .capacity = cases.len, .pointer_stability = .{} } } },
+        .{ .indirectbr = .{ .addr_ty = .ptr, .addr = .{ .named = "x" }, .targets = .{ .items = &targets, .capacity = targets.len, .pointer_stability = .{} } } },
         .@"unreachable",
         .{ .ret = .{ .ty = .void } },
     };
     const expected = [_][]const u8{ "%x:i32;", "", "%x:i1;", "%x:i32;7:i32;", "%x:ptr;", "", "" };
-    var seen = std.EnumSet(std.meta.Tag(ir.Terminator)).initEmpty();
+    var seen: std.EnumSet(std.meta.Tag(ir.Terminator)) = .{};
     for (&terms, expected) |*term, text| {
         seen.insert(std.meta.activeTag(term.*));
         var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
@@ -126,7 +126,7 @@ test "operand traversal: all terminators exclude block labels and include switch
         _ = try ir.operands.terminator(term, Poison{});
         _ = try ir.operands.terminator(@as(*const ir.Terminator, term), CheckPoison{});
     }
-    try std.testing.expectEqual(@typeInfo(ir.Terminator).@"union".fields.len, seen.count());
+    try std.testing.expectEqual(@typeInfo(ir.Terminator).@"union".field_names.len, seen.count());
     try std.testing.expectEqualStrings("x", terms[1].br.target);
     try std.testing.expectEqualStrings("x", terms[2].condbr.then_target);
     try std.testing.expectEqualStrings("x", terms[2].condbr.else_target);

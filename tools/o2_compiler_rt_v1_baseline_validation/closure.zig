@@ -119,10 +119,10 @@ pub fn completeEnforcementEvidence(
         .available_bytes = available_bytes,
         .identity_count = contract.closed_identities.len,
         .compatibility_key_count = contract.compatibility_keys.len,
-        .v3_path_count = @typeInfo(contract.V3Path).@"enum".fields.len,
+        .v3_path_count = @typeInfo(contract.V3Path).@"enum".field_names.len,
         .repetition_count = contract.canonical_repetition_count,
         .actual_successful_functions = actual_successful_functions,
-        .phase_count = @typeInfo(contract.Phase).@"enum".fields.len,
+        .phase_count = @typeInfo(contract.Phase).@"enum".field_names.len,
         .stdout_capture_bytes = process.capture_max,
         .stderr_capture_bytes = process.capture_max,
     };

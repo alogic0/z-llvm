@@ -108,8 +108,8 @@ def main():
         stem = args.output / (name + "-version")
         runner.run([tools[name], "version" if name == "zig" else "--version"], stem)
         versions[name] = Path(str(stem) + ".stdout").read_text().strip()
-    if versions["zig"] != "0.16.0":
-        raise RuntimeError("Zig 0.16.0 required")
+    if versions["zig"] != "0.17.0":
+        raise RuntimeError("Zig 0.17.0 required")
     frozen = json.loads((ROOT / "test/behavioral/performance_manifest.json").read_text())
     for path, expected in frozen["inputs_sha256"].items():
         if sha(ROOT / path) != expected:
@@ -123,7 +123,7 @@ def main():
         "source_sha256": source_state, "frozen_manifest": frozen,
         "runner_sha256": sha(__file__), "manifest_sha256": sha(ROOT / "test/behavioral/performance_manifest.json"),
         "tools": {name: {"path": str(path), "sha256": sha(path), "version": versions.get(name)} for name, path in tools.items()},
-        "compiler_build": "zig 0.16.0 build -Doptimize=ReleaseFast --prefix OUTPUT/compiler (outside measurement)",
+        "compiler_build": "zig 0.17.0 build -Doptimize=ReleaseFast --prefix OUTPUT/compiler (outside measurement)",
         "platform": platform.platform(), "cpu_affinity": sorted(os.sched_getaffinity(0)),
         "cpuinfo": Path("/proc/cpuinfo").read_text(), "warmups": WARMUPS, "samples": SAMPLES,
         "target": "x86_64-unknown-linux-gnu", "harness": "ReleaseFast x86_64-linux-gnu baseline CPU, no LTO",

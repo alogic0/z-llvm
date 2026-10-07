@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 
 comptime {
     if (!std.mem.eql(u8, builtin.zig_version_string, std.mem.trim(u8, @embedFile(".zigversion"), "\r\n")))
-        @compileError("z_llvm requires Zig 0.16.0; invoke that compiler explicitly (see README.md)");
+        @compileError("z_llvm requires Zig 0.17.0; invoke that compiler explicitly (see README.md)");
 }
 
 pub fn build(b: *std.Build) void {
@@ -28,7 +28,7 @@ pub fn build(b: *std.Build) void {
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run_cmd.addArgs(args);
+    run_cmd.addPassthruArgs();
 
     const run_step = b.step("run", "Run the z_llvm tool");
     run_step.dependOn(&run_cmd.step);
@@ -97,7 +97,7 @@ pub fn build(b: *std.Build) void {
         "tools/derive_real_candidate_definition.zig",
         "--",
     });
-    if (b.args) |args| derive_real_candidate_definition_run.addArgs(args);
+    derive_real_candidate_definition_run.addPassthruArgs();
     const derive_real_candidate_definition_step = b.step(
         "derive-real-candidate-definition",
         "Derive the pinned rank-2 definition mapping sidecar",
@@ -140,7 +140,7 @@ pub fn build(b: *std.Build) void {
         "Run the non-default combined CN acceptance runner",
     );
     const inbox206_cn_acceptance_run = b.addRunArtifact(inbox206_cn_acceptance);
-    if (b.args) |args| inbox206_cn_acceptance_run.addArgs(args);
+    inbox206_cn_acceptance_run.addPassthruArgs();
     inbox206_cn_acceptance_step.dependOn(&inbox206_cn_acceptance_run.step);
     const inbox206_cn_acceptance_check_step = b.step(
         "check-inbox206-cn-acceptance-runner",
@@ -171,7 +171,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     const execution_oracle_v1_run = b.addRunArtifact(execution_oracle_v1);
-    if (b.args) |args| execution_oracle_v1_run.addArgs(args);
+    execution_oracle_v1_run.addPassthruArgs();
     const execution_oracle_v1_step = b.step(
         "execution-oracle-v1",
         "Run the non-default current-pin one-row execution oracle",
@@ -259,7 +259,7 @@ pub fn build(b: *std.Build) void {
         "Inventory x86_64 release Zig distribution AIR visibility without requiring lowering or codegen",
     );
     const distribution_zig_air_inventory_run = b.addRunArtifact(distribution_zig_air_inventory);
-    if (b.args) |args| distribution_zig_air_inventory_run.addArgs(args);
+    distribution_zig_air_inventory_run.addPassthruArgs();
     distribution_zig_air_inventory_step.dependOn(&distribution_zig_air_inventory_run.step);
     const uncurated_air_gate = b.addExecutable(.{
         .name = "uncurated_air_gate",
@@ -437,7 +437,7 @@ fn addToolStepWithFixedArgs(
 
 fn addToolStepWithArgs(b: *std.Build, name: []const u8, description: []const u8, tool: []const u8) void {
     const run_cmd = b.addSystemCommand(&.{ b.graph.zig_exe, "run", tool, "--" });
-    if (b.args) |args| run_cmd.addArgs(args);
+    run_cmd.addPassthruArgs();
     const step = b.step(name, description);
     step.dependOn(&run_cmd.step);
 }
@@ -451,7 +451,7 @@ fn addToolStepWithFixedAndUserArgs(
 ) void {
     const run_cmd = b.addSystemCommand(&.{ b.graph.zig_exe, "run", tool, "--" });
     run_cmd.addArgs(fixed_args);
-    if (b.args) |args| run_cmd.addArgs(args);
+    run_cmd.addPassthruArgs();
     const step = b.step(name, description);
     step.dependOn(&run_cmd.step);
 }

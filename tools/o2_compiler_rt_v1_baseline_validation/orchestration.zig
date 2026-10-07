@@ -194,7 +194,7 @@ const SourceAcceptanceGateResult = struct {
 const SourceAcceptanceEvidence = struct {
     snapshot: SourceAcceptanceSnapshot,
     tools: SourceAcceptanceToolSet,
-    gates: [@typeInfo(SourceAcceptanceGate).@"enum".fields.len]SourceAcceptanceGateResult,
+    gates: [@typeInfo(SourceAcceptanceGate).@"enum".field_names.len]SourceAcceptanceGateResult,
     completion: bool,
 };
 
@@ -370,10 +370,7 @@ fn nextArgument(args: *std.process.Args.Iterator) RunnerError![]const u8 {
 }
 
 fn parseToolRole(text: []const u8) RunnerError!ToolRole {
-    inline for (@typeInfo(ToolRole).@"enum".fields) |field| {
-        if (std.mem.eql(u8, text, field.name)) return @enumFromInt(field.value);
-    }
-    return error.InvalidArguments;
+    return std.meta.stringToEnum(ToolRole, text) orelse error.InvalidArguments;
 }
 
 fn parseToolSelector(
@@ -923,7 +920,7 @@ fn parseRawStagedEntry(metadata: []const u8, path: []const u8) RunnerError!Parse
         return error.IndexMetadataMalformed;
     }
     for (old_mode) |byte| if (byte < '0' or byte > '7') return error.IndexMetadataMalformed;
-    const zero_blob = "0" ** 40;
+    const zero_blob = "0000000000000000000000000000000000000000";
     if ((status[0] == 'A' and
         (!std.mem.eql(u8, old_mode, "000000") or !std.mem.eql(u8, old_blob, zero_blob))) or
         (status[0] == 'M' and
@@ -1473,9 +1470,9 @@ fn finishDigest(hasher: *std.crypto.hash.sha2.Sha256) contract.Digest {
 
 fn digestInputSet(inputs: InputSet) contract.Digest {
     var hasher = std.crypto.hash.sha2.Sha256.init(.{});
-    inline for (std.meta.fields(InputSet)) |field| {
-        hashBoundedBytes(&hasher, field.name);
-        hashFileIdentity(&hasher, @field(inputs, field.name));
+    inline for (@typeInfo(InputSet).@"struct".field_names) |field_name| {
+        hashBoundedBytes(&hasher, field_name);
+        hashFileIdentity(&hasher, @field(inputs, field_name));
     }
     return finishDigest(&hasher);
 }
@@ -1556,11 +1553,11 @@ fn hashFamilyPair(
 
 fn digestCoverageResult(coverage: contract.CoverageState) contract.Digest {
     var hasher = std.crypto.hash.sha2.Sha256.init(.{});
-    inline for (std.meta.fields(@TypeOf(coverage.observation_off))) |field| {
-        hashBool(&hasher, @field(coverage.observation_off, field.name));
+    inline for (@typeInfo(@TypeOf(coverage.observation_off)).@"struct".field_names) |field_name| {
+        hashBool(&hasher, @field(coverage.observation_off, field_name));
     }
-    inline for (std.meta.fields(@TypeOf(coverage.observation_on))) |field| {
-        hashBool(&hasher, @field(coverage.observation_on, field.name));
+    inline for (@typeInfo(@TypeOf(coverage.observation_on)).@"struct".field_names) |field_name| {
+        hashBool(&hasher, @field(coverage.observation_on, field_name));
     }
     for (coverage.on_channel_producers) |value| hashU64(&hasher, value);
     hashU64(&hasher, coverage.unexpected_family_events);
@@ -1605,8 +1602,8 @@ fn syntheticRawReportBinding() contract.RawReportBinding {
         .selected_functions = 11,
         .actual_successful_functions = synthetic_actual_successful_functions,
         .failed_functions = 4,
-        .failure_order_sha256 = [_]u8{0x10} ** 32,
-        .successful_manifest_sha256 = [_]u8{0x15} ** 32,
+        .failure_order_sha256 = @splat(0x10),
+        .successful_manifest_sha256 = @splat(0x15),
     };
 }
 
@@ -1626,10 +1623,10 @@ fn syntheticCompleteEvidenceForCapacity(
         .available_bytes = available_bytes,
         .identity_count = contract.closed_identities.len,
         .compatibility_key_count = contract.compatibility_keys.len,
-        .v3_path_count = @typeInfo(contract.V3Path).@"enum".fields.len,
+        .v3_path_count = @typeInfo(contract.V3Path).@"enum".field_names.len,
         .repetition_count = contract.canonical_repetition_count,
         .actual_successful_functions = synthetic_actual_successful_functions,
-        .phase_count = @typeInfo(contract.Phase).@"enum".fields.len,
+        .phase_count = @typeInfo(contract.Phase).@"enum".field_names.len,
         .stdout_capture_bytes = process_capture_max,
         .stderr_capture_bytes = process_capture_max,
     };
@@ -1637,15 +1634,15 @@ fn syntheticCompleteEvidenceForCapacity(
 
 fn syntheticRestoration(byte: u8) RestorationIdentity {
     return .{
-        .repository = [_]u8{byte} ** 32,
-        .canonical_source = [_]u8{byte +% 1} ** 32,
-        .coverage_source = [_]u8{byte +% 2} ** 32,
-        .accepted_input = [_]u8{byte +% 3} ** 32,
+        .repository = @splat(byte),
+        .canonical_source = @splat(byte +% 1),
+        .coverage_source = @splat(byte +% 2),
+        .accepted_input = @splat(byte +% 3),
     };
 }
 
 fn syntheticTool(role: ToolRole, byte: u8) AuthenticatedSubject {
-    const digest = [_]u8{byte} ** 32;
+    const digest: [32]u8 = @splat(byte);
     const version: ?[]const u8 = if (role == .zig) expected_zig_version else null;
     return .{
         .path = "/synthetic/tool",
@@ -1678,30 +1675,30 @@ fn syntheticSubjectSet() SubjectSet {
 fn syntheticClosureBinding() ClosureBinding {
     return .{
         .tools = syntheticSubjectSet(),
-        .fixed_sources = [_]u8{0x71} ** 32,
-        .fixed_inputs = [_]u8{0x72} ** 32,
+        .fixed_sources = @splat(0x71),
+        .fixed_inputs = @splat(0x72),
         .raw_report = syntheticRawReportBinding(),
         .canonical_artifact = .{
             .bytes = 101,
             .mode = 0o755,
             .inode = 101,
-            .sha256 = [_]u8{0x73} ** 32,
+            .sha256 = @splat(0x73),
         },
         .coverage_artifact = .{
             .bytes = 102,
             .mode = 0o755,
             .inode = 102,
-            .sha256 = [_]u8{0x74} ** 32,
+            .sha256 = @splat(0x74),
         },
-        .canonical_observations = [_]u8{0x75} ** 32,
-        .coverage_off_observation = [_]u8{0x76} ** 32,
-        .coverage_on_observation = [_]u8{0x77} ** 32,
-        .counter_result = [_]u8{0x78} ** 32,
+        .canonical_observations = @splat(0x75),
+        .coverage_off_observation = @splat(0x76),
+        .coverage_on_observation = @splat(0x77),
+        .counter_result = @splat(0x78),
         .registered_worktrees = .{
             .count = accepted_registered_worktree_count,
-            .sha256 = [_]u8{0x79} ** 32,
+            .sha256 = @splat(0x79),
         },
-        .family_usage = [_]u8{0x7a} ** 32,
+        .family_usage = @splat(0x7a),
         .completion = true,
     };
 }
@@ -1710,27 +1707,27 @@ fn syntheticStagedSource(byte: u8) StagedSourceIdentity {
     return .{
         .mode = 0o100644,
         .bytes = byte,
-        .blob = [_]u8{byte} ** 20,
-        .raw_sha256 = [_]u8{byte +% 1} ** 32,
+        .blob = @splat(byte),
+        .raw_sha256 = @splat(byte +% 1),
         .worktree_inode = byte,
     };
 }
 
 fn syntheticSourceAcceptanceEvidence() SourceAcceptanceEvidence {
-    var gates: [@typeInfo(SourceAcceptanceGate).@"enum".fields.len]SourceAcceptanceGateResult = undefined;
+    var gates: [@typeInfo(SourceAcceptanceGate).@"enum".field_names.len]SourceAcceptanceGateResult = undefined;
     for (&gates, 0..) |*gate, index| {
         gate.* = .{
             .gate = @enumFromInt(index + 1),
             .exit_status = 0,
             .stdout_bytes = index,
-            .stdout_sha256 = [_]u8{@intCast(index + 1)} ** 32,
+            .stdout_sha256 = @splat(@intCast(index + 1)),
             .stderr_bytes = index + 1,
-            .stderr_sha256 = [_]u8{@intCast(index + 2)} ** 32,
+            .stderr_sha256 = @splat(@intCast(index + 2)),
         };
     }
     return .{
         .snapshot = .{
-            .parent = [_]u8{'1'} ** 40,
+            .parent = @splat('1'),
             .contract_source = syntheticStagedSource(0x21),
             .runner_source = syntheticStagedSource(0x31),
         },
@@ -1754,21 +1751,21 @@ fn encodeSyntheticCyIndex(
     errdefer output.deinit();
     try output.writer.print(":100644 {s} {s} {s} M\x00{s}\x00", .{
         new_mode,
-        "4" ** 40,
-        "1" ** 40,
+        "4444444444444444444444444444444444444444",
+        "1111111111111111111111111111111111111111",
         contract_path,
     });
     if (runner_path) |path| {
         try output.writer.print(":000000 100644 {s} {s} A\x00{s}\x00", .{
-            "0" ** 40,
-            "2" ** 40,
+            "0000000000000000000000000000000000000000",
+            "2222222222222222222222222222222222222222",
             path,
         });
     }
     if (extra_path) |path| {
         try output.writer.print(":100644 100644 {s} {s} M\x00{s}\x00", .{
-            "4" ** 40,
-            "3" ** 40,
+            "4444444444444444444444444444444444444444",
+            "3333333333333333333333333333333333333333",
             path,
         });
     }
@@ -1794,7 +1791,7 @@ fn encodeSyntheticWorktreeMetadata(
     for (paths, 0..) |path, index| {
         try output.writer.print(
             "worktree {s}\x00HEAD {s}\x00branch refs/heads/synthetic-{d}\x00\x00",
-            .{ path, "0" ** 40, index },
+            .{ path, "0000000000000000000000000000000000000000", index },
         );
     }
     return output.toOwnedSlice();
@@ -1803,14 +1800,14 @@ fn encodeSyntheticWorktreeMetadata(
 fn syntheticCanonicalRepetitions() [contract.canonical_repetition_count]contract.CanonicalRepetition {
     const identity = contract.CanonicalRepetition{
         .raw_report = syntheticRawReportBinding(),
-        .report = [_]u8{0x11} ** 32,
-        .object = [_]u8{0x12} ** 32,
-        .owner = [_]u8{0x13} ** 32,
-        .function_manifest = [_]u8{0x14} ** 32,
+        .report = @splat(0x11),
+        .object = @splat(0x12),
+        .owner = @splat(0x13),
+        .function_manifest = @splat(0x14),
         .function_count = synthetic_actual_successful_functions,
         .accepted_subset_produced = false,
     };
-    var repetitions = [_]contract.CanonicalRepetition{identity} ** contract.canonical_repetition_count;
+    var repetitions: [contract.canonical_repetition_count]contract.CanonicalRepetition = @splat(identity);
     repetitions[0].accepted_subset_produced = true;
     return repetitions;
 }
@@ -1861,14 +1858,14 @@ fn syntheticCoverage() contract.CoverageState {
 
 fn syntheticCompletedPhases() !contract.PhaseMachine {
     var phases = contract.PhaseMachine.init();
-    for (0..@typeInfo(contract.Phase).@"enum".fields.len) |index| {
+    for (0..@typeInfo(contract.Phase).@"enum".field_names.len) |index| {
         try phases.succeed(@enumFromInt(index));
     }
     return phases;
 }
 
 fn syntheticContractRestoration() contract.RestorationState {
-    const manifest = [_]u8{0x41} ** 32;
+    const manifest: [32]u8 = @splat(0x41);
     return .{
         .head_before = contract.source_commit,
         .head_after = contract.source_commit,
@@ -1882,9 +1879,9 @@ fn syntheticContractRestoration() contract.RestorationState {
 
 fn syntheticSemanticEquality() contract.SemanticEquality {
     const identity = contract.SemanticIdentity{
-        .report = [_]u8{0x51} ** 32,
-        .object = [_]u8{0x52} ** 32,
-        .owner = [_]u8{0x53} ** 32,
+        .report = @splat(0x51),
+        .object = @splat(0x52),
+        .owner = @splat(0x53),
     };
     return .{ .canonical = identity, .observation_off = identity, .observation_on = identity };
 }
@@ -3452,7 +3449,7 @@ fn sourceAcceptanceGateResult(
 fn validateSourceAcceptanceGateSequence(
     gates: []const SourceAcceptanceGateResult,
 ) RunnerError!void {
-    if (gates.len != @typeInfo(SourceAcceptanceGate).@"enum".fields.len)
+    if (gates.len != @typeInfo(SourceAcceptanceGate).@"enum".field_names.len)
         return error.GateOrderMismatch;
     for (gates, 0..) |gate, index| {
         const expected: SourceAcceptanceGate = @enumFromInt(index + 1);
@@ -3765,7 +3762,7 @@ fn executeSourceAcceptance(init: std.process.Init, cli: SourceAcceptanceCli) !vo
     const initial = try observeSourceAcceptanceSnapshot(init.gpa, init.io, tools.git, cli);
     const cache = try prepareSourceAcceptanceCache(init.gpa, init.io, cli.repository);
     const environment = fixedSourceAcceptanceEnvironment(cache);
-    var gates: [@typeInfo(SourceAcceptanceGate).@"enum".fields.len]SourceAcceptanceGateResult = undefined;
+    var gates: [@typeInfo(SourceAcceptanceGate).@"enum".field_names.len]SourceAcceptanceGateResult = undefined;
     for (&gates, 0..) |*result, index| {
         const gate: SourceAcceptanceGate = @enumFromInt(index + 1);
         result.* = try runSourceAcceptanceGate(
@@ -3841,10 +3838,10 @@ pub fn main(init: std.process.Init) !void {
 
 comptime {
     if (builtin.zig_version.major != 0 or
-        builtin.zig_version.minor != 16 or
+        builtin.zig_version.minor != 17 or
         builtin.zig_version.patch != 0)
     {
-        @compileError("baseline validation runner requires exact Zig 0.16.0");
+        @compileError("baseline validation runner requires exact Zig 0.17.0");
     }
 }
 
@@ -4161,7 +4158,7 @@ test "baseline runner source acceptance parses only the exact two staged paths" 
         parseExactCyStagedSet(valid[0 .. valid.len - 1]),
     );
 
-    const parent = [_]u8{'1'} ** 40;
+    const parent: [40]u8 = @splat('1');
     const cli = SourceAcceptanceCli{
         .zig = undefined,
         .git = undefined,
@@ -4208,7 +4205,7 @@ test "baseline runner source acceptance proves staged worktree identity and pare
         error.StagedSourceMismatch,
         observeStagedSource(std.testing.allocator, io, absolute, wrong_blob),
     );
-    const parent = [_]u8{'1'} ** 40;
+    const parent: [40]u8 = @splat('1');
     try requireExpectedParent(parent, parent);
     var wrong_parent = parent;
     wrong_parent[0] = '2';
@@ -4297,7 +4294,7 @@ test "baseline runner source acceptance encoding publication and readback are fa
 
 test "baseline runner authenticates explicit portable tool tuples and rejects authority drift" {
     const io = std.testing.io;
-    const path = "/home/oleg/.zig/0.16.0/files/zig";
+    const path = "/home/oleg/.zig/0.17.0/files/zig";
     const identity = try observeFile(io, path, true, maximum_artifact_bytes, &.{});
     const selector = ToolSelector{
         .role = .zig,
@@ -4485,7 +4482,7 @@ test "baseline runner DI source set binds literal order domain and malformed exp
         .bytes = index + 1,
         .mode = if (index % 2 == 0) 0o644 else 0o664,
         .inode = index + 100,
-        .sha256 = [_]u8{@intCast(index + 1)} ** 32,
+        .sha256 = @splat(@intCast(index + 1)),
     };
     const aggregate = try aggregateDiSourceSet(&di_source_paths, &identities);
     var reordered = di_source_paths;
@@ -4498,8 +4495,8 @@ test "baseline runner DI source set binds literal order domain and malformed exp
     try std.testing.expect(!std.mem.eql(u8, &aggregate, &renamed_aggregate));
     const other_domain = try aggregateDiSourceSetForDomain("wrong-domain", &di_source_paths, &identities);
     try std.testing.expect(!std.mem.eql(u8, &aggregate, &other_domain));
-    try std.testing.expectError(error.InvalidArguments, parseDiSourceSetExpected("011", "00" ** 32));
-    try std.testing.expectError(error.InvalidArguments, parseDiSourceSetExpected("not-a-count", "00" ** 32));
+    try std.testing.expectError(error.InvalidArguments, parseDiSourceSetExpected("011", "0000000000000000000000000000000000000000000000000000000000000000"));
+    try std.testing.expectError(error.InvalidArguments, parseDiSourceSetExpected("not-a-count", "0000000000000000000000000000000000000000000000000000000000000000"));
     try std.testing.expectError(error.InvalidArguments, parseDiSourceSetExpected("11", "not-a-digest"));
 
     var fixture = try SyntheticDiSourceSetFixture.init();
@@ -4686,13 +4683,13 @@ test "baseline runner DI controller identity rejects drift and malformed expecta
         "0755",
         "14",
         "1",
-        "00" ** 32,
+        "0000000000000000000000000000000000000000000000000000000000000000",
     ));
     try std.testing.expectError(error.InvalidArguments, parseDiControllerIdentityExpected(
         "493",
         "-1",
         "1",
-        "00" ** 32,
+        "0000000000000000000000000000000000000000000000000000000000000000",
     ));
     try std.testing.expectError(error.InvalidArguments, parseDiControllerIdentityExpected(
         "493",
@@ -4897,7 +4894,7 @@ test "baseline runner accepts only successful bounded Zig build summaries" {
 
 test "baseline runner bounded file capture authenticates subject and exact output" {
     const io = std.testing.io;
-    const zig_path = "/home/oleg/.zig/0.16.0/files/zig";
+    const zig_path = "/home/oleg/.zig/0.17.0/files/zig";
     const subject = try authenticateGeneratedSubject(io, zig_path, &.{});
     var temporary = std.testing.tmpDir(.{});
     defer temporary.cleanup();
@@ -4922,7 +4919,7 @@ test "baseline runner bounded file capture authenticates subject and exact outpu
     try std.testing.expectEqual(@as(usize, 0), result.stderr.len);
     const output = try readBoundedAbsolute(std.testing.allocator, io, output_path, 64);
     defer std.testing.allocator.free(output);
-    try std.testing.expectEqualStrings("0.16.0\n", output);
+    try std.testing.expectEqualStrings("0.17.0\n", output);
 }
 
 test "baseline runner coverage status is exactly the authenticated touched set" {
@@ -4954,17 +4951,17 @@ test "baseline runner coverage status is exactly the authenticated touched set" 
 }
 
 test "baseline runner manifest parser rejects malformed and escaping identities" {
-    const valid = "00" ** 32 ++ "  src/a.zig";
+    const valid = "0000000000000000000000000000000000000000000000000000000000000000  src/a.zig";
     const parsed = try parseManifestLine(valid);
     try std.testing.expectEqualStrings("src/a.zig", parsed.path);
     try std.testing.expectError(error.ManifestMismatch, parseManifestLine("00  src/a.zig"));
     try std.testing.expectError(
         error.ManifestMismatch,
-        parseManifestLine("00" ** 32 ++ "  ../escape"),
+        parseManifestLine("0000000000000000000000000000000000000000000000000000000000000000  ../escape"),
     );
     try std.testing.expectError(
         error.ManifestMismatch,
-        parseManifestLine("00" ** 32 ++ "  /absolute"),
+        parseManifestLine("0000000000000000000000000000000000000000000000000000000000000000  /absolute"),
     );
 }
 
@@ -5265,8 +5262,8 @@ test "baseline runner contract phase counter repetition and first failure rules 
         .materializations = 0,
         .actions = 0,
         .commits = 0,
-        .position_requests = [_]u64{0} ** 6,
-        .position_stages = [_]u64{0} ** 6,
+        .position_requests = @splat(0),
+        .position_stages = @splat(0),
     };
     try std.testing.expectError(error.CounterViolation, contract.validateCoverage(.{
         .observation_off = .{ .report = false, .object = false, .owner = false },

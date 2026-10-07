@@ -2,9 +2,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 const contract = @import("../o2_compiler_rt_v1_baseline_validation.zig");
 const authenticated_inputs = @import("authenticated_inputs.zig");
-const authoritative_statfs = @cImport({
-    @cInclude("sys/statfs.h");
-});
 
 const NativeStatfs = extern struct {
     f_type: c_long,
@@ -359,14 +356,22 @@ comptime {
         @compileError("baseline validation capacity requires native Linux x86_64 LP64");
     if (@intFromEnum(std.os.linux.SYS.fstatfs) != 138)
         @compileError("installed Zig Linux fstatfs syscall selection drifted");
-    if (!@hasDecl(authoritative_statfs, "struct_statfs"))
-        @compileError("installed authoritative struct statfs is unavailable");
-    if (@sizeOf(NativeStatfs) != @sizeOf(authoritative_statfs.struct_statfs) or
-        @alignOf(NativeStatfs) != @alignOf(authoritative_statfs.struct_statfs))
-        @compileError("native statfs size or alignment disagrees with installed sys/statfs.h");
-    for (.{ "f_type", "f_bsize", "f_blocks", "f_bfree", "f_bavail", "f_files", "f_ffree", "f_fsid", "f_namelen", "f_frsize", "f_flags", "f_spare" }) |field| {
-        if (@offsetOf(NativeStatfs, field) != @offsetOf(authoritative_statfs.struct_statfs, field))
-            @compileError("native statfs field offset disagrees with installed sys/statfs.h");
+    if (@sizeOf(NativeStatfs) != 120 or @alignOf(NativeStatfs) != 8)
+        @compileError("native statfs size or alignment disagrees with Linux x86_64 ABI");
+    if (@offsetOf(NativeStatfs, "f_type") != 0 or
+        @offsetOf(NativeStatfs, "f_bsize") != 8 or
+        @offsetOf(NativeStatfs, "f_blocks") != 16 or
+        @offsetOf(NativeStatfs, "f_bfree") != 24 or
+        @offsetOf(NativeStatfs, "f_bavail") != 32 or
+        @offsetOf(NativeStatfs, "f_files") != 40 or
+        @offsetOf(NativeStatfs, "f_ffree") != 48 or
+        @offsetOf(NativeStatfs, "f_fsid") != 56 or
+        @offsetOf(NativeStatfs, "f_namelen") != 64 or
+        @offsetOf(NativeStatfs, "f_frsize") != 72 or
+        @offsetOf(NativeStatfs, "f_flags") != 80 or
+        @offsetOf(NativeStatfs, "f_spare") != 88)
+    {
+        @compileError("native statfs field offset disagrees with Linux x86_64 ABI");
     }
 }
 

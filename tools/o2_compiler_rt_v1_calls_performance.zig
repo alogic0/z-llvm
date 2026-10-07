@@ -235,7 +235,7 @@ fn selectAndPinLowestCpu() !usize {
     if (builtin.os.tag != .linux) return error.UnsupportedPlatform;
     const inherited = try std.posix.sched_getaffinity(0);
     const cpu = try lowestCpu(inherited);
-    var selected = [_]usize{0} ** (std.os.linux.CPU_SETSIZE / @sizeOf(usize));
+    var selected: [std.os.linux.CPU_SETSIZE / @sizeOf(usize)]usize = @splat(0);
     const bits = @bitSizeOf(usize);
     selected[cpu / bits] |= @as(usize, 1) << @intCast(cpu % bits);
     std.os.linux.sched_setaffinity(0, &selected) catch return error.AffinityPinFailed;
@@ -273,8 +273,8 @@ fn parseCpuLine(bytes: []const u8, selected_cpu: usize) !IdleCounters {
 
 fn counterTotal(value: IdleCounters) !u64 {
     var total: u64 = 0;
-    inline for (std.meta.fields(IdleCounters)) |field| {
-        total = std.math.add(u64, total, @field(value, field.name)) catch return error.ArithmeticOverflow;
+    inline for (@typeInfo(IdleCounters).@"struct".field_names) |field_name| {
+        total = std.math.add(u64, total, @field(value, field_name)) catch return error.ArithmeticOverflow;
     }
     return total;
 }
@@ -934,8 +934,8 @@ pub fn main(init: std.process.Init) !void {
 }
 
 comptime {
-    if (builtin.zig_version.major != 0 or builtin.zig_version.minor != 16 or builtin.zig_version.patch != 0)
-        @compileError("performance runner requires exact Zig 0.16.0");
+    if (builtin.zig_version.major != 0 or builtin.zig_version.minor != 17 or builtin.zig_version.patch != 0)
+        @compileError("performance runner requires exact Zig 0.17.0");
     if (builtin.os.tag != .linux or builtin.cpu.arch != .x86_64)
         @compileError("performance runner requires native x86_64 Linux");
 }
@@ -958,7 +958,7 @@ test "absolute executable and strict DK confinement reject relative aliases and 
 }
 
 test "lowest inherited CPU selection and empty affinity fail closed" {
-    var set = [_]usize{0} ** (std.os.linux.CPU_SETSIZE / @sizeOf(usize));
+    var set: [std.os.linux.CPU_SETSIZE / @sizeOf(usize)]usize = @splat(0);
     set[0] = (@as(usize, 1) << 9) | (@as(usize, 1) << 3);
     try std.testing.expectEqual(@as(usize, 3), try lowestCpu(set));
     try std.testing.expectError(error.AffinityPinFailed, requireSingleCpu(set, 3));
@@ -1123,8 +1123,9 @@ test "statistics preserve raw ratios exact CI MAD and threshold edges" {
     try std.testing.expect(analysis.ratio_min <= analysis.median_ratio);
     try std.testing.expect(analysis.ratio_max >= analysis.median_ratio);
     try std.testing.expect(analysis.ratio_mad >= 0);
-    const failing_b = [_]u64{1_200_000_000} ** pair_count;
-    const failing = try analyzePairs(syntheticPairs([_]u64{1_000_000_000} ** pair_count, failing_b, 100, 101 + rss_limit_bytes));
+    const failing_b: [pair_count]u64 = @splat(1_200_000_000);
+    const failing_a: [pair_count]u64 = @splat(1_000_000_000);
+    const failing = try analyzePairs(syntheticPairs(failing_a, failing_b, 100, 101 + rss_limit_bytes));
     try std.testing.expect(!failing.time_pass);
     try std.testing.expect(!failing.rss_pass);
     try std.testing.expect(!failing.overall_pass);

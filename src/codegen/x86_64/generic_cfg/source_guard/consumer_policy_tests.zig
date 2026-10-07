@@ -647,7 +647,7 @@ test "composed selector source guard freezes immediate semantic partition anchor
         "if (ValueUseTransaction.isImmediateRhsScalar(binary))",
     ) catch unreachable;
     defer std.testing.allocator.free(r03_after_action);
-    const r03_after_action_z = try std.testing.allocator.dupeZ(u8, r03_after_action);
+    const r03_after_action_z = try std.testing.allocator.dupeSentinel(u8, r03_after_action, 0);
     defer std.testing.allocator.free(r03_after_action_z);
     try std.testing.expectError(
         error.ValueUseImmediateScalarDispatchOrderMismatch,
@@ -662,7 +662,7 @@ test "composed selector source guard freezes immediate semantic partition anchor
         "ValueUseTransaction.begin(selector); while (liveAccumulatorNameAfterCurrent())",
     ) catch unreachable;
     defer std.testing.allocator.free(r03_transactional);
-    const r03_transactional_z = try std.testing.allocator.dupeZ(u8, r03_transactional);
+    const r03_transactional_z = try std.testing.allocator.dupeSentinel(u8, r03_transactional, 0);
     defer std.testing.allocator.free(r03_transactional_z);
     try std.testing.expectError(
         error.ValueUseImmediateScalarResidualOwnershipMismatch,
@@ -677,7 +677,7 @@ test "composed selector source guard freezes immediate semantic partition anchor
         "if (ValueUseTransaction.isImmediateRhsScalar(binary))",
     ) catch unreachable;
     defer std.testing.allocator.free(r04_after_action);
-    const r04_after_action_z = try std.testing.allocator.dupeZ(u8, r04_after_action);
+    const r04_after_action_z = try std.testing.allocator.dupeSentinel(u8, r04_after_action, 0);
     defer std.testing.allocator.free(r04_after_action_z);
     try std.testing.expectError(
         error.ValueUseImmediateScalarDispatchOrderMismatch,
@@ -695,7 +695,7 @@ test "composed selector source guard freezes immediate semantic partition anchor
         immediate_partition_fixture[second_preamble..],
     });
     defer std.testing.allocator.free(r04_transactional);
-    const r04_transactional_z = try std.testing.allocator.dupeZ(u8, r04_transactional);
+    const r04_transactional_z = try std.testing.allocator.dupeSentinel(u8, r04_transactional, 0);
     defer std.testing.allocator.free(r04_transactional_z);
     try std.testing.expectError(
         error.ValueUseImmediateScalarResidualOwnershipMismatch,
@@ -710,7 +710,7 @@ test "composed selector source guard freezes immediate semantic partition anchor
         "mov_eax_to_arg; return switch (binary.op)",
     ) catch unreachable;
     defer std.testing.allocator.free(r00_legacy);
-    const r00_legacy_z = try std.testing.allocator.dupeZ(u8, r00_legacy);
+    const r00_legacy_z = try std.testing.allocator.dupeSentinel(u8, r00_legacy, 0);
     defer std.testing.allocator.free(r00_legacy_z);
     try std.testing.expectError(
         error.ValueUseImmediateScalarResidualOwnershipMismatch,
@@ -725,7 +725,7 @@ test "composed selector source guard freezes immediate semantic partition anchor
         "accumulatorPreserveCurrentDisplacement(); return switch (binary.op)",
     ) catch unreachable;
     defer std.testing.allocator.free(r05_legacy);
-    const r05_legacy_z = try std.testing.allocator.dupeZ(u8, r05_legacy);
+    const r05_legacy_z = try std.testing.allocator.dupeSentinel(u8, r05_legacy, 0);
     defer std.testing.allocator.free(r05_legacy_z);
     try std.testing.expectError(
         error.ValueUseImmediateScalarResidualOwnershipMismatch,
@@ -740,7 +740,7 @@ test "composed selector source guard freezes immediate semantic partition anchor
         "_ = selector; const bits = intBits(binary.ty)",
     ) catch unreachable;
     defer std.testing.allocator.free(stateful_classifier);
-    const stateful_classifier_z = try std.testing.allocator.dupeZ(u8, stateful_classifier);
+    const stateful_classifier_z = try std.testing.allocator.dupeSentinel(u8, stateful_classifier, 0);
     defer std.testing.allocator.free(stateful_classifier_z);
     try std.testing.expectError(
         error.ValueUseImmediateScalarResidualClassifierStateful,
@@ -783,7 +783,7 @@ test "value-use named scalar production wiring freezes accepted and retained fam
         .{accepted},
     );
     defer std.testing.allocator.free(reintroduced_interval_owner);
-    const reintroduced_interval_owner_z = try std.testing.allocator.dupeZ(u8, reintroduced_interval_owner);
+    const reintroduced_interval_owner_z = try std.testing.allocator.dupeSentinel(u8, reintroduced_interval_owner, 0);
     defer std.testing.allocator.free(reintroduced_interval_owner_z);
     try std.testing.expectError(
         error.ValueUseNamedScalarMigratedResidualReintroduced,
@@ -801,7 +801,7 @@ test "value-use named scalar production wiring freezes accepted and retained fam
         "binary, bits, exact_ei_narrow, .b07",
     );
     defer std.testing.allocator.free(wrong_b03_dispatch);
-    const wrong_b03_dispatch_z = try std.testing.allocator.dupeZ(u8, wrong_b03_dispatch);
+    const wrong_b03_dispatch_z = try std.testing.allocator.dupeSentinel(u8, wrong_b03_dispatch, 0);
     defer std.testing.allocator.free(wrong_b03_dispatch_z);
     try std.testing.expectError(
         error.ValueUseNamedScalarDispatchMismatch,
@@ -819,7 +819,7 @@ test "value-use named scalar production wiring freezes accepted and retained fam
         "try transaction.commit();\n    return scalar_named_b07_rhs_admission();\n}\n\nfn namedScalarValueUseDiagnostic",
     );
     defer std.testing.allocator.free(attempted_fallback);
-    const attempted_fallback_z = try std.testing.allocator.dupeZ(u8, attempted_fallback);
+    const attempted_fallback_z = try std.testing.allocator.dupeSentinel(u8, attempted_fallback, 0);
     defer std.testing.allocator.free(attempted_fallback_z);
     try std.testing.expectError(
         error.ValueUseNamedScalarAttemptThenFallback,
@@ -837,7 +837,7 @@ test "value-use named scalar production wiring freezes accepted and retained fam
         "binary, bits, exact_ei_narrow, .b06",
     );
     defer std.testing.allocator.free(missing_b07_dispatch);
-    const missing_b07_dispatch_z = try std.testing.allocator.dupeZ(u8, missing_b07_dispatch);
+    const missing_b07_dispatch_z = try std.testing.allocator.dupeSentinel(u8, missing_b07_dispatch, 0);
     defer std.testing.allocator.free(missing_b07_dispatch_z);
     try std.testing.expectError(
         error.ValueUseNamedScalarDispatchMismatch,
@@ -853,7 +853,7 @@ test "value-use named scalar production wiring freezes accepted and retained fam
         .{accepted},
     );
     defer std.testing.allocator.free(reintroduced_b07_owner);
-    const reintroduced_b07_owner_z = try std.testing.allocator.dupeZ(u8, reintroduced_b07_owner);
+    const reintroduced_b07_owner_z = try std.testing.allocator.dupeSentinel(u8, reintroduced_b07_owner, 0);
     defer std.testing.allocator.free(reintroduced_b07_owner_z);
     try std.testing.expectError(
         error.ValueUseNamedScalarMigratedResidualReintroduced,
@@ -884,7 +884,7 @@ test "scalar multiply production wiring is complete and exclusive" {
         "transaction.attachNamedScalarBinaryAction(",
     );
     defer std.testing.allocator.free(missing_action);
-    const missing_action_z = try std.testing.allocator.dupeZ(u8, missing_action);
+    const missing_action_z = try std.testing.allocator.dupeSentinel(u8, missing_action, 0);
     defer std.testing.allocator.free(missing_action_z);
     try std.testing.expectError(
         error.ValueUseScalarMultiplyPrematureProductionUse,
@@ -900,7 +900,7 @@ test "scalar multiply production wiring is complete and exclusive" {
         .{accepted},
     );
     defer std.testing.allocator.free(reintroduced_fallback);
-    const reintroduced_fallback_z = try std.testing.allocator.dupeZ(u8, reintroduced_fallback);
+    const reintroduced_fallback_z = try std.testing.allocator.dupeSentinel(u8, reintroduced_fallback, 0);
     defer std.testing.allocator.free(reintroduced_fallback_z);
     try std.testing.expectError(
         error.ValueUseScalarMultiplyPrematureProductionUse,
@@ -918,7 +918,7 @@ test "scalar multiply production wiring is complete and exclusive" {
         "_ = selector_state.resolveValue(selector, binary.lhs);\n    var transaction = try ValueUseTransaction.begin(selector);",
     );
     defer std.testing.allocator.free(raw_resolution);
-    const raw_resolution_z = try std.testing.allocator.dupeZ(u8, raw_resolution);
+    const raw_resolution_z = try std.testing.allocator.dupeSentinel(u8, raw_resolution, 0);
     defer std.testing.allocator.free(raw_resolution_z);
     try std.testing.expectError(
         error.ValueUseScalarMultiplyPrematureProductionUse,
@@ -964,7 +964,7 @@ test "unsigned quotient production wiring is complete and exclusive" {
         "_ = selector_state.resolveValue(selector, binary.rhs);\n    var transaction = try ValueUseTransaction.begin(selector);",
     );
     defer std.testing.allocator.free(raw_resolution);
-    const raw_resolution_z = try std.testing.allocator.dupeZ(u8, raw_resolution);
+    const raw_resolution_z = try std.testing.allocator.dupeSentinel(u8, raw_resolution, 0);
     defer std.testing.allocator.free(raw_resolution_z);
     try std.testing.expectError(
         error.ValueUseUnsignedQuotientPrematureProductionUse,
@@ -982,7 +982,7 @@ test "unsigned quotient production wiring is complete and exclusive" {
         "if (false) return lowerUnsignedRem(selector, result_name, binary, bits);",
     );
     defer std.testing.allocator.free(reordered_remainder);
-    const reordered_remainder_z = try std.testing.allocator.dupeZ(u8, reordered_remainder);
+    const reordered_remainder_z = try std.testing.allocator.dupeSentinel(u8, reordered_remainder, 0);
     defer std.testing.allocator.free(reordered_remainder_z);
     try std.testing.expectError(
         error.ValueUseUnsignedQuotientPrematureProductionUse,

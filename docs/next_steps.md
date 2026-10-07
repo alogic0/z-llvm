@@ -58,7 +58,7 @@ focused ReleaseFast tests, native LLVM comparisons, readiness and all 17
 integration subgates passed against an unchanged source snapshot. It does not
 establish program performance or claim a full ReleaseFast unit-suite pass.
 
-Use Zig 0.16.0, retain the patched emitter and unique source work, and follow the
+Use Zig 0.17.0, retain the patched emitter and unique source work, and follow the
 [current keep-list](evidence/tmp_retention_pins.tsv). Historical worktree and
 artifact-authority requirements retired by the improvement plan remain retired.
 Every new cache or failure capture needs a current consumer or bounded diagnostic

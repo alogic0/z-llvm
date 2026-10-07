@@ -219,21 +219,25 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
         try cursor.readFramed("aggregate_layout_facts_bytes")
     else
         null;
-    const aggregate_layout_facts = if (aggregate_layout_facts_text) |text|
-        try exported_aggregate_layout_facts.parseSidecar(allocator, text)
-    else
-        null;
-    errdefer if (aggregate_layout_facts) |provider| provider.deinit(allocator);
+    var aggregate_layout_facts_owned = false;
+    const aggregate_layout_facts = if (aggregate_layout_facts_text) |text| blk: {
+        const p = try exported_aggregate_layout_facts.parseSidecar(allocator, text);
+        aggregate_layout_facts_owned = true;
+        break :blk p;
+    } else null;
+    errdefer if (aggregate_layout_facts_owned) if (aggregate_layout_facts) |provider| provider.deinit(allocator);
 
     const error_union_call_facts_text: ?[]const u8 = if (cursor.peekValueLine("error_union_call_facts_bytes"))
         try cursor.readFramed("error_union_call_facts_bytes")
     else
         null;
-    const parsed_error_union_call_facts = if (error_union_call_facts_text) |text|
-        try error_union_call_facts.parseSidecar(allocator, text)
-    else
-        null;
-    errdefer if (parsed_error_union_call_facts) |provider| provider.deinit(allocator);
+    var parsed_error_union_call_facts_owned = false;
+    const parsed_error_union_call_facts = if (error_union_call_facts_text) |text| blk: {
+        const p = try error_union_call_facts.parseSidecar(allocator, text);
+        parsed_error_union_call_facts_owned = true;
+        break :blk p;
+    } else null;
+    errdefer if (parsed_error_union_call_facts_owned) if (parsed_error_union_call_facts) |provider| provider.deinit(allocator);
 
     var functions: std.ArrayList(Function) = .empty;
     errdefer {
@@ -297,6 +301,8 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
 
     if (!cursor.onlyWhitespaceRemaining()) return error.TrailingData;
 
+    aggregate_layout_facts_owned = false;
+    parsed_error_union_call_facts_owned = false;
     var module: Module = .{
         .allocator = allocator,
         .storage = storage,
@@ -722,7 +728,10 @@ fn parseInstructionLine(line: []const u8) ?Instruction {
 fn isReleaseMode(mode: []const u8) bool {
     return std.mem.eql(u8, mode, "ReleaseFast") or
         std.mem.eql(u8, mode, "ReleaseSafe") or
-        std.mem.eql(u8, mode, "ReleaseSmall");
+        std.mem.eql(u8, mode, "ReleaseSmall") or
+        std.mem.eql(u8, mode, "fast") or
+        std.mem.eql(u8, mode, "safe") or
+        std.mem.eql(u8, mode, "small");
 }
 
 fn isArithmeticOpcode(opcode: []const u8) bool {

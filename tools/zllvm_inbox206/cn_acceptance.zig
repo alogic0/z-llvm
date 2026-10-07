@@ -5,7 +5,7 @@ const Sha256 = std.crypto.hash.sha2.Sha256;
 
 const repository_root = "/home/oleg/prog/z_llvm";
 const external_zig_root = "/home/oleg/prog/ziglang";
-const required_zig_version = "0.16.0";
+const required_zig_version = "0.17.0";
 const pinned_external_zig_revision = "bdee02bc0c7f227c0f11bc9a449df673fe803540";
 const completion_receipt_name = "combined_acceptance_receipt_v1.tsv";
 const mapper_sidecar_path = "local-state/validations/inbox206cn-definition-mapper/rank2_definition_mapping_v1.tsv";
@@ -40,7 +40,7 @@ const GateId = enum(u8) {
     mapper_poisoned,
 };
 
-const gate_count = @typeInfo(GateId).@"enum".fields.len;
+const gate_count = @typeInfo(GateId).@"enum".field_names.len;
 const closure_check_count = gate_count + 1;
 const gate_field_names = [gate_count][]const u8{
     "gate_format_status",
@@ -360,7 +360,7 @@ fn finalizeEvidence(
     }
     const evidence = AcceptanceEvidence{
         .sources = initial.sources,
-        .staged_worktree_equal = [_]bool{true} ** source_count,
+        .staged_worktree_equal = @splat(true),
         .staged_tree = initial.staged_tree,
         .external_zig_revision = initial.external_zig_revision,
         .zig_executable = initial.zig_executable,
@@ -515,7 +515,7 @@ const StagedChange = struct {
 fn parseStagedListing(bytes: []const u8) AcceptanceError![source_count]StagedChange {
     if (bytes.len == 0) return error.EmptyStagedSet;
     var result: [source_count]StagedChange = undefined;
-    var seen = [_]bool{false} ** source_count;
+    var seen: [source_count]bool = @splat(false);
     var record_index: usize = 0;
     var offset: usize = 0;
     while (offset < bytes.len) {
@@ -599,7 +599,7 @@ fn parseMapperResult(bytes: []const u8) AcceptanceError!ArtifactIdentity {
 fn synthesizeEvidence(seed: u8) AcceptanceEvidence {
     var sources: [source_count]SourceIdentity = undefined;
     for (&sources, 0..) |*source, index| {
-        var bytes = [_]u8{seed} ** 16;
+        var bytes: [16]u8 = @splat(seed);
         bytes[0] +%= @intCast(index);
         source.* = sourceIdentity(&bytes) catch unreachable;
     }
@@ -607,21 +607,21 @@ fn synthesizeEvidence(seed: u8) AcceptanceEvidence {
     decodeLowerHex(pinned_external_zig_revision, &revision) catch unreachable;
     return .{
         .sources = sources,
-        .staged_worktree_equal = [_]bool{true} ** source_count,
-        .staged_tree = .{ .bytes = [_]u8{0x55} ** 20 },
+        .staged_worktree_equal = @splat(true),
+        .staged_tree = .{ .bytes = @splat(0x55) },
         .external_zig_revision = .{ .bytes = revision },
-        .zig_executable = .{ .raw_sha256 = .{ .bytes = [_]u8{0x66} ** 32 }, .length = 12345 },
-        .gates = .{ .status = [_]u8{0} ** gate_count },
-        .path_b_receipt = .{ .raw_sha256 = .{ .bytes = [_]u8{0x77} ** 32 }, .length = 962 },
-        .mapper_ordinary = .{ .raw_sha256 = .{ .bytes = [_]u8{0x88} ** 32 }, .length = 1055 },
-        .mapper_poisoned = .{ .raw_sha256 = .{ .bytes = [_]u8{0x88} ** 32 }, .length = 1055 },
+        .zig_executable = .{ .raw_sha256 = .{ .bytes = @splat(0x66) }, .length = 12345 },
+        .gates = .{ .status = @splat(0) },
+        .path_b_receipt = .{ .raw_sha256 = .{ .bytes = @splat(0x77) }, .length = 962 },
+        .mapper_ordinary = .{ .raw_sha256 = .{ .bytes = @splat(0x88) }, .length = 1055 },
+        .mapper_poisoned = .{ .raw_sha256 = .{ .bytes = @splat(0x88) }, .length = 1055 },
     };
 }
 
 fn closureFromEvidence(evidence: *const AcceptanceEvidence) StructuredClosure {
     return .{
         .sources = evidence.sources,
-        .staged_status = [_]StagedStatus{.modified} ** source_count,
+        .staged_status = @splat(.modified),
         .staged_tree = evidence.staged_tree,
         .external_zig_revision = evidence.external_zig_revision,
         .external_zig_clean = true,
@@ -632,7 +632,7 @@ fn closureFromEvidence(evidence: *const AcceptanceEvidence) StructuredClosure {
 fn makeStatusListing(output: *[8192]u8, evidence: *const AcceptanceEvidence) ![]const u8 {
     var stream = std.Io.Writer.fixed(output);
     const writer = &stream;
-    var zero: [40]u8 = [_]u8{'0'} ** 40;
+    var zero: [40]u8 = @splat('0');
     _ = &zero;
     for (source_paths, evidence.sources) |path, source| {
         var blob: [40]u8 = undefined;
@@ -971,8 +971,8 @@ fn observeStructuredClosure(
     defer tree_result.deinit(allocator);
     const staged_tree = try parseSha1Line(tree_result.stdout);
 
-    var staged_owned: [source_count]?[]u8 = [_]?[]u8{null} ** source_count;
-    var worktree_owned: [source_count]?[]u8 = [_]?[]u8{null} ** source_count;
+    var staged_owned: [source_count]?[]u8 = @splat(null);
+    var worktree_owned: [source_count]?[]u8 = @splat(null);
     defer {
         var index: usize = source_count;
         while (index > 0) {
@@ -1012,7 +1012,7 @@ fn collectRealEvidence(
 ) !AcceptanceEvidence {
     const initial = try observeStructuredClosure(allocator, io, zig_path);
     var successive: [closure_check_count]StructuredClosure = undefined;
-    var gates = GateResults{ .status = [_]u8{0} ** gate_count };
+    var gates = GateResults{ .status = @splat(0) };
 
     const format_argv = zigFormatArgv(zig_path);
     const path_b_argv = zigPathBTestArgv(zig_path);
@@ -1219,7 +1219,7 @@ test "combined acceptance canonical receipt binds eight sources and numeric gate
     const encoded = try encodeReceipt(&output, &evidence);
     try std.testing.expect(std.mem.startsWith(u8, encoded, "schema\tinbox206cn-combined-acceptance-v1\nsource_count\t8\n"));
     try std.testing.expect(std.mem.endsWith(u8, encoded, "mapper_ordinary_poisoned_equal\t1\ncompletion\tcomplete\n"));
-    try std.testing.expect(std.mem.indexOf(u8, encoded, "zig_version\t0.16.0\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, encoded, "zig_version\t0.17.0\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, encoded, "zig_executable_path") == null);
     try std.testing.expectEqual(@as(usize, source_count), std.mem.count(u8, encoded, "_staged_worktree_equal\t1\n"));
     try std.testing.expectEqual(@as(usize, gate_count), std.mem.count(u8, encoded, "_status\t0\n"));
@@ -1241,7 +1241,7 @@ test "combined acceptance evidence rejects every independently inconsistent resu
     changed.staged_worktree_equal[6] = false;
     try expectEvidenceError(error.SourceBytesMismatch, changed);
     changed = baseline;
-    changed.staged_tree.bytes = [_]u8{0} ** 20;
+    changed.staged_tree.bytes = @splat(0);
     try expectEvidenceError(error.StagedTreeInvalid, changed);
     changed = baseline;
     changed.external_zig_revision.bytes[0] ^= 1;
@@ -1261,7 +1261,7 @@ test "combined acceptance evidence rejects every independently inconsistent resu
 }
 
 test "Zig selector is explicit absolute singular and version exact" {
-    const alternate = "/opt/synthetic-zig-0.16.0/bin/zig";
+    const alternate = "/opt/synthetic-zig-0.17.0/bin/zig";
     try std.testing.expectEqualStrings(alternate, try validateZigSelector(alternate, null));
     const alternate_bytes = "synthetic alternate Zig executable";
     const alternate_identity = try validateZigMeasurement(
@@ -1269,27 +1269,27 @@ test "Zig selector is explicit absolute singular and version exact" {
         true,
         alternate_bytes.len,
         alternate_bytes,
-        "0.16.0\n",
+        "0.17.0\n",
     );
     try std.testing.expectEqual(@as(u64, alternate_bytes.len), alternate_identity.length);
     try std.testing.expectError(error.ZigSelectorInvalid, validateZigSelector(null, null));
     try std.testing.expectError(error.ZigSelectorInvalid, validateZigSelector("zig", null));
     try std.testing.expectError(error.ZigSelectorInvalid, validateZigSelector("relative/zig", null));
     try std.testing.expectError(error.ZigSelectorInvalid, validateZigSelector(alternate, "extra"));
-    try requireZigVersionOutput("0.16.0\n");
-    try std.testing.expectError(error.ZigVersionMismatch, requireZigVersionOutput("0.15.2\n"));
-    try std.testing.expectError(error.ZigVersionMismatch, requireZigVersionOutput("0.16.0-dev\n"));
+    try requireZigVersionOutput("0.17.0\n");
+    try std.testing.expectError(error.ZigVersionMismatch, requireZigVersionOutput("0.16.2\n"));
+    try std.testing.expectError(error.ZigVersionMismatch, requireZigVersionOutput("0.17.0-dev\n"));
     try std.testing.expectError(
         error.ZigExecutableNotRegular,
-        validateZigMeasurement(.directory, true, alternate_bytes.len, alternate_bytes, "0.16.0\n"),
+        validateZigMeasurement(.directory, true, alternate_bytes.len, alternate_bytes, "0.17.0\n"),
     );
     try std.testing.expectError(
         error.ZigExecutableNotExecutable,
-        validateZigMeasurement(.file, false, alternate_bytes.len, alternate_bytes, "0.16.0\n"),
+        validateZigMeasurement(.file, false, alternate_bytes.len, alternate_bytes, "0.17.0\n"),
     );
     try std.testing.expectError(
         error.ZigExecutableInvalid,
-        validateZigMeasurement(.file, true, alternate_bytes.len + 1, alternate_bytes, "0.16.0\n"),
+        validateZigMeasurement(.file, true, alternate_bytes.len + 1, alternate_bytes, "0.17.0\n"),
     );
 }
 
@@ -1321,7 +1321,7 @@ test "Zig selector canonicalizes an alternate absolute executable location" {
 test "structured closure detects source tree pin and Zig drift before publication" {
     const evidence = synthesizeEvidence(0x29);
     const initial = closureFromEvidence(&evidence);
-    var successive = [_]StructuredClosure{initial} ** closure_check_count;
+    var successive: [closure_check_count]StructuredClosure = @splat(initial);
     var publish_count: usize = 0;
 
     successive[0].sources[0].blob.bytes[0] ^= 1;
@@ -1330,35 +1330,35 @@ test "structured closure detects source tree pin and Zig drift before publicatio
         syntheticFinalizeAndPublish(&initial, &successive, &evidence, evidence.mapper_ordinary, &publish_count),
     );
     try std.testing.expectEqual(@as(usize, 0), publish_count);
-    successive = [_]StructuredClosure{initial} ** closure_check_count;
+    successive = @splat(initial);
 
     successive[0].staged_status[1] = .added;
     try std.testing.expectError(
         error.ClosureSourceMismatch,
         syntheticFinalizeAndPublish(&initial, &successive, &evidence, evidence.mapper_ordinary, &publish_count),
     );
-    successive = [_]StructuredClosure{initial} ** closure_check_count;
+    successive = @splat(initial);
 
     successive[1].staged_tree.bytes[0] ^= 1;
     try std.testing.expectError(
         error.ClosureTreeMismatch,
         syntheticFinalizeAndPublish(&initial, &successive, &evidence, evidence.mapper_ordinary, &publish_count),
     );
-    successive = [_]StructuredClosure{initial} ** closure_check_count;
+    successive = @splat(initial);
 
     successive[2].external_zig_revision.bytes[0] ^= 1;
     try std.testing.expectError(
         error.ClosureExternalRevisionMismatch,
         syntheticFinalizeAndPublish(&initial, &successive, &evidence, evidence.mapper_ordinary, &publish_count),
     );
-    successive = [_]StructuredClosure{initial} ** closure_check_count;
+    successive = @splat(initial);
 
     successive[2].external_zig_clean = false;
     try std.testing.expectError(
         error.ClosureExternalRevisionMismatch,
         syntheticFinalizeAndPublish(&initial, &successive, &evidence, evidence.mapper_ordinary, &publish_count),
     );
-    successive = [_]StructuredClosure{initial} ** closure_check_count;
+    successive = @splat(initial);
 
     successive[3].zig_executable.raw_sha256.bytes[0] ^= 1;
     try std.testing.expectError(
@@ -1371,7 +1371,7 @@ test "structured closure detects source tree pin and Zig drift before publicatio
 test "final artifact mismatch publishes nothing and stable closure admits once" {
     const evidence = synthesizeEvidence(0x2a);
     const initial = closureFromEvidence(&evidence);
-    const successive = [_]StructuredClosure{initial} ** closure_check_count;
+    const successive: [closure_check_count]StructuredClosure = @splat(initial);
     var publish_count: usize = 0;
     var mismatched = evidence.mapper_ordinary;
     mismatched.raw_sha256.bytes[0] ^= 1;
@@ -1510,7 +1510,7 @@ test "fixed gate diagnostic emits only on failure and preserves publication sema
 
     const evidence = synthesizeEvidence(0x4f);
     const initial = closureFromEvidence(&evidence);
-    const successive = [_]StructuredClosure{initial} ** closure_check_count;
+    const successive: [closure_check_count]StructuredClosure = @splat(initial);
     var publish_count: usize = 0;
     try syntheticFinalizeAndPublish(
         &initial,
@@ -1538,7 +1538,7 @@ test "fixed gate diagnostic emits only on failure and preserves publication sema
 }
 
 test "fixed process specifications are closed bounded and path independent" {
-    const synthetic_zig = "/synthetic/zig-0.16.0";
+    const synthetic_zig = "/synthetic/zig-0.17.0";
     const format_argv = zigFormatArgv(synthetic_zig);
     const path_b_argv = zigPathBTestArgv(synthetic_zig);
     const mapper_test_argv = zigMapperTestArgv(synthetic_zig);
@@ -1600,7 +1600,7 @@ test "source binding derives blob digest length and staged-worktree equality" {
     var staged: [source_count][]const u8 = undefined;
     var worktree: [source_count][]const u8 = undefined;
     for (0..source_count) |index| {
-        staged_storage[index] = [_]u8{0x51} ** 16;
+        staged_storage[index] = @splat(0x51);
         staged_storage[index][0] +%= @intCast(index);
         worktree_storage[index] = staged_storage[index];
         staged[index] = &staged_storage[index];

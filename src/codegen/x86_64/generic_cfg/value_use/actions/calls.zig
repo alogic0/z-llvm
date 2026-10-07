@@ -178,7 +178,7 @@ fn validateDirectCallAttachment(
         // A request-free transaction is admitted only by this closed,
         // validated zero-argument direct-call action.
     }
-    var seen = [_]bool{false} ** Types.max_requests;
+    var seen: [Types.max_requests]bool = @splat(false);
     var previous_index: ?u8 = null;
     for (
         action.arguments[0..action.argument_count],

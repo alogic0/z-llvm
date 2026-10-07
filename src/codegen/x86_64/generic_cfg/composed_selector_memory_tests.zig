@@ -125,7 +125,7 @@ test "exact floateidf i56 path executes byte-six and maximal low-56-bit patterns
     const function: *const fn ([*]const u8, usize) callconv(.c) f64 = @ptrCast(mapping.ptr);
 
     const byte_six_set = [_]u8{ 0, 0, 0, 0, 0, 0, 1 };
-    const maximal_low_56 = [_]u8{0xff} ** 7;
+    const maximal_low_56: [7]u8 = @splat(0xff);
     try std.testing.expectEqual(@as(f64, 281_474_976_710_656), function(&byte_six_set, 56));
     try std.testing.expectEqual(@as(f64, -1), function(&maximal_low_56, 56));
 }

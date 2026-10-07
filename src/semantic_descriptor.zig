@@ -436,7 +436,10 @@ fn featureName(feature: Feature) []const u8 {
 fn isReleaseMode(mode: []const u8) bool {
     return std.mem.eql(u8, mode, "ReleaseFast") or
         std.mem.eql(u8, mode, "ReleaseSafe") or
-        std.mem.eql(u8, mode, "ReleaseSmall");
+        std.mem.eql(u8, mode, "ReleaseSmall") or
+        std.mem.eql(u8, mode, "fast") or
+        std.mem.eql(u8, mode, "safe") or
+        std.mem.eql(u8, mode, "small");
 }
 
 const SourceDescriptorInput = struct {
@@ -1291,24 +1294,15 @@ fn parseType(text: []const u8) !sdv2.Type {
 }
 
 fn parseBinOp(text: []const u8) !sdv2.BinOp {
-    inline for (@typeInfo(sdv2.BinOp).@"enum".fields) |field| {
-        if (std.mem.eql(u8, text, field.name)) return @enumFromInt(field.value);
-    }
-    return error.InvalidDescriptor;
+    return std.meta.stringToEnum(sdv2.BinOp, text) orelse error.InvalidDescriptor;
 }
 
 fn parseCompareOp(text: []const u8) !sdv2.CompareOp {
-    inline for (@typeInfo(sdv2.CompareOp).@"enum".fields) |field| {
-        if (std.mem.eql(u8, text, field.name)) return @enumFromInt(field.value);
-    }
-    return error.InvalidDescriptor;
+    return std.meta.stringToEnum(sdv2.CompareOp, text) orelse error.InvalidDescriptor;
 }
 
 fn parseCastOp(text: []const u8) !sdv2.CastOp {
-    inline for (@typeInfo(sdv2.CastOp).@"enum".fields) |field| {
-        if (std.mem.eql(u8, text, field.name)) return @enumFromInt(field.value);
-    }
-    return error.InvalidDescriptor;
+    return std.meta.stringToEnum(sdv2.CastOp, text) orelse error.InvalidDescriptor;
 }
 
 fn parseCallConv(text: []const u8) !sdv2.CallConv {

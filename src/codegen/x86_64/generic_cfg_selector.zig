@@ -162,16 +162,16 @@ const SelectionTransaction = struct {
 
     fn assertMachineFunctionFieldsCovered() void {
         comptime {
-            for (std.meta.fields(MachineFunction)) |field| {
-                if (!std.mem.eql(u8, field.name, "name") and
-                    !std.mem.eql(u8, field.name, "ret_ty") and
-                    !std.mem.eql(u8, field.name, "instructions") and
-                    !std.mem.eql(u8, field.name, "owned_labels") and
-                    !std.mem.eql(u8, field.name, "codegen_path") and
-                    !std.mem.eql(u8, field.name, "entry_xmm_defined_bits") and
-                    !std.mem.eql(u8, field.name, "selection_owner"))
+            for (@typeInfo(MachineFunction).@"struct".field_names) |name| {
+                if (!std.mem.eql(u8, name, "name") and
+                    !std.mem.eql(u8, name, "ret_ty") and
+                    !std.mem.eql(u8, name, "instructions") and
+                    !std.mem.eql(u8, name, "owned_labels") and
+                    !std.mem.eql(u8, name, "codegen_path") and
+                    !std.mem.eql(u8, name, "entry_xmm_defined_bits") and
+                    !std.mem.eql(u8, name, "selection_owner"))
                 {
-                    @compileError("SelectionTransaction must cover new MachineFunction field: " ++ field.name);
+                    @compileError("SelectionTransaction must cover new MachineFunction field: " ++ name);
                 }
             }
         }

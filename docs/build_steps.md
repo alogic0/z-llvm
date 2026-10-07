@@ -1,6 +1,6 @@
 # Build Steps
 
-Use Zig 0.16.0, as pinned in `.zigversion`. `test-unit` (with optional
+Use Zig 0.17.0, as pinned in `.zigversion`. `test-unit` (with optional
 `-Dtest-filter=NAME`), `structural-smoke`, and `artifact-store-test` need no external
 compiler or historical local state. `test` also runs the mandatory ABI gate.
 `behavioral-diff`, `memset-diff`, `memcpy-diff` and `byte-loops-diff` require clang-22;

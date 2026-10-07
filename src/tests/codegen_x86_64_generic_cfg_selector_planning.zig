@@ -3178,9 +3178,9 @@ test "generic cfg selector executes owned llvm trap block" {
         _ = trapIfNegative(-1);
         std.os.linux.exit_group(127);
     }
-    var status: u32 = 0;
+    var status: i32 = 0;
     _ = std.os.linux.waitpid(@intCast(pid), &status, 0);
-    try std.testing.expectEqual(@as(u32, 4), status & 0x7f);
+    try std.testing.expectEqual(@as(i32, 4), status & 0x7f);
 }
 
 test "generic cfg selector preserves multi-use i64 binary lhs" {
@@ -3591,9 +3591,9 @@ test "generic cfg selector executes framed i128 negation trap" {
         _ = negvI128(std.math.minInt(i128));
         std.os.linux.exit_group(127);
     }
-    var status: u32 = 0;
+    var status: i32 = 0;
     _ = std.os.linux.waitpid(@intCast(pid), &status, 0);
-    try std.testing.expectEqual(@as(u32, 4), status & 0x7f);
+    try std.testing.expectEqual(@as(i32, 4), status & 0x7f);
 }
 
 test "generic cfg selector executes i128 signed multiply overflow semantics" {

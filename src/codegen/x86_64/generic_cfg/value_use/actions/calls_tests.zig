@@ -1470,7 +1470,7 @@ test "value-use attached call revalidates after construction refresh and before 
         var transaction = try Transaction.begin(&selector);
         defer transaction.deinit();
         var handles: [2]Transaction.RequestHandle = undefined;
-        var types = [_]ir.Type{.{ .int = 32 }} ** 2;
+        var types: [2]ir.Type = @splat(.{ .int = 32 });
         var count: usize = 1;
         if (later) {
             handles[0] = try transaction.register(callRequest("first", .{ .int = 32 }));

@@ -700,7 +700,7 @@ fn isExactPositiveFpZero(value: ir.Value, ty: ir.Type) bool {
 
 fn blockCanReachViaOwnedBranches(function: ir.Function, start_index: usize, target_index: usize) bool {
     if (function.blocks.items.len > stage2_max_blocks) return false;
-    var seen = [_]bool{false} ** stage2_max_blocks;
+    var seen: [stage2_max_blocks]bool = @splat(false);
     var queue: [stage2_max_blocks]usize = undefined;
     var read_index: usize = 0;
     var write_index: usize = 1;
@@ -998,7 +998,7 @@ fn snapshotScalarPhiSources(
     predecessor: []const u8,
     snapshots: *std.ArrayList(ScalarPhiSnapshot),
 ) !?Diagnostic {
-    var unavailable = [_]bool{false} ** selector_allocatable_regs.len;
+    var unavailable: [selector_allocatable_regs.len]bool = @splat(false);
     for (target.instructions.items) |instruction| {
         if (instruction.removed) continue;
         const phi = switch (instruction.kind) {
@@ -1166,7 +1166,7 @@ fn snapshotXmmPhiSources(
     predecessor: []const u8,
     snapshots: *std.ArrayList(XmmPhiSnapshot),
 ) !?Diagnostic {
-    var unavailable = [_]bool{false} ** selector_types.selector_allocatable_xmm_regs.len;
+    var unavailable: [selector_types.selector_allocatable_xmm_regs.len]bool = @splat(false);
     for (target.instructions.items) |instruction| {
         if (instruction.removed) continue;
         const phi = switch (instruction.kind) {

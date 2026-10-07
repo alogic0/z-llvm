@@ -564,7 +564,7 @@ pub fn observeSelector(
     const version = std.mem.trim(u8, version_result.stdout, " \t\r\n");
     if (version.len == 0 or version.len > 128) return error.SelectorDrift;
     var identity: SelectorIdentity = .{
-        .version = [_]u8{0} ** 128,
+        .version = @splat(0),
         .version_length = @intCast(version.len),
         .length = artifact.length,
         .sha256 = artifact.sha256,

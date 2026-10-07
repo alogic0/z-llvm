@@ -154,7 +154,7 @@ pub const AddressDependencyDomain = struct {
     pub fn validate(domain: *const AddressDependencyDomain) !void {
         for (domain.owners[0..domain.owner_count], 0..) |*owner, owner_index| {
             if (owner.identity_type != .address) return error.AddressDependencyInvalidOwnerType;
-            var seen_roles = [_]bool{false} ** std.meta.fields(Role).len;
+            var seen_roles: [@typeInfo(Role).@"enum".field_names.len]bool = @splat(false);
             for (owner.dependencies[0..owner.dependency_count], 0..) |*dependency, dependency_index| {
                 if (owner.identity.eqlIdentity(&dependency.identity)) return error.AddressDependencyCycle;
                 const role_index = @intFromEnum(dependency.role);
@@ -180,7 +180,7 @@ pub const AddressDependencyDomain = struct {
             }
         }
 
-        var states = [_]VisitState{.unseen} ** max_owners;
+        var states: [max_owners]VisitState = @splat(.unseen);
         for (domain.owners[0..domain.owner_count], 0..) |_, index| {
             try domain.validateAcyclic(index, &states);
         }
@@ -198,7 +198,7 @@ pub const AddressDependencyDomain = struct {
         for (domain.owners[0..domain.owner_count], 0..) |*owner, index| {
             if (!try live_context.isOwnerLive(owner.identity.slice())) continue;
             try live_context.validateOwner(ownerView(owner));
-            var visited = [_]bool{false} ** max_owners;
+            var visited: [max_owners]bool = @splat(false);
             if (try domain.ownerRequires(index, name, &visited, live_context)) return true;
         }
         return false;
@@ -214,7 +214,7 @@ pub const AddressDependencyDomain = struct {
     ) !void {
         try domain.validate();
         const owner_index = domain.ownerIndex(owner_name) orelse return;
-        var visited = [_]bool{false} ** max_owners;
+        var visited: [max_owners]bool = @splat(false);
         try domain.validateOwnerClosureAt(owner_index, &visited, live_context);
     }
 

@@ -112,7 +112,7 @@ pub fn validateSplitValueUseTree(allocator: std.mem.Allocator) !void {
         try appendNormalizedValueUseSource(&combined.writer, source);
         try combined.writer.writeByte('\n');
     }
-    const combined_source = try allocator.dupeZ(u8, combined.writer.buffered());
+    const combined_source = try allocator.dupeSentinel(u8, combined.writer.buffered(), 0);
     defer allocator.free(combined_source);
     const calls_source = try std.Io.Dir.cwd().readFileAllocOptions(
         io,
@@ -542,9 +542,9 @@ pub fn validatePlanningInternalOwnership(path: []const u8, source: [:0]const u8)
             .{visit_name},
         ) catch return error.ValueUsePlanningInternalOwnershipMismatch;
         const state_storage = if (is_semantic)
-            "var states = [_]CopyVisitState{.unseen} ** Types.max_requests;"
+            "var states: [Types.max_requests]CopyVisitState = @splat(.unseen);"
         else
-            "var states = [_]CopyVisitState{.unseen} ** Types.physical_node_count;";
+            "var states: [Types.physical_node_count]CopyVisitState = @splat(.unseen);";
         const state_parameter = if (is_semantic)
             "states: *[Types.max_requests]CopyVisitState,"
         else
@@ -616,9 +616,10 @@ pub fn validateValueUseFacadeSurfaceManifest(source: [:0]const u8) !void {
     const bodies = try collectFunctionBodies(source, &body_storage);
     const transaction_body = functionBodyNamed(bodies, "Transaction") orelse
         return error.ValueUseFacadeManifestMismatch;
-    const transaction_source = try std.testing.allocator.dupeZ(
+    const transaction_source = try std.testing.allocator.dupeSentinel(
         u8,
         source[transaction_body.start..transaction_body.end],
+        0,
     );
     defer std.testing.allocator.free(transaction_source);
     try validateValueUseDirectForwardingWrappers(transaction_source);
@@ -691,7 +692,7 @@ pub fn validateValueUseDirectForwardingWrappers(transaction_source: [:0]const u8
 }
 
 pub fn validateExactTopLevelPubNames(source: []const u8, expected: []const []const u8) !void {
-    var seen = [_]bool{false} ** 128;
+    var seen: [128]bool = @splat(false);
     if (expected.len > seen.len) return error.ValueUseTechnicalPubBudgetMismatch;
     var lines = std.mem.splitScalar(u8, source, '\n');
     while (lines.next()) |line| {

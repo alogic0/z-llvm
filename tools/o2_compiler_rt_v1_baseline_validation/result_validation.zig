@@ -16,7 +16,7 @@ fn parseUnsigned(field: []const u8) !u64 {
 
 pub fn parseCoverageChannel(bytes: []const u8) !ParsedCoverageChannel {
     var summaries = [_]?contract.FamilyCounters{ null, null };
-    var positions_seen = [_][6]bool{[_]bool{false} ** 6} ** 2;
+    var positions_seen: [2][6]bool = @splat(@splat(false));
     var schema_count: usize = 0;
     var summary_header_seen = false;
     var position_header_seen = false;
@@ -81,8 +81,8 @@ pub fn parseCoverageChannel(bytes: []const u8) !ParsedCoverageChannel {
                 .materializations = try parseUnsigned(fields[5]),
                 .actions = try parseUnsigned(fields[6]),
                 .commits = try parseUnsigned(fields[7]),
-                .position_requests = [_]u64{0} ** 6,
-                .position_stages = [_]u64{0} ** 6,
+                .position_requests = @splat(0),
+                .position_stages = @splat(0),
             };
         } else if (field_count == 4) {
             const position_value = try parseUnsigned(fields[1]);

@@ -116,7 +116,7 @@ const Recorder = struct {
 
 test "module references: raw call fields assembly attributes and metadata are explicit boundaries" {
     var inst: ir.Instruction = .{ .result = null, .kind = .{ .call = .{ .ret_ty = .void, .callee = "sink", .args = .empty } } };
-    var unknown = std.EnumSet(refs.OpaqueKind).initEmpty();
+    var unknown: std.EnumSet(refs.OpaqueKind) = .{};
     var symbols: usize = 0;
     const visitor: Recorder = .{ .unknown = &unknown, .symbols = &symbols };
     inst.kind.call.raw_args = "metadata !0";
@@ -132,7 +132,7 @@ test "module references: raw call fields assembly attributes and metadata are ex
     try std.testing.expectEqual(@as(usize, 1), symbols); // not a direct call to sink
     inst.removed = true;
     inst.replacement = .{ .named = "@g" };
-    unknown = .initEmpty();
+    unknown = .{};
     try refs.walkInstruction(&inst, visitor);
     try std.testing.expectEqual(@as(usize, 0), unknown.count());
     try std.testing.expectEqual(@as(usize, 1), symbols);

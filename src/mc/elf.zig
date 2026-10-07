@@ -460,7 +460,7 @@ fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(
 }
 
 fn appendBase64DecodeTable(data: *std.ArrayList(u8), allocator: std.mem.Allocator) !void {
-    var table = [_]u8{255} ** 256;
+    var table: [256]u8 = @splat(255);
     for ('A'..('Z' + 1)) |ch| table[ch] = @intCast(ch - 'A');
     for ('a'..('z' + 1)) |ch| table[ch] = @intCast(26 + ch - 'a');
     for ('0'..('9' + 1)) |ch| table[ch] = @intCast(52 + ch - '0');

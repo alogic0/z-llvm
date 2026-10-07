@@ -507,7 +507,7 @@ pub fn callHasScalarSseType(call: ir.CallInst) bool {
 }
 
 pub fn entryXmmDefinedBits(function: ir.Function) [8]u16 {
-    var result = [_]u16{0} ** 8;
+    var result: [8]u16 = @splat(0);
     var xmm_index: usize = 0;
     for (function.params.items) |param| {
         if (isScalarSseAbiType(param.ty)) {

@@ -174,7 +174,7 @@ fn verifyRepository(allocator: std.mem.Allocator, io: std.Io) !void {
     const tracked = try runGit(allocator, io, &environment, &tracked_argv);
     defer allocator.free(tracked);
     const expected = [_][]const u8{ module_root_path, std_root_path, io_module_path, definition_source_path };
-    var seen = [_]bool{false} ** expected.len;
+    var seen: [expected.len]bool = @splat(false);
     var lines = std.mem.tokenizeScalar(u8, tracked, '\n');
     var count: usize = 0;
     while (lines.next()) |raw_line| {
@@ -364,9 +364,9 @@ fn requireImportAlias(
     expected_literal: []const u8,
     require_public: bool,
 ) !void {
-    const sentinel = try allocator.dupeZ(u8, source.bytes);
+    const sentinel = try allocator.dupeSentinel(u8, source.bytes, 0);
     defer allocator.free(sentinel);
-    var tree = try std.zig.Ast.parse(allocator, sentinel, .zig);
+    var tree = try std.zig.Ast.parse(allocator, sentinel, .{});
     defer tree.deinit(allocator);
     if (tree.errors.len != 0) return MappingError.ParseFailure;
 
@@ -395,9 +395,9 @@ fn requireFieldAlias(
     field_name: []const u8,
     require_public: bool,
 ) !void {
-    const sentinel = try allocator.dupeZ(u8, source.bytes);
+    const sentinel = try allocator.dupeSentinel(u8, source.bytes, 0);
     defer allocator.free(sentinel);
-    var tree = try std.zig.Ast.parse(allocator, sentinel, .zig);
+    var tree = try std.zig.Ast.parse(allocator, sentinel, .{});
     defer tree.deinit(allocator);
     if (tree.errors.len != 0) return MappingError.ParseFailure;
 
@@ -424,9 +424,9 @@ const IdentifierCounts = struct {
 };
 
 fn classifyIdentifier(allocator: std.mem.Allocator, source: []const u8) !IdentifierCounts {
-    const sentinel = try allocator.dupeZ(u8, source);
+    const sentinel = try allocator.dupeSentinel(u8, source, 0);
     defer allocator.free(sentinel);
-    var tree = try std.zig.Ast.parse(allocator, sentinel, .zig);
+    var tree = try std.zig.Ast.parse(allocator, sentinel, .{});
     defer tree.deinit(allocator);
     if (tree.errors.len != 0) return MappingError.ParseFailure;
 

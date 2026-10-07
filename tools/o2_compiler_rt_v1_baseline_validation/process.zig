@@ -207,7 +207,7 @@ test "one harmless absolute Zig command uses bounded closed capture" {
         .{ .name = "LC_ALL", .value = "C" },
         .{ .name = "TZ", .value = "UTC0" },
     };
-    const argv = [_][]const u8{ "/home/oleg/.zig/0.16.0/files/zig", "version" };
+    const argv = [_][]const u8{ "/home/oleg/.zig/0.17.0/files/zig", "version" };
     const result = try runBounded(std.testing.allocator, std.testing.io, .{
         .executable = argv[0],
         .argv = &argv,
@@ -216,6 +216,6 @@ test "one harmless absolute Zig command uses bounded closed capture" {
     });
     defer std.testing.allocator.free(result.stdout);
     defer std.testing.allocator.free(result.stderr);
-    try std.testing.expectEqualStrings("0.16.0\n", result.stdout);
+    try std.testing.expectEqualStrings("0.17.0\n", result.stdout);
     try std.testing.expectEqual(@as(usize, 0), result.stderr.len);
 }

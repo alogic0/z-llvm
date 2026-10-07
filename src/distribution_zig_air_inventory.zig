@@ -122,8 +122,8 @@ const UnsupportedCategory = enum(u8) {
     }
 };
 
-const unsupported_category_count = @typeInfo(UnsupportedCategory).@"enum".fields.len;
-const unknown_opcode_category_count = @typeInfo(air_capabilities.UnknownOpcodeCategory).@"enum".fields.len;
+const unsupported_category_count = @typeInfo(UnsupportedCategory).@"enum".field_names.len;
+const unknown_opcode_category_count = @typeInfo(air_capabilities.UnknownOpcodeCategory).@"enum".field_names.len;
 const top_unknown_opcode_pair_limit = 50;
 const top_unknown_opcode_category_pair_limit = 10;
 const real_candidate_selector_version = "real-candidate-selector-v1";
@@ -142,7 +142,7 @@ const AggregateSurfaceCategory = enum(u8) {
     }
 };
 
-const aggregate_surface_category_count = @typeInfo(AggregateSurfaceCategory).@"enum".fields.len;
+const aggregate_surface_category_count = @typeInfo(AggregateSurfaceCategory).@"enum".field_names.len;
 
 const BoundaryCategory = enum(u8) {
     parse_import,
@@ -160,7 +160,7 @@ const BoundaryCategory = enum(u8) {
     }
 };
 
-const boundary_category_count = @typeInfo(BoundaryCategory).@"enum".fields.len;
+const boundary_category_count = @typeInfo(BoundaryCategory).@"enum".field_names.len;
 
 const CategoryStat = struct {
     count: usize = 0,
@@ -249,10 +249,10 @@ const Counters = struct {
     error_union_uses: usize = 0,
     unsupported_functions: usize = 0,
     unsupported_opcodes: usize = 0,
-    unsupported_categories: [unsupported_category_count]CategoryStat = [_]CategoryStat{.{}} ** unsupported_category_count,
-    unknown_opcode_categories: [unknown_opcode_category_count]CategoryStat = [_]CategoryStat{.{}} ** unknown_opcode_category_count,
-    aggregate_surface_categories: [aggregate_surface_category_count]CategoryStat = [_]CategoryStat{.{}} ** aggregate_surface_category_count,
-    boundary_categories: [boundary_category_count]CategoryStat = [_]CategoryStat{.{}} ** boundary_category_count,
+    unsupported_categories: [unsupported_category_count]CategoryStat = @splat(.{}),
+    unknown_opcode_categories: [unknown_opcode_category_count]CategoryStat = @splat(.{}),
+    aggregate_surface_categories: [aggregate_surface_category_count]CategoryStat = @splat(.{}),
+    boundary_categories: [boundary_category_count]CategoryStat = @splat(.{}),
     opcode_counts: OpcodeCountMap = .empty,
     data_kind_counts: StringCountMap = .empty,
     unknown_opcode_pair_counts: UnknownOpcodePairMap = .empty,

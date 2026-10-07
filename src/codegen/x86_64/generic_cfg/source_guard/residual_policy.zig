@@ -198,7 +198,7 @@ pub fn validateResidualAccumulatorAllowlist(
 
     var body_storage: [max_function_bodies]FunctionBody = undefined;
     const bodies = try collectFunctionBodies(source, &body_storage);
-    var counts = [_]usize{0} ** residual_accumulator_allowlist.len;
+    var counts: [residual_accumulator_allowlist.len]usize = @splat(0);
     for (std.meta.tags(DirectOperation)) |operation| {
         var search_from: usize = 0;
         while (std.mem.indexOfPos(u8, source, search_from, operation.pattern())) |operation_offset| {
@@ -233,7 +233,7 @@ pub fn collectFunctionBodies(source: [:0]const u8, storage: *[max_function_bodie
         const token = tokenizer.next();
         switch (token.tag) {
             .eof => return storage[0..count],
-            .invalid, .invalid_periodasterisks => return error.InvalidZigSource,
+            .invalid => return error.InvalidZigSource,
             .keyword_fn => {},
             else => continue,
         }
@@ -249,7 +249,7 @@ pub fn collectFunctionBodies(source: [:0]const u8, storage: *[max_function_bodie
             const signature_token = tokenizer.next();
             switch (signature_token.tag) {
                 .eof => return error.UnclosedFunctionDeclaration,
-                .invalid, .invalid_periodasterisks => return error.InvalidZigSource,
+                .invalid => return error.InvalidZigSource,
                 .l_paren => paren_depth += 1,
                 .r_paren => {
                     if (paren_depth == 0) return error.MalformedFunctionDeclaration;
@@ -273,7 +273,7 @@ pub fn collectFunctionBodies(source: [:0]const u8, storage: *[max_function_bodie
                         const body_token = tokenizer.next();
                         switch (body_token.tag) {
                             .eof => return error.UnclosedFunctionBody,
-                            .invalid, .invalid_periodasterisks => return error.InvalidZigSource,
+                            .invalid => return error.InvalidZigSource,
                             .l_brace => body_depth += 1,
                             .r_brace => {
                                 body_depth -= 1;
@@ -415,7 +415,7 @@ pub fn residualAllowlistIndex(
 pub fn validateArchitecturalExclusionAllowlist(name: []const u8, source: [:0]const u8) !void {
     var body_storage: [max_function_bodies]FunctionBody = undefined;
     const bodies = try collectFunctionBodies(source, &body_storage);
-    var counts = [_]usize{0} ** architectural_exclusion_allowlist.len;
+    var counts: [architectural_exclusion_allowlist.len]usize = @splat(0);
     for (std.meta.tags(ExclusionOperation)) |operation| {
         var search_from: usize = 0;
         while (std.mem.indexOfPos(u8, source, search_from, operation.pattern())) |operation_offset| {

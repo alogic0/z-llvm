@@ -1375,7 +1375,7 @@ const FpVoidCallAddendList = struct {
     items: [max_fp_void_call_addends]FpVoidCallAddend = undefined,
     count: usize = 0,
     register_count: usize = 0,
-    register_seen: [8]bool = [_]bool{false} ** 8,
+    register_seen: [8]bool = @splat(false),
     stack_disps: [max_fp_void_call_stack_addends]u32 = undefined,
     stack_count: usize = 0,
 

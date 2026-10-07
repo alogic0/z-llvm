@@ -788,7 +788,7 @@ pub const MachineFunction = struct {
             .owned_labels = .empty,
             .codegen_path = .structural_matcher,
             .selection_owner = .unassigned,
-            .entry_xmm_defined_bits = [_]u16{0} ** 8,
+            .entry_xmm_defined_bits = @splat(0),
         };
     }
 
