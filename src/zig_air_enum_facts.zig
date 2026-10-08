@@ -153,6 +153,21 @@ const facts = [_]Fact{
         .backing_type = .{ .int = 32 },
         .enumerators = zig_llvm_builder_type_enumerators[0..],
     },
+    .{
+        .name = "codegen.aarch64.Select.Value.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = select_value_index_enumerators[0..],
+    },
+    .{
+        .name = "Select.Value.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = select_value_index_enumerators[0..],
+    },
+};
+
+const select_value_index_enumerators = [_]Enumerator{
+    .{ .name = "allocating", .value = std.math.maxInt(u32) - 1 },
+    .{ .name = "free", .value = std.math.maxInt(u32) },
 };
 
 const zig_llvm_builder_type_enumerators = [_]Enumerator{
@@ -255,4 +270,9 @@ test "enum facts expose exact nominal backing types and literals" {
     try std.testing.expectEqual(ir.Type{ .int = 8 }, linkage.backing_type);
     try std.testing.expectEqual(@as(?i128, 0), enumeratorValue("zig.llvm.Builder.Linkage", ".external"));
     try std.testing.expectEqual(@as(?i128, 9), enumeratorValue("zig.llvm.Builder.Linkage", ".private"));
+
+    const val_index = lookup("codegen.aarch64.Select.Value.Index") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, val_index.backing_type);
+    try std.testing.expectEqual(@as(?i128, std.math.maxInt(u32) - 1), enumeratorValue("codegen.aarch64.Select.Value.Index", ".allocating"));
+    try std.testing.expectEqual(@as(?i128, std.math.maxInt(u32)), enumeratorValue("codegen.aarch64.Select.Value.Index", ".free"));
 }

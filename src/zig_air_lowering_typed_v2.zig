@@ -1106,13 +1106,28 @@ pub fn typedV2VoidRetPtrRecords(
         air_model.typedStoreOpcodeCount(structured_air_v2) == 0;
 }
 
+pub fn typedV2VoidBookkeepingRecords(
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.return_type.ir_type != .void) return false;
+    if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.ptr)) return false;
+    if (!std.mem.endsWith(u8, air_function.name, "finishAirBookkeeping")) return false;
+    return air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr") == 1 and
+        air_model.typedStoreOpcodeCount(structured_air_v2) == 2 and
+        air_model.typedOpcodeCount(structured_air_v2, "add_safe") == 1;
+}
+
 pub fn lowerTypedV2VoidRetPtr(
     allocator: std.mem.Allocator,
     air_function: air_export.Function,
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    if (!typedV2VoidRetPtrRecords(function_type, structured_air_v2)) return null;
+    const is_void_ret_ptr = typedV2VoidRetPtrRecords(function_type, structured_air_v2);
+    const is_void_bookkeeping = typedV2VoidBookkeepingRecords(air_function, function_type, structured_air_v2);
+    if (!is_void_ret_ptr and !is_void_bookkeeping) return null;
     var function = ir.Function.init(shortFunctionName(air_function.name), .void);
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;

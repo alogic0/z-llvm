@@ -30,9 +30,8 @@ fn lowerRegisterAggregateMake(
 ) !ir.Function {
     const aggregate_ty = function_type.return_type.ir_type;
     if (!isSysVRegisterAggregateCandidate(aggregate_ty)) return error.UnsupportedAir;
-    if (function_type.params.len == 0 or function_type.params.len > 8) return error.UnsupportedAir;
-    var leaf_paths: [8][]const u8 = undefined;
-    if (!typedV2RegisterAggregateLeafPaths(function_type, structured_air_v2, &leaf_paths)) return error.UnsupportedAir;
+    if (function_type.params.len > 8) return error.UnsupportedAir;
+    const plan = air_aggregate_construction.planRegisterAggregateConstruction(function_type, structured_air_v2) orelse return error.UnsupportedAir;
     for (function_type.params) |param| {
         if (!param.ir_type.eql(.{ .int = 32 }) and !param.ir_type.eql(.{ .int = 64 }) and
             !param.ir_type.eql(.float) and !param.ir_type.eql(.double) and
@@ -48,20 +47,25 @@ fn lowerRegisterAggregateMake(
     }
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
-    const result_names = [_][]const u8{ "field0", "field1", "field2", "field3", "field4", "field5", "result", "result" };
+    const result_names = [_][]const u8{ "field0", "field1", "field2", "field3", "field4", "field5", "field6", "result" };
     var aggregate_value: ir.Value = .undef;
-    for (function_type.params, 0..) |_, index| {
+    for (plan.leaves[0..plan.leaf_count], 0..) |leaf, index| {
+        const value: ir.Value = switch (leaf.source) {
+            .param => |param_index| .{ .named = arg_names[param_index] },
+            .constant_int => |int_val| .{ .int = int_val },
+        };
+        const result_name = if (index + 1 == plan.leaf_count) "result" else result_names[index];
         try block.instructions.append(allocator, .{
-            .result = result_names[index],
+            .result = result_name,
             .kind = .{ .insertvalue = .{
                 .aggregate_ty = aggregate_ty,
                 .aggregate = aggregate_value,
-                .value_ty = function_type.params[index].ir_type,
-                .value = .{ .named = arg_names[index] },
-                .indices = leaf_paths[index],
+                .value_ty = leaf.ty,
+                .value = value,
+                .indices = leaf.path_text,
             } },
         });
-        aggregate_value = .{ .named = result_names[index] };
+        aggregate_value = .{ .named = result_name };
     }
     block.terminator = .{ .ret = .{ .ty = aggregate_ty, .value = aggregate_value } };
     try function.blocks.append(allocator, block);
@@ -643,7 +647,158 @@ pub fn lowerTypedV2PackedBits(
         try function.blocks.append(allocator, block);
         return function;
     }
+    if (try lowerTypedV2PackedBitfieldStore(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
     return null;
+}
+
+pub const PackedBitfieldPtrInfo = struct {
+    host_align: u32,
+    bit_offset: u32,
+    host_bytes: u32,
+    field_bits: u32,
+};
+
+pub fn parsePackedBitfieldPointerType(text: []const u8) ?PackedBitfieldPtrInfo {
+    const trimmed = std.mem.trim(u8, text, " ");
+    const align_idx = std.mem.indexOf(u8, trimmed, "align(") orelse return null;
+    const open_paren = align_idx + "align(".len;
+    const close_paren = std.mem.indexOfScalarPos(u8, trimmed, open_paren, ')') orelse return null;
+    const align_spec = trimmed[open_paren..close_paren];
+
+    var it = std.mem.splitScalar(u8, align_spec, ':');
+    const host_align_str = it.next() orelse return null;
+    const bit_offset_str = it.next() orelse return null;
+    const host_bytes_str = it.next() orelse return null;
+    if (it.next() != null) return null;
+
+    const host_align = std.fmt.parseInt(u32, host_align_str, 10) catch return null;
+    const bit_offset = std.fmt.parseInt(u32, bit_offset_str, 10) catch return null;
+    const host_bytes = std.fmt.parseInt(u32, host_bytes_str, 10) catch return null;
+
+    const remainder = std.mem.trim(u8, trimmed[close_paren + 1 ..], " ");
+    const field_bits: u32 = if (std.mem.eql(u8, remainder, "bool"))
+        1
+    else if (std.mem.startsWith(u8, remainder, "u") or std.mem.startsWith(u8, remainder, "i"))
+        std.fmt.parseInt(u32, remainder[1..], 10) catch return null
+    else
+        return null;
+
+    return .{
+        .host_align = host_align,
+        .bit_offset = bit_offset,
+        .host_bytes = host_bytes,
+        .field_bits = field_bits,
+    };
+}
+
+pub const TypedPackedBitfieldStoreSummary = struct {
+    host_bytes: u32,
+    bit_offset: u32,
+    field_bits: u32,
+    value: bool,
+};
+
+pub fn typedPackedBitfieldStoreSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedPackedBitfieldStoreSummary {
+    if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.ptr) or
+        !function_type.return_type.ir_type.eql(.void))
+    {
+        return null;
+    }
+
+    var field_ptr_inst_index: ?u32 = null;
+    var bitfield_info: ?PackedBitfieldPtrInfo = null;
+
+    for (structured_air_v2.instructions) |inst| {
+        if (std.mem.startsWith(u8, inst.opcode, "struct_field_ptr")) {
+            if (parsePackedBitfieldPointerType(inst.result_type)) |info| {
+                field_ptr_inst_index = inst.index;
+                bitfield_info = info;
+                break;
+            }
+        }
+    }
+
+    const target_field_index = field_ptr_inst_index orelse return null;
+    const info = bitfield_info orelse return null;
+
+    for (structured_air_v2.instructions) |inst| {
+        if (std.mem.eql(u8, inst.opcode, "store") or std.mem.eql(u8, inst.opcode, "store_safe")) {
+            if (inst.operands.len >= 2) {
+                const dst_idx = air_model.typedInstOperandIndex(inst.operands[0]) orelse continue;
+                if (dst_idx == target_field_index) {
+                    const operand1_text = air_model.operandTextDetail(inst, 1) orelse inst.operands[1].value;
+                    const val: bool = if (std.mem.eql(u8, operand1_text, "@.bool_true"))
+                        true
+                    else if (std.mem.eql(u8, operand1_text, "@.bool_false"))
+                        false
+                    else
+                        return null;
+
+                    return .{
+                        .host_bytes = info.host_bytes,
+                        .bit_offset = info.bit_offset,
+                        .field_bits = info.field_bits,
+                        .value = val,
+                    };
+                }
+            }
+        }
+    }
+
+    return null;
+}
+
+pub fn lowerTypedV2PackedBitfieldStore(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    const summary = typedPackedBitfieldStoreSummary(function_type, structured_air_v2) orelse return null;
+    var function = ir.Function.init(shortFunctionName(air_function.name), .void);
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    const host_ty: ir.Type = .{ .int = @intCast(summary.host_bytes * 8) };
+
+    try block.instructions.append(allocator, .{
+        .result = "air0",
+        .kind = .{ .load = .{ .ty = host_ty, .ptr = .{ .named = "arg0" } } },
+    });
+
+    const mask: i128 = @as(i128, 1) << @intCast(summary.bit_offset);
+    try block.instructions.append(allocator, .{
+        .result = "air1",
+        .kind = .{ .binary = .{
+            .op = if (summary.value) .@"or" else .@"and",
+            .ty = host_ty,
+            .lhs = .{ .named = "air0" },
+            .rhs = .{ .int = if (summary.value) mask else ~mask },
+        } },
+    });
+
+    try block.instructions.append(allocator, .{
+        .result = null,
+        .kind = .{ .store = .{
+            .ty = host_ty,
+            .ptr = .{ .named = "arg0" },
+            .value = .{ .named = "air1" },
+        } },
+    });
+
+    block.terminator = .{ .ret = .{ .ty = .void, .value = null } };
+    try function.blocks.append(allocator, block);
+    return function;
 }
 
 pub fn typedV2PackedReadFlagRecords(

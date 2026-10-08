@@ -27,12 +27,43 @@ pub fn isSysVRegisterAggregateCandidate(ty: ir.Type) bool {
     return classification.kind == .register;
 }
 
+pub const RegisterAggregateLeafSource = union(enum) {
+    param: usize,
+    constant_int: i128,
+};
+
+pub const RegisterAggregateLeafPlan = struct {
+    path_text: []const u8,
+    ty: ir.Type,
+    source: RegisterAggregateLeafSource,
+};
+
+pub const RegisterAggregatePlan = struct {
+    leaf_count: usize = 0,
+    leaves: [8]RegisterAggregateLeafPlan = undefined,
+};
+
+pub fn parseConstIntOperand(instruction: air_export.TypedInstruction, operand_index: usize) ?i128 {
+    if (operand_index >= instruction.operands.len) return null;
+    const operand = instruction.operands[operand_index];
+    if (!std.mem.eql(u8, operand.kind, "const")) return null;
+    const text = air_model.operandTextDetail(instruction, operand_index) orelse operand.value;
+    const trimmed = std.mem.trim(u8, text, " ");
+    if (std.mem.startsWith(u8, trimmed, "<") and std.mem.endsWith(u8, trimmed, ">")) {
+        const inner = trimmed[1 .. trimmed.len - 1];
+        if (std.mem.indexOfScalar(u8, inner, ',')) |comma| {
+            const val_str = std.mem.trim(u8, inner[comma + 1 ..], " ");
+            return std.fmt.parseInt(i128, val_str, 0) catch null;
+        }
+    }
+    return std.fmt.parseInt(i128, trimmed, 0) catch null;
+}
+
 pub fn registerAggregateRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    var leaf_paths: [8][]const u8 = undefined;
-    return registerAggregateLeafPaths(function_type, structured_air_v2, &leaf_paths);
+    return planRegisterAggregateConstruction(function_type, structured_air_v2) != null;
 }
 
 pub fn registerAggregateLeafPaths(
@@ -40,10 +71,18 @@ pub fn registerAggregateLeafPaths(
     structured_air_v2: air_export.StructuredAirV2,
     leaf_paths: *[8][]const u8,
 ) bool {
-    if (function_type.return_type.ir_type != .aggregate) return false;
-    if (function_type.params.len == 0 or function_type.params.len > leaf_paths.len) return false;
-    if (registerAggregateLeafPathsFromStores(function_type, structured_air_v2, leaf_paths)) return true;
-    return registerAggregateLeafPathsFromAggregateInit(function_type, structured_air_v2, leaf_paths);
+    const plan = planRegisterAggregateConstruction(function_type, structured_air_v2) orelse return false;
+    for (plan.leaves[0..plan.leaf_count]) |leaf| {
+        switch (leaf.source) {
+            .param => |param_index| {
+                if (param_index < leaf_paths.len) {
+                    leaf_paths[param_index] = leaf.path_text;
+                }
+            },
+            .constant_int => {},
+        }
+    }
+    return true;
 }
 
 pub fn registerConstantZeroAggregateRecords(
@@ -106,48 +145,115 @@ fn isZeroString(text: []const u8) bool {
     return std.mem.eql(u8, trimmed, "0") or std.mem.eql(u8, trimmed, "0.0") or std.mem.eql(u8, trimmed, "0x0");
 }
 
-fn registerAggregateLeafPathsFromStores(
+fn planRegisterAggregateFromStores(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
-    leaf_paths: *[8][]const u8,
-) bool {
-    const inferred_summary = inferRegisterAggregateConstructionLayout(function_type, structured_air_v2) orelse return false;
-    if (!isSysVRegisterAggregateCandidate(inferred_summary.ty)) return false;
-    const layout = x86_64SysVDataLayout() orelse return false;
-    const plan = type_layout.aggregateLayoutPlan(layout, inferred_summary.ty) catch return false;
-    const plan_summary = type_layout.summarizeInferredAggregateLayout(function_type.return_type.ir_type.aggregate, plan.ty, .{
-        .construction = true,
-        .store = true,
-        .load = true,
-    });
-    if (!type_layout.aggregateLayoutSummariesMatch(inferred_summary, plan_summary)) return false;
+) ?RegisterAggregatePlan {
+    const layout = x86_64SysVDataLayout() orelse return null;
+    const target_ty: ir.Type = blk: {
+        if (type_layout.aggregateLayoutPlan(layout, function_type.return_type.ir_type)) |_| {
+            break :blk function_type.return_type.ir_type;
+        } else |_| {
+            const inferred = inferRegisterAggregateConstructionLayout(function_type, structured_air_v2) orelse return null;
+            break :blk inferred.ty;
+        }
+    };
+    if (!isSysVRegisterAggregateCandidate(target_ty)) return null;
+    const plan = type_layout.aggregateLayoutPlan(layout, target_ty) catch return null;
     const leaves = plan.leafSlice();
-    if (leaves.len != function_type.params.len) return false;
-    for (leaves, function_type.params) |leaf, param| {
-        if (!leaf.ty.eql(param.ir_type)) return false;
-    }
-    if (air_model.typedOpcodeCount(structured_air_v2, "arg") != function_type.params.len) return false;
-    if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return false;
-    if (air_model.typedStoreOpcodeCount(structured_air_v2) != function_type.params.len) return false;
-    if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return false;
-    const ret_ptr_index = air_model.typedRetPtrIndex(structured_air_v2) orelse return false;
-    var store_index: usize = 0;
+    if (leaves.len == 0 or leaves.len > 8) return null;
+
+    if (air_model.typedOpcodeCount(structured_air_v2, "arg") != function_type.params.len) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return null;
+    if (air_model.typedStoreOpcodeCount(structured_air_v2) != leaves.len) return null;
+    const ret_ptr_index = air_model.typedRetPtrIndex(structured_air_v2) orelse return null;
+
+    var result_plan = RegisterAggregatePlan{ .leaf_count = leaves.len };
+    var leaf_filled: [8]bool = @splat(false);
+    var params_used: [8]bool = @splat(false);
+
     for (structured_air_v2.instructions) |instruction| {
         if (!std.mem.eql(u8, instruction.opcode, "store") and !std.mem.eql(u8, instruction.opcode, "store_safe")) continue;
-        if (store_index >= function_type.params.len) return false;
-        if (instruction.operands.len != 2) return false;
-        if (!std.mem.eql(u8, instruction.operands[1].kind, "inst")) return false;
-        const arg_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return false;
-        if (arg_inst_index != store_index) return false;
-        const operand_type = parseZigType(instruction.operands[1].type_text) orelse return false;
-        if (!function_type.params[store_index].ir_type.eql(operand_type.ir_type)) return false;
-        const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return false;
+        if (instruction.operands.len != 2) return null;
+
+        const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return null;
         var path: [4]usize = undefined;
-        const path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return false;
-        leaf_paths[store_index] = air_model.aggregateIndexPathText(path[0..path_len]) orelse return false;
-        store_index += 1;
+        const path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return null;
+        const target_leaf = type_layout.leafAtIndexPath(layout, target_ty, path[0..path_len]) orelse return null;
+
+        var matched_leaf_index: ?usize = null;
+        for (leaves, 0..) |leaf, i| {
+            if (leaf.offset == target_leaf.offset and leaf.ty.eql(target_leaf.ty)) {
+                matched_leaf_index = i;
+                break;
+            }
+        }
+        const leaf_index = matched_leaf_index orelse return null;
+        if (leaf_filled[leaf_index]) return null;
+
+        const operand_type = parseZigType(instruction.operands[1].type_text) orelse return null;
+        if (!operand_type.ir_type.eql(target_leaf.ty)) return null;
+
+        const path_text = air_model.aggregateIndexPathText(path[0..path_len]) orelse return null;
+
+        if (std.mem.eql(u8, instruction.operands[1].kind, "inst")) {
+            const arg_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return null;
+            if (arg_inst_index >= function_type.params.len) return null;
+            if (!function_type.params[arg_inst_index].ir_type.eql(target_leaf.ty)) return null;
+            params_used[arg_inst_index] = true;
+            result_plan.leaves[leaf_index] = .{
+                .path_text = path_text,
+                .ty = target_leaf.ty,
+                .source = .{ .param = arg_inst_index },
+            };
+        } else if (std.mem.eql(u8, instruction.operands[1].kind, "const")) {
+            const const_val = parseConstIntOperand(instruction, 1) orelse return null;
+            result_plan.leaves[leaf_index] = .{
+                .path_text = path_text,
+                .ty = target_leaf.ty,
+                .source = .{ .constant_int = const_val },
+            };
+        } else {
+            return null;
+        }
+        leaf_filled[leaf_index] = true;
     }
-    return store_index == function_type.params.len;
+
+    for (0..leaves.len) |i| {
+        if (!leaf_filled[i]) return null;
+    }
+    for (0..function_type.params.len) |p| {
+        if (!params_used[p]) return null;
+    }
+    return result_plan;
+}
+
+fn planRegisterAggregateFromAggregateInit(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?RegisterAggregatePlan {
+    var leaf_paths: [8][]const u8 = undefined;
+    if (!registerAggregateLeafPathsFromAggregateInit(function_type, structured_air_v2, &leaf_paths)) return null;
+    var plan = RegisterAggregatePlan{ .leaf_count = function_type.params.len };
+    for (0..function_type.params.len) |i| {
+        plan.leaves[i] = .{
+            .path_text = leaf_paths[i],
+            .ty = function_type.params[i].ir_type,
+            .source = .{ .param = i },
+        };
+    }
+    return plan;
+}
+
+pub fn planRegisterAggregateConstruction(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?RegisterAggregatePlan {
+    if (function_type.return_type.ir_type != .aggregate) return null;
+    if (planRegisterAggregateFromStores(function_type, structured_air_v2)) |plan| return plan;
+    if (planRegisterAggregateFromAggregateInit(function_type, structured_air_v2)) |plan| return plan;
+    return null;
 }
 
 fn registerAggregateLeafPathsFromAggregateInit(
@@ -197,36 +303,43 @@ pub fn inferRegisterAggregateConstructionLayout(
     structured_air_v2: air_export.StructuredAirV2,
 ) ?type_layout.AggregateLayoutSummary {
     if (function_type.return_type.ir_type != .aggregate) return null;
-    if (function_type.params.len == 0) return null;
     if (air_model.typedOpcodeCount(structured_air_v2, "arg") != function_type.params.len) return null;
     if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return null;
-    if (air_model.typedStoreOpcodeCount(structured_air_v2) != function_type.params.len) return null;
     if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return null;
+    const store_count = air_model.typedStoreOpcodeCount(structured_air_v2);
+    if (store_count == 0 or store_count > 8) return null;
     const ret_ptr_index = air_model.typedRetPtrIndex(structured_air_v2) orelse return null;
     var stores: [8]StorePath = undefined;
-    if (function_type.params.len > stores.len) return null;
-    var store_count: usize = 0;
+    var stores_seen: usize = 0;
+    var params_used: [8]bool = @splat(false);
     for (structured_air_v2.instructions) |instruction| {
         if (!std.mem.eql(u8, instruction.opcode, "store") and !std.mem.eql(u8, instruction.opcode, "store_safe")) continue;
-        if (store_count >= function_type.params.len) return null;
+        if (stores_seen >= stores.len) return null;
         if (instruction.operands.len != 2) return null;
-        if (!std.mem.eql(u8, instruction.operands[1].kind, "inst")) return null;
-        const arg_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return null;
-        if (arg_inst_index >= function_type.params.len) return null;
         const operand_type = parseZigType(instruction.operands[1].type_text) orelse return null;
-        if (!function_type.params[arg_inst_index].ir_type.eql(operand_type.ir_type)) return null;
+        if (std.mem.eql(u8, instruction.operands[1].kind, "inst")) {
+            const arg_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return null;
+            if (arg_inst_index >= function_type.params.len) return null;
+            if (!function_type.params[arg_inst_index].ir_type.eql(operand_type.ir_type)) return null;
+            params_used[arg_inst_index] = true;
+        } else if (std.mem.eql(u8, instruction.operands[1].kind, "const")) {
+            if (parseConstIntOperand(instruction, 1) == null) return null;
+        } else return null;
         const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return null;
         var path: [4]usize = undefined;
         const path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return null;
-        stores[store_count] = .{
+        stores[stores_seen] = .{
             .path = path,
             .path_len = path_len,
             .ty = operand_type.ir_type,
         };
-        store_count += 1;
+        stores_seen += 1;
     }
-    if (store_count != function_type.params.len) return null;
-    const inferred_ty = inferAggregateTypeFromStorePaths(stores[0..store_count]) orelse return null;
+    for (0..function_type.params.len) |p| {
+        if (!params_used[p]) return null;
+    }
+    if (stores_seen != store_count) return null;
+    const inferred_ty = inferAggregateTypeFromStorePaths(stores[0..stores_seen]) orelse return null;
     return type_layout.summarizeInferredAggregateLayout(function_type.return_type.ir_type.aggregate, inferred_ty, .{
         .construction = true,
         .store = true,
@@ -493,4 +606,40 @@ test "constant zero register aggregate records matches BiasedFp(f64).zero shape"
     };
     const structured_air_v2 = air_export.StructuredAirV2{ .instructions = instructions[0..] };
     try std.testing.expect(registerConstantZeroAggregateRecords(function_type, structured_air_v2));
+}
+
+test "mixed param and constant register aggregate records matches PartIterator.initOne shape" {
+    var params = [_]air_model.ZigType{
+        .{ .ir_type = .{ .int = 32 } },
+    };
+    const function_type = FunctionType{
+        .params = params[0..],
+        .return_type = .{ .ir_type = .{ .aggregate = "{ i32, i5 }" } },
+        .c_calling_convention = false,
+        .non_default_calling_convention = false,
+    };
+    const field0_ops = [_]air_export.TypedOperand{testInstOperand("2", "*PartIterator")};
+    const field1_ops = [_]air_export.TypedOperand{testInstOperand("2", "*PartIterator")};
+    const store0_ops = [_]air_export.TypedOperand{ testInstOperand("3", "*i32"), testInstOperand("0", "i32") };
+    const store1_ops = [_]air_export.TypedOperand{ testInstOperand("5", "*u5"), testConstOperand("1", "u5") };
+    const store1_details = [_]air_export.TypedDetail{.{ .key = "operand1_text", .value = "<u5, 1>" }};
+    const field0_details = [_]air_export.TypedDetail{.{ .key = "field_index", .value = "0" }};
+    const field1_details = [_]air_export.TypedDetail{.{ .key = "field_index", .value = "1" }};
+    var instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "arg", .result_type = "i32", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 1, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 2, .opcode = "ret_ptr", .result_type = "*PartIterator", .data_kind = "ret_ptr", .operands = &.{} },
+        .{ .index = 3, .opcode = "struct_field_ptr_index_0", .result_type = "*i32", .data_kind = "field_ptr", .operands = @constCast(&field0_ops), .details = @constCast(&field0_details) },
+        .{ .index = 4, .opcode = "store", .result_type = "void", .data_kind = "store", .operands = @constCast(&store0_ops) },
+        .{ .index = 5, .opcode = "struct_field_ptr_index_1", .result_type = "*u5", .data_kind = "field_ptr", .operands = @constCast(&field1_ops), .details = @constCast(&field1_details) },
+        .{ .index = 6, .opcode = "store", .result_type = "void", .data_kind = "store", .operands = @constCast(&store1_ops), .details = @constCast(&store1_details) },
+        .{ .index = 7, .opcode = "dbg_stmt", .result_type = "void", .data_kind = "opaque", .operands = &.{} },
+        .{ .index = 8, .opcode = "ret_load", .result_type = "noreturn", .data_kind = "ret_load", .operands = &.{} },
+    };
+    const structured_air_v2 = air_export.StructuredAirV2{ .instructions = instructions[0..] };
+    const plan = planRegisterAggregateConstruction(function_type, structured_air_v2).?;
+    try std.testing.expectEqual(@as(usize, 2), plan.leaf_count);
+    try std.testing.expectEqual(RegisterAggregateLeafSource{ .param = 0 }, plan.leaves[0].source);
+    try std.testing.expectEqual(RegisterAggregateLeafSource{ .constant_int = 1 }, plan.leaves[1].source);
+    try std.testing.expect(registerAggregateRecords(function_type, structured_air_v2));
 }
