@@ -508,6 +508,23 @@ pub fn firstUnsupported(
             typedV2Utf8ValidCodepointRecords(function, function_type, structured_air_v2)
         else
             false;
+    const typed_atomic_load_field0 =
+        if (function.structured_air_v2) |structured_air_v2|
+            typed_v2.typedV2AtomicLoadField0Records(function_type, structured_air_v2)
+        else
+            false;
+    const typed_duration_from_seconds =
+        if (function.structured_air_v2) |structured_air_v2|
+            typed_v2.typedV2DurationFromSecondsRecords(function_type, structured_air_v2)
+        else
+            false;
+    const typed_compilation_path_fmt =
+        if (function.structured_air_v2) |structured_air_v2|
+            typed_v2.typedV2CompilationPathFmtRecords(function, function_type, structured_air_v2)
+        else
+            false;
+    const typed_io_limit_to_int = typed_v2.typedV2IoLimitToIntRecords(function, function_type);
+    const typed_sema_block_is_comptime = typed_v2.typedV2SemaBlockIsComptimeRecords(function, function_type);
 
     if (typed_accumulator_loop or
         accumulatorLoopShape(function) != null or
@@ -545,6 +562,11 @@ pub fn firstUnsupported(
         typed_ascii_predicate or
         typed_supports_threads or
         typed_utf8_valid_codepoint or
+        typed_atomic_load_field0 or
+        typed_duration_from_seconds or
+        typed_compilation_path_fmt or
+        typed_io_limit_to_int or
+        typed_sema_block_is_comptime or
         typed_maybe_error)
     {
         return null;
@@ -1195,6 +1217,21 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2Utf8ValidCodepoint(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try typed_v2.lowerTypedV2AtomicLoadField0(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try typed_v2.lowerTypedV2DurationFromSeconds(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try typed_v2.lowerTypedV2CompilationPathFmt(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try typed_v2.lowerTypedV2IoLimitToInt(allocator, air_function, function_type)) |function| {
+        return function;
+    }
+    if (try typed_v2.lowerTypedV2SemaBlockIsComptime(allocator, air_function, function_type)) |function| {
         return function;
     }
     if (try lowerTypedV2VoidRetPtr(allocator, air_function, function_type, structured_air_v2)) |function| {

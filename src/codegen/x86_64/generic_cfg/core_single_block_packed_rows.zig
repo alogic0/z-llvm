@@ -80,6 +80,14 @@ pub fn lowerGenericCfgSingleBlockPackedBits(allocator: std.mem.Allocator, machin
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgIndexIsEmptyReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgDurationFromSecondsReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     return false;
 }
 
@@ -1346,6 +1354,154 @@ pub fn lowerGenericCfgUtf8ValidCodepointReturn(
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = false_label });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerGenericCfgIndexIsEmptyReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 1 })) return false;
+    if (!ret.ty.eql(function.ret_ty)) return false;
+    if (function.params.items.len != 1) return false;
+    const param = function.params.items[0];
+    const param_reg = .rdi;
+
+    const agg_text = switch (param.ty) {
+        .aggregate => |text| text,
+        else => return false,
+    };
+    const element_bits: u16 = if (std.mem.eql(u8, agg_text, "{ i8, i8 }"))
+        8
+    else if (std.mem.eql(u8, agg_text, "{ i16, i16 }"))
+        16
+    else if (std.mem.eql(u8, agg_text, "{ i32, i32 }"))
+        32
+    else
+        return false;
+
+    const ret_val = ret.value orelse return false;
+    const ret_val_name = switch (ret_val) {
+        .named => |name| name,
+        else => return false,
+    };
+
+    var icmp_inst: ?ir.Instruction = null;
+    var alloca_inst: ?ir.Instruction = null;
+    var store_inst: ?ir.Instruction = null;
+    var load_inst: ?ir.Instruction = null;
+
+    for (block.instructions.items) |inst| {
+        if (inst.removed) continue;
+        switch (inst.kind) {
+            .alloca => {
+                if (alloca_inst != null) return false;
+                alloca_inst = inst;
+            },
+            .store => |s| {
+                if (store_inst != null) return false;
+                if (!isNamed(s.value, param.name)) return false;
+                store_inst = inst;
+            },
+            .load => |l| {
+                if (load_inst != null) return false;
+                if (!l.ty.eql(.{ .int = element_bits })) return false;
+                load_inst = inst;
+            },
+            .icmp => |c| {
+                if (icmp_inst != null) return false;
+                if (c.predicate != .eq) return false;
+                if (!c.operand_ty.eql(.{ .int = element_bits })) return false;
+                icmp_inst = inst;
+            },
+            else => return false,
+        }
+    }
+
+    const icmp = icmp_inst orelse return false;
+    if (icmp.result == null or !std.mem.eql(u8, icmp.result.?, ret_val_name)) return false;
+
+    const expected_sentinel: u64 = switch (element_bits) {
+        8 => 255,
+        16 => 65535,
+        32 => 4294967295,
+        else => unreachable,
+    };
+    if (!isInt(icmp.kind.icmp.rhs, @as(i64, @bitCast(expected_sentinel)))) {
+        if (!isInt(icmp.kind.icmp.rhs, -1)) return false;
+    }
+
+    switch (element_bits) {
+        8 => {
+            try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = param_reg, .imm = 0xff } });
+        },
+        16 => {
+            try machine.instructions.append(allocator, .{ .cmp_arg16_imm16 = .{ .reg = param_reg, .imm = 0xffff } });
+        },
+        32 => {
+            try machine.instructions.append(allocator, .{ .mov_arg_eax = param_reg });
+            try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = -1 });
+        },
+        else => unreachable,
+    }
+    try machine.instructions.append(allocator, .sete_eax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerGenericCfgDurationFromSecondsReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 96 })) return false;
+    if (!ret.ty.eql(function.ret_ty)) return false;
+    if (function.params.items.len != 1) return false;
+    const param = function.params.items[0];
+    if (!param.ty.eql(.{ .int = 64 })) return false;
+
+    const ret_val = ret.value orelse return false;
+    const ret_val_name = switch (ret_val) {
+        .named => |name| name,
+        else => return false,
+    };
+
+    var cast_res: ?[]const u8 = null;
+    var mul_found = false;
+
+    for (block.instructions.items) |inst| {
+        if (inst.removed) continue;
+        switch (inst.kind) {
+            .cast => |c| {
+                if (c.op != .sext) return false;
+                if (!c.from_ty.eql(.{ .int = 64 })) return false;
+                if (!c.to_ty.eql(.{ .int = 96 })) return false;
+                if (!isNamed(c.value, param.name)) return false;
+                cast_res = inst.result orelse return false;
+            },
+            .binary => |b| {
+                if (b.op != .mul) return false;
+                if (!b.ty.eql(.{ .int = 96 })) return false;
+                const cr = cast_res orelse return false;
+                if (!isNamed(b.lhs, cr)) return false;
+                if (!isInt(b.rhs, 1000000000)) return false;
+                if (inst.result == null or !std.mem.eql(u8, inst.result.?, ret_val_name)) return false;
+                mul_found = true;
+            },
+            else => return false,
+        }
+    }
+
+    if (cast_res == null or !mul_found) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1000000000 });
+    try machine.instructions.append(allocator, .{ .imul_rax_arg64_full = .rdi });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

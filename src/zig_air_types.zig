@@ -94,6 +94,13 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "link.MachO.UnwindInfo.generate.Context")) return .{ .ir_type = .void };
     if (std.mem.eql(u8, trimmed, "link.MachO.UnwindInfo.Encoding")) return .{ .ir_type = .{ .int = 32 } };
+    if (std.mem.eql(u8, trimmed, "Io.Duration") or std.mem.eql(u8, trimmed, "std.Io.Duration")) {
+        return .{ .ir_type = .{ .int = 96 }, .signed = true };
+    }
+    if (std.mem.eql(u8, trimmed, "Compilation.Path")) return .{ .ir_type = .ptr };
+    if (std.mem.eql(u8, trimmed, "Compilation.Path.Formatter")) return .{ .ir_type = .void };
+    if (std.mem.eql(u8, trimmed, "Sema.Block") or std.mem.eql(u8, trimmed, "std.zig.Sema.Block")) return .{ .ir_type = .ptr };
+
     if (type_layout.parseNamedAggregateType(trimmed)) |ty| return .{ .ir_type = ty };
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };

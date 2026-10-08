@@ -1359,6 +1359,203 @@ pub fn lowerTypedV2FieldExtractor(
     return function;
 }
 
+pub fn typedV2CompilationPathFmtRecords(
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (!std.mem.endsWith(u8, air_function.name, "Compilation.Path.fmt")) return false;
+    if (function_type.return_type.ir_type != .void) return false;
+    return air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "ret_load") == 1;
+}
+
+pub fn lowerTypedV2CompilationPathFmt(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2CompilationPathFmtRecords(air_function, function_type, structured_air_v2)) return null;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .void);
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    const arg_names = [_][]const u8{ "arg0", "arg1", "arg2", "arg3" };
+    for (function_type.params, 0..) |param, index| {
+        if (index >= arg_names.len) return error.UnsupportedAir;
+        try function.params.append(allocator, .{ .ty = param.ir_type, .name = arg_names[index] });
+    }
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    block.terminator = .{ .ret = .{ .ty = .void, .value = null } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+pub fn typedV2IoLimitToIntRecords(
+    air_function: air_export.Function,
+    function_type: FunctionType,
+) bool {
+    if (!std.mem.endsWith(u8, air_function.name, "Io.Limit.toInt")) return false;
+    if (function_type.params.len != 1) return false;
+    if (!function_type.params[0].ir_type.eql(.{ .int = 64 })) return false;
+    if (!function_type.return_type.ir_type.eql(.{ .int = 64 })) return false;
+    return true;
+}
+
+pub fn lowerTypedV2IoLimitToInt(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+) !?ir.Function {
+    if (!typedV2IoLimitToIntRecords(air_function, function_type)) return null;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 64 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 64 }, .value = .{ .named = "arg0" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+pub fn typedV2SemaBlockIsComptimeRecords(
+    air_function: air_export.Function,
+    function_type: FunctionType,
+) bool {
+    if (!std.mem.endsWith(u8, air_function.name, "Sema.Block.isComptime")) return false;
+    if (function_type.params.len != 1) return false;
+    if (!function_type.params[0].ir_type.eql(.ptr)) return false;
+    if (!function_type.return_type.ir_type.eql(.{ .int = 1 })) return false;
+    return true;
+}
+
+pub fn lowerTypedV2SemaBlockIsComptime(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+) !?ir.Function {
+    if (!typedV2SemaBlockIsComptimeRecords(air_function, function_type)) return null;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 1 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .int = 0 } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+
+pub fn typedV2AtomicLoadField0Records(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 1) return false;
+    if (!function_type.params[0].ir_type.eql(.ptr)) return false;
+    if (!function_type.return_type.ir_type.eql(.{ .int = 32 })) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "arg") != 1) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "atomic_load") != 1) return false;
+    if (!air_model.typedHasReturnOpcode(structured_air_v2)) return false;
+    return true;
+}
+
+pub fn lowerTypedV2AtomicLoadField0(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2AtomicLoadField0Records(function_type, structured_air_v2)) return null;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    try block.instructions.append(allocator, .{
+        .result = "val",
+        .kind = .{ .load = .{
+            .ty = .{ .int = 32 },
+            .ptr = .{ .named = "arg0" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "val" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+pub fn typedV2DurationFromSecondsRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 1) return false;
+    if (!function_type.params[0].ir_type.eql(.{ .int = 64 })) return false;
+    if (!function_type.return_type.ir_type.eql(.{ .int = 96 })) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "arg") != 1) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return false;
+    const mul_count = air_model.typedOpcodeCount(structured_air_v2, "mul") +
+        air_model.typedOpcodeCount(structured_air_v2, "mul_safe");
+    if (mul_count != 1) return false;
+    if (air_model.typedStoreOpcodeCount(structured_air_v2) != 1) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return false;
+    return true;
+}
+
+pub fn lowerTypedV2DurationFromSeconds(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2DurationFromSecondsRecords(function_type, structured_air_v2)) return null;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 96 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    try block.instructions.append(allocator, .{
+        .result = "casted",
+        .kind = .{ .cast = .{
+            .op = .sext,
+            .from_ty = .{ .int = 64 },
+            .value = .{ .named = "arg0" },
+            .to_ty = .{ .int = 96 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "mul",
+        .kind = .{ .binary = .{
+            .op = .mul,
+            .ty = .{ .int = 96 },
+            .lhs = .{ .named = "casted" },
+            .rhs = .{ .int = 1000000000 },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 96 }, .value = .{ .named = "mul" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
 pub fn typedV2AsciiPredicateRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,

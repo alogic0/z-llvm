@@ -206,6 +206,31 @@ const facts = [_]Fact{
         .backing_type = .{ .int = 64 },
         .enumerators = lang_compiler_backend_enumerators[0..],
     },
+    .{
+        .name = "Sema.RuntimeIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.Sema.RuntimeIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.GlobalErrorSet.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.OptionalNullTerminatedString",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.TrackedInst.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
 };
 
 const select_value_index_enumerators = [_]Enumerator{
