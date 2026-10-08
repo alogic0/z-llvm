@@ -238,7 +238,9 @@ pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !
 fn opaqueCastResultType(instruction: air_export.TypedInstruction, source_type: air_model.ZigType) ?air_model.ZigType {
     if (!air_capabilities.isBitcastOpcode(instruction.opcode) and
         !std.mem.eql(u8, instruction.opcode, "intcast") and
-        !std.mem.eql(u8, instruction.opcode, "intcast_safe")) return null;
+        !std.mem.eql(u8, instruction.opcode, "intcast_safe") and
+        !std.mem.eql(u8, instruction.opcode, "int_cast") and
+        !std.mem.eql(u8, instruction.opcode, "int_cast_safe")) return null;
     if (!isOpaqueNominalTypeSurface(instruction.result_type)) return null;
     return switch (source_type.ir_type) {
         .int, .ptr, .float, .double => source_type,
@@ -289,17 +291,27 @@ pub fn lowerTypedMax(self: anytype, instruction: air_export.TypedInstruction) !v
     const rhs = try self.resolveTypedOperand(instruction, 1);
     const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
     if (!lhs.ty.ir_type.eql(rhs.ty.ir_type) or !result_type.ir_type.eql(lhs.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
-    if (!lhs.ty.ir_type.eql(.{ .int = 32 })) return air_model.LowerError.UnsupportedAir;
+    switch (lhs.ty.ir_type) {
+        .int => |bits| if (bits != 8 and bits != 16 and bits != 32 and bits != 64 and bits != 128) return air_model.LowerError.UnsupportedAir,
+        else => return air_model.LowerError.UnsupportedAir,
+    }
+
+    var eff_lhs = lhs;
+    var eff_rhs = rhs;
+    if (eff_lhs.value == .int and eff_rhs.value != .int) {
+        eff_lhs = rhs;
+        eff_rhs = lhs;
+    }
 
     const cmp_name = try ownPrint(self.module, "air{}_max_cmp", .{instruction.index});
     const result_name = try self.resultName(instruction.index);
     try self.block.instructions.append(self.allocator, .{
         .result = cmp_name,
         .kind = .{ .icmp = .{
-            .predicate = if (lhs.ty.signed) .slt else .ult,
-            .operand_ty = lhs.ty.ir_type,
-            .lhs = lhs.value,
-            .rhs = rhs.value,
+            .predicate = if (eff_lhs.ty.signed) .slt else .ult,
+            .operand_ty = eff_lhs.ty.ir_type,
+            .lhs = eff_lhs.value,
+            .rhs = eff_rhs.value,
         } },
     });
     try self.block.instructions.append(self.allocator, .{
@@ -307,9 +319,9 @@ pub fn lowerTypedMax(self: anytype, instruction: air_export.TypedInstruction) !v
         .kind = .{ .select = .{
             .cond_ty = .{ .int = 1 },
             .cond = .{ .named = cmp_name },
-            .ty = lhs.ty.ir_type,
-            .true_value = rhs.value,
-            .false_value = lhs.value,
+            .ty = eff_lhs.ty.ir_type,
+            .true_value = eff_rhs.value,
+            .false_value = eff_lhs.value,
         } },
     });
     self.values[instruction.index] = .{
@@ -324,17 +336,27 @@ pub fn lowerTypedMin(self: anytype, instruction: air_export.TypedInstruction) !v
     const rhs = try self.resolveTypedOperand(instruction, 1);
     const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
     if (!lhs.ty.ir_type.eql(rhs.ty.ir_type) or !result_type.ir_type.eql(lhs.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
-    if (!lhs.ty.ir_type.eql(.{ .int = 32 })) return air_model.LowerError.UnsupportedAir;
+    switch (lhs.ty.ir_type) {
+        .int => |bits| if (bits != 8 and bits != 16 and bits != 32 and bits != 64 and bits != 128) return air_model.LowerError.UnsupportedAir,
+        else => return air_model.LowerError.UnsupportedAir,
+    }
+
+    var eff_lhs = lhs;
+    var eff_rhs = rhs;
+    if (eff_lhs.value == .int and eff_rhs.value != .int) {
+        eff_lhs = rhs;
+        eff_rhs = lhs;
+    }
 
     const cmp_name = try ownPrint(self.module, "air{}_min_cmp", .{instruction.index});
     const result_name = try self.resultName(instruction.index);
     try self.block.instructions.append(self.allocator, .{
         .result = cmp_name,
         .kind = .{ .icmp = .{
-            .predicate = if (lhs.ty.signed) .slt else .ult,
-            .operand_ty = lhs.ty.ir_type,
-            .lhs = lhs.value,
-            .rhs = rhs.value,
+            .predicate = if (eff_lhs.ty.signed) .slt else .ult,
+            .operand_ty = eff_lhs.ty.ir_type,
+            .lhs = eff_lhs.value,
+            .rhs = eff_rhs.value,
         } },
     });
     try self.block.instructions.append(self.allocator, .{
@@ -342,9 +364,9 @@ pub fn lowerTypedMin(self: anytype, instruction: air_export.TypedInstruction) !v
         .kind = .{ .select = .{
             .cond_ty = .{ .int = 1 },
             .cond = .{ .named = cmp_name },
-            .ty = lhs.ty.ir_type,
-            .true_value = lhs.value,
-            .false_value = rhs.value,
+            .ty = eff_lhs.ty.ir_type,
+            .true_value = eff_lhs.value,
+            .false_value = eff_rhs.value,
         } },
     });
     self.values[instruction.index] = .{
@@ -478,26 +500,109 @@ pub fn lowerTypedBitReverse(self: anytype, instruction: air_export.TypedInstruct
     if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
     const source = try self.resolveTypedOperand(instruction, 0);
     const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
-    if (!source.ty.ir_type.eql(.{ .int = 32 }) or !result_type.ir_type.eql(source.ty.ir_type)) {
+    const bit_width = switch (source.ty.ir_type) {
+        .int => |bits| bits,
+        else => return air_model.LowerError.UnsupportedAir,
+    };
+    if (!result_type.ir_type.eql(source.ty.ir_type)) {
         return air_model.LowerError.UnsupportedAir;
     }
 
-    const result_name = try self.resultName(instruction.index);
-    var call: ir.CallInst = .{
-        .ret_ty = result_type.ir_type,
-        .callee = "llvm.bitreverse.i32",
-        .args = .empty,
-    };
-    errdefer call.deinit(self.allocator);
-    try call.args.append(self.allocator, .{ .ty = source.ty.ir_type, .value = source.value });
-    try self.block.instructions.append(self.allocator, .{
-        .result = result_name,
-        .kind = .{ .call = call },
-    });
-    self.values[instruction.index] = .{
-        .ty = result_type,
-        .value = .{ .named = result_name },
-    };
+    if (bit_width == 32) {
+        const result_name = try self.resultName(instruction.index);
+        var call: ir.CallInst = .{
+            .ret_ty = result_type.ir_type,
+            .callee = "llvm.bitreverse.i32",
+            .args = .empty,
+        };
+        errdefer call.deinit(self.allocator);
+        try call.args.append(self.allocator, .{ .ty = source.ty.ir_type, .value = source.value });
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .call = call },
+        });
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = .{ .named = result_name },
+        };
+        return;
+    }
+
+    if (bit_width == 64) {
+        const result_name = try self.resultName(instruction.index);
+        var call: ir.CallInst = .{
+            .ret_ty = result_type.ir_type,
+            .callee = "llvm.bitreverse.i64",
+            .args = .empty,
+        };
+        errdefer call.deinit(self.allocator);
+        try call.args.append(self.allocator, .{ .ty = source.ty.ir_type, .value = source.value });
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .call = call },
+        });
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = .{ .named = result_name },
+        };
+        return;
+    }
+
+    if (bit_width < 32) {
+        const zext_name = try ownPrint(self.module, "air{}_bitrev_zext", .{instruction.index});
+        try self.block.instructions.append(self.allocator, .{
+            .result = zext_name,
+            .kind = .{ .cast = .{
+                .op = .zext,
+                .from_ty = source.ty.ir_type,
+                .to_ty = .{ .int = 32 },
+                .value = source.value,
+            } },
+        });
+
+        const rev_name = try ownPrint(self.module, "air{}_bitrev_i32", .{instruction.index});
+        var call: ir.CallInst = .{
+            .ret_ty = .{ .int = 32 },
+            .callee = "llvm.bitreverse.i32",
+            .args = .empty,
+        };
+        errdefer call.deinit(self.allocator);
+        try call.args.append(self.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = zext_name } });
+        try self.block.instructions.append(self.allocator, .{
+            .result = rev_name,
+            .kind = .{ .call = call },
+        });
+
+        const shift_amt: i128 = @as(i128, 32 - bit_width);
+        const lshr_name = try ownPrint(self.module, "air{}_bitrev_lshr", .{instruction.index});
+        try self.block.instructions.append(self.allocator, .{
+            .result = lshr_name,
+            .kind = .{ .binary = .{
+                .op = .lshr,
+                .ty = .{ .int = 32 },
+                .lhs = .{ .named = rev_name },
+                .rhs = .{ .int = shift_amt },
+            } },
+        });
+
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .cast = .{
+                .op = .trunc,
+                .from_ty = .{ .int = 32 },
+                .to_ty = result_type.ir_type,
+                .value = .{ .named = lshr_name },
+            } },
+        });
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = .{ .named = result_name },
+        };
+        return;
+    }
+
+    return air_model.LowerError.UnsupportedAir;
 }
 
 pub fn lowerTypedZeroCount(self: anytype, instruction: air_export.TypedInstruction, callee: []const u8, label: []const u8) !void {

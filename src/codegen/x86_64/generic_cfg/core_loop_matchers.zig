@@ -381,12 +381,16 @@ pub fn matchExtractValue(instruction: ir.Instruction, aggregate_name: []const u8
         std.mem.eql(u8, extract.indices, indices);
 }
 
+pub fn isByteSourceType(ty: ir.Type) bool {
+    return ty.eql(.{ .int = 8 }) or ty.eql(.{ .aggregate = "[1 x i8]" });
+}
+
 pub fn matchByteGep(instruction: ir.Instruction, ptr_name: []const u8, index_name: []const u8) bool {
     const gep = switch (instruction.kind) {
         .gep => |gep| gep,
         else => return false,
     };
-    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" }) or !isNamed(gep.ptr, ptr_name)) return false;
+    if (!isByteSourceType(gep.source_ty) or !isNamed(gep.ptr, ptr_name)) return false;
     if (gep.indices.items.len != 1) return false;
     const index = gep.indices.items[0];
     return index.ty.eql(.{ .int = 64 }) and isNamed(index.value, index_name);

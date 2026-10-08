@@ -92,6 +92,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .or_eax_imm32 => |value| try writer.print("\torl ${}, %eax\n", .{value}),
             .imul_eax_imm32 => |value| try writer.print("\timull ${}, %eax, %eax\n", .{value}),
             .and_eax_imm32 => |value| try writer.print("\tandl ${}, %eax\n", .{value}),
+            .xor_eax_imm32 => |value| try writer.print("\txorl ${}, %eax\n", .{value}),
             .abs_i32_edi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tmovl %edi, %edx\n\tnegl %edx\n\ttestl %edi, %edi\n\tcmovsl %edx, %eax\n"),
             .abs_i64_rdi_rax => try writer.writeAll("\tmovq %rdi, %rax\n\tmovq %rdi, %rdx\n\tnegq %rdx\n\ttestq %rdi, %rdi\n\tcmovsq %rdx, %rax\n"),
             .wide_int_to_fp_rdi_rsi_xmm0 => |conversion| try printWideIntToFp(writer, conversion.signed, conversion.to_bits),
@@ -1310,6 +1311,32 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "\tjne 1b\n" ++
                     "2:\n",
             ),
+            .strlen_rdi_rax => try writer.writeAll(
+                "\txorl %eax, %eax\n" ++
+                    "1:\n" ++
+                    "\tcmpb $0, (%rdi,%rax)\n" ++
+                    "\tje 2f\n" ++
+                    "\tincq %rax\n" ++
+                    "\tjmp 1b\n" ++
+                    "2:\n",
+            ),
+            .strnlen_rdi_rsi_rax => try writer.writeAll(
+                "\txorl %eax, %eax\n" ++
+                    "1:\n" ++
+                    "\tcmpq %rsi, %rax\n" ++
+                    "\tjae 2f\n" ++
+                    "\tcmpb $0, (%rdi,%rax)\n" ++
+                    "\tje 2f\n" ++
+                    "\tincq %rax\n" ++
+                    "\tjmp 1b\n" ++
+                    "2:\n",
+            ),
+            .atomic_try_lock_rdi_al => try writer.writeAll(
+                "\txorl %eax, %eax\n" ++
+                    "\tmovl $1, %edx\n" ++
+                    "\tlock cmpxchgl %edx, (%rdi)\n" ++
+                    "\tsete %al\n",
+            ),
             .smin_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmovgl %esi, %eax\n"),
             .umin_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmoval %esi, %eax\n"),
             .smax_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmovll %esi, %eax\n"),
@@ -1318,6 +1345,12 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .replace_low_i8_dil_sil_al => try writer.writeAll("\tmovl %edi, %eax\n\tandl $-8, %eax\n\tmovl %esi, %edx\n\tandl $7, %edx\n\torl %edx, %eax\n"),
             .read_flag_i8_dil_al => try writer.writeAll("\txorl %eax, %eax\n\ttestb %dil, %dil\n\tsets %al\n"),
             .ult_i8_dil_imm8_al => |imm| try writer.print("\txorl %eax, %eax\n\tcmpb ${}, %dil\n\tsetb %al\n", .{imm}),
+            .cmp_ult_u32_edi_esi_al => try writer.writeAll("\txorl %eax, %eax\n\tcmpl %esi, %edi\n\tsetb %al\n"),
+            .ascii_range_u8_dil_imm8_imm8_al => |range| try writer.print("\txorl %eax, %eax\n\tmovb %dil, %al\n\tsubb ${}, %al\n\tcmpb ${}, %al\n\tsetb %al\n", .{ range.low, range.len }),
+            .ascii_alphabetic_dil_al => try writer.writeAll("\txorl %eax, %eax\n\tmovb %dil, %al\n\tandb $0xdf, %al\n\tsubb $65, %al\n\tcmpb $26, %al\n\tsetb %al\n"),
+            .ascii_alphanumeric_dil_al => try writer.writeAll("\txorl %eax, %eax\n\tmovb %dil, %cl\n\tsubb $48, %cl\n\tcmpb $10, %cl\n\tsetb %cl\n\tmovb %dil, %al\n\tandb $0xdf, %al\n\tsubb $65, %al\n\tcmpb $26, %al\n\tsetb %al\n\torb %cl, %al\n"),
+            .ascii_whitespace_dil_al => try writer.writeAll("\txorl %eax, %eax\n\tcmpb $32, %dil\n\tsete %cl\n\tmovb %dil, %al\n\tsubb $9, %al\n\tcmpb $5, %al\n\tsetb %al\n\torb %cl, %al\n"),
+            .grow_capacity_u64_rdi_imm32_rax => |imm| try writer.print("\tmovq %rdi, %rcx\n\tshrq $1, %rcx\n\tmovq $-1, %rax\n\taddq ${}, %rcx\n\taddq %rdi, %rcx\n\tcmovaeq %rcx, %rax\n", .{imm}),
             .store_imm8_abs => |store| try writer.print("\tmovb ${}, {x}\n", .{ store.value, store.address }),
             .cmp_ecx_arg32 => |reg| try writer.print("\tcmpl %ecx, {s}\n", .{reg.name32()}),
             .cmp_rcx_arg64 => |reg| try writer.print("\tcmpq %rcx, {s}\n", .{reg.name64()}),

@@ -22,7 +22,28 @@ pub const Fact = struct {
     },
 };
 
-const facts = [_]Fact{};
+const facts = [_]Fact{
+    .{
+        .name = "BiasedFp(f64)",
+        .aggregate_text = "{ i64, i32 }",
+        .match = .basename,
+        .evidence = .{
+            .construction = true,
+            .store = true,
+            .load = true,
+        },
+    },
+    .{
+        .name = "BiasedFp(f32)",
+        .aggregate_text = "{ i32, i32 }",
+        .match = .basename,
+        .evidence = .{
+            .construction = true,
+            .store = true,
+            .load = true,
+        },
+    },
+};
 
 pub fn lookup(nominal: []const u8) ?Fact {
     const normalized = stripNominalSigil(std.mem.trim(u8, nominal, " "));
@@ -59,8 +80,10 @@ fn stripNominalSigil(text: []const u8) []const u8 {
 }
 
 test "aggregate layout facts keep exact pair ownership narrow" {
-    try std.testing.expectEqual(@as(usize, 0), count());
+    try std.testing.expectEqual(@as(usize, 2), count());
     try std.testing.expect(lookup("aggregate_abi.Pair") == null);
     try std.testing.expect(lookup("%runtime_aggregate_pair_main.Pair") == null);
     try std.testing.expect(lookup("other.Pair") == null);
+    try std.testing.expect(lookup("fmt.parse_float.common.BiasedFp(f64)") != null);
+    try std.testing.expect(lookup("fmt.parse_float.common.BiasedFp(f32)") != null);
 }

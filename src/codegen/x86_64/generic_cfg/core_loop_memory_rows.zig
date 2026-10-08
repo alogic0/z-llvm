@@ -19,6 +19,7 @@ const blockByName = loop_matchers.blockByName;
 const matchI64BinaryNamedImm = loop_matchers.matchI64BinaryNamedImm;
 const matchSpinlockGep = loop_matchers.matchSpinlockGep;
 const isSpinlockedMemcpyCall = loop_matchers.isSpinlockedMemcpyCall;
+const isByteSourceType = loop_matchers.isByteSourceType;
 
 pub fn lowerByteScanLenLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!matchesByteScanLenLoop(function)) return false;
@@ -1169,7 +1170,7 @@ fn matchesByteScanLenLoop(function: ir.Function) bool {
         .gep => |gep| gep,
         else => return false,
     };
-    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" }) or !isNamed(gep.ptr, function.params.items[0].name)) return false;
+    if (!isByteSourceType(gep.source_ty) or !isNamed(gep.ptr, function.params.items[0].name)) return false;
     if (gep.indices.items.len != 1) return false;
     const gep_index = gep.indices.items[0];
     if (!gep_index.ty.eql(.{ .int = 64 }) or !isNamed(gep_index.value, phi_name)) return false;
@@ -1644,7 +1645,7 @@ fn blockHasI64EqToLen(block: ir.BasicBlock, len_param_name: []const u8) bool {
 }
 
 fn byteCompareGep(gep: ir.GepInst, ptr_param_name: []const u8, index_name: []const u8) bool {
-    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" }) or !isNamed(gep.ptr, ptr_param_name)) return false;
+    if (!isByteSourceType(gep.source_ty) or !isNamed(gep.ptr, ptr_param_name)) return false;
     if (gep.indices.items.len != 1) return false;
     const index = gep.indices.items[0];
     return index.ty.eql(.{ .int = 64 }) and isNamed(index.value, index_name);

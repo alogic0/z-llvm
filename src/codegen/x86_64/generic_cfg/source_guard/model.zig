@@ -350,7 +350,7 @@ pub const residual_accumulator_allowlist = [_]ResidualAllowlistEntry{
 
     .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .operation = .bind_value_loc, .structural_role = "fixed stack object and pointer binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 4 },
 
-    .{ .source = "composed_selector_impl.zig", .function = "bindParams", .operation = .bind_value_loc, .structural_role = "fixed incoming ABI parameter binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 6 },
+    .{ .source = "composed_selector_impl.zig", .function = "bindParams", .operation = .bind_value_loc, .structural_role = "fixed incoming ABI parameter binding", .classification = .non_accumulator_result_path, .future_slice = .none, .expected_count = 7 },
     .{ .source = "composed_selector_impl.zig", .function = "bindPhiResults", .operation = .bind_value_loc, .structural_role = "computed planned PHI destination alias binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 3 },
     .{ .source = "composed_selector_impl.zig", .function = "stabilizeFramedPhiDestinations", .operation = .bind_value_loc, .structural_role = "computed stabilized PHI destination alias binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
     .{ .source = "composed_selector_impl.zig", .function = "enterBlock", .operation = .bind_value_loc, .structural_role = "computed predecessor PHI location alias binding", .classification = .alias_only_binding, .future_slice = .none, .expected_count = 1 },
@@ -422,7 +422,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_calls.zig", .function = "lowerUnsignedOverflowI32", .body_sha256 = "4dc4da7d4dd45a3ddb97b01d1c722605a902b76c147962bfc5581e59333d0121" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerSmulOverflowI64", .body_sha256 = "7354791d4df4eba960278a7e0662130d91700494cb73b4c83233fcf662f76cb9" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerCtpop", .body_sha256 = "386892044354332641c3184338b678f04aa018652f909cb27820bb82788fd66a" },
-    .{ .source = "composed_selector_calls.zig", .function = "lowerBitPermutation", .body_sha256 = "498fb6091e5385483eb55a6b67d2c813fb7ce8a401c41f837a451adf1150a497" },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerBitPermutation", .body_sha256 = "8743cd741281e5e38b60f81418841fbc0ad52f2a615597231c737573dba2ad95" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerAbsI128", .body_sha256 = "cf69f866c281db4b54bbeec420603927e57fc1b11220102ce0da5d2137296d79" },
 
     .{ .source = "composed_selector_cfg.zig", .function = "lowerSelect", .body_sha256 = "7de55a040bf63ee1db4c709fde09ddf8c865a3dc6ba7ceadcd3677520937a5f1" },
@@ -447,7 +447,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
 
     .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .body_sha256 = "385f68fd00df0594e2e8f6d00cbfcf0a2db631289f4608bd80259325e705a758" },
 
-    .{ .source = "composed_selector_impl.zig", .function = "bindParams", .body_sha256 = "f2c94d64d5666e6eed44b12db8b3fa6ce52ef882a97c2d5d2d4fc2355ded2d01" },
+    .{ .source = "composed_selector_impl.zig", .function = "bindParams", .body_sha256 = "cfcf97a69f47c99966fd8a8daa4f062f3f089c08acfb6884e5f08cee57885a34" },
     .{ .source = "composed_selector_impl.zig", .function = "bindPhiResults", .body_sha256 = "283fc0d5adddb7c7ac2fad47020bf99b026be3e2c09accabd0077d6e8b7abcf8" },
     .{ .source = "composed_selector_impl.zig", .function = "stabilizeFramedPhiDestinations", .body_sha256 = "84522a7d762d08de43dcffc4c9284f642605be75b0078f0bf74516df20f1196f" },
     .{ .source = "composed_selector_impl.zig", .function = "enterBlock", .body_sha256 = "edb2e130813a5ca0847f5e5060f9088d196db18deaec281dbd95a58b7db92b1f" },

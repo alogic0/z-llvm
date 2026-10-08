@@ -190,6 +190,7 @@ fn tryLowerComposedBlockFailClosed(
     const result = composed_selector.tryLowerComposedBlockWithContextAndAddressDependencies(allocator, machine, function, module_context, &transaction.address_dependencies) catch |err| {
         return switch (err) {
             error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "composed-block-unsupported-value" }),
+            error.ValueUseForwardPlanMissing => unsupported(.{ .no_emitter = "value-use-forward-plan-missing" }),
             else => err,
         };
     };
@@ -212,6 +213,7 @@ fn tryLowerComposedCfgFailClosed(
     const result = composed_selector.tryLowerComposedCfgWithContextAndAddressDependencies(allocator, machine, function, module_context, &transaction.address_dependencies) catch |err| {
         return switch (err) {
             error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "stage2-unsupported-value" }),
+            error.ValueUseForwardPlanMissing => unsupported(.{ .no_emitter = "value-use-forward-plan-missing" }),
             else => err,
         };
     };

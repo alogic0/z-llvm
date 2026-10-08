@@ -182,7 +182,13 @@ pub fn isComposedReturnType(ty: ir.Type) bool {
     if (ty == .ptr or ty == .void or ty == .half or ty == .float or ty == .double) return true;
     if (sysv_abi.sseAggregateReturnKind(ty) != null) return true;
     const bits = intBits(ty) orelse return false;
-    return bits == 32 or bits == 64 or bits == 128;
+    return bits == 16 or bits == 32 or bits == 64 or bits == 128;
+}
+
+pub fn isComposedCfgReturnType(ty: ir.Type) bool {
+    if (isComposedReturnType(ty)) return true;
+    const bits = intBits(ty) orelse return false;
+    return bits == 1 or bits == 8;
 }
 
 pub fn shiftAmount5(value: i128) !u5 {
@@ -218,6 +224,7 @@ pub fn i32BitPattern(value: i128) !i32 {
 }
 
 pub fn i64Value(value: i128) !i64 {
-    if (value < std.math.minInt(i64) or value > std.math.maxInt(i64)) return error.UnsupportedCodegenValue;
-    return @intCast(value);
+    if (value < std.math.minInt(i64) or value > std.math.maxInt(u64)) return error.UnsupportedCodegenValue;
+    if (value < 0) return @intCast(value);
+    return @bitCast(@as(u64, @intCast(value)));
 }

@@ -77,6 +77,9 @@ pub fn lowerTypedV2SmallIntegerAggregateAbi(
     if (try lowerRegisterAggregateFieldWriteBeforeCall(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
+    if (typedV2ConstantZeroAggregateRecords(function_type, structured_air_v2)) {
+        return try lowerRegisterAggregateZero(allocator, air_function, function_type);
+    }
     if (!typedV2RegisterAggregateRecords(function_type, structured_air_v2)) return null;
     return try lowerRegisterAggregateMake(allocator, air_function, function_type, structured_air_v2);
 }
@@ -280,6 +283,30 @@ pub fn typedV2RegisterAggregateRecords(
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
     return air_aggregate_construction.registerAggregateRecords(function_type, structured_air_v2);
+}
+
+pub fn typedV2ConstantZeroAggregateRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    return air_aggregate_construction.registerConstantZeroAggregateRecords(function_type, structured_air_v2);
+}
+
+pub fn lowerRegisterAggregateZero(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+) !ir.Function {
+    const aggregate_ty = function_type.return_type.ir_type;
+    var function = ir.Function.init(shortFunctionName(air_function.name), aggregate_ty);
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    block.terminator = .{ .ret = .{ .ty = aggregate_ty, .value = .zero_initializer } };
+    try function.blocks.append(allocator, block);
+    return function;
 }
 
 pub fn typedV2RegisterAggregateLeafPaths(

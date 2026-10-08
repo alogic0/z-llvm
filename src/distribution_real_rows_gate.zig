@@ -1403,10 +1403,17 @@ pub fn lowerOracleFunctionToObject(
         } };
     }
 
-    var machine = codegen.x86_64.lowerFunction(
+    var diagnostic_tag: ?[]const u8 = null;
+    var diagnostic_detail: ?[]const u8 = null;
+    var machine = codegen.x86_64.lowerFunctionWithOptions(
         allocator,
         target_triple,
         lowered.module.functions.items[0],
+        .{
+            .generic_cfg_selector = true,
+            .generic_cfg_selector_diagnostic_tag = &diagnostic_tag,
+            .generic_cfg_selector_diagnostic_detail = &diagnostic_detail,
+        },
     ) catch |err| return .{ .failure = .{
         .stage = "object-emission",
         .diagnostic = try std.fmt.allocPrint(allocator, "x86_64-lower:{s}", .{@errorName(err)}),

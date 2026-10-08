@@ -26,7 +26,9 @@ pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !Functi
     while (fields.next()) |field| {
         const param_text = std.mem.trim(u8, field, " ");
         if (param_text.len == 0) continue;
-        try params.append(allocator, parseZigType(param_text) orelse return error.UnsupportedAir);
+        const parsed = parseZigType(param_text) orelse return error.UnsupportedAir;
+        if (parsed.ir_type == .void) continue;
+        try params.append(allocator, parsed);
     }
     return .{
         .params = try params.toOwnedSlice(allocator),
@@ -71,6 +73,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     const trimmed = std.mem.trim(u8, text, " ");
     if (std.mem.eql(u8, trimmed, "void")) return .{ .ir_type = .void };
     if (std.mem.eql(u8, trimmed, "noreturn")) return .{ .ir_type = .void };
+    if (std.mem.eql(u8, trimmed, "InternPool.Active")) return .{ .ir_type = .void };
     if (std.mem.eql(u8, trimmed, "bool")) return .{ .ir_type = .{ .int = 1 } };
     if (std.mem.eql(u8, trimmed, "c_int")) return .{ .ir_type = .{ .int = 32 }, .signed = true };
     if (std.mem.eql(u8, trimmed, "c_long")) return .{ .ir_type = .{ .int = 64 }, .signed = true };
@@ -96,7 +99,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (enum_facts.lookup(trimmed)) |fact| return .{ .ir_type = fact.backing_type, .signed = fact.signed };
     if (trimmed.len > 1 and trimmed[0] == '?') {
         const child = parseZigType(trimmed[1..]) orelse return null;
-        if (child.ir_type == .int and (child.ir_type.int == 32 or child.ir_type.int == 64)) return child;
+        if (child.ir_type == .int and child.ir_type.int <= 64) return child;
         if (child.ir_type == .ptr) return child;
         return null;
     }
@@ -353,6 +356,8 @@ test "parse fact-owned named enum type surfaces" {
     try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_optional_token.ir_type);
     const parsed_shuffle_mask = parseZigType("Air.ShuffleTwoMask") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_shuffle_mask.ir_type);
+    const parsed_coff_machine = parseZigType("coff.IMAGE.FILE.MACHINE") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 16 }, parsed_coff_machine.ir_type);
 
     const parsed_fn = try parseFunctionType(std.testing.allocator, "fn (*Io.Event) void");
     defer parsed_fn.deinit(std.testing.allocator);
@@ -360,11 +365,20 @@ test "parse fact-owned named enum type surfaces" {
     try std.testing.expectEqual(ir.Type.ptr, parsed_fn.params[0].ir_type);
     try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_fn.params[0].pointer_child.?);
 
+    const parsed_machine_fn = try parseFunctionType(std.testing.allocator, "fn (coff.IMAGE.FILE.MACHINE) bool");
+    defer parsed_machine_fn.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 1), parsed_machine_fn.params.len);
+    try std.testing.expectEqual(ir.Type{ .int = 16 }, parsed_machine_fn.params[0].ir_type);
+    try std.testing.expectEqual(ir.Type{ .int = 1 }, parsed_machine_fn.return_type.ir_type);
+
     const parsed_shuffle_fn = try parseFunctionType(std.testing.allocator, "fn (u32) Air.ShuffleTwoMask");
     defer parsed_shuffle_fn.deinit(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 1), parsed_shuffle_fn.params.len);
     try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_shuffle_fn.params[0].ir_type);
-    try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed_shuffle_fn.return_type.ir_type);
+    const parsed_linkage = parseZigType("zig.llvm.Builder.Linkage") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 8 }, parsed_linkage.ir_type);
+    const parsed_opt_linkage = parseZigType("?zig.llvm.Builder.Linkage") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 8 }, parsed_opt_linkage.ir_type);
 }
 
 test "opaque nominal type surface accepts comptime argument instantiations" {

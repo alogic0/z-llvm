@@ -27,8 +27,8 @@ pub fn supportedAggregateCopyLeafCount(ty: ir.Type) ?usize {
 }
 
 pub fn supportedAggregateCopyLeaf(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or ty.eql(.{ .int = 32 }) or
-        ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
+    return (ty == .int and ty.int > 0 and ty.int <= 128) or
+        ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
 }
 
 pub fn isAggregateIrType(ty: ir.Type) bool {

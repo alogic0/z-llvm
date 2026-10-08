@@ -5,9 +5,13 @@ checkpoint covering aliases, module references, vector lanes and shift counts.
 This page describes the
 implementation; the
 [refactor plan](roadmap/architecture_refactor_plan.md) records its completed scope.
-The bounded refactors, memset capability and
-[fixed-program performance baseline](evidence/fixed_program_baseline.md) are complete.
-The next memory family is `ssp.__memcpy_chk`.
+The bounded refactors, memset capability,
+[fixed-program performance baseline](evidence/fixed_program_baseline.md),
+[checked memcpy family](evidence/composed_memcpy_family.md),
+[scalar byte-loop slice](evidence/composed_byte_loops.md),
+[loop-memory repair slice](evidence/loops_memory_repair.md), and
+[cyclic byte-vector transfer slice](evidence/cyclic_byte_transfers.md) are complete.
+The active integration frontier is the compiler-core real-rows denominator migration to tracked Zig 0.17.0.
 The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
 backend for selected Zig inputs. It does not yet provide a complete LLVM
 replacement or a self-hosting Zig backend.

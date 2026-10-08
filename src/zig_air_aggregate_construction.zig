@@ -46,6 +46,66 @@ pub fn registerAggregateLeafPaths(
     return registerAggregateLeafPathsFromAggregateInit(function_type, structured_air_v2, leaf_paths);
 }
 
+pub fn registerConstantZeroAggregateRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.return_type.ir_type != .aggregate) return false;
+    if (!isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
+    if (function_type.params.len != 0) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "arg") != 0) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return false;
+    const ret_ptr_index = air_model.typedRetPtrIndex(structured_air_v2) orelse return false;
+    const store_count = air_model.typedStoreOpcodeCount(structured_air_v2);
+    if (store_count == 0) return false;
+
+    var stores_seen: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, "ret_ptr") or
+            std.mem.eql(u8, instruction.opcode, "ret_load") or
+            air_model.isTypedFieldPtrDataKind(instruction.data_kind) or
+            std.mem.eql(u8, instruction.opcode, "dbg_stmt"))
+        {
+            continue;
+        }
+        if (std.mem.eql(u8, instruction.opcode, "store") or std.mem.eql(u8, instruction.opcode, "store_safe")) {
+            if (instruction.operands.len != 2) return false;
+            if (!isConstZero(instruction, 1)) return false;
+            const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return false;
+            var path: [4]usize = undefined;
+            _ = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return false;
+            stores_seen += 1;
+            continue;
+        }
+        return false;
+    }
+    return stores_seen == store_count;
+}
+
+fn isConstZero(instruction: air_export.TypedInstruction, operand_index: usize) bool {
+    if (operand_index >= instruction.operands.len) return false;
+    const operand = instruction.operands[operand_index];
+    if (!std.mem.eql(u8, operand.kind, "const")) return false;
+    if (isZeroString(operand.value)) return true;
+    if (air_model.operandTextDetail(instruction, operand_index)) |text| {
+        if (isZeroString(text)) return true;
+    }
+    return false;
+}
+
+fn isZeroString(text: []const u8) bool {
+    const trimmed = std.mem.trim(u8, text, " ");
+    if (std.mem.startsWith(u8, trimmed, "<") and std.mem.endsWith(u8, trimmed, ">")) {
+        const inner = trimmed[1 .. trimmed.len - 1];
+        if (std.mem.indexOfScalar(u8, inner, ',')) |comma| {
+            const val = std.mem.trim(u8, inner[comma + 1 ..], " ");
+            return std.mem.eql(u8, val, "0") or std.mem.eql(u8, val, "0.0") or std.mem.eql(u8, val, "0x0");
+        }
+    }
+    return std.mem.eql(u8, trimmed, "0") or std.mem.eql(u8, trimmed, "0.0") or std.mem.eql(u8, trimmed, "0x0");
+}
+
 fn registerAggregateLeafPathsFromStores(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
@@ -406,4 +466,31 @@ test "aggregate construction infers array leaf layout from typed AIR element sto
     const summary = inferRegisterAggregateConstructionLayout(function_type, structured_air_v2).?;
     try std.testing.expect(summary.ty.eql(.{ .aggregate = "{ [4 x float] }" }));
     try std.testing.expect(registerAggregateRecords(function_type, structured_air_v2));
+}
+
+test "constant zero register aggregate records matches BiasedFp(f64).zero shape" {
+    const function_type = FunctionType{
+        .params = &.{},
+        .return_type = .{ .ir_type = .{ .aggregate = "{ i64, i32 }" } },
+        .c_calling_convention = false,
+        .non_default_calling_convention = false,
+    };
+    const field0_ops = [_]air_export.TypedOperand{testInstOperand("0", "*fmt.parse_float.common.BiasedFp(f64)")};
+    const field1_ops = [_]air_export.TypedOperand{testInstOperand("0", "*fmt.parse_float.common.BiasedFp(f64)")};
+    const store0_ops = [_]air_export.TypedOperand{ testInstOperand("1", "*u64"), testConstOperand("<u64, 0>", "u64") };
+    const store1_ops = [_]air_export.TypedOperand{ testInstOperand("3", "*i32"), testConstOperand("<i32, 0>", "i32") };
+    const store0_details = [_]air_export.TypedDetail{.{ .key = "operand1_text", .value = "<u64, 0>" }};
+    const store1_details = [_]air_export.TypedDetail{.{ .key = "operand1_text", .value = "<i32, 0>" }};
+    const field0_details = [_]air_export.TypedDetail{.{ .key = "field_index", .value = "0" }};
+    const field1_details = [_]air_export.TypedDetail{.{ .key = "field_index", .value = "1" }};
+    var instructions = [_]air_export.TypedInstruction{
+        .{ .index = 0, .opcode = "ret_ptr", .result_type = "*fmt.parse_float.common.BiasedFp(f64)", .data_kind = "ret_ptr", .operands = &.{} },
+        .{ .index = 1, .opcode = "struct_field_ptr_index_0", .result_type = "*u64", .data_kind = "field_ptr", .operands = @constCast(&field0_ops), .details = @constCast(&field0_details) },
+        .{ .index = 2, .opcode = "store", .result_type = "void", .data_kind = "store", .operands = @constCast(&store0_ops), .details = @constCast(&store0_details) },
+        .{ .index = 3, .opcode = "struct_field_ptr_index_1", .result_type = "*i32", .data_kind = "field_ptr", .operands = @constCast(&field1_ops), .details = @constCast(&field1_details) },
+        .{ .index = 4, .opcode = "store", .result_type = "void", .data_kind = "store", .operands = @constCast(&store1_ops), .details = @constCast(&store1_details) },
+        .{ .index = 5, .opcode = "ret_load", .result_type = "noreturn", .data_kind = "ret_load", .operands = &.{} },
+    };
+    const structured_air_v2 = air_export.StructuredAirV2{ .instructions = instructions[0..] };
+    try std.testing.expect(registerConstantZeroAggregateRecords(function_type, structured_air_v2));
 }

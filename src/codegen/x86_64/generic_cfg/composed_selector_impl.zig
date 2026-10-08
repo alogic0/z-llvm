@@ -74,6 +74,7 @@ const parseI32ArrayType = composed_helpers.parseI32ArrayType;
 const alignedCallFrameBytes = composed_helpers.alignedCallFrameBytes;
 const stack128FrameBytes = composed_helpers.stack128FrameBytes;
 const isComposedReturnType = composed_helpers.isComposedReturnType;
+const isComposedCfgReturnType = composed_helpers.isComposedCfgReturnType;
 const shiftAmount5 = composed_helpers.shiftAmount5;
 const shiftAmount6 = composed_helpers.shiftAmount6;
 const shiftAmount7 = composed_helpers.shiftAmount7;
@@ -112,7 +113,7 @@ pub fn tryLowerComposedCfgWithContextAndAddressDependencies(
     module_context: ?*const x86_64_types.ReadOnlyModuleContext,
     dependency_domain: *AddressDependencyDomain,
 ) !SelectionResult {
-    if (!isComposedReturnType(function.ret_ty)) return unsupported(.{ .no_emitter = "stage2-ret-type" });
+    if (!isComposedCfgReturnType(function.ret_ty)) return unsupported(.{ .no_emitter = "stage2-ret-type" });
     if (function.blocks.items.len == 0) return unsupported(.{ .unsupported_control_flow = "stage2-empty-function" });
     if (function.blocks.items.len > stage2_max_blocks) return unsupported(.{ .no_spill_envelope = "stage2-block-count" });
 
@@ -206,6 +207,7 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
                         return .{ .no_emitter = "composed-block-param-i8-extension" };
                     try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg });
                 },
+                16 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
                 32 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
                 64 => try selector_state.bindValueLoc(selector, param.name, .{ .arg64 = reg }),
                 128 => {

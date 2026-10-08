@@ -206,11 +206,11 @@ pub fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic 
         return null;
     }
     const bits = intBits(ret.ty) orelse return .{ .no_emitter = "composed-block-ret-type" };
-    if (bits != 32 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-ret-width" };
+    if (bits != 1 and bits != 8 and bits != 16 and bits != 32 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-ret-width" };
     const value = ret.value orelse return .{ .unsupported_value = "composed-block-missing-ret-value" };
     switch (value) {
         .int => |int| switch (bits) {
-            32 => try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(int) }),
+            1, 8, 16, 32 => try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(int) }),
             64 => try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = try i64Value(int) }),
             128 => return .{ .unsupported_value = "composed-block-ret-value" },
             else => unreachable,

@@ -77,6 +77,7 @@ const TypedLoopTryPostBranchSummary = core.TypedLoopTryPostBranchSummary;
 const TypedLoopTryPostSwitchSummary = core.TypedLoopTryPostSwitchSummary;
 const TypedInlineAsmSummary = core.TypedInlineAsmSummary;
 const TypedAtomicRmwSummary = core.TypedAtomicRmwSummary;
+const TypedAtomicTryLockSummary = core.TypedAtomicTryLockSummary;
 const TypedDenseIntegerSwitchSummary = core.TypedDenseIntegerSwitchSummary;
 const TypedErrorSwitchSummary = core.TypedErrorSwitchSummary;
 const TypedErrorUnionSummary = core.TypedErrorUnionSummary;
@@ -556,9 +557,10 @@ pub fn typedPackedReadFlagSummary(
     {
         return null;
     }
+    const bitcast_count = typedOpcodeCount(structured_air_v2, "bitcast") + typedOpcodeCount(structured_air_v2, "bit_cast");
     if (typedOpcodeCount(structured_air_v2, "arg") != 1 or
         typedOpcodeCount(structured_air_v2, "alloc") != 1 or
-        typedOpcodeCount(structured_air_v2, "bitcast") != 2 or
+        bitcast_count != 2 or
         typedStoreOpcodeCount(structured_air_v2) != 1 or
         typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_2") != 1 or
         typedOpcodeCount(structured_air_v2, "load") != 1 or
@@ -580,9 +582,10 @@ pub fn typedPackedReplaceLowSummary(
     {
         return null;
     }
+    const replace_bitcast_count = typedOpcodeCount(structured_air_v2, "bitcast") + typedOpcodeCount(structured_air_v2, "bit_cast");
     if (typedOpcodeCount(structured_air_v2, "arg") != 2 or
         typedOpcodeCount(structured_air_v2, "alloc") != 1 or
-        typedOpcodeCount(structured_air_v2, "bitcast") != 2 or
+        replace_bitcast_count != 2 or
         typedStoreOpcodeCount(structured_air_v2) != 2 or
         typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") != 1 or
         typedOpcodeCount(structured_air_v2, "trunc") != 1 or
@@ -667,7 +670,10 @@ pub fn typedAccumulatorLoopSummary(
         return null;
     }
     const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
-    const intcast_count = typedOpcodeCount(structured_air_v2, "intcast") + typedOpcodeCount(structured_air_v2, "intcast_safe");
+    const intcast_count = typedOpcodeCount(structured_air_v2, "intcast") +
+        typedOpcodeCount(structured_air_v2, "intcast_safe") +
+        typedOpcodeCount(structured_air_v2, "int_cast") +
+        typedOpcodeCount(structured_air_v2, "int_cast_safe");
     if (typedOpcodeCount(structured_air_v2, "arg") != 1 or
         typedOpcodeCount(structured_air_v2, "alloc") != 2 or
         typedOpcodeCount(structured_air_v2, "loop") != 1 or
@@ -839,6 +845,24 @@ pub fn typedAtomicAddSummary(
         return .{ .instruction = instruction };
     }
     return null;
+}
+
+pub fn typedAtomicTryLockSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedAtomicTryLockSummary {
+    if (function_type.params.len != 1 or
+        function_type.params[0].ir_type != .ptr or
+        !function_type.return_type.ir_type.eql(.{ .int = 1 }) or
+        typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        (typedOpcodeCount(structured_air_v2, "cmpxchg_strong") != 1 and
+         typedOpcodeCount(structured_air_v2, "cmpxchg") != 1) or
+        typedOpcodeCount(structured_air_v2, "is_null") != 1 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    return .{};
 }
 
 pub fn typedDenseIntegerSwitchSummary(
@@ -1136,7 +1160,7 @@ fn typedUnionValueLoadedFromAlloc(
     if (!std.mem.eql(u8, load.opcode, "load") or load.operands.len != 1) return false;
     const load_pointer_index = typedInstOperandIndex(load.operands[0]) orelse return false;
     const load_pointer = instructionByIndex(structured_air_v2, load_pointer_index) orelse return false;
-    if (std.mem.eql(u8, load_pointer.opcode, "bitcast")) {
+    if (std.mem.eql(u8, load_pointer.opcode, "bitcast") or std.mem.eql(u8, load_pointer.opcode, "bit_cast")) {
         return load_pointer.operands.len == 1 and typedInstOperandIndex(load_pointer.operands[0]) == alloc_index;
     }
     return load_pointer_index == alloc_index;
@@ -1151,7 +1175,7 @@ fn typedUnionLoadedPointerFromAlloc(
     if (!std.mem.eql(u8, load.opcode, "load") or load.operands.len != 1) return null;
     const load_pointer_index = typedInstOperandIndex(load.operands[0]) orelse return null;
     const load_pointer = instructionByIndex(structured_air_v2, load_pointer_index) orelse return null;
-    if (std.mem.eql(u8, load_pointer.opcode, "bitcast")) {
+    if (std.mem.eql(u8, load_pointer.opcode, "bitcast") or std.mem.eql(u8, load_pointer.opcode, "bit_cast")) {
         if (load_pointer.operands.len != 1 or typedInstOperandIndex(load_pointer.operands[0]) != alloc_index) return null;
         return load_pointer.index;
     }

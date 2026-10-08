@@ -7,15 +7,16 @@ readonly root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
 readonly scratch="${1:-tmp/inbox66_abi_diff/run-$$}"
-readonly zig="${ZIG_EMITTER:-../ziglang/build/stage4/bin/zig}"
+readonly zig_source="${ZIG_SOURCE_DIR:-../ziglang}"
+readonly zig="${ZIG_EMITTER:-$zig_source/build/stage4/bin/zig}"
 readonly zllvm="${ZLLVM_EXE:-zig-out/bin/z_llvm}"
 readonly nm="${LLVM_NM:-/usr/lib/llvm-22/bin/llvm-nm}"
 readonly objdump="${LLVM_OBJDUMP:-/usr/lib/llvm-22/bin/llvm-objdump}"
 readonly readelf="${LLVM_READELF:-/usr/lib/llvm-22/bin/llvm-readelf}"
 readonly linker="${ABI_DIFF_LINKER:-cc}"
 readonly timeout_bin="${TIMEOUT:-/usr/bin/timeout}"
-readonly zig_pin="bdee02bc0c7f227c0f11bc9a449df673fe803540"
-readonly zig_version="0.17.0-dev.364+bdee02bc0"
+readonly zig_pin="${ZIG_PIN:-bdee02bc0c7f227c0f11bc9a449df673fe803540}"
+readonly zig_version="${ZIG_VERSION:-0.17.0-dev.364+bdee02bc0}"
 readonly accepted_source_head="3deafe0f"
 readonly target="x86_64-linux-gnu"
 readonly cpu="baseline"
@@ -66,8 +67,10 @@ require_identity() {
     [[ -x "$nm" && -x "$objdump" && -x "$readelf" && -x "$timeout_bin" ]] ||
         fail "missing pinned object-inspection or timeout tool"
     command -v "$linker" >/dev/null || fail "missing native linker driver: $linker"
-    [[ "$(git -C ../ziglang rev-parse HEAD)" == "$zig_pin" ]] || fail "patched Zig source pin mismatch"
-    [[ "$($zig version)" == "$zig_version" ]] || fail "reference compiler identity mismatch"
+    [[ "$(git -C "$zig_source" rev-parse HEAD 2>/dev/null || true)" == "$zig_pin" ]] ||
+        fail "patched Zig source pin mismatch: expected $zig_pin (override via ZIG_SOURCE_DIR/ZIG_PIN; run 'zig build test-unit' for isolated compiler tests)"
+    [[ "$($zig version 2>/dev/null || true)" == "$zig_version" ]] ||
+        fail "reference compiler identity mismatch: expected $zig_version (override via ZIG_EMITTER/ZIG_VERSION)"
     git merge-base --is-ancestor "$accepted_source_head" HEAD || fail "accepted O0 head is not an ancestor"
     [[ "$(digest "$cohort")" == "$cohort_source_sha256" ]] || fail "frozen compiler-rt cohort body source changed"
     [[ "$(wc -l < "$cohort_manifest")" == 11 ]] || fail "audited cohort is not exactly ten rows"
@@ -79,7 +82,7 @@ require_identity() {
     rg -q $'^integer\t.*composed_cfg' "$cohort_manifest" || fail "cohort lacks composed_cfg"
     while IFS=$'\t' read -r _ _ _ _ _ _ source source_sha _; do
         [[ "$source" == pinned_source ]] && continue
-        [[ "$(digest "../ziglang/$source")" == "$source_sha" ]] || fail "pinned compiler-rt source changed: $source"
+        [[ "$(digest "$zig_source/$source")" == "$source_sha" ]] || fail "pinned compiler-rt source changed: $source"
     done < "$cohort_manifest"
     mkdir -p "$scratch/global-cache" "$scratch/common"
 }

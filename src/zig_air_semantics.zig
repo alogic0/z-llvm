@@ -43,14 +43,17 @@ pub fn fpPredicate(opcode: []const u8) ?ir.FcmpPredicate {
 
 pub fn castOp(opcode: []const u8, from: ZigType, to: ZigType) ?ir.CastOp {
     if (std.mem.eql(u8, opcode, "trunc")) return .trunc;
-    if (std.mem.eql(u8, opcode, "bitcast")) return .bitcast;
+    if (std.mem.eql(u8, opcode, "bitcast") or std.mem.eql(u8, opcode, "bit_cast")) return .bitcast;
     if (std.mem.eql(u8, opcode, "ptrtoint")) return .ptrtoint;
     if (std.mem.eql(u8, opcode, "inttoptr")) return .inttoptr;
     if (std.mem.eql(u8, opcode, "float_from_int")) return if (from.signed) .sitofp else .uitofp;
     if (std.mem.eql(u8, opcode, "int_from_float")) return if (to.signed) .fptosi else .fptoui;
     if (std.mem.eql(u8, opcode, "fpext")) return .fpext;
     if (std.mem.eql(u8, opcode, "fptrunc")) return .fptrunc;
-    if (!std.mem.eql(u8, opcode, "intcast") and !std.mem.eql(u8, opcode, "intcast_safe")) return null;
+    if (!std.mem.eql(u8, opcode, "intcast") and
+        !std.mem.eql(u8, opcode, "intcast_safe") and
+        !std.mem.eql(u8, opcode, "int_cast") and
+        !std.mem.eql(u8, opcode, "int_cast_safe")) return null;
     const from_bits = intBits(from.ir_type) orelse return null;
     const to_bits = intBits(to.ir_type) orelse return null;
     if (to_bits < from_bits) return .trunc;
@@ -77,4 +80,7 @@ test "safe intcast shares integer cast semantics" {
     try std.testing.expectEqual(ir.CastOp.zext, castOp("intcast_safe", unsigned32, unsigned64).?);
     try std.testing.expectEqual(ir.CastOp.sext, castOp("intcast_safe", signed32, unsigned64).?);
     try std.testing.expectEqual(ir.CastOp.bitcast, castOp("intcast_safe", unsigned64, unsigned64).?);
+    try std.testing.expectEqual(ir.CastOp.trunc, castOp("int_cast", unsigned64, unsigned32).?);
+    try std.testing.expectEqual(ir.CastOp.zext, castOp("int_cast", unsigned32, unsigned64).?);
+    try std.testing.expectEqual(ir.CastOp.sext, castOp("int_cast_safe", signed32, unsigned64).?);
 }

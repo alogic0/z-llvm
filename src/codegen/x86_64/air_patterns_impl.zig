@@ -205,6 +205,7 @@ pub const lowerSelectedUmlFixSatI64Return = scalar_patterns.lowerSelectedUmlFixS
 pub const lowerSingleStackSlotCallReturn = scalar_patterns.lowerSingleStackSlotCallReturn;
 pub const lowerInlineAsmBarrierReturn = scalar_patterns.lowerInlineAsmBarrierReturn;
 pub const lowerAtomicAddReturn = scalar_patterns.lowerAtomicAddReturn;
+pub const lowerAtomicTryLockReturn = scalar_patterns.lowerAtomicTryLockReturn;
 pub const lowerFloatMulReturn = fp_patterns.lowerFloatMulReturn;
 pub const lowerFloatAddReturn = fp_patterns.lowerFloatAddReturn;
 pub const lowerRuntimeFloatAddMainReturn = fp_patterns.lowerRuntimeFloatAddMainReturn;

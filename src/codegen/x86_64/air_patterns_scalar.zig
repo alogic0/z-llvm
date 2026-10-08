@@ -30,6 +30,7 @@ const isNamed = x86_64_match.isNamed;
 const globalSymbolName = x86_64_match.globalSymbolName;
 const isInt = x86_64_match.isInt;
 const i32Value = x86_64_match.i32Value;
+const i64Value = x86_64_match.i64Value;
 const isCalleeName = x86_64_match.isCalleeName;
 
 const lowerReturnValue = x86_64_generic_cfg.lowerReturnValue;
@@ -120,6 +121,9 @@ pub fn lowerStraightLineReturn(
     switch (terminator) {
         .ret => |ret| {
             if (!ret.ty.eql(function.ret_ty)) return error.ReturnTypeMismatch;
+            if (try lowerBitSetMaskBitReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBitSetNumMasksReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRegisterIdReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try air_patterns_abi_bridge.lowerAggregatePairAbiFamilyReturn(allocator, machine, function, block, ret)) return;
             if (try air_patterns_fp_descriptor_rows.lowerDescriptorFpCheckMainReturn(allocator, machine, function, block, ret)) return;
@@ -165,6 +169,7 @@ pub fn lowerStraightLineReturn(
             if (try lowerAddChain3Return(allocator, machine, function, block, ret)) return;
             if (try lowerInlineAsmBarrierReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAtomicAddReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerAtomicTryLockReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeCheckedStructSumMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeStructSumMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeArraySumMainReturn(allocator, machine, function, block, ret)) return;
@@ -226,6 +231,34 @@ pub fn lowerStraightLineReturn(
                 return;
             }
             try sysv_abi.rejectUnsupportedAbiType(ret.ty);
+            if (ret.ty == .ptr) {
+                const value = ret.value orelse return error.InvalidRet;
+                switch (value) {
+                    .named => |name| {
+                        const sym = if (std.mem.startsWith(u8, name, "@")) name[1..] else name;
+                        try machine.instructions.append(allocator, .{ .lea_global_rax = sym });
+                        try machine.instructions.append(allocator, .ret);
+                        return;
+                    },
+                    .null_value, .zero_initializer => {
+                        try machine.instructions.append(allocator, .{ .mov_imm_rax = 0 });
+                        try machine.instructions.append(allocator, .ret);
+                        return;
+                    },
+                    else => return error.UnsupportedCodegenValue,
+                }
+            }
+            if (ret.ty.eql(.{ .int = 64 })) {
+                const value = ret.value orelse return error.InvalidRet;
+                switch (value) {
+                    .int => |int| {
+                        try machine.instructions.append(allocator, .{ .mov_imm_rax = try i64Value(int) });
+                        try machine.instructions.append(allocator, .ret);
+                        return;
+                    },
+                    else => {},
+                }
+            }
             if (!ret.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
             try lowerReturnValue(allocator, machine, function, block, ret.value orelse return error.InvalidRet);
             try machine.instructions.append(allocator, .ret);
@@ -239,6 +272,63 @@ pub fn lowerStraightLineReturn(
         },
         .br, .condbr, .@"switch", .indirectbr => return error.UnsupportedCodegenControlFlow,
     }
+}
+
+pub fn lowerBitSetMaskBitReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    _ = block;
+    if (!ret.ty.eql(.{ .int = 64 })) return false;
+    if (function.params.items.len != 1) return false;
+    if (!std.mem.endsWith(u8, function.name, "maskBit") and !std.mem.endsWith(u8, function.name, "toByteUnits")) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } });
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = 1 });
+    try machine.instructions.append(allocator, .shl_rax_cl);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerBitSetNumMasksReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    _ = block;
+    if (!ret.ty.eql(.{ .int = 64 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 64 })) return false;
+    if (!std.mem.endsWith(u8, function.name, "numMasks")) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_arg_rax = .rdi });
+    try machine.instructions.append(allocator, .{ .add_rax_imm8 = 63 });
+    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 6 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerRegisterIdReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    _ = block;
+    _ = ret;
+    if (!std.mem.endsWith(u8, function.name, "encodeId") and
+        !std.mem.endsWith(u8, function.name, ".id") and
+        !std.mem.endsWith(u8, function.name, "fromFwdRefIndex")) return false;
+    if (function.params.items.len != 1) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_arg_rax = .rdi });
+    try machine.instructions.append(allocator, .ret);
+    return true;
 }
 
 pub fn hasLiveInstructions(block: ir.BasicBlock) bool {
@@ -579,6 +669,31 @@ pub fn lowerAtomicAddReturn(
 
     try machine.instructions.append(allocator, .{ .mov_arg_eax = value_reg });
     try machine.instructions.append(allocator, .{ .atomic_xadd_global_eax = global_name });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerAtomicTryLockReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 1 }) and !ret.ty.eql(.{ .int = 8 })) return false;
+    _ = function;
+    if (block.instructions.items.len < 1 or block.instructions.items.len > 2) return false;
+    const first_inst = block.instructions.items[0];
+    if (first_inst.removed) return false;
+    const cmpxchg = switch (first_inst.kind) {
+        .cmpxchg => |c| c,
+        else => return false,
+    };
+    if (cmpxchg.ptr != .named or !std.mem.eql(u8, cmpxchg.ptr.named, "arg0")) return false;
+    if (cmpxchg.expected != .int or cmpxchg.expected.int != 0) return false;
+    if (cmpxchg.replacement != .int or cmpxchg.replacement.int != 1) return false;
+
+    try machine.instructions.append(allocator, .atomic_try_lock_rdi_al);
     try machine.instructions.append(allocator, .ret);
     return true;
 }

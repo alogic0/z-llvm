@@ -595,6 +595,8 @@ pub fn isCastOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "trunc") or
         std.mem.eql(u8, opcode, "intcast") or
         std.mem.eql(u8, opcode, "intcast_safe") or
+        std.mem.eql(u8, opcode, "int_cast") or
+        std.mem.eql(u8, opcode, "int_cast_safe") or
         isBitcastOpcode(opcode) or
         std.mem.eql(u8, opcode, "ptrtoint") or
         std.mem.eql(u8, opcode, "inttoptr") or
@@ -603,6 +605,7 @@ pub fn isCastOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "fpext") or
         std.mem.eql(u8, opcode, "fptrunc");
 }
+
 
 pub fn isCallOpcode(opcode: []const u8) bool {
     return air_export.categoryForOpcode(opcode) == .call;
@@ -653,6 +656,12 @@ pub fn isAtomicRmwOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "atomic_rmw");
 }
 
+pub fn isCmpxchgOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "cmpxchg") or
+        std.mem.eql(u8, opcode, "cmpxchg_strong") or
+        std.mem.eql(u8, opcode, "cmpxchg_weak");
+}
+
 pub fn isAssemblyOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "assembly");
 }
@@ -666,7 +675,7 @@ pub fn isRetPtrOpcode(opcode: []const u8) bool {
 }
 
 pub fn isBitcastOpcode(opcode: []const u8) bool {
-    return std.mem.eql(u8, opcode, "bitcast");
+    return std.mem.eql(u8, opcode, "bitcast") or std.mem.eql(u8, opcode, "bit_cast");
 }
 
 pub fn callTailKindForOpcode(opcode: []const u8) ?[]const u8 {
@@ -786,6 +795,7 @@ fn isIgnoredMetadataOpcode(opcode: []const u8) bool {
 fn isStraightLineLowerableOpcode(opcode: []const u8) bool {
     return isCommonLowerableOpcode(opcode) or
         isAtomicRmwOpcode(opcode) or
+        isCmpxchgOpcode(opcode) or
         isAggregateInitOpcode(opcode) or
         isAssemblyOpcode(opcode);
 }
@@ -804,6 +814,7 @@ fn isInventoryKnownOtherOpcode(opcode: []const u8) bool {
         "assembly",
         "atomic",
         "bitcast",
+        "bit_cast",
         "block",
         "br",
         "call",

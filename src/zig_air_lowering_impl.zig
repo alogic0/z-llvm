@@ -109,6 +109,7 @@ const runtimeNavSymbol = legacy.runtimeNavSymbol;
 const ensureBase64LookupGlobal = typed_v2_fallbacks.ensureBase64LookupGlobal;
 
 const typedV2RegisterAggregateRecords = typed_v2.typedV2RegisterAggregateRecords;
+const typedV2ConstantZeroAggregateRecords = typed_v2.typedV2ConstantZeroAggregateRecords;
 const typedV2SretIntegerAggregateRecords = typed_v2.typedV2SretIntegerAggregateRecords;
 const typedV2SretIntegerAggregateCopyRecords = typed_v2.typedV2SretIntegerAggregateCopyRecords;
 const typedV2SretIntegerAggregateFieldWrapperRecords = typed_v2.typedV2SretIntegerAggregateFieldWrapperRecords;
@@ -134,6 +135,7 @@ const typedV2MixCAddMayPanicRecords = typed_v2.typedV2MixCAddMayPanicRecords;
 const typedV2CheckedIntFromFloatRecords = typed_v2.typedV2CheckedIntFromFloatRecords;
 const typedV2UnionTagPayloadSwitchRecords = typed_v2.typedV2UnionTagPayloadSwitchRecords;
 const typedV2UnionTagPayloadBranchRecords = typed_v2.typedV2UnionTagPayloadBranchRecords;
+const typedV2AsciiPredicateRecords = typed_v2.typedV2AsciiPredicateRecords;
 const lowerTypedV2ArraySum = legacy.lowerTypedV2ArraySum;
 const lowerTypedV2AggregatePairAbi = legacy.lowerTypedV2AggregatePairAbi;
 const lowerTypedV2SmallIntegerAggregateAbi = typed_v2.lowerTypedV2SmallIntegerAggregateAbi;
@@ -143,11 +145,18 @@ const lowerTypedV2MaybeError = typed_v2.lowerTypedV2MaybeError;
 const lowerTypedV2OptionalPayload = typed_v2.lowerTypedV2OptionalPayload;
 const lowerTypedV2OptionalPayloadBranch = typed_v2.lowerTypedV2OptionalPayloadBranch;
 const lowerTypedV2OptionalPointer = typed_v2.lowerTypedV2OptionalPointer;
+const typedV2VoidRetPtrRecords = typed_v2.typedV2VoidRetPtrRecords;
+const lowerTypedV2VoidRetPtr = typed_v2.lowerTypedV2VoidRetPtr;
+const typedV2SingleFieldWrapperRecords = typed_v2.typedV2SingleFieldWrapperRecords;
+const typedV2SingleFieldWrapperArgType = typed_v2.typedV2SingleFieldWrapperArgType;
+const lowerTypedV2SingleFieldWrapper = typed_v2.lowerTypedV2SingleFieldWrapper;
+const classifyWrapperAbiTier = typed_v2.classifyWrapperAbiTier;
 const lowerTypedV2PackedBits = typed_v2.lowerTypedV2PackedBits;
 const lowerTypedV2ConditionalSliceSum = typed_v2.lowerTypedV2ConditionalSliceSum;
 const lowerTypedV2SliceSum = typed_v2.lowerTypedV2SliceSum;
 const lowerTypedV2InlineAsmBarrier = typed_v2.lowerTypedV2InlineAsmBarrier;
 const lowerTypedV2AtomicAdd = typed_v2.lowerTypedV2AtomicAdd;
+const lowerTypedV2AtomicTryLock = typed_v2.lowerTypedV2AtomicTryLock;
 const lowerTypedV2AccumulatorLoop = typed_v2.lowerTypedV2AccumulatorLoop;
 const lowerTypedV2ConditionalSlotUpdate = typed_v2.lowerTypedV2ConditionalSlotUpdate;
 const lowerTypedV2LoopTry = typed_v2.lowerTypedV2LoopTry;
@@ -160,6 +169,7 @@ const lowerTypedV2MixCAddMayPanic = typed_v2.lowerTypedV2MixCAddMayPanic;
 const lowerTypedV2CheckedIntFromFloat = typed_v2.lowerTypedV2CheckedIntFromFloat;
 const lowerTypedV2UnionTagPayloadSwitch = typed_v2.lowerTypedV2UnionTagPayloadSwitch;
 const lowerTypedV2UnionTagPayloadBranch = typed_v2.lowerTypedV2UnionTagPayloadBranch;
+const lowerTypedV2AsciiPredicate = typed_v2.lowerTypedV2AsciiPredicate;
 
 const lowerErrorClassify = typed_v2_fallbacks.lowerErrorClassify;
 const lowerErrorSwitch = typed_v2_fallbacks.lowerErrorSwitch;
@@ -340,7 +350,8 @@ pub fn firstUnsupported(
             false;
     const typed_register_aggregate =
         if (function.structured_air_v2) |structured_air_v2|
-            typedV2RegisterAggregateRecords(function_type, structured_air_v2)
+            typedV2RegisterAggregateRecords(function_type, structured_air_v2) or
+                typedV2ConstantZeroAggregateRecords(function_type, structured_air_v2)
         else
             false;
     const typed_sret_integer_aggregate =
@@ -450,6 +461,26 @@ pub fn firstUnsupported(
                 false
         else
             false;
+    const typed_atomic_try_lock =
+        if (function.structured_air_v2) |structured_air_v2|
+            air_model.typedAtomicTryLockSummary(function_type, structured_air_v2) != null
+        else
+            false;
+    const typed_void_ret_ptr =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2VoidRetPtrRecords(function_type, structured_air_v2)
+        else
+            false;
+    const typed_single_field_wrapper =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2SingleFieldWrapperRecords(structured_air_v2)
+        else
+            false;
+    const typed_ascii_predicate =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2AsciiPredicateRecords(function_type, structured_air_v2)
+        else
+            false;
 
     if (typed_accumulator_loop or
         accumulatorLoopShape(function) != null or
@@ -480,6 +511,10 @@ pub fn firstUnsupported(
         typed_checked_int_from_float or
         typed_union_tag_payload_switch or
         typed_union_tag_payload_branch or
+        typed_atomic_try_lock or
+        typed_void_ret_ptr or
+        typed_single_field_wrapper or
+        typed_ascii_predicate or
         typed_maybe_error)
     {
         return null;
@@ -595,14 +630,64 @@ fn parseFunctionTypeForLowering(
     air_function: air_export.Function,
 ) !FunctionType {
     return parseFunctionType(allocator, air_function.type_text) catch |err| switch (err) {
-        error.UnsupportedAir => parseFunctionTypeWithUnusedOpaqueParams(allocator, air_function) catch |fallback_err| switch (fallback_err) {
-            error.UnsupportedAir => parseFunctionTypeWithUnionTagOnlyOpaqueSignature(allocator, air_function) catch |tag_err| switch (tag_err) {
-                error.UnsupportedAir => parseFunctionTypeWithOpaqueBitcasts(allocator, air_function),
-                else => return tag_err,
+        error.UnsupportedAir => parseFunctionTypeWithSingleFieldWrapper(allocator, air_function) catch |single_wrapper_err| switch (single_wrapper_err) {
+            error.UnsupportedAir => parseFunctionTypeWithUnusedOpaqueParams(allocator, air_function) catch |fallback_err| switch (fallback_err) {
+                error.UnsupportedAir => parseFunctionTypeWithUnionTagOnlyOpaqueSignature(allocator, air_function) catch |tag_err| switch (tag_err) {
+                    error.UnsupportedAir => parseFunctionTypeWithOpaqueBitcasts(allocator, air_function),
+                    else => return tag_err,
+                },
+                else => return fallback_err,
             },
-            else => return fallback_err,
+            else => return single_wrapper_err,
         },
         else => return err,
+    };
+}
+
+fn parseFunctionTypeWithSingleFieldWrapper(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+) !FunctionType {
+    const structured_air_v2 = air_function.structured_air_v2 orelse return error.UnsupportedAir;
+    const arg_ty_text = typedV2SingleFieldWrapperArgType(structured_air_v2) orelse return error.UnsupportedAir;
+    const tier = classifyWrapperAbiTier(arg_ty_text) orelse return error.UnsupportedAir;
+
+    const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, air_function.type_text, " "));
+    const suffix = if (std.mem.indexOfScalar(u8, trimmed, ')')) |close|
+        std.mem.trim(u8, trimmed[close + 1 ..], " ")
+    else
+        "";
+    const c_calling_convention = std.mem.startsWith(u8, suffix, "callconv(.c)");
+    const non_default_calling_convention = std.mem.startsWith(u8, suffix, "callconv(") and !c_calling_convention;
+
+    var params: std.ArrayList(ZigType) = .empty;
+    errdefer params.deinit(allocator);
+
+    const return_type: ZigType = switch (tier) {
+        .int32 => blk: {
+            try params.append(allocator, .{ .ir_type = .{ .int = 32 } });
+            break :blk .{ .ir_type = .{ .int = 32 } };
+        },
+        .int64 => blk: {
+            try params.append(allocator, .{ .ir_type = .{ .int = 64 } });
+            break :blk .{ .ir_type = .{ .int = 64 } };
+        },
+        .int128 => blk: {
+            try params.append(allocator, .{ .ir_type = .{ .int = 128 } });
+            break :blk .{ .ir_type = .{ .int = 128 } };
+        },
+        .memory_sret => blk: {
+            try params.append(allocator, .{ .ir_type = .ptr });
+            try params.append(allocator, .{ .ir_type = .ptr });
+            break :blk .{ .ir_type = .void };
+        },
+    };
+
+    return .{
+        .params = try params.toOwnedSlice(allocator),
+        .return_type = return_type,
+        .c_calling_convention = c_calling_convention,
+        .non_default_calling_convention = non_default_calling_convention,
     };
 }
 
@@ -633,8 +718,9 @@ fn parseFunctionTypeWithUnusedOpaqueParams(
             }
             return error.UnsupportedAir;
         };
-        try params.append(allocator, param_type);
         param_index += 1;
+        if (param_type.ir_type == .void) continue;
+        try params.append(allocator, param_type);
     }
     return .{
         .params = try params.toOwnedSlice(allocator),
@@ -694,6 +780,7 @@ fn parseFunctionTypeWithOpaqueBitcasts(
         const param_text = std.mem.trim(u8, field, " ");
         if (param_text.len == 0) continue;
         const param_type = parseZigType(param_text) orelse try inferredOpaqueBitcastType(structured_air_v2, param_text);
+        if (param_type.ir_type == .void) continue;
         try params.append(allocator, param_type);
     }
     return .{
@@ -709,8 +796,11 @@ fn inferredOpaqueBitcastType(structured_air_v2: air_export.StructuredAirV2, text
     var inferred: ?ZigType = null;
     for (structured_air_v2.instructions) |instruction| {
         if (std.mem.eql(u8, instruction.opcode, "bitcast") or
+            std.mem.eql(u8, instruction.opcode, "bit_cast") or
             std.mem.eql(u8, instruction.opcode, "intcast") or
-            std.mem.eql(u8, instruction.opcode, "intcast_safe"))
+            std.mem.eql(u8, instruction.opcode, "intcast_safe") or
+            std.mem.eql(u8, instruction.opcode, "int_cast") or
+            std.mem.eql(u8, instruction.opcode, "int_cast_safe"))
         {
             if (std.mem.eql(u8, instruction.result_type, text)) {
                 const operand_type = singleOperandType(instruction) orelse continue;
@@ -1020,6 +1110,15 @@ fn lowerFunctionTypedV2(
 
     const function_type = try parseFunctionTypeForLowering(allocator, air_function);
     defer function_type.deinit(allocator);
+    if (try lowerTypedV2SingleFieldWrapper(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2AsciiPredicate(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2VoidRetPtr(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
     if (try lowerTypedV2OptionalPayload(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
@@ -1077,6 +1176,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2AtomicAdd(allocator, module, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2AtomicTryLock(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
     if (try lowerTypedV2AccumulatorLoop(allocator, module, air_function, function_type, structured_air_v2)) |function| {

@@ -119,6 +119,7 @@ pub const Instruction = union(enum) {
     or_eax_imm32: i32,
     imul_eax_imm32: i32,
     and_eax_imm32: i32,
+    xor_eax_imm32: i32,
     abs_i32_edi_eax,
     abs_i64_rdi_rax,
     wide_int_to_fp_rdi_rsi_xmm0: struct {
@@ -268,6 +269,9 @@ pub const Instruction = union(enum) {
     guarded_strncpy_rdi_rsi_rdx_rcx_rax,
     guarded_strcpy_rdi_rsi_rdx_rax,
     memset_rdi_sil_rdx_rax,
+    strlen_rdi_rax,
+    strnlen_rdi_rsi_rax,
+    atomic_try_lock_rdi_al,
     smin_i32_edi_esi_eax,
     umin_i32_edi_esi_eax,
     smax_i32_edi_esi_eax,
@@ -276,6 +280,15 @@ pub const Instruction = union(enum) {
     replace_low_i8_dil_sil_al,
     read_flag_i8_dil_al,
     ult_i8_dil_imm8_al: u8,
+    cmp_ult_u32_edi_esi_al,
+    ascii_range_u8_dil_imm8_imm8_al: struct {
+        low: u8,
+        len: u8,
+    },
+    ascii_alphabetic_dil_al,
+    ascii_alphanumeric_dil_al,
+    ascii_whitespace_dil_al,
+    grow_capacity_u64_rdi_imm32_rax: i32,
     store_imm8_abs: struct {
         address: u32,
         value: u8,

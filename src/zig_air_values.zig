@@ -120,6 +120,7 @@ pub fn parseSymbolPointer(text: []const u8) ?SymbolPointer {
     const ty = parseZigType(type_text) orelse return null;
     if (ty.ir_type != .ptr) return null;
     if (std.mem.startsWith(u8, value_text, "&") and value_text.len > 1) {
+        if (value_text[1] == '.') return null;
         return .{ .ty = ty, .symbol = value_text[1..] };
     }
     if (ptrCastSymbol(value_text)) |symbol| {

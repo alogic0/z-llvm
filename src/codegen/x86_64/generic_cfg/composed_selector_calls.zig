@@ -117,6 +117,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.ctpop.i128")) return try lowerCtpop(selector, result, call, 128);
     if (std.mem.eql(u8, call.callee, "llvm.usub.sat.i64")) return try lowerUsubSatI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.bswap.i128")) return try lowerBitPermutation(selector, result, call, 128, .byte_swap);
+    if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i32")) return try lowerBitPermutation(selector, result, call, 32, .bit_reverse);
     if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i64")) return try lowerBitPermutation(selector, result, call, 64, .bit_reverse);
     if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i128")) return try lowerBitPermutation(selector, result, call, 128, .bit_reverse);
     if (std.mem.eql(u8, call.callee, "llvm.ucmp.i32.i128")) return try lowerI128Compare(selector, result, call, false);
@@ -125,6 +126,9 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.memset.p0.i64")) return try lowerMemset(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64") or
         std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64")) return try lowerInlineMemcpy(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.memmove.p0.p0.i64")) return try lowerInlineMemmove(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "strlen")) return try lowerInlineStrlen(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "strnlen")) return try lowerInlineStrnlen(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .add);
     if (std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .sub);
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64")) return try lowerSmulOverflowI64(selector, result, call);
@@ -691,6 +695,84 @@ pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, 
     return null;
 }
 
+pub fn lowerInlineMemmove(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    if (result != null) return .{ .unsupported_value = "composed-block-memmove-result" };
+    if (call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+        return .{ .no_emitter = "composed-block-memmove-call-form" };
+    }
+    if (call.tail_kind) |tail_kind| {
+        if (!std.mem.eql(u8, tail_kind, "tail")) return .{ .no_emitter = "composed-block-memmove-tail-kind" };
+    }
+    if (call.ret_ty != .void or call.args.items.len != 4) return .{ .no_emitter = "composed-block-memmove-signature" };
+    const dst = call.args.items[0];
+    const src = call.args.items[1];
+    const len = call.args.items[2];
+    const is_volatile = call.args.items[3];
+    if (dst.ty != .ptr or src.ty != .ptr or !len.ty.eql(.{ .int = 64 }) or
+        !is_volatile.ty.eql(.{ .int = 1 }) or !is_volatile.value.eql(.{ .int = 0 }))
+    {
+        return .{ .no_emitter = "composed-block-memmove-args" };
+    }
+
+    if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+    if (try lowerDirectCallArg(selector, dst, .rdi)) |diagnostic| return diagnostic;
+    if (try lowerDirectCallArg(selector, src, .rsi)) |diagnostic| return diagnostic;
+    if (try lowerDirectCallArg(selector, len, .rdx)) |diagnostic| return diagnostic;
+
+    try selector_state.emitEflagsInstruction(selector, .memmove_rdi_rsi_rdx_rax, .clobber);
+    return null;
+}
+
+pub fn lowerInlineStrlen(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-strlen-result" };
+    if (call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+        return .{ .no_emitter = "composed-block-strlen-call-form" };
+    }
+    if (call.tail_kind) |tail_kind| {
+        if (!std.mem.eql(u8, tail_kind, "tail") and !std.mem.eql(u8, tail_kind, "notail")) return .{ .no_emitter = "composed-block-strlen-tail-kind" };
+    }
+    if (!call.ret_ty.eql(.{ .int = 64 }) or call.args.items.len != 1) return .{ .no_emitter = "composed-block-strlen-signature" };
+    const s = call.args.items[0];
+    if (s.ty != .ptr) return .{ .no_emitter = "composed-block-strlen-args" };
+
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepareCallBeforeArguments(.clobber)) |diagnostic| return diagnostic;
+    if (try lowerDirectCallArg(selector, s, .rdi)) |diagnostic| return diagnostic;
+    try transaction.finishCallPreparationAfterArguments();
+
+    try selector_state.emitEflagsInstruction(selector, .strlen_rdi_rax, .clobber);
+    try transaction.define(result_name, .fullRax());
+    try transaction.commit();
+    return null;
+}
+
+pub fn lowerInlineStrnlen(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-strnlen-result" };
+    if (call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+        return .{ .no_emitter = "composed-block-strnlen-call-form" };
+    }
+    if (call.tail_kind) |tail_kind| {
+        if (!std.mem.eql(u8, tail_kind, "tail") and !std.mem.eql(u8, tail_kind, "notail")) return .{ .no_emitter = "composed-block-strnlen-tail-kind" };
+    }
+    if (!call.ret_ty.eql(.{ .int = 64 }) or call.args.items.len != 2) return .{ .no_emitter = "composed-block-strnlen-signature" };
+    const s = call.args.items[0];
+    const maxlen = call.args.items[1];
+    if (s.ty != .ptr or !maxlen.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-strnlen-args" };
+
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepareCallBeforeArguments(.clobber)) |diagnostic| return diagnostic;
+    if (try lowerDirectCallArg(selector, s, .rdi)) |diagnostic| return diagnostic;
+    if (try lowerDirectCallArg(selector, maxlen, .rsi)) |diagnostic| return diagnostic;
+    try transaction.finishCallPreparationAfterArguments();
+
+    try selector_state.emitEflagsInstruction(selector, .strnlen_rdi_rsi_rax, .clobber);
+    try transaction.define(result_name, .fullRax());
+    try transaction.commit();
+    return null;
+}
+
 fn memcpySourceAttributes(attrs: ?[]const u8) bool {
     const text = attrs orelse return true;
     if (std.mem.eql(u8, text, "readonly")) return true;
@@ -989,6 +1071,23 @@ fn lowerBitPermutation(
     const ty: ir.Type = .{ .int = bits };
     if (!call.ret_ty.eql(ty) or call.args.items.len != 1 or !call.args.items[0].ty.eql(ty)) {
         return .{ .no_emitter = "composed-block-bit-permutation-signature" };
+    }
+
+    if (bits == 32) {
+        if (operation != .bit_reverse) unreachable;
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(.clobber, accumulatorInputDisplacement(selector, call.args.items[0].value, .spill_live))) |diagnostic| return diagnostic;
+        try selector_state.clobberArgReg(selector, .rdi);
+        try selector_state.clobberArgReg(selector, .rcx);
+        try selector_state.clobberArgReg(selector, .rdx);
+        transaction.materialize(call.args.items[0].value, .fullRax()) catch
+            return .{ .unsupported_value = "composed-block-bit-permutation-value" };
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_eax_to_arg = .rdi });
+        try selector_state.emitEflagsInstruction(selector, .bit_reverse_i32_edi_eax, .clobber);
+        try transaction.define(result_name, .zeroExtending(32));
+        try transaction.commit();
+        return null;
     }
 
     if (bits == 64) {
@@ -1306,18 +1405,44 @@ pub fn ownedInternalValueName(selector: *ComposedBlockSelector, result_name: []c
 pub fn lowerDirectCallArg(selector: *ComposedBlockSelector, arg: ir.CallArg, target: ArgReg) !?Diagnostic {
     if (arg.ty == .ptr) {
         const loc = selector_state.resolveValue(selector, arg.value) orelse return .{ .unsupported_value = "composed-block-call-unknown-ptr-arg" };
-        const disp = switch (loc) {
-            .stack_scalar => |stack| stack.base_disp,
-            .stack128 => |disp| disp,
-            .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .xmm, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-call-ptr-arg" },
-        };
-        try selector_state.clobberArgReg(selector, target);
-        try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = target });
-        if (disp != 0) {
-            const addend: i32 = std.math.cast(i32, disp) orelse return .{ .no_spill_envelope = "composed-block-call-stack-disp" };
-            try selector_state.emitEflagsInstruction(selector, .{ .add_arg64_imm32 = .{ .reg = target, .imm = addend } }, .write);
+        switch (loc) {
+            .stack_scalar => |stack| {
+                try selector_state.clobberArgReg(selector, target);
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = target });
+                if (stack.base_disp != 0) {
+                    const addend: i32 = std.math.cast(i32, stack.base_disp) orelse return .{ .no_spill_envelope = "composed-block-call-stack-disp" };
+                    try selector_state.emitEflagsInstruction(selector, .{ .add_arg64_imm32 = .{ .reg = target, .imm = addend } }, .write);
+                }
+                return null;
+            },
+            .stack128 => |disp| {
+                try selector_state.clobberArgReg(selector, target);
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = target });
+                if (disp != 0) {
+                    const addend: i32 = std.math.cast(i32, disp) orelse return .{ .no_spill_envelope = "composed-block-call-stack-disp" };
+                    try selector_state.emitEflagsInstruction(selector, .{ .add_arg64_imm32 = .{ .reg = target, .imm = addend } }, .write);
+                }
+                return null;
+            },
+            .arg64, .scratch64 => |reg| {
+                if (reg != target) {
+                    try selector_state.clobberArgReg(selector, target);
+                    try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = target, .src = reg } });
+                }
+                return null;
+            },
+            .rax => {
+                try selector_state.clobberArgReg(selector, target);
+                try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = target });
+                return null;
+            },
+            .spill64 => |frame_index| {
+                try selector_state.clobberArgReg(selector, target);
+                try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = target, .frame_index = frame_index } });
+                return null;
+            },
+            .arg32, .arg128, .eax, .scratch32, .scratch128, .xmm, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-call-ptr-arg" },
         }
-        return null;
     }
 
     const bits = intBits(arg.ty) orelse return .{ .no_emitter = "composed-block-call-arg-type" };

@@ -864,3 +864,117 @@ test "x86_64 encoding emits scalar FP predicate materialization" {
         0xc3,
     }, bytes);
 }
+
+test "x86_64 encoding and lowering for grow_capacity_u64_rdi_imm32_rax" {
+    try std.testing.expectEqual(@as(u32, 24), mc.encoding.instructionSize(.{ .grow_capacity_u64_rdi_imm32_rax = 16 }));
+    try std.testing.expectEqual(@as(u32, 24), mc.encoding.instructionSize(.{ .grow_capacity_u64_rdi_imm32_rax = 32 }));
+    try std.testing.expectEqual(@as(u32, 27), mc.encoding.instructionSize(.{ .grow_capacity_u64_rdi_imm32_rax = 1000 }));
+
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @growCapacity(i64 %arg0) {
+        \\entry:
+        \\  %air2 = udiv i64 %arg0, 2
+        \\  %air4 = add i64 %air2, 16
+        \\  %air5 = add i64 %arg0, %air4
+        \\  ret i64 %air5
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .grow_capacity_u64_rdi_imm32_rax = 16 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0x89, 0xf9,
+        0x48, 0xd1, 0xe9,
+        0x48, 0xc7, 0xc0, 0xff, 0xff, 0xff, 0xff,
+        0x48, 0x83, 0xc1, 0x10,
+        0x48, 0x01, 0xf9,
+        0x48, 0x0f, 0x43, 0xc1,
+        0xc3,
+    }, bytes);
+}
+
+test "x86_64 lowering and encoding for zext u31 to u32 with high bit or" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @fromTargetIndex(i31 %arg0) {
+        \\entry:
+        \\  %air2 = zext i31 %arg0 to i32
+        \\  %air3 = or i32 2147483648, %air2
+        \\  ret i32 %air3
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 4), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .and_eax_imm32 = 0x7fffffff }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .or_eax_imm32 = @bitCast(@as(u32, 0x80000000)) }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[3]);
+
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+
+    try std.testing.expectEqualSlices(u8, &.{
+        0x89, 0xf8,
+        0x25, 0xff, 0xff, 0xff, 0x7f,
+        0x0d, 0x00, 0x00, 0x00, 0x80,
+        0xc3,
+    }, bytes);
+}
+
+test "x86_64 lowering and encoding for icmp ult i32" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i1 @indexLessThan(i32 %arg0, i32 %arg1) {
+        \\entry:
+        \\  %res = icmp ult i32 %arg0, %arg1
+        \\  ret i1 %res
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.cmp_ult_u32_edi_esi_al, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+
+    try std.testing.expectEqualSlices(u8, &.{
+        0x31, 0xc0,
+        0x39, 0xf7,
+        0x0f, 0x92, 0xc0,
+        0xc3,
+    }, bytes);
+}

@@ -1,7 +1,7 @@
 const std = @import("std");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_export = @import("zig_air_export.zig");
-const air_text = @import("zig_air_text.zig");
+pub const air_text = @import("zig_air_text.zig");
 const ir = @import("ir.zig");
 const memory_location = @import("analysis/memory_location.zig");
 const target_mod = @import("target.zig");
@@ -1113,6 +1113,8 @@ pub const TypedAtomicRmwSummary = struct {
     instruction: air_export.TypedInstruction,
 };
 
+pub const TypedAtomicTryLockSummary = struct {};
+
 pub const TypedDenseIntegerSwitchSummary = struct {
     results: [5]i32,
 };
@@ -1307,6 +1309,14 @@ pub fn untypedStore(instruction: air_export.Instruction) ?UntypedStore {
         .slot = slot,
         .value = parseUntypedValueSource(std.mem.trim(u8, value_text, " ")) orelse return null,
     };
+}
+
+pub fn untypedFindStoreToSlot(function: air_export.Function, slot: u32) ?UntypedStore {
+    for (function.instructions) |instruction| {
+        const store = untypedStore(instruction) orelse continue;
+        if (store.slot == slot) return store;
+    }
+    return null;
 }
 
 pub fn untypedBinaryRefs(instruction: air_export.Instruction) ?UntypedBinaryRefs {

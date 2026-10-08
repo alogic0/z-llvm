@@ -37,6 +37,7 @@ const symbolName = shared.symbolName;
 const validateDefaultCallConv = shared.validateDefaultCallConv;
 
 const lowerAtomicAddReturn = core_single_block_misc.lowerAtomicAddReturn;
+const lowerAtomicTryLockReturn = core_single_block_misc.lowerAtomicTryLockReturn;
 const lowerInlineAsmBarrierReturn = cabi_tls_global_lowering.lowerInlineAsmBarrierReturn;
 const sret_byval_rows = @import("core_single_block_sret_byval_rows.zig");
 const lowerGenericCfgSelectedSretStores = sret_byval_rows.lowerGenericCfgSelectedSretStores;
@@ -53,6 +54,10 @@ pub fn lowerGenericCfgSingleBlockEffectBarrier(allocator: std.mem.Allocator, mac
         return true;
     }
     if (try lowerAtomicAddReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerAtomicTryLockReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }

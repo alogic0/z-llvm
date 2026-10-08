@@ -34,6 +34,43 @@ const zig_ast_optional_token_index_enumerators = [_]Enumerator{
     .{ .name = "none", .value = std.math.maxInt(u32) },
 };
 
+const coff_image_file_machine_enumerators = [_]Enumerator{
+    .{ .name = "UNKNOWN", .value = 0x0 },
+    .{ .name = "ALPHA", .value = 0x184 },
+    .{ .name = "ALPHA64", .value = 0x284 },
+    .{ .name = "AM33", .value = 0x1d3 },
+    .{ .name = "AMD64", .value = 0x8664 },
+    .{ .name = "ARM", .value = 0x1c0 },
+    .{ .name = "ARM64", .value = 0xaa64 },
+    .{ .name = "ARM64EC", .value = 0xA641 },
+    .{ .name = "ARM64X", .value = 0xA64E },
+    .{ .name = "ARMNT", .value = 0x1c4 },
+    .{ .name = "EBC", .value = 0xebc },
+    .{ .name = "I386", .value = 0x14c },
+    .{ .name = "IA64", .value = 0x200 },
+    .{ .name = "LOONGARCH32", .value = 0x6232 },
+    .{ .name = "LOONGARCH64", .value = 0x6264 },
+    .{ .name = "M32R", .value = 0x9041 },
+    .{ .name = "MIPS16", .value = 0x266 },
+    .{ .name = "MIPSFPU", .value = 0x366 },
+    .{ .name = "MIPSFPU16", .value = 0x466 },
+    .{ .name = "POWERPC", .value = 0x1f0 },
+    .{ .name = "POWERPCFP", .value = 0x1f1 },
+    .{ .name = "R3000BE", .value = 0x160 },
+    .{ .name = "R3000", .value = 0x162 },
+    .{ .name = "R4000", .value = 0x166 },
+    .{ .name = "R10000", .value = 0x168 },
+    .{ .name = "RISCV32", .value = 0x5032 },
+    .{ .name = "RISCV64", .value = 0x5064 },
+    .{ .name = "RISCV128", .value = 0x5128 },
+    .{ .name = "SH3", .value = 0x1a2 },
+    .{ .name = "SH3DSP", .value = 0x1a3 },
+    .{ .name = "SH4", .value = 0x1a6 },
+    .{ .name = "SH5", .value = 0x1a8 },
+    .{ .name = "THUMB", .value = 0x1c2 },
+    .{ .name = "WCEMIPSV2", .value = 0x169 },
+};
+
 const no_enumerators = [_]Enumerator{};
 
 const facts = [_]Fact{
@@ -58,10 +95,54 @@ const facts = [_]Fact{
         .enumerators = zig_ast_optional_token_index_enumerators[0..],
     },
     .{
+        .name = "coff.IMAGE.FILE.MACHINE",
+        .backing_type = .{ .int = 16 },
+        .enumerators = coff_image_file_machine_enumerators[0..],
+    },
+    .{
+        .name = "std.coff.IMAGE.FILE.MACHINE",
+        .backing_type = .{ .int = 16 },
+        .enumerators = coff_image_file_machine_enumerators[0..],
+    },
+    .{
         .name = "Air.ShuffleTwoMask",
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],
     },
+    .{
+        .name = "link.Wasm.String",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "zig.llvm.Builder.Linkage",
+        .backing_type = .{ .int = 8 },
+        .enumerators = zig_llvm_builder_linkage_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.Linkage",
+        .backing_type = .{ .int = 8 },
+        .enumerators = zig_llvm_builder_linkage_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.NullTerminatedString",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+};
+
+const zig_llvm_builder_linkage_enumerators = [_]Enumerator{
+    .{ .name = "external", .value = 0 },
+    .{ .name = "weak", .value = 1 },
+    .{ .name = "appending", .value = 2 },
+    .{ .name = "internal", .value = 3 },
+    .{ .name = "linkonce", .value = 4 },
+    .{ .name = "extern_weak", .value = 7 },
+    .{ .name = "common", .value = 8 },
+    .{ .name = "private", .value = 9 },
+    .{ .name = "weak_odr", .value = 10 },
+    .{ .name = "linkonce_odr", .value = 11 },
+    .{ .name = "available_externally", .value = 12 },
 };
 
 pub fn lookup(nominal: []const u8) ?Fact {
@@ -110,4 +191,19 @@ test "enum facts expose exact nominal backing types and literals" {
     const shuffle_mask = lookup("Air.ShuffleTwoMask") orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(ir.Type{ .int = 32 }, shuffle_mask.backing_type);
     try std.testing.expect(enumeratorValue("Air.ShuffleTwoMask", ".undef") == null);
+
+    const coff_machine = lookup("coff.IMAGE.FILE.MACHINE") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 16 }, coff_machine.backing_type);
+    try std.testing.expectEqual(@as(?i128, 0x8664), enumeratorValue("coff.IMAGE.FILE.MACHINE", ".AMD64"));
+    try std.testing.expectEqual(@as(?i128, 0xaa64), enumeratorValue("coff.IMAGE.FILE.MACHINE", ".ARM64"));
+    try std.testing.expectEqual(@as(?i128, 0xA641), enumeratorValue("coff.IMAGE.FILE.MACHINE", ".ARM64EC"));
+    try std.testing.expectEqual(@as(?i128, 0xA64E), enumeratorValue("coff.IMAGE.FILE.MACHINE", ".ARM64X"));
+
+    const std_coff_machine = lookup("std.coff.IMAGE.FILE.MACHINE") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 16 }, std_coff_machine.backing_type);
+
+    const linkage = lookup("zig.llvm.Builder.Linkage") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 8 }, linkage.backing_type);
+    try std.testing.expectEqual(@as(?i128, 0), enumeratorValue("zig.llvm.Builder.Linkage", ".external"));
+    try std.testing.expectEqual(@as(?i128, 9), enumeratorValue("zig.llvm.Builder.Linkage", ".private"));
 }

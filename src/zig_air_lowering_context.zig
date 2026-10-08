@@ -763,6 +763,7 @@ pub const LoweringContext = struct {
                 };
             }
             if (try self.resolveStringLiteralPointer(literal)) |string_pointer| return string_pointer;
+            if (try self.resolveAnonymousConstantPointer(literal)) |anon_pointer| return anon_pointer;
             if (try self.resolveStringLiteralSlice(instruction, operand_index, literal)) |string_slice| return string_slice;
             if (parseConstant(literal)) |constant| return constant;
             if (resolveTypedNumericConstOperand(operand)) |constant| return constant;
@@ -876,6 +877,73 @@ pub const LoweringContext = struct {
             .kind = .constant,
             .ty = .{ .aggregate = try ownPrint(self.module, "[{} x i8]", .{byte_len}) },
             .initializer = .{ .c_string = try ownPrint(self.module, "c\"{s}\"", .{body}) },
+        });
+        return symbol;
+    }
+
+    fn resolveAnonymousConstantPointer(self: *LoweringContext, literal: []const u8) !?TypedValue {
+        if (!std.mem.startsWith(u8, literal, "<") or !std.mem.endsWith(u8, literal, ">")) return null;
+        var fields = splitTopLevel(literal[1 .. literal.len - 1], ',');
+        const type_text = std.mem.trim(u8, fields.next() orelse return null, " ");
+        const value_text = std.mem.trim(u8, fields.next() orelse return null, " ");
+        if (fields.next() != null) return null;
+        const ty = parseZigType(type_text) orelse return null;
+        if (ty.ir_type != .ptr) return null;
+        if (!std.mem.startsWith(u8, value_text, "&.{")) return null;
+
+        const masks_marker = ".masks = .{";
+        if (std.mem.indexOf(u8, value_text, masks_marker)) |pos| {
+            const list_start = pos + masks_marker.len;
+            const list_end = std.mem.indexOfScalarPos(u8, value_text, list_start, '}') orelse return null;
+            const items_text = value_text[list_start..list_end];
+            var it = splitTopLevel(items_text, ',');
+            var int_list: std.ArrayList(u64) = .empty;
+            defer int_list.deinit(self.allocator);
+            while (it.next()) |item| {
+                const trimmed_item = std.mem.trim(u8, item, " \t\r\n");
+                if (trimmed_item.len == 0) continue;
+                const val = std.fmt.parseInt(u64, trimmed_item, 10) catch return null;
+                try int_list.append(self.allocator, val);
+            }
+            if (int_list.items.len == 0) return null;
+
+            const byte_len = int_list.items.len * 8;
+            const bytes = try self.allocator.alloc(u8, byte_len);
+            defer self.allocator.free(bytes);
+            for (int_list.items, 0..) |val, i| {
+                std.mem.writeInt(u64, bytes[i * 8 ..][0..8], val, .little);
+            }
+
+            const symbol = try self.ensureByteArrayGlobal(bytes);
+            return .{
+                .ty = ty,
+                .value = .{ .named = try ownPrint(self.module, "@{s}", .{symbol}) },
+            };
+        }
+        return null;
+    }
+
+    pub fn ensureByteArrayGlobal(self: *LoweringContext, bytes: []const u8) ![]const u8 {
+        const hash = std.hash.Wyhash.hash(0, bytes);
+        const symbol = try ownPrint(self.module, "__zllvm_const_{x}", .{hash});
+        for (self.module.globals.items) |global| {
+            if (std.mem.eql(u8, global.name, symbol)) return symbol;
+        }
+        var values: std.ArrayList(ir.Value) = .empty;
+        errdefer values.deinit(self.allocator);
+        for (bytes) |b| {
+            try values.append(self.allocator, .{ .int = b });
+        }
+        try self.module.globals.append(self.allocator, .{
+            .name = symbol,
+            .linkage = .internal,
+            .address_attrs = "unnamed_addr",
+            .kind = .constant,
+            .ty = .{ .aggregate = try ownPrint(self.module, "[{} x i8]", .{bytes.len}) },
+            .initializer = .{ .array = .{
+                .elem_ty = .{ .int = 8 },
+                .values = values,
+            } },
         });
         return symbol;
     }

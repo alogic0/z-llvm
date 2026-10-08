@@ -192,11 +192,12 @@ const AlignmentSpec = struct {
 };
 
 fn defaultIntegerAlignment(bits: u16) ?u16 {
-    if (bits == 0) return null;
+    if (bits == 0) return 8;
     if (bits <= 8) return 8;
     if (bits <= 16) return 16;
     if (bits <= 32) return 32;
     if (bits <= 64) return 64;
+    if (bits <= 128) return 128;
     return null;
 }
 
@@ -216,8 +217,8 @@ fn parsePointerSpec(layout: *DataLayout, part: []const u8) !void {
 }
 
 fn byteWidth(bits: u16) ?u64 {
-    if (bits == 0 or bits % 8 != 0) return null;
-    return bits / 8;
+    if (bits == 0) return 0;
+    return (@as(u64, bits) + 7) / 8;
 }
 
 fn bitsToBytes(bits: u16) u64 {

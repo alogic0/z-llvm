@@ -99,7 +99,8 @@ pub fn typedV2AggregatePairFirstRecords(
     return air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "alloc") == 1 and
         air_model.typedStoreOpcodeCount(structured_air_v2) == 1 and
-        air_model.typedOpcodeCount(structured_air_v2, "bitcast") == 1 and
+        (air_model.typedOpcodeCount(structured_air_v2, "bitcast") == 1 or
+         air_model.typedOpcodeCount(structured_air_v2, "bit_cast") == 1) and
         air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
         air_model.typedOpcodeCount(structured_air_v2, "load") == 1 and
         air_model.typedHasReturnOpcode(structured_air_v2);
@@ -166,7 +167,8 @@ pub fn accumulatorLoopShape(function: air_export.Function) ?AccumulatorLoopShape
 
     const compare = air_model.untypedFindCompareAgainstArg(function, index, arg) orelse return null;
     if (!condBrUses(function, compare)) return null;
-    const cast = air_model.untypedFindCastFromSlot(function, "intcast", index) orelse return null;
+    const cast = air_model.untypedFindCastFromSlot(function, "intcast", index) orelse
+        air_model.untypedFindCastFromSlot(function, "int_cast", index) orelse return null;
     const sum_load = air_model.untypedFindAnyLoadFromSlot(function, sum) orelse return null;
     const sum_add = air_model.untypedFindBinaryUsing(function, "add", sum_load, cast) orelse return null;
     if (!hasStoreOf(function, sum, .{ .ref = sum_add })) return null;

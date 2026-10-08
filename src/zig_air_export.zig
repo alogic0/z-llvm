@@ -114,8 +114,8 @@ pub const TypedInstruction = struct {
     opcode: []const u8,
     result_type: []const u8,
     data_kind: []const u8,
-    operands: []TypedOperand,
-    details: []TypedDetail = &.{},
+    operands: []const TypedOperand,
+    details: []const TypedDetail = &.{},
 };
 
 pub const TypedOperand = struct {
@@ -648,12 +648,20 @@ pub fn categoryForOpcode(opcode: []const u8) InstructionCategory {
         std.mem.eql(u8, opcode, "memcpy") or
         std.mem.eql(u8, opcode, "memmove") or
         std.mem.eql(u8, opcode, "memset") or
-        std.mem.eql(u8, opcode, "memset_safe"))
+        std.mem.eql(u8, opcode, "memset_safe") or
+        std.mem.eql(u8, opcode, "cmpxchg") or
+        std.mem.eql(u8, opcode, "cmpxchg_strong") or
+        std.mem.eql(u8, opcode, "cmpxchg_weak") or
+        std.mem.eql(u8, opcode, "atomic_rmw"))
     {
         return .memory;
     }
     if (std.mem.eql(u8, opcode, "intcast") or
+        std.mem.eql(u8, opcode, "intcast_safe") or
+        std.mem.eql(u8, opcode, "int_cast") or
+        std.mem.eql(u8, opcode, "int_cast_safe") or
         std.mem.eql(u8, opcode, "bitcast") or
+        std.mem.eql(u8, opcode, "bit_cast") or
         std.mem.eql(u8, opcode, "trunc") or
         std.mem.eql(u8, opcode, "float_from_int") or
         std.mem.eql(u8, opcode, "int_from_float") or

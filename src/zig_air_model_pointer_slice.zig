@@ -235,7 +235,10 @@ pub fn typedAccumulatorLoopSummary(
         return null;
     }
     const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
-    const intcast_count = typedOpcodeCount(structured_air_v2, "intcast") + typedOpcodeCount(structured_air_v2, "intcast_safe");
+    const intcast_count = typedOpcodeCount(structured_air_v2, "intcast") +
+        typedOpcodeCount(structured_air_v2, "intcast_safe") +
+        typedOpcodeCount(structured_air_v2, "int_cast") +
+        typedOpcodeCount(structured_air_v2, "int_cast_safe");
     if (typedOpcodeCount(structured_air_v2, "arg") != 1 or
         typedOpcodeCount(structured_air_v2, "alloc") != 2 or
         typedOpcodeCount(structured_air_v2, "loop") != 1 or

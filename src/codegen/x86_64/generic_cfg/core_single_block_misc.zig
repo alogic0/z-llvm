@@ -176,6 +176,31 @@ pub fn lowerAtomicAddReturn(
     return true;
 }
 
+pub fn lowerAtomicTryLockReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 1 }) and !ret.ty.eql(.{ .int = 8 })) return false;
+    _ = function;
+    if (block.instructions.items.len < 1 or block.instructions.items.len > 2) return false;
+    const first_inst = block.instructions.items[0];
+    if (first_inst.removed) return false;
+    const cmpxchg = switch (first_inst.kind) {
+        .cmpxchg => |c| c,
+        else => return false,
+    };
+    if (cmpxchg.ptr != .named or !std.mem.eql(u8, cmpxchg.ptr.named, "arg0")) return false;
+    if (cmpxchg.expected != .int or cmpxchg.expected.int != 0) return false;
+    if (cmpxchg.replacement != .int or cmpxchg.replacement.int != 1) return false;
+
+    try machine.instructions.append(allocator, .atomic_try_lock_rdi_al);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 pub fn lowerGenericCfgByteTableLookupReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,

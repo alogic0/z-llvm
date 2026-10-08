@@ -343,8 +343,8 @@ pub fn leafTypeAtOffset(layout: target.DataLayout, aggregate_ty: ir.Type, expect
 }
 
 pub fn isSupportedScalarLeaf(ty: ir.Type) bool {
-    return ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or ty.eql(.{ .int = 32 }) or
-        ty.eql(.{ .int = 64 }) or ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
+    return (ty == .int and ty.int > 0 and ty.int <= 128) or
+        ty.eql(.ptr) or ty.eql(.float) or ty.eql(.double);
 }
 
 pub fn isSupportedScalarLeafAggregate(aggregate_ty: ir.Type) bool {
@@ -353,6 +353,7 @@ pub fn isSupportedScalarLeafAggregate(aggregate_ty: ir.Type) bool {
     var field_index: usize = 0;
     while (field_index < count) : (field_index += 1) {
         const ty = fieldType(aggregate_ty, field_index) orelse return false;
+        if (ty.eql(.{ .int = 0 })) continue;
         if (isSupportedScalarLeaf(ty)) continue;
         if (isAggregateType(ty) and isSupportedScalarLeafAggregate(ty)) continue;
         return false;
@@ -373,6 +374,7 @@ pub fn collectSupportedScalarLeaves(
     while (field_index < count) : (field_index += 1) {
         const ty = fieldType(aggregate_ty, field_index) orelse return error.UnsupportedCodegenAbi;
         const offset = base_offset + (fieldByteOffset(layout, aggregate_ty, field_index) orelse return error.UnsupportedCodegenAbi);
+        if (ty.eql(.{ .int = 0 })) continue;
         if (isSupportedScalarLeaf(ty)) {
             if (leaf_count.* >= leaves.len) return error.UnsupportedCodegenAbi;
             leaves[leaf_count.*] = .{ .offset = offset, .ty = ty };

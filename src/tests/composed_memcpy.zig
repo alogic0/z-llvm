@@ -50,7 +50,7 @@ test "composed memcpy rejects malformed markers and unsupported intrinsic neighb
         .{ .call = "call void @llvm.memcpy.p0.p0.i64(ptr %d, ptr %s, i64 0, i1 false)", .detail = "composed-block-memcpy-len" },
         .{ .call = "call void @llvm.memcpy.p0.p0.i32(ptr %d, ptr %s, i32 1, i1 false)", .detail = "composed-block-llvm-intrinsic" },
         .{ .call = "call void @llvm.memcpy.p1.p0.i64(ptr %d, ptr %s, i64 %n, i1 false)", .detail = "composed-block-llvm-intrinsic" },
-        .{ .call = "call void @llvm.memmove.p0.p0.i64(ptr %d, ptr %s, i64 %n, i1 false)", .detail = "composed-block-llvm-intrinsic" },
+        .{ .call = "call void @llvm.memmove.p1.p0.i64(ptr %d, ptr %s, i64 %n, i1 false)", .detail = "composed-block-llvm-intrinsic" },
     };
     for (variants) |v| {
         const text = try std.fmt.allocPrint(std.testing.allocator, "define ptr @copy(ptr %d, ptr %s, i64 %n) {{\nentry:\n {s}\n ret ptr %d\n}}\n", .{v.call});
@@ -305,6 +305,39 @@ test "composed memcpy admits sequential cyclic byte vector transfers in same loo
         \\  br i1 %end, label %done, label %loop
         \\done:
         \\  ret void
+        \\}
+    ;
+    try check(text, null);
+}
+
+test "composed generic cfg lowers inline memmove intrinsic" {
+    const text =
+        \\define void @move(ptr %d, ptr %s, i64 %n) {
+        \\entry:
+        \\  call void @llvm.memmove.p0.p0.i64(ptr %d, ptr %s, i64 %n, i1 false)
+        \\  ret void
+        \\}
+    ;
+    try check(text, null);
+}
+
+test "composed generic cfg lowers inline strlen call" {
+    const text =
+        \\define i64 @len(ptr %s) {
+        \\entry:
+        \\  %res = call i64 @strlen(ptr %s)
+        \\  ret i64 %res
+        \\}
+    ;
+    try check(text, null);
+}
+
+test "composed generic cfg lowers inline strnlen call" {
+    const text =
+        \\define i64 @nlen(ptr %s, i64 %maxlen) {
+        \\entry:
+        \\  %res = call i64 @strnlen(ptr %s, i64 %maxlen)
+        \\  ret i64 %res
         \\}
     ;
     try check(text, null);

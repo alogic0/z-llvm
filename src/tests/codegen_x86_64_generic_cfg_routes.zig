@@ -1086,3 +1086,49 @@ test "x86_64 codegen routes conditional slice accumulation loop through generic 
     defer machine.deinit(std.testing.allocator);
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
+
+test "x86_64 codegen routes multi-value switch predicate through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i1 @isArm64EC(i16 %arg0) {
+        \\entry:
+        \\  switch i16 %arg0, label %block2_default [
+        \\    i16 42561, label %block2_case0
+        \\    i16 42574, label %block2_case0
+        \\  ]
+        \\
+        \\block2_case0:
+        \\  br label %block2_switch_merge
+        \\
+        \\block2_default:
+        \\  br label %block2_switch_merge
+        \\
+        \\block2_switch_merge:
+        \\  %block2_result = phi i1 [ 1, %block2_case0 ], [ 0, %block2_default ]
+        \\  ret i1 %block2_result
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var diagnostic_tag: ?[]const u8 = null;
+    var diagnostic_detail: ?[]const u8 = null;
+    var machine = codegen.x86_64.lowerFunctionWithOptions(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+        .{
+            .generic_cfg_selector = true,
+            .generic_cfg_selector_diagnostic_tag = &diagnostic_tag,
+            .generic_cfg_selector_diagnostic_detail = &diagnostic_detail,
+        },
+    ) catch |err| {
+        std.debug.print("diagnostic_tag={?s} detail={?s} err={}\n", .{ diagnostic_tag, diagnostic_detail, err });
+        return err;
+    };
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}

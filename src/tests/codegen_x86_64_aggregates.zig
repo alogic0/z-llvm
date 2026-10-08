@@ -1265,3 +1265,44 @@ test "x86_64 codegen copies f32 memory aggregate leaves from byval to sret" {
     }
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[10]);
 }
+
+test "x86_64 generic cfg lowers register-register integer comparison with aggregate context parameter" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define internal fastcc i1 @eql({ ptr } %arg0, i32 %arg1, i32 %arg2) {
+        \\entry:
+        \\  %cmp = icmp eq i32 %arg1, %arg2
+        \\  ret i1 %cmp
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 lowers zeroinitializer register aggregate return" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define { i64, i32 } @zero_biased_fp() {
+        \\entry:
+        \\  ret { i64, i32 } zeroinitializer
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 3), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_eax = 0 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.xor_edx_edx, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
+}

@@ -394,7 +394,26 @@ pub fn lowerRegisterAggregateReturn(
     if (classification.kind != .register or classification.eightbyte_count == 0) return false;
     if (try lowerRegisterAggregateParamReturn(allocator, machine, function, block, ret, classification)) return true;
     const leaf_count = block.instructions.items.len;
-    if (leaf_count == 0 or leaf_count > 8) return false;
+    if (leaf_count == 0) {
+        const ret_value = ret.value orelse return false;
+        if (ret_value == .zero_initializer) {
+            for (0..classification.eightbyte_count) |i| {
+                const class = classification.eightbytes[i] orelse break;
+                switch (class) {
+                    .integer => switch (i) {
+                        0 => try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 }),
+                        1 => try machine.instructions.append(allocator, .xor_edx_edx),
+                        else => return false,
+                    },
+                    else => return false,
+                }
+            }
+            try machine.instructions.append(allocator, .ret);
+            return true;
+        }
+        return false;
+    }
+    if (leaf_count > 8) return false;
 
     var leaves: [8]AggregateReturnLeaf = undefined;
     var aggregate_value: ir.Value = .undef;

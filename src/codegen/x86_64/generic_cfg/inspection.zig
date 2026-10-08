@@ -35,8 +35,10 @@ pub fn inspectFunction(function: ir.Function) SelectionResult {
 }
 
 pub fn inspectFunctionWithContext(function: ir.Function, context: ?*const x86_64_types.ReadOnlyModuleContext) SelectionResult {
-    if (function.calling_conv != null) {
-        return unsupported(.{ .unsupported_control_flow = "non-default-calling-convention" });
+    if (function.calling_conv) |cc| {
+        if (!std.mem.eql(u8, cc, "ccc") and !std.mem.eql(u8, cc, "fastcc")) {
+            return unsupported(.{ .unsupported_control_flow = "non-default-calling-convention" });
+        }
     }
     if (!isScalarReturnType(function.ret_ty)) {
         return unsupported(.{ .unsupported_type = "unsupported-return-type" });
@@ -363,6 +365,10 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
     if (std.mem.eql(u8, call.callee, "llvm.bswap.i128") or std.mem.eql(u8, call.callee, "llvm.bitreverse.i128")) {
         const ty: ir.Type = .{ .int = 128 };
         return if (call.ret_ty.eql(ty) and call.args.items.len == 1 and call.args.items[0].ty.eql(ty)) null else .{ .unsupported_type = "bit-permutation-i128" };
+    }
+    if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i32")) {
+        const ty: ir.Type = .{ .int = 32 };
+        return if (call.ret_ty.eql(ty) and call.args.items.len == 1 and call.args.items[0].ty.eql(ty)) null else .{ .unsupported_type = "bit-permutation-i32" };
     }
     if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i64")) {
         const ty: ir.Type = .{ .int = 64 };

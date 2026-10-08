@@ -27,7 +27,51 @@ pub fn lowerGenericCfgSingleBlockPackedBits(allocator: std.mem.Allocator, machin
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgAsciiPredicateReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgNarrowBinaryImmReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgGrowCapacityReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgCmpUltU32Return(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     return false;
+}
+
+pub fn lowerGenericCfgCmpUltU32Return(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 1 }) or !ret.ty.eql(.{ .int = 1 })) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 32 }) or !function.params.items[1].ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 1) return false;
+    const icmp_inst = block.instructions.items[0];
+    if (icmp_inst.removed) return false;
+    const icmp_result = icmp_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, icmp_result)) return false;
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(icmp.lhs, function.params.items[0].name) or
+        !isNamed(icmp.rhs, function.params.items[1].name)) return false;
+
+    try machine.instructions.append(allocator, .cmp_ult_u32_edi_esi_al);
+    try machine.instructions.append(allocator, .ret);
+    return true;
 }
 
 pub fn lowerGenericCfgPackedReplaceLowReturn(
@@ -130,6 +174,462 @@ pub fn lowerGenericCfgPackedU8LtImmReturn(
     if (imm < 0 or imm > std.math.maxInt(u8)) return false;
 
     try machine.instructions.append(allocator, .{ .ult_i8_dil_imm8_al = @intCast(imm) });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerGenericCfgAsciiPredicateReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 1 }) or !ret.ty.eql(.{ .int = 1 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 8 })) return false;
+    const arg0_name = function.params.items[0].name;
+
+    // Pattern 1: Single range check (isUpper, isLower, isDigit)
+    // %sub = sub i8 %arg0, <low>
+    // %cmp = icmp ult i8 %sub, <len>
+    // ret i1 %cmp
+    if (block.instructions.items.len == 2) {
+        const sub_inst = block.instructions.items[0];
+        const cmp_inst = block.instructions.items[1];
+        if (sub_inst.removed or cmp_inst.removed) return false;
+        const sub_result = sub_inst.result orelse return false;
+        const cmp_result = cmp_inst.result orelse return false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, cmp_result)) return false;
+
+        const sub = switch (sub_inst.kind) {
+            .binary => |binary| binary,
+            else => return false,
+        };
+        if (sub.op != .sub or !sub.ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(sub.lhs, arg0_name)) return false;
+        const low = switch (sub.rhs) {
+            .int => |int| try i64Value(int),
+            else => return false,
+        };
+        if (low < 0 or low > 255) return false;
+
+        const icmp = switch (cmp_inst.kind) {
+            .icmp => |icmp| icmp,
+            else => return false,
+        };
+        if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(icmp.lhs, sub_result)) return false;
+        const len = switch (icmp.rhs) {
+            .int => |int| try i64Value(int),
+            else => return false,
+        };
+        if (len < 0 or len > 255) return false;
+
+        try machine.instructions.append(allocator, .{
+            .ascii_range_u8_dil_imm8_imm8_al = .{
+                .low = @intCast(low),
+                .len = @intCast(len),
+            },
+        });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+
+    // Pattern 2: Alphabetic check (isAlphabetic)
+    // %masked = and i8 %arg0, -33 (or 223 / 0xdf)
+    // %sub = sub i8 %masked, 65
+    // %cmp = icmp ult i8 %sub, 26
+    // ret i1 %cmp
+    if (block.instructions.items.len == 3) {
+        const mask_inst = block.instructions.items[0];
+        const sub_inst = block.instructions.items[1];
+        const cmp_inst = block.instructions.items[2];
+        if (mask_inst.removed or sub_inst.removed or cmp_inst.removed) return false;
+        const mask_result = mask_inst.result orelse return false;
+        const sub_result = sub_inst.result orelse return false;
+        const cmp_result = cmp_inst.result orelse return false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, cmp_result)) return false;
+
+        const mask = switch (mask_inst.kind) {
+            .binary => |binary| binary,
+            else => return false,
+        };
+        if (mask.op != .@"and" or !mask.ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(mask.lhs, arg0_name)) return false;
+        const mask_val = switch (mask.rhs) {
+            .int => |int| try i64Value(int),
+            else => return false,
+        };
+        if (mask_val != -33 and mask_val != 223 and mask_val != 0xdf) return false;
+
+        const sub = switch (sub_inst.kind) {
+            .binary => |binary| binary,
+            else => return false,
+        };
+        if (sub.op != .sub or !sub.ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(sub.lhs, mask_result) or !isInt(sub.rhs, 65)) return false;
+
+        const icmp = switch (cmp_inst.kind) {
+            .icmp => |icmp| icmp,
+            else => return false,
+        };
+        if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(icmp.lhs, sub_result) or !isInt(icmp.rhs, 26)) return false;
+
+        try machine.instructions.append(allocator, .ascii_alphabetic_dil_al);
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+
+    // Pattern 3: Whitespace check (isWhitespace)
+    // %is_space = icmp eq i8 %arg0, 32
+    // %ctrl_sub = sub i8 %arg0, 9
+    // %is_ctrl = icmp ult i8 %ctrl_sub, 5
+    // %res = or i1 %is_space, %is_ctrl
+    // ret i1 %res
+    if (block.instructions.items.len == 4) {
+        const space_inst = block.instructions.items[0];
+        const sub_inst = block.instructions.items[1];
+        const ctrl_inst = block.instructions.items[2];
+        const or_inst = block.instructions.items[3];
+        if (space_inst.removed or sub_inst.removed or ctrl_inst.removed or or_inst.removed) return false;
+        const space_result = space_inst.result orelse return false;
+        const sub_result = sub_inst.result orelse return false;
+        const ctrl_result = ctrl_inst.result orelse return false;
+        const or_result = or_inst.result orelse return false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, or_result)) return false;
+
+        const space_cmp = switch (space_inst.kind) {
+            .icmp => |icmp| icmp,
+            else => return false,
+        };
+        if (space_cmp.predicate != .eq or !space_cmp.operand_ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(space_cmp.lhs, arg0_name) or !isInt(space_cmp.rhs, 32)) return false;
+
+        const sub = switch (sub_inst.kind) {
+            .binary => |binary| binary,
+            else => return false,
+        };
+        if (sub.op != .sub or !sub.ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(sub.lhs, arg0_name) or !isInt(sub.rhs, 9)) return false;
+
+        const ctrl_cmp = switch (ctrl_inst.kind) {
+            .icmp => |icmp| icmp,
+            else => return false,
+        };
+        if (ctrl_cmp.predicate != .ult or !ctrl_cmp.operand_ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(ctrl_cmp.lhs, sub_result) or !isInt(ctrl_cmp.rhs, 5)) return false;
+
+        const or_bin = switch (or_inst.kind) {
+            .binary => |binary| binary,
+            else => return false,
+        };
+        if (or_bin.op != .@"or" or !or_bin.ty.eql(.{ .int = 1 })) return false;
+        if (!((isNamed(or_bin.lhs, space_result) and isNamed(or_bin.rhs, ctrl_result)) or
+            (isNamed(or_bin.lhs, ctrl_result) and isNamed(or_bin.rhs, space_result)))) return false;
+
+        try machine.instructions.append(allocator, .ascii_whitespace_dil_al);
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+
+    // Pattern 4: Alphanumeric check (isAlphanumeric)
+    // %digit_sub = sub i8 %arg0, 48
+    // %is_digit = icmp ult i8 %digit_sub, 10
+    // %alpha_mask = and i8 %arg0, -33
+    // %alpha_sub = sub i8 %alpha_mask, 65
+    // %is_alpha = icmp ult i8 %alpha_sub, 26
+    // %res = or i1 %is_digit, %is_alpha
+    // ret i1 %res
+    if (block.instructions.items.len == 6) {
+        const dsub_inst = block.instructions.items[0];
+        const dcmp_inst = block.instructions.items[1];
+        const amask_inst = block.instructions.items[2];
+        const asub_inst = block.instructions.items[3];
+        const acmp_inst = block.instructions.items[4];
+        const or_inst = block.instructions.items[5];
+        if (dsub_inst.removed or dcmp_inst.removed or amask_inst.removed or asub_inst.removed or acmp_inst.removed or or_inst.removed) return false;
+        const dsub_result = dsub_inst.result orelse return false;
+        const dcmp_result = dcmp_inst.result orelse return false;
+        const amask_result = amask_inst.result orelse return false;
+        const asub_result = asub_inst.result orelse return false;
+        const acmp_result = acmp_inst.result orelse return false;
+        const or_result = or_inst.result orelse return false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, or_result)) return false;
+
+        const dsub = switch (dsub_inst.kind) {
+            .binary => |binary| binary,
+            else => return false,
+        };
+        if (dsub.op != .sub or !dsub.ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(dsub.lhs, arg0_name) or !isInt(dsub.rhs, 48)) return false;
+
+        const dcmp = switch (dcmp_inst.kind) {
+            .icmp => |icmp| icmp,
+            else => return false,
+        };
+        if (dcmp.predicate != .ult or !dcmp.operand_ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(dcmp.lhs, dsub_result) or !isInt(dcmp.rhs, 10)) return false;
+
+        const amask = switch (amask_inst.kind) {
+            .binary => |binary| binary,
+            else => return false,
+        };
+        if (amask.op != .@"and" or !amask.ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(amask.lhs, arg0_name)) return false;
+        const mask_val = switch (amask.rhs) {
+            .int => |int| try i64Value(int),
+            else => return false,
+        };
+        if (mask_val != -33 and mask_val != 223 and mask_val != 0xdf) return false;
+
+        const asub = switch (asub_inst.kind) {
+            .binary => |binary| binary,
+            else => return false,
+        };
+        if (asub.op != .sub or !asub.ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(asub.lhs, amask_result) or !isInt(asub.rhs, 65)) return false;
+
+        const acmp = switch (acmp_inst.kind) {
+            .icmp => |icmp| icmp,
+            else => return false,
+        };
+        if (acmp.predicate != .ult or !acmp.operand_ty.eql(.{ .int = 8 })) return false;
+        if (!isNamed(acmp.lhs, asub_result) or !isInt(acmp.rhs, 26)) return false;
+
+        const or_bin = switch (or_inst.kind) {
+            .binary => |binary| binary,
+            else => return false,
+        };
+        if (or_bin.op != .@"or" or !or_bin.ty.eql(.{ .int = 1 })) return false;
+        if (!((isNamed(or_bin.lhs, dcmp_result) and isNamed(or_bin.rhs, acmp_result)) or
+            (isNamed(or_bin.lhs, acmp_result) and isNamed(or_bin.rhs, dcmp_result)))) return false;
+
+        try machine.instructions.append(allocator, .ascii_alphanumeric_dil_al);
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+
+    return false;
+}
+
+pub fn lowerGenericCfgNarrowBinaryImmReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    const ret_bits = switch (function.ret_ty) {
+        .int => |bits| bits,
+        else => return false,
+    };
+    if (ret_bits == 0 or ret_bits > 32) return false;
+    if (!ret.ty.eql(function.ret_ty)) return false;
+    if (function.params.items.len != 1) return false;
+    const param_bits = switch (function.params.items[0].ty) {
+        .int => |bits| bits,
+        else => return false,
+    };
+    if (param_bits == 0 or param_bits > ret_bits) return false;
+    const param_name = function.params.items[0].name;
+
+    var binary_inst: ir.Instruction = undefined;
+    var base_name: []const u8 = undefined;
+
+    if (block.instructions.items.len == 1) {
+        if (param_bits != ret_bits) return false;
+        binary_inst = block.instructions.items[0];
+        base_name = param_name;
+    } else if (block.instructions.items.len == 2) {
+        const inst0 = block.instructions.items[0];
+        if (inst0.removed) return false;
+        const cast = switch (inst0.kind) {
+            .cast => |c| c,
+            else => return false,
+        };
+        if (cast.op != .zext) return false;
+        if (!cast.to_ty.eql(function.ret_ty)) return false;
+        if (!isNamed(cast.value, param_name)) return false;
+        const zext_res = inst0.result orelse return false;
+
+        binary_inst = block.instructions.items[1];
+        base_name = zext_res;
+    } else {
+        return false;
+    }
+
+    if (binary_inst.removed) return false;
+    const inst_result = binary_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, inst_result)) return false;
+
+    const binary = switch (binary_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    const binary_bits = switch (binary.ty) {
+        .int => |bits| bits,
+        else => return false,
+    };
+    if (binary_bits != ret_bits) return false;
+
+    var literal: i64 = 0;
+    const op = binary.op;
+
+    if (isNamed(binary.lhs, base_name)) {
+        literal = switch (binary.rhs) {
+            .int => |int| try i64Value(int),
+            else => return false,
+        };
+    } else if (isNamed(binary.rhs, base_name)) {
+        if (op != .add and op != .xor and op != .@"and" and op != .@"or") return false;
+        literal = switch (binary.lhs) {
+            .int => |int| try i64Value(int),
+            else => return false,
+        };
+    } else {
+        return false;
+    }
+
+    if (literal < std.math.minInt(i32) or literal > std.math.maxInt(u32)) return false;
+    const imm32: i32 = if (literal > std.math.maxInt(i32))
+        @bitCast(@as(u32, @intCast(literal)))
+    else
+        @intCast(literal);
+
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = .rdi });
+
+    if (param_bits < ret_bits and param_bits < 32) {
+        const param_mask: i32 = @intCast((@as(u64, 1) << @intCast(param_bits)) - 1);
+        try machine.instructions.append(allocator, .{ .and_eax_imm32 = param_mask });
+    }
+
+    switch (op) {
+        .add => try machine.instructions.append(allocator, .{ .add_eax_imm32 = imm32 }),
+        .sub => {
+            const neg_literal = -literal;
+            if (neg_literal < std.math.minInt(i32) or neg_literal > std.math.maxInt(i32)) return false;
+            try machine.instructions.append(allocator, .{ .add_eax_imm32 = @intCast(neg_literal) });
+        },
+        .xor => try machine.instructions.append(allocator, .{ .xor_eax_imm32 = imm32 }),
+        .@"and" => try machine.instructions.append(allocator, .{ .and_eax_imm32 = imm32 }),
+        .@"or" => try machine.instructions.append(allocator, .{ .or_eax_imm32 = imm32 }),
+        else => return false,
+    }
+
+    if (ret_bits < 32) {
+        const mask: i32 = @intCast((@as(u64, 1) << @intCast(ret_bits)) - 1);
+        try machine.instructions.append(allocator, .{ .and_eax_imm32 = mask });
+    }
+
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn isIntEqual(val: ir.Value, target: i64) bool {
+    return switch (val) {
+        .int => |int| (i64Value(int) catch return false) == target,
+        else => false,
+    };
+}
+
+fn isAddPairExtractImm(bin: ir.BinaryInst, named_name: []const u8, extracted_imm: *i32) bool {
+    if (bin.op != .add) return false;
+    if (isNamed(bin.lhs, named_name)) {
+        const val = switch (bin.rhs) {
+            .int => |int| i64Value(int) catch return false,
+            else => return false,
+        };
+        if (val < std.math.minInt(i32) or val > std.math.maxInt(i32)) return false;
+        extracted_imm.* = @intCast(val);
+        return true;
+    } else if (isNamed(bin.rhs, named_name)) {
+        const val = switch (bin.lhs) {
+            .int => |int| i64Value(int) catch return false,
+            else => return false,
+        };
+        if (val < std.math.minInt(i32) or val > std.math.maxInt(i32)) return false;
+        extracted_imm.* = @intCast(val);
+        return true;
+    }
+    return false;
+}
+
+fn isAddPairNamed(bin: ir.BinaryInst, name_a: []const u8, name_b: []const u8) bool {
+    if (bin.op != .add) return false;
+    return (isNamed(bin.lhs, name_a) and isNamed(bin.rhs, name_b)) or
+        (isNamed(bin.lhs, name_b) and isNamed(bin.rhs, name_a));
+}
+
+pub fn lowerGenericCfgGrowCapacityReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    const ret_bits = switch (function.ret_ty) {
+        .int => |bits| bits,
+        else => return false,
+    };
+    if (ret_bits != 64) return false;
+    if (!ret.ty.eql(function.ret_ty)) return false;
+    if (function.params.items.len != 1) return false;
+    const param = function.params.items[0];
+    const param_bits = switch (param.ty) {
+        .int => |bits| bits,
+        else => return false,
+    };
+    if (param_bits != 64) return false;
+    const param_name = param.name;
+
+    if (block.instructions.items.len != 3) return false;
+    const inst0 = block.instructions.items[0];
+    const inst1 = block.instructions.items[1];
+    const inst2 = block.instructions.items[2];
+    if (inst0.removed or inst1.removed or inst2.removed) return false;
+
+    const res0 = inst0.result orelse return false;
+    const res1 = inst1.result orelse return false;
+    const res2 = inst2.result orelse return false;
+
+    const ret_val = ret.value orelse return error.InvalidRet;
+    if (!isNamed(ret_val, res2)) return false;
+
+    const bin0 = switch (inst0.kind) {
+        .binary => |b| b,
+        else => return false,
+    };
+    if (!isNamed(bin0.lhs, param_name)) return false;
+    const is_div2 = (bin0.op == .udiv and isIntEqual(bin0.rhs, 2)) or
+        (bin0.op == .lshr and isIntEqual(bin0.rhs, 1));
+    if (!is_div2) return false;
+
+    const bin1 = switch (inst1.kind) {
+        .binary => |b| b,
+        else => return false,
+    };
+    if (bin1.op != .add) return false;
+
+    const bin2 = switch (inst2.kind) {
+        .binary => |b| b,
+        else => return false,
+    };
+    if (bin2.op != .add) return false;
+
+    var imm: i32 = 0;
+    var matched = false;
+    if (isAddPairExtractImm(bin1, res0, &imm) and isAddPairNamed(bin2, param_name, res1)) {
+        matched = true;
+    } else if (isAddPairNamed(bin1, param_name, res0) and isAddPairExtractImm(bin2, res1, &imm)) {
+        matched = true;
+    } else if (isAddPairExtractImm(bin1, param_name, &imm) and isAddPairNamed(bin2, res1, res0)) {
+        matched = true;
+    }
+
+    if (!matched) return false;
+
+    try machine.instructions.append(allocator, .{ .grow_capacity_u64_rdi_imm32_rax = imm });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

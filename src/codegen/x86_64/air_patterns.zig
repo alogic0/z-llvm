@@ -73,6 +73,7 @@ pub const lowerAddChain3Return = impl.lowerAddChain3Return;
 pub const lowerRuntimeArraySumPreoptHelper = impl.lowerRuntimeArraySumPreoptHelper;
 pub const lowerInlineAsmBarrierReturn = impl.lowerInlineAsmBarrierReturn;
 pub const lowerAtomicAddReturn = impl.lowerAtomicAddReturn;
+pub const lowerAtomicTryLockReturn = impl.lowerAtomicTryLockReturn;
 pub const lowerGlobalReadReturn = global_tls_pattern_rows_module.lowerGlobalReadReturn;
 pub const lowerGlobalUpdateReturn = global_tls_pattern_rows_module.lowerGlobalUpdateReturn;
 pub const lowerGlobalUpdateCheckMainReturn = global_tls_pattern_rows_module.lowerGlobalUpdateCheckMainReturn;

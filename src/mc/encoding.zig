@@ -248,6 +248,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{0x25});
                 try appendI32(&bytes, allocator, value);
             },
+            .xor_eax_imm32 => |value| {
+                try bytes.appendSlice(allocator, &.{0x35});
+                try appendI32(&bytes, allocator, value);
+            },
             .abs_i32_edi_eax => try bytes.appendSlice(allocator, &.{ 0x89, 0xf8, 0x89, 0xfa, 0xf7, 0xda, 0x85, 0xff, 0x0f, 0x48, 0xc2 }),
             .abs_i64_rdi_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x89, 0xf8, 0x48, 0x89, 0xfa, 0x48, 0xf7, 0xda, 0x48, 0x85, 0xff, 0x48, 0x0f, 0x48, 0xc2 }),
             .wide_int_to_fp_rdi_rsi_xmm0 => |conversion| try bytes.appendSlice(allocator, switch (conversion.to_bits) {
@@ -1298,6 +1302,28 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0x48, 0x39, 0xca, // cmpq %rcx, %rdx
                 0x75, 0xf4, // jne 1b
             }),
+            .strlen_rdi_rax => try bytes.appendSlice(allocator, &.{
+                0x31, 0xc0,
+                0x80, 0x3c, 0x07, 0x00,
+                0x74, 0x05,
+                0x48, 0xff, 0xc0,
+                0xeb, 0xf5,
+            }),
+            .strnlen_rdi_rsi_rax => try bytes.appendSlice(allocator, &.{
+                0x31, 0xc0,
+                0x48, 0x39, 0xf0,
+                0x73, 0x0b,
+                0x80, 0x3c, 0x07, 0x00,
+                0x74, 0x05,
+                0x48, 0xff, 0xc0,
+                0xeb, 0xf0,
+            }),
+            .atomic_try_lock_rdi_al => try bytes.appendSlice(allocator, &.{
+                0x31, 0xc0, // xorl %eax, %eax
+                0xba, 0x01, 0x00, 0x00, 0x00, // movl $1, %edx
+                0xf0, 0x0f, 0xb1, 0x17, // lock cmpxchgl %edx, (%rdi)
+                0x0f, 0x94, 0xc0, // sete %al
+            }),
             .smin_i32_edi_esi_eax => try bytes.appendSlice(allocator, &.{ 0x89, 0xf8, 0x39, 0xf7, 0x0f, 0x4f, 0xc6 }),
             .umin_i32_edi_esi_eax => try bytes.appendSlice(allocator, &.{ 0x89, 0xf8, 0x39, 0xf7, 0x0f, 0x47, 0xc6 }),
             .smax_i32_edi_esi_eax => try bytes.appendSlice(allocator, &.{ 0x89, 0xf8, 0x39, 0xf7, 0x0f, 0x4c, 0xc6 }),
@@ -1306,6 +1332,69 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .replace_low_i8_dil_sil_al => try bytes.appendSlice(allocator, &.{ 0x89, 0xf8, 0x83, 0xe0, 0xf8, 0x89, 0xf2, 0x83, 0xe2, 0x07, 0x09, 0xd0 }),
             .read_flag_i8_dil_al => try bytes.appendSlice(allocator, &.{ 0x31, 0xc0, 0x40, 0x84, 0xff, 0x0f, 0x98, 0xc0 }),
             .ult_i8_dil_imm8_al => |imm| try bytes.appendSlice(allocator, &.{ 0x31, 0xc0, 0x40, 0x80, 0xff, imm, 0x0f, 0x92, 0xc0 }),
+            .cmp_ult_u32_edi_esi_al => try bytes.appendSlice(allocator, &.{ 0x31, 0xc0, 0x39, 0xf7, 0x0f, 0x92, 0xc0 }),
+            .ascii_range_u8_dil_imm8_imm8_al => |range| try bytes.appendSlice(allocator, &.{
+                0x31, 0xc0,
+                0x40, 0x88, 0xf8,
+                0x2c, range.low,
+                0x3c, range.len,
+                0x0f, 0x92, 0xc0,
+            }),
+            .ascii_alphabetic_dil_al => try bytes.appendSlice(allocator, &.{
+                0x31, 0xc0,
+                0x40, 0x88, 0xf8,
+                0x24, 0xdf,
+                0x2c, 0x41,
+                0x3c, 0x1a,
+                0x0f, 0x92, 0xc0,
+            }),
+            .ascii_alphanumeric_dil_al => try bytes.appendSlice(allocator, &.{
+                0x31, 0xc0,
+                0x40, 0x88, 0xf9,
+                0x80, 0xe9, 0x30,
+                0x80, 0xf9, 0x0a,
+                0x0f, 0x92, 0xc1,
+                0x40, 0x88, 0xf8,
+                0x24, 0xdf,
+                0x2c, 0x41,
+                0x3c, 0x1a,
+                0x0f, 0x92, 0xc0,
+                0x08, 0xc8,
+            }),
+            .ascii_whitespace_dil_al => try bytes.appendSlice(allocator, &.{
+                0x31, 0xc0,
+                0x40, 0x80, 0xff, 0x20,
+                0x0f, 0x94, 0xc1,
+                0x40, 0x88, 0xf8,
+                0x2c, 0x09,
+                0x3c, 0x05,
+                0x0f, 0x92, 0xc0,
+                0x08, 0xc8,
+            }),
+            .grow_capacity_u64_rdi_imm32_rax => |imm| {
+                if (imm >= -128 and imm <= 127) {
+                    try bytes.appendSlice(allocator, &.{
+                        0x48, 0x89, 0xf9,
+                        0x48, 0xd1, 0xe9,
+                        0x48, 0xc7, 0xc0, 0xff, 0xff, 0xff, 0xff,
+                        0x48, 0x83, 0xc1, @as(u8, @bitCast(@as(i8, @intCast(imm)))),
+                        0x48, 0x01, 0xf9,
+                        0x48, 0x0f, 0x43, 0xc1,
+                    });
+                } else {
+                    try bytes.appendSlice(allocator, &.{
+                        0x48, 0x89, 0xf9,
+                        0x48, 0xd1, 0xe9,
+                        0x48, 0xc7, 0xc0, 0xff, 0xff, 0xff, 0xff,
+                        0x48, 0x81, 0xc1,
+                    });
+                    try appendI32(&bytes, allocator, imm);
+                    try bytes.appendSlice(allocator, &.{
+                        0x48, 0x01, 0xf9,
+                        0x48, 0x0f, 0x43, 0xc1,
+                    });
+                }
+            },
             .store_imm8_abs => |store| {
                 try bytes.appendSlice(allocator, &.{ 0xc6, 0x04, 0x25 });
                 try appendU32(&bytes, allocator, store.address);
@@ -1838,6 +1927,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .or_eax_imm32 => 5,
         .imul_eax_imm32 => 6,
         .and_eax_imm32 => 5,
+        .xor_eax_imm32 => 5,
         .abs_i32_edi_eax => 11,
         .abs_i64_rdi_rax => 16,
         .wide_int_to_fp_rdi_rsi_xmm0 => |conversion| switch (conversion.to_bits) {
@@ -1992,12 +2082,21 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .guarded_strncpy_rdi_rsi_rdx_rcx_rax => 55,
         .guarded_strcpy_rdi_rsi_rdx_rax => 42,
         .memset_rdi_sil_rdx_rax => 22,
+        .strlen_rdi_rax => 13,
+        .strnlen_rdi_rsi_rax => 18,
+        .atomic_try_lock_rdi_al => 14,
         .and_edi_imm8 => 3,
         .smin_i32_edi_esi_eax, .umin_i32_edi_esi_eax, .smax_i32_edi_esi_eax, .umax_i32_edi_esi_eax => 7,
         .shift_mix_i32_edi_esi_eax => 15,
         .replace_low_i8_dil_sil_al => 12,
         .read_flag_i8_dil_al => 8,
         .ult_i8_dil_imm8_al => 9,
+        .cmp_ult_u32_edi_esi_al => 7,
+        .ascii_range_u8_dil_imm8_imm8_al => 12,
+        .ascii_alphabetic_dil_al => 14,
+        .ascii_alphanumeric_dil_al => 28,
+        .ascii_whitespace_dil_al => 21,
+        .grow_capacity_u64_rdi_imm32_rax => |imm| if (imm >= -128 and imm <= 127) 24 else 27,
         .store_imm8_abs => 8,
         .cmp_ecx_arg32 => |reg| if (reg.rexB()) 3 else 2,
         .cmp_rcx_arg64 => 3,

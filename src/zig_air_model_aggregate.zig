@@ -114,7 +114,8 @@ pub fn selectedStructSumShape(function: air_export.Function) bool {
 pub fn packedReadFlagSummary(function: air_export.Function) ?PackedFieldSummary {
     const field2 = functionFieldPtrIndex(function, 2) orelse return null;
     const load = untypedFindAnyLoadFromSlot(function, field2) orelse return null;
-    const bitcast = untypedFindCastOf(function, "bitcast", load) orelse null;
+    const bitcast = untypedFindCastOf(function, "bitcast", load) orelse
+        untypedFindCastOf(function, "bit_cast", load) orelse null;
     return .{
         .kind = .read_flag,
         .field_ptr = field2,
@@ -200,7 +201,8 @@ pub fn tableLookupSummary(function: air_export.Function) ?TableLookupSummary {
         if (!std.mem.eql(u8, mask.opcode, "bit_and")) continue;
         for (function.instructions) |cast| {
             if (untypedCastSource(cast) != mask.index) continue;
-            if (!std.mem.startsWith(u8, cast.opcode, "intcast")) continue;
+            if (!std.mem.startsWith(u8, cast.opcode, "intcast") and
+                !std.mem.startsWith(u8, cast.opcode, "int_cast")) continue;
             for (function.instructions) |table_access| {
                 if (untypedArrayElemIndex(table_access) == cast.index) {
                     return .{
@@ -230,9 +232,10 @@ pub fn typedPackedReadFlagSummary(
     {
         return null;
     }
+    const bitcast_count = typedOpcodeCount(structured_air_v2, "bitcast") + typedOpcodeCount(structured_air_v2, "bit_cast");
     if (typedOpcodeCount(structured_air_v2, "arg") != 1 or
         typedOpcodeCount(structured_air_v2, "alloc") != 1 or
-        typedOpcodeCount(structured_air_v2, "bitcast") != 2 or
+        bitcast_count != 2 or
         typedStoreOpcodeCount(structured_air_v2) != 1 or
         typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_2") != 1 or
         typedOpcodeCount(structured_air_v2, "load") != 1 or
@@ -254,9 +257,10 @@ pub fn typedPackedReplaceLowSummary(
     {
         return null;
     }
+    const replace_bitcast_count = typedOpcodeCount(structured_air_v2, "bitcast") + typedOpcodeCount(structured_air_v2, "bit_cast");
     if (typedOpcodeCount(structured_air_v2, "arg") != 2 or
         typedOpcodeCount(structured_air_v2, "alloc") != 1 or
-        typedOpcodeCount(structured_air_v2, "bitcast") != 2 or
+        replace_bitcast_count != 2 or
         typedStoreOpcodeCount(structured_air_v2) != 2 or
         typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") != 1 or
         typedOpcodeCount(structured_air_v2, "trunc") != 1 or

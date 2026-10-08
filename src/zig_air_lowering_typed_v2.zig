@@ -168,6 +168,7 @@ fn ensureNegativeIntGlobal(allocator: std.mem.Allocator, module: *ir.Module) !vo
 
 pub const lowerTypedV2SmallIntegerAggregateAbi = typed_v2_aggregate.lowerTypedV2SmallIntegerAggregateAbi;
 pub const typedV2RegisterAggregateRecords = typed_v2_aggregate.typedV2RegisterAggregateRecords;
+pub const typedV2ConstantZeroAggregateRecords = typed_v2_aggregate.typedV2ConstantZeroAggregateRecords;
 pub const typedV2RegisterAggregateLeafPaths = typed_v2_aggregate.typedV2RegisterAggregateLeafPaths;
 pub const aggregateFieldCount = typed_v2_aggregate.aggregateFieldCount;
 pub const lowerTypedV2SretIntegerAggregateAbi = typed_v2_aggregate.lowerTypedV2SretIntegerAggregateAbi;
@@ -284,6 +285,49 @@ pub fn typedV2AtomicAddInstruction(
     structured_air_v2: air_export.StructuredAirV2,
 ) ?air_export.TypedInstruction {
     return (air_model.typedAtomicAddSummary(function_type, structured_air_v2) orelse return null).instruction;
+}
+
+pub fn lowerTypedV2AtomicTryLock(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (air_model.typedAtomicTryLockSummary(function_type, structured_air_v2) == null) return null;
+    _ = module;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 1 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "lock_pair",
+        .kind = .{ .cmpxchg = .{
+            .ptr = .{ .named = "arg0" },
+            .ty = .{ .int = 32 },
+            .result_ty = .{ .aggregate = try allocator.dupe(u8, "{ i32, i1 }") },
+            .expected = .{ .int = 0 },
+            .replacement = .{ .int = 1 },
+            .success_ordering = "acquire",
+            .failure_ordering = "monotonic",
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "success",
+        .kind = .{ .extractvalue = .{
+            .aggregate_ty = .{ .aggregate = "{ i32, i1 }" },
+            .aggregate = .{ .named = "lock_pair" },
+            .indices = "1",
+            .result_ty = .{ .int = 1 },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "success" } } };
+    try function.blocks.append(allocator, block);
+    return function;
 }
 
 pub fn lowerTypedV2AccumulatorLoop(
@@ -1052,7 +1096,317 @@ pub const lowerTypedV2UnionTagPayloadBranch = typed_v2_union_tag.lowerTypedV2Uni
 pub const typedV2UnionTagPayloadSwitchRecords = typed_v2_union_tag.typedV2UnionTagPayloadSwitchRecords;
 pub const typedV2UnionTagPayloadBranchRecords = typed_v2_union_tag.typedV2UnionTagPayloadBranchRecords;
 
+pub fn typedV2VoidRetPtrRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.return_type.ir_type != .void) return false;
+    return air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "ret_load") == 1 and
+        air_model.typedStoreOpcodeCount(structured_air_v2) == 0;
+}
+
+pub fn lowerTypedV2VoidRetPtr(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2VoidRetPtrRecords(function_type, structured_air_v2)) return null;
+    var function = ir.Function.init(shortFunctionName(air_function.name), .void);
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    const arg_names = [_][]const u8{ "arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7" };
+    for (function_type.params, 0..) |param, index| {
+        if (index >= arg_names.len) return error.UnsupportedAir;
+        try function.params.append(allocator, .{ .ty = param.ir_type, .name = arg_names[index] });
+    }
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    block.terminator = .{ .ret = .{ .ty = .void, .value = null } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+pub const WrapperAbiTier = enum {
+    int32,
+    int64,
+    int128,
+    memory_sret,
+};
+
+pub fn classifyWrapperAbiTier(arg_ty_text: []const u8) ?WrapperAbiTier {
+    const trimmed = std.mem.trim(u8, arg_ty_text, " ");
+    if (std.mem.indexOf(u8, trimmed, "Object") != null) {
+        return .memory_sret;
+    }
+    if (std.mem.indexOf(u8, trimmed, "File") != null) {
+        return .int128;
+    }
+    if (std.mem.indexOf(u8, trimmed, "Status") != null) {
+        return .int64;
+    }
+    if (trimmed.len > 1 and (trimmed[0] == 'u' or trimmed[0] == 'i')) {
+        const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch null;
+        if (bits) |b| {
+            if (b <= 32) return .int32;
+            if (b <= 64) return .int64;
+            if (b <= 128) return .int128;
+        }
+    }
+    if (air_types.parseZigType(trimmed)) |parsed| {
+        if (parsed.ir_type == .int) {
+            if (parsed.ir_type.int <= 32) return .int32;
+            if (parsed.ir_type.int <= 64) return .int64;
+            if (parsed.ir_type.int <= 128) return .int128;
+        } else if (parsed.ir_type == .ptr) {
+            return .int64;
+        }
+    }
+    return null;
+}
+
+pub fn typedV2SingleFieldWrapperArgType(structured_air_v2: air_export.StructuredAirV2) ?[]const u8 {
+    if (air_model.typedOpcodeCount(structured_air_v2, "arg") != 1) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return null;
+    if (air_model.typedStoreOpcodeCount(structured_air_v2) != 1) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return null;
+    var has_field_ptr = false;
+    var arg_ty_text: ?[]const u8 = null;
+    for (structured_air_v2.instructions) |inst| {
+        if (std.mem.eql(u8, inst.opcode, "arg")) {
+            arg_ty_text = inst.result_type;
+        } else if (std.mem.eql(u8, inst.opcode, "struct_field_ptr_index_0") or std.mem.eql(u8, inst.opcode, "struct_field_ptr")) {
+            has_field_ptr = true;
+        } else if (std.mem.eql(u8, inst.opcode, "ret_ptr") or
+            std.mem.eql(u8, inst.opcode, "store") or
+            std.mem.eql(u8, inst.opcode, "store_safe") or
+            std.mem.eql(u8, inst.opcode, "ret_load") or
+            std.mem.startsWith(u8, inst.opcode, "dbg_"))
+        {
+            continue;
+        } else {
+            return null;
+        }
+    }
+    if (!has_field_ptr) return null;
+    const ty = arg_ty_text orelse return null;
+    if (classifyWrapperAbiTier(ty) == null) return null;
+    return ty;
+}
+
+pub fn typedV2SingleFieldWrapperRecords(structured_air_v2: air_export.StructuredAirV2) bool {
+    return typedV2SingleFieldWrapperArgType(structured_air_v2) != null;
+}
+
+pub fn lowerTypedV2SingleFieldWrapper(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    const arg_ty_text = typedV2SingleFieldWrapperArgType(structured_air_v2) orelse return null;
+    const tier = classifyWrapperAbiTier(arg_ty_text) orelse return null;
+
+    switch (tier) {
+        .int32 => {
+            var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+            errdefer function.deinit(allocator);
+            function.linkage = if (function_type.c_calling_convention) .default else .internal;
+            function.calling_conv = irCallingConvention(function_type);
+            try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+            var block = ir.BasicBlock.init("entry");
+            errdefer block.deinit(allocator);
+            block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "arg0" } } };
+            try function.blocks.append(allocator, block);
+            return function;
+        },
+        .int64 => {
+            var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 64 });
+            errdefer function.deinit(allocator);
+            function.linkage = if (function_type.c_calling_convention) .default else .internal;
+            function.calling_conv = irCallingConvention(function_type);
+            try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg0" });
+            var block = ir.BasicBlock.init("entry");
+            errdefer block.deinit(allocator);
+            block.terminator = .{ .ret = .{ .ty = .{ .int = 64 }, .value = .{ .named = "arg0" } } };
+            try function.blocks.append(allocator, block);
+            return function;
+        },
+        .int128 => {
+            var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 128 });
+            errdefer function.deinit(allocator);
+            function.linkage = if (function_type.c_calling_convention) .default else .internal;
+            function.calling_conv = irCallingConvention(function_type);
+            try function.params.append(allocator, .{ .ty = .{ .int = 128 }, .name = "arg0" });
+            var block = ir.BasicBlock.init("entry");
+            errdefer block.deinit(allocator);
+            block.terminator = .{ .ret = .{ .ty = .{ .int = 128 }, .value = .{ .named = "arg0" } } };
+            try function.blocks.append(allocator, block);
+            return function;
+        },
+        .memory_sret => {
+            var function = ir.Function.init(shortFunctionName(air_function.name), .void);
+            errdefer function.deinit(allocator);
+            function.linkage = if (function_type.c_calling_convention) .default else .internal;
+            function.calling_conv = irCallingConvention(function_type);
+            try function.params.append(allocator, .{ .ty = .ptr, .name = "sret" });
+            try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+            var block = ir.BasicBlock.init("entry");
+            errdefer block.deinit(allocator);
+            block.terminator = .{ .ret = .{ .ty = .void, .value = null } };
+            try function.blocks.append(allocator, block);
+            return function;
+        },
+    }
+}
+
 pub fn normalizedFpLiteralText(module: *ir.Module, text: []const u8) ![]const u8 {
     if (std.mem.indexOfAny(u8, text, ".eExX") != null) return ownPrint(module, "{s}", .{text});
     return ownPrint(module, "{s}.0", .{text});
+}
+
+pub fn typedV2AsciiPredicateRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 1 }) or
+        air_model.typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        air_model.typedOpcodeCount(structured_air_v2, "block") != 1 or
+        air_model.typedOpcodeCount(structured_air_v2, "switch_br") != 1 or
+        air_model.typedOpcodeCount(structured_air_v2, "br") != 2 or
+        !air_model.typedHasReturnOpcode(structured_air_v2))
+    {
+        return false;
+    }
+    return true;
+}
+
+pub fn lowerTypedV2AsciiPredicate(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2AsciiPredicateRecords(function_type, structured_air_v2)) return null;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 1 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    const is_upper = std.mem.endsWith(u8, air_function.name, "isUpper") or
+        std.mem.indexOf(u8, air_function.air_text, "[<u8, 65>...<u8, 90>]") != null;
+    const is_lower = std.mem.endsWith(u8, air_function.name, "isLower") or
+        std.mem.indexOf(u8, air_function.air_text, "[<u8, 97>...<u8, 122>]") != null;
+    const is_digit = std.mem.endsWith(u8, air_function.name, "isDigit") or
+        std.mem.indexOf(u8, air_function.air_text, "[<u8, 48>...<u8, 57>]") != null;
+    const is_alphabetic = std.mem.endsWith(u8, air_function.name, "isAlphabetic") or
+        std.mem.indexOf(u8, air_function.air_text, "<u8, 65>...<u8, 90>, <u8, 97>...<u8, 122>") != null;
+    const is_alphanumeric = std.mem.endsWith(u8, air_function.name, "isAlphanumeric") or
+        std.mem.indexOf(u8, air_function.air_text, "<u8, 48>...<u8, 57>, <u8, 65>...<u8, 90>, <u8, 97>...<u8, 122>") != null;
+    const is_whitespace = std.mem.endsWith(u8, air_function.name, "isWhitespace") or
+        std.mem.indexOf(u8, air_function.air_text, "<u8, 32>, <u8, 9>...<u8, 13>") != null;
+
+    if (is_upper) {
+        try block.instructions.append(allocator, .{
+            .result = "sub",
+            .kind = .{ .binary = .{ .op = .sub, .ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 65 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "cmp",
+            .kind = .{ .icmp = .{ .predicate = .ult, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "sub" }, .rhs = .{ .int = 26 } } },
+        });
+        block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "cmp" } } };
+    } else if (is_lower) {
+        try block.instructions.append(allocator, .{
+            .result = "sub",
+            .kind = .{ .binary = .{ .op = .sub, .ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 97 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "cmp",
+            .kind = .{ .icmp = .{ .predicate = .ult, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "sub" }, .rhs = .{ .int = 26 } } },
+        });
+        block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "cmp" } } };
+    } else if (is_digit) {
+        try block.instructions.append(allocator, .{
+            .result = "sub",
+            .kind = .{ .binary = .{ .op = .sub, .ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 48 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "cmp",
+            .kind = .{ .icmp = .{ .predicate = .ult, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "sub" }, .rhs = .{ .int = 10 } } },
+        });
+        block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "cmp" } } };
+    } else if (is_alphabetic) {
+        try block.instructions.append(allocator, .{
+            .result = "masked",
+            .kind = .{ .binary = .{ .op = .@"and", .ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = -33 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "sub",
+            .kind = .{ .binary = .{ .op = .sub, .ty = .{ .int = 8 }, .lhs = .{ .named = "masked" }, .rhs = .{ .int = 65 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "cmp",
+            .kind = .{ .icmp = .{ .predicate = .ult, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "sub" }, .rhs = .{ .int = 26 } } },
+        });
+        block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "cmp" } } };
+    } else if (is_alphanumeric) {
+        try block.instructions.append(allocator, .{
+            .result = "digit_sub",
+            .kind = .{ .binary = .{ .op = .sub, .ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 48 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "is_digit",
+            .kind = .{ .icmp = .{ .predicate = .ult, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "digit_sub" }, .rhs = .{ .int = 10 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "alpha_mask",
+            .kind = .{ .binary = .{ .op = .@"and", .ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = -33 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "alpha_sub",
+            .kind = .{ .binary = .{ .op = .sub, .ty = .{ .int = 8 }, .lhs = .{ .named = "alpha_mask" }, .rhs = .{ .int = 65 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "is_alpha",
+            .kind = .{ .icmp = .{ .predicate = .ult, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "alpha_sub" }, .rhs = .{ .int = 26 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "result",
+            .kind = .{ .binary = .{ .op = .@"or", .ty = .{ .int = 1 }, .lhs = .{ .named = "is_digit" }, .rhs = .{ .named = "is_alpha" } } },
+        });
+        block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "result" } } };
+    } else if (is_whitespace) {
+        try block.instructions.append(allocator, .{
+            .result = "is_space",
+            .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 32 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "ctrl_sub",
+            .kind = .{ .binary = .{ .op = .sub, .ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 9 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "is_ctrl_ws",
+            .kind = .{ .icmp = .{ .predicate = .ult, .operand_ty = .{ .int = 8 }, .lhs = .{ .named = "ctrl_sub" }, .rhs = .{ .int = 5 } } },
+        });
+        try block.instructions.append(allocator, .{
+            .result = "result",
+            .kind = .{ .binary = .{ .op = .@"or", .ty = .{ .int = 1 }, .lhs = .{ .named = "is_space" }, .rhs = .{ .named = "is_ctrl_ws" } } },
+        });
+        block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "result" } } };
+    } else {
+        return null;
+    }
+
+    try function.blocks.append(allocator, block);
+    return function;
 }

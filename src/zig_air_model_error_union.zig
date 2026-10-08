@@ -193,7 +193,7 @@ fn concreteErrorSetType(
     if (isErrorSetType(direct_type)) return direct_type;
     if (!std.mem.eql(u8, direct_type, "anyerror")) return null;
     const cast = typedInstructionByIndex(structured_air_v2, operand_index) orelse return null;
-    if (!std.mem.eql(u8, cast.opcode, "bitcast") or cast.operands.len != 1) return null;
+    if ((!std.mem.eql(u8, cast.opcode, "bitcast") and !std.mem.eql(u8, cast.opcode, "bit_cast")) or cast.operands.len != 1) return null;
     const source_type = std.mem.trim(u8, cast.operands[0].type_text, " ");
     if (!isErrorSetType(source_type)) return null;
     return source_type;

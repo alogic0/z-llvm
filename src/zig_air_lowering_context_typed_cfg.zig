@@ -99,25 +99,30 @@ pub fn lowerTypedSwitchValueBlock(
     const merge_type = self.typedBlockResultType(instruction) orelse return air_model.LowerError.UnsupportedAir;
     if (merge_type.ir_type == .void) return air_model.LowerError.UnsupportedAir;
 
-    var case_values: std.ArrayList(air_model.TypedValue) = .empty;
-    defer case_values.deinit(self.allocator);
-    try collectSwitchCaseValues(self.allocator, &case_values, self.air_function.air_text, switch_instruction.index);
-    if (case_values.items.len == 0) return air_model.LowerError.UnsupportedAir;
-    for (case_values.items) |case_value| {
-        if (!case_value.ty.ir_type.eql(cond.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+    var arms: std.ArrayList(SwitchArm) = .empty;
+    defer {
+        for (arms.items) |*arm| arm.values.deinit(self.allocator);
+        arms.deinit(self.allocator);
+    }
+    try collectSwitchCaseArms(self.allocator, &arms, self.air_function.air_text, switch_instruction.index);
+    if (arms.items.len == 0) return air_model.LowerError.UnsupportedAir;
+    for (arms.items) |arm| {
+        for (arm.values.items) |case_value| {
+            if (!case_value.ty.ir_type.eql(cond.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+        }
     }
     const has_else_arm = switchHasElseArm(self.air_function.air_text, switch_instruction.index);
 
     var branch_instructions: std.ArrayList(air_export.TypedInstruction) = .empty;
     defer branch_instructions.deinit(self.allocator);
     try self.collectBlockValueBranches(instruction.index, &branch_instructions);
-    const expected_branches = case_values.items.len + @intFromBool(has_else_arm);
+    const expected_branches = arms.items.len + @intFromBool(has_else_arm);
     if (branch_instructions.items.len != expected_branches) return air_model.LowerError.UnsupportedAir;
 
     var labels: std.ArrayList([]const u8) = .empty;
     defer labels.deinit(self.allocator);
-    for (case_values.items, 0..) |_, case_index| {
-        try labels.append(self.allocator, try ownPrint(self.module, "block{}_case{}", .{ instruction.index, case_index }));
+    for (arms.items, 0..) |_, arm_index| {
+        try labels.append(self.allocator, try ownPrint(self.module, "block{}_case{}", .{ instruction.index, arm_index }));
     }
     const default_label = if (has_else_arm)
         try ownPrint(self.module, "block{}_default", .{instruction.index})
@@ -133,12 +138,14 @@ pub fn lowerTypedSwitchValueBlock(
         .cases = .empty,
     };
     errdefer switch_term.cases.deinit(self.allocator);
-    for (case_values.items, 0..) |case_value, case_index| {
-        try switch_term.cases.append(self.allocator, .{
-            .value_ty = cond.ty.ir_type,
-            .value = case_value.value,
-            .target = labels.items[case_index],
-        });
+    for (arms.items, 0..) |arm, arm_index| {
+        for (arm.values.items) |case_value| {
+            try switch_term.cases.append(self.allocator, .{
+                .value_ty = cond.ty.ir_type,
+                .value = case_value.value,
+                .target = labels.items[arm_index],
+            });
+        }
     }
 
     var finished = self.block.*;
@@ -829,21 +836,35 @@ fn switchInputIndexFromAirText(function_air_text: []const u8, switch_index: u32)
     return air_text.instructionRef(std.mem.trim(u8, line[open + 1 .. close], " !"));
 }
 
-fn collectSwitchCaseValues(
+const SwitchArm = struct {
+    values: std.ArrayList(air_model.TypedValue),
+};
+
+fn collectSwitchCaseArms(
     allocator: std.mem.Allocator,
-    values: *std.ArrayList(air_model.TypedValue),
+    arms: *std.ArrayList(SwitchArm),
     function_air_text: []const u8,
     switch_index: u32,
 ) !void {
     const text = switchText(function_air_text, switch_index) orelse return air_model.LowerError.UnsupportedAir;
     var offset: usize = 0;
-    while (std.mem.indexOfPos(u8, text, offset, "[<")) |start| {
-        const value_start = start + 1;
-        const value_end = std.mem.indexOfPos(u8, text, value_start, "] =>") orelse return air_model.LowerError.UnsupportedAir;
-        const value = air_values_parse_constant_or_error(function_air_text, text, value_start, value_end) orelse
-            return air_model.LowerError.UnsupportedAir;
-        try values.append(allocator, value);
-        offset = value_end + "] =>".len;
+    while (std.mem.indexOfPos(u8, text, offset, "[")) |start| {
+        const close = std.mem.indexOfPos(u8, text, start + 1, "] =>") orelse return air_model.LowerError.UnsupportedAir;
+        const arm_text = text[start + 1 .. close];
+        var arm: SwitchArm = .{ .values = .empty };
+        errdefer arm.values.deinit(allocator);
+
+        var fields = air_text.splitTopLevel(arm_text, ',');
+        while (fields.next()) |field| {
+            const trimmed = std.mem.trim(u8, field, " \t\r\n");
+            if (trimmed.len == 0) continue;
+            const value = air_values_parse_constant_or_error(function_air_text, trimmed, 0, trimmed.len) orelse
+                return air_model.LowerError.UnsupportedAir;
+            try arm.values.append(allocator, value);
+        }
+        if (arm.values.items.len == 0) return air_model.LowerError.UnsupportedAir;
+        try arms.append(allocator, arm);
+        offset = close + "] =>".len;
     }
 }
 

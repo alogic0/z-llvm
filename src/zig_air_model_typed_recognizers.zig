@@ -77,6 +77,7 @@ const TypedLoopTryPostBranchSummary = core.TypedLoopTryPostBranchSummary;
 const TypedLoopTryPostSwitchSummary = core.TypedLoopTryPostSwitchSummary;
 const TypedInlineAsmSummary = core.TypedInlineAsmSummary;
 const TypedAtomicRmwSummary = core.TypedAtomicRmwSummary;
+const TypedAtomicTryLockSummary = core.TypedAtomicTryLockSummary;
 const TypedDenseIntegerSwitchSummary = core.TypedDenseIntegerSwitchSummary;
 const TypedErrorSwitchSummary = core.TypedErrorSwitchSummary;
 const TypedErrorUnionSummary = core.TypedErrorUnionSummary;
@@ -205,6 +206,7 @@ pub const typedConditionalSlotUpdateSummary = typed_recognizers_impl.typedCondit
 pub const typedLoopTrySummary = typed_recognizers_impl.typedLoopTrySummary;
 pub const typedInlineAsmBarrierSummary = typed_recognizers_impl.typedInlineAsmBarrierSummary;
 pub const typedAtomicAddSummary = typed_recognizers_impl.typedAtomicAddSummary;
+pub const typedAtomicTryLockSummary = typed_recognizers_impl.typedAtomicTryLockSummary;
 pub const typedDenseIntegerSwitchSummary = typed_recognizers_impl.typedDenseIntegerSwitchSummary;
 pub const typedErrorSwitchSummary = typed_recognizers_impl.typedErrorSwitchSummary;
 pub const typedErrorClassifierSummary = typed_recognizers_impl.typedErrorClassifierSummary;
@@ -212,7 +214,3 @@ pub const typedErrorUnionPayloadSummary = typed_recognizers_impl.typedErrorUnion
 pub const typedErrorUnionFlow = typed_recognizers_impl.typedErrorUnionFlow;
 pub const typedErrorUnionFlowDiagnosticName = typed_recognizers_impl.typedErrorUnionFlowDiagnosticName;
 pub const typedMaybeErrorSummary = typed_recognizers_impl.typedMaybeErrorSummary;
-
-test {
-    _ = @import("zig_air_model_typed_recognizers_tests.zig");
-}
