@@ -121,7 +121,6 @@ pub fn lowerGenericCfgScalarSretParamStores(
     while (leaf_index < leaf_count) : (leaf_index += 1) {
         const leaf = leaves[leaf_index];
         const field_ty = leaf.ty;
-        if (!function.params.items[leaf_index + 1].ty.eql(field_ty)) return false;
         if (leaf.offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
         const offset: u32 = @intCast(leaf.offset);
         const store_ptr = if (offset == 0 and instruction_index < block.instructions.items.len) ptr: {
@@ -160,7 +159,19 @@ pub fn lowerGenericCfgScalarSretParamStores(
             else => return false,
         };
         if (!store.ty.eql(field_ty) or store.attrs.isBarrier()) return false;
-        if (!isNamed(store.ptr, ptr_name) or !isNamed(store.value, function.params.items[leaf_index + 1].name)) return false;
+        if (!isNamed(store.ptr, ptr_name)) return false;
+        const store_val_name = switch (store.value) {
+            .named => |n| n,
+            else => return false,
+        };
+        var found_param = false;
+        for (function.params.items[1..]) |param| {
+            if (std.mem.eql(u8, param.name, store_val_name) and param.ty.eql(field_ty)) {
+                found_param = true;
+                break;
+            }
+        }
+        if (!found_param) return false;
         instruction_index += 1;
 
         try emitGenericCfgScalarSretParamStore(allocator, machine, function, block, store.value, field_ty, sret_reg, offset);

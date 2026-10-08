@@ -353,6 +353,7 @@ pub const ScalarLoadKind = enum {
 pub const ScalarLoadAction = struct {
     kind: ScalarLoadKind,
     bits: u16,
+    is_ptr: bool = false,
 };
 
 /// Existing readonly-pointer i96/i128 result semantics. The planner

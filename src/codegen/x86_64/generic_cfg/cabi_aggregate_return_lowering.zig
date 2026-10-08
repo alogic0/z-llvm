@@ -596,6 +596,15 @@ fn emitConstantEightbyte(
     }
 }
 
+fn isEightByteIntegerAggregate(ty: ir.Type) bool {
+    if (ty != .aggregate) return false;
+    const classification = sysv_abi.classifyAggregate(ty) catch return false;
+    return classification.kind == .register and
+        classification.eightbyte_count == 1 and
+        classification.eightbytes[0] == .integer and
+        classification.size_bytes == 8;
+}
+
 fn emitIntegerEightbyte(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -633,7 +642,7 @@ fn emitIntegerEightbyte(
         if (dyn_leaf.offset < base_offset or dyn_leaf.offset >= base_offset + 8) return error.UnsupportedCodegenAbi;
         const rel_offset = dyn_leaf.offset - base_offset;
         if (rel_offset == 0) {
-            if (dyn_leaf.ty.eql(.{ .int = 64 }) or dyn_leaf.ty.eql(.ptr)) {
+            if (dyn_leaf.ty.eql(.{ .int = 64 }) or dyn_leaf.ty.eql(.ptr) or isEightByteIntegerAggregate(dyn_leaf.ty)) {
                 try emitInteger64Leaf(allocator, machine, function, block, dyn_leaf, dst);
             } else if (switch (dyn_leaf.ty) { .int => |bits| bits <= 32, else => false }) {
                 try emitInteger32Leaf(allocator, machine, function, block, dyn_leaf, dst);

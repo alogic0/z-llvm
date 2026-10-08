@@ -94,6 +94,47 @@ pub fn validateSretAggregateMakeRecords(
     return true;
 }
 
+pub fn validateSretParamFieldConstructorRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    const aggregate_ty = function_type.return_type.ir_type;
+    const plan = aggregateCopyLayoutPlan(aggregate_ty) orelse return false;
+    const leaves = plan.leafSlice();
+    if (leaves.len < 3) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "arg") != function_type.params.len) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return false;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return false;
+    if (air_model.typedStoreOpcodeCount(structured_air_v2) != function_type.params.len) return false;
+    const ret_ptr_index = air_model.typedRetPtrIndex(structured_air_v2) orelse return false;
+    var params_seen: [8]bool = @splat(false);
+    var fields_seen: [8]bool = @splat(false);
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "store") and !std.mem.eql(u8, instruction.opcode, "store_safe")) continue;
+        if (instruction.operands.len != 2) return false;
+        if (!std.mem.eql(u8, instruction.operands[1].kind, "inst")) return false;
+        const raw_inst_index = std.fmt.parseInt(usize, instruction.operands[1].value, 10) catch return false;
+        const arg_inst_index = aggregate_construction.resolveParamIndex(structured_air_v2, raw_inst_index) orelse return false;
+        if (arg_inst_index >= function_type.params.len) return false;
+        if (params_seen[arg_inst_index]) return false;
+        const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return false;
+        var path: [4]usize = undefined;
+        const path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return false;
+        if (path_len != 1) return false;
+        const field_idx = path[0];
+        if (field_idx >= 8 or fields_seen[field_idx]) return false;
+        const field_ty = type_layout.fieldType(aggregate_ty, field_idx) orelse return false;
+        const operand_type = parseZigType(instruction.operands[1].type_text) orelse return false;
+        if (!field_ty.eql(operand_type.ir_type)) return false;
+        params_seen[arg_inst_index] = true;
+        fields_seen[field_idx] = true;
+    }
+    for (params_seen[0..function_type.params.len]) |seen| {
+        if (!seen) return false;
+    }
+    return true;
+}
+
 fn inferSretAggregateMakeType(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,

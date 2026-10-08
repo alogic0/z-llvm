@@ -1,4 +1,5 @@
 const std = @import("std");
+const enum_facts = @import("zig_air_enum_facts.zig");
 const air_export = @import("zig_air_export.zig");
 const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
 const air_model = @import("zig_air_model.zig");
@@ -52,8 +53,16 @@ pub fn parseConstIntOperand(instruction: air_export.TypedInstruction, operand_in
     if (std.mem.startsWith(u8, trimmed, "<") and std.mem.endsWith(u8, trimmed, ">")) {
         const inner = trimmed[1 .. trimmed.len - 1];
         if (std.mem.indexOfScalar(u8, inner, ',')) |comma| {
+            const type_str = std.mem.trim(u8, inner[0..comma], " ");
             const val_str = std.mem.trim(u8, inner[comma + 1 ..], " ");
-            return std.fmt.parseInt(i128, val_str, 0) catch null;
+            if (std.fmt.parseInt(i128, val_str, 0)) |val| {
+                return val;
+            } else |_| {
+                if (enum_facts.enumeratorValue(type_str, val_str)) |val| {
+                    return val;
+                }
+            }
+            return null;
         }
     }
     return std.fmt.parseInt(i128, trimmed, 0) catch null;
@@ -145,6 +154,37 @@ fn isZeroString(text: []const u8) bool {
     return std.mem.eql(u8, trimmed, "0") or std.mem.eql(u8, trimmed, "0.0") or std.mem.eql(u8, trimmed, "0x0");
 }
 
+pub fn resolveParamIndex(structured_air_v2: air_export.StructuredAirV2, inst_index: usize) ?usize {
+    var cur = inst_index;
+    while (true) {
+        var found = false;
+        for (structured_air_v2.instructions) |inst| {
+            if (inst.index == cur) {
+                if (std.mem.eql(u8, inst.opcode, "arg")) {
+                    var arg_idx: usize = 0;
+                    for (structured_air_v2.instructions) |ai| {
+                        if (ai.index == cur) return arg_idx;
+                        if (std.mem.eql(u8, ai.opcode, "arg")) arg_idx += 1;
+                    }
+                    return arg_idx;
+                } else if (std.mem.eql(u8, inst.opcode, "bit_cast") or
+                    std.mem.eql(u8, inst.opcode, "bitcast") or
+                    std.mem.eql(u8, inst.opcode, "int_cast") or
+                    std.mem.eql(u8, inst.opcode, "cast"))
+                {
+                    if (inst.operands.len >= 1 and std.mem.eql(u8, inst.operands[0].kind, "inst")) {
+                        cur = std.fmt.parseInt(u32, inst.operands[0].value, 10) catch return null;
+                        found = true;
+                        break;
+                    }
+                }
+                return null;
+            }
+        }
+        if (!found) return null;
+    }
+}
+
 fn planRegisterAggregateFromStores(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
@@ -158,7 +198,8 @@ fn planRegisterAggregateFromStores(
             break :blk inferred.ty;
         }
     };
-    if (!isSysVRegisterAggregateCandidate(target_ty)) return null;
+    const is_candidate = isSysVRegisterAggregateCandidate(target_ty);
+    if (!is_candidate) return null;
     const plan = type_layout.aggregateLayoutPlan(layout, target_ty) catch return null;
     const leaves = plan.leafSlice();
     if (leaves.len == 0 or leaves.len > 8) return null;
@@ -166,8 +207,65 @@ fn planRegisterAggregateFromStores(
     if (air_model.typedOpcodeCount(structured_air_v2, "arg") != function_type.params.len) return null;
     if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return null;
     if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return null;
-    if (air_model.typedStoreOpcodeCount(structured_air_v2) != leaves.len) return null;
+    const store_count = air_model.typedStoreOpcodeCount(structured_air_v2);
+    const target_field_count = type_layout.fieldCount(target_ty);
+    const is_field_mode = (store_count == target_field_count and target_field_count > 0 and store_count != leaves.len);
+    if (!is_field_mode and store_count != leaves.len) return null;
     const ret_ptr_index = air_model.typedRetPtrIndex(structured_air_v2) orelse return null;
+
+    if (is_field_mode) {
+        var result_plan = RegisterAggregatePlan{ .leaf_count = target_field_count };
+        var field_filled: [8]bool = @splat(false);
+        var params_used: [8]bool = @splat(false);
+
+        for (structured_air_v2.instructions) |instruction| {
+            if (!std.mem.eql(u8, instruction.opcode, "store") and !std.mem.eql(u8, instruction.opcode, "store_safe")) continue;
+            if (instruction.operands.len != 2) return null;
+
+            const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return null;
+            var path: [4]usize = undefined;
+            const path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return null;
+            if (path_len != 1) return null;
+            const field_idx = path[0];
+            if (field_idx >= target_field_count or field_filled[field_idx]) return null;
+
+            const field_ty = type_layout.fieldType(target_ty, field_idx) orelse return null;
+            const operand_type = parseZigType(instruction.operands[1].type_text) orelse return null;
+            if (!operand_type.ir_type.eql(field_ty)) return null;
+
+            const path_text = air_model.aggregateIndexPathText(path[0..path_len]) orelse return null;
+
+            if (std.mem.eql(u8, instruction.operands[1].kind, "inst")) {
+                const raw_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return null;
+                const arg_inst_index = resolveParamIndex(structured_air_v2, raw_inst_index) orelse return null;
+                if (arg_inst_index >= function_type.params.len) return null;
+                if (!function_type.params[arg_inst_index].ir_type.eql(field_ty)) return null;
+                params_used[arg_inst_index] = true;
+                result_plan.leaves[field_idx] = .{
+                    .path_text = path_text,
+                    .ty = field_ty,
+                    .source = .{ .param = arg_inst_index },
+                };
+            } else if (std.mem.eql(u8, instruction.operands[1].kind, "const")) {
+                const const_val = parseConstIntOperand(instruction, 1) orelse return null;
+                result_plan.leaves[field_idx] = .{
+                    .path_text = path_text,
+                    .ty = field_ty,
+                    .source = .{ .constant_int = const_val },
+                };
+            } else return null;
+
+            field_filled[field_idx] = true;
+        }
+
+        for (0..target_field_count) |i| {
+            if (!field_filled[i]) return null;
+        }
+        for (0..function_type.params.len) |p| {
+            if (!params_used[p]) return null;
+        }
+        return result_plan;
+    }
 
     var result_plan = RegisterAggregatePlan{ .leaf_count = leaves.len };
     var leaf_filled: [8]bool = @splat(false);
@@ -179,7 +277,21 @@ fn planRegisterAggregateFromStores(
 
         const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return null;
         var path: [4]usize = undefined;
-        const path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return null;
+        var path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return null;
+
+        var current_field_ty = target_ty;
+        for (path[0..path_len]) |p_idx| {
+            current_field_ty = type_layout.fieldType(current_field_ty, p_idx) orelse return null;
+        }
+        while (path_len < path.len) {
+            const norm = type_layout.normalizeAggregateType(current_field_ty);
+            if (!type_layout.isAggregateType(norm)) break;
+            if (type_layout.fieldCount(norm) != 1) break;
+            current_field_ty = type_layout.fieldType(norm, 0) orelse break;
+            path[path_len] = 0;
+            path_len += 1;
+        }
+
         const target_leaf = type_layout.leafAtIndexPath(layout, target_ty, path[0..path_len]) orelse return null;
 
         var matched_leaf_index: ?usize = null;
@@ -198,7 +310,8 @@ fn planRegisterAggregateFromStores(
         const path_text = air_model.aggregateIndexPathText(path[0..path_len]) orelse return null;
 
         if (std.mem.eql(u8, instruction.operands[1].kind, "inst")) {
-            const arg_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return null;
+            const raw_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return null;
+            const arg_inst_index = resolveParamIndex(structured_air_v2, raw_inst_index) orelse return null;
             if (arg_inst_index >= function_type.params.len) return null;
             if (!function_type.params[arg_inst_index].ir_type.eql(target_leaf.ty)) return null;
             params_used[arg_inst_index] = true;
@@ -207,6 +320,7 @@ fn planRegisterAggregateFromStores(
                 .ty = target_leaf.ty,
                 .source = .{ .param = arg_inst_index },
             };
+
         } else if (std.mem.eql(u8, instruction.operands[1].kind, "const")) {
             const const_val = parseConstIntOperand(instruction, 1) orelse return null;
             result_plan.leaves[leaf_index] = .{
@@ -214,9 +328,7 @@ fn planRegisterAggregateFromStores(
                 .ty = target_leaf.ty,
                 .source = .{ .constant_int = const_val },
             };
-        } else {
-            return null;
-        }
+        } else return null;
         leaf_filled[leaf_index] = true;
     }
 
@@ -318,7 +430,8 @@ pub fn inferRegisterAggregateConstructionLayout(
         if (instruction.operands.len != 2) return null;
         const operand_type = parseZigType(instruction.operands[1].type_text) orelse return null;
         if (std.mem.eql(u8, instruction.operands[1].kind, "inst")) {
-            const arg_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return null;
+            const raw_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return null;
+            const arg_inst_index = resolveParamIndex(structured_air_v2, raw_inst_index) orelse return null;
             if (arg_inst_index >= function_type.params.len) return null;
             if (!function_type.params[arg_inst_index].ir_type.eql(operand_type.ir_type)) return null;
             params_used[arg_inst_index] = true;

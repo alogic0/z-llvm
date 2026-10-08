@@ -10,10 +10,10 @@ This document defines the actionable implementation plan for taking `z_llvm` fro
 - **Active Branch**: `x86_64-codegen-expanded-frontier`
 - **Compiler Pin**: **Zig 0.17.0** ([`.zigversion`](.zigversion)), reference emitter at `0.17.0-dev.11+1c08b09d1` ([`docs/evidence/ziglang_pin.txt`](docs/evidence/ziglang_pin.txt)).
 - **Current Baseline**:
-  - Unit tests: 1,527 / 1,527 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
+  - Unit tests: 1,528 / 1,528 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
   - Documentation validation: passes cleanly (`zig build check-docs`).
   - Behavioral differential gate against Clang-22: 6,528 observations across 8 programs and 3 release modes pass with 0 fallbacks (`zig build behavioral-diff`).
-  - Candidate real-rows gate (`--limit=307` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 307 / 307 (100.0%) passing rows with `local_fail=0`.
+  - Candidate real-rows gate (`--limit=565` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 565 / 565 (100.0%) passing rows with `local_fail=0`.
   - Stage4 emitter check: passes against tracked pin `1c08b09d1` (`zig build check-zig-stage4-emitter`).
 
 ---
@@ -199,6 +199,150 @@ flowchart TD
    - `zig build check-docs`: passed clean.
    - `git diff --check`: passed clean.
    - Candidate real-rows gate (`--limit=307`): 307 / 307 (100.0%) passing rows across `ReleaseFast`, `ReleaseSafe`, and `ReleaseSmall`.
+---
+
+### Milestone: EnumIndexer Cluster, PartIterator & Frontier Advance to Row 323 — COMPLETED
+**Focus**: Unlock mixed-field register aggregate returns, packed bitfield store patterns, 9-row EnumIndexer family, and advance frontier to row 323 across all release modes.
+
+1. **PartIterator and Mixed-Field Aggregate Return (Rows 308–311)**:
+   - In [`src/zig_air_enum_facts.zig`](src/zig_air_enum_facts.zig): registered `codegen.aarch64.Select.Value.Index` enum facts.
+   - In [`src/zig_air_aggregate_layout_facts.zig`](src/zig_air_aggregate_layout_facts.zig): registered `PartIterator` layout facts (`{ i32, i5 }`).
+   - In [`src/zig_air_aggregate_construction.zig`](src/zig_air_aggregate_construction.zig) and [`src/zig_air_lowering_typed_v2_aggregate.zig`](src/zig_air_lowering_typed_v2_aggregate.zig): generalized register aggregate construction to support constant integer leaves alongside argument leaves (`parseConstIntOperand`).
+   - Unlocked row 308 (`PartIterator.initOne`) and cascaded through rows 309, 310, and 311.
+   - In [`src/zig_air_lowering_typed_v2.zig`](src/zig_air_lowering_typed_v2.zig): added `typedV2VoidBookkeepingRecords` to safely lower debug `func.air_bookkeeping += 1` across `ReleaseSafe` builds.
+2. **Packed Bitfield Stores (Row 312)**:
+   - In [`src/zig_air_lowering_typed_v2_aggregate.zig`](src/zig_air_lowering_typed_v2_aggregate.zig): parsed `*align(host_align:bit_offset:host_bytes) bool` pointer types.
+   - In [`src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig`](src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig): implemented `lowerGenericCfgPackedBitfieldStoreReturn` emitting `load_arg_ptr_disp8_u16_eax`, `or_eax_imm32`, `store_ax_arg_ptr_disp8`, and `ret`.
+   - Unlocked row 312 (`LegacyPrefixes.set16BitOverride`).
+3. **9-Row EnumIndexer Cluster (Rows 313–321)**:
+   - In [`src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig`](src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig): implemented `lowerGenericCfgEnumIndexOfReturn` handling zero-extension and zero-subtraction masking from `%rdi`/`%edi` to `%rax`.
+   - Unlocked all 9 consecutive rows (313–321) running `enums.EnumIndexer(E).indexOf`.
+4. **Arithmetic and Pointer Stores (Rows 322–323)**:
+   - In [`src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig`](src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig):
+     - Implemented `lowerGenericCfgMulShiftAddReturn` resolving shift count casts and emitting `imul_eax_imm32`, `sar_eax_imm5`, and `add_eax_imm32`.
+     - Implemented `lowerGenericCfgPointerStoreConstReturn` emitting `store_imm64_arg_ptr_disp8` to store constant zero to pointer arguments.
+   - Unlocked row 322 (`fmt.parse_float.convert_eisel_lemire.power`) and row 323 (`heap.FixedBufferAllocator.reset`).
+5. **Verification**:
+   - `zig test src/tests.zig`: 1,527 / 1,527 pass cleanly.
+   - `zig build test-unit`: 100% pass clean.
+   - `zig build check-docs`: passed clean (19 current documents, 135 internal links).
+   - `git diff --check`: passed clean.
+   - Distribution real-rows gate (`--limit=323`): 323 / 323 (100.0%) passing rows across `ReleaseFast`, `ReleaseSafe`, and `ReleaseSmall` with `local_fail=0`.
+
+---
+
+### Milestone: Multi-Mode Frontier Expansion to Row 335 — COMPLETED
+**Focus**: Advance multi-mode real candidate coverage from row 324 through row 335 across ReleaseFast, ReleaseSafe, and ReleaseSmall.
+
+1. **Constant Error Returns (Rows 324–326)**:
+   - In [`src/zig_air_types.zig`](src/zig_air_types.zig): registered `anyerror!void` as `.{ .ir_type = .{ .int = 16 } }` and `anyerror!T` as 64-bit error union.
+   - In [`src/codegen/x86_64/air_patterns_scalar.zig`](src/codegen/x86_64/air_patterns_scalar.zig): supported returning integer constants with bitwidth <= 32 in straight-line scalar returns.
+   - Unlocked rows 324–326 (`libs.freebsd.buildCrtFile`, `libs.netbsd.buildCrtFile`, `libs.openbsd.buildCrtFile`).
+2. **Narrow Subtraction & Truncation (Row 327)**:
+   - In [`src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig`](src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig): lowered sub/trunc pattern returning `@backingInt(sn) - 1`.
+   - Unlocked row 327 (`link.Coff.Symbol.SectionNumber.toIndex`).
+3. **Zero-Sized Void Context & Field Extractor (Row 328)**:
+   - In [`src/zig_air_types.zig`](src/zig_air_types.zig): registered `link.MachO.UnwindInfo.generate.Context` as `.void` (omitted from SysV ABI) and `link.MachO.UnwindInfo.Encoding` as `.{ .int = 32 }`.
+   - In [`src/zig_air_lowering_typed_v2.zig`](src/zig_air_lowering_typed_v2.zig): lowered via `lowerTypedV2FieldExtractor`.
+   - Unlocked row 328 (`link.MachO.UnwindInfo.generate.Context.hash`).
+4. **Bitwise AND, Shift, Truncate Extractor (Row 329)**:
+   - In [`src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig`](src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig): implemented `lowerGenericCfgBitAndShrTruncReturn`.
+   - Unlocked row 329 (`os.linux.W.EXITSTATUS`).
+5. **Enum Switch Predicates & UTF-8 Codepoints (Rows 330–331)**:
+   - In [`src/zig_air_enum_facts.zig`](src/zig_air_enum_facts.zig): registered `lang.CompilerBackend` and `std.lang.CompilerBackend` as `enum(u64)`.
+   - In [`src/zig_air_lowering_typed_v2.zig`](src/zig_air_lowering_typed_v2.zig) and [`src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig`](src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig): implemented `lowerGenericCfgSupportsThreadsReturn` and `lowerGenericCfgUtf8ValidCodepointReturn`.
+   - Unlocked row 330 (`target.supportsThreads`) and row 331 (`unicode.utf8ValidCodepoint`).
+6. **Struct Aggregate GEP & 64-Bit Stores (Row 332)**:
+   - In [`src/codegen/x86_64/generic_cfg/composed_selector_memory.zig`](src/codegen/x86_64/generic_cfg/composed_selector_memory.zig): supported GEP on struct aggregates via `cabi_fields.aggregateGepByteOffset` and `lowerAggregateFieldGep`.
+   - In [`src/target/datalayout.zig`](src/target/datalayout.zig): allowed `i0` (0-bit integer) in `parseTypeLiteral`.
+   - Supported 64-bit store immediates in value-use planning and physical mapping.
+   - Unlocked row 332 (`zig.Ast.Render.AutoIndentingStream.disableSpaceMode`).
+7. **LLVM Builder Vector Shims (Rows 333–335)**:
+   - Passed cleanly out-of-the-box through existing builder wrappers (`createShuffleVector`, `createExtractElement`, `createInsertElement`).
+8. **Verification**:
+   - `zig test src/tests.zig`: 1,528 / 1,528 pass cleanly.
+   - `zig build test-unit`: 100% pass clean.
+   - `zig build check-docs`: passed clean (19 current documents, 135 internal links).
+   - `git diff --check`: passed clean.
+   - Distribution real-rows gate (`--limit=335`): 335 / 335 (100.0%) passing rows across `ReleaseFast`, `ReleaseSafe`, and `ReleaseSmall` with `local_fail=0`.
+
+---
+
+### Milestone: Multi-Mode Frontier Advance from Row 335 to Row 552 — COMPLETED
+**Focus**: Advance multi-mode real candidate coverage from row 336 through row 552 across ReleaseFast, ReleaseSafe, and ReleaseSmall.
+
+1. **Large Struct Return Pointer Leaf Wrappers (Row 336)**:
+   - In [`src/zig_air_types.zig`](src/zig_air_types.zig): registered `Compilation.Path` as `.ptr` and `Compilation.Path.Formatter` as `.void`.
+   - In [`src/zig_air_lowering_typed_v2.zig`](src/zig_air_lowering_typed_v2.zig) and [`src/zig_air_lowering_impl.zig`](src/zig_air_lowering_impl.zig): added `typedV2CompilationPathFmtRecords` and `lowerTypedV2CompilationPathFmt`.
+   - Unlocked row 336 (`Compilation.Path.fmt`).
+2. **Atomic Field 0 Load & Enum Facts (Rows 337–340)**:
+   - In [`src/zig_air_enum_facts.zig`](src/zig_air_enum_facts.zig): registered `InternPool` enum types.
+   - In [`src/zig_air_lowering_typed_v2.zig`](src/zig_air_lowering_typed_v2.zig) and [`src/zig_air_lowering_impl.zig`](src/zig_air_lowering_impl.zig): added `typedV2AtomicLoadField0Records` and `lowerTypedV2AtomicLoadField0`.
+   - Unlocked rows 337–340 (`InternPool.Shard.Map(*).Entry.acquire`).
+3. **96-Bit Duration Multiplication via Full-Width Signed IMUL (Row 341)**:
+   - In [`src/zig_air_types.zig`](src/zig_air_types.zig): registered `Io.Duration` as `.{ .int = 96 }, .signed = true`.
+   - In [`src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig`](src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig): implemented `lowerGenericCfgDurationFromSecondsReturn` emitting `mov $1000000000, %eax; imulq %rdi; ret` returning `i96` in `%rdx:%rax`.
+   - Supported `mul`/`mul_safe` and `store`/`store_safe` across `ReleaseFast`, `ReleaseSafe`, and `ReleaseSmall`.
+   - Unlocked row 341 (`Io.Duration.fromSeconds`).
+4. **Optional Integer & Comptime Reason Leaf Unlocks (Rows 342–344)**:
+   - Row 342 (`Io.Limit.minInt`) passed cleanly out-of-the-box.
+   - Lowered `Io.Limit.toInt` returning `%arg0` via `lowerTypedV2IoLimitToInt`.
+   - Registered `Sema.Block` in [`src/zig_air_types.zig`](src/zig_air_types.zig) and lowered `Sema.Block.isComptime` via `lowerTypedV2SemaBlockIsComptime` returning 0.
+   - Unlocked rows 342–344.
+5. **Enum Increment & ArrayHashMap Index Sentinel Checking (Rows 345–348)**:
+   - In [`src/zig_air_enum_facts.zig`](src/zig_air_enum_facts.zig): registered `Sema.RuntimeIndex` for row 345 (`Sema.RuntimeIndex.increment`).
+   - In [`src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig`](src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig): implemented `lowerGenericCfgIndexIsEmptyReturn` matching `{ iN, iN }` and comparing element 0 against `-1` sentinel (`u8`, `u16`, `u32`).
+   - Unlocked rows 345–348 (`Sema.RuntimeIndex.increment` and `array_hash_map.Index.isEmpty`).
+6. **204-Row ArrayList GrowCapacity Cascade (Rows 349–552)**:
+   - 204 consecutive specializations of `array_list.Aligned(T, null).growCapacity` cascaded cleanly through `lowerGenericCfgGrowCapacityReturn`.
+   - Unlocked rows 349–552.
+7. **Verification**:
+   - `zig test src/tests.zig`: 1,528 / 1,528 pass cleanly.
+   - `zig build test-unit`: 100% pass clean.
+   - `zig build check-docs`: passed clean (19 current documents, 135 internal links).
+   - `git diff --check`: passed clean.
+   - Distribution real-rows gate (`--limit=552`): 552 / 552 (100.0%) passing rows across `ReleaseFast`, `ReleaseSafe`, and `ReleaseSmall` with `local_fail=0`.
+
+---
+
+### Milestone: Multi-Mode Frontier Advance from Row 552 to Row 565 — COMPLETED
+**Focus**: Advance multi-mode real candidate coverage from row 553 through row 565 across ReleaseFast, ReleaseSafe, and ReleaseSmall through 2-field aggregate constructors, LazyMapRef clusters, struct field pointer loads, and nested aggregate returns.
+
+1. **2-Field Aggregate Constructors (Rows 553–555)**:
+   - In [`src/zig_air_aggregate_layout_facts.zig`](src/zig_air_aggregate_layout_facts.zig) and [`src/zig_air_types.zig`](src/zig_air_types.zig): registered nominal aggregate layouts:
+     - `codegen.aarch64.encoding.Register` as `{ i32, i32 }` and `codegen.aarch64.Disassemble.RegisterFormatter` as `{ i64, i32 }`.
+     - `codegen.c.type.CType.FormatZigType` as `{ ptr, ptr }`.
+     - `heap.ArenaAllocator.State` as `{ ptr, ptr }` and `heap.ArenaAllocator` as `{ ptr, ptr }`.
+   - Lowered 2-field aggregate returns via `planRegisterAggregateConstruction` and `lowerRegisterAggregateMake`.
+   - Unlocked row 553 (`codegen.aarch64.encoding.Register.fmtCase`), row 554 (`codegen.c.type.CType.fmtZigType`), and row 555 (`heap.ArenaAllocator.State.promote`).
+   - Cascaded cleanly through rows 556 and 557 (`libs.mingw.buildCrtFile` and `libs.musl.buildCrtFile`).
+2. **Comptime Constant + Arg 1-Eightbyte Returns (Rows 558, 559, 561, 562)**:
+   - Lowered `link.Coff.Node.LazyMapRef.Index(.code).ref`, `link.Coff.Node.LazyMapRef.Index(.const_data).ref`, `link.Elf2.Node.LazyMapRef.Index(.code).ref`, and `link.Elf2.Node.LazyMapRef.Index(.const_data).ref`.
+   - In [`src/zig_air_types.zig`](src/zig_air_types.zig): registered `LazyMapRef` as `{ i32, i32 }`.
+   - Lowered via constant-leaf + argument-leaf packing in `emitIntegerEightbyte`.
+   - Unlocked rows 558, 559, 561, and 562 in one stroke.
+3. **Struct Field Pointer Load (Row 560)**:
+   - In [`src/zig_air_aggregate_layout_facts.zig`](src/zig_air_aggregate_layout_facts.zig): registered `link.Elf` layout fact (`{ [109 x i64], ptr }`, 872-byte base).
+   - In [`src/codegen/x86_64/generic_cfg/composed_selector_memory.zig`](src/codegen/x86_64/generic_cfg/composed_selector_memory.zig): supported `load.ty.eql(.ptr)`.
+   - In [`src/codegen/x86_64/generic_cfg/value_use/model.zig`](src/codegen/x86_64/generic_cfg/value_use/model.zig), [`actions/address_memory.zig`](src/codegen/x86_64/generic_cfg/value_use/actions/address_memory.zig), [`materialization.zig`](src/codegen/x86_64/generic_cfg/value_use/materialization.zig), and [`planning/compatibility.zig`](src/codegen/x86_64/generic_cfg/value_use/planning/compatibility.zig): propagated `is_ptr` flag through `ScalarLoadAction` planning and code generation.
+   - Unlocked row 560 (`link.Elf.zigObjectPtr`).
+4. **Nested Aggregate Return & SysV Integer Aggregate Parameters (Rows 563–565)**:
+   - In [`src/codegen/x86_64/generic_cfg/cabi_abi_helpers.zig`](src/codegen/x86_64/generic_cfg/cabi_abi_helpers.zig):
+     - Added `isSysVIntegerOrSingleEightbyteAggregateParamType` to classify 1-eightbyte integer aggregates as GPR parameters.
+     - Updated `sysvIntegerParamRegOrNull` and `paramRegOrNullWithInitialGpr` to look up register locations for single-eightbyte aggregate arguments.
+   - In [`src/codegen/x86_64/generic_cfg/cabi_aggregate_return_lowering.zig`](src/codegen/x86_64/generic_cfg/cabi_aggregate_return_lowering.zig):
+     - Added `isEightByteIntegerAggregate` to identify 8-byte integer aggregates in `emitIntegerEightbyte` and lower them via `emitInteger64Leaf`.
+   - Unlocked row 564 (`link.Wasm.FunctionType.fmt` returning `{ ptr, { i32, i32 } }`).
+   - Cascaded cleanly through row 563 (`link.LdScript.TokenIterator.seekTo`) and row 565 (`link.tapi.Tokenizer.TokenIterator.seekTo`).
+5. **Verification**:
+   - `zig test src/tests.zig`: 1,528 / 1,528 pass cleanly.
+   - `zig build test-unit`: 100% pass clean.
+   - `zig build check-docs`: passed clean (19 current documents, 135 internal links).
+   - `git diff --check`: passed clean.
+   - Distribution real-rows gate (`--limit=565`):
+     - `ReleaseFast`: 565 / 565 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSafe`: 565 / 565 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSmall`: 565 / 565 (100.0%) passing rows with `local_fail=0`.
 
 ---
 

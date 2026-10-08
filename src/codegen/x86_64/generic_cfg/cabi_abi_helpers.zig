@@ -22,7 +22,7 @@ pub fn sysvIntegerParamReg(function: ir.Function, name: []const u8, ty: ir.Type)
 }
 
 pub fn sysvIntegerParamRegOrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?ArgReg {
-    if (!isSysVIntegerParamType(ty)) return error.UnsupportedCodegenType;
+    if (!isSysVIntegerOrSingleEightbyteAggregateParamType(ty)) return error.UnsupportedCodegenType;
     return try paramRegOrNull(function, name, ty);
 }
 
@@ -35,13 +35,13 @@ pub fn paramRegWithInitialGpr(function: ir.Function, name: []const u8, ty: ir.Ty
 }
 
 pub fn paramRegOrNullWithInitialGpr(function: ir.Function, name: []const u8, ty: ir.Type, initial_gpr: usize) !?ArgReg {
-    if (!isSysVIntegerParamType(ty)) return error.UnsupportedCodegenType;
+    if (!isSysVIntegerOrSingleEightbyteAggregateParamType(ty)) return error.UnsupportedCodegenType;
     var gpr_index: usize = initial_gpr;
     var sse_index: usize = 0;
     var stack_eightbytes: usize = 0;
     for (function.params.items) |param| {
         if (std.mem.eql(u8, param.name, name)) {
-            if (!param.ty.eql(ty) or !isSysVIntegerParamType(param.ty)) return error.UnsupportedCodegenValue;
+            if (!param.ty.eql(ty) or !isSysVIntegerOrSingleEightbyteAggregateParamType(param.ty)) return error.UnsupportedCodegenValue;
             if (gpr_index >= 6) return error.UnsupportedCodegenAbi;
             return try ArgReg.fromIndex(gpr_index);
         }
@@ -75,6 +75,18 @@ pub fn isSysVIntegerParamType(ty: ir.Type) bool {
         .ptr => true,
         else => false,
     };
+}
+
+pub fn isSysVIntegerOrSingleEightbyteAggregateParamType(ty: ir.Type) bool {
+    if (isSysVIntegerParamType(ty)) return true;
+    if (ty == .aggregate) {
+        const classification = sysv_abi.classifyAggregate(ty) catch return false;
+        return classification.kind == .register and
+            classification.eightbyte_count == 1 and
+            classification.eightbytes[0] == .integer and
+            classification.size_bytes <= 8;
+    }
+    return false;
 }
 
 pub fn fpParamIndex(function: ir.Function, name: []const u8, ty: ir.Type) !usize {

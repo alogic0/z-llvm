@@ -1005,11 +1005,11 @@ fn validateBindingCompatibility(
             return error.ValueUsePreparedActionMissing;
         switch (action) {
             .load_scalar => |load| switch (load.kind) {
-                .ordinary => try validateOrdinaryLoadHome(binding, current, load.bits, false),
+                .ordinary => try validateOrdinaryLoadHome(binding, current, load.bits, false, load.is_ptr),
                 .readonly_pointer => try validateReadOnlyPointerLoadHome(binding, current),
             },
             .load_readonly_pair => try validateReadOnlyPointerLoadHome(binding, current),
-            .load_stack_i128_alias => try validateOrdinaryLoadHome(binding, current, 128, true),
+            .load_stack_i128_alias => try validateOrdinaryLoadHome(binding, current, 128, true, false),
             .load_readonly_table_i16 => try validateReadOnlyTableLoadHome(binding, current),
             else => return error.ValueUsePreparedActionFormMismatch,
         }
@@ -1100,6 +1100,7 @@ fn validateOrdinaryLoadHome(
     current: ValueLoc,
     bits: u16,
     alias_i128: bool,
+    is_ptr: bool,
 ) !void {
     switch (current) {
         .stack_scalar => |stack| {
@@ -1122,8 +1123,11 @@ fn validateOrdinaryLoadHome(
                 return error.ValueUseLoadOrdinaryStackArrayWidth;
         },
         .arg64, .scratch64, .spill64 => {
-            if (alias_i128 or binding.vreg.class != .gpr64 or binding.vreg.bits < 64 or bits != 32)
+            if (alias_i128 or binding.vreg.class != .gpr64 or binding.vreg.bits < 64 or
+                (!is_ptr and bits != 8 and bits != 32) or (is_ptr and bits != 64))
+            {
                 return error.ValueUseLoadOrdinaryPointerWidth;
+            }
         },
         else => return error.ValueUseLoadOrdinaryPointerRejected,
     }

@@ -130,6 +130,7 @@ pub fn executeScalarLoad(
                 transaction,
                 &transaction.prepared_views[request_index].view,
                 action.bits,
+                action.is_ptr,
             );
         },
         .readonly_pointer => {
@@ -163,6 +164,7 @@ fn executeOrdinaryScalarLoad(
     transaction: anytype,
     view: *const Types.PreparedView,
     bits: u16,
+    is_ptr: bool,
 ) !void {
     switch (view.*) {
         .stack_object => |stack| switch (stack) {
@@ -187,22 +189,38 @@ fn executeOrdinaryScalarLoad(
         },
         .address_descriptor => |descriptor| try appendPreparedLoadStackI32(Authority, transaction, descriptor),
         .register => |prepared| {
-            if (bits != 8 and bits != 32) return error.ValueUseLoadOrdinaryPointerWidth;
+            if ((!is_ptr and bits != 8 and bits != 32) or (is_ptr and bits != 64)) return error.ValueUseLoadOrdinaryPointerWidth;
             const reg = switch (prepared.register) {
                 .gpr64 => |reg| reg,
                 else => return error.ValueUseLoadOrdinaryPointerRejected,
             };
-            try transaction.selector.machine.instructions.append(transaction.selector.allocator, if (bits == 8) .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = reg, .offset = 0 } } else .{ .load_arg_ptr_eax = reg });
+            try transaction.selector.machine.instructions.append(
+                transaction.selector.allocator,
+                if (is_ptr)
+                    .{ .load_arg_ptr_disp8_rax = .{ .reg = reg, .offset = 0 } }
+                else if (bits == 8)
+                    .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = reg, .offset = 0 } }
+                else
+                    .{ .load_arg_ptr_eax = reg },
+            );
         },
         .spill => |spill| {
-            if ((bits != 8 and bits != 32) or spill.bits < 64) return error.ValueUseLoadOrdinaryPointerWidth;
+            if (((!is_ptr and bits != 8 and bits != 32) or (is_ptr and bits != 64)) or spill.bits < 64) return error.ValueUseLoadOrdinaryPointerWidth;
             try materialization.materializeScalar64(
                 transaction.selector,
                 .{ .spill64 = spill.frame_index },
                 .{ .gpr64 = .rcx },
             );
             try failLoadForTest(Authority, transaction, .after_pointer_staging);
-            try transaction.selector.machine.instructions.append(transaction.selector.allocator, if (bits == 8) .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = .rcx, .offset = 0 } } else .{ .load_arg_ptr_eax = .rcx });
+            try transaction.selector.machine.instructions.append(
+                transaction.selector.allocator,
+                if (is_ptr)
+                    .{ .load_arg_ptr_disp8_rax = .{ .reg = .rcx, .offset = 0 } }
+                else if (bits == 8)
+                    .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = .rcx, .offset = 0 } }
+                else
+                    .{ .load_arg_ptr_eax = .rcx },
+            );
         },
         else => return error.ValueUseLoadOrdinaryPointerRejected,
     }

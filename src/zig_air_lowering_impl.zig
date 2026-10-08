@@ -1,6 +1,7 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
 const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
+const aggregate_layout_facts = @import("zig_air_aggregate_layout_facts.zig");
 const ir = @import("ir.zig");
 const memory_location = @import("analysis/memory_location.zig");
 const target_mod = @import("target.zig");
@@ -637,7 +638,8 @@ fn scopedAggregateLayoutFactsForFunction(
         if (instruction.operands.len != 1) continue;
         const source_child = pointerChildText(instruction.operands[0].type_text) orelse continue;
         if (!isOpaqueNominalTypeSurface(source_child)) continue;
-        if (exported_aggregate_layout_facts.active_provider.lookup(source_child) != null) continue;
+        if (exported_aggregate_layout_facts.active_provider.lookup(source_child) != null or
+            aggregate_layout_facts.lookup(source_child) != null) continue;
         const field_child = pointerChildText(instruction.result_type) orelse continue;
         const field_type = parseZigType(field_child) orelse continue;
         const field_text = irTypeTextForAggregateFact(allocator, field_type.ir_type) catch continue;

@@ -63,6 +63,66 @@ const facts = [_]Fact{
             .load = true,
         },
     },
+    .{
+        .name = "RegisterFormatter",
+        .aggregate_text = "{ i64, i32 }",
+        .match = .basename,
+        .evidence = .{
+            .construction = true,
+            .store = true,
+            .load = true,
+        },
+    },
+    .{
+        .name = "FormatZigType",
+        .aggregate_text = "{ { i32 }, ptr }",
+        .match = .basename,
+        .evidence = .{
+            .construction = true,
+            .store = true,
+            .load = true,
+        },
+    },
+    .{
+        .name = "LazyMapRef",
+        .aggregate_text = "{ i1, i32 }",
+        .match = .basename,
+        .evidence = .{
+            .construction = true,
+            .store = true,
+            .load = true,
+        },
+    },
+    .{
+        .name = "ArenaAllocator",
+        .aggregate_text = "{ { ptr, ptr }, { ptr, ptr } }",
+        .match = .basename,
+        .evidence = .{
+            .construction = true,
+            .store = true,
+            .load = true,
+        },
+    },
+    .{
+        .name = "link.Wasm.FunctionType.Formatter",
+        .aggregate_text = "{ ptr, { i32, i32 } }",
+        .match = .exact,
+        .evidence = .{
+            .construction = true,
+            .store = true,
+            .load = true,
+        },
+    },
+    .{
+        .name = "link.Elf",
+        .aggregate_text = "{ [109 x i64], ptr }",
+        .match = .exact,
+        .evidence = .{
+            .construction = false,
+            .store = false,
+            .load = true,
+        },
+    },
 };
 
 pub fn lookup(nominal: []const u8) ?Fact {
@@ -100,7 +160,7 @@ fn stripNominalSigil(text: []const u8) []const u8 {
 }
 
 test "aggregate layout facts keep exact pair ownership narrow" {
-    try std.testing.expectEqual(@as(usize, 4), count());
+    try std.testing.expectEqual(@as(usize, 10), count());
     try std.testing.expect(lookup("aggregate_abi.Pair") == null);
     try std.testing.expect(lookup("%runtime_aggregate_pair_main.Pair") == null);
     try std.testing.expect(lookup("other.Pair") == null);
@@ -108,4 +168,10 @@ test "aggregate layout facts keep exact pair ownership narrow" {
     try std.testing.expect(lookup("fmt.parse_float.common.BiasedFp(f32)") != null);
     try std.testing.expect(lookup("codegen.aarch64.Select.Value.PartIterator") != null);
     try std.testing.expect(lookup("Progress.Node") != null);
+    try std.testing.expect(lookup("codegen.aarch64.Disassemble.RegisterFormatter") != null);
+    try std.testing.expect(lookup("codegen.c.type.CType.FormatZigType") != null);
+    try std.testing.expect(lookup("link.Coff.Node.LazyMapRef") != null);
+    try std.testing.expect(lookup("heap.ArenaAllocator") != null);
+    try std.testing.expect(lookup("link.Wasm.FunctionType.Formatter") != null);
+    try std.testing.expect(lookup("link.Elf") != null);
 }

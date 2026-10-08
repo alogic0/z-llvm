@@ -5,7 +5,12 @@ const air_export = @import("zig_air_export.zig");
 const air_model = @import("zig_air_model.zig");
 const air_types = @import("zig_air_types.zig");
 const ir = @import("ir.zig");
+const target = @import("target.zig");
 const type_layout = @import("zig_air_type_layout.zig");
+
+fn x86_64SysVDataLayout() ?target.DataLayout {
+    return target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128") catch null;
+}
 
 const FunctionType = air_model.FunctionType;
 const collectAggregateCopyLeaves = air_aggregate_copy.collectAggregateCopyLeaves;
@@ -35,7 +40,7 @@ fn lowerRegisterAggregateMake(
     for (function_type.params) |param| {
         if (!param.ir_type.eql(.{ .int = 32 }) and !param.ir_type.eql(.{ .int = 64 }) and
             !param.ir_type.eql(.float) and !param.ir_type.eql(.double) and
-            !param.ir_type.eql(.ptr)) return error.UnsupportedAir;
+            !param.ir_type.eql(.ptr) and !param.ir_type.eql(.{ .aggregate = "{ i32, i32 }" })) return error.UnsupportedAir;
     }
     var function = ir.Function.init(shortFunctionName(air_function.name), aggregate_ty);
     errdefer function.deinit(allocator);
@@ -342,6 +347,9 @@ pub fn lowerTypedV2SretIntegerAggregateAbi(
         return try lowerSretIntegerAggregateFieldWrapper(allocator, module, air_function, function_type.return_type.ir_type, wrapper);
     }
     if (!typedV2SretIntegerAggregateRecords(function_type, structured_air_v2)) return null;
+    if (air_aggregate_copy.validateSretParamFieldConstructorRecords(function_type, structured_air_v2)) {
+        return try lowerSretParamFieldConstructor(allocator, module, air_function, function_type, structured_air_v2);
+    }
     return try lowerSretIntegerAggregateMake(allocator, module, air_function, function_type.return_type.ir_type);
 }
 
@@ -350,7 +358,102 @@ pub fn typedV2SretIntegerAggregateRecords(
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
     if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
-    return validateSretAggregateMakeRecords(function_type, structured_air_v2);
+    return validateSretAggregateMakeRecords(function_type, structured_air_v2) or
+        air_aggregate_copy.validateSretParamFieldConstructorRecords(function_type, structured_air_v2);
+}
+
+pub fn lowerSretParamFieldConstructor(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !ir.Function {
+    const layout = x86_64SysVDataLayout() orelse return error.UnsupportedAir;
+    const aggregate_ty = function_type.return_type.ir_type;
+    const plan = type_layout.aggregateLayoutPlan(layout, aggregate_ty) catch return error.UnsupportedAir;
+    const leaves = plan.leafSlice();
+    if (leaves.len < 3) return error.UnsupportedAir;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .void);
+    errdefer function.deinit(allocator);
+    function.linkage = .default;
+    function.calling_conv = null;
+
+    try function.params.append(allocator, .{ .ty = .ptr, .attrs = try sretAttrsForAggregate(module, aggregate_ty), .name = "sret" });
+
+    var param_leaf_names: [8][8][]const u8 = undefined;
+    var param_leaf_counts: [8]usize = @splat(0);
+    var global_arg_idx: usize = 0;
+    for (function_type.params, 0..) |param, p_idx| {
+        if (p_idx >= 8) return error.UnsupportedAir;
+        if (param.ir_type == .aggregate) {
+            const p_plan = type_layout.aggregateLayoutPlan(layout, param.ir_type) catch return error.UnsupportedAir;
+            const p_leaves = p_plan.leafSlice();
+            if (p_leaves.len > 8) return error.UnsupportedAir;
+            param_leaf_counts[p_idx] = p_leaves.len;
+            for (p_leaves, 0..) |p_leaf, pl_idx| {
+                const arg_name = try ownPrint(module, "arg{}", .{global_arg_idx});
+                global_arg_idx += 1;
+                param_leaf_names[p_idx][pl_idx] = arg_name;
+                try function.params.append(allocator, .{ .ty = p_leaf.ty, .name = arg_name });
+            }
+        } else {
+            param_leaf_counts[p_idx] = 1;
+            const arg_name = try ownPrint(module, "arg{}", .{global_arg_idx});
+            global_arg_idx += 1;
+            param_leaf_names[p_idx][0] = arg_name;
+            try function.params.append(allocator, .{ .ty = param.ir_type, .name = arg_name });
+        }
+    }
+
+    var field_param_map: [8]usize = undefined;
+    const ret_ptr_index = air_model.typedRetPtrIndex(structured_air_v2) orelse return error.UnsupportedAir;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "store") and !std.mem.eql(u8, instruction.opcode, "store_safe")) continue;
+        const raw_inst_index = std.fmt.parseInt(usize, instruction.operands[1].value, 10) catch return error.UnsupportedAir;
+        const arg_inst_index = air_aggregate_construction.resolveParamIndex(structured_air_v2, raw_inst_index) orelse return error.UnsupportedAir;
+        const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return error.UnsupportedAir;
+        var path: [4]usize = undefined;
+        const path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return error.UnsupportedAir;
+        if (path_len != 1) return error.UnsupportedAir;
+        const field_idx = path[0];
+        if (field_idx >= 8) return error.UnsupportedAir;
+        field_param_map[field_idx] = arg_inst_index;
+    }
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    var leaf_idx: usize = 0;
+    for (0..function_type.params.len) |field_idx| {
+        const p_idx = field_param_map[field_idx];
+        const count = param_leaf_counts[p_idx];
+        for (0..count) |c| {
+            if (leaf_idx >= leaves.len) return error.UnsupportedAir;
+            const leaf = leaves[leaf_idx];
+            leaf_idx += 1;
+            const arg_name = param_leaf_names[p_idx][c];
+            const leaf_field_name = try ownPrint(module, "leaf{}", .{leaf_idx - 1});
+
+            var gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
+            errdefer gep.deinit(allocator);
+            try gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(leaf.offset) } });
+            try block.instructions.append(allocator, .{ .result = leaf_field_name, .kind = .{ .gep = gep } });
+            try block.instructions.append(allocator, .{
+                .result = null,
+                .kind = .{ .store = .{
+                    .ty = leaf.ty,
+                    .value = .{ .named = arg_name },
+                    .ptr = .{ .named = leaf_field_name },
+                } },
+            });
+        }
+    }
+
+    block.terminator = .{ .ret = .{ .ty = .void } };
+    try function.blocks.append(allocator, block);
+    return function;
 }
 
 pub fn typedV2SretIntegerAggregateCopyRecords(

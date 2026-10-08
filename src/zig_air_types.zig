@@ -100,6 +100,22 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "Compilation.Path")) return .{ .ir_type = .ptr };
     if (std.mem.eql(u8, trimmed, "Compilation.Path.Formatter")) return .{ .ir_type = .void };
     if (std.mem.eql(u8, trimmed, "Sema.Block") or std.mem.eql(u8, trimmed, "std.zig.Sema.Block")) return .{ .ir_type = .ptr };
+    if (std.mem.startsWith(u8, trimmed, "link.Coff.Node.LazyMapRef.Index(") or
+        std.mem.startsWith(u8, trimmed, "link.Elf2.Node.LazyMapRef.Index("))
+    {
+        return .{ .ir_type = .{ .int = 32 } };
+    }
+    if (std.mem.eql(u8, trimmed, "link.File.LazySymbol.Kind")) return .{ .ir_type = .{ .int = 1 } };
+    if (std.mem.eql(u8, trimmed, "codegen.aarch64.encoding.Register")) return .{ .ir_type = .{ .int = 64 } };
+    if (std.mem.eql(u8, trimmed, "codegen.aarch64.Disassemble.Case")) return .{ .ir_type = .{ .int = 32 } };
+    if (std.mem.eql(u8, trimmed, "Type") or std.mem.eql(u8, trimmed, "type.CType") or std.mem.eql(u8, trimmed, "codegen.c.type.CType")) {
+        return .{ .ir_type = .{ .int = 32 } };
+    }
+    if (std.mem.eql(u8, trimmed, "Zcu") or std.mem.eql(u8, trimmed, "codegen.c.type.Zcu")) return .{ .ir_type = .ptr };
+    if (std.mem.eql(u8, trimmed, "heap.ArenaAllocator.State")) return .{ .ir_type = .{ .aggregate = "{ ptr, ptr }" } };
+    if (std.mem.eql(u8, trimmed, "mem.Allocator") or std.mem.eql(u8, trimmed, "std.mem.Allocator")) return .{ .ir_type = .{ .aggregate = "{ ptr, ptr }" } };
+    if (std.mem.eql(u8, trimmed, "link.Wasm.FunctionType")) return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
+    if (std.mem.eql(u8, trimmed, "link.Elf.ZigObject")) return .{ .ir_type = .ptr };
 
     if (type_layout.parseNamedAggregateType(trimmed)) |ty| return .{ .ir_type = ty };
     if (std.mem.startsWith(u8, trimmed, "error{")) {

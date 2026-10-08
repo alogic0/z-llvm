@@ -132,6 +132,16 @@ const facts = [_]Fact{
         .enumerators = no_enumerators[0..],
     },
     .{
+        .name = "link.File.LazySymbol.Kind",
+        .backing_type = .{ .int = 1 },
+        .enumerators = lazy_symbol_kind_enumerators[0..],
+    },
+    .{
+        .name = "LazySymbol.Kind",
+        .backing_type = .{ .int = 1 },
+        .enumerators = lazy_symbol_kind_enumerators[0..],
+    },
+    .{
         .name = "link.Wasm.String",
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],
@@ -197,6 +207,16 @@ const facts = [_]Fact{
         .enumerators = no_enumerators[0..],
     },
     .{
+        .name = "libs.mingw.CrtFile",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "libs.musl.CrtFile",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
         .name = "lang.CompilerBackend",
         .backing_type = .{ .int = 64 },
         .enumerators = lang_compiler_backend_enumerators[0..],
@@ -236,6 +256,11 @@ const facts = [_]Fact{
 const select_value_index_enumerators = [_]Enumerator{
     .{ .name = "allocating", .value = std.math.maxInt(u32) - 1 },
     .{ .name = "free", .value = std.math.maxInt(u32) },
+};
+
+const lazy_symbol_kind_enumerators = [_]Enumerator{
+    .{ .name = "code", .value = 0 },
+    .{ .name = "const_data", .value = 1 },
 };
 
 const zig_llvm_builder_type_enumerators = [_]Enumerator{
