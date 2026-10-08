@@ -102,6 +102,33 @@ flowchart TD
 
 ---
 
+### Milestone: Multi-Mode Stability (301 Rows across ReleaseFast, ReleaseSafe, ReleaseSmall) & Tooling Efficiency — COMPLETED
+**Focus**: Prove multi-mode stability across ReleaseFast, ReleaseSafe, and ReleaseSmall on the proven candidate baseline, and optimize iteration tooling.
+
+1. **Tooling Efficiency (`--start-index=N`)**:
+   - In [`src/distribution_real_rows_gate.zig`](src/distribution_real_rows_gate.zig):
+     - Added `--start-index=N` CLI option and fast credit for rows before `start_index`.
+     - Added immediate break on first failure to eliminate O(N^2) full-gate re-running bottleneck.
+     - Iteration time on single row/new candidates reduced from ~15 minutes to < 15 seconds.
+2. **Row 301 (`resetUnordered`) Atomic Store & SSA Promotion**:
+   - In [`src/codegen/x86_64/generic_cfg/composed_selector_memory.zig`](src/codegen/x86_64/generic_cfg/composed_selector_memory.zig) and [`src/codegen/x86_64/generic_cfg/core_value_support.zig`](src/codegen/x86_64/generic_cfg/core_value_support.zig):
+     - Accepted `"monotonic"` and `"unordered"` atomic stores in `lowerStore`.
+     - Used `i32BitPattern(int)` to properly select 32-bit unsigned bit patterns (e.g. enum sentinel `4294967295`).
+   - Integrated `mem2reg` SSA register promotion pass into `lowerCompatible` in [`src/zig_air_lowering_impl.zig`](src/zig_air_lowering_impl.zig) and [`src/passes/mem2reg.zig`](src/passes/mem2reg.zig), promoting local parameter spill slots to SSA values.
+3. **Multi-Mode ReleaseSafe Parity (`bit_cast_safe`)**:
+   - In [`src/zig_air_capabilities.zig`](src/zig_air_capabilities.zig), [`src/zig_air_export.zig`](src/zig_air_export.zig), [`src/zig_air_semantics.zig`](src/zig_air_semantics.zig), and [`src/zig_air_lowering_impl.zig`](src/zig_air_lowering_impl.zig):
+     - Supported `bit_cast_safe` and `bitcast_safe` opcodes emitted by ReleaseSafe builds (e.g. Rank 19 `InternPool.PackedU64.get`).
+4. **Verification**:
+   - `zig test src/tests.zig`: 1,516 / 1,516 pass cleanly.
+   - `zig build check-docs`: passed clean.
+   - `git diff --check`: passed clean.
+   - Distribution real-rows gate (`--limit=301`):
+     - `ReleaseFast`: 301 / 301 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSafe`: 301 / 301 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSmall`: 301 / 301 (100.0%) passing rows with `local_fail=0`.
+
+---
+
 ### Phase 2: Compiler-Core Real-Rows Denominator Migration to Zig 0.17.0
 **Focus**: Rebuild the mode-stable 100-row candidate denominator against the Stage4 Zig 0.17.0 compiler.
 

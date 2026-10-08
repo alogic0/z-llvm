@@ -5,6 +5,7 @@ const air_capabilities = @import("zig_air_capabilities.zig");
 const air_model = @import("zig_air_model.zig");
 const air_semantics = @import("zig_air_semantics.zig");
 const air_types = @import("zig_air_types.zig");
+const air_text = @import("zig_air_text.zig");
 const ir = @import("ir.zig");
 
 const parseZigType = air_types.parseZigType;
@@ -164,6 +165,10 @@ pub fn lowerTypedCompare(self: anytype, instruction: air_export.TypedInstruction
 }
 
 pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !void {
+    if (std.mem.eql(u8, instruction.opcode, "ptr_cast") and instruction.operands.len == 0) {
+        try lowerTypedPtrCastOpaque(self, instruction);
+        return;
+    }
     if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
     const source = try self.resolveTypedOperand(instruction, 0);
     const target_type = parseZigType(instruction.result_type) orelse
@@ -235,7 +240,51 @@ pub fn lowerTypedCast(self: anytype, instruction: air_export.TypedInstruction) !
     };
 }
 
+pub fn lowerTypedPtrCastOpaque(self: anytype, instruction: air_export.TypedInstruction) !void {
+    const raw = rawInstructionByIndex(self.air_function, instruction.index) orelse return air_model.LowerError.UnsupportedAir;
+    if (!std.mem.eql(u8, raw.opcode, "ptr_cast")) return air_model.LowerError.UnsupportedAir;
+
+    var fields = air_text.splitTopLevel(raw.payload, ',');
+    const target_type_text = std.mem.trim(u8, fields.next() orelse return air_model.LowerError.UnsupportedAir, " ");
+    const source_text = std.mem.trim(u8, fields.next() orelse return air_model.LowerError.UnsupportedAir, " ");
+    if (fields.next() != null) return air_model.LowerError.UnsupportedAir;
+
+    const source_index = air_text.instructionRef(source_text) orelse return air_model.LowerError.UnsupportedAir;
+    if (source_index >= self.values.len) return air_model.LowerError.UnsupportedAir;
+    const source = self.values[source_index] orelse return air_model.LowerError.UnsupportedAir;
+
+    const target_type = parseZigType(target_type_text) orelse return air_model.LowerError.UnsupportedAir;
+    if (source.ty.ir_type != .ptr or target_type.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
+
+    if (instruction.index < self.synthetic_vector_slots.len and source_index < self.synthetic_vector_slots.len) {
+        self.synthetic_vector_slots[instruction.index] = self.synthetic_vector_slots[source_index];
+    }
+    if (instruction.index < self.synthetic_vector_element_ptrs.len and source_index < self.synthetic_vector_element_ptrs.len) {
+        self.synthetic_vector_element_ptrs[instruction.index] = self.synthetic_vector_element_ptrs[source_index];
+    }
+    if (instruction.index < self.synthetic_union_tag_slots.len and source_index < self.synthetic_union_tag_slots.len) {
+        self.synthetic_union_tag_slots[instruction.index] = self.synthetic_union_tag_slots[source_index];
+    }
+    self.values[instruction.index] = .{
+        .ty = target_type,
+        .value = source.value,
+    };
+}
+
+fn rawInstructionByIndex(function: air_export.Function, index: u32) ?air_export.Instruction {
+    for (function.instructions) |instruction| {
+        if (instruction.index == index) return instruction;
+    }
+    return null;
+}
+
 fn opaqueCastResultType(instruction: air_export.TypedInstruction, source_type: air_model.ZigType) ?air_model.ZigType {
+    if (std.mem.eql(u8, instruction.opcode, "ptr_cast")) {
+        return switch (source_type.ir_type) {
+            .ptr => source_type,
+            else => null,
+        };
+    }
     if (!air_capabilities.isBitcastOpcode(instruction.opcode) and
         !std.mem.eql(u8, instruction.opcode, "intcast") and
         !std.mem.eql(u8, instruction.opcode, "intcast_safe") and

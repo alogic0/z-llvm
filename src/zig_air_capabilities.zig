@@ -381,7 +381,8 @@ pub fn memorySemanticOpForOpcode(opcode: []const u8) MemorySemanticOp {
     if (std.mem.eql(u8, opcode, "load")) return .load;
     if (std.mem.eql(u8, opcode, "store") or
         std.mem.eql(u8, opcode, "store_safe") or
-        std.mem.eql(u8, opcode, "atomic_store_monotonic"))
+        std.mem.eql(u8, opcode, "atomic_store_monotonic") or
+        std.mem.eql(u8, opcode, "atomic_store_unordered"))
     {
         return .store;
     }
@@ -598,8 +599,11 @@ pub fn isCastOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "int_cast") or
         std.mem.eql(u8, opcode, "int_cast_safe") or
         isBitcastOpcode(opcode) or
+        std.mem.eql(u8, opcode, "ptr_cast") or
         std.mem.eql(u8, opcode, "ptrtoint") or
         std.mem.eql(u8, opcode, "inttoptr") or
+        std.mem.eql(u8, opcode, "ptr_from_int") or
+        std.mem.eql(u8, opcode, "int_from_ptr") or
         std.mem.eql(u8, opcode, "float_from_int") or
         std.mem.eql(u8, opcode, "int_from_float") or
         std.mem.eql(u8, opcode, "fpext") or
@@ -675,7 +679,10 @@ pub fn isRetPtrOpcode(opcode: []const u8) bool {
 }
 
 pub fn isBitcastOpcode(opcode: []const u8) bool {
-    return std.mem.eql(u8, opcode, "bitcast") or std.mem.eql(u8, opcode, "bit_cast");
+    return std.mem.eql(u8, opcode, "bitcast") or
+        std.mem.eql(u8, opcode, "bit_cast") or
+        std.mem.eql(u8, opcode, "bit_cast_safe") or
+        std.mem.eql(u8, opcode, "bitcast_safe");
 }
 
 pub fn callTailKindForOpcode(opcode: []const u8) ?[]const u8 {
@@ -826,6 +833,7 @@ fn isInventoryKnownOtherOpcode(opcode: []const u8) bool {
         "load",
         "loop",
         "not",
+        "ptr_cast",
         "repeat",
         "ret",
         "store",
@@ -990,6 +998,8 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(ScalarSemanticOp.compare, scalarSemanticOpForOpcode("cmp_eq"));
     try std.testing.expectEqual(ScalarSemanticOp.cast, scalarSemanticOpForOpcode("intcast"));
     try std.testing.expectEqual(ScalarSemanticOp.cast, scalarSemanticOpForOpcode("intcast_safe"));
+    try std.testing.expectEqual(ScalarSemanticOp.cast, scalarSemanticOpForOpcode("ptr_cast"));
+    try std.testing.expect(typedV2CanLower(opcodeCapability("ptr_cast")));
     try std.testing.expectEqual(ScalarSemanticOp.byte_swap, scalarSemanticOpForOpcode("byte_swap"));
     try std.testing.expectEqual(ScalarSemanticOp.max, scalarSemanticOpForOpcode("max"));
     try std.testing.expectEqual(ScalarSemanticOp.min, scalarSemanticOpForOpcode("min"));
@@ -1007,6 +1017,8 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("store_safe"));
     try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("atomic_store_monotonic"));
     try std.testing.expect(typedV2CanLower(opcodeCapability("atomic_store_monotonic")));
+    try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("atomic_store_unordered"));
+    try std.testing.expect(typedV2CanLower(opcodeCapability("atomic_store_unordered")));
     try std.testing.expectEqual(SemanticDomain.optional, semanticDomainForOpcode("optional_payload"));
     try std.testing.expectEqual(OptionalSemanticOp.is_non_null, optionalSemanticOpForOpcode("is_non_null"));
     try std.testing.expectEqual(OptionalSemanticOp.is_non_null, optionalSemanticOpForOpcode("is_non_null_ptr"));

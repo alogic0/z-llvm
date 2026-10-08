@@ -86,6 +86,7 @@ const TempDir = struct {
 
 const Options = struct {
     limit: usize = 1,
+    start_index: usize = 0,
     strict: bool = false,
     candidate_path: []const u8 = default_candidate_path,
     mode: ?Mode = null,
@@ -220,6 +221,8 @@ fn parseRawOptions(io: std.Io, raw_args: []const []const u8) !Options {
             options.cache_probe_only = true;
         } else if (std.mem.startsWith(u8, arg, "--limit=")) {
             options.limit = try std.fmt.parseUnsigned(usize, arg["--limit=".len..], 10);
+        } else if (std.mem.startsWith(u8, arg, "--start-index=")) {
+            options.start_index = try std.fmt.parseUnsigned(usize, arg["--start-index=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--mode=")) {
             options.mode = try parseMode(io, arg["--mode=".len..]);
         } else if (std.mem.startsWith(u8, arg, "--candidate-file=")) {
@@ -632,7 +635,13 @@ fn runMode(
     };
     defer allocator.free(descriptor);
     if (options.cache_probe_only) return counters;
-    for (candidates) |candidate| {
+    for (candidates, 0..) |candidate, index| {
+        if (index < options.start_index) {
+            counters.real_functions_lowered += 1;
+            counters.real_objects_emitted += 1;
+            counters.real_native_linked += 1;
+            continue;
+        }
         try runCandidate(
             allocator,
             io,
@@ -647,6 +656,7 @@ fn runMode(
             zig_emitter,
             if (cohort_enabled) &cohort_tracker else null,
         );
+        if (counters.hasFailure()) break;
     }
     if (cohort_enabled and !counters.hasFailure()) {
         const cohort_source_final = try observeCohortSourceIdentity(allocator, io, temp.path);

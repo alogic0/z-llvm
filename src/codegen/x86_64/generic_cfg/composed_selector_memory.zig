@@ -172,7 +172,12 @@ fn ordinaryLoadValueUseDiagnostic(
 }
 
 pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
-    if (store.attrs.isBarrier()) return .{ .no_emitter = "composed-block-store-barrier" };
+    if (store.attrs.is_volatile or store.attrs.syncscope != null) return .{ .no_emitter = "composed-block-store-barrier" };
+    if (store.attrs.atomic_ordering) |ordering| {
+        if (!std.mem.eql(u8, ordering, "monotonic") and !std.mem.eql(u8, ordering, "unordered")) {
+            return .{ .no_emitter = "composed-block-store-barrier" };
+        }
+    }
     if (store.ty.eql(.{ .int = 8 }) and (store.ty_addrspace != null or store.ptr_addrspace != null)) return .{ .no_emitter = "composed-block-byte-store-addrspace" };
     if (store.ptr == .named and selector.readonly_pointer_params.contains(store.ptr.named))
         return .{ .no_emitter = "composed-block-store-readonly-param" };
@@ -750,7 +755,7 @@ fn lowerStoreScalarTransactional(
             ) catch return .{ .unsupported_value = storeValueDetail(selector, store.value) };
         },
         .int => |int| blk: {
-            const immediate = i32Value(int) catch return .{ .unsupported_value = "composed-block-store-value-other" };
+            const immediate = i32BitPattern(int) catch return .{ .unsupported_value = "composed-block-store-value-other" };
             break :blk registerValueUseAction(
                 &transaction,
                 store.ptr,

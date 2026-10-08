@@ -652,7 +652,8 @@ pub fn categoryForOpcode(opcode: []const u8) InstructionCategory {
         std.mem.eql(u8, opcode, "cmpxchg") or
         std.mem.eql(u8, opcode, "cmpxchg_strong") or
         std.mem.eql(u8, opcode, "cmpxchg_weak") or
-        std.mem.eql(u8, opcode, "atomic_rmw"))
+        std.mem.eql(u8, opcode, "atomic_rmw") or
+        std.mem.eql(u8, opcode, "atomic_store_unordered"))
     {
         return .memory;
     }
@@ -660,8 +661,11 @@ pub fn categoryForOpcode(opcode: []const u8) InstructionCategory {
         std.mem.eql(u8, opcode, "intcast_safe") or
         std.mem.eql(u8, opcode, "int_cast") or
         std.mem.eql(u8, opcode, "int_cast_safe") or
+        std.mem.eql(u8, opcode, "ptr_cast") or
         std.mem.eql(u8, opcode, "bitcast") or
         std.mem.eql(u8, opcode, "bit_cast") or
+        std.mem.eql(u8, opcode, "bit_cast_safe") or
+        std.mem.eql(u8, opcode, "bitcast_safe") or
         std.mem.eql(u8, opcode, "trunc") or
         std.mem.eql(u8, opcode, "float_from_int") or
         std.mem.eql(u8, opcode, "int_from_float") or

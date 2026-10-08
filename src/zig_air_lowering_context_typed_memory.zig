@@ -243,8 +243,10 @@ pub fn lowerTypedLoadFromSlicePtrPtr(self: anytype, instruction: air_export.Type
 }
 
 pub fn lowerTypedStore(self: anytype, instruction: air_export.TypedInstruction) !void {
-    if (std.mem.eql(u8, instruction.opcode, "atomic_store_monotonic")) {
-        try self.lowerTypedAtomicStoreMonotonic(instruction);
+    if (std.mem.eql(u8, instruction.opcode, "atomic_store_monotonic") or
+        std.mem.eql(u8, instruction.opcode, "atomic_store_unordered"))
+    {
+        try lowerTypedAtomicStore(self, instruction);
         return;
     }
     if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
@@ -266,7 +268,9 @@ pub fn lowerTypedStore(self: anytype, instruction: air_export.TypedInstruction) 
     });
 }
 
-pub fn lowerTypedAtomicStoreMonotonic(self: anytype, instruction: air_export.TypedInstruction) !void {
+pub const lowerTypedAtomicStoreMonotonic = lowerTypedAtomicStore;
+
+pub fn lowerTypedAtomicStore(self: anytype, instruction: air_export.TypedInstruction) !void {
     if (instruction.operands.len != 0) return air_model.LowerError.UnsupportedAir;
     const raw = rawInstructionByIndex(self.air_function, instruction.index) orelse return air_model.LowerError.UnsupportedAir;
     if (!std.mem.eql(u8, raw.opcode, instruction.opcode)) return air_model.LowerError.UnsupportedAir;
@@ -276,7 +280,7 @@ pub fn lowerTypedAtomicStoreMonotonic(self: anytype, instruction: air_export.Typ
     const value_text = std.mem.trim(u8, fields.next() orelse return air_model.LowerError.UnsupportedAir, " ");
     const ordering = std.mem.trim(u8, fields.next() orelse return air_model.LowerError.UnsupportedAir, " ");
     if (fields.next() != null) return air_model.LowerError.UnsupportedAir;
-    if (!std.mem.eql(u8, ordering, "monotonic")) return air_model.LowerError.UnsupportedAir;
+    if (!std.mem.eql(u8, ordering, "monotonic") and !std.mem.eql(u8, ordering, "unordered")) return air_model.LowerError.UnsupportedAir;
 
     const pointer_index = air_text.instructionRef(pointer_text) orelse return air_model.LowerError.UnsupportedAir;
     if (pointer_index >= self.values.len) return air_model.LowerError.UnsupportedAir;
@@ -287,6 +291,7 @@ pub fn lowerTypedAtomicStoreMonotonic(self: anytype, instruction: air_export.Typ
     const child_ty = pointer.ty.pointer_child orelse return air_model.LowerError.UnsupportedAir;
     if (!child_ty.eql(value.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
 
+    const atomic_ordering: []const u8 = if (std.mem.eql(u8, ordering, "monotonic")) "monotonic" else "unordered";
     try self.block.instructions.append(self.allocator, .{
         .result = null,
         .kind = .{ .store = .{
@@ -295,7 +300,7 @@ pub fn lowerTypedAtomicStoreMonotonic(self: anytype, instruction: air_export.Typ
             .ptr = pointer.value,
             .attrs = .{
                 .is_volatile = pointer.ty.is_volatile_pointer,
-                .atomic_ordering = "monotonic",
+                .atomic_ordering = atomic_ordering,
             },
         } },
     });

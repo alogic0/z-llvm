@@ -34,6 +34,10 @@ const zig_ast_optional_token_index_enumerators = [_]Enumerator{
     .{ .name = "none", .value = std.math.maxInt(u32) },
 };
 
+const intern_pool_index_enumerators = [_]Enumerator{
+    .{ .name = "none", .value = std.math.maxInt(u32) },
+};
+
 const coff_image_file_machine_enumerators = [_]Enumerator{
     .{ .name = "UNKNOWN", .value = 0x0 },
     .{ .name = "ALPHA", .value = 0x184 },
@@ -128,6 +132,16 @@ const facts = [_]Fact{
         .name = "InternPool.NullTerminatedString",
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
     },
     .{
         .name = "zig.llvm.Builder.Type",

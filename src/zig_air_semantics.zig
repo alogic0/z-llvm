@@ -43,7 +43,11 @@ pub fn fpPredicate(opcode: []const u8) ?ir.FcmpPredicate {
 
 pub fn castOp(opcode: []const u8, from: ZigType, to: ZigType) ?ir.CastOp {
     if (std.mem.eql(u8, opcode, "trunc")) return .trunc;
-    if (std.mem.eql(u8, opcode, "bitcast") or std.mem.eql(u8, opcode, "bit_cast")) return .bitcast;
+    if (std.mem.eql(u8, opcode, "bitcast") or
+        std.mem.eql(u8, opcode, "bit_cast") or
+        std.mem.eql(u8, opcode, "bit_cast_safe") or
+        std.mem.eql(u8, opcode, "bitcast_safe") or
+        std.mem.eql(u8, opcode, "ptr_cast")) return .bitcast;
     if (std.mem.eql(u8, opcode, "ptrtoint")) return .ptrtoint;
     if (std.mem.eql(u8, opcode, "inttoptr")) return .inttoptr;
     if (std.mem.eql(u8, opcode, "float_from_int")) return if (from.signed) .sitofp else .uitofp;

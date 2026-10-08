@@ -515,7 +515,7 @@ fn genericCfgSupportsSingleBlockI32StoreAttrs(attrs: ir.MemoryAttrs) bool {
     if (attrs.@"align") |alignment| {
         if (alignment < 4) return false;
     }
-    if (attrs.atomic_ordering) |ordering| return std.mem.eql(u8, ordering, "monotonic");
+    if (attrs.atomic_ordering) |ordering| return std.mem.eql(u8, ordering, "monotonic") or std.mem.eql(u8, ordering, "unordered");
     return true;
 }
 

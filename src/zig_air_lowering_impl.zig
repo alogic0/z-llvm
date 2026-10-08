@@ -13,6 +13,8 @@ const air_types = @import("zig_air_types.zig");
 const air_values = @import("zig_air_values.zig");
 const air_roots = @import("zig_air_roots.zig");
 const lowering_context = @import("zig_air_lowering_context.zig");
+const mem2reg = @import("passes/mem2reg.zig");
+const pass_manager = @import("pass_manager.zig");
 
 pub const UnsupportedReason = enum {
     function_type,
@@ -318,6 +320,11 @@ pub fn lowerCompatible(
     }
 
     try addMissingCallDeclarations(allocator, &module);
+    var mem2reg_context: pass_manager.Context = .{
+        .allocator = allocator,
+        .io = undefined,
+    };
+    _ = try mem2reg.pass.run(&module, &mem2reg_context);
     try module.verify();
     return .{
         .module = module,
@@ -798,6 +805,8 @@ fn inferredOpaqueBitcastType(structured_air_v2: air_export.StructuredAirV2, text
     for (structured_air_v2.instructions) |instruction| {
         if (std.mem.eql(u8, instruction.opcode, "bitcast") or
             std.mem.eql(u8, instruction.opcode, "bit_cast") or
+            std.mem.eql(u8, instruction.opcode, "bit_cast_safe") or
+            std.mem.eql(u8, instruction.opcode, "bitcast_safe") or
             std.mem.eql(u8, instruction.opcode, "intcast") or
             std.mem.eql(u8, instruction.opcode, "intcast_safe") or
             std.mem.eql(u8, instruction.opcode, "int_cast") or
