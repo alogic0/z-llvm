@@ -1347,6 +1347,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .ult_i8_dil_imm8_al => |imm| try writer.print("\txorl %eax, %eax\n\tcmpb ${}, %dil\n\tsetb %al\n", .{imm}),
             .cmp_ult_u32_edi_esi_al => try writer.writeAll("\txorl %eax, %eax\n\tcmpl %esi, %edi\n\tsetb %al\n"),
             .ascii_range_u8_dil_imm8_imm8_al => |range| try writer.print("\txorl %eax, %eax\n\tmovb %dil, %al\n\tsubb ${}, %al\n\tcmpb ${}, %al\n\tsetb %al\n", .{ range.low, range.len }),
+            .range_u32_edi_imm32_imm32_al => |range| try writer.print("\txorl %eax, %eax\n\tsubl ${}, %edi\n\tcmpl ${}, %edi\n\tsetb %al\n", .{ range.low, range.len }),
             .ascii_alphabetic_dil_al => try writer.writeAll("\txorl %eax, %eax\n\tmovb %dil, %al\n\tandb $0xdf, %al\n\tsubb $65, %al\n\tcmpb $26, %al\n\tsetb %al\n"),
             .ascii_alphanumeric_dil_al => try writer.writeAll("\txorl %eax, %eax\n\tmovb %dil, %cl\n\tsubb $48, %cl\n\tcmpb $10, %cl\n\tsetb %cl\n\tmovb %dil, %al\n\tandb $0xdf, %al\n\tsubb $65, %al\n\tcmpb $26, %al\n\tsetb %al\n\torb %cl, %al\n"),
             .ascii_whitespace_dil_al => try writer.writeAll("\txorl %eax, %eax\n\tcmpb $32, %dil\n\tsete %cl\n\tmovb %dil, %al\n\tsubb $9, %al\n\tcmpb $5, %al\n\tsetb %al\n\torb %cl, %al\n"),

@@ -186,12 +186,15 @@ pub fn lowerGenericCfgAsciiPredicateReturn(
     ret: anytype,
 ) !bool {
     if (!function.ret_ty.eql(.{ .int = 1 }) or !ret.ty.eql(.{ .int = 1 })) return false;
-    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 8 })) return false;
+    if (function.params.items.len != 1) return false;
+    const is_i8 = function.params.items[0].ty.eql(.{ .int = 8 });
+    const is_i32 = function.params.items[0].ty.eql(.{ .int = 32 });
+    if (!is_i8 and !is_i32) return false;
     const arg0_name = function.params.items[0].name;
 
-    // Pattern 1: Single range check (isUpper, isLower, isDigit)
-    // %sub = sub i8 %arg0, <low>
-    // %cmp = icmp ult i8 %sub, <len>
+    // Pattern 1: Single range check (isUpper, isLower, isDigit, isSurrogateCodepoint)
+    // %sub = sub iN %arg0, <low>
+    // %cmp = icmp ult iN %sub, <len>
     // ret i1 %cmp
     if (block.instructions.items.len == 2) {
         const sub_inst = block.instructions.items[0];
@@ -205,34 +208,48 @@ pub fn lowerGenericCfgAsciiPredicateReturn(
             .binary => |binary| binary,
             else => return false,
         };
-        if (sub.op != .sub or !sub.ty.eql(.{ .int = 8 })) return false;
+        if (sub.op != .sub) return false;
         if (!isNamed(sub.lhs, arg0_name)) return false;
         const low = switch (sub.rhs) {
             .int => |int| try i64Value(int),
             else => return false,
         };
-        if (low < 0 or low > 255) return false;
 
         const icmp = switch (cmp_inst.kind) {
             .icmp => |icmp| icmp,
             else => return false,
         };
-        if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 8 })) return false;
+        if (icmp.predicate != .ult) return false;
         if (!isNamed(icmp.lhs, sub_result)) return false;
         const len = switch (icmp.rhs) {
             .int => |int| try i64Value(int),
             else => return false,
         };
-        if (len < 0 or len > 255) return false;
 
-        try machine.instructions.append(allocator, .{
-            .ascii_range_u8_dil_imm8_imm8_al = .{
-                .low = @intCast(low),
-                .len = @intCast(len),
-            },
-        });
-        try machine.instructions.append(allocator, .ret);
-        return true;
+        if (is_i8) {
+            if (!sub.ty.eql(.{ .int = 8 }) or !icmp.operand_ty.eql(.{ .int = 8 })) return false;
+            if (low < 0 or low > 255 or len < 0 or len > 255) return false;
+            try machine.instructions.append(allocator, .{
+                .ascii_range_u8_dil_imm8_imm8_al = .{
+                    .low = @intCast(low),
+                    .len = @intCast(len),
+                },
+            });
+            try machine.instructions.append(allocator, .ret);
+            return true;
+        } else if (is_i32) {
+            if (!sub.ty.eql(.{ .int = 32 }) or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+            if (low < 0 or low > std.math.maxInt(u32) or len < 0 or len > std.math.maxInt(u32)) return false;
+            try machine.instructions.append(allocator, .{
+                .range_u32_edi_imm32_imm32_al = .{
+                    .low = @intCast(low),
+                    .len = @intCast(len),
+                },
+            });
+            try machine.instructions.append(allocator, .ret);
+            return true;
+        }
+        return false;
     }
 
     // Pattern 2: Alphabetic check (isAlphabetic)

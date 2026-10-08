@@ -170,6 +170,7 @@ const lowerTypedV2CheckedIntFromFloat = typed_v2.lowerTypedV2CheckedIntFromFloat
 const lowerTypedV2UnionTagPayloadSwitch = typed_v2.lowerTypedV2UnionTagPayloadSwitch;
 const lowerTypedV2UnionTagPayloadBranch = typed_v2.lowerTypedV2UnionTagPayloadBranch;
 const lowerTypedV2AsciiPredicate = typed_v2.lowerTypedV2AsciiPredicate;
+const lowerTypedV2SingleRangePredicate = typed_v2.lowerTypedV2SingleRangePredicate;
 
 const lowerErrorClassify = typed_v2_fallbacks.lowerErrorClassify;
 const lowerErrorSwitch = typed_v2_fallbacks.lowerErrorSwitch;
@@ -1114,6 +1115,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2AsciiPredicate(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2SingleRangePredicate(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
     if (try lowerTypedV2VoidRetPtr(allocator, air_function, function_type, structured_air_v2)) |function| {

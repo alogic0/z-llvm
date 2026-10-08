@@ -1410,3 +1410,113 @@ pub fn lowerTypedV2AsciiPredicate(
     try function.blocks.append(allocator, block);
     return function;
 }
+
+pub const RangeBounds = struct {
+    low: u32,
+    high: u32,
+    len: u32,
+    case_is_true: bool,
+};
+
+pub fn parseSwitchBrSingleRange(function_air_text: []const u8) ?RangeBounds {
+    const sw_pos = std.mem.indexOf(u8, function_air_text, "switch_br(") orelse return null;
+    const bracket_start = std.mem.indexOfPos(u8, function_air_text, sw_pos, "[") orelse return null;
+    const bracket_end = std.mem.indexOfPos(u8, function_air_text, bracket_start, "] =>") orelse return null;
+    const case_text = function_air_text[bracket_start + 1 .. bracket_end];
+
+    const ellipsis = std.mem.indexOf(u8, case_text, "...") orelse return null;
+    const low_part = std.mem.trim(u8, case_text[0..ellipsis], " \t");
+    const high_part = std.mem.trim(u8, case_text[ellipsis + 3 ..], " \t");
+
+    const low = parseAngleValue(low_part) orelse return null;
+    const high = parseAngleValue(high_part) orelse return null;
+    if (high < low) return null;
+    const len = high - low + 1;
+
+    const arrow = bracket_end + "] =>".len;
+    const else_pos = std.mem.indexOfPos(u8, function_air_text, arrow, "else =>") orelse return null;
+    const case_body = function_air_text[arrow..else_pos];
+    const case_is_true = if (std.mem.indexOf(u8, case_body, "@.bool_true") != null)
+        true
+    else if (std.mem.indexOf(u8, case_body, "@.bool_false") != null)
+        false
+    else
+        return null;
+
+    return .{
+        .low = low,
+        .high = high,
+        .len = len,
+        .case_is_true = case_is_true,
+    };
+}
+
+fn parseAngleValue(text: []const u8) ?u32 {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len < 3 or trimmed[0] != '<' or trimmed[trimmed.len - 1] != '>') return null;
+    const comma = std.mem.indexOfScalar(u8, trimmed, ',') orelse return null;
+    const val_str = std.mem.trim(u8, trimmed[comma + 1 .. trimmed.len - 1], " ");
+    return std.fmt.parseInt(u32, val_str, 0) catch null;
+}
+
+pub fn typedV2SingleRangePredicateRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 1 or
+        function_type.params[0].ir_type != .int or
+        function_type.params[0].ir_type.int > 32 or
+        !function_type.return_type.ir_type.eql(.{ .int = 1 }) or
+        air_model.typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        air_model.typedOpcodeCount(structured_air_v2, "block") != 1 or
+        air_model.typedOpcodeCount(structured_air_v2, "switch_br") != 1 or
+        air_model.typedOpcodeCount(structured_air_v2, "br") != 2 or
+        !air_model.typedHasReturnOpcode(structured_air_v2))
+    {
+        return false;
+    }
+    return true;
+}
+
+pub fn lowerTypedV2SingleRangePredicate(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2SingleRangePredicateRecords(function_type, structured_air_v2)) return null;
+    const range = parseSwitchBrSingleRange(air_function.air_text) orelse return null;
+    if (!range.case_is_true) return null;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 1 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    const param_ty = ir.Type{ .int = 32 };
+    try function.params.append(allocator, .{ .ty = param_ty, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    try block.instructions.append(allocator, .{
+        .result = "sub",
+        .kind = .{ .binary = .{
+            .op = .sub,
+            .ty = param_ty,
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .int = @intCast(range.low) },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "cmp",
+        .kind = .{ .icmp = .{
+            .predicate = .ult,
+            .operand_ty = param_ty,
+            .lhs = .{ .named = "sub" },
+            .rhs = .{ .int = @intCast(range.len) },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "cmp" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}

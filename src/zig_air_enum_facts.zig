@@ -129,6 +129,41 @@ const facts = [_]Fact{
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],
     },
+    .{
+        .name = "zig.llvm.Builder.Type",
+        .backing_type = .{ .int = 32 },
+        .enumerators = zig_llvm_builder_type_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.Type",
+        .backing_type = .{ .int = 32 },
+        .enumerators = zig_llvm_builder_type_enumerators[0..],
+    },
+};
+
+const zig_llvm_builder_type_enumerators = [_]Enumerator{
+    .{ .name = "void", .value = 0 },
+    .{ .name = "half", .value = 1 },
+    .{ .name = "bfloat", .value = 2 },
+    .{ .name = "float", .value = 3 },
+    .{ .name = "double", .value = 4 },
+    .{ .name = "fp128", .value = 5 },
+    .{ .name = "x86_fp80", .value = 6 },
+    .{ .name = "ppc_fp128", .value = 7 },
+    .{ .name = "x86_amx", .value = 8 },
+    .{ .name = "x86_mmx", .value = 9 },
+    .{ .name = "label", .value = 10 },
+    .{ .name = "token", .value = 11 },
+    .{ .name = "metadata", .value = 12 },
+    .{ .name = "i1", .value = 13 },
+    .{ .name = "i8", .value = 14 },
+    .{ .name = "i16", .value = 15 },
+    .{ .name = "i29", .value = 16 },
+    .{ .name = "i32", .value = 17 },
+    .{ .name = "i64", .value = 18 },
+    .{ .name = "i80", .value = 19 },
+    .{ .name = "i128", .value = 20 },
+    .{ .name = "ptr", .value = 21 },
 };
 
 const zig_llvm_builder_linkage_enumerators = [_]Enumerator{

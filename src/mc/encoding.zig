@@ -1340,6 +1340,16 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0x3c, range.len,
                 0x0f, 0x92, 0xc0,
             }),
+            .range_u32_edi_imm32_imm32_al => |range| {
+                const low_bytes: [4]u8 = @bitCast(range.low);
+                const len_bytes: [4]u8 = @bitCast(range.len);
+                try bytes.appendSlice(allocator, &.{
+                    0x31, 0xc0,
+                    0x81, 0xef, low_bytes[0], low_bytes[1], low_bytes[2], low_bytes[3],
+                    0x81, 0xff, len_bytes[0], len_bytes[1], len_bytes[2], len_bytes[3],
+                    0x0f, 0x92, 0xc0,
+                });
+            },
             .ascii_alphabetic_dil_al => try bytes.appendSlice(allocator, &.{
                 0x31, 0xc0,
                 0x40, 0x88, 0xf8,
@@ -2093,6 +2103,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .ult_i8_dil_imm8_al => 9,
         .cmp_ult_u32_edi_esi_al => 7,
         .ascii_range_u8_dil_imm8_imm8_al => 12,
+        .range_u32_edi_imm32_imm32_al => 17,
         .ascii_alphabetic_dil_al => 14,
         .ascii_alphanumeric_dil_al => 28,
         .ascii_whitespace_dil_al => 21,

@@ -285,6 +285,10 @@ pub const Instruction = union(enum) {
         low: u8,
         len: u8,
     },
+    range_u32_edi_imm32_imm32_al: struct {
+        low: u32,
+        len: u32,
+    },
     ascii_alphabetic_dil_al,
     ascii_alphanumeric_dil_al,
     ascii_whitespace_dil_al,

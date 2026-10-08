@@ -1575,6 +1575,17 @@ fn allocTempFile(
 }
 
 fn safeStem(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
+    if (text.len > 96) {
+        const hash = std.hash.Wyhash.hash(0, text);
+        const prefix = text[0..64];
+        const stem = try std.fmt.allocPrint(allocator, "{s}_{x:0>16}", .{ prefix, hash });
+        for (stem) |*byte| {
+            if (!std.ascii.isAlphanumeric(byte.*) and byte.* != '_' and byte.* != '.' and byte.* != '-') {
+                byte.* = '_';
+            }
+        }
+        return stem;
+    }
     const stem = try allocator.dupe(u8, text);
     for (stem) |*byte| {
         if (!std.ascii.isAlphanumeric(byte.*) and byte.* != '_' and byte.* != '.' and byte.* != '-') {

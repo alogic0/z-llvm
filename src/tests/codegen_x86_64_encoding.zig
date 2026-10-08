@@ -978,3 +978,44 @@ test "x86_64 lowering and encoding for icmp ult i32" {
         0xc3,
     }, bytes);
 }
+
+test "x86_64 lowering and encoding for i32 single range predicate" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i1 @isSurrogateCodepoint(i32 %arg0) {
+        \\entry:
+        \\  %sub = sub i32 %arg0, 55296
+        \\  %cmp = icmp ult i32 %sub, 2048
+        \\  ret i1 %cmp
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{
+        .range_u32_edi_imm32_imm32_al = .{
+            .low = 55296,
+            .len = 2048,
+        },
+    }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+
+    try std.testing.expectEqualSlices(u8, &.{
+        0x31, 0xc0,
+        0x81, 0xef, 0x00, 0xd8, 0x00, 0x00,
+        0x81, 0xff, 0x00, 0x08, 0x00, 0x00,
+        0x0f, 0x92, 0xc0,
+        0xc3,
+    }, bytes);
+}
