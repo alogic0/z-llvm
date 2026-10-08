@@ -10,7 +10,7 @@ This document defines the actionable implementation plan for taking `z_llvm` fro
 - **Active Branch**: `x86_64-codegen-expanded-frontier`
 - **Compiler Pin**: **Zig 0.17.0** ([`.zigversion`](.zigversion)), reference emitter at `0.17.0-dev.11+1c08b09d1` ([`docs/evidence/ziglang_pin.txt`](docs/evidence/ziglang_pin.txt)).
 - **Current Baseline**:
-  - Unit tests: 1,524 / 1,524 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
+  - Unit tests: 1,527 / 1,527 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
   - Documentation validation: passes cleanly (`zig build check-docs`).
   - Behavioral differential gate against Clang-22: 6,528 observations across 8 programs and 3 release modes pass with 0 fallbacks (`zig build behavioral-diff`).
   - Candidate real-rows gate (`--limit=307` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 307 / 307 (100.0%) passing rows with `local_fail=0`.
@@ -180,6 +180,25 @@ flowchart TD
      - `ReleaseFast`: 307 / 307 (100.0%) passing rows with `local_fail=0`.
      - `ReleaseSafe`: 307 / 307 (100.0%) passing rows with `local_fail=0`.
      - `ReleaseSmall`: 307 / 307 (100.0%) passing rows with `local_fail=0`.
+
+---
+
+### Milestone: SysV Constant & Mixed Aggregate Return Lowering — COMPLETED
+**Focus**: Implement compile-time constant folding and multi-leaf packing for SysV register aggregate returns (supporting constant aggregates, arbitrary narrow integer widths <= 32, and dynamic leaves with constant field packing).
+
+1. **SysV Constant & Packed Aggregate Returns**:
+   - In [`src/codegen/x86_64/generic_cfg/cabi_aggregate_return_lowering.zig`](src/codegen/x86_64/generic_cfg/cabi_aggregate_return_lowering.zig):
+     - Implemented `computeConstantEightbyte` and `emitConstantEightbyte` to fold arbitrary compile-time constant aggregate leaves into a single optimal `mov` instruction (e.g. constant struct/tuple initializers).
+     - Generalized `emitIntegerEightbyte` with `base_offset` to handle 1 dynamic leaf alongside multiple constant leaves within an eightbyte using `%rcx` scratch accumulation (`or_rcx_rax` / `or_rcx_rdx`).
+     - Supported narrow integer return types (`i1`, `i8`, `i16`, `i32`) in `emitIntegerEightbyte`.
+2. **Unit Tests & Verification**:
+   - In [`src/tests/codegen_x86_64_aggregates.zig`](src/tests/codegen_x86_64_aggregates.zig):
+     - Added unit tests for: constant packed aggregate returns, dynamic + constant mixed aggregate returns, and single narrow integer aggregate returns.
+   - `zig test src/tests.zig`: 1,527 / 1,527 pass cleanly.
+   - `zig build test-unit`: 100% pass clean.
+   - `zig build check-docs`: passed clean.
+   - `git diff --check`: passed clean.
+   - Candidate real-rows gate (`--limit=307`): 307 / 307 (100.0%) passing rows across `ReleaseFast`, `ReleaseSafe`, and `ReleaseSmall`.
 
 ---
 

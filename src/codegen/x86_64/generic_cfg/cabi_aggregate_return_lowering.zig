@@ -536,6 +536,66 @@ fn emitPackedTwoI32Leaves(
     }
 }
 
+fn isLeafConstant(leaf: AggregateReturnLeaf) bool {
+    return switch (leaf.value) {
+        .int, .zero_initializer, .null_value => true,
+        else => false,
+    };
+}
+
+fn areAllLeavesConstant(leaves: []const AggregateReturnLeaf) bool {
+    for (leaves) |leaf| {
+        if (!isLeafConstant(leaf)) return false;
+    }
+    return true;
+}
+
+fn computeConstantEightbyte(leaves: []const AggregateReturnLeaf, base_offset: usize) !u64 {
+    var combined: u64 = 0;
+    for (leaves) |leaf| {
+        if (leaf.offset < base_offset or leaf.offset >= base_offset + 8) return error.UnsupportedCodegenAbi;
+        const rel_offset = leaf.offset - base_offset;
+        const bit_shift: u6 = @intCast(rel_offset * 8);
+        const leaf_val: u64 = switch (leaf.value) {
+            .int => |val| @truncate(@as(u128, @bitCast(val))),
+            .zero_initializer, .null_value => 0,
+            else => return error.UnsupportedCodegenValue,
+        };
+        const mask: u64 = switch (leaf.ty) {
+            .int => |bits| if (bits >= 64) std.math.maxInt(u64) else (@as(u64, 1) << @intCast(bits)) - 1,
+            .ptr => std.math.maxInt(u64),
+            else => return error.UnsupportedCodegenType,
+        };
+        combined |= (leaf_val & mask) << bit_shift;
+    }
+    return combined;
+}
+
+fn emitConstantEightbyte(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    combined: u64,
+    dst: IntegerReturnDst,
+) !void {
+    if (combined == 0) {
+        switch (dst) {
+            .rax => try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 }),
+            .rdx => try machine.instructions.append(allocator, .xor_edx_edx),
+        }
+    } else if (combined <= std.math.maxInt(u32)) {
+        switch (dst) {
+            .rax => try machine.instructions.append(allocator, .{ .mov_imm_eax = @intCast(combined) }),
+            .rdx => try machine.instructions.append(allocator, .{ .mov_imm_rdx = @intCast(combined) }),
+        }
+    } else {
+        const i64_val: i64 = @bitCast(combined);
+        switch (dst) {
+            .rax => try machine.instructions.append(allocator, .{ .mov_imm_rax = i64_val }),
+            .rdx => try machine.instructions.append(allocator, .{ .mov_imm_rdx = i64_val }),
+        }
+    }
+}
+
 fn emitIntegerEightbyte(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -543,6 +603,7 @@ fn emitIntegerEightbyte(
     block: ir.BasicBlock,
     leaves: []const AggregateReturnLeaf,
     dst: IntegerReturnDst,
+    base_offset: usize,
 ) !void {
     if (leaves.len == 0) {
         switch (dst) {
@@ -551,18 +612,77 @@ fn emitIntegerEightbyte(
         }
         return;
     }
-    if (leaves.len == 1) {
-        const leaf = leaves[0];
-        if (leaf.ty.eql(.{ .int = 64 }) or leaf.ty.eql(.ptr)) {
-            try emitInteger64Leaf(allocator, machine, function, block, leaf, dst);
-            return;
-        }
-        if (leaf.ty.eql(.{ .int = 32 })) {
-            try emitInteger32Leaf(allocator, machine, function, block, leaf, dst);
-            return;
-        }
-        return error.UnsupportedCodegenType;
+
+    if (areAllLeavesConstant(leaves)) {
+        const combined = try computeConstantEightbyte(leaves, base_offset);
+        try emitConstantEightbyte(allocator, machine, combined, dst);
+        return;
     }
+
+    var dynamic_index: ?usize = null;
+    var dynamic_count: usize = 0;
+    for (leaves, 0..) |leaf, i| {
+        if (!isLeafConstant(leaf)) {
+            dynamic_index = i;
+            dynamic_count += 1;
+        }
+    }
+
+    if (dynamic_count == 1) {
+        const dyn_leaf = leaves[dynamic_index.?];
+        if (dyn_leaf.offset < base_offset or dyn_leaf.offset >= base_offset + 8) return error.UnsupportedCodegenAbi;
+        const rel_offset = dyn_leaf.offset - base_offset;
+        if (rel_offset == 0) {
+            if (dyn_leaf.ty.eql(.{ .int = 64 }) or dyn_leaf.ty.eql(.ptr)) {
+                try emitInteger64Leaf(allocator, machine, function, block, dyn_leaf, dst);
+            } else if (switch (dyn_leaf.ty) { .int => |bits| bits <= 32, else => false }) {
+                try emitInteger32Leaf(allocator, machine, function, block, dyn_leaf, dst);
+            } else {
+                return error.UnsupportedCodegenType;
+            }
+        } else {
+            if (dyn_leaf.ty.eql(.{ .int = 32 }) and rel_offset == 4) {
+                try emitInteger32Leaf(allocator, machine, function, block, dyn_leaf, dst);
+                const shift_amt: u6 = @intCast(rel_offset * 8);
+                switch (dst) {
+                    .rax => try machine.instructions.append(allocator, .{ .shl_rax_imm6 = shift_amt }),
+                    .rdx => try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = shift_amt }),
+                }
+            } else {
+                return error.UnsupportedCodegenType;
+            }
+        }
+
+        if (leaves.len > 1) {
+            var const_combined: u64 = 0;
+            for (leaves, 0..) |leaf, i| {
+                if (i == dynamic_index.?) continue;
+                if (leaf.offset < base_offset or leaf.offset >= base_offset + 8) return error.UnsupportedCodegenAbi;
+                const c_rel = leaf.offset - base_offset;
+                const bit_shift: u6 = @intCast(c_rel * 8);
+                const leaf_val: u64 = switch (leaf.value) {
+                    .int => |val| @truncate(@as(u128, @bitCast(val))),
+                    .zero_initializer, .null_value => 0,
+                    else => 0,
+                };
+                const mask: u64 = switch (leaf.ty) {
+                    .int => |bits| if (bits >= 64) std.math.maxInt(u64) else (@as(u64, 1) << @intCast(bits)) - 1,
+                    .ptr => std.math.maxInt(u64),
+                    else => return error.UnsupportedCodegenType,
+                };
+                const_combined |= (leaf_val & mask) << bit_shift;
+            }
+            if (const_combined != 0) {
+                try machine.instructions.append(allocator, .{ .mov_imm_rcx = @bitCast(const_combined) });
+                switch (dst) {
+                    .rax => try machine.instructions.append(allocator, .or_rcx_rax),
+                    .rdx => try machine.instructions.append(allocator, .or_rcx_rdx),
+                }
+            }
+        }
+        return;
+    }
+
     if (leaves.len == 2) {
         const l0 = leaves[0];
         const l1 = leaves[1];
@@ -725,7 +845,7 @@ pub fn lowerRegisterAggregateReturn(
 
     if (classification.eightbyte_count == 1) {
         switch (class0) {
-            .integer => try emitIntegerEightbyte(allocator, machine, function, block, eb0_leaves, .rax),
+            .integer => try emitIntegerEightbyte(allocator, machine, function, block, eb0_leaves, .rax, 0),
             .sse => try emitSseEightbyte(allocator, machine, function, eb0_leaves, .xmm0),
         }
         try machine.instructions.append(allocator, .ret);
@@ -749,26 +869,26 @@ pub fn lowerRegisterAggregateReturn(
                     if (eb1_needs_rax_scratch) {
                         if (eb0_uses_rdx) {
                             try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdx } });
-                            try emitIntegerEightbyte(allocator, machine, function, block, eb1_leaves, .rdx);
+                            try emitIntegerEightbyte(allocator, machine, function, block, eb1_leaves, .rdx, 8);
                             try machine.instructions.append(allocator, .{ .mov_arg_rax = .rcx });
                         } else {
-                            try emitIntegerEightbyte(allocator, machine, function, block, eb1_leaves, .rdx);
-                            try emitIntegerEightbyte(allocator, machine, function, block, eb0_leaves, .rax);
+                            try emitIntegerEightbyte(allocator, machine, function, block, eb1_leaves, .rdx, 8);
+                            try emitIntegerEightbyte(allocator, machine, function, block, eb0_leaves, .rax, 0);
                         }
                     } else {
-                        try emitIntegerEightbyte(allocator, machine, function, block, eb0_leaves, .rax);
-                        try emitIntegerEightbyte(allocator, machine, function, block, eb1_leaves, .rdx);
+                        try emitIntegerEightbyte(allocator, machine, function, block, eb0_leaves, .rax, 0);
+                        try emitIntegerEightbyte(allocator, machine, function, block, eb1_leaves, .rdx, 8);
                     }
                 },
                 .sse => {
-                    try emitIntegerEightbyte(allocator, machine, function, block, eb0_leaves, .rax);
+                    try emitIntegerEightbyte(allocator, machine, function, block, eb0_leaves, .rax, 0);
                     try emitSseEightbyte(allocator, machine, function, eb1_leaves, .xmm0);
                 },
             },
             .sse => switch (class1) {
                 .integer => {
                     try emitSseEightbyte(allocator, machine, function, eb0_leaves, .xmm0);
-                    try emitIntegerEightbyte(allocator, machine, function, block, eb1_leaves, .rax);
+                    try emitIntegerEightbyte(allocator, machine, function, block, eb1_leaves, .rax, 8);
                 },
                 .sse => {
                     try emitSseEightbyte(allocator, machine, function, eb0_leaves, .xmm0);

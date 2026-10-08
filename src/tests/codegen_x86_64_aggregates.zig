@@ -1505,3 +1505,78 @@ test "x86_64 lowers dynamic mask bit pattern" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
+
+test "x86_64 lowers constant packed aggregate return" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define { i32, i16, i16 } @make_const_aggregate() {
+        \\entry:
+        \\  %0 = insertvalue { i32, i16, i16 } poison, i32 42, 0
+        \\  %1 = insertvalue { i32, i16, i16 } %0, i16 7, 1
+        \\  %2 = insertvalue { i32, i16, i16 } %1, i16 13, 2
+        \\  ret { i32, i16, i16 } %2
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    const expected_val: i64 = @bitCast((@as(u64, 13) << 48) | (@as(u64, 7) << 32) | 42);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rax = expected_val }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
+test "x86_64 lowers dynamic and constant mixed aggregate return" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define { i32, i32 } @make_mixed_pair(i32 %arg) {
+        \\entry:
+        \\  %0 = insertvalue { i32, i32 } poison, i32 %arg, 0
+        \\  %1 = insertvalue { i32, i32 } %0, i32 1, 1
+        \\  ret { i32, i32 } %1
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rcx = 1 << 32 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.or_rcx_rax, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[3]);
+}
+
+test "x86_64 lowers single narrow integer aggregate return" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define { i8 } @make_single_i8(i8 %val) {
+        \\entry:
+        \\  %0 = insertvalue { i8 } poison, i8 %val, 0
+        \\  ret { i8 } %0
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
