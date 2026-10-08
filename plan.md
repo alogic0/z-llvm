@@ -10,11 +10,40 @@ This document defines the actionable implementation plan for taking `z_llvm` fro
 - **Active Branch**: `x86_64-codegen-expanded-frontier`
 - **Compiler Pin**: **Zig 0.17.0** ([`.zigversion`](.zigversion)), reference emitter at `0.17.0-dev.11+1c08b09d1` ([`docs/evidence/ziglang_pin.txt`](docs/evidence/ziglang_pin.txt)).
 - **Current Baseline**:
-  - Unit tests: 1,516 / 1,516 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
+  - Unit tests: 1,522 / 1,522 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
   - Documentation validation: passes cleanly (`zig build check-docs`).
   - Behavioral differential gate against Clang-22: 6,528 observations across 8 programs and 3 release modes pass with 0 fallbacks (`zig build behavioral-diff`).
-  - Candidate real-rows gate (`--limit=300` on `ReleaseFast`): 300 / 300 (100.0%) passing rows with `local_fail=0`.
+  - Candidate real-rows gate (`--limit=301` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 301 / 301 (100.0%) passing rows with `local_fail=0`.
   - Stage4 emitter check: passes against tracked pin `1c08b09d1` (`zig build check-zig-stage4-emitter`).
+
+---
+
+### Milestone: Generic SysV Aggregate Return Lowering — COMPLETED
+**Focus**: Generalize SysV C ABI register aggregate return lowering for 1- and 2-eightbyte structures, slices, and tuples.
+
+1. **Backwards Leaf Aggregation**:
+   - In [`src/codegen/x86_64/generic_cfg/cabi_aggregate_return_lowering.zig`](src/codegen/x86_64/generic_cfg/cabi_aggregate_return_lowering.zig):
+     - Generalized `collectConstructedAggregateLeaves` to trace backwards from `ret.value`, allowing preceding/interleaved instructions in the basic block.
+     - Accepted `.poison`, `.undef`, and `.zero_initializer` as base aggregates.
+     - Deduplicated multiple inserts targeting the same byte offset and sorted leaves by byte offset.
+     - Enabled `.mov_rax_to_arg = dst` for all GPR destination registers (`.rdx, .rcx, .r8, .r9`) in `moveRaxIntoArgReg`.
+2. **SysV 1- and 2-Eightbyte Register Returns**:
+   - Implemented `emitInteger64Leaf`, `emitInteger32Leaf`, `emitPackedTwoI32Leaves`, `emitIntegerEightbyte`, `emitSseLeaf`, and `emitSseEightbyte`.
+   - Generalized `lowerRegisterAggregateReturn` to handle:
+     - `INTEGER / INTEGER` returns across `%rax:%rdx` (e.g. `{ ptr, i64 }` slices, `{ i64, i64 }` pairs).
+     - `INTEGER / SSE` and `SSE / INTEGER` mixed returns across `%rax` and `%xmm0`.
+     - `SSE / SSE` returns across `%xmm0:%xmm1`.
+     - Leaf sources from constants (zero, 64-bit imm), incoming GPR/stack params, and computed SSA values.
+     - Scratch register dependency preservation (eightbyte 1 evaluation before eightbyte 0 when `%rax` scratch is required).
+3. **Core Machine Encoding & Unit Verification**:
+   - In [`src/codegen/x86_64/generic_cfg/core_value_emit.zig`](src/codegen/x86_64/generic_cfg/core_value_emit.zig):
+     - Fixed two's complement byte encoding for `add_rax_imm8` subtraction (`@as(u8, @truncate(@as(u64, @bitCast(-rhs))))`).
+   - In [`src/tests/codegen_x86_64_aggregates.zig`](src/tests/codegen_x86_64_aggregates.zig):
+     - Added comprehensive unit tests for: slice from poison base, constant 0 length slice, null pointer + constant length, out-of-order aggregate inserts, mixed `ptr` + `double`, and slice with computed SSA length.
+4. **Verification**:
+   - `zig test src/tests.zig`: 1,522 / 1,522 pass cleanly.
+   - `zig build check-docs`: passed clean (19 current documents, 135 internal links).
+   - `git diff --check`: passed clean.
 
 ### Non-Negotiable Operating Principles
 1. **Generic Lowering Only**: Never use function-name matching, case ID dispatch, or synthetic return stubs. All codegen decisions must derive strictly from IR types, control flow graph shapes, and SysV ABI classifications.

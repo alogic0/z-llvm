@@ -24,8 +24,10 @@ const fpParamIndex = cabi_abi_helpers.fpParamIndex;
 const paramReg = cabi_abi_helpers.paramReg;
 const paramRegWithInitialGpr = cabi_abi_helpers.paramRegWithInitialGpr;
 const paramValueReg = cabi_abi_helpers.paramValueReg;
+const scalarParamStackDisp8 = cabi_abi_helpers.scalarParamStackDisp8;
 const sysvIntegerParamRegOrNull = cabi_abi_helpers.sysvIntegerParamRegOrNull;
 const emitGenericCfgI64ValueIntoRax = core_value_emit.emitGenericCfgI64ValueIntoRax;
+const emitGenericCfgI32ValueIntoEax = core_value_emit.emitGenericCfgI32ValueIntoEax;
 
 const appendSysVCallTargetWithStackArgs = x86_64_emit.appendSysVCallTargetWithStackArgs;
 const appendDirectCallWithStackArgs = x86_64_emit.appendDirectCallWithStackArgs;
@@ -145,7 +147,7 @@ fn collectConstructedAggregateLeaves(
     var current: ir.Value = .{ .named = final_name };
     while (true) {
         switch (current) {
-            .undef => break,
+            .undef, .poison, .zero_initializer => break,
             .named => |name| {
                 if (count >= reversed.len) return error.UnsupportedCodegenAbi;
                 const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenInstruction;
@@ -155,18 +157,31 @@ fn collectConstructedAggregateLeaves(
                 };
                 if (!insert.aggregate_ty.eql(aggregate_ty)) return error.UnsupportedCodegenType;
                 const offset = try aggregateInsertByteOffset(aggregate_ty, insert.indices, insert.value_ty);
-                reversed[count] = .{ .value = insert.value, .ty = insert.value_ty, .offset = offset };
-                count += 1;
+                var already_present = false;
+                for (reversed[0..count]) |existing| {
+                    if (existing.offset == offset) {
+                        already_present = true;
+                        break;
+                    }
+                }
+                if (!already_present) {
+                    reversed[count] = .{ .value = insert.value, .ty = insert.value_ty, .offset = offset };
+                    count += 1;
+                }
                 current = insert.aggregate;
             },
-            .int, .fp, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            .int, .fp, .null_value, .vector, .constant_expr => return error.UnsupportedCodegenValue,
         }
     }
     var index: usize = 0;
     while (index < count) : (index += 1) {
         leaves[index] = reversed[count - 1 - index];
-        if (index != 0 and leaves[index].offset <= leaves[index - 1].offset) return error.UnsupportedCodegenAbi;
     }
+    std.mem.sort(AggregateReturnLeaf, leaves[0..count], {}, struct {
+        fn lessThan(_: void, a: AggregateReturnLeaf, b: AggregateReturnLeaf) bool {
+            return a.offset < b.offset;
+        }
+    }.lessThan);
     return count;
 }
 
@@ -267,7 +282,7 @@ fn moveRaxIntoArgReg(allocator: std.mem.Allocator, machine: *MachineFunction, ds
     switch (dst) {
         .rdi => try machine.instructions.append(allocator, .mov_rax_rdi),
         .rsi => try machine.instructions.append(allocator, .mov_rax_rsi),
-        .rdx, .rcx, .r8, .r9 => return error.UnsupportedCodegenAbi,
+        .rdx, .rcx, .r8, .r9 => try machine.instructions.append(allocator, .{ .mov_rax_to_arg = dst }),
     }
 }
 
@@ -381,6 +396,264 @@ pub fn lowerSmallIntegerAggregateReturn(
     return true;
 }
 
+const IntegerReturnDst = enum { rax, rdx };
+
+fn emitInteger64Leaf(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    leaf: AggregateReturnLeaf,
+    dst: IntegerReturnDst,
+) !void {
+    switch (leaf.value) {
+        .int => |val| {
+            if (val == 0) {
+                switch (dst) {
+                    .rax => try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 }),
+                    .rdx => try machine.instructions.append(allocator, .xor_edx_edx),
+                }
+            } else {
+                const i64_val = try x86_64_match.i64Value(val);
+                switch (dst) {
+                    .rax => try machine.instructions.append(allocator, .{ .mov_imm_rax = i64_val }),
+                    .rdx => try machine.instructions.append(allocator, .{ .mov_imm_rdx = i64_val }),
+                }
+            }
+        },
+        .null_value, .zero_initializer => {
+            switch (dst) {
+                .rax => try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 }),
+                .rdx => try machine.instructions.append(allocator, .xor_edx_edx),
+            }
+        },
+        .named => |name| {
+            if (try sysvIntegerParamRegOrNull(function, name, leaf.ty)) |src| {
+                switch (dst) {
+                    .rax => try machine.instructions.append(allocator, .{ .mov_arg_rax = src }),
+                    .rdx => {
+                        if (src != .rdx) {
+                            try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = src } });
+                        }
+                    },
+                }
+                return;
+            }
+            if (scalarParamStackDisp8(function, name, leaf.ty) catch null) |offset| {
+                switch (dst) {
+                    .rax => try appendLoadStackDispRax(allocator, machine, offset),
+                    .rdx => try appendLoadStackDispArg64(allocator, machine, .rdx, offset),
+                }
+                return;
+            }
+            switch (dst) {
+                .rax => try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, leaf.value),
+                .rdx => {
+                    try emitGenericCfgI64ValueIntoRax(allocator, machine, function, block, leaf.value);
+                    try machine.instructions.append(allocator, .{ .mov_rax_to_arg = .rdx });
+                },
+            }
+        },
+        .fp, .undef, .poison, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn emitInteger32Leaf(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    leaf: AggregateReturnLeaf,
+    dst: IntegerReturnDst,
+) !void {
+    switch (leaf.value) {
+        .int => |val| {
+            const i32_val = try x86_64_match.i32Value(val);
+            switch (dst) {
+                .rax => try machine.instructions.append(allocator, .{ .mov_imm_eax = i32_val }),
+                .rdx => try machine.instructions.append(allocator, .{ .mov_imm_rdx = @as(u32, @bitCast(i32_val)) }),
+            }
+        },
+        .null_value, .zero_initializer => {
+            switch (dst) {
+                .rax => try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 }),
+                .rdx => try machine.instructions.append(allocator, .xor_edx_edx),
+            }
+        },
+        .named => |name| {
+            if (try sysvIntegerParamRegOrNull(function, name, leaf.ty)) |src| {
+                switch (dst) {
+                    .rax => try machine.instructions.append(allocator, .{ .mov_arg_eax = src }),
+                    .rdx => try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = src } }),
+                }
+                return;
+            }
+            switch (dst) {
+                .rax => try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, leaf.value),
+                .rdx => {
+                    try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, leaf.value);
+                    try machine.instructions.append(allocator, .{ .mov_rax_to_arg = .rdx });
+                },
+            }
+        },
+        .fp, .undef, .poison, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn emitPackedTwoI32Leaves(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    low_leaf: AggregateReturnLeaf,
+    high_leaf: AggregateReturnLeaf,
+    dst: IntegerReturnDst,
+) !void {
+    if (low_leaf.value == .int and high_leaf.value == .int) {
+        const low_val = @as(u64, @as(u32, @bitCast(try x86_64_match.i32Value(low_leaf.value.int))));
+        const high_val = @as(u64, @as(u32, @bitCast(try x86_64_match.i32Value(high_leaf.value.int))));
+        const combined: i64 = @bitCast((high_val << 32) | low_val);
+        switch (dst) {
+            .rax => try machine.instructions.append(allocator, .{ .mov_imm_rax = combined }),
+            .rdx => try machine.instructions.append(allocator, .{ .mov_imm_rdx = combined }),
+        }
+        return;
+    }
+    const low_reg = try paramValueReg(function, low_leaf.value, low_leaf.ty);
+    const high_reg = try paramValueReg(function, high_leaf.value, high_leaf.ty);
+    switch (dst) {
+        .rax => {
+            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = high_reg } });
+            try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = 32 });
+            try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg });
+            try machine.instructions.append(allocator, .or_rdx_rax);
+        },
+        .rdx => {
+            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rcx, .src = high_reg } });
+            try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = 32 });
+            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_reg } });
+            try machine.instructions.append(allocator, .or_rcx_rdx);
+        },
+    }
+}
+
+fn emitIntegerEightbyte(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    leaves: []const AggregateReturnLeaf,
+    dst: IntegerReturnDst,
+) !void {
+    if (leaves.len == 0) {
+        switch (dst) {
+            .rax => try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 }),
+            .rdx => try machine.instructions.append(allocator, .xor_edx_edx),
+        }
+        return;
+    }
+    if (leaves.len == 1) {
+        const leaf = leaves[0];
+        if (leaf.ty.eql(.{ .int = 64 }) or leaf.ty.eql(.ptr)) {
+            try emitInteger64Leaf(allocator, machine, function, block, leaf, dst);
+            return;
+        }
+        if (leaf.ty.eql(.{ .int = 32 })) {
+            try emitInteger32Leaf(allocator, machine, function, block, leaf, dst);
+            return;
+        }
+        return error.UnsupportedCodegenType;
+    }
+    if (leaves.len == 2) {
+        const l0 = leaves[0];
+        const l1 = leaves[1];
+        if (l0.ty.eql(.{ .int = 32 }) and l1.ty.eql(.{ .int = 32 })) {
+            try emitPackedTwoI32Leaves(allocator, machine, function, l0, l1, dst);
+            return;
+        }
+        return error.UnsupportedCodegenType;
+    }
+    return error.UnsupportedCodegenAbi;
+}
+
+fn emitSseLeaf(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    leaf: AggregateReturnLeaf,
+    dst: XmmReg,
+) !void {
+    switch (leaf.value) {
+        .named => |name| {
+            const src_index = try fpParamIndex(function, name, leaf.ty);
+            const src = try XmmReg.fromIndex(src_index);
+            if (src != dst) {
+                try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = dst, .src = src } });
+            }
+        },
+        .fp => {
+            if (leaf.ty.eql(.float)) {
+                const bits = try x86_64_match.fp32TextBits(leaf.value);
+                if (bits == 0) {
+                    try machine.instructions.append(allocator, .{ .pxor_xmm = .{ .dst = dst, .src = dst } });
+                } else switch (dst) {
+                    .xmm0 => try machine.instructions.append(allocator, .{ .mov_imm32_xmm0 = bits }),
+                    .xmm1 => try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = bits }),
+                    else => return error.UnsupportedCodegenAbi,
+                }
+            } else if (leaf.ty.eql(.double)) {
+                const bits = try x86_64_match.fp64TextBits(leaf.value);
+                if (bits == 0) {
+                    try machine.instructions.append(allocator, .{ .pxor_xmm = .{ .dst = dst, .src = dst } });
+                } else switch (dst) {
+                    .xmm0 => try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = bits }),
+                    .xmm1 => try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = bits }),
+                    else => return error.UnsupportedCodegenAbi,
+                }
+            } else return error.UnsupportedCodegenType;
+        },
+        .null_value, .zero_initializer => {
+            try machine.instructions.append(allocator, .{ .pxor_xmm = .{ .dst = dst, .src = dst } });
+        },
+        .int, .undef, .poison, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn emitSseEightbyte(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    leaves: []const AggregateReturnLeaf,
+    dst: XmmReg,
+) !void {
+    if (leaves.len == 0) {
+        try machine.instructions.append(allocator, .{ .pxor_xmm = .{ .dst = dst, .src = dst } });
+        return;
+    }
+    if (leaves.len == 1) {
+        try emitSseLeaf(allocator, machine, function, leaves[0], dst);
+        return;
+    }
+    if (leaves.len == 2) {
+        const l0 = leaves[0];
+        const l1 = leaves[1];
+        if (l0.ty.eql(.float) and l1.ty.eql(.float)) {
+            const low_fp_index = try fpParamIndexFromValue(function, l0.value, .float);
+            const high_fp_index = try fpParamIndexFromValue(function, l1.value, .float);
+            const low_reg = try XmmReg.fromIndex(low_fp_index);
+            const high_reg = try XmmReg.fromIndex(high_fp_index);
+            if (low_reg != dst) {
+                try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = dst, .src = low_reg } });
+            }
+            if (high_reg != dst) {
+                try machine.instructions.append(allocator, .{ .unpcklps_xmm = .{ .dst = dst, .src = high_reg } });
+            }
+            return;
+        }
+        return error.UnsupportedCodegenType;
+    }
+    return error.UnsupportedCodegenAbi;
+}
+
 pub fn lowerRegisterAggregateReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -393,162 +666,120 @@ pub fn lowerRegisterAggregateReturn(
     const classification = classifySysVAggregate(function.ret_ty) catch return false;
     if (classification.kind != .register or classification.eightbyte_count == 0) return false;
     if (try lowerRegisterAggregateParamReturn(allocator, machine, function, block, ret, classification)) return true;
-    const leaf_count = block.instructions.items.len;
-    if (leaf_count == 0) {
-        const ret_value = ret.value orelse return false;
-        if (ret_value == .zero_initializer) {
-            for (0..classification.eightbyte_count) |i| {
-                const class = classification.eightbytes[i] orelse break;
-                switch (class) {
-                    .integer => switch (i) {
-                        0 => try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 }),
-                        1 => try machine.instructions.append(allocator, .xor_edx_edx),
-                        else => return false,
+
+    const ret_val = ret.value orelse return false;
+    if (ret_val == .zero_initializer or ret_val == .null_value) {
+        for (0..classification.eightbyte_count) |i| {
+            const class = classification.eightbytes[i] orelse break;
+            switch (class) {
+                .integer => switch (i) {
+                    0 => try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 }),
+                    1 => try machine.instructions.append(allocator, .xor_edx_edx),
+                    else => return false,
+                },
+                .sse => switch (i) {
+                    0 => try machine.instructions.append(allocator, .{ .pxor_xmm = .{ .dst = .xmm0, .src = .xmm0 } }),
+                    1 => {
+                        const dst: XmmReg = if (classification.eightbytes[0] == .sse) .xmm1 else .xmm0;
+                        try machine.instructions.append(allocator, .{ .pxor_xmm = .{ .dst = dst, .src = dst } });
                     },
                     else => return false,
-                }
+                },
             }
-            try machine.instructions.append(allocator, .ret);
-            return true;
         }
-        return false;
+        try machine.instructions.append(allocator, .ret);
+        return true;
     }
-    if (leaf_count > 8) return false;
+
+    const ret_name = switch (ret_val) {
+        .named => |name| name,
+        else => return false,
+    };
 
     var leaves: [8]AggregateReturnLeaf = undefined;
-    var aggregate_value: ir.Value = .undef;
-    for (block.instructions.items, 0..) |instruction, index| {
-        if (instruction.removed) return false;
-        const result = instruction.result orelse return false;
-        const insert = switch (instruction.kind) {
-            .insertvalue => |insert| insert,
-            else => return false,
-        };
-        if (!insert.aggregate_ty.eql(function.ret_ty)) return false;
-        if (!valuesEqual(insert.aggregate, aggregate_value)) return false;
-        const offset = try aggregateInsertByteOffset(function.ret_ty, insert.indices, insert.value_ty);
-        if (index != 0 and offset <= leaves[index - 1].offset) return error.UnsupportedCodegenAbi;
-        leaves[index] = .{ .value = insert.value, .ty = insert.value_ty, .offset = offset };
-        aggregate_value = .{ .named = result };
-    }
-    if (!valuesEqual(ret.value orelse return error.InvalidRet, aggregate_value)) return false;
+    const leaf_count = collectConstructedAggregateLeaves(block, function.ret_ty, ret_name, &leaves) catch return false;
+    if (leaf_count == 0) return false;
 
     if (try lowerFourI32RegisterAggregateReturn(allocator, machine, function, leaves[0..leaf_count], classification)) return true;
 
-    var gpr_return_index: usize = 0;
-    var sse_return_index: usize = 0;
-    var leaf_index: usize = 0;
-    while (leaf_index < leaf_count) : (leaf_index += 1) {
-        const leaf = leaves[leaf_index];
-        const leaf_eightbyte: usize = @intCast(leaf.offset / 8);
-        if (leaf_eightbyte >= classification.eightbyte_count) return false;
-        const leaf_class = classification.eightbytes[leaf_eightbyte] orelse return false;
-        switch (leaf_class) {
-            .integer => {
-                if (leaf.ty.eql(.{ .int = 64 }) or leaf.ty.eql(.ptr)) {
-                    const src = try paramValueReg(function, leaf.value, leaf.ty);
-                    switch (gpr_return_index) {
-                        0 => try machine.instructions.append(allocator, .{ .mov_arg_rax = src }),
-                        1 => try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = src } }),
-                        else => return error.UnsupportedCodegenAbi,
+    var eb0_leaves_buf: [4]AggregateReturnLeaf = undefined;
+    var eb0_count: usize = 0;
+    var eb1_leaves_buf: [4]AggregateReturnLeaf = undefined;
+    var eb1_count: usize = 0;
+
+    for (leaves[0..leaf_count]) |leaf| {
+        if (leaf.offset < 8) {
+            if (eb0_count >= eb0_leaves_buf.len) return error.UnsupportedCodegenAbi;
+            eb0_leaves_buf[eb0_count] = leaf;
+            eb0_count += 1;
+        } else if (leaf.offset < 16) {
+            if (eb1_count >= eb1_leaves_buf.len) return error.UnsupportedCodegenAbi;
+            eb1_leaves_buf[eb1_count] = leaf;
+            eb1_count += 1;
+        } else return error.UnsupportedCodegenAbi;
+    }
+    const eb0_leaves = eb0_leaves_buf[0..eb0_count];
+    const eb1_leaves = eb1_leaves_buf[0..eb1_count];
+
+    const class0 = classification.eightbytes[0] orelse return error.UnsupportedCodegenAbi;
+
+    if (classification.eightbyte_count == 1) {
+        switch (class0) {
+            .integer => try emitIntegerEightbyte(allocator, machine, function, block, eb0_leaves, .rax),
+            .sse => try emitSseEightbyte(allocator, machine, function, eb0_leaves, .xmm0),
+        }
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+
+    if (classification.eightbyte_count == 2) {
+        const class1 = classification.eightbytes[1] orelse return error.UnsupportedCodegenAbi;
+        switch (class0) {
+            .integer => switch (class1) {
+                .integer => {
+                    const eb1_needs_rax_scratch = eb1_leaves.len > 0 and
+                        eb1_leaves[0].value == .named and
+                        (sysvIntegerParamRegOrNull(function, eb1_leaves[0].value.named, eb1_leaves[0].ty) catch null) == null and
+                        (scalarParamStackDisp8(function, eb1_leaves[0].value.named, eb1_leaves[0].ty) catch null) == null;
+
+                    const eb0_uses_rdx = eb0_leaves.len > 0 and
+                        eb0_leaves[0].value == .named and
+                        (sysvIntegerParamRegOrNull(function, eb0_leaves[0].value.named, eb0_leaves[0].ty) catch null) == .rdx;
+
+                    if (eb1_needs_rax_scratch) {
+                        if (eb0_uses_rdx) {
+                            try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdx } });
+                            try emitIntegerEightbyte(allocator, machine, function, block, eb1_leaves, .rdx);
+                            try machine.instructions.append(allocator, .{ .mov_arg_rax = .rcx });
+                        } else {
+                            try emitIntegerEightbyte(allocator, machine, function, block, eb1_leaves, .rdx);
+                            try emitIntegerEightbyte(allocator, machine, function, block, eb0_leaves, .rax);
+                        }
+                    } else {
+                        try emitIntegerEightbyte(allocator, machine, function, block, eb0_leaves, .rax);
+                        try emitIntegerEightbyte(allocator, machine, function, block, eb1_leaves, .rdx);
                     }
-                    gpr_return_index += 1;
-                    continue;
-                }
-                if (!leaf.ty.eql(.{ .int = 32 })) return false;
-                if (leaf.offset % 8 != 0) return error.UnsupportedCodegenAbi;
-                const low_reg = try paramValueReg(function, leaf.value, leaf.ty);
-                if (leaf_index + 1 < leaf_count and
-                    leaves[leaf_index + 1].ty.eql(.{ .int = 32 }) and
-                    leaves[leaf_index + 1].offset / 8 == leaf_eightbyte and
-                    leaves[leaf_index + 1].offset % 8 == 4)
-                {
-                    const high_reg = try paramValueReg(function, leaves[leaf_index + 1].value, .{ .int = 32 });
-                    switch (gpr_return_index) {
-                        0 => {
-                            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = high_reg } });
-                            try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = 32 });
-                            try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg });
-                            try machine.instructions.append(allocator, .or_rdx_rax);
-                        },
-                        1 => {
-                            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rcx, .src = high_reg } });
-                            try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = 32 });
-                            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_reg } });
-                            try machine.instructions.append(allocator, .or_rcx_rdx);
-                        },
-                        else => return error.UnsupportedCodegenAbi,
-                    }
-                    gpr_return_index += 1;
-                    leaf_index += 1;
-                    continue;
-                }
-                switch (gpr_return_index) {
-                    0 => try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg }),
-                    1 => try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_reg } }),
-                    else => return error.UnsupportedCodegenAbi,
-                }
-                gpr_return_index += 1;
+                },
+                .sse => {
+                    try emitIntegerEightbyte(allocator, machine, function, block, eb0_leaves, .rax);
+                    try emitSseEightbyte(allocator, machine, function, eb1_leaves, .xmm0);
+                },
             },
-            .sse => {
-                if (leaf.ty.eql(.float) and leaf.offset % 8 == 0 and
-                    leaf_index + 1 < leaf_count and
-                    leaves[leaf_index + 1].ty.eql(.float) and
-                    leaves[leaf_index + 1].offset / 8 == leaf_eightbyte and
-                    leaves[leaf_index + 1].offset % 8 == 4)
-                {
-                    if (sse_return_index >= 2) return error.UnsupportedCodegenAbi;
-                    const low_fp_index = try fpParamIndexFromValue(function, leaf.value, .float);
-                    const high_fp_index = try fpParamIndexFromValue(function, leaves[leaf_index + 1].value, .float);
-                    const low_reg = try XmmReg.fromIndex(low_fp_index);
-                    const high_reg = try XmmReg.fromIndex(high_fp_index);
-                    const dst = try XmmReg.fromIndex(sse_return_index);
-                    if (low_reg != dst) {
-                        try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = dst, .src = low_reg } });
-                    }
-                    if (high_reg != dst) {
-                        try machine.instructions.append(allocator, .{ .unpcklps_xmm = .{ .dst = dst, .src = high_reg } });
-                    }
-                    sse_return_index += 1;
-                    leaf_index += 1;
-                    continue;
-                }
-                if (leaf.ty.eql(.float) and leaf.offset % 8 == 0) {
-                    const fp_index = try fpParamIndexFromValue(function, leaf.value, leaf.ty);
-                    switch (sse_return_index) {
-                        0 => switch (try XmmReg.fromIndex(fp_index)) {
-                            .xmm0 => {},
-                            .xmm1, .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => |src| try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm0, .src = src } }),
-                        },
-                        1 => switch (try XmmReg.fromIndex(fp_index)) {
-                            .xmm1 => {},
-                            .xmm0, .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => |src| try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm1, .src = src } }),
-                        },
-                        else => return error.UnsupportedCodegenAbi,
-                    }
-                    sse_return_index += 1;
-                    continue;
-                }
-                if (!leaf.ty.eql(.double)) return false;
-                const fp_index = try fpParamIndexFromValue(function, leaf.value, leaf.ty);
-                switch (sse_return_index) {
-                    0 => switch (try XmmReg.fromIndex(fp_index)) {
-                        .xmm0 => {},
-                        .xmm1 => try machine.instructions.append(allocator, .movapd_xmm1_xmm0),
-                        .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => return error.UnsupportedCodegenAbi,
-                    },
-                    1 => switch (try XmmReg.fromIndex(fp_index)) {
-                        .xmm1 => {},
-                        .xmm0, .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => return error.UnsupportedCodegenAbi,
-                    },
-                    else => return error.UnsupportedCodegenAbi,
-                }
-                sse_return_index += 1;
+            .sse => switch (class1) {
+                .integer => {
+                    try emitSseEightbyte(allocator, machine, function, eb0_leaves, .xmm0);
+                    try emitIntegerEightbyte(allocator, machine, function, block, eb1_leaves, .rax);
+                },
+                .sse => {
+                    try emitSseEightbyte(allocator, machine, function, eb0_leaves, .xmm0);
+                    try emitSseEightbyte(allocator, machine, function, eb1_leaves, .xmm1);
+                },
             },
         }
+        try machine.instructions.append(allocator, .ret);
+        return true;
     }
-    try machine.instructions.append(allocator, .ret);
-    return true;
+    return false;
 }
 
 fn lowerRegisterAggregateParamReturn(

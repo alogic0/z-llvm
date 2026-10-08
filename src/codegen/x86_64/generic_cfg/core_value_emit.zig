@@ -374,7 +374,7 @@ pub fn emitGenericCfgI64ValueIntoRax(
                         },
                         .sub => {
                             if (rhs < 0 or rhs > 127) return error.UnsupportedCodegenValue;
-                            if (rhs != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = @intCast(-rhs) });
+                            if (rhs != 0) try machine.instructions.append(allocator, .{ .add_rax_imm8 = @as(u8, @truncate(@as(u64, @bitCast(-rhs)))) });
                         },
                         .@"and" => {
                             if (rhs < std.math.minInt(i32) or rhs > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
