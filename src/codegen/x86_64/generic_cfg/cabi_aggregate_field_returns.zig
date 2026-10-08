@@ -57,8 +57,13 @@ pub fn lowerSysVAggregateFieldReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if ((!ret.ty.eql(.{ .int = 32 }) and !ret.ty.eql(.{ .int = 64 }) and !ret.ty.eql(.float) and !ret.ty.eql(.double)) or
-        (block.instructions.items.len != 3 and block.instructions.items.len != 4)) return false;
+    const is_supported_ret = ret.ty.eql(.{ .int = 32 }) or ret.ty.eql(.{ .int = 64 }) or
+        ret.ty.eql(.float) or ret.ty.eql(.double) or
+        (switch (ret.ty) {
+            .int => |bits| bits > 64 and bits <= 128,
+            else => false,
+        });
+    if (!is_supported_ret or (block.instructions.items.len != 3 and block.instructions.items.len != 4)) return false;
     const alloca_inst = block.instructions.items[0];
     const store_inst = block.instructions.items[1];
     const maybe_gep_inst: ?ir.Instruction = if (block.instructions.items.len == 4) block.instructions.items[2] else null;

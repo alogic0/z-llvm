@@ -3,6 +3,7 @@ const ir = @import("../../../ir.zig");
 const target = @import("../../../target.zig");
 const type_layout = @import("../../../zig_air_type_layout.zig");
 const x86_64_types = @import("../types.zig");
+const sysv_abi = @import("../sysv_abi.zig");
 const x86_64_match = @import("../match.zig");
 const x86_64_machine = @import("../machine.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
@@ -555,6 +556,67 @@ pub fn emitSysVAggregateFieldOffsetReturn(
         const location = try sysvIntegerAggregateFieldLocation(function, param_name, aggregate_ty, field_offset, field_ty);
         try emitSysVIntegerAggregateFieldLocationReturn(allocator, machine, location, field_ty);
         return;
+    }
+    const is_int_wide = switch (field_ty) {
+        .int => |bits| bits > 64 and bits <= 128,
+        else => false,
+    };
+    if (is_int_wide) {
+        if (field_offset % 8 != 0) return error.UnsupportedCodegenAbi;
+        const layout = try x86_64SysVDataLayout();
+        const aggregate_size = try layout.typeStoreSizeBytes(aggregate_ty);
+        const field_size = try layout.typeStoreSizeBytes(field_ty);
+        if (field_offset + field_size > aggregate_size) return error.UnsupportedCodegenAbi;
+
+        var gpr_index: usize = 0;
+        var sse_index: usize = 0;
+        var stack_eightbytes: usize = 0;
+        var found_param = false;
+        for (function.params.items) |param| {
+            if (std.mem.eql(u8, param.name, param_name)) {
+                if (!param.ty.eql(aggregate_ty)) return error.UnsupportedCodegenValue;
+                found_param = true;
+                break;
+            }
+            try advanceSysVParamCursors(param.ty, &gpr_index, &sse_index, &stack_eightbytes);
+        }
+        if (!found_param) return error.UnsupportedCodegenValue;
+
+        const classification = try sysv_abi.classifyAggregate(aggregate_ty);
+        const eb0_index = field_offset / 8;
+        const eb1_index = eb0_index + 1;
+        if (eb1_index >= classification.eightbyte_count) return error.UnsupportedCodegenAbi;
+        if (classification.eightbytes[@intCast(eb0_index)] != .integer or
+            classification.eightbytes[@intCast(eb1_index)] != .integer) return error.UnsupportedCodegenAbi;
+
+        const needed = sysv_abi.aggregateRegisterNeeds(classification);
+        const in_regs = (gpr_index + needed.gpr <= 6 and sse_index + needed.sse <= 8);
+
+        if (in_regs) {
+            const prior0 = sysv_abi.aggregateRegisterNeedsBefore(classification, @intCast(eb0_index));
+            const prior1 = sysv_abi.aggregateRegisterNeedsBefore(classification, @intCast(eb1_index));
+            const reg0 = try ArgReg.fromIndex(gpr_index + prior0.gpr);
+            const reg1 = try ArgReg.fromIndex(gpr_index + prior1.gpr);
+
+            if (reg0 == .rdx) {
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = reg0 });
+                try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = reg1 } });
+            } else {
+                try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = reg1 } });
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = reg0 });
+            }
+            return;
+        } else {
+            const offset0 = 8 + stack_eightbytes * 8 + field_offset;
+            const offset1 = offset0 + 8;
+            try appendLoadStackDispRax(allocator, machine, @intCast(offset0));
+            if (offset1 <= std.math.maxInt(u8)) {
+                try machine.instructions.append(allocator, .{ .load_stack_disp8_arg64 = .{ .reg = .rdx, .disp = @intCast(offset1) } });
+            } else {
+                try machine.instructions.append(allocator, .{ .load_stack_disp32_arg64 = .{ .reg = .rdx, .disp = @intCast(offset1) } });
+            }
+            return;
+        }
     }
     if (field_ty.eql(.float)) {
         _ = try emitSysVAggregateF32FieldOffsetReturn(allocator, machine, function, param_name, aggregate_ty, field_offset);

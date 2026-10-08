@@ -10,10 +10,10 @@ This document defines the actionable implementation plan for taking `z_llvm` fro
 - **Active Branch**: `x86_64-codegen-expanded-frontier`
 - **Compiler Pin**: **Zig 0.17.0** ([`.zigversion`](.zigversion)), reference emitter at `0.17.0-dev.11+1c08b09d1` ([`docs/evidence/ziglang_pin.txt`](docs/evidence/ziglang_pin.txt)).
 - **Current Baseline**:
-  - Unit tests: 1,522 / 1,522 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
+  - Unit tests: 1,524 / 1,524 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
   - Documentation validation: passes cleanly (`zig build check-docs`).
   - Behavioral differential gate against Clang-22: 6,528 observations across 8 programs and 3 release modes pass with 0 fallbacks (`zig build behavioral-diff`).
-  - Candidate real-rows gate (`--limit=301` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 301 / 301 (100.0%) passing rows with `local_fail=0`.
+  - Candidate real-rows gate (`--limit=307` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 307 / 307 (100.0%) passing rows with `local_fail=0`.
   - Stage4 emitter check: passes against tracked pin `1c08b09d1` (`zig build check-zig-stage4-emitter`).
 
 ---
@@ -155,6 +155,31 @@ flowchart TD
      - `ReleaseFast`: 301 / 301 (100.0%) passing rows with `local_fail=0`.
      - `ReleaseSafe`: 301 / 301 (100.0%) passing rows with `local_fail=0`.
      - `ReleaseSmall`: 301 / 301 (100.0%) passing rows with `local_fail=0`.
+
+---
+
+### Milestone: Wide Integer Field Returns, Dynamic Mask Bits & 307-Row Multi-Mode Gate — COMPLETED
+**Focus**: Generalize aggregate field extraction for wide integers (64 < bits <= 128, e.g. `i96`, `i128`), lower dynamic shift mask bit patterns, and prove 307 rows across ReleaseFast, ReleaseSafe, and ReleaseSmall.
+
+1. **Wide Integer Aggregate Field Extraction (Rows 302–304)**:
+   - In [`src/codegen/x86_64/generic_cfg/cabi_aggregate_field_returns.zig`](src/codegen/x86_64/generic_cfg/cabi_aggregate_field_returns.zig) and [`cabi_aggregate_fields.zig`](src/codegen/x86_64/generic_cfg/cabi_aggregate_fields.zig):
+     - Accepted integer return types with `64 < bits <= 128` (such as `i96` in `Io.Duration.toNanoseconds` / `Io.Timestamp.toNanoseconds` and `i128` in `Io.Limit.minInt64`).
+     - Lowered wide integer field offset return (`emitSysVAggregateWideIntFieldOffsetReturn`) spanning 2 eightbytes in `%rax:%rdx` via SysV register passing or stack disp.
+2. **Generic Dynamic Mask Bit Return (Rows 305–307)**:
+   - In [`src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig`](src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig):
+     - Implemented `lowerGenericCfgMaskBitReturn` to lower `shl 1, %shift` dynamic bit shifting patterns (used by `bit_set.Integer(N).maskBit`).
+     - Emits `mov %arg0, %rcx; mov $1, %eax; shl %cl, %eax; ret` (or 64-bit `%rax`).
+3. **Unit Tests & Multi-Mode Gate Verification**:
+   - In [`src/tests/codegen_x86_64_aggregates.zig`](src/tests/codegen_x86_64_aggregates.zig):
+     - Added unit tests for wide integer aggregate field return and dynamic mask bit return.
+   - `zig test src/tests.zig`: 1,524 / 1,524 pass cleanly.
+   - `zig build test-unit`: 100% pass clean.
+   - `zig build check-docs`: passed clean.
+   - `git diff --check`: passed clean.
+   - Distribution real-rows gate (`--limit=307`):
+     - `ReleaseFast`: 307 / 307 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSafe`: 307 / 307 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSmall`: 307 / 307 (100.0%) passing rows with `local_fail=0`.
 
 ---
 

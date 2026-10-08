@@ -7,6 +7,10 @@ const Instruction = shared.x86_64_machine.Instruction;
 const i64Value = shared.i64Value;
 const isInt = shared.isInt;
 const isNamed = shared.isNamed;
+const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
+const cabi_call_lowering = @import("cabi_call_lowering.zig");
+const paramReg = cabi_abi_helpers.paramReg;
+const findInstruction = cabi_call_lowering.findInstruction;
 
 pub fn lowerGenericCfgSingleBlockPackedBits(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (function.blocks.items.len != 1) return false;
@@ -40,6 +44,10 @@ pub fn lowerGenericCfgSingleBlockPackedBits(allocator: std.mem.Allocator, machin
         return true;
     }
     if (try lowerGenericCfgCmpUltU32Return(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgMaskBitReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
@@ -647,6 +655,75 @@ pub fn lowerGenericCfgGrowCapacityReturn(
     if (!matched) return false;
 
     try machine.instructions.append(allocator, .{ .grow_capacity_u64_rdi_imm32_rax = imm });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerGenericCfgMaskBitReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (function.params.items.len != 1) return false;
+    const arg_param = function.params.items[0];
+    const arg_bits = switch (arg_param.ty) {
+        .int => |bits| bits,
+        else => return false,
+    };
+    if (arg_bits != 32 and arg_bits != 64) return false;
+
+    const ret_bits = switch (ret.ty) {
+        .int => |bits| bits,
+        else => return false,
+    };
+    if (ret_bits == 0 or ret_bits > 64) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        else => return false,
+    };
+
+    const shl_inst = findInstruction(block, ret_name) orelse return false;
+    const shl_binary = switch (shl_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (shl_binary.op != .shl or !shl_binary.ty.eql(ret.ty)) return false;
+    if (!isInt(shl_binary.lhs, 1)) return false;
+
+    var current_value = shl_binary.rhs;
+    while (true) {
+        const name = switch (current_value) {
+            .named => |n| n,
+            else => return false,
+        };
+        if (std.mem.eql(u8, name, arg_param.name)) break;
+        const inst = findInstruction(block, name) orelse return false;
+        switch (inst.kind) {
+            .cast => |cast| {
+                if (cast.op != .trunc and cast.op != .zext) return false;
+                current_value = cast.value;
+            },
+            .binary => |binary| {
+                if (binary.op == .@"and") {
+                    current_value = binary.lhs;
+                } else return false;
+            },
+            else => return false,
+        }
+    }
+
+    const arg_reg = try paramReg(function, arg_param.name, arg_param.ty);
+    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = arg_reg } });
+    if (ret_bits <= 32) {
+        try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+        try machine.instructions.append(allocator, .shl_eax_cl);
+    } else {
+        try machine.instructions.append(allocator, .{ .mov_imm_rax = 1 });
+        try machine.instructions.append(allocator, .shl_rax_cl);
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
 }
