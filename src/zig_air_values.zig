@@ -91,9 +91,16 @@ fn errorSetConstantCode(type_text: []const u8, value_text: []const u8) ?i128 {
 
 fn errorUnionConstantCode(type_text: []const u8, value_text: []const u8) ?i128 {
     const ty = std.mem.trim(u8, type_text, " ");
+    const value = std.mem.trim(u8, value_text, " ");
+    if (std.mem.eql(u8, ty, "anyerror!void")) {
+        if (std.mem.startsWith(u8, value, "error.")) return 1;
+        if (std.mem.eql(u8, value, "{}")) return 0;
+    }
+    if (std.mem.startsWith(u8, ty, "anyerror!")) {
+        if (std.mem.startsWith(u8, value, "error.")) return 1;
+    }
     const marker = std.mem.indexOf(u8, ty, "}!") orelse return null;
     if (!std.mem.startsWith(u8, ty, "error{")) return null;
-    const value = std.mem.trim(u8, value_text, " ");
     if (std.mem.startsWith(u8, value, "error.")) {
         const error_set_text = ty[0 .. marker + 1];
         return errorSetConstantCode(error_set_text, value);

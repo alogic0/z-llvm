@@ -53,6 +53,16 @@ const facts = [_]Fact{
             .load = true,
         },
     },
+    .{
+        .name = "Progress.Node",
+        .aggregate_text = "{ i8 }",
+        .match = .exact,
+        .evidence = .{
+            .construction = true,
+            .store = true,
+            .load = true,
+        },
+    },
 };
 
 pub fn lookup(nominal: []const u8) ?Fact {
@@ -90,11 +100,12 @@ fn stripNominalSigil(text: []const u8) []const u8 {
 }
 
 test "aggregate layout facts keep exact pair ownership narrow" {
-    try std.testing.expectEqual(@as(usize, 3), count());
+    try std.testing.expectEqual(@as(usize, 4), count());
     try std.testing.expect(lookup("aggregate_abi.Pair") == null);
     try std.testing.expect(lookup("%runtime_aggregate_pair_main.Pair") == null);
     try std.testing.expect(lookup("other.Pair") == null);
     try std.testing.expect(lookup("fmt.parse_float.common.BiasedFp(f64)") != null);
     try std.testing.expect(lookup("fmt.parse_float.common.BiasedFp(f32)") != null);
     try std.testing.expect(lookup("codegen.aarch64.Select.Value.PartIterator") != null);
+    try std.testing.expect(lookup("Progress.Node") != null);
 }

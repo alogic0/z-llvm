@@ -14,6 +14,8 @@ const selector_fp = @import("composed_selector_fp.zig");
 const selector_vector = @import("composed_selector_vector.zig");
 const aggregate_object = @import("aggregate_object.zig");
 const value_use = @import("composed_selector_value_use_transaction.zig");
+const cabi_fields = @import("cabi_aggregate_fields.zig");
+const shared = @import("core_shared.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
@@ -789,6 +791,9 @@ fn lowerStoreI64Transactional(
         .register64, .spill64 => {},
         else => return .{ .no_emitter = "composed-block-store-ptr" },
     }
+    if (store.value == .int) {
+        return lowerStoreScalarTransactional(selector, store, pointer_class, 64);
+    }
     if (store.value != .named) return .{ .unsupported_value = "composed-block-store-value-other" };
     const pointer_use = pointerUseForm(selector, store.ptr, false) orelse
         return .{ .no_emitter = "composed-block-store-ptr" };
@@ -831,7 +836,7 @@ fn scalarStorePointerDiagnostic(
             null
         else
             .{ .no_emitter = "composed-block-store-stack-width" },
-        .register64, .spill64 => if (bits == 8 or bits == 32)
+        .register64, .spill64 => if (bits == 8 or bits == 32 or bits == 64)
             null
         else
             .{ .no_emitter = "composed-block-store-ptr-width" },
@@ -926,6 +931,10 @@ fn pointerUseForm(
     };
 }
 
+fn isStructAggregateType(ty: ir.Type) bool {
+    return ty == .aggregate and std.mem.startsWith(u8, ty.aggregate, "{");
+}
+
 pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.GepInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (gep.ptr == .named and std.mem.startsWith(u8, gep.ptr.named, "@"))
@@ -939,6 +948,11 @@ pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.G
     }
     if (isI32ElementPointerSource(gep.source_ty)) {
         const diagnostic = try lowerI32ElementPointerGep(selector, result_name, gep);
+        if (diagnostic == null and readonly_base) try selector.readonly_pointer_params.put(result_name, {});
+        return diagnostic;
+    }
+    if (isStructAggregateType(gep.source_ty)) {
+        const diagnostic = try lowerAggregateFieldGep(selector, result_name, gep);
         if (diagnostic == null and readonly_base) try selector.readonly_pointer_params.put(result_name, {});
         return diagnostic;
     }
@@ -1084,6 +1098,43 @@ pub fn lowerBytePointerGep(selector: *ComposedBlockSelector, result_name: []cons
             .{ .no_emitter = "composed-block-gep-index-range" },
         error.ValueUseUnresolvedSource, error.ValueUseExpiredSource => .{ .unsupported_value = "composed-block-gep-dynamic-index" },
         error.ValueUseUnsupportedAddressForm, error.ValueUseSourceViewMismatch, error.ValueUseRegisterClassMismatch, error.ValueUseTypeMismatch => .{ .unsupported_value = "composed-block-unknown-byte-gep-ptr" },
+        else => return err,
+    };
+    return null;
+}
+
+pub fn lowerAggregateFieldGep(selector: *ComposedBlockSelector, result_name: []const u8, gep: ir.GepInst) !?Diagnostic {
+    if (gep.ptr_addrspace != null) return .{ .no_emitter = "composed-block-gep-addrspace" };
+    const layout = shared.x86_64SysVDataLayout() catch return .{ .no_emitter = "composed-block-gep-layout" };
+    const byte_offset = cabi_fields.aggregateGepByteOffset(layout, gep.source_ty, gep) orelse
+        return .{ .no_emitter = "composed-block-aggregate-gep-offset" };
+
+    const base_use = pointerUseForm(selector, gep.ptr, false) orelse
+        return .{ .unsupported_value = "composed-block-unknown-aggregate-gep-ptr" };
+    if (base_use.form == .stack_object_address)
+        return .{ .unsupported_value = "composed-block-unknown-aggregate-gep-ptr" };
+
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const action_offset: ValueUseTransaction.AddressOffset = .{
+        .constant = std.math.cast(i32, byte_offset) orelse return .{ .no_emitter = "composed-block-gep-index-range" },
+    };
+
+    const action = try registerValueUseAction(
+        &transaction,
+        gep.ptr,
+        .ptr,
+        base_use.class,
+        base_use.form,
+        .{ .form_byte_address = .{
+            .result = try valueUseActionIdentity(result_name),
+            .offset = action_offset,
+        } },
+    );
+    executeValueUseAction(&transaction, action) catch |err| return switch (err) {
+        error.ValueUseAddressOffsetOutOfRange => .{ .no_emitter = "composed-block-gep-index-range" },
+        error.ValueUseUnresolvedSource, error.ValueUseExpiredSource => .{ .unsupported_value = "composed-block-gep-dynamic-index" },
+        error.ValueUseUnsupportedAddressForm, error.ValueUseSourceViewMismatch, error.ValueUseRegisterClassMismatch, error.ValueUseTypeMismatch => .{ .unsupported_value = "composed-block-unknown-aggregate-gep-ptr" },
         else => return err,
     };
     return null;

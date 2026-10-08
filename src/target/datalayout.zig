@@ -279,7 +279,6 @@ fn parseTypeLiteral(text: []const u8) ?ir.Type {
         (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
     if (trimmed.len < 2 or trimmed[0] != 'i') return null;
     const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch return null;
-    if (bits == 0) return null;
     return .{ .int = bits };
 }
 

@@ -75,6 +75,24 @@ const coff_image_file_machine_enumerators = [_]Enumerator{
     .{ .name = "WCEMIPSV2", .value = 0x169 },
 };
 
+const lang_compiler_backend_enumerators = [_]Enumerator{
+    .{ .name = "other", .value = 0 },
+    .{ .name = "stage1", .value = 1 },
+    .{ .name = "stage2_llvm", .value = 2 },
+    .{ .name = "stage2_c", .value = 3 },
+    .{ .name = "stage2_wasm", .value = 4 },
+    .{ .name = "stage2_arm", .value = 5 },
+    .{ .name = "stage2_x86_64", .value = 6 },
+    .{ .name = "stage2_aarch64", .value = 7 },
+    .{ .name = "stage2_x86", .value = 8 },
+    .{ .name = "stage2_riscv64", .value = 9 },
+    .{ .name = "stage2_sparc64", .value = 10 },
+    .{ .name = "stage2_spirv", .value = 11 },
+    .{ .name = "stage2_powerpc", .value = 12 },
+    .{ .name = "stage2_loongarch", .value = 13 },
+    .{ .name = "zsf_spork8", .value = 14 },
+};
+
 const no_enumerators = [_]Enumerator{};
 
 const facts = [_]Fact{
@@ -162,6 +180,31 @@ const facts = [_]Fact{
         .name = "Select.Value.Index",
         .backing_type = .{ .int = 32 },
         .enumerators = select_value_index_enumerators[0..],
+    },
+    .{
+        .name = "libs.freebsd.CrtFile",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "libs.netbsd.CrtFile",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "libs.openbsd.CrtFile",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "lang.CompilerBackend",
+        .backing_type = .{ .int = 64 },
+        .enumerators = lang_compiler_backend_enumerators[0..],
+    },
+    .{
+        .name = "std.lang.CompilerBackend",
+        .backing_type = .{ .int = 64 },
+        .enumerators = lang_compiler_backend_enumerators[0..],
     },
 };
 

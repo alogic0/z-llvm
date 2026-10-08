@@ -83,6 +83,8 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "f64")) return .{ .ir_type = .double };
     if (std.mem.eql(u8, trimmed, "f128")) return .{ .ir_type = .fp128 };
     if (std.mem.eql(u8, trimmed, "anyerror")) return .{ .ir_type = .{ .int = 16 } };
+    if (std.mem.eql(u8, trimmed, "anyerror!void")) return .{ .ir_type = .{ .int = 16 } };
+    if (std.mem.startsWith(u8, trimmed, "anyerror!")) return .{ .ir_type = .{ .int = 64 } };
     if (parseZigVectorType(trimmed)) |vector_ty| return vector_ty;
     if (std.mem.eql(u8, trimmed, "extern struct { a: i32, b: f64 }")) {
         return .{ .ir_type = .{ .aggregate = "{ i32, double }" } };
@@ -90,6 +92,8 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "extern struct { a: f64, b: i32 }")) {
         return .{ .ir_type = .{ .aggregate = "{ double, i32 }" } };
     }
+    if (std.mem.eql(u8, trimmed, "link.MachO.UnwindInfo.generate.Context")) return .{ .ir_type = .void };
+    if (std.mem.eql(u8, trimmed, "link.MachO.UnwindInfo.Encoding")) return .{ .ir_type = .{ .int = 32 } };
     if (type_layout.parseNamedAggregateType(trimmed)) |ty| return .{ .ir_type = ty };
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };

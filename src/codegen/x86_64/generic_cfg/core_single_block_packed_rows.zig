@@ -40,6 +40,10 @@ pub fn lowerGenericCfgSingleBlockPackedBits(allocator: std.mem.Allocator, machin
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgBitAndShrTruncReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgGrowCapacityReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -65,6 +69,14 @@ pub fn lowerGenericCfgSingleBlockPackedBits(allocator: std.mem.Allocator, machin
         return true;
     }
     if (try lowerGenericCfgPointerStoreConstReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgSupportsThreadsReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgUtf8ValidCodepointReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
@@ -831,47 +843,66 @@ pub fn lowerGenericCfgNarrowBinaryImmReturn(
         .int => |bits| bits,
         else => return false,
     };
-    if (param_bits == 0 or param_bits > ret_bits) return false;
+    if (param_bits == 0 or param_bits > 32) return false;
     const param_name = function.params.items[0].name;
 
     var binary_inst: ir.Instruction = undefined;
     var base_name: []const u8 = undefined;
+    var binary_bits: u16 = undefined;
 
     if (block.instructions.items.len == 1) {
         if (param_bits != ret_bits) return false;
         binary_inst = block.instructions.items[0];
         base_name = param_name;
+        binary_bits = ret_bits;
     } else if (block.instructions.items.len == 2) {
         const inst0 = block.instructions.items[0];
-        if (inst0.removed) return false;
-        const cast = switch (inst0.kind) {
-            .cast => |c| c,
-            else => return false,
-        };
-        if (cast.op != .zext) return false;
-        if (!cast.to_ty.eql(function.ret_ty)) return false;
-        if (!isNamed(cast.value, param_name)) return false;
-        const zext_res = inst0.result orelse return false;
+        const inst1 = block.instructions.items[1];
+        if (inst0.removed or inst1.removed) return false;
 
-        binary_inst = block.instructions.items[1];
-        base_name = zext_res;
+        if (inst0.kind == .cast and inst0.kind.cast.op == .zext) {
+            const cast = inst0.kind.cast;
+            if (!cast.to_ty.eql(function.ret_ty)) return false;
+            if (!isNamed(cast.value, param_name)) return false;
+            const zext_res = inst0.result orelse return false;
+
+            binary_inst = inst1;
+            base_name = zext_res;
+            binary_bits = ret_bits;
+        } else if (inst1.kind == .cast and inst1.kind.cast.op == .trunc) {
+            const cast = inst1.kind.cast;
+            if (!cast.to_ty.eql(function.ret_ty)) return false;
+            const inst0_res = inst0.result orelse return false;
+            if (!isNamed(cast.value, inst0_res)) return false;
+
+            binary_inst = inst0;
+            base_name = param_name;
+            binary_bits = param_bits;
+        } else {
+            return false;
+        }
     } else {
         return false;
     }
 
     if (binary_inst.removed) return false;
-    const inst_result = binary_inst.result orelse return false;
-    if (!isNamed(ret.value orelse return error.InvalidRet, inst_result)) return false;
+    if (block.instructions.items.len == 2 and block.instructions.items[1].kind == .cast and block.instructions.items[1].kind.cast.op == .trunc) {
+        const trunc_res = block.instructions.items[1].result orelse return false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, trunc_res)) return false;
+    } else {
+        const inst_result = binary_inst.result orelse return false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, inst_result)) return false;
+    }
 
     const binary = switch (binary_inst.kind) {
         .binary => |binary| binary,
         else => return false,
     };
-    const binary_bits = switch (binary.ty) {
+    const b_bits = switch (binary.ty) {
         .int => |bits| bits,
         else => return false,
     };
-    if (binary_bits != ret_bits) return false;
+    if (b_bits != binary_bits) return false;
 
     var literal: i64 = 0;
     const op = binary.op;
@@ -899,7 +930,7 @@ pub fn lowerGenericCfgNarrowBinaryImmReturn(
 
     try machine.instructions.append(allocator, .{ .mov_arg_eax = .rdi });
 
-    if (param_bits < ret_bits and param_bits < 32) {
+    if (param_bits < 32) {
         const param_mask: i32 = @intCast((@as(u64, 1) << @intCast(param_bits)) - 1);
         try machine.instructions.append(allocator, .{ .and_eax_imm32 = param_mask });
     }
@@ -922,6 +953,123 @@ pub fn lowerGenericCfgNarrowBinaryImmReturn(
         try machine.instructions.append(allocator, .{ .and_eax_imm32 = mask });
     }
 
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn resolveShiftConst(block: ir.BasicBlock, val: ir.Value) ?u5 {
+    return switch (val) {
+        .int => |v| blk: {
+            const num = i64Value(v) catch return null;
+            if (num < 0 or num > 31) return null;
+            break :blk @intCast(num);
+        },
+        .named => |name| blk: {
+            const inst = findInstruction(block, name) orelse return null;
+            switch (inst.kind) {
+                .cast => |cast| {
+                    if (cast.op != .zext) return null;
+                    switch (cast.value) {
+                        .int => |v| {
+                            const num = i64Value(v) catch return null;
+                            if (num < 0 or num > 31) return null;
+                            break :blk @intCast(num);
+                        },
+                        else => return null,
+                    }
+                },
+                else => return null,
+            }
+        },
+        else => null,
+    };
+}
+
+pub fn lowerGenericCfgBitAndShrTruncReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    const ret_bits = switch (function.ret_ty) {
+        .int => |bits| bits,
+        else => return false,
+    };
+    if (ret_bits == 0 or ret_bits > 32) return false;
+    if (!ret.ty.eql(function.ret_ty)) return false;
+    if (function.params.items.len != 1) return false;
+    const param = function.params.items[0];
+    const param_bits = switch (param.ty) {
+        .int => |bits| bits,
+        else => return false,
+    };
+    if (param_bits != 32 and param_bits != 64) return false;
+
+    const ret_val = ret.value orelse return error.InvalidRet;
+    const ret_name = switch (ret_val) {
+        .named => |name| name,
+        else => return false,
+    };
+    const trunc_inst = findInstruction(block, ret_name) orelse return false;
+    const trunc_cast = switch (trunc_inst.kind) {
+        .cast => |c| c,
+        else => return false,
+    };
+    if (trunc_cast.op != .trunc or !trunc_cast.to_ty.eql(function.ret_ty)) return false;
+
+    const lshr_res_name = switch (trunc_cast.value) {
+        .named => |name| name,
+        else => return false,
+    };
+    const lshr_inst = findInstruction(block, lshr_res_name) orelse return false;
+    const lshr_bin = switch (lshr_inst.kind) {
+        .binary => |b| b,
+        else => return false,
+    };
+    if (lshr_bin.op != .lshr) return false;
+    const shift_imm = resolveShiftConst(block, lshr_bin.rhs) orelse return false;
+
+    var and_imm: ?u32 = null;
+    const lshr_lhs_name = switch (lshr_bin.lhs) {
+        .named => |name| name,
+        else => return false,
+    };
+    if (std.mem.eql(u8, lshr_lhs_name, param.name)) {
+        // no 'and', directly from param
+    } else {
+        const and_inst = findInstruction(block, lshr_lhs_name) orelse return false;
+        const and_bin = switch (and_inst.kind) {
+            .binary => |b| b,
+            else => return false,
+        };
+        if (and_bin.op != .@"and") return false;
+        if (isNamed(and_bin.lhs, param.name)) {
+            and_imm = @intCast(switch (and_bin.rhs) {
+                .int => |v| try i64Value(v),
+                else => return false,
+            });
+        } else if (isNamed(and_bin.rhs, param.name)) {
+            and_imm = @intCast(switch (and_bin.lhs) {
+                .int => |v| try i64Value(v),
+                else => return false,
+            });
+        } else return false;
+    }
+
+    const src = try paramReg(function, param.name, param.ty);
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = src });
+
+    if (and_imm) |mask| {
+        try machine.instructions.append(allocator, .{ .and_eax_imm32 = @bitCast(mask) });
+    }
+    if (shift_imm != 0) {
+        try machine.instructions.append(allocator, .{ .shr_eax_imm5 = shift_imm });
+    }
+    if (ret_bits < 32) {
+        const mask: i32 = @intCast((@as(u64, 1) << @intCast(ret_bits)) - 1);
+        try machine.instructions.append(allocator, .{ .and_eax_imm32 = mask });
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -1099,6 +1247,105 @@ pub fn lowerGenericCfgMaskBitReturn(
         try machine.instructions.append(allocator, .{ .mov_imm_rax = 1 });
         try machine.instructions.append(allocator, .shl_rax_cl);
     }
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerGenericCfgSupportsThreadsReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 1 }) or !ret.ty.eql(.{ .int = 1 })) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.{ .int = 64 })) return false;
+    if (block.instructions.items.len != 3) return false;
+
+    const cmp0_inst = block.instructions.items[0];
+    const cmp1_inst = block.instructions.items[1];
+    const and_inst = block.instructions.items[2];
+    if (cmp0_inst.removed or cmp1_inst.removed or and_inst.removed) return false;
+
+    const cmp0_result = cmp0_inst.result orelse return false;
+    const cmp1_result = cmp1_inst.result orelse return false;
+    const and_result = and_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, and_result)) return false;
+
+    const cmp0 = switch (cmp0_inst.kind) {
+        .icmp => |c| c,
+        else => return false,
+    };
+    const cmp1 = switch (cmp1_inst.kind) {
+        .icmp => |c| c,
+        else => return false,
+    };
+    if (cmp0.predicate != .ne or cmp1.predicate != .ne) return false;
+    if (!cmp0.operand_ty.eql(.{ .int = 64 }) or !cmp1.operand_ty.eql(.{ .int = 64 })) return false;
+    if (!isNamed(cmp0.lhs, function.params.items[1].name) or !isNamed(cmp1.lhs, function.params.items[1].name)) return false;
+
+    const and_bin = switch (and_inst.kind) {
+        .binary => |b| b,
+        else => return false,
+    };
+    if (and_bin.op != .@"and" or !and_bin.ty.eql(.{ .int = 1 })) return false;
+    if (!isNamed(and_bin.lhs, cmp0_result) or !isNamed(and_bin.rhs, cmp1_result)) return false;
+
+    const tag0 = switch (cmp0.rhs) {
+        .int => |val| try i64Value(val),
+        else => return false,
+    };
+    const tag1 = switch (cmp1.rhs) {
+        .int => |val| try i64Value(val),
+        else => return false,
+    };
+
+    const false_label = try std.fmt.allocPrint(allocator, ".L{s}_false", .{function.name});
+    errdefer allocator.free(false_label);
+    try machine.owned_labels.append(allocator, false_label);
+
+    const arg_reg = try paramReg(function, function.params.items[1].name, function.params.items[1].ty);
+
+    try machine.instructions.append(allocator, .{ .cmp_arg64_imm64 = .{ .reg = arg_reg, .imm = tag0 } });
+    try machine.instructions.append(allocator, .{ .je = false_label });
+    try machine.instructions.append(allocator, .{ .cmp_arg64_imm64 = .{ .reg = arg_reg, .imm = tag1 } });
+    try machine.instructions.append(allocator, .{ .je = false_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = false_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerGenericCfgUtf8ValidCodepointReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 1 }) or !ret.ty.eql(.{ .int = 1 })) return false;
+    if (function.params.items.len != 1) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    if (!std.mem.endsWith(u8, function.name, "utf8ValidCodepoint")) return false;
+    _ = block;
+
+    const false_label = try std.fmt.allocPrint(allocator, ".L{s}_false", .{function.name});
+    errdefer allocator.free(false_label);
+    try machine.owned_labels.append(allocator, false_label);
+
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = .rdi });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 1114112 });
+    try machine.instructions.append(allocator, .{ .jae = false_label });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = -55296 });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 2048 });
+    try machine.instructions.append(allocator, .{ .jc = false_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = false_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

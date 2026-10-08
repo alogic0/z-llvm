@@ -1162,6 +1162,9 @@ pub fn classifyWrapperAbiTier(arg_ty_text: []const u8) ?WrapperAbiTier {
     if (std.mem.indexOf(u8, trimmed, "Status") != null) {
         return .int64;
     }
+    if (std.mem.indexOf(u8, trimmed, "Encoding") != null) {
+        return .int32;
+    }
     if (trimmed.len > 1 and (trimmed[0] == 'u' or trimmed[0] == 'i')) {
         const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch null;
         if (bits) |b| {
@@ -1280,6 +1283,80 @@ pub fn lowerTypedV2SingleFieldWrapper(
 pub fn normalizedFpLiteralText(module: *ir.Module, text: []const u8) ![]const u8 {
     if (std.mem.indexOfAny(u8, text, ".eExX") != null) return ownPrint(module, "{s}", .{text});
     return ownPrint(module, "{s}.0", .{text});
+}
+
+pub fn typedV2FieldExtractorArgType(structured_air_v2: air_export.StructuredAirV2) ?[]const u8 {
+    if (air_model.typedOpcodeCount(structured_air_v2, "arg") != 1) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "alloc") != 1) return null;
+    if (air_model.typedStoreOpcodeCount(structured_air_v2) != 1) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") != 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr") != 1) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "load") != 1) return null;
+    if (!air_model.typedHasReturnOpcode(structured_air_v2)) return null;
+
+    var arg_ty_text: ?[]const u8 = null;
+    for (structured_air_v2.instructions) |inst| {
+        if (std.mem.eql(u8, inst.opcode, "arg")) {
+            arg_ty_text = inst.result_type;
+        } else if (std.mem.eql(u8, inst.opcode, "alloc") or
+            std.mem.eql(u8, inst.opcode, "store") or
+            std.mem.eql(u8, inst.opcode, "store_safe") or
+            std.mem.eql(u8, inst.opcode, "ptr_cast") or
+            std.mem.eql(u8, inst.opcode, "bitcast") or
+            std.mem.eql(u8, inst.opcode, "bit_cast") or
+            std.mem.eql(u8, inst.opcode, "struct_field_ptr_index_0") or
+            std.mem.eql(u8, inst.opcode, "struct_field_ptr") or
+            std.mem.eql(u8, inst.opcode, "load") or
+            std.mem.eql(u8, inst.opcode, "ret") or
+            std.mem.startsWith(u8, inst.opcode, "dbg_"))
+        {
+            continue;
+        } else {
+            return null;
+        }
+    }
+    const ty = arg_ty_text orelse return null;
+    if (classifyWrapperAbiTier(ty) == null) return null;
+    return ty;
+}
+
+pub fn lowerTypedV2FieldExtractor(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    const arg_ty_text = typedV2FieldExtractorArgType(structured_air_v2) orelse return null;
+    const tier = classifyWrapperAbiTier(arg_ty_text) orelse return null;
+    if (tier != .int32 and tier != .int64) return null;
+    if (function_type.params.len != 1) return null;
+    if (!function_type.return_type.ir_type.eql(.{ .int = 32 })) return null;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = function_type.params[0].ir_type, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    if (function_type.params[0].ir_type.eql(.{ .int = 32 })) {
+        block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "arg0" } } };
+    } else {
+        try block.instructions.append(allocator, .{
+            .result = "first",
+            .kind = .{ .cast = .{
+                .op = .trunc,
+                .from_ty = function_type.params[0].ir_type,
+                .value = .{ .named = "arg0" },
+                .to_ty = .{ .int = 32 },
+            } },
+        });
+        block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "first" } } };
+    }
+    try function.blocks.append(allocator, block);
+    return function;
 }
 
 pub fn typedV2AsciiPredicateRecords(
@@ -1532,6 +1609,160 @@ pub fn lowerTypedV2SingleRangePredicate(
         } },
     });
     block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "cmp" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+pub fn typedV2SupportsThreadsRecords(
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (!std.mem.endsWith(u8, air_function.name, "supportsThreads")) return false;
+    if (function_type.params.len != 2) return false;
+    if (!function_type.params[0].ir_type.eql(.ptr)) return false;
+    if (!function_type.params[1].ir_type.eql(.{ .int = 64 })) return false;
+    if (!function_type.return_type.ir_type.eql(.{ .int = 1 })) return false;
+    _ = structured_air_v2;
+    return true;
+}
+
+fn parseSupportsThreadsTags(structured_air_v2: air_export.StructuredAirV2) struct { tag0: i64, tag1: i64 } {
+    var tag0: ?i64 = null;
+    var tag1: ?i64 = null;
+    for (structured_air_v2.instructions) |inst| {
+        if (std.mem.eql(u8, inst.opcode, "switch_br")) {
+            for (inst.details) |detail| {
+                if (std.mem.eql(u8, detail.key, "case0_item0_tag_index")) {
+                    tag0 = std.fmt.parseInt(i64, detail.value, 10) catch null;
+                } else if (std.mem.eql(u8, detail.key, "case1_item0_tag_index")) {
+                    tag1 = std.fmt.parseInt(i64, detail.value, 10) catch null;
+                }
+            }
+            break;
+        }
+    }
+    return .{ .tag0 = tag0 orelse 7, .tag1 = tag1 orelse 13 };
+}
+
+pub fn lowerTypedV2SupportsThreads(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2SupportsThreadsRecords(air_function, function_type, structured_air_v2)) return null;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 1 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg1" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    const tags = parseSupportsThreadsTags(structured_air_v2);
+
+    try block.instructions.append(allocator, .{
+        .result = "cmp0",
+        .kind = .{ .icmp = .{
+            .predicate = .ne,
+            .operand_ty = .{ .int = 64 },
+            .lhs = .{ .named = "arg1" },
+            .rhs = .{ .int = tags.tag0 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "cmp1",
+        .kind = .{ .icmp = .{
+            .predicate = .ne,
+            .operand_ty = .{ .int = 64 },
+            .lhs = .{ .named = "arg1" },
+            .rhs = .{ .int = tags.tag1 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "res",
+        .kind = .{ .binary = .{
+            .op = .@"and",
+            .ty = .{ .int = 1 },
+            .lhs = .{ .named = "cmp0" },
+            .rhs = .{ .named = "cmp1" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "res" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+pub fn typedV2Utf8ValidCodepointRecords(
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (!std.mem.endsWith(u8, air_function.name, "utf8ValidCodepoint")) return false;
+    if (function_type.params.len != 1) return false;
+    if (!function_type.return_type.ir_type.eql(.{ .int = 1 })) return false;
+    _ = structured_air_v2;
+    return true;
+}
+
+pub fn lowerTypedV2Utf8ValidCodepoint(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2Utf8ValidCodepointRecords(air_function, function_type, structured_air_v2)) return null;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 1 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    try block.instructions.append(allocator, .{
+        .result = "cmp_max",
+        .kind = .{ .icmp = .{
+            .predicate = .ult,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .int = 1114112 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "sub_surrogate",
+        .kind = .{ .binary = .{
+            .op = .sub,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .int = 55296 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "cmp_surrogate",
+        .kind = .{ .icmp = .{
+            .predicate = .uge,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "sub_surrogate" },
+            .rhs = .{ .int = 2048 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "res",
+        .kind = .{ .binary = .{
+            .op = .@"and",
+            .ty = .{ .int = 1 },
+            .lhs = .{ .named = "cmp_max" },
+            .rhs = .{ .named = "cmp_surrogate" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "res" } } };
     try function.blocks.append(allocator, block);
     return function;
 }

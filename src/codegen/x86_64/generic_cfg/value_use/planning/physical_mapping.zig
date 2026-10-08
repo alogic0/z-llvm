@@ -863,10 +863,10 @@ fn appendStorePointerDestinationNodes(
     switch (pointer) {
         .stack_scalar => |stack| if ((bits != 1 and bits != 8) or stack.kind != .integer or stack.bits != 8)
             return error.ValueUseStorePointerFormUnsupported,
-        .arg64, .scratch64 => if (bits != 8 and bits != 32)
+        .arg64, .scratch64 => if (bits != 8 and bits != 32 and bits != 64)
             return error.ValueUseStorePointerFormUnsupported,
         .spill64 => {
-            if (bits != 8 and bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            if (bits != 8 and bits != 32 and bits != 64) return error.ValueUseStorePointerFormUnsupported;
             try nodes.append(.rcx);
         },
         .stack_i32_ptr => |ptr| {
@@ -891,10 +891,10 @@ fn appendStorePointerMappings(
     switch (pointer) {
         .stack_scalar => |stack| if ((bits != 1 and bits != 8) or stack.kind != .integer or stack.bits != 8)
             return error.ValueUseStorePointerFormUnsupported,
-        .arg64, .scratch64 => if (bits != 8 and bits != 32)
+        .arg64, .scratch64 => if (bits != 8 and bits != 32 and bits != 64)
             return error.ValueUseStorePointerFormUnsupported,
         .spill64 => {
-            if (bits != 8 and bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            if (bits != 8 and bits != 32 and bits != 64) return error.ValueUseStorePointerFormUnsupported;
             mappings.append(.{ .source = null, .destination = .rcx, .source_request_index = source_request_index });
         },
         .stack_i32_ptr => |ptr| {

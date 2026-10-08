@@ -1426,7 +1426,10 @@ pub fn lowerOracleFunctionToObject(
         },
     ) catch |err| return .{ .failure = .{
         .stage = "object-emission",
-        .diagnostic = try std.fmt.allocPrint(allocator, "x86_64-lower:{s}", .{@errorName(err)}),
+        .diagnostic = if (diagnostic_tag) |tag|
+            try std.fmt.allocPrint(allocator, "x86_64-lower:{s}:{s}:{s}", .{ @errorName(err), tag, diagnostic_detail orelse "" })
+        else
+            try std.fmt.allocPrint(allocator, "x86_64-lower:{s}", .{@errorName(err)}),
         .function_lowered = true,
     } };
     defer machine.deinit(allocator);

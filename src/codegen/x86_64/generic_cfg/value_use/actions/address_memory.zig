@@ -478,9 +478,15 @@ pub fn executeStoreImmediate(
     action: Types.StoreImmediateAction,
 ) !void {
     try materialization.clobberPhysicalNode(transaction.selector, .accumulator);
-    try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
-        .mov_imm_eax = action.value,
-    });
+    if (action.bits == 64 and action.value < 0) {
+        try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+            .mov_imm_rax = @as(i64, action.value),
+        });
+    } else {
+        try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
+            .mov_imm_eax = action.value,
+        });
+    }
     try executeStoreEaxToPointer(Authority, transaction, pointer_view, action.bits);
 }
 pub fn executeStoreI64(
@@ -573,18 +579,28 @@ fn executeStoreEaxToPointer(
             );
         },
         .arg64, .scratch64 => |reg| {
-            if (bits != 8 and bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            if (bits != 8 and bits != 32 and bits != 64) return error.ValueUseStorePointerFormUnsupported;
             try transaction.selector.machine.instructions.append(
                 transaction.selector.allocator,
-                if (bits == 8) .{ .store_al_arg_ptr_disp8 = .{ .reg = reg, .offset = 0 } } else .{ .store_eax_arg_ptr = reg },
+                if (bits == 8)
+                    .{ .store_al_arg_ptr_disp8 = .{ .reg = reg, .offset = 0 } }
+                else if (bits == 32)
+                    .{ .store_eax_arg_ptr = reg }
+                else
+                    .{ .store_rax_arg_ptr_disp8 = .{ .reg = reg, .offset = 0 } },
             );
         },
         .spill64 => {
-            if (bits != 8 and bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            if (bits != 8 and bits != 32 and bits != 64) return error.ValueUseStorePointerFormUnsupported;
             try materializeActionPointer(Authority, transaction, pointer, .rcx);
             try transaction.selector.machine.instructions.append(
                 transaction.selector.allocator,
-                if (bits == 8) .{ .store_al_arg_ptr_disp8 = .{ .reg = .rcx, .offset = 0 } } else .{ .store_eax_arg_ptr = .rcx },
+                if (bits == 8)
+                    .{ .store_al_arg_ptr_disp8 = .{ .reg = .rcx, .offset = 0 } }
+                else if (bits == 32)
+                    .{ .store_eax_arg_ptr = .rcx }
+                else
+                    .{ .store_rax_arg_ptr_disp8 = .{ .reg = .rcx, .offset = 0 } },
             );
         },
         .stack_i32_ptr => |stack_ptr| {

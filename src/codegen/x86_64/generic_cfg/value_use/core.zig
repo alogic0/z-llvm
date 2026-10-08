@@ -719,7 +719,7 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
             };
         },
         .store_immediate => |store| {
-            if (store.bits != 1 and store.bits != 8 and store.bits != 32) return error.ValueUseStoreWidthUnsupported;
+            if (store.bits != 1 and store.bits != 8 and store.bits != 32 and store.bits != 64) return error.ValueUseStoreWidthUnsupported;
             if (store.bits == 1 and store.value != 0 and store.value != 1)
                 return error.ValueUseStoreImmediateOutOfRange;
         },

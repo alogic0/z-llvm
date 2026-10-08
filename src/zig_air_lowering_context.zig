@@ -483,6 +483,13 @@ pub const LoweringContext = struct {
         const source = try self.resolveValue(fields.next() orelse return error.UnsupportedAir);
         if (fields.next() != null) return error.UnsupportedAir;
         const target_type = parseZigType(target_text) orelse return error.UnsupportedAir;
+        if (source.ty.ir_type.eql(target_type.ir_type)) {
+            self.values[instruction.index] = .{
+                .ty = target_type,
+                .value = source.value,
+            };
+            return;
+        }
         const op = castOp(instruction.opcode, source.ty, target_type) orelse return error.UnsupportedAir;
         const result_name = try self.resultName(instruction.index);
         try self.block.instructions.append(self.allocator, .{

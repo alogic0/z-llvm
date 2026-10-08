@@ -173,6 +173,10 @@ const lowerTypedV2UnionTagPayloadSwitch = typed_v2.lowerTypedV2UnionTagPayloadSw
 const lowerTypedV2UnionTagPayloadBranch = typed_v2.lowerTypedV2UnionTagPayloadBranch;
 const lowerTypedV2AsciiPredicate = typed_v2.lowerTypedV2AsciiPredicate;
 const lowerTypedV2SingleRangePredicate = typed_v2.lowerTypedV2SingleRangePredicate;
+const lowerTypedV2SupportsThreads = typed_v2.lowerTypedV2SupportsThreads;
+const typedV2SupportsThreadsRecords = typed_v2.typedV2SupportsThreadsRecords;
+const lowerTypedV2Utf8ValidCodepoint = typed_v2.lowerTypedV2Utf8ValidCodepoint;
+const typedV2Utf8ValidCodepointRecords = typed_v2.typedV2Utf8ValidCodepointRecords;
 
 const lowerErrorClassify = typed_v2_fallbacks.lowerErrorClassify;
 const lowerErrorSwitch = typed_v2_fallbacks.lowerErrorSwitch;
@@ -484,9 +488,24 @@ pub fn firstUnsupported(
             typedV2SingleFieldWrapperRecords(structured_air_v2)
         else
             false;
+    const typed_field_extractor =
+        if (function.structured_air_v2) |structured_air_v2|
+            typed_v2.typedV2FieldExtractorArgType(structured_air_v2) != null
+        else
+            false;
     const typed_ascii_predicate =
         if (function.structured_air_v2) |structured_air_v2|
             typedV2AsciiPredicateRecords(function_type, structured_air_v2)
+        else
+            false;
+    const typed_supports_threads =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2SupportsThreadsRecords(function, function_type, structured_air_v2)
+        else
+            false;
+    const typed_utf8_valid_codepoint =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2Utf8ValidCodepointRecords(function, function_type, structured_air_v2)
         else
             false;
 
@@ -522,7 +541,10 @@ pub fn firstUnsupported(
         typed_atomic_try_lock or
         typed_void_ret_ptr or
         typed_single_field_wrapper or
+        typed_field_extractor or
         typed_ascii_predicate or
+        typed_supports_threads or
+        typed_utf8_valid_codepoint or
         typed_maybe_error)
     {
         return null;
@@ -638,17 +660,54 @@ fn parseFunctionTypeForLowering(
     air_function: air_export.Function,
 ) !FunctionType {
     return parseFunctionType(allocator, air_function.type_text) catch |err| switch (err) {
-        error.UnsupportedAir => parseFunctionTypeWithSingleFieldWrapper(allocator, air_function) catch |single_wrapper_err| switch (single_wrapper_err) {
-            error.UnsupportedAir => parseFunctionTypeWithUnusedOpaqueParams(allocator, air_function) catch |fallback_err| switch (fallback_err) {
-                error.UnsupportedAir => parseFunctionTypeWithUnionTagOnlyOpaqueSignature(allocator, air_function) catch |tag_err| switch (tag_err) {
-                    error.UnsupportedAir => parseFunctionTypeWithOpaqueBitcasts(allocator, air_function),
-                    else => return tag_err,
+        error.UnsupportedAir => parseFunctionTypeWithFieldExtractor(allocator, air_function) catch |field_extractor_err| switch (field_extractor_err) {
+            error.UnsupportedAir => parseFunctionTypeWithSingleFieldWrapper(allocator, air_function) catch |single_wrapper_err| switch (single_wrapper_err) {
+                error.UnsupportedAir => parseFunctionTypeWithUnusedOpaqueParams(allocator, air_function) catch |fallback_err| switch (fallback_err) {
+                    error.UnsupportedAir => parseFunctionTypeWithUnionTagOnlyOpaqueSignature(allocator, air_function) catch |tag_err| switch (tag_err) {
+                        error.UnsupportedAir => parseFunctionTypeWithOpaqueBitcasts(allocator, air_function),
+                        else => return tag_err,
+                    },
+                    else => return fallback_err,
                 },
-                else => return fallback_err,
+                else => return single_wrapper_err,
             },
-            else => return single_wrapper_err,
+            else => return field_extractor_err,
         },
         else => return err,
+    };
+}
+
+fn parseFunctionTypeWithFieldExtractor(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+) !FunctionType {
+    const structured_air_v2 = air_function.structured_air_v2 orelse return error.UnsupportedAir;
+    const arg_ty_text = typed_v2.typedV2FieldExtractorArgType(structured_air_v2) orelse return error.UnsupportedAir;
+    const tier = classifyWrapperAbiTier(arg_ty_text) orelse return error.UnsupportedAir;
+
+    const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, air_function.type_text, " "));
+    const suffix = if (std.mem.indexOfScalar(u8, trimmed, ')')) |close|
+        std.mem.trim(u8, trimmed[close + 1 ..], " ")
+    else
+        "";
+    const c_calling_convention = std.mem.startsWith(u8, suffix, "callconv(.c)");
+    const non_default_calling_convention = std.mem.startsWith(u8, suffix, "callconv(") and !c_calling_convention;
+
+    var params: std.ArrayList(ZigType) = .empty;
+    errdefer params.deinit(allocator);
+
+    const param_ty: ZigType = switch (tier) {
+        .int32 => .{ .ir_type = .{ .int = 32 } },
+        .int64 => .{ .ir_type = .{ .int = 64 } },
+        else => return error.UnsupportedAir,
+    };
+    try params.append(allocator, param_ty);
+
+    return .{
+        .params = try params.toOwnedSlice(allocator),
+        .return_type = .{ .ir_type = .{ .int = 32 } },
+        .c_calling_convention = c_calling_convention,
+        .non_default_calling_convention = non_default_calling_convention,
     };
 }
 
@@ -1123,10 +1182,19 @@ fn lowerFunctionTypedV2(
     if (try lowerTypedV2SingleFieldWrapper(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
+    if (try typed_v2.lowerTypedV2FieldExtractor(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
     if (try lowerTypedV2AsciiPredicate(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
     if (try lowerTypedV2SingleRangePredicate(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2SupportsThreads(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2Utf8ValidCodepoint(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
     if (try lowerTypedV2VoidRetPtr(allocator, air_function, function_type, structured_air_v2)) |function| {

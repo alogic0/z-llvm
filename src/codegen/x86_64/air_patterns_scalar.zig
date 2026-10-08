@@ -259,6 +259,21 @@ pub fn lowerStraightLineReturn(
                     else => {},
                 }
             }
+            const ret_bits = switch (ret.ty) {
+                .int => |bits| bits,
+                else => null,
+            };
+            if (ret_bits) |bits| if (bits <= 32) {
+                const value = ret.value orelse return error.InvalidRet;
+                switch (value) {
+                    .int => |int| {
+                        try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(int) });
+                        try machine.instructions.append(allocator, .ret);
+                        return;
+                    },
+                    else => {},
+                }
+            };
             if (!ret.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
             try lowerReturnValue(allocator, machine, function, block, ret.value orelse return error.InvalidRet);
             try machine.instructions.append(allocator, .ret);

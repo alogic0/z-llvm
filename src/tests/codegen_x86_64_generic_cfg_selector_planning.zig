@@ -4382,3 +4382,39 @@ test "generic cfg selector composes parity i128 through assigned register pair" 
     try expectInstruction(machine.instructions.items, .{ .binary_arg_rax = .{ .op = .xor, .reg = .rdx } });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
+
+test "generic cfg selector lowers supportsThreads icmp ne chain" {
+    const text =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i1 @supportsThreads(ptr %arg0, i64 %arg1) {
+        \\entry:
+        \\  %cmp0 = icmp ne i64 %arg1, 7
+        \\  %cmp1 = icmp ne i64 %arg1, 13
+        \\  %res = and i1 %cmp0, %cmp1
+        \\  ret i1 %res
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+
+    var diagnostic_tag: ?[]const u8 = null;
+    var diagnostic_detail: ?[]const u8 = null;
+    var machine = codegen.x86_64.lowerFunctionWithOptions(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+        .{
+            .generic_cfg_selector = true,
+            .generic_cfg_selector_diagnostic_tag = &diagnostic_tag,
+            .generic_cfg_selector_diagnostic_detail = &diagnostic_detail,
+        },
+    ) catch |err| {
+        std.debug.print("GENERIC_CFG ERROR: {s}:{s}\n", .{ diagnostic_tag orelse "?", diagnostic_detail orelse "?" });
+        return err;
+    };
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
