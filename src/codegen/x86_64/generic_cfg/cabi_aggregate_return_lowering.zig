@@ -428,7 +428,15 @@ fn emitInteger64Leaf(
             }
         },
         .named => |name| {
-            if (try sysvIntegerParamRegOrNull(function, name, leaf.ty)) |src| {
+            const resolved_name = blk: {
+                if (findInstruction(block, name)) |inst| {
+                    if (inst.kind == .cast and inst.kind.cast.op == .trunc) {
+                        if (inst.kind.cast.value == .named) break :blk inst.kind.cast.value.named;
+                    }
+                }
+                break :blk name;
+            };
+            if (try sysvIntegerParamRegOrNull(function, resolved_name, leaf.ty)) |src| {
                 switch (dst) {
                     .rax => try machine.instructions.append(allocator, .{ .mov_arg_rax = src }),
                     .rdx => {
@@ -439,7 +447,7 @@ fn emitInteger64Leaf(
                 }
                 return;
             }
-            if (scalarParamStackDisp8(function, name, leaf.ty) catch null) |offset| {
+            if (scalarParamStackDisp8(function, resolved_name, leaf.ty) catch null) |offset| {
                 switch (dst) {
                     .rax => try appendLoadStackDispRax(allocator, machine, offset),
                     .rdx => try appendLoadStackDispArg64(allocator, machine, .rdx, offset),
@@ -481,7 +489,15 @@ fn emitInteger32Leaf(
             }
         },
         .named => |name| {
-            if (try sysvIntegerParamRegOrNull(function, name, leaf.ty)) |src| {
+            const resolved_name = blk: {
+                if (findInstruction(block, name)) |inst| {
+                    if (inst.kind == .cast and inst.kind.cast.op == .trunc) {
+                        if (inst.kind.cast.value == .named) break :blk inst.kind.cast.value.named;
+                    }
+                }
+                break :blk name;
+            };
+            if (try sysvIntegerParamRegOrNull(function, resolved_name, leaf.ty)) |src| {
                 switch (dst) {
                     .rax => try machine.instructions.append(allocator, .{ .mov_arg_eax = src }),
                     .rdx => try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = src } }),

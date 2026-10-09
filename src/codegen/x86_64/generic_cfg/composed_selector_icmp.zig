@@ -338,7 +338,7 @@ fn isSetccEaxCompareIcmp(icmp: ir.IcmpInst) bool {
         .constant_expr,
         => return false,
     };
-    if (icmp.predicate == .eq and bits <= 32 and immediate != 0) return true;
+    if ((icmp.predicate == .eq or icmp.predicate == .ne) and bits <= 32 and immediate != 0) return true;
     if (icmp.predicate == .sgt and
         ((immediate == -1 and (bits == 6 or bits == 16 or bits == 32)) or bits == 32))
     {

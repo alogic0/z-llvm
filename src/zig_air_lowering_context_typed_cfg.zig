@@ -95,7 +95,7 @@ pub fn lowerTypedSwitchValueBlock(
         return air_model.LowerError.UnsupportedAir;
     if (cond_index >= self.values.len) return air_model.LowerError.UnsupportedAir;
     const cond = self.values[cond_index] orelse return air_model.LowerError.UnsupportedAir;
-    if (!cond.ty.ir_type.eql(.{ .int = 32 }) and !cond.ty.ir_type.eql(.{ .int = 16 })) return air_model.LowerError.UnsupportedAir;
+    if (cond.ty.ir_type != .int or (cond.ty.ir_type.int != 64 and cond.ty.ir_type.int != 32 and cond.ty.ir_type.int != 16 and cond.ty.ir_type.int != 8)) return air_model.LowerError.UnsupportedAir;
     const merge_type = self.typedBlockResultType(instruction) orelse return air_model.LowerError.UnsupportedAir;
     if (merge_type.ir_type == .void) return air_model.LowerError.UnsupportedAir;
 
@@ -118,6 +118,37 @@ pub fn lowerTypedSwitchValueBlock(
     try self.collectBlockValueBranches(instruction.index, &branch_instructions);
     const expected_branches = arms.items.len + @intFromBool(has_else_arm);
     if (branch_instructions.items.len != expected_branches) return air_model.LowerError.UnsupportedAir;
+
+    if (arms.items.len == 1 and arms.items[0].values.items.len == 1 and has_else_arm and branch_instructions.items.len == 2) {
+        const case_branch = try self.lowerTypedSwitchBranchValue(instruction.index, branch_instructions.items[0], merge_type);
+        const else_branch = try self.lowerTypedSwitchBranchValue(instruction.index, branch_instructions.items[1], merge_type);
+        const cmp_name = try self.resultName(switch_instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = cmp_name,
+            .kind = .{ .icmp = .{
+                .predicate = .eq,
+                .operand_ty = cond.ty.ir_type,
+                .lhs = cond.value,
+                .rhs = arms.items[0].values.items[0].value,
+            } },
+        });
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .select = .{
+                .cond_ty = .{ .int = 1 },
+                .cond = .{ .named = cmp_name },
+                .ty = merge_type.ir_type,
+                .true_value = case_branch.value.value,
+                .false_value = else_branch.value.value,
+            } },
+        });
+        self.values[instruction.index] = .{
+            .ty = merge_type,
+            .value = .{ .named = result_name },
+        };
+        return true;
+    }
 
     var labels: std.ArrayList([]const u8) = .empty;
     defer labels.deinit(self.allocator);

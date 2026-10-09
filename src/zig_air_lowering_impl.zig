@@ -1348,8 +1348,13 @@ fn lowerFunctionTypedV2(
 
     for (function_type.params, 0..) |param_type, param_index| {
         const name = try ownPrint(module, "arg{}", .{param_index});
+        const attrs: ?[]const u8 = if (param_type.ir_type.eql(.{ .int = 8 }) and !param_type.signed)
+            "zeroext"
+        else
+            null;
         try function.params.append(allocator, .{
             .ty = param_type.ir_type,
+            .attrs = attrs,
             .name = name,
         });
     }

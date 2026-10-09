@@ -184,6 +184,9 @@ pub fn emitGenericCfgI32ValueIntoEax(
                             const constant = singleBlockI32CastConstant(block, cast) orelse return error.UnsupportedCodegenInstruction;
                             try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(constant) });
                         },
+                        .trunc => {
+                            try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, cast.value);
+                        },
                         else => return error.UnsupportedCodegenInstruction,
                     }
                 },

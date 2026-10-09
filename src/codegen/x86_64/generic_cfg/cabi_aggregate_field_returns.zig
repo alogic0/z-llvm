@@ -63,23 +63,49 @@ pub fn lowerSysVAggregateFieldReturn(
             .int => |bits| bits > 64 and bits <= 128,
             else => false,
         });
-    if (!is_supported_ret or (block.instructions.items.len != 3 and block.instructions.items.len != 4)) return false;
+    const has_binary_and = block.instructions.items.len == 5 and blk: {
+        const last = block.instructions.items[4];
+        if (last.removed or last.result == null) break :blk false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, last.result.?)) break :blk false;
+        const binary = switch (last.kind) {
+            .binary => |b| b,
+            else => break :blk false,
+        };
+        break :blk binary.op == .@"and" and std.meta.activeTag(binary.rhs) == .int and
+            (ret.ty.eql(.{ .int = 32 }) or ret.ty.eql(.{ .int = 64 }));
+    };
+    if (!is_supported_ret) return false;
+    if (!has_binary_and and block.instructions.items.len != 3 and block.instructions.items.len != 4) return false;
+
     const alloca_inst = block.instructions.items[0];
     const store_inst = block.instructions.items[1];
-    const maybe_gep_inst: ?ir.Instruction = if (block.instructions.items.len == 4) block.instructions.items[2] else null;
-    const load_inst = block.instructions.items[block.instructions.items.len - 1];
+    const maybe_gep_inst: ?ir.Instruction = if (has_binary_and or block.instructions.items.len == 4) block.instructions.items[2] else null;
+    const load_inst = if (has_binary_and) block.instructions.items[3] else block.instructions.items[block.instructions.items.len - 1];
     if (alloca_inst.removed or store_inst.removed or load_inst.removed) return false;
     if (maybe_gep_inst) |gep_inst| if (gep_inst.removed) return false;
     const alloca_name = alloca_inst.result orelse return false;
     const load_name = load_inst.result orelse return false;
-    if (!isNamed(ret.value orelse return error.InvalidRet, load_name)) return false;
+    if (has_binary_and) {
+        const last = block.instructions.items[4];
+        const binary = switch (last.kind) {
+            .binary => |b| b,
+            else => unreachable,
+        };
+        if (!isNamed(binary.lhs, load_name)) return false;
+    } else {
+        if (!isNamed(ret.value orelse return error.InvalidRet, load_name)) return false;
+    }
 
     const alloca = switch (alloca_inst.kind) {
         .alloca => |alloca| alloca,
         else => return false,
     };
     const classification = classifySysVAggregate(alloca.allocated_ty) catch return false;
-    if (classification.kind != .register or classification.eightbyte_count == 0) return false;
+    if (classification.kind == .register) {
+        if (classification.eightbyte_count == 0) return false;
+    } else if (classification.kind != .memory) {
+        return false;
+    }
 
     const store = switch (store_inst.kind) {
         .store => |store| store,
@@ -114,6 +140,24 @@ pub fn lowerSysVAggregateFieldReturn(
     _ = aggregateFieldIndexAtOffset(alloca.allocated_ty, field_offset, load.ty) orelse return false;
 
     try emitSysVAggregateFieldOffsetReturn(allocator, machine, function, param_name, alloca.allocated_ty, field_offset, load.ty);
+    if (has_binary_and) {
+        const last = block.instructions.items[4];
+        const binary = switch (last.kind) {
+            .binary => |b| b,
+            else => unreachable,
+        };
+        if (load.ty.eql(.{ .int = 32 })) {
+            const and_imm = try x86_64_match.i32BitPattern(binary.rhs.int);
+            try machine.instructions.append(allocator, .{ .and_eax_imm32 = and_imm });
+        } else if (load.ty.eql(.{ .int = 64 })) {
+            if (binary.rhs.int == 9223372036854775807) {
+                try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 1 });
+                try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 1 });
+            } else {
+                return false;
+            }
+        } else return false;
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
 }

@@ -189,14 +189,14 @@ fn executeOrdinaryScalarLoad(
         },
         .address_descriptor => |descriptor| try appendPreparedLoadStackI32(Authority, transaction, descriptor),
         .register => |prepared| {
-            if ((!is_ptr and bits != 8 and bits != 32) or (is_ptr and bits != 64)) return error.ValueUseLoadOrdinaryPointerWidth;
+            if ((!is_ptr and bits != 8 and bits != 32 and bits != 64) or (is_ptr and bits != 64)) return error.ValueUseLoadOrdinaryPointerWidth;
             const reg = switch (prepared.register) {
                 .gpr64 => |reg| reg,
                 else => return error.ValueUseLoadOrdinaryPointerRejected,
             };
             try transaction.selector.machine.instructions.append(
                 transaction.selector.allocator,
-                if (is_ptr)
+                if (is_ptr or bits == 64)
                     .{ .load_arg_ptr_disp8_rax = .{ .reg = reg, .offset = 0 } }
                 else if (bits == 8)
                     .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = reg, .offset = 0 } }
@@ -205,7 +205,7 @@ fn executeOrdinaryScalarLoad(
             );
         },
         .spill => |spill| {
-            if (((!is_ptr and bits != 8 and bits != 32) or (is_ptr and bits != 64)) or spill.bits < 64) return error.ValueUseLoadOrdinaryPointerWidth;
+            if (((!is_ptr and bits != 8 and bits != 32 and bits != 64) or (is_ptr and bits != 64)) or spill.bits < 64) return error.ValueUseLoadOrdinaryPointerWidth;
             try materialization.materializeScalar64(
                 transaction.selector,
                 .{ .spill64 = spill.frame_index },
@@ -214,7 +214,7 @@ fn executeOrdinaryScalarLoad(
             try failLoadForTest(Authority, transaction, .after_pointer_staging);
             try transaction.selector.machine.instructions.append(
                 transaction.selector.allocator,
-                if (is_ptr)
+                if (is_ptr or bits == 64)
                     .{ .load_arg_ptr_disp8_rax = .{ .reg = .rcx, .offset = 0 } }
                 else if (bits == 8)
                     .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = .rcx, .offset = 0 } }

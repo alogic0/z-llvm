@@ -78,8 +78,13 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         return lowerB01NamedScalarBinary(selector, result_name, binary);
     }
     if (bits == 8) {
-        if (binary.op != .@"and" or !valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
-        return try lowerBinaryImmediateRhs(selector, result_name, binary);
+        var op_bin = binary;
+        if (op_bin.op == .@"and" and valueIsInt(op_bin.lhs) and !valueIsInt(op_bin.rhs)) {
+            op_bin.lhs = binary.rhs;
+            op_bin.rhs = binary.lhs;
+        }
+        if (op_bin.op != .@"and" or !valueIsInt(op_bin.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
+        return try lowerBinaryImmediateRhs(selector, result_name, op_bin);
     }
     const exact_ei_narrow = isExactEiNarrowBits(selector, bits);
     if (bits != 6 and bits != 7 and bits != 16 and bits != 32 and bits != 64 and bits != 128 and !exact_ei_narrow)
@@ -89,6 +94,15 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         return try lowerBinaryImmediateRhs(selector, result_name, binary);
     }
     if (valueIsInt(binary.lhs)) {
+        switch (binary.op) {
+            .add, .@"or", .@"and", .xor => {
+                var commuted = binary;
+                commuted.lhs = binary.rhs;
+                commuted.rhs = binary.lhs;
+                return try lowerBinaryImmediateRhs(selector, result_name, commuted);
+            },
+            else => {},
+        }
         return try lowerBinaryImmediateLhs(selector, result_name, binary);
     }
     if (bits == 128) return try lowerPairBinary(selector, result_name, binary);

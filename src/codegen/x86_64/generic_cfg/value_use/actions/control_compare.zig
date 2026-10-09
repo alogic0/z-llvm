@@ -657,13 +657,13 @@ fn classifySetccEaxCompare(
     }
 
     if (bits > 32) return error.ValueUseSetccEaxCompareFormUnsupported;
-    if (action.predicate == .eq and action.immediate != 0) {
+    if ((action.predicate == .eq or action.predicate == .ne) and action.immediate != 0) {
         _ = std.math.cast(i64, action.immediate) orelse
             return error.ValueUseSetccEaxCompareImmediateOutOfRange;
         return .{
             .bits = bits,
             .definition = .{ .compare_immediate = action.immediate },
-            .setcc = .sete_eax,
+            .setcc = if (action.predicate == .eq) .sete_eax else .setne_eax,
         };
     }
     if (action.predicate == .sgt and (bits == 6 or bits == 16 or bits == 32)) {

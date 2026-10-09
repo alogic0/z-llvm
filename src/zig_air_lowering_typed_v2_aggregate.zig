@@ -53,10 +53,27 @@ fn lowerRegisterAggregateMake(
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
     const result_names = [_][]const u8{ "field0", "field1", "field2", "field3", "field4", "field5", "field6", "result" };
+    const trunc_names = [_][]const u8{ "trunc0", "trunc1", "trunc2", "trunc3", "trunc4", "trunc5", "trunc6", "trunc7" };
     var aggregate_value: ir.Value = .undef;
     for (plan.leaves[0..plan.leaf_count], 0..) |leaf, index| {
         const value: ir.Value = switch (leaf.source) {
-            .param => |param_index| .{ .named = arg_names[param_index] },
+            .param => |param_index| blk: {
+                const param_ty = function_type.params[param_index].ir_type;
+                if (param_ty == .int and leaf.ty == .int and param_ty.int > leaf.ty.int) {
+                    const trunc_name = trunc_names[index];
+                    try block.instructions.append(allocator, .{
+                        .result = trunc_name,
+                        .kind = .{ .cast = .{
+                            .op = .trunc,
+                            .from_ty = param_ty,
+                            .value = .{ .named = arg_names[param_index] },
+                            .to_ty = leaf.ty,
+                        } },
+                    });
+                    break :blk .{ .named = trunc_name };
+                }
+                break :blk .{ .named = arg_names[param_index] };
+            },
             .constant_int => |int_val| .{ .int = int_val },
         };
         const result_name = if (index + 1 == plan.leaf_count) "result" else result_names[index];

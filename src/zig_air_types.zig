@@ -116,6 +116,12 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "mem.Allocator") or std.mem.eql(u8, trimmed, "std.mem.Allocator")) return .{ .ir_type = .{ .aggregate = "{ ptr, ptr }" } };
     if (std.mem.eql(u8, trimmed, "link.Wasm.FunctionType")) return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
     if (std.mem.eql(u8, trimmed, "link.Elf.ZigObject")) return .{ .ir_type = .ptr };
+    if (std.mem.eql(u8, trimmed, "Air.ShuffleOneMask") or std.mem.eql(u8, trimmed, "ShuffleOneMask")) {
+        return .{ .ir_type = .{ .aggregate = "{ i31, i1 }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "InternPool.AnalUnit") or std.mem.eql(u8, trimmed, "AnalUnit")) {
+        return .{ .ir_type = .{ .int = 64 } };
+    }
 
     if (type_layout.parseNamedAggregateType(trimmed)) |ty| return .{ .ir_type = ty };
     if (std.mem.startsWith(u8, trimmed, "error{")) {

@@ -34,6 +34,12 @@ pub fn paramRegWithInitialGpr(function: ir.Function, name: []const u8, ty: ir.Ty
     return try paramRegOrNullWithInitialGpr(function, name, ty, initial_gpr) orelse error.UnsupportedCodegenValue;
 }
 
+pub fn isSysVIntegerTypeEqlOrCompatible(param_ty: ir.Type, ty: ir.Type) bool {
+    if (param_ty.eql(ty)) return true;
+    if (param_ty == .int and ty == .int and param_ty.int <= 64 and ty.int <= 64) return true;
+    return false;
+}
+
 pub fn paramRegOrNullWithInitialGpr(function: ir.Function, name: []const u8, ty: ir.Type, initial_gpr: usize) !?ArgReg {
     if (!isSysVIntegerOrSingleEightbyteAggregateParamType(ty)) return error.UnsupportedCodegenType;
     var gpr_index: usize = initial_gpr;
@@ -41,7 +47,7 @@ pub fn paramRegOrNullWithInitialGpr(function: ir.Function, name: []const u8, ty:
     var stack_eightbytes: usize = 0;
     for (function.params.items) |param| {
         if (std.mem.eql(u8, param.name, name)) {
-            if (!param.ty.eql(ty) or !isSysVIntegerOrSingleEightbyteAggregateParamType(param.ty)) return error.UnsupportedCodegenValue;
+            if (!isSysVIntegerTypeEqlOrCompatible(param.ty, ty) or !isSysVIntegerOrSingleEightbyteAggregateParamType(param.ty)) return error.UnsupportedCodegenValue;
             if (gpr_index >= 6) return error.UnsupportedCodegenAbi;
             return try ArgReg.fromIndex(gpr_index);
         }
@@ -57,7 +63,7 @@ pub fn scalarParamStackDisp8(function: ir.Function, name: []const u8, ty: ir.Typ
     var stack_eightbytes: usize = 0;
     for (function.params.items) |param| {
         if (std.mem.eql(u8, param.name, name)) {
-            if (!param.ty.eql(ty)) return error.UnsupportedCodegenValue;
+            if (!isSysVIntegerTypeEqlOrCompatible(param.ty, ty)) return error.UnsupportedCodegenValue;
             const in_register = if (isSysVIntegerParamType(ty)) gpr_index < 6 else sse_index < 8;
             if (in_register) return error.UnsupportedCodegenAbi;
             const offset = 8 + stack_eightbytes * 8;
@@ -112,7 +118,7 @@ pub fn stackParamDisp8OrNull(function: ir.Function, name: []const u8, ty: ir.Typ
     var stack_eightbytes: usize = 0;
     for (function.params.items) |param| {
         if (std.mem.eql(u8, param.name, name)) {
-            if (!param.ty.eql(ty)) return error.UnsupportedCodegenValue;
+            if (!isSysVIntegerTypeEqlOrCompatible(param.ty, ty)) return error.UnsupportedCodegenValue;
             const in_register = if (isSysVIntegerParamType(ty)) gpr_index < 6 else sse_index < 8;
             if (in_register) return null;
             const offset = 8 + stack_eightbytes * 8;
@@ -223,6 +229,11 @@ pub fn sysvIntegerAggregateFieldLocation(
                 } };
             }
             const classification = try sysv_abi.classifyAggregate(param.ty);
+            if (classification.kind == .memory) {
+                const offset = 8 + stack_eightbytes * 8 + field_offset;
+                if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+                return .{ .stack = @intCast(offset) };
+            }
             const field_eightbyte = field_offset / 8;
             if (field_eightbyte >= classification.eightbyte_count) return error.UnsupportedCodegenAbi;
             const field_class = classification.eightbytes[@intCast(field_eightbyte)] orelse

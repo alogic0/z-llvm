@@ -458,6 +458,11 @@ pub fn sysvIntegerAggregateFieldLocation(
         if (std.mem.eql(u8, param.name, param_name)) {
             if (!param.ty.eql(aggregate_ty)) return error.UnsupportedCodegenValue;
             const classification = try classifySysVAggregate(param.ty);
+            if (classification.kind == .memory) {
+                const offset = 8 + stack_eightbytes * 8 + field_offset;
+                if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+                return .{ .stack = @intCast(offset) };
+            }
             const field_eightbyte = field_offset / 8;
             if (field_eightbyte >= classification.eightbyte_count) return error.UnsupportedCodegenAbi;
             const field_class = classification.eightbytes[@intCast(field_eightbyte)] orelse return error.UnsupportedCodegenAbi;
@@ -770,6 +775,11 @@ pub fn sysvAggregateFieldLocationByOffset(
         if (std.mem.eql(u8, param.name, param_name)) {
             if (!param.ty.eql(aggregate_ty)) return error.UnsupportedCodegenValue;
             const classification = try classifySysVAggregate(param.ty);
+            if (classification.kind == .memory) {
+                const offset = 8 + stack_eightbytes * 8 + field_offset;
+                if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+                return .{ .stack = @intCast(offset) };
+            }
             if (classification.kind != .register) return error.UnsupportedCodegenAbi;
             const field_eightbyte = field_offset / 8;
             const field_class = if (field_eightbyte < classification.eightbytes.len)

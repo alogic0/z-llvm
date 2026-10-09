@@ -168,8 +168,13 @@ pub fn resolveParamIndex(structured_air_v2: air_export.StructuredAirV2, inst_ind
                     }
                     return arg_idx;
                 } else if (std.mem.eql(u8, inst.opcode, "bit_cast") or
+                    std.mem.eql(u8, inst.opcode, "bit_cast_safe") or
                     std.mem.eql(u8, inst.opcode, "bitcast") or
+                    std.mem.eql(u8, inst.opcode, "bitcast_safe") or
                     std.mem.eql(u8, inst.opcode, "int_cast") or
+                    std.mem.eql(u8, inst.opcode, "int_cast_safe") or
+                    std.mem.eql(u8, inst.opcode, "intcast") or
+                    std.mem.eql(u8, inst.opcode, "intcast_safe") or
                     std.mem.eql(u8, inst.opcode, "cast"))
                 {
                     if (inst.operands.len >= 1 and std.mem.eql(u8, inst.operands[0].kind, "inst")) {
@@ -238,8 +243,9 @@ fn planRegisterAggregateFromStores(
             if (std.mem.eql(u8, instruction.operands[1].kind, "inst")) {
                 const raw_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return null;
                 const arg_inst_index = resolveParamIndex(structured_air_v2, raw_inst_index) orelse return null;
-                if (arg_inst_index >= function_type.params.len) return null;
-                if (!function_type.params[arg_inst_index].ir_type.eql(field_ty)) return null;
+                const param_ty = function_type.params[arg_inst_index].ir_type;
+                const types_compatible = param_ty.eql(field_ty) or (param_ty == .int and field_ty == .int and param_ty.int >= field_ty.int);
+                if (!types_compatible) return null;
                 params_used[arg_inst_index] = true;
                 result_plan.leaves[field_idx] = .{
                     .path_text = path_text,
@@ -312,8 +318,9 @@ fn planRegisterAggregateFromStores(
         if (std.mem.eql(u8, instruction.operands[1].kind, "inst")) {
             const raw_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return null;
             const arg_inst_index = resolveParamIndex(structured_air_v2, raw_inst_index) orelse return null;
-            if (arg_inst_index >= function_type.params.len) return null;
-            if (!function_type.params[arg_inst_index].ir_type.eql(target_leaf.ty)) return null;
+            const param_ty = function_type.params[arg_inst_index].ir_type;
+            const types_compatible = param_ty.eql(target_leaf.ty) or (param_ty == .int and target_leaf.ty == .int and param_ty.int >= target_leaf.ty.int);
+            if (!types_compatible) return null;
             params_used[arg_inst_index] = true;
             result_plan.leaves[leaf_index] = .{
                 .path_text = path_text,

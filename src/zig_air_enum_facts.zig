@@ -38,6 +38,10 @@ const intern_pool_index_enumerators = [_]Enumerator{
     .{ .name = "none", .value = std.math.maxInt(u32) },
 };
 
+const intern_pool_anal_unit_optional_enumerators = [_]Enumerator{
+    .{ .name = "none", .value = std.math.maxInt(u64) },
+};
+
 const coff_image_file_machine_enumerators = [_]Enumerator{
     .{ .name = "UNKNOWN", .value = 0x0 },
     .{ .name = "ALPHA", .value = 0x184 },
@@ -93,9 +97,25 @@ const lang_compiler_backend_enumerators = [_]Enumerator{
     .{ .name = "zsf_spork8", .value = 14 },
 };
 
+const math_order_enumerators = [_]Enumerator{
+    .{ .name = "gt", .value = 0 },
+    .{ .name = "lt", .value = 1 },
+    .{ .name = "eq", .value = 2 },
+};
+
 const no_enumerators = [_]Enumerator{};
 
 const facts = [_]Fact{
+    .{
+        .name = "math.Order",
+        .backing_type = .{ .int = 8 },
+        .enumerators = math_order_enumerators[0..],
+    },
+    .{
+        .name = "std.math.Order",
+        .backing_type = .{ .int = 8 },
+        .enumerators = math_order_enumerators[0..],
+    },
     .{
         .name = "Io.Event",
         .backing_type = .{ .int = 32 },
@@ -115,6 +135,11 @@ const facts = [_]Fact{
         .name = "zig.Ast.OptionalTokenIndex",
         .backing_type = .{ .int = 32 },
         .enumerators = zig_ast_optional_token_index_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.AnalUnit.Optional",
+        .backing_type = .{ .int = 64 },
+        .enumerators = intern_pool_anal_unit_optional_enumerators[0..],
     },
     .{
         .name = "coff.IMAGE.FILE.MACHINE",
@@ -302,8 +327,22 @@ const zig_llvm_builder_linkage_enumerators = [_]Enumerator{
     .{ .name = "available_externally", .value = 12 },
 };
 
+const shuffle_one_mask_kind_enumerators = [_]Enumerator{
+    .{ .name = "elem", .value = 0 },
+    .{ .name = "value", .value = 1 },
+};
+
 pub fn lookup(nominal: []const u8) ?Fact {
     const normalized = stripNominalSigil(std.mem.trim(u8, nominal, " "));
+    if (std.mem.startsWith(u8, normalized, "Air.ShuffleOneMask__enum_") or
+        std.mem.startsWith(u8, normalized, "ShuffleOneMask__enum_"))
+    {
+        return .{
+            .name = normalized,
+            .backing_type = .{ .int = 1 },
+            .enumerators = shuffle_one_mask_kind_enumerators[0..],
+        };
+    }
     for (facts) |fact| {
         if (std.mem.eql(u8, normalized, fact.name)) return fact;
     }

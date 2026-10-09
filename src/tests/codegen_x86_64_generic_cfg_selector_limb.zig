@@ -1023,7 +1023,7 @@ test "generic cfg selector keeps limb64 bitwise near miss fail-closed" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
-        \\define void @near_miss(ptr %out, ptr %a, ptr %b, i16 %bits) {
+        \\define void @near_miss(ptr %out, ptr %a, ptr %b, i1 %signed, i16 %bits) {
         \\entry:
         \\  %bytes = call fastcc i16 @zig.target.intByteSize(i16 %bits)
         \\  %a0 = load i64, ptr %a, align 8
