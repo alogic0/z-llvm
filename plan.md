@@ -13,7 +13,9 @@ This document defines the actionable implementation plan for taking `z_llvm` fro
   - Unit tests: 1,528 / 1,528 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
   - Documentation validation: passes cleanly (`zig build check-docs`).
   - Behavioral differential gate against Clang-22: 6,528 observations across 8 programs and 3 release modes pass with 0 fallbacks (`zig build behavioral-diff`).
-  - Candidate real-rows gate (`--limit=665` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 665 / 665 (100.0%) passing rows with `local_fail=0`.
+  - Candidate real-rows gate (`--limit=679` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 679 / 679 (100.0%) passing rows with `local_fail=0` (commit `a3c2bc8c`).
+  - Current Failure Boundary: Row 680 (`os.linux.W.IFSTOPPED`) across all release modes.
+  - Architectural Strategy Reference: [`docs/roadmap/architectural_batching_strategy.md`](docs/roadmap/architectural_batching_strategy.md).
   - Stage4 emitter check: passes against tracked pin `1c08b09d1` (`zig build check-zig-stage4-emitter`).
 
 ---
@@ -392,30 +394,66 @@ flowchart TD
 
 ---
 
-### Phase 2: Compiler-Core Real-Rows Denominator Migration to Zig 0.17.0
-**Focus**: Rebuild the mode-stable 100-row candidate denominator against the Stage4 Zig 0.17.0 compiler.
+### Milestone: Frontier Advance (Rows 665 -> 679) & MultiArrayList Cascade — COMPLETED
+**Focus**: Lower MachO formatters, Wasm unwrap, BigInt RMW, 64-bit constant multiplication, and trivial void block inlining.
 
-1. **Inventory Gap Analysis**:
-   - Run the count-only compiler-core module inventory for `ReleaseFast`:
-     ```sh
-     zig build distribution-zig-air-inventory -- --slice=compiler-core-module --mode=ReleaseFast
-     ```
-   - Analyze ranked `top_unsupported` categories and `top_opcode` entries to identify the primary blocking opcodes.
-2. **Burn Down Unsupported Opcodes**:
-   - Follow the tactical roadmap in [`docs/roadmap/x86_64_compiler_core_family_checklist.md`](docs/roadmap/x86_64_compiler_core_family_checklist.md).
-   - Implement missing instruction lowerings in [`src/zig_air_lowering_typed_v2.zig`](src/zig_air_lowering_typed_v2.zig) and [`src/codegen/x86_64/generic_cfg_selector.zig`](src/codegen/x86_64/generic_cfg_selector.zig).
-   - Ensure lowering is typed and CFG-driven with strict fail-closed guards.
-3. **Rebuild Mode-Stable Denominator**:
-   - Run candidate derivation across `ReleaseFast`, `ReleaseSafe`, and `ReleaseSmall`:
-     ```sh
-     zig build real-candidates-v2 -- \
-       --base=docs/evidence/real_candidates_releasefast_v1.tsv \
-       --out=docs/evidence/real_candidates_release_v2.tsv \
-       --releasefast-air=<path> \
-       --releasesafe-air=<path> \
-       --releasesmall-air=<path>
-     ```
-   - Verify candidate survival across all three release modes.
+1. **MachO Formatter Cluster (Rows 666–668)**:
+   - Registered `link.MachO.Relocation`, `link.MachO.Thunk`, `link.MachO.UnwindInfo.Page` and format types in [`src/zig_air_types.zig`](src/zig_air_types.zig).
+   - Lowered via SysV 16-byte register aggregate returns in `%rax:%rdx`.
+   - Unlocked rows 666–668 (`link.MachO.Relocation.fmtPretty`, `link.MachO.Thunk.fmt`, `link.MachO.UnwindInfo.Page.fmt`).
+2. **Wasm DataPayload Off Unwrap (Row 669)**:
+   - In [`src/zig_air_types.zig`](src/zig_air_types.zig) and [`src/zig_air_enum_facts.zig`](src/zig_air_enum_facts.zig): registered `link.Wasm.DataPayload.Off` as `.{ .int = 32 }` with sentinel `.none = maxInt(u32)`.
+   - Unlocked row 669 (`link.Wasm.DataPayload.Off.unwrap`).
+3. **BigInt In-Place 64-Bit Bitwise RMW (Rows 670–671)**:
+   - In [`src/codegen/x86_64/generic_cfg/legacy_envelopes.zig`](src/codegen/x86_64/generic_cfg/legacy_envelopes.zig): added `matchesPointerOffsetBitwiseRmwEnvelope`.
+   - Emits SysV pointer offset load, imm mask op (`andq` / `xorq`), and pointer offset store at displacement 16.
+   - Unlocked rows 670–671 (`math.big.int.Managed.{abs,negate}`).
+4. **64-Bit IMUL Const & Trivial Void Blocks (Rows 672–679)**:
+   - In [`src/codegen/x86_64/generic_cfg/core_misc_rows.zig`](src/codegen/x86_64/generic_cfg/core_misc_rows.zig): generalized `lowerMulConstReturn` for 64-bit integer multiplication (`imul_rax_arg64`).
+   - In [`src/zig_air_model_base.zig`](src/zig_air_model_base.zig), [`src/zig_air_lowering_impl.zig`](src/zig_air_lowering_impl.zig), and [`src/zig_air_lowering_context_typed_cfg.zig`](src/zig_air_lowering_context_typed_cfg.zig): implemented trivial void block inlining.
+   - Cascaded all 8 consecutive `MultiArrayList.capacityInBytes` specializations with 0 extra code.
+   - Unlocked rows 672–679.
+5. **Architectural Batching Strategy**:
+   - Landed [`docs/roadmap/architectural_batching_strategy.md`](docs/roadmap/architectural_batching_strategy.md) defining the 5 orthogonal compiler subsystems.
+6. **Verification (Commit `a3c2bc8c`)**:
+   - `zig test src/tests.zig` / `zig build test-unit`: 1,528 / 1,528 pass cleanly.
+   - `zig build check-docs`: passed clean (19 current documents, 135 internal links).
+   - Candidate real-rows gate (`--limit=679`): 679 / 679 (100.0%) passing rows across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall` with `local_fail=0`.
+   - First failure boundary: cleanly confirmed at Row 680 (`os.linux.W.IFSTOPPED`).
+
+---
+
+### Phase 2: Architectural Batching Execution for Real-Rows Convergence (Rows 680 -> 14,185)
+**Focus**: Execute the 5 orthogonal compiler capability batches defined in [`docs/roadmap/architectural_batching_strategy.md`](docs/roadmap/architectural_batching_strategy.md) to complete Tier 1 (leaf functions) and unlock Tier 2 (callee closures) at scale.
+
+1. **Subsystem Batch 1: Automated Dynamic Nominal Type & Layout Ingestion**:
+   - Connect active nominal layout facts from [`src/zig_air_exported_aggregate_layout_facts.zig`](src/zig_air_exported_aggregate_layout_facts.zig) directly into `parseZigType` in [`src/zig_air_types.zig`](src/zig_air_types.zig).
+   - Eliminates manual string table updates and permanently eliminates `unsupported:function_type` for all 6,186 nominal structs in the corpus.
+2. **Subsystem Batch 2: Generalized SysV Eightbyte Classification & Emission Engine**:
+   - In [`src/codegen/x86_64/generic_cfg/cabi_aggregate_return_lowering.zig`](src/codegen/x86_64/generic_cfg/cabi_aggregate_return_lowering.zig), replace per-shape envelopes with offset-driven leaf packing:
+     - Byte offset $[0, 8) \rightarrow$ pack into `%rax`.
+     - Byte offset $[8, 16) \rightarrow$ pack into `%rdx`.
+     - Byte size $> 16 \rightarrow$ route to memory `sret` buffer in `%rdi`.
+   - Replaces bespoke aggregate emitters and unlocks all remaining return structs across Tier 1 and Tier 4.
+3. **Subsystem Batch 3: Straight-Line Arithmetic, Bitwise & Pointer RMW DAG Engine**:
+   - In [`src/codegen/x86_64/generic_cfg/core_single_block_scalar_rows.zig`](src/codegen/x86_64/generic_cfg/core_single_block_scalar_rows.zig):
+     - Generalize straight-line `return op(arg, imm)` and `return op(imm, arg)` across `i8`, `i16`, `i32`, `i64`.
+     - Generalize pointer RMW `[ptr + off] op= imm/arg` across all bitwidths and standard arithmetic/bitwise operators.
+   - Automatically harvests all remaining `capacityInBytes` (~179 rows remaining in Tier 1) and pointer flag modifications.
+4. **Subsystem Batch 4: Small-Switch & Sub-Range to Speculative Select Transform**:
+   - In [`src/zig_air_lowering_context_typed_cfg.zig`](src/zig_air_lowering_context_typed_cfg.zig):
+     - Lower $\le 4$ case switches and enum tag checks into single-block balanced `select` / `cmov` instructions.
+     - Lower contiguous sub-ranges into unsigned bias comparisons `(val - min) <= (max - min)`.
+   - Immediately unlocks Row 680 (`os.linux.W.IFSTOPPED`), enum unwraps, and token tag predicates without multi-block CFG complexity.
+5. **Subsystem Batch 5: Generic SysV Direct Callee Calling Convention (Tier 2 Opener)**:
+   - In [`src/codegen/x86_64/generic_cfg/cabi_call_lowering.zig`](src/codegen/x86_64/generic_cfg/cabi_call_lowering.zig):
+     - Implement standard SysV argument passing (`%rdi, %rsi, %rdx, %rcx, %r8, %r9`), 16-byte stack alignment, and direct `call <symbol>` lowering.
+   - Unlocks the entire 1,285-row Tier 2 block (`ArrayList.append`, `MultiArrayList.set`, internal helpers) in 2–3 milestone releases.
+6. **Batch Verification Protocol**:
+   - For every capability batch, verify:
+     - `zig build test-unit` (100% clean).
+     - `zig build check-docs` (link integrity and status blocks).
+     - Three-mode real-rows gate (`ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`) with `local_fail=0` across sweeping row ranges.
 
 ---
 
