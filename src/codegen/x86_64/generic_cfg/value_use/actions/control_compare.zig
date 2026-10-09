@@ -724,6 +724,17 @@ fn classifySetccEaxCompare(
             .setcc = .setb_eax,
         };
     }
+    if ((action.predicate == .ule or action.predicate == .ult) and bits == 8) {
+        const immediate = std.math.cast(i64, action.immediate) orelse
+            return error.ValueUseSetccEaxCompareImmediateOutOfRange;
+        if (immediate < 0 or immediate > 255)
+            return error.ValueUseSetccEaxCompareImmediateOutOfRange;
+        return .{
+            .bits = bits,
+            .definition = .{ .instruction = .{ .cmp_eax_imm32 = @intCast(immediate) } },
+            .setcc = if (action.predicate == .ule) .setbe_eax else .setb_eax,
+        };
+    }
     if (action.predicate == .ult and bits == 32) return .{
         .bits = bits,
         .definition = .{ .compare_immediate = action.immediate },

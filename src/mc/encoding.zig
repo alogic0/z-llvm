@@ -1381,6 +1381,14 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0x0f, 0x92, 0xc0,
                 0x08, 0xc8,
             }),
+            .ascii_control_dil_al => try bytes.appendSlice(allocator, &.{
+                0x31, 0xc0,
+                0x40, 0x80, 0xff, 0x1f,
+                0x0f, 0x96, 0xc0,
+                0x40, 0x80, 0xff, 0x7f,
+                0x0f, 0x94, 0xc1,
+                0x08, 0xc8,
+            }),
             .grow_capacity_u64_rdi_imm32_rax => |imm| {
                 if (imm >= -128 and imm <= 127) {
                     try bytes.appendSlice(allocator, &.{
@@ -1441,6 +1449,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .setg_eax => try bytes.appendSlice(allocator, &.{ 0x0f, 0x9f, 0xc0, 0x0f, 0xb6, 0xc0 }),
             .setl_eax => try bytes.appendSlice(allocator, &.{ 0x0f, 0x9c, 0xc0, 0x0f, 0xb6, 0xc0 }),
             .setne_eax => try bytes.appendSlice(allocator, &.{ 0x0f, 0x95, 0xc0, 0x0f, 0xb6, 0xc0 }),
+            .setbe_eax => try bytes.appendSlice(allocator, &.{ 0x0f, 0x96, 0xc0, 0x0f, 0xb6, 0xc0 }),
             .test_eax_eax => try bytes.appendSlice(allocator, &.{ 0x85, 0xc0 }),
             .test_rax_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x85, 0xc0 }),
             .test_rdx_rdx => try bytes.appendSlice(allocator, &.{ 0x48, 0x85, 0xd2 }),
@@ -2107,6 +2116,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .ascii_alphabetic_dil_al => 14,
         .ascii_alphanumeric_dil_al => 28,
         .ascii_whitespace_dil_al => 21,
+        .ascii_control_dil_al => 18,
         .grow_capacity_u64_rdi_imm32_rax => |imm| if (imm >= -128 and imm <= 127) 24 else 27,
         .store_imm8_abs => 8,
         .cmp_ecx_arg32 => |reg| if (reg.rexB()) 3 else 2,
@@ -2119,7 +2129,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .cmp_rdx_rcx => 3,
         .cmp_rdx_rdi => 3,
         .cmp_rax_rdx => 3,
-        .setb_eax, .seta_eax, .sete_eax, .setg_eax, .setl_eax, .setne_eax => 6,
+        .setb_eax, .seta_eax, .sete_eax, .setg_eax, .setl_eax, .setne_eax, .setbe_eax => 6,
         .test_eax_eax => 2,
         .test_rax_rax, .test_rdx_rdx => 3,
         .mulsd_xmm1_xmm0, .mulsd_xmm => 4,

@@ -1758,7 +1758,7 @@ pub fn aggregateIndexPathText(path: []const usize) ?[]const u8 {
 
 pub fn plainFieldPointerChild(ty: ir.Type) bool {
     return switch (ty) {
-        .int => |bits| bits == 1 or bits % 8 == 0,
+        .int => |bits| bits >= 1 and bits <= 128,
         .float, .double, .ptr => true,
         .aggregate => true,
         .void, .half, .x86_fp80, .fp128, .metadata, .vector => false,

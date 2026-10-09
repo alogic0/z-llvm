@@ -836,7 +836,109 @@ fn lowerGenericCfgPopcountReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    return lowerGenericCfgBitCountReturn(allocator, machine, function, block, ret, "llvm.ctpop.i32", .popcount_i32_edi_eax, false);
+    if (!ret.ty.eql(function.ret_ty)) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) and !ret.ty.eql(.{ .int = 64 })) return false;
+    if (function.params.items.len != 1) return false;
+    const arg0 = function.params.items[0];
+
+    var maybe_call: ?ir.CallInst = null;
+    var maybe_call_result: ?[]const u8 = null;
+    var maybe_zext_pre: ?ir.CastInst = null;
+    var maybe_zext_pre_result: ?[]const u8 = null;
+    var maybe_trunc: ?ir.CastInst = null;
+    var maybe_trunc_result: ?[]const u8 = null;
+    var maybe_zext_post: ?ir.CastInst = null;
+    var maybe_zext_post_result: ?[]const u8 = null;
+
+    for (block.instructions.items) |inst| {
+        if (inst.removed) continue;
+        switch (inst.kind) {
+            .call => |call| {
+                if (maybe_call != null) return false;
+                maybe_call = call;
+                maybe_call_result = inst.result orelse return false;
+            },
+            .cast => |cast| switch (cast.op) {
+                .zext => {
+                    if (maybe_call == null) {
+                        if (maybe_zext_pre != null) return false;
+                        maybe_zext_pre = cast;
+                        maybe_zext_pre_result = inst.result orelse return false;
+                    } else {
+                        if (maybe_zext_post != null) return false;
+                        maybe_zext_post = cast;
+                        maybe_zext_post_result = inst.result orelse return false;
+                    }
+                },
+                .trunc => {
+                    if (maybe_call == null or maybe_trunc != null) return false;
+                    maybe_trunc = cast;
+                    maybe_trunc_result = inst.result orelse return false;
+                },
+                else => return false,
+            },
+            else => return false,
+        }
+    }
+
+    const call = maybe_call orelse return false;
+    const call_result = maybe_call_result orelse return false;
+    const is_ctpop_i32 = isCalleeName(call.callee, "llvm.ctpop.i32");
+    const is_ctpop_i64 = isCalleeName(call.callee, "llvm.ctpop.i64");
+    if (!is_ctpop_i32 and !is_ctpop_i64) return false;
+    if (call.callee_value != null or call.inline_asm != null or call.args.items.len != 1) return false;
+
+    const expected_call_ty: ir.Type = if (is_ctpop_i32) .{ .int = 32 } else .{ .int = 64 };
+    if (!call.ret_ty.eql(expected_call_ty) or !call.args.items[0].ty.eql(expected_call_ty)) return false;
+
+    // Verify input chain
+    if (maybe_zext_pre) |zext_pre| {
+        const zext_pre_res = maybe_zext_pre_result orelse return false;
+        if (!isNamed(zext_pre.value, arg0.name)) return false;
+        if (!isNamed(call.args.items[0].value, zext_pre_res)) return false;
+        if (!zext_pre.to_ty.eql(expected_call_ty)) return false;
+    } else {
+        if (!isNamed(call.args.items[0].value, arg0.name)) return false;
+    }
+
+    // Verify return chain
+    const ret_val = ret.value orelse return error.InvalidRet;
+    const ret_name = switch (ret_val) {
+        .named => |name| name,
+        else => return false,
+    };
+
+    if (maybe_trunc) |trunc| {
+        const trunc_res = maybe_trunc_result orelse return false;
+        if (!isNamed(trunc.value, call_result)) return false;
+        if (!trunc.from_ty.eql(expected_call_ty)) return false;
+
+        const zext_post = maybe_zext_post orelse return false;
+        const zext_post_res = maybe_zext_post_result orelse return false;
+        if (!isNamed(zext_post.value, trunc_res)) return false;
+        if (!zext_post.from_ty.eql(trunc.to_ty)) return false;
+        if (!zext_post.to_ty.eql(ret.ty)) return false;
+        if (!std.mem.eql(u8, zext_post_res, ret_name)) return false;
+    } else if (maybe_zext_post) |zext_post| {
+        const zext_post_res = maybe_zext_post_result orelse return false;
+        if (!isNamed(zext_post.value, call_result)) return false;
+        if (!zext_post.from_ty.eql(expected_call_ty)) return false;
+        if (!zext_post.to_ty.eql(ret.ty)) return false;
+        if (!std.mem.eql(u8, zext_post_res, ret_name)) return false;
+    } else {
+        if (!std.mem.eql(u8, call_result, ret_name)) return false;
+    }
+
+    if (is_ctpop_i32) {
+        if ((try paramReg(function, arg0.name, arg0.ty)) != .rdi) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, .popcount_i32_edi_eax);
+    } else {
+        if ((try paramReg(function, arg0.name, arg0.ty)) != .rdi) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, .{ .mov_arg_rax = .rdi });
+        try machine.instructions.append(allocator, .popcount_rax);
+    }
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
 }
 
 fn lowerGenericCfgBitReverseReturn(

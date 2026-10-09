@@ -59,6 +59,9 @@ pub fn lowerTypedBlock(self: anytype, instruction: air_export.TypedInstruction) 
     if (try self.lowerTypedBranchReturnContinueBlock(instruction, cond, then_body, else_body)) {
         return;
     }
+    if (try self.lowerTypedShortCircuitBoolBlock(instruction, cond, then_body, else_body)) {
+        return;
+    }
     if (self.typedBlockBranchValue(instruction.index, then_body)) |true_value| {
         if (self.typedBlockBranchValue(instruction.index, else_body)) |false_value| {
             if (true_value.ty.ir_type.eql(false_value.ty.ir_type)) {
@@ -498,6 +501,114 @@ pub fn typedBlockBranchValue(
     const target = air_model.blockTarget(target_operand) orelse return air_model.LowerError.UnsupportedAir;
     if (target != target_block) return air_model.LowerError.UnsupportedAir;
     return self.resolveTypedOperand(branch_instruction, 1);
+}
+
+pub fn verifySpeculatableBranchBody(
+    self: anytype,
+    target_block: u32,
+    body: air_export.StructuredBody,
+) ?air_export.TypedInstruction {
+    const view = self.typed_view orelse return null;
+    var last_branch: ?air_export.TypedInstruction = null;
+    for (body.instructions) |child_idx| {
+        const child = view.instruction(child_idx) orelse return null;
+        if (view.capability(child).status == .ignored_metadata) continue;
+        if (air_capabilities.isBrOpcode(child.opcode)) {
+            if (last_branch != null) return null;
+            if (child.operands.len != 2) return null;
+            const target = air_model.blockTarget(child.operands[0]) orelse return null;
+            if (target != target_block) return null;
+            last_branch = child;
+            continue;
+        }
+        if (last_branch != null) return null;
+        const domain = air_capabilities.semanticDomainForOpcode(child.opcode);
+        if (domain != .scalar) return null;
+        const op = air_capabilities.scalarSemanticOpForOpcode(child.opcode);
+        switch (op) {
+            .compare, .cast => {},
+            .binary => {
+                if (std.mem.startsWith(u8, child.opcode, "div") or std.mem.startsWith(u8, child.opcode, "rem")) {
+                    return null;
+                }
+            },
+            else => return null,
+        }
+    }
+    return last_branch;
+}
+
+pub fn lowerTypedShortCircuitBoolBlock(
+    self: anytype,
+    instruction: air_export.TypedInstruction,
+    cond: anytype,
+    then_body: air_export.StructuredBody,
+    else_body: air_export.StructuredBody,
+) air_model.LowerError!bool {
+    const view = self.typed_view orelse return false;
+    if (!cond.ty.ir_type.eql(.{ .int = 1 })) return false;
+
+    // Case 1: then_body is br(target, true) -> cond or else_val
+    if (self.typedBlockBranchValue(instruction.index, then_body)) |then_val| {
+        if (then_val.ty.ir_type.eql(.{ .int = 1 }) and then_val.value.eql(.{ .int = 1 })) {
+            const br_inst = self.verifySpeculatableBranchBody(instruction.index, else_body) orelse return false;
+            for (else_body.instructions) |child_idx| {
+                if (child_idx == br_inst.index) break;
+                const child = view.instruction(child_idx) orelse return air_model.LowerError.UnsupportedAir;
+                if (view.capability(child).status == .ignored_metadata) continue;
+                try self.lowerTypedInstruction(child);
+            }
+            const else_val = try self.resolveTypedOperand(br_inst, 1);
+            if (!else_val.ty.ir_type.eql(.{ .int = 1 })) return air_model.LowerError.UnsupportedAir;
+            const result_name = try self.resultName(instruction.index);
+            try self.block.instructions.append(self.allocator, .{
+                .result = result_name,
+                .kind = .{ .binary = .{
+                    .op = .@"or",
+                    .ty = .{ .int = 1 },
+                    .lhs = cond.value,
+                    .rhs = else_val.value,
+                } },
+            });
+            self.values[instruction.index] = .{
+                .ty = .{ .ir_type = .{ .int = 1 } },
+                .value = .{ .named = result_name },
+            };
+            return true;
+        }
+    } else |_| {}
+
+    // Case 2: else_body is br(target, false) -> cond and then_val
+    if (self.typedBlockBranchValue(instruction.index, else_body)) |else_val| {
+        if (else_val.ty.ir_type.eql(.{ .int = 1 }) and else_val.value.eql(.{ .int = 0 })) {
+            const br_inst = self.verifySpeculatableBranchBody(instruction.index, then_body) orelse return false;
+            for (then_body.instructions) |child_idx| {
+                if (child_idx == br_inst.index) break;
+                const child = view.instruction(child_idx) orelse return air_model.LowerError.UnsupportedAir;
+                if (view.capability(child).status == .ignored_metadata) continue;
+                try self.lowerTypedInstruction(child);
+            }
+            const then_val = try self.resolveTypedOperand(br_inst, 1);
+            if (!then_val.ty.ir_type.eql(.{ .int = 1 })) return air_model.LowerError.UnsupportedAir;
+            const result_name = try self.resultName(instruction.index);
+            try self.block.instructions.append(self.allocator, .{
+                .result = result_name,
+                .kind = .{ .binary = .{
+                    .op = .@"and",
+                    .ty = .{ .int = 1 },
+                    .lhs = cond.value,
+                    .rhs = then_val.value,
+                } },
+            });
+            self.values[instruction.index] = .{
+                .ty = .{ .ir_type = .{ .int = 1 } },
+                .value = .{ .named = result_name },
+            };
+            return true;
+        }
+    } else |_| {}
+
+    return false;
 }
 
 pub fn lowerTypedBranchMergeBlock(

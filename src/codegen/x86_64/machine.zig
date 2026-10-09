@@ -292,6 +292,7 @@ pub const Instruction = union(enum) {
     ascii_alphabetic_dil_al,
     ascii_alphanumeric_dil_al,
     ascii_whitespace_dil_al,
+    ascii_control_dil_al,
     grow_capacity_u64_rdi_imm32_rax: i32,
     store_imm8_abs: struct {
         address: u32,
@@ -319,6 +320,7 @@ pub const Instruction = union(enum) {
     setg_eax,
     setl_eax,
     setne_eax,
+    setbe_eax,
     test_eax_eax,
     test_rax_rax,
     test_rdx_rdx,

@@ -100,6 +100,15 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "Compilation.Path")) return .{ .ir_type = .ptr };
     if (std.mem.eql(u8, trimmed, "Compilation.Path.Formatter")) return .{ .ir_type = .void };
     if (std.mem.eql(u8, trimmed, "Sema.Block") or std.mem.eql(u8, trimmed, "std.zig.Sema.Block")) return .{ .ir_type = .ptr };
+    if (std.mem.startsWith(u8, trimmed, "bit_set.Integer(") or
+        std.mem.startsWith(u8, trimmed, "std.bit_set.Integer("))
+    {
+        const open = std.mem.indexOfScalar(u8, trimmed, '(') orelse return null;
+        const close = std.mem.indexOfScalarPos(u8, trimmed, open + 1, ')') orelse return null;
+        const bits = std.fmt.parseInt(u16, std.mem.trim(u8, trimmed[open + 1 .. close], " "), 10) catch return null;
+        if (bits == 0) return null;
+        return .{ .ir_type = .{ .int = bits } };
+    }
     if (std.mem.startsWith(u8, trimmed, "link.Coff.Node.LazyMapRef.Index(") or
         std.mem.startsWith(u8, trimmed, "link.Elf2.Node.LazyMapRef.Index("))
     {
@@ -121,6 +130,20 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "InternPool.AnalUnit") or std.mem.eql(u8, trimmed, "AnalUnit")) {
         return .{ .ir_type = .{ .int = 64 } };
+    }
+    if (std.mem.eql(u8, trimmed, "Air.Inst.Index") or std.mem.eql(u8, trimmed, "InternPool.Nav.Index")) {
+        return .{ .ir_type = .{ .int = 32 } };
+    }
+    if (std.mem.endsWith(u8, trimmed, "FormatAirData") or std.mem.endsWith(u8, trimmed, "FormatWipMirData") or std.mem.endsWith(u8, trimmed, "FormatNavData")) {
+        return .{ .ir_type = .{ .aggregate = "{ ptr, i32 }" } };
+    }
+    if (std.mem.startsWith(u8, trimmed, "fmt.Alt(") or std.mem.startsWith(u8, trimmed, "std.fmt.Alt(")) {
+        if (std.mem.indexOf(u8, trimmed, "FormatAirData") != null or
+            std.mem.indexOf(u8, trimmed, "FormatWipMirData") != null or
+            std.mem.indexOf(u8, trimmed, "FormatNavData") != null)
+        {
+            return .{ .ir_type = .{ .aggregate = "{ { ptr, i32 } }" } };
+        }
     }
 
     if (type_layout.parseNamedAggregateType(trimmed)) |ty| return .{ .ir_type = ty };

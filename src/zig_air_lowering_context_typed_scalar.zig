@@ -542,7 +542,19 @@ pub fn lowerTypedCtz(self: anytype, instruction: air_export.TypedInstruction) !v
 }
 
 pub fn lowerTypedPopcount(self: anytype, instruction: air_export.TypedInstruction) !void {
-    try self.lowerTypedBitCount(instruction, "llvm.ctpop.i32", "popcount", false);
+    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
+    const source = try self.resolveTypedOperand(instruction, 0);
+    const source_bits = switch (source.ty.ir_type) {
+        .int => |bits| bits,
+        else => return air_model.LowerError.UnsupportedAir,
+    };
+    if (source_bits <= 32) {
+        try self.lowerTypedBitCount(instruction, "llvm.ctpop.i32", "popcount", false);
+    } else if (source_bits <= 64) {
+        try self.lowerTypedBitCount(instruction, "llvm.ctpop.i64", "popcount", false);
+    } else {
+        return air_model.LowerError.UnsupportedAir;
+    }
 }
 
 pub fn lowerTypedBitReverse(self: anytype, instruction: air_export.TypedInstruction) !void {
@@ -666,40 +678,64 @@ pub fn lowerTypedBitCount(self: anytype, instruction: air_export.TypedInstructio
         .int => |bits| bits,
         else => return air_model.LowerError.UnsupportedAir,
     };
-    if (!source.ty.ir_type.eql(.{ .int = 32 }) or result_type.signed or result_bits > 32) {
+    const source_bits = switch (source.ty.ir_type) {
+        .int => |bits| bits,
+        else => return air_model.LowerError.UnsupportedAir,
+    };
+    const callee_bits: u16 = if (std.mem.endsWith(u8, callee, ".i64")) 64 else 32;
+    if (source.ty.signed or result_type.signed or source_bits > callee_bits) {
         return air_model.LowerError.UnsupportedAir;
     }
 
-    const wide_result_name = if (result_type.ir_type.eql(.{ .int = 32 }))
+    const callee_ty: ir.Type = .{ .int = callee_bits };
+    const call_source_value = if (source_bits == callee_bits)
+        source.value
+    else value: {
+        const zext_name = try ownPrint(self.module, "air{}_{s}_zext", .{ instruction.index, label });
+        try self.block.instructions.append(self.allocator, .{
+            .result = zext_name,
+            .kind = .{ .cast = .{
+                .op = .zext,
+                .from_ty = source.ty.ir_type,
+                .to_ty = callee_ty,
+                .value = source.value,
+            } },
+        });
+        break :value ir.Value{ .named = zext_name };
+    };
+
+    const call_result_name = if (result_bits == callee_bits)
         try self.resultName(instruction.index)
     else
-        try ownPrint(self.module, "air{}_{s}_i32", .{ instruction.index, label });
+        try ownPrint(self.module, "air{}_{s}_{s}", .{ instruction.index, label, if (callee_bits == 64) "i64" else "i32" });
     var call: ir.CallInst = .{
-        .ret_ty = .{ .int = 32 },
+        .ret_ty = callee_ty,
         .callee = callee,
         .args = .empty,
     };
     errdefer call.deinit(self.allocator);
-    try call.args.append(self.allocator, .{ .ty = source.ty.ir_type, .value = source.value });
+    try call.args.append(self.allocator, .{ .ty = callee_ty, .value = call_source_value });
     if (has_zero_is_poison_arg) {
         try call.args.append(self.allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = 0 } });
     }
     try self.block.instructions.append(self.allocator, .{
-        .result = wide_result_name,
+        .result = call_result_name,
         .kind = .{ .call = call },
     });
-    const result_name = if (result_type.ir_type.eql(.{ .int = 32 })) wide_result_name else name: {
-        const narrowed_name = try self.resultName(instruction.index);
+
+    const result_name = if (result_bits == callee_bits) call_result_name else name: {
+        const adjusted_name = try self.resultName(instruction.index);
+        const op: ir.CastOp = if (result_bits < callee_bits) .trunc else .zext;
         try self.block.instructions.append(self.allocator, .{
-            .result = narrowed_name,
+            .result = adjusted_name,
             .kind = .{ .cast = .{
-                .op = .trunc,
-                .from_ty = .{ .int = 32 },
-                .value = .{ .named = wide_result_name },
+                .op = op,
+                .from_ty = callee_ty,
+                .value = .{ .named = call_result_name },
                 .to_ty = result_type.ir_type,
             } },
         });
-        break :name narrowed_name;
+        break :name adjusted_name;
     };
     self.values[instruction.index] = .{
         .ty = result_type,

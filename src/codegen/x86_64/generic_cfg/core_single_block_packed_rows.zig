@@ -660,41 +660,41 @@ pub fn lowerGenericCfgAsciiPredicateReturn(
     // %sub = sub i8 %masked, 65
     // %cmp = icmp ult i8 %sub, 26
     // ret i1 %cmp
-    if (block.instructions.items.len == 3) {
+    if (block.instructions.items.len == 3 and is_i8) alphabetic: {
         const mask_inst = block.instructions.items[0];
         const sub_inst = block.instructions.items[1];
         const cmp_inst = block.instructions.items[2];
-        if (mask_inst.removed or sub_inst.removed or cmp_inst.removed) return false;
-        const mask_result = mask_inst.result orelse return false;
-        const sub_result = sub_inst.result orelse return false;
-        const cmp_result = cmp_inst.result orelse return false;
-        if (!isNamed(ret.value orelse return error.InvalidRet, cmp_result)) return false;
+        if (mask_inst.removed or sub_inst.removed or cmp_inst.removed) break :alphabetic;
+        const mask_result = mask_inst.result orelse break :alphabetic;
+        const sub_result = sub_inst.result orelse break :alphabetic;
+        const cmp_result = cmp_inst.result orelse break :alphabetic;
+        if (!isNamed(ret.value orelse return error.InvalidRet, cmp_result)) break :alphabetic;
 
         const mask = switch (mask_inst.kind) {
             .binary => |binary| binary,
-            else => return false,
+            else => break :alphabetic,
         };
-        if (mask.op != .@"and" or !mask.ty.eql(.{ .int = 8 })) return false;
-        if (!isNamed(mask.lhs, arg0_name)) return false;
+        if (mask.op != .@"and" or !mask.ty.eql(.{ .int = 8 })) break :alphabetic;
+        if (!isNamed(mask.lhs, arg0_name)) break :alphabetic;
         const mask_val = switch (mask.rhs) {
-            .int => |int| try i64Value(int),
-            else => return false,
+            .int => |int| (i64Value(int) catch break :alphabetic),
+            else => break :alphabetic,
         };
-        if (mask_val != -33 and mask_val != 223 and mask_val != 0xdf) return false;
+        if (mask_val != -33 and mask_val != 223 and mask_val != 0xdf) break :alphabetic;
 
         const sub = switch (sub_inst.kind) {
             .binary => |binary| binary,
-            else => return false,
+            else => break :alphabetic,
         };
-        if (sub.op != .sub or !sub.ty.eql(.{ .int = 8 })) return false;
-        if (!isNamed(sub.lhs, mask_result) or !isInt(sub.rhs, 65)) return false;
+        if (sub.op != .sub or !sub.ty.eql(.{ .int = 8 })) break :alphabetic;
+        if (!isNamed(sub.lhs, mask_result) or !isInt(sub.rhs, 65)) break :alphabetic;
 
         const icmp = switch (cmp_inst.kind) {
             .icmp => |icmp| icmp,
-            else => return false,
+            else => break :alphabetic,
         };
-        if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 8 })) return false;
-        if (!isNamed(icmp.lhs, sub_result) or !isInt(icmp.rhs, 26)) return false;
+        if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 8 })) break :alphabetic;
+        if (!isNamed(icmp.lhs, sub_result) or !isInt(icmp.rhs, 26)) break :alphabetic;
 
         try machine.instructions.append(allocator, .ascii_alphabetic_dil_al);
         try machine.instructions.append(allocator, .ret);
@@ -828,6 +828,60 @@ pub fn lowerGenericCfgAsciiPredicateReturn(
         try machine.instructions.append(allocator, .ascii_alphanumeric_dil_al);
         try machine.instructions.append(allocator, .ret);
         return true;
+    }
+
+    // Pattern 5: Control character check (isControl)
+    // %cmp1 = icmp ule i8 %arg0, 31 (or ult 32)
+    // %cmp2 = icmp eq i8 %arg0, 127
+    // %res = or i1 %cmp1, %cmp2
+    // ret i1 %res
+    if (block.instructions.items.len == 3 and is_i8) {
+        const inst0 = block.instructions.items[0];
+        const inst1 = block.instructions.items[1];
+        const inst2 = block.instructions.items[2];
+        if (!inst0.removed and !inst1.removed and !inst2.removed) {
+            const res0 = inst0.result orelse return false;
+            const res1 = inst1.result orelse return false;
+            const res2 = inst2.result orelse return false;
+            if (isNamed(ret.value orelse return error.InvalidRet, res2)) {
+                const or_bin = switch (inst2.kind) {
+                    .binary => |binary| binary,
+                    else => null,
+                };
+                if (or_bin) |ob| {
+                    if (ob.op == .@"or" and ob.ty.eql(.{ .int = 1 })) {
+                        if ((isNamed(ob.lhs, res0) and isNamed(ob.rhs, res1)) or
+                            (isNamed(ob.lhs, res1) and isNamed(ob.rhs, res0)))
+                        {
+                            const cmpA = switch (inst0.kind) {
+                                .icmp => |icmp| icmp,
+                                else => null,
+                            };
+                            const cmpB = switch (inst1.kind) {
+                                .icmp => |icmp| icmp,
+                                else => null,
+                            };
+                            if (cmpA != null and cmpB != null) {
+                                if (cmpA.?.operand_ty.eql(.{ .int = 8 }) and cmpB.?.operand_ty.eql(.{ .int = 8 }) and
+                                    isNamed(cmpA.?.lhs, arg0_name) and isNamed(cmpB.?.lhs, arg0_name))
+                                {
+                                    const a_is_low = (cmpA.?.predicate == .ule and isInt(cmpA.?.rhs, 31)) or (cmpA.?.predicate == .ult and isInt(cmpA.?.rhs, 32));
+                                    const a_is_del = cmpA.?.predicate == .eq and isInt(cmpA.?.rhs, 127);
+                                    const b_is_low = (cmpB.?.predicate == .ule and isInt(cmpB.?.rhs, 31)) or (cmpB.?.predicate == .ult and isInt(cmpB.?.rhs, 32));
+                                    const b_is_del = cmpB.?.predicate == .eq and isInt(cmpB.?.rhs, 127);
+
+                                    if ((a_is_low and b_is_del) or (b_is_low and a_is_del)) {
+                                        try machine.instructions.append(allocator, .ascii_control_dil_al);
+                                        try machine.instructions.append(allocator, .ret);
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     return false;

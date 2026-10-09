@@ -49,7 +49,7 @@ pub fn validateEflagsEmissionAuthority(name: []const u8, source: []const u8) !vo
     if (!guarded) return;
 
     const markers = [_][]const u8{
-        ".cmp_",        ".test_", ".setb_eax", ".seta_eax", ".sete_eax", ".setg_eax", ".setl_eax", ".setne_eax",
+        ".cmp_",        ".test_", ".setb_eax", ".seta_eax", ".sete_eax", ".setg_eax", ".setl_eax", ".setne_eax", ".setbe_eax",
         ".binary_arg_", ".imul_", ".mul_rax",  ".xor_edx",  ".div_arg",  ".add_",     ".sub_",     ".shl_",
         ".shr_",        ".sar_",  ".and_",     ".or_",      ".adc_",     ".sbb_",     ".je ",      ".jne ",
         ".jo ",         ".jc ",   ".jp ",      ".js ",      ".jae ",     ".jle ",
