@@ -527,7 +527,11 @@ fn emitPackedTwoI32Leaves(
     if (low_leaf.value == .int and high_leaf.value == .int) {
         const low_val = @as(u64, @as(u32, @bitCast(try x86_64_match.i32Value(low_leaf.value.int))));
         const high_val = @as(u64, @as(u32, @bitCast(try x86_64_match.i32Value(high_leaf.value.int))));
-        const combined: i64 = @bitCast((high_val << 32) | low_val);
+        const mask: u64 = switch (high_leaf.ty) {
+            .int => |bits| if (bits >= 32) 0xffff_ffff else (@as(u64, 1) << @intCast(bits)) - 1,
+            else => return error.UnsupportedCodegenType,
+        };
+        const combined: i64 = @bitCast(((high_val & mask) << 32) | low_val);
         switch (dst) {
             .rax => try machine.instructions.append(allocator, .{ .mov_imm_rax = combined }),
             .rdx => try machine.instructions.append(allocator, .{ .mov_imm_rdx = combined }),
@@ -538,16 +542,33 @@ fn emitPackedTwoI32Leaves(
     const high_reg = try paramValueReg(function, high_leaf.value, high_leaf.ty);
     switch (dst) {
         .rax => {
-            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = high_reg } });
-            try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = 32 });
-            try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg });
-            try machine.instructions.append(allocator, .or_rdx_rax);
+            if (high_leaf.ty.eql(.{ .int = 32 })) {
+                try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = high_reg } });
+                try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = 32 });
+                try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg });
+                try machine.instructions.append(allocator, .or_rdx_rax);
+            } else {
+                try machine.instructions.append(allocator, .{ .mov_arg_eax = high_reg });
+                const mask: i32 = switch (high_leaf.ty.int) {
+                    8 => 0xff,
+                    16 => 0xffff,
+                    else => return error.UnsupportedCodegenAbi,
+                };
+                try machine.instructions.append(allocator, .{ .and_eax_imm32 = mask });
+                try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 32 });
+                try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_reg } });
+                try machine.instructions.append(allocator, .or_rdx_rax);
+            }
         },
         .rdx => {
-            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rcx, .src = high_reg } });
-            try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = 32 });
-            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_reg } });
-            try machine.instructions.append(allocator, .or_rcx_rdx);
+            if (high_leaf.ty.eql(.{ .int = 32 })) {
+                try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rcx, .src = high_reg } });
+                try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = 32 });
+                try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_reg } });
+                try machine.instructions.append(allocator, .or_rcx_rdx);
+            } else {
+                return error.UnsupportedCodegenAbi;
+            }
         },
     }
 }
@@ -711,7 +732,9 @@ fn emitIntegerEightbyte(
     if (leaves.len == 2) {
         const l0 = leaves[0];
         const l1 = leaves[1];
-        if (l0.ty.eql(.{ .int = 32 }) and l1.ty.eql(.{ .int = 32 })) {
+        if (l0.ty.eql(.{ .int = 32 }) and
+            (l1.ty.eql(.{ .int = 32 }) or l1.ty.eql(.{ .int = 16 }) or l1.ty.eql(.{ .int = 8 })))
+        {
             try emitPackedTwoI32Leaves(allocator, machine, function, l0, l1, dst);
             return;
         }

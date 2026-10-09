@@ -247,6 +247,7 @@ pub fn lowerAggregateAbiReturn(
     if (try lowerRegisterAggregateReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerSmallIntegerAggregateReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerSysVAggregateFieldReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerSysVAggregateFieldImmAddReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateIntegerFieldAddReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateFloatFieldAddReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateDoubleFieldAddReturn(allocator, machine, function, block, ret)) return true;
@@ -446,23 +447,43 @@ fn lowerRegisterAggregateReturn(
                 if (leaf.offset % 8 != 0) return error.UnsupportedCodegenAbi;
                 const low_reg = try paramValueReg(function, leaf.value, leaf.ty);
                 if (leaf_index + 1 < leaf_count and
-                    leaves[leaf_index + 1].ty.eql(.{ .int = 32 }) and
+                    (leaves[leaf_index + 1].ty.eql(.{ .int = 32 }) or
+                        leaves[leaf_index + 1].ty.eql(.{ .int = 16 }) or
+                        leaves[leaf_index + 1].ty.eql(.{ .int = 8 })) and
                     leaves[leaf_index + 1].offset / 8 == leaf_eightbyte and
                     leaves[leaf_index + 1].offset % 8 == 4)
                 {
-                    const high_reg = try paramValueReg(function, leaves[leaf_index + 1].value, .{ .int = 32 });
+                    const next_leaf = leaves[leaf_index + 1];
+                    const high_reg = try paramValueReg(function, next_leaf.value, next_leaf.ty);
                     switch (gpr_return_index) {
                         0 => {
-                            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = high_reg } });
-                            try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = 32 });
-                            try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg });
-                            try machine.instructions.append(allocator, .or_rdx_rax);
+                            if (next_leaf.ty.eql(.{ .int = 32 })) {
+                                try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = high_reg } });
+                                try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = 32 });
+                                try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg });
+                                try machine.instructions.append(allocator, .or_rdx_rax);
+                            } else {
+                                try machine.instructions.append(allocator, .{ .mov_arg_eax = high_reg });
+                                const mask: i32 = switch (next_leaf.ty.int) {
+                                    8 => 0xff,
+                                    16 => 0xffff,
+                                    else => return error.UnsupportedCodegenAbi,
+                                };
+                                try machine.instructions.append(allocator, .{ .and_eax_imm32 = mask });
+                                try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 32 });
+                                try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_reg } });
+                                try machine.instructions.append(allocator, .or_rdx_rax);
+                            }
                         },
                         1 => {
-                            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rcx, .src = high_reg } });
-                            try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = 32 });
-                            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_reg } });
-                            try machine.instructions.append(allocator, .or_rcx_rdx);
+                            if (next_leaf.ty.eql(.{ .int = 32 })) {
+                                try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rcx, .src = high_reg } });
+                                try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = 32 });
+                                try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_reg } });
+                                try machine.instructions.append(allocator, .or_rcx_rdx);
+                            } else {
+                                return error.UnsupportedCodegenAbi;
+                            }
                         },
                         else => return error.UnsupportedCodegenAbi,
                     }
@@ -680,6 +701,95 @@ fn lowerSysVAggregateFieldReturn(
     _ = aggregateFieldIndexAtOffset(alloca.allocated_ty, field_offset, load.ty) orelse return false;
 
     try emitSysVAggregateFieldOffsetReturn(allocator, machine, function, param_name, alloca.allocated_ty, field_offset, load.ty);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerSysVAggregateFieldImmAddReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if ((!ret.ty.eql(.{ .int = 32 }) and !ret.ty.eql(.{ .int = 64 })) or
+        (block.instructions.items.len != 4 and block.instructions.items.len != 5)) return false;
+    const alloca_inst = block.instructions.items[0];
+    const store_inst = block.instructions.items[1];
+    const maybe_gep_inst: ?ir.Instruction = if (block.instructions.items.len == 5) block.instructions.items[2] else null;
+    const load_inst = if (block.instructions.items.len == 5) block.instructions.items[3] else block.instructions.items[2];
+    const binary_inst = block.instructions.items[block.instructions.items.len - 1];
+    if (alloca_inst.removed or store_inst.removed or load_inst.removed or binary_inst.removed) return false;
+    if (maybe_gep_inst) |gep_inst| if (gep_inst.removed) return false;
+    const alloca_name = alloca_inst.result orelse return false;
+    const load_name = load_inst.result orelse return false;
+    const binary_name = binary_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, binary_name)) return false;
+
+    const alloca = switch (alloca_inst.kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(alloca.allocated_ty) or store.attrs.isBarrier() or !isNamed(store.ptr, alloca_name)) return false;
+    const param_name = switch (store.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(ret.ty) or load.attrs.isBarrier()) return false;
+
+    const binary = switch (binary_inst.kind) {
+        .binary => |b| b,
+        else => return false,
+    };
+    if (binary.op != .add or !binary.ty.eql(ret.ty)) return false;
+    if (!isNamed(binary.lhs, load_name)) return false;
+    const imm = switch (binary.rhs) {
+        .int => |imm| imm,
+        else => return false,
+    };
+
+    const layout = try x86_64SysVDataLayout();
+    const field_offset = if (maybe_gep_inst) |gep_inst| blk: {
+        const gep_name = gep_inst.result orelse return false;
+        if (!isNamed(load.ptr, gep_name)) return false;
+        const gep = switch (gep_inst.kind) {
+            .gep => |gep| gep,
+            else => return false,
+        };
+        if (!isNamed(gep.ptr, alloca_name)) return false;
+        break :blk aggregateGepByteOffset(layout, alloca.allocated_ty, gep) orelse return false;
+    } else blk: {
+        if (!isNamed(load.ptr, alloca_name)) return false;
+        break :blk @as(u64, 0);
+    };
+    _ = aggregateFieldIndexAtOffset(alloca.allocated_ty, field_offset, load.ty) orelse return false;
+
+    try emitSysVAggregateFieldOffsetReturn(allocator, machine, function, param_name, alloca.allocated_ty, field_offset, load.ty);
+    if (ret.ty.eql(.{ .int = 64 })) {
+        if (imm >= 0 and imm <= std.math.maxInt(u8)) {
+            try machine.instructions.append(allocator, .{ .add_rax_imm8 = @intCast(imm) });
+        } else {
+            return false;
+        }
+    } else if (ret.ty.eql(.{ .int = 32 })) {
+        if (imm >= std.math.minInt(i32) and imm <= std.math.maxInt(i32)) {
+            try machine.instructions.append(allocator, .{ .add_eax_imm32 = @intCast(imm) });
+        } else {
+            return false;
+        }
+    } else {
+        return false;
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -1347,6 +1457,11 @@ fn sysvIntegerAggregateFieldLocation(
         if (std.mem.eql(u8, param.name, param_name)) {
             if (!param.ty.eql(aggregate_ty)) return error.UnsupportedCodegenValue;
             const classification = try classifySysVAggregate(param.ty);
+            if (classification.kind == .memory) {
+                const offset = 8 + stack_eightbytes * 8 + field_offset;
+                if (offset > std.math.maxInt(u32)) return error.UnsupportedCodegenAbi;
+                return .{ .stack = @intCast(offset) };
+            }
             const field_eightbyte = field_offset / 8;
             if (field_eightbyte >= classification.eightbyte_count) return error.UnsupportedCodegenAbi;
             const field_class = classification.eightbytes[@intCast(field_eightbyte)] orelse return error.UnsupportedCodegenAbi;

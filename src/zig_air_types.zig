@@ -134,8 +134,28 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "Air.Inst.Index") or std.mem.eql(u8, trimmed, "InternPool.Nav.Index")) {
         return .{ .ir_type = .{ .int = 32 } };
     }
+    if (std.mem.eql(u8, trimmed, "compress.zstd.Decompress.Frame.Magic")) return .{ .ir_type = .{ .int = 32 } };
+    if (std.mem.eql(u8, trimmed, "compress.zstd.Decompress.Frame.Kind")) return .{ .ir_type = .{ .int = 8 } };
+    if (std.mem.eql(u8, trimmed, "Target.Cpu.Arch") or std.mem.eql(u8, trimmed, "std.Target.Cpu.Arch")) {
+        return .{ .ir_type = .{ .int = 8 } };
+    }
     if (std.mem.endsWith(u8, trimmed, "FormatAirData") or std.mem.endsWith(u8, trimmed, "FormatWipMirData") or std.mem.endsWith(u8, trimmed, "FormatNavData")) {
         return .{ .ir_type = .{ .aggregate = "{ ptr, i32 }" } };
+    }
+    if (std.mem.endsWith(u8, trimmed, "FormatRelocTypeCtx")) {
+        return .{ .ir_type = .{ .aggregate = "{ i32, i8 }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "link.Elf.Thunk") or std.mem.eql(u8, trimmed, "Elf.Thunk")) {
+        return .{ .ir_type = .ptr };
+    }
+    if (std.mem.eql(u8, trimmed, "link.Elf.Thunk.Format") or std.mem.eql(u8, trimmed, "Elf.Thunk.Format")) {
+        return .{ .ir_type = .{ .aggregate = "{ ptr, ptr }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "link.MachO.Platform") or std.mem.eql(u8, trimmed, "MachO.Platform")) {
+        return .{ .ir_type = .{ .int = 64 } };
+    }
+    if (std.mem.eql(u8, trimmed, "link.MachO.Platform.Format") or std.mem.eql(u8, trimmed, "MachO.Platform.Format")) {
+        return .{ .ir_type = .{ .aggregate = "{ i64, i8 }" } };
     }
     if (std.mem.startsWith(u8, trimmed, "fmt.Alt(") or std.mem.startsWith(u8, trimmed, "std.fmt.Alt(")) {
         if (std.mem.indexOf(u8, trimmed, "FormatAirData") != null or
@@ -143,6 +163,19 @@ pub fn parseZigType(text: []const u8) ?ZigType {
             std.mem.indexOf(u8, trimmed, "FormatNavData") != null)
         {
             return .{ .ir_type = .{ .aggregate = "{ { ptr, i32 } }" } };
+        }
+        if (std.mem.indexOf(u8, trimmed, "FormatRelocTypeCtx") != null) {
+            return .{ .ir_type = .{ .aggregate = "{ { i32, i8 } }" } };
+        }
+        if (std.mem.indexOf(u8, trimmed, "link.MachO.Platform.Format") != null or
+            std.mem.indexOf(u8, trimmed, "MachO.Platform.Format") != null)
+        {
+            return .{ .ir_type = .{ .aggregate = "{ { i64, i8 } }" } };
+        }
+        if (std.mem.indexOf(u8, trimmed, "link.Elf.Thunk.Format") != null or
+            std.mem.indexOf(u8, trimmed, "Elf.Thunk.Format") != null)
+        {
+            return .{ .ir_type = .{ .aggregate = "{ { ptr, ptr } }" } };
         }
     }
 

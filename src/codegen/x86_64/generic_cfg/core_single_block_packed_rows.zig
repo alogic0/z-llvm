@@ -88,6 +88,10 @@ pub fn lowerGenericCfgSingleBlockPackedBits(allocator: std.mem.Allocator, machin
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgPackTwoU32Return(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     return false;
 }
 
@@ -1558,4 +1562,73 @@ pub fn lowerGenericCfgDurationFromSecondsReturn(
     try machine.instructions.append(allocator, .{ .imul_rax_arg64_full = .rdi });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+pub fn lowerGenericCfgPackTwoU32Return(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or !ret.ty.eql(.{ .int = 64 })) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 32 }) or !function.params.items[1].ty.eql(.{ .int = 32 })) return false;
+    const arg0_name = function.params.items[0].name;
+    const arg1_name = function.params.items[1].name;
+    const ret_val = ret.value orelse return error.InvalidRet;
+    const ret_val_name = switch (ret_val) {
+        .named => |n| n,
+        else => return false,
+    };
+    const or_inst = findInstruction(block, ret_val_name) orelse return false;
+    if (or_inst.removed) return false;
+    const binary = switch (or_inst.kind) {
+        .binary => |b| b,
+        else => return false,
+    };
+    if (binary.op != .@"or" or !binary.ty.eql(.{ .int = 64 })) return false;
+
+    const matches_forward = isShl32ZextArg(block, binary.lhs, arg0_name) and isZextArg(block, binary.rhs, arg1_name);
+    const matches_reverse = isShl32ZextArg(block, binary.rhs, arg0_name) and isZextArg(block, binary.lhs, arg1_name);
+    if (!matches_forward and !matches_reverse) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = .rdi });
+    try machine.instructions.append(allocator, .{ .shl_rax_imm6 = 32 });
+    try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } });
+    try machine.instructions.append(allocator, .or_rcx_rax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn isShl32ZextArg(block: ir.BasicBlock, val: ir.Value, arg_name: []const u8) bool {
+    const name = switch (val) {
+        .named => |n| n,
+        else => return false,
+    };
+    const inst = findInstruction(block, name) orelse return false;
+    if (inst.removed) return false;
+    const binary = switch (inst.kind) {
+        .binary => |b| b,
+        else => return false,
+    };
+    if (binary.op != .shl or !binary.ty.eql(.{ .int = 64 })) return false;
+    const shift_amt = resolveIntConst(block, binary.rhs) orelse return false;
+    if (shift_amt != 32) return false;
+    return isZextArg(block, binary.lhs, arg_name);
+}
+
+fn isZextArg(block: ir.BasicBlock, val: ir.Value, arg_name: []const u8) bool {
+    const name = switch (val) {
+        .named => |n| n,
+        else => return false,
+    };
+    const inst = findInstruction(block, name) orelse return false;
+    if (inst.removed) return false;
+    const cast = switch (inst.kind) {
+        .cast => |c| c,
+        else => return false,
+    };
+    if (cast.op != .zext or !cast.from_ty.eql(.{ .int = 32 }) or !cast.to_ty.eql(.{ .int = 64 })) return false;
+    return isNamed(cast.value, arg_name);
 }

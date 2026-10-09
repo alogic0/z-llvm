@@ -20,13 +20,13 @@ pub fn parseConstant(text: []const u8) ?TypedValue {
         const value_text = std.mem.trim(u8, fields.next() orelse return null, " ");
         if (fields.next() != null) return null;
         const ty = parseZigType(std.mem.trim(u8, type_text, " ")) orelse return null;
-        if (std.mem.eql(u8, value_text, "null")) return .{
-            .ty = ty,
-            .value = if (ty.ir_type == .ptr) .null_value else .{ .int = 0 },
-        };
         if (enum_facts.enumeratorValue(type_text, value_text)) |code| return .{
             .ty = ty,
             .value = .{ .int = code },
+        };
+        if (std.mem.eql(u8, value_text, "null")) return .{
+            .ty = ty,
+            .value = if (ty.ir_type == .ptr) .null_value else .{ .int = 0 },
         };
         if (errorSetConstantCode(type_text, value_text)) |code| return .{
             .ty = ty,

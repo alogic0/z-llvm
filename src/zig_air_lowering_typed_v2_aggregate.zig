@@ -38,7 +38,8 @@ fn lowerRegisterAggregateMake(
     if (function_type.params.len > 8) return error.UnsupportedAir;
     const plan = air_aggregate_construction.planRegisterAggregateConstruction(function_type, structured_air_v2) orelse return error.UnsupportedAir;
     for (function_type.params) |param| {
-        if (!param.ir_type.eql(.{ .int = 32 }) and !param.ir_type.eql(.{ .int = 64 }) and
+        if (!param.ir_type.eql(.{ .int = 8 }) and !param.ir_type.eql(.{ .int = 16 }) and
+            !param.ir_type.eql(.{ .int = 32 }) and !param.ir_type.eql(.{ .int = 64 }) and
             !param.ir_type.eql(.float) and !param.ir_type.eql(.double) and
             !param.ir_type.eql(.ptr) and !param.ir_type.eql(.{ .aggregate = "{ i32, i32 }" })) return error.UnsupportedAir;
     }

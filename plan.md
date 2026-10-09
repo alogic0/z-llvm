@@ -13,7 +13,7 @@ This document defines the actionable implementation plan for taking `z_llvm` fro
   - Unit tests: 1,528 / 1,528 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
   - Documentation validation: passes cleanly (`zig build check-docs`).
   - Behavioral differential gate against Clang-22: 6,528 observations across 8 programs and 3 release modes pass with 0 fallbacks (`zig build behavioral-diff`).
-  - Candidate real-rows gate (`--limit=565` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 565 / 565 (100.0%) passing rows with `local_fail=0`.
+  - Candidate real-rows gate (`--limit=665` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 665 / 665 (100.0%) passing rows with `local_fail=0`.
   - Stage4 emitter check: passes against tracked pin `1c08b09d1` (`zig build check-zig-stage4-emitter`).
 
 ---
@@ -343,6 +343,52 @@ flowchart TD
      - `ReleaseFast`: 565 / 565 (100.0%) passing rows with `local_fail=0`.
      - `ReleaseSafe`: 565 / 565 (100.0%) passing rows with `local_fail=0`.
      - `ReleaseSmall`: 565 / 565 (100.0%) passing rows with `local_fail=0`.
+
+---
+
+### Milestone: Multi-Mode Frontier Advance from Row 657 to Row 665 — COMPLETED
+**Focus**: Advance multi-mode real candidate coverage from row 658 through row 665 across ReleaseFast, ReleaseSafe, and ReleaseSmall.
+
+1. **Range Switch Lowering & Zstandard Magic (Row 658)**:
+   - Register `compress.zstd.Decompress.Frame.Magic` as `i32` and `Kind` / `?Kind` as `i8` with enum facts.
+   - Lower range-switch arms into speculatable 2-level `select` instructions in single block.
+   - Accept 8-bit integer return types in `isComposedReturnType` and support `.ule` with 32-bit immediate in composed icmp selector and control compare.
+   - Allow 32-bit unsigned bit patterns in `executeSetccEaxCompare` for equality and unsigned setcc instructions.
+   - Unlocks row 658 (`compress.zstd.Decompress.Frame.Magic.kind`).
+
+2. **Dwarf Nav Writer Cascade (Row 659)**:
+   - Cascaded cleanly with 0 extra code (row 659 `link.Dwarf.WipNav.ExprLocCounter.writer`).
+
+3. **Pack Two U32 Parameters Return (Row 660)**:
+   - In [`src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig`](src/codegen/x86_64/generic_cfg/core_single_block_packed_rows.zig): add single-block pattern `lowerGenericCfgPackTwoU32Return` matching `(@as(u64, arg0) << 32) | @as(u64, arg1)` and emitting `mov %edi, %eax; shl $32, %rax; mov %esi, %ecx; or %rcx, %rax; ret`.
+   - Unlocks row 660 (`link.Elf.Atom.priorityLookup`).
+
+4. **Elf Thunk Fmt Register Aggregate (Row 661)**:
+   - Register `link.Elf.Thunk` as `.ptr`, `link.Elf.Thunk.Format` as `"{ ptr, ptr }"`, and `fmt.Alt(...)` as `"{ { ptr, ptr } }"`.
+   - Lowers via SysV register aggregate return in `%rax:%rdx` (`mov %rdi, %rax; mov %rsi, %rdx; ret`).
+   - Unlocks row 661 (`link.Elf.Thunk.fmt`).
+
+5. **Stack Aggregate Field Load + Immediate Addition (Rows 662–663)**:
+   - Register layout facts for `link.Elf.eh_frame.Cie` and `link.Elf.eh_frame.Fde` in [`src/zig_air_aggregate_layout_facts.zig`](src/zig_air_aggregate_layout_facts.zig).
+   - Support SysV memory-class aggregate parameters in `sysvIntegerAggregateFieldLocation`.
+   - Add `lowerSysVAggregateFieldImmAddReturn` in [`src/codegen/x86_64/air_patterns_abi_bridge.zig`](src/codegen/x86_64/air_patterns_abi_bridge.zig) to load `usize` field 1 from stack offset and add immediate 4.
+   - Unlocks rows 662–663 (`link.Elf.eh_frame.{Cie,Fde}.calcSize`).
+
+6. **Mixed 32/8-Bit Packed Register Aggregate Returns (Rows 664–665)**:
+   - In [`src/zig_air_types.zig`](src/zig_air_types.zig): register `Target.Cpu.Arch` as `i8`, `FormatRelocTypeCtx` as `"{ i32, i8 }"`, `link.MachO.Platform` as `i64`, `link.MachO.Platform.Format` as `"{ i64, i8 }"`, and corresponding `fmt.Alt(...)` types.
+   - Support `int = 8` and `int = 16` in `lowerRegisterAggregateMake`.
+   - Support 8-bit and 16-bit high leaves when packing into an eightbyte in `emitPackedTwoI32Leaves` and `emitIntegerEightbyte`.
+   - Unlocks row 664 (`link.Elf.relocation.fmtRelocType`) and row 665 (`link.MachO.Platform.fmtTarget`).
+
+7. **Verification**:
+   - `zig test src/tests.zig`: 1,528 / 1,528 pass cleanly.
+   - `zig build test-unit`: 100% pass clean.
+   - `zig build check-docs`: passed clean (19 current documents, 135 internal links).
+   - `git diff --check`: passed clean.
+   - Distribution real-rows gate (`--limit=665`):
+     - `ReleaseFast`: 665 / 665 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSafe`: 665 / 665 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSmall`: 665 / 665 (100.0%) passing rows with `local_fail=0`.
 
 ---
 

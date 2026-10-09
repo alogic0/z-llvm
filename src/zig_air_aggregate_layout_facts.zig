@@ -143,6 +143,26 @@ const facts = [_]Fact{
             .load = true,
         },
     },
+    .{
+        .name = "link.Elf.eh_frame.Cie",
+        .aggregate_text = "{ i64, i64, i32, i32, i32, i32, i64, i1 }",
+        .match = .exact,
+        .evidence = .{
+            .construction = true,
+            .store = true,
+            .load = true,
+        },
+    },
+    .{
+        .name = "link.Elf.eh_frame.Fde",
+        .aggregate_text = "{ i64, i64, i32, i32, i32, i32, i1, i64 }",
+        .match = .exact,
+        .evidence = .{
+            .construction = true,
+            .store = true,
+            .load = true,
+        },
+    },
 };
 
 pub fn lookup(nominal: []const u8) ?Fact {
@@ -180,7 +200,7 @@ fn stripNominalSigil(text: []const u8) []const u8 {
 }
 
 test "aggregate layout facts keep exact pair ownership narrow" {
-    try std.testing.expectEqual(@as(usize, 12), count());
+    try std.testing.expectEqual(@as(usize, 14), count());
     try std.testing.expect(lookup("aggregate_abi.Pair") == null);
     try std.testing.expect(lookup("%runtime_aggregate_pair_main.Pair") == null);
     try std.testing.expect(lookup("other.Pair") == null);
@@ -195,4 +215,6 @@ test "aggregate layout facts keep exact pair ownership narrow" {
     try std.testing.expect(lookup("link.Wasm.FunctionType.Formatter") != null);
     try std.testing.expect(lookup("macho.section_64") != null);
     try std.testing.expect(lookup("Air.ShuffleOneMask") != null);
+    try std.testing.expect(lookup("link.Elf.eh_frame.Cie") != null);
+    try std.testing.expect(lookup("link.Elf.eh_frame.Fde") != null);
 }

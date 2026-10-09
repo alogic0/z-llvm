@@ -358,7 +358,7 @@ fn isSetccEaxCompareIcmp(icmp: ir.IcmpInst) bool {
         return true;
     }
     if ((icmp.predicate == .ule or icmp.predicate == .ult) and bits == 8 and immediate <= 255) return true;
-    return icmp.predicate == .ult and bits == 32;
+    return (icmp.predicate == .ult or icmp.predicate == .ule) and bits == 32;
 }
 
 fn lowerSetccEaxCompare(

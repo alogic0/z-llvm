@@ -735,10 +735,10 @@ fn classifySetccEaxCompare(
             .setcc = if (action.predicate == .ule) .setbe_eax else .setb_eax,
         };
     }
-    if (action.predicate == .ult and bits == 32) return .{
+    if ((action.predicate == .ult or action.predicate == .ule) and bits == 32) return .{
         .bits = bits,
         .definition = .{ .compare_immediate = action.immediate },
-        .setcc = .setb_eax,
+        .setcc = if (action.predicate == .ult) .setb_eax else .setbe_eax,
     };
     return error.ValueUseSetccEaxCompareFormUnsupported;
 }
@@ -807,7 +807,17 @@ pub fn executeSetccEaxCompare(
     const definition: x86_64_machine.Instruction = switch (plan.definition) {
         .instruction => |instruction| instruction,
         .compare_immediate => |immediate| .{
-            .cmp_eax_imm32 = std.math.cast(i32, immediate) orelse
+            .cmp_eax_imm32 = if (std.math.cast(i32, immediate)) |imm|
+                imm
+            else if (if (plan.setcc) |setcc| switch (setcc) {
+                .sete_eax, .setne_eax, .setb_eax, .setbe_eax, .seta_eax => true,
+                else => false,
+            } else false)
+                if (std.math.cast(u32, immediate)) |imm|
+                    @bitCast(imm)
+                else
+                    return error.ValueUseSetccEaxCompareImmediateOutOfRange
+            else
                 return error.ValueUseSetccEaxCompareImmediateOutOfRange,
         },
     };

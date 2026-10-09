@@ -104,14 +104,22 @@ pub fn lowerTypedSwitchValueBlock(
 
     var arms: std.ArrayList(SwitchArm) = .empty;
     defer {
-        for (arms.items) |*arm| arm.values.deinit(self.allocator);
+        for (arms.items) |*arm| arm.items.deinit(self.allocator);
         arms.deinit(self.allocator);
     }
     try collectSwitchCaseArms(self.allocator, &arms, self.air_function.air_text, switch_instruction.index);
     if (arms.items.len == 0) return air_model.LowerError.UnsupportedAir;
     for (arms.items) |arm| {
-        for (arm.values.items) |case_value| {
-            if (!case_value.ty.ir_type.eql(cond.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+        for (arm.items.items) |item| {
+            switch (item) {
+                .exact => |case_value| {
+                    if (!case_value.ty.ir_type.eql(cond.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+                },
+                .range => |r| {
+                    if (!r.low.ty.ir_type.eql(cond.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+                    if (!r.high.ty.ir_type.eql(cond.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+                },
+            }
         }
     }
     const has_else_arm = switchHasElseArm(self.air_function.air_text, switch_instruction.index);
@@ -122,19 +130,10 @@ pub fn lowerTypedSwitchValueBlock(
     const expected_branches = arms.items.len + @intFromBool(has_else_arm);
     if (branch_instructions.items.len != expected_branches) return air_model.LowerError.UnsupportedAir;
 
-    if (arms.items.len == 1 and arms.items[0].values.items.len == 1 and has_else_arm and branch_instructions.items.len == 2) {
+    if (arms.items.len == 1 and arms.items[0].items.items.len == 1 and has_else_arm and branch_instructions.items.len == 2) {
         const case_branch = try self.lowerTypedSwitchBranchValue(instruction.index, branch_instructions.items[0], merge_type);
         const else_branch = try self.lowerTypedSwitchBranchValue(instruction.index, branch_instructions.items[1], merge_type);
-        const cmp_name = try self.resultName(switch_instruction.index);
-        try self.block.instructions.append(self.allocator, .{
-            .result = cmp_name,
-            .kind = .{ .icmp = .{
-                .predicate = .eq,
-                .operand_ty = cond.ty.ir_type,
-                .lhs = cond.value,
-                .rhs = arms.items[0].values.items[0].value,
-            } },
-        });
+        const cmp_name = try lowerSwitchArmCondition(self, cond, arms.items[0].items.items[0], switch_instruction.index, 0);
         const result_name = try self.resultName(instruction.index);
         try self.block.instructions.append(self.allocator, .{
             .result = result_name,
@@ -144,6 +143,42 @@ pub fn lowerTypedSwitchValueBlock(
                 .ty = merge_type.ir_type,
                 .true_value = case_branch.value.value,
                 .false_value = else_branch.value.value,
+            } },
+        });
+        self.values[instruction.index] = .{
+            .ty = merge_type,
+            .value = .{ .named = result_name },
+        };
+        return true;
+    }
+
+    if (arms.items.len == 2 and arms.items[0].items.items.len == 1 and arms.items[1].items.items.len == 1 and has_else_arm and branch_instructions.items.len == 3) {
+        const case0_branch = try self.lowerTypedSwitchBranchValue(instruction.index, branch_instructions.items[0], merge_type);
+        const case1_branch = try self.lowerTypedSwitchBranchValue(instruction.index, branch_instructions.items[1], merge_type);
+        const else_branch = try self.lowerTypedSwitchBranchValue(instruction.index, branch_instructions.items[2], merge_type);
+        const cmp0_name = try lowerSwitchArmCondition(self, cond, arms.items[0].items.items[0], switch_instruction.index, 0);
+        const cmp1_name = try lowerSwitchArmCondition(self, cond, arms.items[1].items.items[0], switch_instruction.index, 1);
+
+        const sel1_name = try ownPrint(self.module, "switch_{}_sel1", .{instruction.index});
+        try self.block.instructions.append(self.allocator, .{
+            .result = sel1_name,
+            .kind = .{ .select = .{
+                .cond_ty = .{ .int = 1 },
+                .cond = .{ .named = cmp1_name },
+                .ty = merge_type.ir_type,
+                .true_value = case1_branch.value.value,
+                .false_value = else_branch.value.value,
+            } },
+        });
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .select = .{
+                .cond_ty = .{ .int = 1 },
+                .cond = .{ .named = cmp0_name },
+                .ty = merge_type.ir_type,
+                .true_value = case0_branch.value.value,
+                .false_value = .{ .named = sel1_name },
             } },
         });
         self.values[instruction.index] = .{
@@ -173,12 +208,17 @@ pub fn lowerTypedSwitchValueBlock(
     };
     errdefer switch_term.cases.deinit(self.allocator);
     for (arms.items, 0..) |arm, arm_index| {
-        for (arm.values.items) |case_value| {
-            try switch_term.cases.append(self.allocator, .{
-                .value_ty = cond.ty.ir_type,
-                .value = case_value.value,
-                .target = labels.items[arm_index],
-            });
+        for (arm.items.items) |item| {
+            switch (item) {
+                .exact => |case_value| {
+                    try switch_term.cases.append(self.allocator, .{
+                        .value_ty = cond.ty.ir_type,
+                        .value = case_value.value,
+                        .target = labels.items[arm_index],
+                    });
+                },
+                .range => return air_model.LowerError.UnsupportedAir,
+            }
         }
     }
 
@@ -978,8 +1018,16 @@ fn switchInputIndexFromAirText(function_air_text: []const u8, switch_index: u32)
     return air_text.instructionRef(std.mem.trim(u8, line[open + 1 .. close], " !"));
 }
 
+const SwitchArmItem = union(enum) {
+    exact: air_model.TypedValue,
+    range: struct {
+        low: air_model.TypedValue,
+        high: air_model.TypedValue,
+    },
+};
+
 const SwitchArm = struct {
-    values: std.ArrayList(air_model.TypedValue),
+    items: std.ArrayList(SwitchArmItem),
 };
 
 fn collectSwitchCaseArms(
@@ -993,20 +1041,90 @@ fn collectSwitchCaseArms(
     while (std.mem.indexOfPos(u8, text, offset, "[")) |start| {
         const close = std.mem.indexOfPos(u8, text, start + 1, "] =>") orelse return air_model.LowerError.UnsupportedAir;
         const arm_text = text[start + 1 .. close];
-        var arm: SwitchArm = .{ .values = .empty };
-        errdefer arm.values.deinit(allocator);
+        var arm: SwitchArm = .{ .items = .empty };
+        errdefer arm.items.deinit(allocator);
 
         var fields = air_text.splitTopLevel(arm_text, ',');
         while (fields.next()) |field| {
             const trimmed = std.mem.trim(u8, field, " \t\r\n");
             if (trimmed.len == 0) continue;
-            const value = air_values_parse_constant_or_error(function_air_text, trimmed, 0, trimmed.len) orelse
-                return air_model.LowerError.UnsupportedAir;
-            try arm.values.append(allocator, value);
+            if (std.mem.indexOf(u8, trimmed, "...")) |dots| {
+                const low_text = std.mem.trim(u8, trimmed[0..dots], " \t\r\n");
+                const high_text = std.mem.trim(u8, trimmed[dots + 3 ..], " \t\r\n");
+                const low = air_values_parse_constant_or_error(function_air_text, low_text, 0, low_text.len) orelse
+                    return air_model.LowerError.UnsupportedAir;
+                const high = air_values_parse_constant_or_error(function_air_text, high_text, 0, high_text.len) orelse
+                    return air_model.LowerError.UnsupportedAir;
+                try arm.items.append(allocator, .{ .range = .{ .low = low, .high = high } });
+            } else {
+                const value = air_values_parse_constant_or_error(function_air_text, trimmed, 0, trimmed.len) orelse
+                    return air_model.LowerError.UnsupportedAir;
+                try arm.items.append(allocator, .{ .exact = value });
+            }
         }
-        if (arm.values.items.len == 0) return air_model.LowerError.UnsupportedAir;
+        if (arm.items.items.len == 0) return air_model.LowerError.UnsupportedAir;
         try arms.append(allocator, arm);
         offset = close + "] =>".len;
+    }
+}
+
+fn lowerSwitchArmCondition(
+    self: anytype,
+    cond: air_model.TypedValue,
+    item: SwitchArmItem,
+    switch_index: u32,
+    arm_index: usize,
+) ![]const u8 {
+    switch (item) {
+        .exact => |exact_val| {
+            const cmp_name = try ownPrint(self.module, "switch_{}_arm{}_cmp", .{ switch_index, arm_index });
+            try self.block.instructions.append(self.allocator, .{
+                .result = cmp_name,
+                .kind = .{ .icmp = .{
+                    .predicate = .eq,
+                    .operand_ty = cond.ty.ir_type,
+                    .lhs = cond.value,
+                    .rhs = exact_val.value,
+                } },
+            });
+            return cmp_name;
+        },
+        .range => |r| {
+            const low_int = switch (r.low.value) {
+                .int => |val| val,
+                else => return air_model.LowerError.UnsupportedAir,
+            };
+            const high_int = switch (r.high.value) {
+                .int => |val| val,
+                else => return air_model.LowerError.UnsupportedAir,
+            };
+            const diff = high_int - low_int;
+            var sub_val = cond.value;
+            if (low_int != 0) {
+                const sub_name = try ownPrint(self.module, "switch_{}_arm{}_sub", .{ switch_index, arm_index });
+                try self.block.instructions.append(self.allocator, .{
+                    .result = sub_name,
+                    .kind = .{ .binary = .{
+                        .op = .sub,
+                        .ty = cond.ty.ir_type,
+                        .lhs = cond.value,
+                        .rhs = .{ .int = low_int },
+                    } },
+                });
+                sub_val = .{ .named = sub_name };
+            }
+            const cmp_name = try ownPrint(self.module, "switch_{}_arm{}_cmp", .{ switch_index, arm_index });
+            try self.block.instructions.append(self.allocator, .{
+                .result = cmp_name,
+                .kind = .{ .icmp = .{
+                    .predicate = .ule,
+                    .operand_ty = cond.ty.ir_type,
+                    .lhs = sub_val,
+                    .rhs = .{ .int = diff },
+                } },
+            });
+            return cmp_name;
+        },
     }
 }
 

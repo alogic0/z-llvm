@@ -276,6 +276,31 @@ const facts = [_]Fact{
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],
     },
+    .{
+        .name = "compress.zstd.Decompress.Frame.Magic",
+        .backing_type = .{ .int = 32 },
+        .enumerators = compress_zstd_magic_enumerators[0..],
+    },
+    .{
+        .name = "compress.zstd.Decompress.Frame.Kind",
+        .backing_type = .{ .int = 8 },
+        .enumerators = compress_zstd_kind_enumerators[0..],
+    },
+    .{
+        .name = "?compress.zstd.Decompress.Frame.Kind",
+        .backing_type = .{ .int = 8 },
+        .enumerators = compress_zstd_kind_enumerators[0..],
+    },
+};
+
+const compress_zstd_magic_enumerators = [_]Enumerator{
+    .{ .name = "zstandard", .value = 4247762216 },
+};
+
+const compress_zstd_kind_enumerators = [_]Enumerator{
+    .{ .name = "zstandard", .value = 0 },
+    .{ .name = "skippable", .value = 1 },
+    .{ .name = "null", .value = 2 },
 };
 
 const select_value_index_enumerators = [_]Enumerator{
@@ -352,8 +377,8 @@ pub fn lookup(nominal: []const u8) ?Fact {
 pub fn enumeratorValue(nominal: []const u8, literal: []const u8) ?i128 {
     const fact = lookup(nominal) orelse return null;
     const trimmed = std.mem.trim(u8, literal, " ");
-    if (trimmed.len < 2 or trimmed[0] != '.') return null;
-    const name = trimmed[1..];
+    if (trimmed.len == 0) return null;
+    const name = if (trimmed.len >= 2 and trimmed[0] == '.') trimmed[1..] else trimmed;
     for (fact.enumerators) |enumerator| {
         if (std.mem.eql(u8, name, enumerator.name)) return enumerator.value;
     }

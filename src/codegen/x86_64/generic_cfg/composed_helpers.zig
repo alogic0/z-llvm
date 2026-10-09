@@ -182,7 +182,7 @@ pub fn isComposedReturnType(ty: ir.Type) bool {
     if (ty == .ptr or ty == .void or ty == .half or ty == .float or ty == .double) return true;
     if (sysv_abi.sseAggregateReturnKind(ty) != null) return true;
     const bits = intBits(ty) orelse return false;
-    return bits == 16 or bits == 32 or bits == 64 or bits == 128;
+    return bits == 8 or bits == 16 or bits == 32 or bits == 64 or bits == 128;
 }
 
 pub fn isComposedCfgReturnType(ty: ir.Type) bool {
