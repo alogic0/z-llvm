@@ -9,6 +9,7 @@ const ArgReg = shared.ArgReg;
 
 const appendPanicCall = shared.appendPanicCall;
 const i32Value = shared.i32Value;
+const i64Value = shared.i64Value;
 const isCalleeName = shared.isCalleeName;
 const isInt = shared.isInt;
 const isNamed = shared.isNamed;
@@ -263,7 +264,9 @@ pub fn lowerMulConstReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    const is_i32 = ret.ty.eql(.{ .int = 32 });
+    const is_i64 = ret.ty.eql(.{ .int = 64 });
+    if (!is_i32 and !is_i64) return false;
     if (block.instructions.items.len != 1) return false;
 
     const mul_inst = block.instructions.items[0];
@@ -280,30 +283,55 @@ pub fn lowerMulConstReturn(
         .binary => |binary| binary,
         else => return false,
     };
-    if (mul.op != .mul or !mul.ty.eql(.{ .int = 32 })) return false;
+    if (mul.op != .mul or !mul.ty.eql(ret.ty)) return false;
 
-    const SelectedMul = struct {
-        reg: ArgReg,
-        multiplier: i32,
-    };
-    const selected: SelectedMul = switch (mul.lhs) {
-        .int => |value| .{
-            .reg = try paramValueReg(function, mul.rhs, .{ .int = 32 }),
-            .multiplier = try i32Value(value),
-        },
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => switch (mul.rhs) {
+    if (is_i32) {
+        const SelectedMul = struct {
+            reg: ArgReg,
+            multiplier: i32,
+        };
+        const selected: SelectedMul = switch (mul.lhs) {
             .int => |value| .{
-                .reg = try paramValueReg(function, mul.lhs, .{ .int = 32 }),
+                .reg = try paramValueReg(function, mul.rhs, .{ .int = 32 }),
                 .multiplier = try i32Value(value),
             },
-            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
-        },
-    };
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => switch (mul.rhs) {
+                .int => |value| .{
+                    .reg = try paramValueReg(function, mul.lhs, .{ .int = 32 }),
+                    .multiplier = try i32Value(value),
+                },
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+            },
+        };
 
-    try machine.instructions.append(allocator, .{ .mov_arg_eax = selected.reg });
-    try machine.instructions.append(allocator, .{ .imul_eax_imm32 = selected.multiplier });
-    try machine.instructions.append(allocator, .ret);
-    return true;
+        try machine.instructions.append(allocator, .{ .mov_arg_eax = selected.reg });
+        try machine.instructions.append(allocator, .{ .imul_eax_imm32 = selected.multiplier });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    } else {
+        const SelectedMul64 = struct {
+            reg: ArgReg,
+            multiplier: i64,
+        };
+        const selected: SelectedMul64 = switch (mul.lhs) {
+            .int => |value| .{
+                .reg = try paramValueReg(function, mul.rhs, .{ .int = 64 }),
+                .multiplier = try i64Value(value),
+            },
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => switch (mul.rhs) {
+                .int => |value| .{
+                    .reg = try paramValueReg(function, mul.lhs, .{ .int = 64 }),
+                    .multiplier = try i64Value(value),
+                },
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+            },
+        };
+
+        try machine.instructions.append(allocator, .{ .mov_imm_rax = selected.multiplier });
+        try machine.instructions.append(allocator, .{ .imul_rax_arg64 = selected.reg });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
 }
 
 pub fn validateCondbr(block: ir.BasicBlock, cond_name: []const u8, true_block: []const u8, false_block: []const u8) !void {

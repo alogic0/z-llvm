@@ -157,6 +157,30 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "link.MachO.Platform.Format") or std.mem.eql(u8, trimmed, "MachO.Platform.Format")) {
         return .{ .ir_type = .{ .aggregate = "{ i64, i8 }" } };
     }
+    if (std.mem.eql(u8, trimmed, "link.MachO.Relocation") or std.mem.eql(u8, trimmed, "MachO.Relocation")) {
+        return .{ .ir_type = .ptr };
+    }
+    if (std.mem.eql(u8, trimmed, "link.MachO.Relocation.Format") or std.mem.eql(u8, trimmed, "MachO.Relocation.Format")) {
+        return .{ .ir_type = .{ .aggregate = "{ ptr, i8 }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "link.MachO.Thunk") or std.mem.eql(u8, trimmed, "MachO.Thunk")) {
+        return .{ .ir_type = .ptr };
+    }
+    if (std.mem.eql(u8, trimmed, "link.MachO.Thunk.Format") or std.mem.eql(u8, trimmed, "MachO.Thunk.Format")) {
+        return .{ .ir_type = .{ .aggregate = "{ ptr, ptr }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "link.MachO.UnwindInfo") or std.mem.eql(u8, trimmed, "MachO.UnwindInfo")) {
+        return .{ .ir_type = .ptr };
+    }
+    if (std.mem.eql(u8, trimmed, "link.MachO.UnwindInfo.Page") or std.mem.eql(u8, trimmed, "MachO.UnwindInfo.Page")) {
+        return .{ .ir_type = .ptr };
+    }
+    if (std.mem.eql(u8, trimmed, "link.MachO.UnwindInfo.Page.Format") or std.mem.eql(u8, trimmed, "MachO.UnwindInfo.Page.Format")) {
+        return .{ .ir_type = .{ .aggregate = "{ ptr, ptr }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "link.Wasm.DataPayload.Off") or std.mem.eql(u8, trimmed, "Wasm.DataPayload.Off")) {
+        return .{ .ir_type = .{ .int = 32 } };
+    }
     if (std.mem.startsWith(u8, trimmed, "fmt.Alt(") or std.mem.startsWith(u8, trimmed, "std.fmt.Alt(")) {
         if (std.mem.indexOf(u8, trimmed, "FormatAirData") != null or
             std.mem.indexOf(u8, trimmed, "FormatWipMirData") != null or
@@ -171,6 +195,21 @@ pub fn parseZigType(text: []const u8) ?ZigType {
             std.mem.indexOf(u8, trimmed, "MachO.Platform.Format") != null)
         {
             return .{ .ir_type = .{ .aggregate = "{ { i64, i8 } }" } };
+        }
+        if (std.mem.indexOf(u8, trimmed, "link.MachO.Relocation.Format") != null or
+            std.mem.indexOf(u8, trimmed, "MachO.Relocation.Format") != null)
+        {
+            return .{ .ir_type = .{ .aggregate = "{ { ptr, i8 } }" } };
+        }
+        if (std.mem.indexOf(u8, trimmed, "link.MachO.Thunk.Format") != null or
+            std.mem.indexOf(u8, trimmed, "MachO.Thunk.Format") != null)
+        {
+            return .{ .ir_type = .{ .aggregate = "{ { ptr, ptr } }" } };
+        }
+        if (std.mem.indexOf(u8, trimmed, "link.MachO.UnwindInfo.Page.Format") != null or
+            std.mem.indexOf(u8, trimmed, "MachO.UnwindInfo.Page.Format") != null)
+        {
+            return .{ .ir_type = .{ .aggregate = "{ { ptr, ptr } }" } };
         }
         if (std.mem.indexOf(u8, trimmed, "link.Elf.Thunk.Format") != null or
             std.mem.indexOf(u8, trimmed, "Elf.Thunk.Format") != null)

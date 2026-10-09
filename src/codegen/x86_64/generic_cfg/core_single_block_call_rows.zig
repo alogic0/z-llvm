@@ -692,6 +692,15 @@ pub fn lowerGenericCfgSingleBlockVoid(allocator: std.mem.Allocator, machine: *Ma
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (@import("legacy_envelopes.zig").matchesPointerOffsetBitwiseRmwEnvelope(function)) |plan| {
+        try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = plan.offset } });
+        try machine.instructions.append(allocator, .{ .mov_imm_rcx = plan.mask });
+        try machine.instructions.append(allocator, .{ .binary_arg_rax = .{ .op = plan.op, .reg = .rcx } });
+        try machine.instructions.append(allocator, .{ .store_rax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = plan.offset } });
+        try machine.instructions.append(allocator, .ret);
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (block.instructions.items.len == 1) {
         const instruction = block.instructions.items[0];
         if (instruction.removed) return false;

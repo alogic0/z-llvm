@@ -582,6 +582,7 @@ pub fn firstUnsupported(
             if (typed_view != null and typed_view.?.errorUnionVoidReturnContinueBlockByIndex(instruction.index)) continue;
             if (typed_view != null and typed_view.?.genericCfgBlock(instruction.index)) continue;
             if (typed_view != null and typed_view.?.containsGenericCfgBlockInstruction(instruction.index)) continue;
+            if (typed_view != null and typed_view.?.isTrivialVoidBlock(instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }
         if (air_capabilities.isCondBrOpcode(instruction.opcode) or
@@ -592,6 +593,7 @@ pub fn firstUnsupported(
             if (typed_view != null and typed_view.?.containsVoidGuardBlockInstruction(instruction.index)) continue;
             if (typed_view != null and typed_view.?.containsErrorUnionVoidReturnContinueBlockInstruction(instruction.index)) continue;
             if (typed_view != null and typed_view.?.containsGenericCfgBlockInstruction(instruction.index)) continue;
+            if (typed_view != null and typed_view.?.containsTrivialVoidBlockInstruction(instruction.index)) continue;
             if (typed_view != null and typed_view.?.terminalErrorUnionCondBr(instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }

@@ -1753,6 +1753,10 @@ pub fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Mac
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerMulConstReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgI64ParamReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;

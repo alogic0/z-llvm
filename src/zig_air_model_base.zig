@@ -264,17 +264,43 @@ pub const TypedFunctionView = struct {
             const typed_capability = self.capability(typed_instruction);
             if (typed_capability.status == .ignored_metadata) continue;
             if (air_capabilities.isBrOpcode(typed_instruction.opcode)) {
-                if (saw_branch or typed_instruction.operands.len != 2) return false;
-                const target = blockTarget(typed_instruction.operands[0]) orelse return false;
-                if (target != target_block) return false;
-                if (!(typedVoidConstOperand(typed_instruction, 1) orelse false)) return false;
-                saw_branch = true;
-                continue;
+                if (saw_branch) return false;
+                if (typed_instruction.operands.len == 1) {
+                    const target = blockTarget(typed_instruction.operands[0]) orelse return false;
+                    if (target != target_block) return false;
+                    saw_branch = true;
+                    continue;
+                } else if (typed_instruction.operands.len == 2) {
+                    const target = blockTarget(typed_instruction.operands[0]) orelse return false;
+                    if (target != target_block) return false;
+                    if (!(typedVoidConstOperand(typed_instruction, 1) orelse false)) return false;
+                    saw_branch = true;
+                    continue;
+                } else {
+                    return false;
+                }
             }
             if (saw_branch) return false;
             if (!discardedVoidBranchValueInstruction(typed_instruction)) return false;
         }
         return saw_branch;
+    }
+
+    pub fn isTrivialVoidBlock(self: TypedFunctionView, block_index: u32) bool {
+        const block_instruction = self.instruction(block_index) orelse return false;
+        if (!air_capabilities.isBlockOpcode(block_instruction.opcode)) return false;
+        const block_body = self.body(.block, block_index) orelse return false;
+        return self.voidBranchBody(block_body, block_index);
+    }
+
+    pub fn containsTrivialVoidBlockInstruction(self: TypedFunctionView, instruction_index: u32) bool {
+        for (self.structured_air.bodies) |structured_body| {
+            if (structured_body.kind != .block) continue;
+            const owner = structured_body.owner orelse continue;
+            if (!self.isTrivialVoidBlock(owner)) continue;
+            if (self.containsInstruction(structured_body, instruction_index)) return true;
+        }
+        return false;
     }
 
     fn discardedVoidBranchValueInstruction(candidate: air_export.TypedInstruction) bool {
@@ -1567,7 +1593,8 @@ pub fn typedVoidConstOperand(instruction: air_export.TypedInstruction, operand_i
     const operand = instruction.operands[operand_index];
     if (!isTypedConstOperand(operand)) return false;
     if (!std.mem.eql(u8, operand.type_text, "void")) return false;
-    const text = operandTextDetail(instruction, operand_index) orelse return null;
+    if (std.mem.eql(u8, operand.value, "void_value") or std.mem.eql(u8, operand.value, "@.void_value")) return true;
+    const text = operandTextDetail(instruction, operand_index) orelse return true;
     return std.mem.eql(u8, text, "@.void_value");
 }
 

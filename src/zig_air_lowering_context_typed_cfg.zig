@@ -33,6 +33,19 @@ pub fn lowerTypedCfgInstruction(self: anytype, instruction: air_export.TypedInst
 pub fn lowerTypedBlock(self: anytype, instruction: air_export.TypedInstruction) air_model.LowerError!void {
     const view = self.typed_view orelse return air_model.LowerError.UnsupportedAir;
     const block_body = view.body(.block, instruction.index) orelse return air_model.LowerError.UnsupportedAir;
+    if (view.isTrivialVoidBlock(instruction.index)) {
+        for (block_body.instructions) |child_index| {
+            const child = view.instruction(child_index) orelse return air_model.LowerError.UnsupportedAir;
+            if (view.capability(child).status == .ignored_metadata) continue;
+            if (air_capabilities.isBrOpcode(child.opcode)) continue;
+            try self.lowerTypedInstruction(child);
+        }
+        self.values[instruction.index] = .{
+            .ty = .{ .ir_type = .void },
+            .value = .{ .named = "" },
+        };
+        return;
+    }
     if (try self.lowerTypedSwitchValueBlock(instruction, block_body)) return;
     const cond_instruction = try self.lowerTypedBlockBodyUntilCond(block_body);
     if (!air_capabilities.isCondBrOpcode(cond_instruction.opcode) or cond_instruction.operands.len != 1) {

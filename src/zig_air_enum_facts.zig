@@ -172,6 +172,16 @@ const facts = [_]Fact{
         .enumerators = no_enumerators[0..],
     },
     .{
+        .name = "link.Wasm.DataPayload.Off",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "Wasm.DataPayload.Off",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
         .name = "zig.llvm.Builder.Linkage",
         .backing_type = .{ .int = 8 },
         .enumerators = zig_llvm_builder_linkage_enumerators[0..],

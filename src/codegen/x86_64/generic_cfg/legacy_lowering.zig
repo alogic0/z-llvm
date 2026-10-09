@@ -74,5 +74,13 @@ pub fn tryLower(
         try machine.instructions.append(allocator, .umodei5_after_memcpy);
         return true;
     }
+    if (legacy_envelopes.matchesPointerOffsetBitwiseRmwEnvelope(function)) |plan| {
+        try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_rax = .{ .reg = .rdi, .offset = plan.offset } });
+        try machine.instructions.append(allocator, .{ .mov_imm_rcx = plan.mask });
+        try machine.instructions.append(allocator, .{ .binary_arg_rax = .{ .op = plan.op, .reg = .rcx } });
+        try machine.instructions.append(allocator, .{ .store_rax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = plan.offset } });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
     return false;
 }

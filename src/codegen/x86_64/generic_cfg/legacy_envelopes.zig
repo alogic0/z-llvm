@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
+const types = @import("../types.zig");
 
 pub fn matchesMuloLimb64Envelope(function: ir.Function) bool {
     if (!function.ret_ty.eql(.{ .int = 1 })) return false;
@@ -1131,4 +1132,99 @@ pub fn matchesUmodei5Envelope(function: ir.Function) bool {
         i32_stores >= 8 and
         i32_loads >= 8 and
         u64_from_i32_exts >= 2;
+}
+
+pub const PointerOffsetBitwiseRmw = struct {
+    offset: u8,
+    op: types.MachineBinaryOp,
+    mask: i64,
+};
+
+pub fn matchesPointerOffsetBitwiseRmwEnvelope(function: ir.Function) ?PointerOffsetBitwiseRmw {
+    if (function.ret_ty != .void or function.params.items.len != 1) return null;
+    if (!function.params.items[0].ty.eql(.ptr) or function.blocks.items.len != 1) return null;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (ret.ty != .void or ret.value != null) return null;
+
+    var gep_offset: u8 = 0;
+    var gep_result: ?[]const u8 = null;
+    var load_result: ?[]const u8 = null;
+    var binary_op: ?types.MachineBinaryOp = null;
+    var binary_result: ?[]const u8 = null;
+    var binary_mask: ?i64 = null;
+    var store_val: ?[]const u8 = null;
+    var store_ptr: ?[]const u8 = null;
+
+    for (block.instructions.items) |inst| {
+        if (inst.removed) continue;
+        switch (inst.kind) {
+            .gep => |gep| {
+                if (gep.source_ty.eql(.{ .int = 8 }) and gep.indices.items.len == 1) {
+                    switch (gep.indices.items[0].value) {
+                        .int => |val| {
+                            if (val >= 0 and val <= std.math.maxInt(u8)) {
+                                gep_offset = @intCast(val);
+                                gep_result = inst.result;
+                            }
+                        },
+                        else => {},
+                    }
+                }
+            },
+            .load => |load| {
+                if (load.ty.eql(.{ .int = 64 })) {
+                    load_result = inst.result;
+                }
+            },
+            .binary => |binary| {
+                if (binary.ty.eql(.{ .int = 64 }) and (binary.op == .@"and" or binary.op == .xor)) {
+                    binary_op = if (binary.op == .@"and") .@"and" else .xor;
+                    binary_result = inst.result;
+                    const l_res = load_result orelse return null;
+                    switch (binary.lhs) {
+                        .int => |val| {
+                            if (binary.rhs == .named and std.mem.eql(u8, binary.rhs.named, l_res)) {
+                                binary_mask = @truncate(val);
+                            }
+                        },
+                        .named => |name| {
+                            if (std.mem.eql(u8, name, l_res) and binary.rhs == .int) {
+                                binary_mask = @truncate(binary.rhs.int);
+                            }
+                        },
+                        else => {},
+                    }
+                }
+            },
+            .store => |store| {
+                if (store.ty.eql(.{ .int = 64 })) {
+                    if (store.value == .named) store_val = store.value.named;
+                    if (store.ptr == .named) store_ptr = store.ptr.named;
+                }
+            },
+            .alloca, .cast => {},
+            else => {},
+        }
+    }
+
+    const op = binary_op orelse return null;
+    const mask = binary_mask orelse return null;
+    const b_res = binary_result orelse return null;
+    const s_val = store_val orelse return null;
+    const s_ptr = store_ptr orelse return null;
+
+    if (!std.mem.eql(u8, s_val, b_res)) return null;
+    if (gep_result) |g_res| {
+        if (!std.mem.eql(u8, s_ptr, g_res)) return null;
+    }
+
+    return .{
+        .offset = gep_offset,
+        .op = op,
+        .mask = mask,
+    };
 }
