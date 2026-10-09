@@ -212,6 +212,24 @@ fn stripNominalSigil(text: []const u8) []const u8 {
 pub fn nominalFieldByteOffset(nominal_name: []const u8, field_index: usize) ?u64 {
     const trimmed = std.mem.trim(u8, nominal_name, " ");
     const name = if (std.mem.startsWith(u8, trimmed, "const ")) std.mem.trim(u8, trimmed[6..], " ") else trimmed;
+    if (std.mem.eql(u8, name, "macho.section_64") or std.mem.endsWith(u8, name, ".section_64") or std.mem.eql(u8, name, "section_64")) {
+        return switch (field_index) {
+            8 => 64, // flags: u32
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "math.big.int.Managed") or std.mem.endsWith(u8, name, ".math.big.int.Managed") or std.mem.eql(u8, name, "Managed") or std.mem.endsWith(u8, name, ".Managed")) {
+        return switch (field_index) {
+            2 => 32, // metadata: usize
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "zig.Ast.Render.AutoIndentingStream") or std.mem.endsWith(u8, name, ".AutoIndentingStream") or std.mem.eql(u8, name, "AutoIndentingStream")) {
+        return switch (field_index) {
+            7 => 104, // indent: usize
+            else => null,
+        };
+    }
     if (std.mem.eql(u8, name, "Compilation") or std.mem.endsWith(u8, name, ".Compilation")) {
         return switch (field_index) {
             7 => 88, // root_mod: *Module

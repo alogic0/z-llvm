@@ -528,6 +528,53 @@ fn scalar_immediate_multi_alias_preservation(
     return null;
 }
 
+fn isScalarImmediateFrameless64(selector: *const ComposedBlockSelector, binary: ir.BinaryInst) bool {
+    if (selector.stack_frame_bytes != 0) return false;
+    if (binary.lhs != .named or binary.rhs != .int) return false;
+    const bits = intBits(binary.ty) orelse return false;
+    if (bits != 64) return false;
+    const literal = binary.rhs.int;
+    if (binary.op == .@"and" and literal == std.math.maxInt(u32)) return false;
+    if ((binary.op == .add or binary.op == .sub) and literal >= std.math.minInt(i32) and literal <= std.math.maxInt(i32)) return false;
+    return switch (binary.op) {
+        .@"and", .@"or", .add, .sub, .xor => true,
+        else => false,
+    };
+}
+
+fn scalar_immediate_frameless64(
+    selector: *ComposedBlockSelector,
+    result_name: []const u8,
+    binary: ir.BinaryInst,
+    bits: u16,
+    literal: i128,
+) !?Diagnostic {
+    while (try selector_state.liveAccumulatorNameAfterCurrent(selector)) |live_name| {
+        if (try selector_state.preserveLiveAccumulatorValue(selector, live_name)) |diagnostic| return diagnostic;
+    }
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, try accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
+    try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
+
+    try selector_state.clobberArgReg(selector, .rcx);
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(literal) });
+    try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{
+        .op = switch (binary.op) {
+            .@"and" => .@"and",
+            .@"or" => .@"or",
+            .xor => .xor,
+            .add => .add,
+            .sub => .sub,
+            else => unreachable,
+        },
+        .reg = .rcx,
+    } });
+
+    try finishArithmeticResult(&transaction, result_name, bits);
+    return null;
+}
+
 pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
     const literal = switch (binary.rhs) {
         .int => |int| int,
@@ -538,6 +585,8 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
         return scalar_immediate_live_shared_source_preservation(selector, result_name, binary, bits, literal);
     if (isScalarImmediateMultiAliasPreservation(binary))
         return scalar_immediate_multi_alias_preservation(selector, result_name, binary, bits, literal);
+    if (isScalarImmediateFrameless64(selector, binary))
+        return scalar_immediate_frameless64(selector, result_name, binary, bits, literal);
     if (ValueUseTransaction.isImmediateRhsScalar(binary))
         return lowerImmediateRhsScalar(selector, result_name, binary, bits, literal);
 

@@ -268,7 +268,9 @@ pub fn lowerTypedPtrCastOpaque(self: anytype, instruction: air_export.TypedInstr
     if (instruction.index < self.synthetic_pointer_payloads.len and source_index < self.synthetic_pointer_payloads.len) {
         self.synthetic_pointer_payloads[instruction.index] = self.synthetic_pointer_payloads[source_index];
     }
-    const source_value = if (source_index < self.synthetic_pointer_payloads.len and self.synthetic_pointer_payloads[source_index] != null)
+    const source_value = if (source_index < self.synthetic_pointer_payloads.len and
+        self.synthetic_pointer_payloads[source_index] != null and
+        self.synthetic_pointer_payloads[source_index].?.ty.ir_type == .ptr)
         self.synthetic_pointer_payloads[source_index].?.value
     else
         source.value;

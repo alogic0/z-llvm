@@ -317,6 +317,16 @@ const facts = [_]Fact{
         .enumerators = no_enumerators[0..],
     },
     .{
+        .name = "zig.llvm.Builder.Metadata.String.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.Metadata.String.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
         .name = "InternPool.OptionalNullTerminatedString",
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],

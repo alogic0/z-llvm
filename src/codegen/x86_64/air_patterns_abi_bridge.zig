@@ -649,17 +649,38 @@ fn lowerSysVAggregateFieldReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if ((!ret.ty.eql(.{ .int = 32 }) and !ret.ty.eql(.{ .int = 64 }) and !ret.ty.eql(.float) and !ret.ty.eql(.double)) or
-        (block.instructions.items.len != 3 and block.instructions.items.len != 4)) return false;
+    const is_supported_ret = ret.ty.eql(.{ .int = 32 }) or ret.ty.eql(.{ .int = 64 }) or
+        ret.ty.eql(.float) or ret.ty.eql(.double) or
+        (switch (ret.ty) {
+            .int => |bits| bits > 0 and bits <= 64,
+            else => false,
+        });
+    if (!is_supported_ret) return false;
+
+    const has_trunc = blk: {
+        if (block.instructions.items.len < 1) break :blk false;
+        const last = block.instructions.items[block.instructions.items.len - 1];
+        if (last.removed or last.result == null) break :blk false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, last.result.?)) break :blk false;
+        const cast = switch (last.kind) {
+            .cast => |c| c,
+            else => break :blk false,
+        };
+        break :blk cast.op == .trunc and cast.to_ty.eql(ret.ty);
+    };
+
+    const expected_base_len: usize = if (has_trunc) 4 else 3;
+    if (block.instructions.items.len != expected_base_len and block.instructions.items.len != expected_base_len + 1) return false;
+    const has_gep = block.instructions.items.len == expected_base_len + 1;
+
     const alloca_inst = block.instructions.items[0];
     const store_inst = block.instructions.items[1];
-    const maybe_gep_inst: ?ir.Instruction = if (block.instructions.items.len == 4) block.instructions.items[2] else null;
-    const load_inst = block.instructions.items[block.instructions.items.len - 1];
+    const maybe_gep_inst: ?ir.Instruction = if (has_gep) block.instructions.items[2] else null;
+    const load_inst = if (has_trunc) block.instructions.items[if (has_gep) 3 else 2] else block.instructions.items[block.instructions.items.len - 1];
     if (alloca_inst.removed or store_inst.removed or load_inst.removed) return false;
     if (maybe_gep_inst) |gep_inst| if (gep_inst.removed) return false;
     const alloca_name = alloca_inst.result orelse return false;
     const load_name = load_inst.result orelse return false;
-    if (!isNamed(ret.value orelse return error.InvalidRet, load_name)) return false;
 
     const alloca = switch (alloca_inst.kind) {
         .alloca => |alloca| alloca,
@@ -682,7 +703,16 @@ fn lowerSysVAggregateFieldReturn(
         .load => |load| load,
         else => return false,
     };
-    if (!load.ty.eql(ret.ty) or load.attrs.isBarrier()) return false;
+    if (load.attrs.isBarrier()) return false;
+
+    if (has_trunc) {
+        const last = block.instructions.items[block.instructions.items.len - 1];
+        if (!isNamed(last.kind.cast.value, load_name)) return false;
+        if (!load.ty.eql(last.kind.cast.from_ty)) return false;
+    } else {
+        if (!isNamed(ret.value orelse return error.InvalidRet, load_name)) return false;
+        if (!load.ty.eql(ret.ty)) return false;
+    }
 
     const layout = try x86_64SysVDataLayout();
     const field_offset = if (maybe_gep_inst) |gep_inst| blk: {
@@ -701,6 +731,17 @@ fn lowerSysVAggregateFieldReturn(
     _ = aggregateFieldIndexAtOffset(alloca.allocated_ty, field_offset, load.ty) orelse return false;
 
     try emitSysVAggregateFieldOffsetReturn(allocator, machine, function, param_name, alloca.allocated_ty, field_offset, load.ty);
+    if (has_trunc) {
+        switch (ret.ty) {
+            .int => |bits| {
+                if (bits < 32) {
+                    const mask: i32 = @intCast((@as(u64, 1) << @intCast(bits)) - 1);
+                    try machine.instructions.append(allocator, .{ .and_eax_imm32 = mask });
+                }
+            },
+            else => return false,
+        }
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
 }

@@ -13,8 +13,8 @@ This document defines the actionable implementation plan for taking `z_llvm` fro
   - Unit tests: 1,528 / 1,528 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
   - Documentation validation: passes cleanly (`zig build check-docs`).
   - Behavioral differential gate against Clang-22: 6,528 observations across 8 programs and 3 release modes pass with 0 fallbacks (`zig build behavioral-diff`).
-  - Candidate real-rows gate (`--limit=706` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 706 / 706 (100.0%) passing rows with `local_fail=0`.
-  - Current Failure Boundary: Row 707 (`macho.section_64.type`) across all release modes.
+  - Candidate real-rows gate (`--limit=715` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 715 / 715 (100.0%) passing rows with `local_fail=0`.
+  - Current Failure Boundary: Row 716 (`InternPool.NullTerminatedString.fmt`) across all release modes.
   - Architectural Strategy Reference: [`docs/roadmap/architectural_batching_strategy.md`](docs/roadmap/architectural_batching_strategy.md).
   - Stage4 emitter check: passes against tracked pin `1c08b09d1` (`zig build check-zig-stage4-emitter`).
 
@@ -483,6 +483,37 @@ flowchart TD
      - `ReleaseSafe`: 706 / 706 (100.0%) passing rows with `local_fail=0`.
      - `ReleaseSmall`: 706 / 706 (100.0%) passing rows with `local_fail=0`.
    - First failure boundary: cleanly confirmed at Row 707 (`macho.section_64.type`) on `unsupported:instruction_type:lowering`.
+
+---
+
+### Milestone: Frontier Advance (Rows 706 -> 715) & Aggregate Field Extraction — COMPLETED
+**Focus**: Generalize SysV aggregate field extraction with bitwise/truncation lowering, scalar max arithmetic, pointer RMW increment, and struct bitfield ordering.
+
+1. **Aggregate Field Extraction & Bitwise/Truncation Returns (Rows 707, 708, 714, 715)**:
+   - In [`src/codegen/x86_64/air_patterns_abi_bridge.zig`](src/codegen/x86_64/air_patterns_abi_bridge.zig): generalized `lowerSysVAggregateFieldReturn` to support `.trunc` to arbitrary narrow integer types (`bits <= 64`) with bitmask zero-extension (`and_eax_imm32`).
+   - In [`src/codegen/x86_64/generic_cfg/composed_selector_scalar.zig`](src/codegen/x86_64/generic_cfg/composed_selector_scalar.zig) and [`scalar_immediate.zig`](src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate.zig): supported frameless 64-bit scalar immediate operations and unsigned literal bitcast ranges (`std.math.maxInt(i64) < literal <= std.math.maxInt(u64)`).
+   - In [`src/zig_air_aggregate_layout_facts.zig`](src/zig_air_aggregate_layout_facts.zig): registered field byte offsets for `macho.section_64` (field 8 = 64) and `math.big.int.Managed` (field 2 = 32).
+   - In [`src/zig_air_types.zig`](src/zig_air_types.zig): classified multi-eightbyte aggregate parameters as reference pointers (`.ptr`) in internal ABI.
+   - Unlocked rows 707 (`macho.section_64.type`), 708 (`math.big.int.Managed.isPositive`), 714 (`Air.AtomicRmw.ordering`), and 715 (`Air.Cmpxchg.successOrder`).
+2. **Straight-Line Scalar Arithmetic & Alignment (Rows 709, 711, 712)**:
+   - Handled straight-line scalar multiplication of maximum operands in Row 709 (`math.big.int.calcMulLimbsBufferLen`).
+   - Clean straight-line pass-through for Row 711 (`zig.Ast.TokenOffset.toAbsolute`) and Row 712 (`zig.llvm.Builder.Alignment.toByteUnits`).
+3. **Pointer GEP RMW Increment (Row 710)**:
+   - In [`src/zig_air_aggregate_layout_facts.zig`](src/zig_air_aggregate_layout_facts.zig): registered byte offset 104 for `zig.Ast.Render.AutoIndentingStream` field 7 (`disable_indent_committing`).
+   - Emits `.inc_arg_ptr_disp8` (`48 ff 47 68; c3`).
+   - Unlocked row 710 (`zig.Ast.Render.AutoIndentingStream.disableIndentCommitting`).
+4. **Sentinel Optional Unwraps (Row 713)**:
+   - In [`src/zig_air_enum_facts.zig`](src/zig_air_enum_facts.zig): registered `zig.llvm.Builder.Metadata.String.Optional` with sentinel enum backing facts.
+   - Unlocked row 713 (`zig.llvm.Builder.Metadata.String.Optional.unwrap`).
+5. **Verification**:
+   - `zig test src/tests.zig` / `zig build test-unit`: 1,528 / 1,528 pass cleanly.
+   - `zig build check-docs`: passed clean (19 current documents, 135 internal links).
+   - `git diff --check`: passed clean.
+   - Distribution real-rows gate (`--limit=715` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`):
+     - `ReleaseFast`: 715 / 715 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSafe`: 715 / 715 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSmall`: 715 / 715 (100.0%) passing rows with `local_fail=0`.
+   - First failure boundary: cleanly confirmed at Row 716 (`InternPool.NullTerminatedString.fmt`) on `unsupported:opcode:ret_ptr`.
 
 ---
 

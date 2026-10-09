@@ -86,6 +86,18 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "anyerror!void")) return .{ .ir_type = .{ .int = 16 } };
     if (std.mem.startsWith(u8, trimmed, "anyerror!")) return .{ .ir_type = .{ .int = 64 } };
     if (parseZigVectorType(trimmed)) |vector_ty| return vector_ty;
+    if (std.mem.startsWith(u8, trimmed, "*") or
+        std.mem.startsWith(u8, trimmed, "?*") or
+        std.mem.startsWith(u8, trimmed, "[*]"))
+    {
+        const child_text = pointerChildText(trimmed) orelse return null;
+        const child = parseZigType(child_text);
+        return .{
+            .ir_type = .ptr,
+            .pointer_child = if (child) |parsed| parsed.ir_type else null,
+            .is_volatile_pointer = std.mem.indexOf(u8, trimmed, "volatile") != null,
+        };
+    }
     if (std.mem.eql(u8, trimmed, "extern struct { a: i32, b: f64 }")) {
         return .{ .ir_type = .{ .aggregate = "{ i32, double }" } };
     }
@@ -110,6 +122,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.endsWith(u8, trimmed, "section_64")) return .{ .ir_type = .ptr };
     if (std.mem.endsWith(u8, trimmed, "math.big.int.Managed") or std.mem.eql(u8, trimmed, "Managed")) return .{ .ir_type = .ptr };
+    if (std.mem.endsWith(u8, trimmed, "AutoIndentingStream")) return .{ .ir_type = .ptr };
     if (std.mem.eql(u8, trimmed, "Sema.Block") or std.mem.eql(u8, trimmed, "std.zig.Sema.Block")) return .{ .ir_type = .ptr };
     if (std.mem.startsWith(u8, trimmed, "bit_set.Integer(") or
         std.mem.startsWith(u8, trimmed, "std.bit_set.Integer("))

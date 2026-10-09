@@ -1147,14 +1147,18 @@ fn immediateShiftAmount(literal: i128, bits: u16) Types.ImmediateScalarRequestEr
 }
 
 fn immediateI32(literal: i128) Types.ImmediateScalarRequestError!i32 {
-    if (!fitsI32(literal)) return error.ValueUseImmediateScalarLiteralOutOfRange;
-    return @intCast(literal);
+    if (fitsI32(literal)) return @intCast(literal);
+    if (literal > std.math.maxInt(i32) and literal <= std.math.maxInt(u32))
+        return @bitCast(@as(u32, @intCast(literal)));
+    return error.ValueUseImmediateScalarLiteralOutOfRange;
 }
 
 fn immediateI64(literal: i128) Types.ImmediateScalarRequestError!i64 {
-    if (literal < std.math.minInt(i64) or literal > std.math.maxInt(i64))
-        return error.ValueUseImmediateScalarLiteralOutOfRange;
-    return @intCast(literal);
+    if (literal >= std.math.minInt(i64) and literal <= std.math.maxInt(i64))
+        return @intCast(literal);
+    if (literal > std.math.maxInt(i64) and literal <= std.math.maxInt(u64))
+        return @bitCast(@as(u64, @intCast(literal)));
+    return error.ValueUseImmediateScalarLiteralOutOfRange;
 }
 
 fn fitsI32(literal: i128) bool {
