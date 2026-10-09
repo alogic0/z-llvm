@@ -1228,3 +1228,103 @@ pub fn matchesPointerOffsetBitwiseRmwEnvelope(function: ir.Function) ?PointerOff
         .mask = mask,
     };
 }
+
+pub const PointerOffsetIncrementRmw = struct {
+    offset: u8,
+};
+
+pub fn matchesPointerOffsetIncrementRmwEnvelope(function: ir.Function) ?PointerOffsetIncrementRmw {
+    if (function.ret_ty != .void or function.params.items.len != 1) return null;
+    if (!function.params.items[0].ty.eql(.ptr) or function.blocks.items.len != 1) return null;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (ret.ty != .void or ret.value != null) return null;
+
+    const param_name = function.params.items[0].name;
+    var gep_offset: u8 = 0;
+    var gep_result: ?[]const u8 = null;
+    var load_result: ?[]const u8 = null;
+    var binary_result: ?[]const u8 = null;
+    var is_increment = false;
+    var store_val: ?[]const u8 = null;
+    var store_ptr: ?[]const u8 = null;
+
+    for (block.instructions.items) |inst| {
+        if (inst.removed) continue;
+        switch (inst.kind) {
+            .gep => |gep| {
+                if (gep.source_ty.eql(.{ .int = 8 }) and gep.indices.items.len == 1) {
+                    if (gep.ptr == .named and std.mem.eql(u8, gep.ptr.named, param_name)) {
+                        switch (gep.indices.items[0].value) {
+                            .int => |val| {
+                                if (val >= 0 and val <= std.math.maxInt(u8)) {
+                                    gep_offset = @intCast(val);
+                                    gep_result = inst.result;
+                                }
+                            },
+                            else => {},
+                        }
+                    }
+                }
+            },
+            .load => |load| {
+                if (load.ty.eql(.{ .int = 64 })) {
+                    const ptr_name = switch (load.ptr) {
+                        .named => |name| name,
+                        else => return null,
+                    };
+                    if (gep_result) |g_res| {
+                        if (std.mem.eql(u8, ptr_name, g_res)) {
+                            load_result = inst.result;
+                        }
+                    } else if (std.mem.eql(u8, ptr_name, param_name)) {
+                        load_result = inst.result;
+                    }
+                }
+            },
+            .binary => |binary| {
+                if (binary.ty.eql(.{ .int = 64 }) and binary.op == .add) {
+                    const l_res = load_result orelse return null;
+                    if (binary.lhs == .named and std.mem.eql(u8, binary.lhs.named, l_res) and
+                        binary.rhs == .int and binary.rhs.int == 1)
+                    {
+                        binary_result = inst.result;
+                        is_increment = true;
+                    } else if (binary.rhs == .named and std.mem.eql(u8, binary.rhs.named, l_res) and
+                        binary.lhs == .int and binary.lhs.int == 1)
+                    {
+                        binary_result = inst.result;
+                        is_increment = true;
+                    }
+                }
+            },
+            .store => |store| {
+                if (store.ty.eql(.{ .int = 64 })) {
+                    if (store.value == .named) store_val = store.value.named;
+                    if (store.ptr == .named) store_ptr = store.ptr.named;
+                }
+            },
+            .alloca, .cast => {},
+            else => return null,
+        }
+    }
+
+    if (!is_increment) return null;
+    const b_res = binary_result orelse return null;
+    const s_val = store_val orelse return null;
+    const s_ptr = store_ptr orelse return null;
+
+    if (!std.mem.eql(u8, s_val, b_res)) return null;
+    if (gep_result) |g_res| {
+        if (!std.mem.eql(u8, s_ptr, g_res)) return null;
+    } else {
+        if (!std.mem.eql(u8, s_ptr, param_name)) return null;
+    }
+
+    return .{
+        .offset = gep_offset,
+    };
+}

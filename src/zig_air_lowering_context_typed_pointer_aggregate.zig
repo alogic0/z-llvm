@@ -421,11 +421,6 @@ pub fn lowerTypedFieldPtr(self: anytype, instruction: air_export.TypedInstructio
     if (try self.lowerTypedSyntheticUnionFieldPtr(instruction, result_type, field_index)) return;
     const source_ty = aggregate_ptr.ty.pointer_child;
     const offset_opt: ?u64 = blk: {
-        if (source_ty) |known_source_ty| {
-            if (aggregateFieldByteOffset(known_source_ty, field_child, field_index)) |offset| {
-                if (offset >= 0) break :blk @intCast(offset);
-            }
-        }
         if (instruction.operands.len > 0) {
             const operand_type_text = instruction.operands[0].type_text;
             if (pointerChildText(operand_type_text)) |child_name| {
@@ -434,6 +429,11 @@ pub fn lowerTypedFieldPtr(self: anytype, instruction: air_export.TypedInstructio
                         break :blk offset;
                     }
                 }
+            }
+        }
+        if (source_ty) |known_source_ty| {
+            if (aggregateFieldByteOffset(known_source_ty, field_child, field_index)) |offset| {
+                if (offset >= 0) break :blk @intCast(offset);
             }
         }
         break :blk null;

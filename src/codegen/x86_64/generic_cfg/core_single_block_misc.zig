@@ -306,3 +306,90 @@ pub fn lowerGenericCfgByteTableLookupReturn(
     try machine.instructions.append(allocator, .ret);
     return true;
 }
+
+pub fn lowerAtomicFieldXchgReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.ptr) or !function.ret_ty.eql(.ptr)) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.ptr)) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        else => return false,
+    };
+
+    var disp: i8 = 0;
+    var atomic_inst: ir.Instruction = undefined;
+
+    if (block.instructions.items.len == 2) {
+        const gep_inst = block.instructions.items[0];
+        if (gep_inst.removed) return false;
+        const gep_result = gep_inst.result orelse return false;
+        const gep = switch (gep_inst.kind) {
+            .gep => |g| g,
+            else => return false,
+        };
+        if (!gep.source_ty.eql(.{ .int = 8 })) return false;
+        const base_reg = paramValueReg(function, gep.ptr, .ptr) catch return false;
+        if (base_reg != .rdi) return false;
+        if (gep.indices.items.len != 1) return false;
+        const idx = gep.indices.items[0];
+        if (!idx.ty.eql(.{ .int = 64 })) return false;
+        const offset = switch (idx.value) {
+            .int => |val| val,
+            else => return false,
+        };
+        if (offset < std.math.minInt(i8) or offset > std.math.maxInt(i8)) return false;
+        disp = @intCast(offset);
+
+        atomic_inst = block.instructions.items[1];
+        if (atomic_inst.removed) return false;
+        const atomic_result = atomic_inst.result orelse return false;
+        if (!std.mem.eql(u8, ret_name, atomic_result)) return false;
+        const atomic = switch (atomic_inst.kind) {
+            .atomicrmw => |a| a,
+            else => return false,
+        };
+        if (!std.mem.eql(u8, atomic.op, "xchg")) return false;
+        if (!atomic.ty.eql(.ptr)) return false;
+        switch (atomic.ptr) {
+            .named => |ptr_name| if (!std.mem.eql(u8, ptr_name, gep_result)) return false,
+            else => return false,
+        }
+        switch (atomic.value) {
+            .null_value => {},
+            .int => |val| if (val != 0) return false,
+            else => return false,
+        }
+    } else if (block.instructions.items.len == 1) {
+        atomic_inst = block.instructions.items[0];
+        if (atomic_inst.removed) return false;
+        const atomic_result = atomic_inst.result orelse return false;
+        if (!std.mem.eql(u8, ret_name, atomic_result)) return false;
+        const atomic = switch (atomic_inst.kind) {
+            .atomicrmw => |a| a,
+            else => return false,
+        };
+        if (!std.mem.eql(u8, atomic.op, "xchg")) return false;
+        if (!atomic.ty.eql(.ptr)) return false;
+        const base_reg = paramValueReg(function, atomic.ptr, .ptr) catch return false;
+        if (base_reg != .rdi) return false;
+        switch (atomic.value) {
+            .null_value => {},
+            .int => |val| if (val != 0) return false,
+            else => return false,
+        }
+        disp = 0;
+    } else {
+        return false;
+    }
+
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = 0 });
+    try machine.instructions.append(allocator, .{ .atomic_xchg_rdi_disp8_rax = disp });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}

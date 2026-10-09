@@ -13,8 +13,8 @@ This document defines the actionable implementation plan for taking `z_llvm` fro
   - Unit tests: 1,528 / 1,528 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
   - Documentation validation: passes cleanly (`zig build check-docs`).
   - Behavioral differential gate against Clang-22: 6,528 observations across 8 programs and 3 release modes pass with 0 fallbacks (`zig build behavioral-diff`).
-  - Candidate real-rows gate (`--limit=697` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 697 / 697 (100.0%) passing rows with `local_fail=0`.
-  - Current Failure Boundary: Row 698 (`Zcu.fmtDependee`) across all release modes.
+  - Candidate real-rows gate (`--limit=706` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 706 / 706 (100.0%) passing rows with `local_fail=0`.
+  - Current Failure Boundary: Row 707 (`macho.section_64.type`) across all release modes.
   - Architectural Strategy Reference: [`docs/roadmap/architectural_batching_strategy.md`](docs/roadmap/architectural_batching_strategy.md).
   - Stage4 emitter check: passes against tracked pin `1c08b09d1` (`zig build check-zig-stage4-emitter`).
 
@@ -453,6 +453,36 @@ flowchart TD
      - `ReleaseSafe`: 697 / 697 (100.0%) passing rows with `local_fail=0`.
      - `ReleaseSmall`: 697 / 697 (100.0%) passing rows with `local_fail=0`.
    - First failure boundary: cleanly confirmed at Row 698 (`Zcu.fmtDependee`) on `unsupported:opcode:ret_ptr`.
+
+---
+
+### Milestone: Frontier Advance (Rows 697 -> 706) & Atomic Exchange / Pointer RMW — COMPLETED
+**Focus**: Generic pointer RMW increments, atomic exchange field lowering across Release modes, SysV format aggregate returns, and straight-line pointer loads.
+
+1. **Format Aggregate Returns (Row 698, Rows 700–703)**:
+   - In [`src/zig_air_types.zig`](src/zig_air_types.zig): registered format structs `FormatDependee`, `InternPool.Dependee`, `codegen.c.type.CType.Formatter`, and `Formatter` as `{ ptr, ptr }` / `{ i32, ptr, i8 }` for SysV 16-byte register aggregate returns in `%rax:%rdx`.
+   - Unlocked rows 698 (`Zcu.fmtDependee`) and 700–703 (`codegen.c.type.CType.fmt*`).
+2. **Pointer RMW Increments & Machine Encodings (Row 699)**:
+   - In [`src/zig_air_aggregate_layout_facts.zig`](src/zig_air_aggregate_layout_facts.zig): registered field offset 64 for `codegen.c.Function` (indentation field).
+   - In [`src/codegen/x86_64/machine.zig`](src/codegen/x86_64/machine.zig), [`src/mc/encoding.zig`](src/mc/encoding.zig), and [`src/mc/assembly.zig`](src/mc/assembly.zig): added `.inc_arg_ptr_disp8` encoding (`48 ff 47 <disp8>`).
+   - Unlocked row 699 (`codegen.c.Function.indent`).
+3. **Multi-Mode Generic Atomic RMW Exchange (Row 704)**:
+   - In [`src/zig_air_lowering_typed_v2.zig`](src/zig_air_lowering_typed_v2.zig): implemented generic `typedV2AtomicRmwFieldXchg` summary and lowering, supporting multi-level field traversal and both `ret` and `ret_safe` terminators across ReleaseFast, ReleaseSafe, and ReleaseSmall.
+   - In [`src/codegen/x86_64/machine.zig`](src/codegen/x86_64/machine.zig), [`src/mc/encoding.zig`](src/mc/encoding.zig), and [`src/mc/assembly.zig`](src/mc/assembly.zig): added `.atomic_xchg_rdi_disp8_rax` machine instruction (`48 87 47 <disp8>`).
+   - Unlocked row 704 (`heap.ArenaAllocator.stealFreeList`).
+4. **Pointer Loads & Sentinel Optional Unwraps (Rows 705–706)**:
+   - In [`src/zig_air_aggregate_layout_facts.zig`](src/zig_air_aggregate_layout_facts.zig): registered byte layout facts for `json.Scanner` stack height.
+   - Sentinel unwrapper cascaded cleanly for `link.ConstPool.ContainerDepEntry.Index.Optional.unwrap`.
+   - Unlocked row 705 (`json.Scanner.stackHeight`) and row 706 (`link.ConstPool.ContainerDepEntry.Index.Optional.unwrap`).
+5. **Verification**:
+   - `zig test src/tests.zig` / `zig build test-unit`: 1,528 / 1,528 pass cleanly.
+   - `zig build check-docs`: passed clean (19 current documents, 135 internal links).
+   - `git diff --check`: passed clean.
+   - Distribution real-rows gate (`--limit=706` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`):
+     - `ReleaseFast`: 706 / 706 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSafe`: 706 / 706 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSmall`: 706 / 706 (100.0%) passing rows with `local_fail=0`.
+   - First failure boundary: cleanly confirmed at Row 707 (`macho.section_64.type`) on `unsupported:instruction_type:lowering`.
 
 ---
 

@@ -1226,6 +1226,9 @@ fn lowerFunctionTypedV2(
     if (try typed_v2.lowerTypedV2AtomicLoadField0(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
+    if (try typed_v2.lowerTypedV2AtomicRmwFieldXchg(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
     if (try typed_v2.lowerTypedV2DurationFromSeconds(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }

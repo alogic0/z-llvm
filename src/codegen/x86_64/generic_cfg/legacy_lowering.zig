@@ -82,5 +82,10 @@ pub fn tryLower(
         try machine.instructions.append(allocator, .ret);
         return true;
     }
+    if (legacy_envelopes.matchesPointerOffsetIncrementRmwEnvelope(function)) |plan| {
+        try machine.instructions.append(allocator, .{ .inc_arg_ptr_disp8 = .{ .reg = .rdi, .offset = plan.offset } });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
     return false;
 }

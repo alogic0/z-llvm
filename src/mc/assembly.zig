@@ -869,6 +869,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                 "\tmovq %rsi, %rax\n" ++
                     "\txchgq %rax, (%rdi)\n",
             ),
+            .atomic_xchg_rdi_disp8_rax => |disp| try writer.print("\txchgq %rax, {}(%rdi)\n", .{disp}),
             .spinlocked_xchg_i128_rdi_rsi_rdx_rax => |symbol| try writer.print(
                 "\tmovq %rdx, %r9\n" ++
                     "\tmovq %rdi, %r8\n" ++
@@ -1574,6 +1575,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .load_arg_ptr_disp8_u16_arg => |load| try writer.print("\tmovzwl {}({s}), {s}\n", .{ load.offset, load.base.name64(), load.dst.name32() }),
             .load_arg_ptr_disp8_xmm => |load| try writer.print("\tmovsd {}({s}), {s}\n", .{ load.offset, load.base.name64(), load.dst.name() }),
             .add_arg_ptr_disp4_eax => |reg| try writer.print("\taddl 4({s}), %eax\n", .{reg.name64()}),
+            .inc_arg_ptr_disp8 => |inc| try writer.print("\tincq {}({s})\n", .{ inc.offset, inc.reg.name64() }),
             .store_eax_arg_ptr => |reg| try writer.print("\tmovl %eax, ({s})\n", .{reg.name64()}),
             .store_imm64_arg_ptr_disp8 => |store| try writer.print("\tmovq ${}, {}({s})\n", .{ store.imm, store.offset, store.reg.name64() }),
             .store_arg64_arg_ptr_disp8 => |store| try writer.print("\tmovq {s}, {}({s})\n", .{ store.src_reg.name64(), store.offset, store.ptr_reg.name64() }),

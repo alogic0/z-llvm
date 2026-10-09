@@ -92,10 +92,25 @@ pub fn classifyAggregate(ty: ir.Type) !AggregateClassification {
         else => {},
     }
     const layout = try dataLayout();
-    const size = try layout.typeStoreSizeBytes(normalized_ty);
+    const size = blk: {
+        var max_leaf_end: u64 = 0;
+        var f_idx: usize = 0;
+        var has_nominal = false;
+        while (type_layout.fieldType(normalized_ty, f_idx)) |f_ty| : (f_idx += 1) {
+            if (type_layout.fieldByteOffset(layout, ty, f_idx)) |off| {
+                const f_size = layout.typeStoreSizeBytes(f_ty) catch break;
+                max_leaf_end = @max(max_leaf_end, off + f_size);
+                has_nominal = true;
+            }
+        }
+        if (has_nominal and max_leaf_end > 0) {
+            break :blk @min(try layout.typeStoreSizeBytes(normalized_ty), std.mem.alignForward(u64, max_leaf_end, 8));
+        }
+        break :blk try layout.typeStoreSizeBytes(normalized_ty);
+    };
     if (size == 0 or size > 16) return .{ .kind = .memory, .size_bytes = size };
 
-    const classification = try classifyAggregateSized(layout, normalized_ty, size);
+    const classification = try classifyAggregateSized(layout, ty, size);
     return if (classification.kind == .register and classification.eightbyte_count == 0)
         .{ .kind = .memory, .size_bytes = size }
     else

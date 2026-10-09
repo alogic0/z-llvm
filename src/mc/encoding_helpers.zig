@@ -430,6 +430,12 @@ pub fn encodeArgPtrDisp4ToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Allo
     try bytes.append(allocator, 0x04);
 }
 
+pub fn encodeIncArgPtrDisp8(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8) !void {
+    try bytes.append(allocator, if (reg.rexB()) 0x49 else 0x48);
+    try bytes.append(allocator, 0xff);
+    try encodeArgPtrDisp8Tail(bytes, allocator, reg, offset);
+}
+
 pub fn encodeArgPtrDisp8ToRax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8) !void {
     try bytes.append(allocator, if (reg.rexB()) 0x49 else 0x48);
     try bytes.append(allocator, 0x8b);

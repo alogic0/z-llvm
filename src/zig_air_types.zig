@@ -103,10 +103,10 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         return .{ .ir_type = .ptr };
     }
     if (std.mem.endsWith(u8, trimmed, "FormatDependee")) {
-        return .{ .ir_type = .void };
+        return .{ .ir_type = .{ .aggregate = "{ ptr, ptr }" } };
     }
     if (std.mem.eql(u8, trimmed, "codegen.c.type.CType.Formatter") or std.mem.endsWith(u8, trimmed, "CType.Formatter") or std.mem.eql(u8, trimmed, "Formatter")) {
-        return .{ .ir_type = .void };
+        return .{ .ir_type = .{ .aggregate = "codegen.c.type.CType.Formatter" } };
     }
     if (std.mem.endsWith(u8, trimmed, "section_64")) return .{ .ir_type = .ptr };
     if (std.mem.endsWith(u8, trimmed, "math.big.int.Managed") or std.mem.eql(u8, trimmed, "Managed")) return .{ .ir_type = .ptr };
@@ -217,7 +217,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
             return .{ .ir_type = .{ .aggregate = "{ { i64, ptr } }" } };
         }
         if (std.mem.indexOf(u8, trimmed, "FormatDependee") != null) {
-            return .{ .ir_type = .void };
+            return .{ .ir_type = .{ .aggregate = "{ { ptr, ptr } }" } };
         }
         if (std.mem.indexOf(u8, trimmed, "FormatAirData") != null or
             std.mem.indexOf(u8, trimmed, "FormatWipMirData") != null or

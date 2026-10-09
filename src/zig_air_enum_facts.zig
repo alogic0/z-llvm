@@ -587,6 +587,13 @@ const shuffle_one_mask_kind_enumerators = [_]Enumerator{
     .{ .name = "value", .value = 1 },
 };
 
+const ctype_formatter_kind_enumerators = [_]Enumerator{
+    .{ .name = "type_name", .value = 0 },
+    .{ .name = "declarator_prefix", .value = 1 },
+    .{ .name = "declarator_suffix", .value = 2 },
+    .{ .name = "declarator_suffix_ignore_nonstring", .value = 3 },
+};
+
 pub fn lookup(nominal: []const u8) ?Fact {
     const normalized = stripNominalSigil(std.mem.trim(u8, nominal, " "));
     if (std.mem.startsWith(u8, normalized, "Air.ShuffleOneMask__enum_") or
@@ -596,6 +603,13 @@ pub fn lookup(nominal: []const u8) ?Fact {
             .name = normalized,
             .backing_type = .{ .int = 1 },
             .enumerators = shuffle_one_mask_kind_enumerators[0..],
+        };
+    }
+    if (std.mem.indexOf(u8, normalized, "Formatter__enum_") != null) {
+        return .{
+            .name = normalized,
+            .backing_type = .{ .int = 8 },
+            .enumerators = ctype_formatter_kind_enumerators[0..],
         };
     }
     for (facts) |fact| {

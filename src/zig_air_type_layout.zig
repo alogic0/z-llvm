@@ -287,6 +287,13 @@ pub fn fieldCount(aggregate_ty: ir.Type) usize {
 }
 
 pub fn fieldByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, field_index: usize) ?u64 {
+    switch (aggregate_ty) {
+        .aggregate => |text| {
+            if (aggregate_layout_facts.nominalFieldByteOffset(text, field_index)) |off| return off;
+            if (aggregate_layout_facts.nominalFieldByteOffset(stripNominalSigil(text), field_index)) |off| return off;
+        },
+        else => {},
+    }
     const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, normalizeAggregateType(aggregate_ty), field_index) orelse return null;
     if (offset_i < 0) return null;
     return @intCast(offset_i);
@@ -294,7 +301,7 @@ pub fn fieldByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, field_i
 
 pub fn leafAtIndexPath(layout: target.DataLayout, aggregate_ty: ir.Type, path: []const usize) ?AggregateLeaf {
     if (path.len == 0) return null;
-    var current_ty = normalizeAggregateType(aggregate_ty);
+    var current_ty = aggregate_ty;
     var offset: u64 = 0;
     for (path, 0..) |field_index, position| {
         const field_ty = fieldType(current_ty, field_index) orelse return null;
@@ -304,8 +311,8 @@ pub fn leafAtIndexPath(layout: target.DataLayout, aggregate_ty: ir.Type, path: [
             if (isAggregateType(normalized_field_ty)) return null;
             return .{ .offset = offset, .ty = normalized_field_ty };
         }
-        current_ty = normalizeAggregateType(field_ty);
-        if (!isAggregateType(current_ty)) return null;
+        current_ty = field_ty;
+        if (!isAggregateType(normalizeAggregateType(current_ty))) return null;
     }
     return null;
 }
@@ -397,7 +404,15 @@ pub fn aggregateLayoutPlan(layout: target.DataLayout, aggregate_ty: ir.Type) !Ag
         .size_bytes = try layout.typeStoreSizeBytes(normalized_ty),
         .field_count = count,
     };
-    try collectSupportedScalarLeaves(layout, normalized_ty, 0, &plan.leaves, &plan.leaf_count);
+    try collectSupportedScalarLeaves(layout, aggregate_ty, 0, &plan.leaves, &plan.leaf_count);
+    var max_leaf_end: u64 = 0;
+    for (plan.leaves[0..plan.leaf_count]) |leaf| {
+        const leaf_size = try layout.typeStoreSizeBytes(leaf.ty);
+        max_leaf_end = @max(max_leaf_end, leaf.offset + leaf_size);
+    }
+    if (max_leaf_end > 0) {
+        plan.size_bytes = @min(plan.size_bytes, std.mem.alignForward(u64, max_leaf_end, 8));
+    }
     return plan;
 }
 
@@ -688,4 +703,11 @@ test "type layout plan covers large sret byval aggregates" {
     try std.testing.expectEqual(@as(u64, 0), plan.leafSlice()[0].offset);
     try std.testing.expectEqual(@as(u64, 2040), plan.leafSlice()[255].offset);
     try std.testing.expect(plan.leafSlice()[255].ty.eql(.{ .int = 64 }));
+}
+
+test "type layout resolves heap.ArenaAllocator leaf path" {
+    const layout = try target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
+    const leaf = leafAtIndexPath(layout, .{ .aggregate = "heap.ArenaAllocator" }, &[_]usize{ 1, 1 }).?;
+    try std.testing.expectEqual(@as(u64, 24), leaf.offset);
+    try std.testing.expect(leaf.ty.eql(.ptr));
 }

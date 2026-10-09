@@ -38,6 +38,7 @@ const validateDefaultCallConv = shared.validateDefaultCallConv;
 
 const lowerAtomicAddReturn = core_single_block_misc.lowerAtomicAddReturn;
 const lowerAtomicTryLockReturn = core_single_block_misc.lowerAtomicTryLockReturn;
+const lowerAtomicFieldXchgReturn = core_single_block_misc.lowerAtomicFieldXchgReturn;
 const lowerInlineAsmBarrierReturn = cabi_tls_global_lowering.lowerInlineAsmBarrierReturn;
 const sret_byval_rows = @import("core_single_block_sret_byval_rows.zig");
 const lowerGenericCfgSelectedSretStores = sret_byval_rows.lowerGenericCfgSelectedSretStores;
@@ -58,6 +59,10 @@ pub fn lowerGenericCfgSingleBlockEffectBarrier(allocator: std.mem.Allocator, mac
         return true;
     }
     if (try lowerAtomicTryLockReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerAtomicFieldXchgReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
@@ -697,6 +702,12 @@ pub fn lowerGenericCfgSingleBlockVoid(allocator: std.mem.Allocator, machine: *Ma
         try machine.instructions.append(allocator, .{ .mov_imm_rcx = plan.mask });
         try machine.instructions.append(allocator, .{ .binary_arg_rax = .{ .op = plan.op, .reg = .rcx } });
         try machine.instructions.append(allocator, .{ .store_rax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = plan.offset } });
+        try machine.instructions.append(allocator, .ret);
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (@import("legacy_envelopes.zig").matchesPointerOffsetIncrementRmwEnvelope(function)) |plan| {
+        try machine.instructions.append(allocator, .{ .inc_arg_ptr_disp8 = .{ .reg = .rdi, .offset = plan.offset } });
         try machine.instructions.append(allocator, .ret);
         machine.codegen_path = .generic_cfg;
         return true;

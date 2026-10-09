@@ -249,6 +249,7 @@ pub const Instruction = union(enum) {
     xchg_ptr_value_i16_eax,
     xchg_ptr_value_i32_eax,
     xchg_ptr_value_i64_rax,
+    atomic_xchg_rdi_disp8_rax: i8,
     spinlocked_xchg_i128_rdi_rsi_rdx_rax: []const u8,
     spinlocked_store_i128_rdi_rsi_rdx: []const u8,
     spinlocked_load_i128_rdi_rax_rdx: []const u8,
@@ -644,6 +645,10 @@ pub const Instruction = union(enum) {
         offset: u8,
     },
     add_arg_ptr_disp4_eax: ArgReg,
+    inc_arg_ptr_disp8: struct {
+        reg: ArgReg,
+        offset: u8,
+    },
     store_eax_arg_ptr: ArgReg,
     store_imm64_arg_ptr_disp8: struct {
         reg: ArgReg,

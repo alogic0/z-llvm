@@ -56,6 +56,7 @@ const xmmFrameSlotInstructionSize = encoding_helpers.xmmFrameSlotInstructionSize
 const encodeArgPtrToEax = encoding_helpers.encodeArgPtrToEax;
 const encodeEaxToArgPtr = encoding_helpers.encodeEaxToArgPtr;
 const encodeArgPtrDisp4ToEax = encoding_helpers.encodeArgPtrDisp4ToEax;
+const encodeIncArgPtrDisp8 = encoding_helpers.encodeIncArgPtrDisp8;
 const encodeArgPtrDisp8ToRax = encoding_helpers.encodeArgPtrDisp8ToRax;
 const encodeArgPtrDisp32ToRax = encoding_helpers.encodeArgPtrDisp32ToRax;
 const encodeArgPtrDisp8ToEax = encoding_helpers.encodeArgPtrDisp8ToEax;
@@ -918,6 +919,9 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0x48, 0x89, 0xf0, // movq %rsi, %rax
                 0x48, 0x87, 0x07, // xchgq %rax, (%rdi)
             }),
+            .atomic_xchg_rdi_disp8_rax => |disp| try bytes.appendSlice(allocator, &.{
+                0x48, 0x87, 0x47, @bitCast(disp),
+            }),
             .spinlocked_xchg_i128_rdi_rsi_rdx_rax => try bytes.appendSlice(allocator, &.{
                 0x49, 0x89, 0xd1, // movq %rdx, %r9
                 0x49, 0x89, 0xf8, // movq %rdi, %r8
@@ -1704,6 +1708,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .load_arg_ptr_disp8_u16_arg => |load| try encodeArgPtrDisp8U16ToArg(&bytes, allocator, load.base, load.dst, load.offset),
             .load_arg_ptr_disp8_xmm => |load| try encodeArgPtrDisp8ToXmm(&bytes, allocator, load.base, load.dst, load.offset),
             .add_arg_ptr_disp4_eax => |reg| try encodeArgPtrDisp4ToEax(&bytes, allocator, reg),
+            .inc_arg_ptr_disp8 => |inc| try encodeIncArgPtrDisp8(&bytes, allocator, inc.reg, inc.offset),
             .store_eax_arg_ptr => |reg| try encodeEaxToArgPtr(&bytes, allocator, reg),
             .store_imm64_arg_ptr_disp8 => |store| try encodeStoreImm64ArgPtrDisp8(&bytes, allocator, store.reg, store.offset, store.imm),
             .store_arg64_arg_ptr_disp8 => |store| try encodeStoreArg64ToArgPtrDisp8(&bytes, allocator, store.ptr_reg, store.src_reg, store.offset),
@@ -2081,6 +2086,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .xchg_ptr_value_i16_eax => 9,
         .xchg_ptr_value_i32_eax => 4,
         .xchg_ptr_value_i64_rax => 6,
+        .atomic_xchg_rdi_disp8_rax => 4,
         .spinlocked_xchg_i128_rdi_rsi_rdx_rax => 66,
         .spinlocked_store_i128_rdi_rsi_rdx => 56,
         .spinlocked_load_i128_rdi_rax_rdx => 53,
@@ -2231,6 +2237,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .load_arg_ptr_disp8_u16_arg => |load| (if (load.base.rexB() or load.dst.rexR()) @as(u32, 1) else 0) + 3 + if (load.offset == 0) @as(u32, 0) else 1,
         .load_arg_ptr_disp8_xmm => |load| 4 + (if (load.base.rexB()) @as(u32, 1) else 0) + if (load.offset == 0) @as(u32, 0) else 1,
         .add_arg_ptr_disp4_eax => |reg| if (reg.rexB()) 4 else 3,
+        .inc_arg_ptr_disp8 => |inc| 2 + if (inc.offset == 0) @as(u32, 1) else 2,
         .store_eax_arg_ptr => |reg| if (reg.rexB()) 3 else 2,
         .store_imm64_arg_ptr_disp8 => |store| 7 + if (store.offset == 0) @as(u32, 0) else 1,
         .store_arg64_arg_ptr_disp8 => |store| 3 + if (store.offset == 0) @as(u32, 0) else 1,

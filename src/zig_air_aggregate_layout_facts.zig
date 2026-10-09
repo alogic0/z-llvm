@@ -104,6 +104,16 @@ const facts = [_]Fact{
         },
     },
     .{
+        .name = "codegen.c.type.CType.Formatter",
+        .aggregate_text = "{ i32, ptr, i8 }",
+        .match = .exact,
+        .evidence = .{
+            .construction = true,
+            .store = true,
+            .load = true,
+        },
+    },
+    .{
         .name = "link.Wasm.FunctionType.Formatter",
         .aggregate_text = "{ ptr, { i32, i32 } }",
         .match = .exact,
@@ -214,6 +224,20 @@ pub fn nominalFieldByteOffset(nominal_name: []const u8, field_index: usize) ?u64
             else => null,
         };
     }
+    if (std.mem.eql(u8, name, "codegen.c.type.CType.Formatter") or std.mem.endsWith(u8, name, ".codegen.c.type.CType.Formatter") or std.mem.eql(u8, name, "CType.Formatter") or std.mem.endsWith(u8, name, ".CType.Formatter") or std.mem.eql(u8, name, "Formatter") or std.mem.endsWith(u8, name, ".Formatter")) {
+        return switch (field_index) {
+            0 => 8, // cty: CType
+            1 => 0, // zcu: *const Zcu
+            2 => 12, // kind: enum
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "codegen.c.Function") or std.mem.endsWith(u8, name, ".codegen.c.Function") or std.mem.eql(u8, name, "Function") or std.mem.endsWith(u8, name, ".Function")) {
+        return switch (field_index) {
+            8 => 64, // indent: usize
+            else => null,
+        };
+    }
     if (std.mem.eql(u8, name, "Io.Writer.Allocating") or std.mem.endsWith(u8, name, ".Io.Writer.Allocating")) {
         return switch (field_index) {
             1 => 16, // writer: Writer
@@ -230,7 +254,7 @@ pub fn nominalFieldByteOffset(nominal_name: []const u8, field_index: usize) ?u64
 }
 
 test "aggregate layout facts keep exact pair ownership narrow" {
-    try std.testing.expectEqual(@as(usize, 14), count());
+    try std.testing.expectEqual(@as(usize, 15), count());
     try std.testing.expect(lookup("aggregate_abi.Pair") == null);
     try std.testing.expect(lookup("%runtime_aggregate_pair_main.Pair") == null);
     try std.testing.expect(lookup("other.Pair") == null);
@@ -240,6 +264,7 @@ test "aggregate layout facts keep exact pair ownership narrow" {
     try std.testing.expect(lookup("Progress.Node") != null);
     try std.testing.expect(lookup("codegen.aarch64.Disassemble.RegisterFormatter") != null);
     try std.testing.expect(lookup("codegen.c.type.CType.FormatZigType") != null);
+    try std.testing.expect(lookup("codegen.c.type.CType.Formatter") != null);
     try std.testing.expect(lookup("link.Coff.Node.LazyMapRef") != null);
     try std.testing.expect(lookup("heap.ArenaAllocator") != null);
     try std.testing.expect(lookup("link.Wasm.FunctionType.Formatter") != null);

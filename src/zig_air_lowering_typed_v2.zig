@@ -11,6 +11,8 @@ const air_types = @import("zig_air_types.zig");
 const air_values = @import("zig_air_values.zig");
 const ir = @import("ir.zig");
 const runtime_wrappers = @import("zig_air_runtime_wrappers.zig");
+const target_mod = @import("target.zig");
+const type_layout = @import("zig_air_type_layout.zig");
 
 const ZigType = air_model.ZigType;
 const FunctionType = air_model.FunctionType;
@@ -1495,6 +1497,175 @@ pub fn lowerTypedV2AtomicLoadField0(
         } },
     });
     block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "val" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn typedFieldPtrIndex(inst: air_export.TypedInstruction) ?usize {
+    const prefix = "struct_field_ptr_index_";
+    if (std.mem.startsWith(u8, inst.opcode, prefix)) {
+        return std.fmt.parseInt(usize, inst.opcode[prefix.len..], 10) catch null;
+    }
+    if (std.mem.eql(u8, inst.opcode, "struct_field_ptr")) {
+        if (typedDetail(inst, "field_index")) |text| {
+            return std.fmt.parseInt(usize, text, 10) catch null;
+        }
+    }
+    return null;
+}
+
+pub const TypedAtomicRmwFieldXchgInfo = struct {
+    offset: u64,
+    ty: ir.Type,
+};
+
+pub fn typedV2AtomicRmwFieldXchgSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedAtomicRmwFieldXchgInfo {
+    if (function_type.params.len != 1) return null;
+    if (!function_type.params[0].ir_type.eql(.ptr)) return null;
+    if (!function_type.return_type.ir_type.eql(.ptr)) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "arg") != 1) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "atomic_rmw") != 1) return null;
+    if (!air_model.typedHasReturnOpcode(structured_air_v2)) return null;
+
+    for (structured_air_v2.instructions) |inst| {
+        if (std.mem.eql(u8, inst.opcode, "arg") or
+            std.mem.eql(u8, inst.opcode, "alloc") or
+            std.mem.eql(u8, inst.opcode, "store") or
+            std.mem.eql(u8, inst.opcode, "store_safe") or
+            std.mem.eql(u8, inst.opcode, "ptr_cast") or
+            std.mem.eql(u8, inst.opcode, "bitcast") or
+            std.mem.eql(u8, inst.opcode, "bit_cast") or
+            std.mem.eql(u8, inst.opcode, "load") or
+            std.mem.startsWith(u8, inst.opcode, "struct_field_ptr") or
+            std.mem.eql(u8, inst.opcode, "atomic_rmw") or
+            std.mem.eql(u8, inst.opcode, "ret") or
+            std.mem.eql(u8, inst.opcode, "ret_safe") or
+            std.mem.startsWith(u8, inst.opcode, "dbg_"))
+        {
+            continue;
+        }
+        return null;
+    }
+
+    var atomic_inst: ?air_export.TypedInstruction = null;
+    for (structured_air_v2.instructions) |inst| {
+        if (std.mem.eql(u8, inst.opcode, "atomic_rmw")) {
+            atomic_inst = inst;
+            break;
+        }
+    }
+    const atomic = atomic_inst orelse return null;
+    if (atomic.operands.len == 0) return null;
+    const atomic_operand_inst = air_model.typedInstOperandIndex(atomic.operands[0]) orelse return null;
+
+    var path_buffer: [16]usize = undefined;
+    var path_len: usize = 0;
+    var current_target_inst = atomic_operand_inst;
+    while (true) {
+        var found_inst: ?air_export.TypedInstruction = null;
+        for (structured_air_v2.instructions) |inst| {
+            if (inst.index == current_target_inst) {
+                found_inst = inst;
+                break;
+            }
+        }
+        const inst = found_inst orelse return null;
+        if (typedFieldPtrIndex(inst)) |idx| {
+            if (path_len >= path_buffer.len) return null;
+            path_buffer[path_len] = idx;
+            path_len += 1;
+            if (inst.operands.len == 0) return null;
+            current_target_inst = air_model.typedInstOperandIndex(inst.operands[0]) orelse break;
+        } else {
+            break;
+        }
+    }
+    if (path_len == 0) return null;
+
+    var root_to_leaf: [16]usize = undefined;
+    for (0..path_len) |i| {
+        root_to_leaf[i] = path_buffer[path_len - 1 - i];
+    }
+    const path = root_to_leaf[0..path_len];
+
+    var arg_ty_text: ?[]const u8 = null;
+    for (structured_air_v2.instructions) |inst| {
+        if (std.mem.eql(u8, inst.opcode, "arg")) {
+            arg_ty_text = inst.result_type;
+            break;
+        }
+    }
+    const full_arg_ty = arg_ty_text orelse return null;
+    var trimmed_base = full_arg_ty;
+    while (trimmed_base.len > 0 and (trimmed_base[0] == '*' or trimmed_base[0] == ' ')) {
+        trimmed_base = trimmed_base[1..];
+    }
+    if (std.mem.startsWith(u8, trimmed_base, "const ")) {
+        trimmed_base = trimmed_base["const ".len..];
+    }
+
+    const data_layout = target_mod.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128") catch return null;
+    const leaf = type_layout.leafAtIndexPath(data_layout, .{ .aggregate = trimmed_base }, path) orelse return null;
+    if (!leaf.ty.eql(.ptr)) return null;
+
+    for (structured_air_v2.instructions) |inst| {
+        if (std.mem.eql(u8, inst.opcode, "ret") or std.mem.eql(u8, inst.opcode, "ret_safe")) {
+            if (inst.operands.len == 0) return null;
+            const ret_inst = air_model.typedInstOperandIndex(inst.operands[0]) orelse return null;
+            if (ret_inst != atomic.index) return null;
+            break;
+        }
+    }
+
+    return .{
+        .offset = leaf.offset,
+        .ty = leaf.ty,
+    };
+}
+
+pub fn typedV2AtomicRmwFieldXchgRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    return typedV2AtomicRmwFieldXchgSummary(function_type, structured_air_v2) != null;
+}
+
+pub fn lowerTypedV2AtomicRmwFieldXchg(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    const info = typedV2AtomicRmwFieldXchgSummary(function_type, structured_air_v2) orelse return null;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .ptr);
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    var gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "arg0" }, .indices = .empty };
+    errdefer gep.deinit(allocator);
+    try gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(info.offset) } });
+    try block.instructions.append(allocator, .{ .result = "field_ptr", .kind = .{ .gep = gep } });
+
+    try block.instructions.append(allocator, .{
+        .result = "old",
+        .kind = .{ .atomicrmw = .{
+            .op = "xchg",
+            .ty = .ptr,
+            .ptr = .{ .named = "field_ptr" },
+            .value = .null_value,
+            .ordering = "acquire",
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .ptr, .value = .{ .named = "old" } } };
     try function.blocks.append(allocator, block);
     return function;
 }

@@ -1565,7 +1565,13 @@ pub fn typedRetPtrIndex(structured_air_v2: air_export.StructuredAirV2) ?u32 {
 }
 
 pub fn typedConstUsizeOperand(instruction: air_export.TypedInstruction, operand_index: usize) ?usize {
-    const text = operandTextDetail(instruction, operand_index) orelse return null;
+    const text = operandTextDetail(instruction, operand_index) orelse blk: {
+        if (operand_index < instruction.operands.len) {
+            const op = instruction.operands[operand_index];
+            if (isTypedConstOperand(op)) break :blk op.value;
+        }
+        return null;
+    };
     if (std.mem.eql(u8, text, "@.zero_usize")) return 0;
     if (std.mem.eql(u8, text, "@.one_usize")) return 1;
     if (std.mem.startsWith(u8, text, "<usize, ") and std.mem.endsWith(u8, text, ">")) {
@@ -1575,7 +1581,13 @@ pub fn typedConstUsizeOperand(instruction: air_export.TypedInstruction, operand_
 }
 
 pub fn typedConstI32Operand(instruction: air_export.TypedInstruction, operand_index: usize) ?i32 {
-    const text = operandTextDetail(instruction, operand_index) orelse return null;
+    const text = operandTextDetail(instruction, operand_index) orelse blk: {
+        if (operand_index < instruction.operands.len) {
+            const op = instruction.operands[operand_index];
+            if (isTypedConstOperand(op)) break :blk op.value;
+        }
+        return null;
+    };
     if (!std.mem.startsWith(u8, text, "<i32, ") or !std.mem.endsWith(u8, text, ">")) return null;
     return std.fmt.parseInt(i32, std.mem.trim(u8, text["<i32, ".len .. text.len - 1], " "), 10) catch null;
 }
