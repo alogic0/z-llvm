@@ -171,6 +171,8 @@ pub fn resolveParamIndex(structured_air_v2: air_export.StructuredAirV2, inst_ind
                     std.mem.eql(u8, inst.opcode, "bit_cast_safe") or
                     std.mem.eql(u8, inst.opcode, "bitcast") or
                     std.mem.eql(u8, inst.opcode, "bitcast_safe") or
+                    std.mem.eql(u8, inst.opcode, "ptr_cast") or
+                    std.mem.eql(u8, inst.opcode, "ptr_cast_safe") or
                     std.mem.eql(u8, inst.opcode, "int_cast") or
                     std.mem.eql(u8, inst.opcode, "int_cast_safe") or
                     std.mem.eql(u8, inst.opcode, "intcast") or
@@ -181,6 +183,16 @@ pub fn resolveParamIndex(structured_air_v2: air_export.StructuredAirV2, inst_ind
                         cur = std.fmt.parseInt(u32, inst.operands[0].value, 10) catch return null;
                         found = true;
                         break;
+                    }
+                    if (std.mem.eql(u8, inst.opcode, "ptr_cast") or std.mem.eql(u8, inst.opcode, "ptr_cast_safe")) {
+                        for (structured_air_v2.instructions) |other_inst| {
+                            if (other_inst.index < cur and std.mem.eql(u8, other_inst.opcode, "arg")) {
+                                cur = other_inst.index;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (found) break;
                     }
                 }
                 return null;

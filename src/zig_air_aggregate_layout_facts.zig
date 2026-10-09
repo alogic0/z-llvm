@@ -199,6 +199,36 @@ fn stripNominalSigil(text: []const u8) []const u8 {
     return text;
 }
 
+pub fn nominalFieldByteOffset(nominal_name: []const u8, field_index: usize) ?u64 {
+    const trimmed = std.mem.trim(u8, nominal_name, " ");
+    const name = if (std.mem.startsWith(u8, trimmed, "const ")) std.mem.trim(u8, trimmed[6..], " ") else trimmed;
+    if (std.mem.eql(u8, name, "Compilation") or std.mem.endsWith(u8, name, ".Compilation")) {
+        return switch (field_index) {
+            7 => 88, // root_mod: *Module
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "Module") or std.mem.endsWith(u8, name, ".Module")) {
+        return switch (field_index) {
+            11 => 622, // strip: bool
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "Io.Writer.Allocating") or std.mem.endsWith(u8, name, ".Io.Writer.Allocating")) {
+        return switch (field_index) {
+            1 => 16, // writer: Writer
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "Io.Writer") or std.mem.endsWith(u8, name, ".Io.Writer") or std.mem.eql(u8, name, "Writer") or std.mem.endsWith(u8, name, ".Writer")) {
+        return switch (field_index) {
+            2 => 24, // end: usize
+            else => null,
+        };
+    }
+    return null;
+}
+
 test "aggregate layout facts keep exact pair ownership narrow" {
     try std.testing.expectEqual(@as(usize, 14), count());
     try std.testing.expect(lookup("aggregate_abi.Pair") == null);

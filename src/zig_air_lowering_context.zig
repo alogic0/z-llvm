@@ -423,6 +423,12 @@ pub const LoweringContext = struct {
     ) !TypedValue {
         const lhs_bits = intBits(lhs_type.ir_type) orelse return error.UnsupportedAir;
         const rhs_bits = intBits(rhs.ty.ir_type) orelse return error.UnsupportedAir;
+        if (rhs.value == .int) {
+            return .{
+                .ty = .{ .ir_type = lhs_type.ir_type },
+                .value = rhs.value,
+            };
+        }
         const op: ir.CastOp = if (rhs_bits < lhs_bits)
             .zext
         else if (rhs_bits > lhs_bits)

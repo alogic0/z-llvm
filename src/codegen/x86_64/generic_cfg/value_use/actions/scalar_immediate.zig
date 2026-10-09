@@ -58,6 +58,7 @@ pub fn isImmediateRhsScalar(binary: ir.BinaryInst) bool {
         .lshr => bits == 16 or bits == 32 or bits == 64,
         .shl, .ashr => bits <= 32 or bits == 64,
         .@"and", .@"or", .add, .sub, .xor => bits <= 32 or bits == 64,
+        .mul => bits <= 32,
         else => false,
     };
 }
@@ -291,6 +292,10 @@ fn classifyImmediateRhsSemantic(
             .r06_wide_scratch_immediate
         else
             .r05_wide_accumulator_immediate,
+        .mul => if (bits <= 32)
+            .r04_narrow_accumulator_immediate
+        else
+            error.ValueUseImmediateScalarWidthUnsupported,
         else => error.ValueUseImmediateScalarFormUnsupported,
     };
 }
@@ -789,6 +794,7 @@ fn executeImmediateR04R06(
             .@"or" => try emitImmediateWrite(transaction, .{ .or_eax_imm32 = literal }),
             .add => try emitImmediateWrite(transaction, .{ .add_eax_imm32 = literal }),
             .sub => try emitImmediateWrite(transaction, .{ .add_eax_imm32 = -literal }),
+            .mul => try emitImmediateWrite(transaction, .{ .imul_eax_imm32 = literal }),
             .xor => {
                 try transaction.selector.machine.instructions.append(
                     transaction.selector.allocator,

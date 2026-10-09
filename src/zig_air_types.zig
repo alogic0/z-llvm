@@ -99,6 +99,17 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "Compilation.Path")) return .{ .ir_type = .ptr };
     if (std.mem.eql(u8, trimmed, "Compilation.Path.Formatter")) return .{ .ir_type = .void };
+    if (std.mem.eql(u8, trimmed, "InternPool.Dependee") or std.mem.eql(u8, trimmed, "std.zig.InternPool.Dependee") or std.mem.eql(u8, trimmed, "Dependee")) {
+        return .{ .ir_type = .ptr };
+    }
+    if (std.mem.endsWith(u8, trimmed, "FormatDependee")) {
+        return .{ .ir_type = .void };
+    }
+    if (std.mem.eql(u8, trimmed, "codegen.c.type.CType.Formatter") or std.mem.endsWith(u8, trimmed, "CType.Formatter") or std.mem.eql(u8, trimmed, "Formatter")) {
+        return .{ .ir_type = .void };
+    }
+    if (std.mem.endsWith(u8, trimmed, "section_64")) return .{ .ir_type = .ptr };
+    if (std.mem.endsWith(u8, trimmed, "math.big.int.Managed") or std.mem.eql(u8, trimmed, "Managed")) return .{ .ir_type = .ptr };
     if (std.mem.eql(u8, trimmed, "Sema.Block") or std.mem.eql(u8, trimmed, "std.zig.Sema.Block")) return .{ .ir_type = .ptr };
     if (std.mem.startsWith(u8, trimmed, "bit_set.Integer(") or
         std.mem.startsWith(u8, trimmed, "std.bit_set.Integer("))
@@ -145,6 +156,21 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.endsWith(u8, trimmed, "FormatRelocTypeCtx")) {
         return .{ .ir_type = .{ .aggregate = "{ i32, i8 }" } };
     }
+    if (std.mem.endsWith(u8, trimmed, "Global.Index.FormatData") or std.mem.endsWith(u8, trimmed, "Metadata.String.FormatData")) {
+        return .{ .ir_type = .{ .aggregate = "{ i32, ptr }" } };
+    }
+    if (std.mem.endsWith(u8, trimmed, "FormatAnalUnit")) {
+        return .{ .ir_type = .{ .aggregate = "{ i64, ptr }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "InternPool.AnalUnit") or std.mem.eql(u8, trimmed, "std.zig.InternPool.AnalUnit")) {
+        return .{ .ir_type = .{ .int = 64 } };
+    }
+    if (std.mem.eql(u8, trimmed, "Compilation")) {
+        return .{ .ir_type = .ptr };
+    }
+    if (std.mem.eql(u8, trimmed, "Module") or std.mem.endsWith(u8, trimmed, ".Module")) {
+        return .{ .ir_type = .ptr };
+    }
     if (std.mem.eql(u8, trimmed, "link.Elf.Thunk") or std.mem.eql(u8, trimmed, "Elf.Thunk")) {
         return .{ .ir_type = .ptr };
     }
@@ -182,6 +208,17 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         return .{ .ir_type = .{ .int = 32 } };
     }
     if (std.mem.startsWith(u8, trimmed, "fmt.Alt(") or std.mem.startsWith(u8, trimmed, "std.fmt.Alt(")) {
+        if (std.mem.indexOf(u8, trimmed, "Global.Index.FormatData") != null or
+            std.mem.indexOf(u8, trimmed, "Metadata.String.FormatData") != null)
+        {
+            return .{ .ir_type = .{ .aggregate = "{ { i32, ptr } }" } };
+        }
+        if (std.mem.indexOf(u8, trimmed, "FormatAnalUnit") != null) {
+            return .{ .ir_type = .{ .aggregate = "{ { i64, ptr } }" } };
+        }
+        if (std.mem.indexOf(u8, trimmed, "FormatDependee") != null) {
+            return .{ .ir_type = .void };
+        }
         if (std.mem.indexOf(u8, trimmed, "FormatAirData") != null or
             std.mem.indexOf(u8, trimmed, "FormatWipMirData") != null or
             std.mem.indexOf(u8, trimmed, "FormatNavData") != null)

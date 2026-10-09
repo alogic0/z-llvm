@@ -103,6 +103,25 @@ const math_order_enumerators = [_]Enumerator{
     .{ .name = "eq", .value = 2 },
 };
 
+const zig_llvm_builder_alignment_enumerators = [_]Enumerator{
+    .{ .name = "default", .value = std.math.maxInt(u6) },
+};
+
+const intern_pool_alignment_enumerators = [_]Enumerator{
+    .{ .name = "1", .value = 0 },
+    .{ .name = "2", .value = 1 },
+    .{ .name = "4", .value = 2 },
+    .{ .name = "8", .value = 3 },
+    .{ .name = "16", .value = 4 },
+    .{ .name = "32", .value = 5 },
+    .{ .name = "64", .value = 6 },
+    .{ .name = "none", .value = std.math.maxInt(u6) },
+};
+
+const intern_pool_tracked_inst_maybe_lost_zir_index_enumerators = [_]Enumerator{
+    .{ .name = "lost", .value = std.math.maxInt(u32) },
+};
+
 const no_enumerators = [_]Enumerator{};
 
 const facts = [_]Fact{
@@ -271,8 +290,29 @@ const facts = [_]Fact{
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],
     },
+
     .{
         .name = "InternPool.GlobalErrorSet.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "zig.llvm.Builder.Global.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.Global.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "zig.llvm.Builder.Metadata.String",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.Metadata.String",
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],
     },
@@ -282,9 +322,189 @@ const facts = [_]Fact{
         .enumerators = no_enumerators[0..],
     },
     .{
-        .name = "InternPool.TrackedInst.Index.Optional",
+        .name = "InternPool.TrackedInst.Index",
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.TrackedInst.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.TrackedInst.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.TrackedInst.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.DepEntry.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.DepEntry.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.DepEntry.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.DepEntry.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.FileIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.FileIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.FileIndex.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.FileIndex.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.Nav.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.Nav.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.Nav.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.Nav.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.TrackedInst.MaybeLost.ZirIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_tracked_inst_maybe_lost_zir_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.TrackedInst.MaybeLost.ZirIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_tracked_inst_maybe_lost_zir_index_enumerators[0..],
+    },
+    .{
+        .name = "zig.Zir.Inst.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.Zir.Inst.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Zir.Inst.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Zcu.CompileLogLine.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.Zcu.CompileLogLine.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Zcu.CompileLogLine.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.Zcu.CompileLogLine.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "Zcu.InlineReferenceFrame.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.Zcu.InlineReferenceFrame.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Zcu.InlineReferenceFrame.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.Zcu.InlineReferenceFrame.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "link.ConstPool.ContainerDepEntry.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "link.ConstPool.ContainerDepEntry.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "ConstPool.ContainerDepEntry.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "ConstPool.ContainerDepEntry.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "zig.llvm.Builder.Alignment",
+        .backing_type = .{ .int = 6 },
+        .enumerators = zig_llvm_builder_alignment_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.Alignment",
+        .backing_type = .{ .int = 6 },
+        .enumerators = zig_llvm_builder_alignment_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.Alignment",
+        .backing_type = .{ .int = 6 },
+        .enumerators = intern_pool_alignment_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.Alignment",
+        .backing_type = .{ .int = 6 },
+        .enumerators = intern_pool_alignment_enumerators[0..],
     },
     .{
         .name = "compress.zstd.Decompress.Frame.Magic",
@@ -442,4 +662,13 @@ test "enum facts expose exact nominal backing types and literals" {
     try std.testing.expectEqual(ir.Type{ .int = 32 }, val_index.backing_type);
     try std.testing.expectEqual(@as(?i128, std.math.maxInt(u32) - 1), enumeratorValue("codegen.aarch64.Select.Value.Index", ".allocating"));
     try std.testing.expectEqual(@as(?i128, std.math.maxInt(u32)), enumeratorValue("codegen.aarch64.Select.Value.Index", ".free"));
+
+    const llvm_align = lookup("zig.llvm.Builder.Alignment") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 6 }, llvm_align.backing_type);
+    try std.testing.expectEqual(@as(?i128, 63), enumeratorValue("zig.llvm.Builder.Alignment", ".default"));
+
+    const ip_align = lookup("InternPool.Alignment") orelse return error.TestExpectedEqual;
+    try std.testing.expectEqual(ir.Type{ .int = 6 }, ip_align.backing_type);
+    try std.testing.expectEqual(@as(?i128, 63), enumeratorValue("InternPool.Alignment", ".none"));
+    try std.testing.expectEqual(@as(?i128, 0), enumeratorValue("InternPool.Alignment", ".1"));
 }

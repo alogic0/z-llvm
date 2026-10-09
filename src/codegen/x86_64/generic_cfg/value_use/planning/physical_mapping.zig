@@ -411,6 +411,11 @@ fn appendImmediateRhsDestinationNodes(
             try result.append(.accumulator);
             try result.append(.rcx);
         },
+        .mul => if (bits <= 32) {
+            try result.append(.accumulator);
+        } else {
+            return error.ValueUseImmediateScalarFormUnsupported;
+        },
         else => return error.ValueUseImmediateScalarFormUnsupported,
     }
 }

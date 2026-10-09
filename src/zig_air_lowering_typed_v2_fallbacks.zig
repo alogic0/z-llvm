@@ -27,6 +27,7 @@ pub fn lowerRegisterAggregateMake(
     if (!typedV2RegisterAggregateLeafPaths(function_type, structured_air_v2, &leaf_paths)) return error.UnsupportedAir;
     for (function_type.params) |param| {
         if (!param.ir_type.eql(.{ .int = 32 }) and !param.ir_type.eql(.{ .int = 64 }) and
+            !param.ir_type.eql(.ptr) and
             !param.ir_type.eql(.float) and !param.ir_type.eql(.double)) return error.UnsupportedAir;
     }
     var function = ir.Function.init(shortFunctionName(air_function.name), aggregate_ty);

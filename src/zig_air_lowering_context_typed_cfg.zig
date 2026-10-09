@@ -111,7 +111,7 @@ pub fn lowerTypedSwitchValueBlock(
         return air_model.LowerError.UnsupportedAir;
     if (cond_index >= self.values.len) return air_model.LowerError.UnsupportedAir;
     const cond = self.values[cond_index] orelse return air_model.LowerError.UnsupportedAir;
-    if (cond.ty.ir_type != .int or (cond.ty.ir_type.int != 64 and cond.ty.ir_type.int != 32 and cond.ty.ir_type.int != 16 and cond.ty.ir_type.int != 8)) return air_model.LowerError.UnsupportedAir;
+    if (cond.ty.ir_type != .int or cond.ty.ir_type.int == 0 or cond.ty.ir_type.int > 64) return air_model.LowerError.UnsupportedAir;
     const merge_type = self.typedBlockResultType(instruction) orelse return air_model.LowerError.UnsupportedAir;
     if (merge_type.ir_type == .void) return air_model.LowerError.UnsupportedAir;
 

@@ -7,6 +7,8 @@ const typed_v2_fallbacks = @import("zig_air_lowering_typed_v2_fallbacks.zig");
 const ir = @import("ir.zig");
 
 const parseZigType = air_types.parseZigType;
+const pointerChildText = air_types.pointerChildText;
+const aggregate_layout_facts = @import("zig_air_aggregate_layout_facts.zig");
 const aggregateFieldByteOffset = air_model.aggregateFieldByteOffset;
 const genericTypedGepIndex = air_model.genericTypedGepIndex;
 const isPlainFieldPointerChild = air_model.plainFieldPointerChild;
@@ -418,33 +420,74 @@ pub fn lowerTypedFieldPtr(self: anytype, instruction: air_export.TypedInstructio
     const field_index = air_model.fieldIndex(instruction) orelse return air_model.LowerError.UnsupportedAir;
     if (try self.lowerTypedSyntheticUnionFieldPtr(instruction, result_type, field_index)) return;
     const source_ty = aggregate_ptr.ty.pointer_child;
-    if (source_ty) |known_source_ty| {
-        if (aggregateFieldByteOffset(known_source_ty, field_child, field_index)) |offset| {
-            if (offset == 0) {
-                self.values[instruction.index] = .{
-                    .ty = result_type,
-                    .value = aggregate_ptr.value,
-                };
-                return;
+    const offset_opt: ?u64 = blk: {
+        if (source_ty) |known_source_ty| {
+            if (aggregateFieldByteOffset(known_source_ty, field_child, field_index)) |offset| {
+                if (offset >= 0) break :blk @intCast(offset);
             }
-            const result_name = try self.resultName(instruction.index);
-            var gep: ir.GepInst = .{
-                .source_ty = .{ .int = 8 },
-                .ptr = aggregate_ptr.value,
-                .indices = .empty,
-            };
-            errdefer gep.deinit(self.allocator);
-            try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = offset } });
-            try self.block.instructions.append(self.allocator, .{
-                .result = result_name,
-                .kind = .{ .gep = gep },
-            });
+        }
+        if (instruction.operands.len > 0) {
+            const operand_type_text = instruction.operands[0].type_text;
+            if (pointerChildText(operand_type_text)) |child_name| {
+                if (field_index >= 0) {
+                    if (aggregate_layout_facts.nominalFieldByteOffset(child_name, @intCast(field_index))) |offset| {
+                        break :blk offset;
+                    }
+                }
+            }
+        }
+        break :blk null;
+    };
+    if (offset_opt) |offset| {
+        if (offset == 0) {
             self.values[instruction.index] = .{
                 .ty = result_type,
-                .value = .{ .named = result_name },
+                .value = aggregate_ptr.value,
             };
             return;
         }
+        var base_ptr = aggregate_ptr.value;
+        var total_offset: u64 = offset;
+        if (base_ptr == .named) {
+            for (self.block.instructions.items) |prev_inst| {
+                if (prev_inst.result) |prev_result| {
+                    if (std.mem.eql(u8, prev_result, base_ptr.named)) {
+                        if (prev_inst.kind == .gep) {
+                            const prev_gep = prev_inst.kind.gep;
+                            if (prev_gep.source_ty.eql(.{ .int = 8 }) and prev_gep.indices.items.len == 1) {
+                                switch (prev_gep.indices.items[0].value) {
+                                    .int => |prev_offset| {
+                                        if (prev_offset >= 0) {
+                                            base_ptr = prev_gep.ptr;
+                                            total_offset += @intCast(prev_offset);
+                                        }
+                                    },
+                                    else => {},
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        const result_name = try self.resultName(instruction.index);
+        var gep: ir.GepInst = .{
+            .source_ty = .{ .int = 8 },
+            .ptr = base_ptr,
+            .indices = .empty,
+        };
+        errdefer gep.deinit(self.allocator);
+        try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = total_offset } });
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .gep = gep },
+        });
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = .{ .named = result_name },
+        };
+        return;
     }
 
     if (field_index == 0 and isPlainFieldPointerChild(field_child)) {

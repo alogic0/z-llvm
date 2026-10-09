@@ -116,11 +116,11 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
     if (isF32x2(load.ty)) return lowerLoadF32Pair(selector, result_name, load);
     if (scalarFpBits(load.ty)) |bits| return lowerLoadFp(selector, result_name, load, bits);
     const is_ptr = load.ty.eql(.ptr);
-    if (!load.ty.eql(.{ .int = 8 }) and !load.ty.eql(.{ .int = 16 }) and !load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 }) and !is_ptr) return .{ .no_emitter = "composed-block-load-width" };
+    if (!load.ty.eql(.{ .int = 1 }) and !load.ty.eql(.{ .int = 8 }) and !load.ty.eql(.{ .int = 16 }) and !load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 }) and !is_ptr) return .{ .no_emitter = "composed-block-load-width" };
     var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
     const alias_i128 = load.ty.eql(.{ .int = 128 });
-    const bits: u16 = if (is_ptr) 64 else @intCast(load.ty.int);
+    const bits: u16 = if (is_ptr) 64 else if (load.ty.eql(.{ .int = 1 })) 8 else @intCast(load.ty.int);
     const pointer_request = try registerValueUseAction(
         &transaction,
         load.ptr,

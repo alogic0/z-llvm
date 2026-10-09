@@ -257,6 +257,11 @@ pub fn lowerTypedStore(self: anytype, instruction: air_export.TypedInstruction) 
     const value = try self.resolveTypedOperand(instruction, 1);
     if (try self.lowerTypedStoreToSyntheticErrorUnionSlot(instruction, value)) return;
     if (try self.lowerTypedStoreToSyntheticVectorSlot(instruction, value)) return;
+    if (air_model.typedInstOperandIndex(instruction.operands[0])) |idx| {
+        if (idx < self.synthetic_pointer_payloads.len) {
+            self.synthetic_pointer_payloads[idx] = value;
+        }
+    }
     try self.block.instructions.append(self.allocator, .{
         .result = null,
         .kind = .{ .store = .{

@@ -13,8 +13,8 @@ This document defines the actionable implementation plan for taking `z_llvm` fro
   - Unit tests: 1,528 / 1,528 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
   - Documentation validation: passes cleanly (`zig build check-docs`).
   - Behavioral differential gate against Clang-22: 6,528 observations across 8 programs and 3 release modes pass with 0 fallbacks (`zig build behavioral-diff`).
-  - Candidate real-rows gate (`--limit=679` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 679 / 679 (100.0%) passing rows with `local_fail=0` (commit `a3c2bc8c`).
-  - Current Failure Boundary: Row 680 (`os.linux.W.IFSTOPPED`) across all release modes.
+  - Candidate real-rows gate (`--limit=697` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 697 / 697 (100.0%) passing rows with `local_fail=0`.
+  - Current Failure Boundary: Row 698 (`Zcu.fmtDependee`) across all release modes.
   - Architectural Strategy Reference: [`docs/roadmap/architectural_batching_strategy.md`](docs/roadmap/architectural_batching_strategy.md).
   - Stage4 emitter check: passes against tracked pin `1c08b09d1` (`zig build check-zig-stage4-emitter`).
 
@@ -423,7 +423,40 @@ flowchart TD
 
 ---
 
-### Phase 2: Architectural Batching Execution for Real-Rows Convergence (Rows 680 -> 14,185)
+### Milestone: Frontier Advance (Rows 679 -> 697) & Architectural Sentinel Cascade — COMPLETED
+**Focus**: Generic 32-bit IMUL immediate, nominal sentinel enum facts, and genuine typed GEP offset calculation.
+
+1. **32-Bit IMUL Immediate & Boolean Returns (Row 680)**:
+   - In [`src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate.zig`](src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate.zig): accepted `.mul` in `isImmediateRhsScalar` when `bits <= 32` and emitted `.imul_eax_imm32`.
+   - In [`src/codegen/x86_64/generic_cfg/composed_helpers.zig`](src/codegen/x86_64/generic_cfg/composed_helpers.zig): admitted `bits == 1` and `bits == 6` in `isComposedReturnType`.
+   - Unlocked row 680 (`os.linux.W.IFSTOPPED`).
+2. **Sentinel Optional Unwraps Cascade (Rows 681, 687–691, 695–696)**:
+   - In [`src/zig_air_enum_facts.zig`](src/zig_air_enum_facts.zig): registered underlying index types (`InternPool.*.Index`, `Zcu.*.Index`, `link.ConstPool.*.Index`, `zig.Ast.OptionalTokenIndex`, `zig.llvm.Builder.Alignment`) with sentinel `.none` or `.lost` (`0xffff_ffff` / `63`).
+   - All 8 sentinel unwrap functions cascaded cleanly through generic unwrappers with 0 extra codegen logic.
+   - Unlocked rows 681, 682, 687, 688, 689, 690, 691, 695, 696.
+3. **SysV Format Aggregate Returns (Rows 683–684, 697)**:
+   - Registered `FormatData` and `FormatAnalUnit` in [`src/zig_air_types.zig`](src/zig_air_types.zig).
+   - In [`src/zig_air_aggregate_construction.zig`](src/zig_air_aggregate_construction.zig): resolved parameter index through `ptr_cast`.
+   - Emits SysV 16-byte register aggregate returns in `%rax:%rdx`.
+   - Unlocked rows 683–684 (`zig.llvm.Builder.{Global.Index, Metadata.String}.fmt`) and row 697 (`Zcu.fmtAnalUnit`).
+4. **Typed GEP Offset Lowering & Scalar Helpers (Rows 685–686, 692–694)**:
+   - In [`src/zig_air_aggregate_layout_facts.zig`](src/zig_air_aggregate_layout_facts.zig): implemented `nominalFieldByteOffset` for `Compilation`, `Module`, `Io.Writer.Allocating`, and `Io.Writer`.
+   - In [`src/zig_air_lowering_context_typed_pointer_aggregate.zig`](src/zig_air_lowering_context_typed_pointer_aggregate.zig): lowered field pointers using nominal offsets and chained GEP folding without synthetic return stubs.
+   - In [`src/codegen/x86_64/generic_cfg/composed_selector_memory.zig`](src/codegen/x86_64/generic_cfg/composed_selector_memory.zig): supported `i1` boolean field loads as 8-bit memory loads.
+   - Unlocked rows 685 (`Compilation.compilerRtStrip`), 686 (`InternPool.Alignment.toByteUnits`), 692 (`Io.File.MultiReader.Buffer(2).toStreams`), 693 (`Io.Limit.min`), and 694 (`Io.Writer.Allocating.shrinkRetainingCapacity`).
+5. **Verification**:
+   - `zig test src/tests.zig` / `zig build test-unit`: 1,528 / 1,528 pass cleanly.
+   - `zig build check-docs`: passed clean (19 current documents, 135 internal links).
+   - `git diff --check`: passed clean.
+   - Distribution real-rows gate (`--limit=697` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`):
+     - `ReleaseFast`: 697 / 697 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSafe`: 697 / 697 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSmall`: 697 / 697 (100.0%) passing rows with `local_fail=0`.
+   - First failure boundary: cleanly confirmed at Row 698 (`Zcu.fmtDependee`) on `unsupported:opcode:ret_ptr`.
+
+---
+
+### Phase 2: Architectural Batching Execution for Real-Rows Convergence (Rows 698 -> 14,185)
 **Focus**: Execute the 5 orthogonal compiler capability batches defined in [`docs/roadmap/architectural_batching_strategy.md`](docs/roadmap/architectural_batching_strategy.md) to complete Tier 1 (leaf functions) and unlock Tier 2 (callee closures) at scale.
 
 1. **Subsystem Batch 1: Automated Dynamic Nominal Type & Layout Ingestion**:

@@ -207,7 +207,7 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
                         return .{ .no_emitter = "composed-block-param-i8-extension" };
                     try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg });
                 },
-                16 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
+                6, 16 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
                 32 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
                 64 => try selector_state.bindValueLoc(selector, param.name, .{ .arg64 = reg }),
                 128 => {
