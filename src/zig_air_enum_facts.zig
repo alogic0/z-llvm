@@ -294,6 +294,26 @@ const facts = [_]Fact{
         .enumerators = zig_llvm_builder_metadata_kind_enumerators[0..],
     },
     .{
+        .name = "zig.llvm.Builder.StrtabString",
+        .backing_type = .{ .int = 32 },
+        .enumerators = zig_llvm_builder_strtab_string_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.StrtabString",
+        .backing_type = .{ .int = 32 },
+        .enumerators = zig_llvm_builder_strtab_string_enumerators[0..],
+    },
+    .{
+        .name = "zig.llvm.Builder.Type.FormatData.Mode",
+        .backing_type = .{ .int = 8 },
+        .enumerators = zig_llvm_builder_type_format_mode_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.Type.FormatData.Mode",
+        .backing_type = .{ .int = 8 },
+        .enumerators = zig_llvm_builder_type_format_mode_enumerators[0..],
+    },
+    .{
         .name = "codegen.aarch64.Select.Value.Index",
         .backing_type = .{ .int = 32 },
         .enumerators = select_value_index_enumerators[0..],
@@ -921,6 +941,19 @@ const zig_llvm_builder_metadata_kind_enumerators = [_]Enumerator{
 
 const zig_llvm_builder_metadata_unused_enumerators = [_]Enumerator{
     .{ .name = "unused", .value = 0 },
+};
+
+const zig_llvm_builder_strtab_string_enumerators = [_]Enumerator{
+    .{ .name = "none", .value = std.math.maxInt(u31) },
+    .{ .name = "empty", .value = std.math.maxInt(u31) + 1 },
+};
+
+const zig_llvm_builder_type_format_mode_enumerators = [_]Enumerator{
+    .{ .name = "default", .value = 0 },
+    .{ .name = "m", .value = 1 },
+    .{ .name = "lt", .value = 2 },
+    .{ .name = "gt", .value = 3 },
+    .{ .name = "percent", .value = 4 },
 };
 
 pub fn lookup(nominal: []const u8) ?Fact {

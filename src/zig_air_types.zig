@@ -226,7 +226,9 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         return .{ .ir_type = .{ .aggregate = "{ i32, ptr }" } };
     }
     if (std.mem.endsWith(u8, trimmed, "NullTerminatedString.FormatData") or
-        std.mem.endsWith(u8, trimmed, "Builder.String.FormatData"))
+        std.mem.endsWith(u8, trimmed, "Builder.String.FormatData") or
+        std.mem.endsWith(u8, trimmed, "StrtabString.FormatData") or
+        std.mem.endsWith(u8, trimmed, "Type.FormatData"))
     {
         return .{ .ir_type = .{ .aggregate = "{ i32, ptr, i8 }" } };
     }
@@ -306,7 +308,9 @@ pub fn parseZigType(text: []const u8) ?ZigType {
             return .{ .ir_type = .{ .aggregate = "{ { i32, ptr } }" } };
         }
         if (std.mem.indexOf(u8, trimmed, "NullTerminatedString.FormatData") != null or
-            std.mem.indexOf(u8, trimmed, "Builder.String.FormatData") != null)
+            std.mem.indexOf(u8, trimmed, "Builder.String.FormatData") != null or
+            std.mem.indexOf(u8, trimmed, "StrtabString.FormatData") != null or
+            std.mem.indexOf(u8, trimmed, "Type.FormatData") != null)
         {
             return .{ .ir_type = .{ .aggregate = "{ { i32, ptr, i8 } }" } };
         }
