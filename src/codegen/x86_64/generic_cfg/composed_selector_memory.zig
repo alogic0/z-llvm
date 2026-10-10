@@ -101,7 +101,16 @@ pub fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca
 
 pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir.LoadInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
-    if (load.attrs.isBarrier()) return .{ .no_emitter = "composed-block-load-barrier" };
+    if (load.attrs.is_volatile or load.attrs.syncscope != null) return .{ .no_emitter = "composed-block-load-barrier" };
+    if (load.attrs.atomic_ordering) |ordering| {
+        if (!std.mem.eql(u8, ordering, "acquire") and
+            !std.mem.eql(u8, ordering, "monotonic") and
+            !std.mem.eql(u8, ordering, "unordered") and
+            !std.mem.eql(u8, ordering, "seq_cst"))
+        {
+            return .{ .no_emitter = "composed-block-load-barrier" };
+        }
+    }
     if (load.ty.eql(.{ .int = 8 }) and (load.ty_addrspace != null or load.ptr_addrspace != null)) return .{ .no_emitter = "composed-block-byte-load-addrspace" };
     if (inspection.isByteVector128(load.ty)) return lowerLoadByteVector(selector, result_name, load);
     if (selector_state.resolveValue(selector, load.ptr)) |ptr| if (ptr == .readonly_table_ptr)
@@ -175,6 +184,7 @@ fn ordinaryLoadValueUseDiagnostic(
 }
 
 pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
+    if (store.value == .undef or store.value == .poison) return null;
     if (store.attrs.is_volatile or store.attrs.syncscope != null) return .{ .no_emitter = "composed-block-store-barrier" };
     if (store.attrs.atomic_ordering) |ordering| {
         if (!std.mem.eql(u8, ordering, "monotonic") and !std.mem.eql(u8, ordering, "unordered")) {
@@ -187,7 +197,11 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
     if (inspection.isByteVector128(store.ty)) return lowerStoreByteVector(selector, store);
     if (scalarFpStoreBits(store.ty)) |bits| return lowerStoreFp(selector, store, bits);
     if (store.ty == .ptr) return lowerStoreStackPointer(selector, store);
-    if (!store.ty.eql(.{ .int = 1 }) and !store.ty.eql(.{ .int = 8 }) and !store.ty.eql(.{ .int = 32 }) and !store.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-store-width" };
+    const is_int_store = switch (store.ty) {
+        .int => |bits| bits <= 8 or bits == 16 or bits == 32 or bits == 64,
+        else => false,
+    };
+    if (!is_int_store) return .{ .no_emitter = "composed-block-store-width" };
     const pointer_class = selector_state.storePointerDiagnosticClass(selector, store.ptr) orelse
         return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
     if (store.ty.eql(.{ .int = 64 })) return lowerStoreI64Transactional(selector, store, pointer_class);
@@ -833,11 +847,11 @@ fn scalarStorePointerDiagnostic(
     bits: u8,
 ) ?Diagnostic {
     return switch (pointer_class) {
-        .stack_scalar => |stack| if ((bits == 1 or bits == 8) and stack.bits == 8 and stack.kind == .integer)
+        .stack_scalar => |stack| if (bits <= 8 and stack.bits == 8 and stack.kind == .integer)
             null
         else
             .{ .no_emitter = "composed-block-store-stack-width" },
-        .register64, .spill64 => if (bits == 8 or bits == 32 or bits == 64)
+        .register64, .spill64 => if (bits <= 8 or bits == 16 or bits == 32 or bits == 64)
             null
         else
             .{ .no_emitter = "composed-block-store-ptr-width" },
