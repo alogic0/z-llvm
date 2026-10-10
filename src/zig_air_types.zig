@@ -230,6 +230,12 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     {
         return .{ .ir_type = .{ .aggregate = "{ i32, ptr, i8 }" } };
     }
+    if (std.mem.endsWith(u8, trimmed, "Attributes.FormatData")) {
+        return .{ .ir_type = .{ .aggregate = "{ i32, ptr, i16 }" } };
+    }
+    if (std.mem.endsWith(u8, trimmed, "FormatData.Flags")) {
+        return .{ .ir_type = .{ .int = 16 } };
+    }
     if (std.mem.endsWith(u8, trimmed, "FormatAnalUnit")) {
         return .{ .ir_type = .{ .aggregate = "{ i64, ptr }" } };
     }
@@ -291,6 +297,9 @@ pub fn parseZigType(text: []const u8) ?ZigType {
             std.mem.indexOf(u8, trimmed, "Builder.String.FormatData") != null)
         {
             return .{ .ir_type = .{ .aggregate = "{ { i32, ptr, i8 } }" } };
+        }
+        if (std.mem.indexOf(u8, trimmed, "Attributes.FormatData") != null) {
+            return .{ .ir_type = .{ .aggregate = "{ { i32, ptr, i16 } }" } };
         }
         if (std.mem.indexOf(u8, trimmed, "FormatAnalUnit") != null) {
             return .{ .ir_type = .{ .aggregate = "{ { i64, ptr } }" } };
