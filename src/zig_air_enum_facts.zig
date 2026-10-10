@@ -46,6 +46,10 @@ const elf_program_header_index_enumerators = [_]Enumerator{
     .{ .name = "none", .value = std.math.maxInt(u16) },
 };
 
+const progress_node_optional_index_enumerators = [_]Enumerator{
+    .{ .name = "none", .value = std.math.maxInt(u8) },
+};
+
 const ast_node_optional_offset_enumerators = [_]Enumerator{
     .{ .name = "none", .value = std.math.maxInt(i32) },
 };
@@ -291,6 +295,36 @@ const facts = [_]Fact{
     .{
         .name = "std.zig.InternPool.NamespaceIndex",
         .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Progress.Node.OptionalIndex",
+        .backing_type = .{ .int = 8 },
+        .enumerators = progress_node_optional_index_enumerators[0..],
+    },
+    .{
+        .name = "std.Progress.Node.OptionalIndex",
+        .backing_type = .{ .int = 8 },
+        .enumerators = progress_node_optional_index_enumerators[0..],
+    },
+    .{
+        .name = "Node.OptionalIndex",
+        .backing_type = .{ .int = 8 },
+        .enumerators = progress_node_optional_index_enumerators[0..],
+    },
+    .{
+        .name = "Progress.Node.Index",
+        .backing_type = .{ .int = 8 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.Progress.Node.Index",
+        .backing_type = .{ .int = 8 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Node.Index",
+        .backing_type = .{ .int = 8 },
         .enumerators = no_enumerators[0..],
     },
     .{

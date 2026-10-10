@@ -116,6 +116,7 @@ const ScratchCompareKind = enum {
     ne_zero_i16,
     ne_zero_i32,
     ne_zero_i64,
+    ne_i64_immediate,
     ne_named,
     eq_pointer_null,
     eq_pointer_named,
@@ -251,6 +252,11 @@ pub fn classifyScratchCompare(
                 64 => .{ .kind = .ne_zero_i64, .bits = bits },
                 else => error.ValueUseScratchCompareFormUnsupported,
             };
+            if (action.predicate == .ne and bits == 64 and immediate != 0) {
+                _ = composed_helpers.i64Value(immediate) catch
+                    return error.ValueUseScratchCompareImmediateOutOfRange;
+                return .{ .kind = .ne_i64_immediate, .bits = bits };
+            }
             if (!action.samesign and action.predicate == .eq and bits == 52 and immediate == 0)
                 return .{ .kind = .eq_i52_zero, .bits = bits };
             if (action.predicate == .eq and bits == 64 and immediate != 0) {
@@ -420,6 +426,7 @@ pub fn executeScratchCompare(
             .{ .cmp_rcx_arg64 = .r8 },
         .eq_pointer_null, .eq_i52_zero => .{ .test_arg64 = .rcx },
         .eq_i64_immediate,
+        .ne_i64_immediate,
         .sgt_i64_immediate,
         .slt_i64_immediate,
         .ult_i64_immediate,
@@ -441,7 +448,7 @@ pub fn executeScratchCompare(
     try failScratchCompareForTest(Authority, transaction, .after_flags_definition);
 
     const setcc: x86_64_machine.Instruction = switch (plan.kind) {
-        .ne_zero_i16, .ne_zero_i32, .ne_zero_i64, .ne_named => .setne_eax,
+        .ne_zero_i16, .ne_zero_i32, .ne_zero_i64, .ne_i64_immediate, .ne_named => .setne_eax,
         .eq_pointer_null, .eq_pointer_named, .eq_i52_zero, .eq_named, .eq_i64_immediate => .sete_eax,
         .unsigned_i16_immediate => if (action.predicate == .ult) .setb_eax else .seta_eax,
         .ugt_named, .ugt_i64_immediate, .ugt_i32_immediate => .setb_eax,

@@ -47,6 +47,9 @@ fn classifyScratchCompare(icmp: ir.IcmpInst) !ScratchCompareDispatch {
             {
                 return scratchCompareAction(icmp, .{ .immediate = 0 });
             }
+            if (immediate != 0 and bits == 64) {
+                return scratchCompareAction(icmp, .{ .immediate = icmp.rhs.int });
+            }
         }
         if (!icmp.samesign and icmp.rhs == .named and
             (bits == 16 or bits == 32 or bits == 64))
