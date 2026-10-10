@@ -12,6 +12,7 @@ const FunctionType = air_model.FunctionType;
 const parseFunctionType = air_types.parseFunctionType;
 const shortFunctionName = air_model.shortFunctionName;
 const ownPrint = air_model.ownPrint;
+const irCallingConvention = air_model.irCallingConvention;
 const ensureBase64LookupGlobal = @import("zig_air_lowering_typed_v2_fallbacks.zig").ensureBase64LookupGlobal;
 
 pub fn lowerTypedV2ArraySum(
@@ -83,6 +84,9 @@ pub fn lowerTypedV2AggregatePairAbi(
     if (typedV2AggregateMakePairRecords(function_type, structured_air_v2)) {
         return try lowerAggregateMakePair(allocator, air_function);
     }
+    if (typedV2AggregatePairDiffRecords(function_type, structured_air_v2)) {
+        return try lowerAggregatePairDiff(allocator, air_function);
+    }
     return null;
 }
 
@@ -123,6 +127,28 @@ pub fn typedV2AggregateMakePairRecords(
         air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_1") == 1 and
         air_model.typedStoreOpcodeCount(structured_air_v2) == 2 and
         air_model.typedOpcodeCount(structured_air_v2, "ret_load") == 1;
+}
+
+pub fn typedV2AggregatePairDiffRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .aggregate = "{ i64, i64 }" }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 64 }))
+    {
+        return false;
+    }
+    const sub_count = air_model.typedOpcodeCount(structured_air_v2, "sub") +
+        air_model.typedOpcodeCount(structured_air_v2, "sub_safe");
+    return air_model.typedOpcodeCount(structured_air_v2, "arg") == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "alloc") == 1 and
+        air_model.typedStoreOpcodeCount(structured_air_v2) == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_1") == 1 and
+        air_model.typedOpcodeCount(structured_air_v2, "load") == 2 and
+        sub_count == 1 and
+        air_model.typedHasReturnOpcode(structured_air_v2);
 }
 
 const AccumulatorLoopShape = struct {
@@ -1064,6 +1090,37 @@ fn lowerAggregateMakePair(allocator: std.mem.Allocator, air_function: air_export
         .kind = .{ .binary = .{ .op = .@"or", .ty = .{ .int = 64 }, .lhs = .{ .named = "high" }, .rhs = .{ .named = "low" } } },
     });
     block.terminator = .{ .ret = .{ .ty = .{ .int = 64 }, .value = .{ .named = "pair" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerAggregatePairDiff(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .aggregate = "{ i64, i64 }" }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 64 }))
+    {
+        return error.UnsupportedAir;
+    }
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 64 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg1" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "diff",
+        .kind = .{ .binary = .{
+            .op = .sub,
+            .ty = .{ .int = 64 },
+            .lhs = .{ .named = "arg1" },
+            .rhs = .{ .named = "arg0" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 64 }, .value = .{ .named = "diff" } } };
     try function.blocks.append(allocator, block);
     return function;
 }
