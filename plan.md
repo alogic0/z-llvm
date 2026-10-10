@@ -13,8 +13,8 @@ This document defines the actionable implementation plan for taking `z_llvm` fro
   - Unit tests: 1,528 / 1,528 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
   - Documentation validation: passes cleanly (`zig build check-docs`).
   - Behavioral differential gate against Clang-22: 6,528 observations across 8 programs and 3 release modes pass with 0 fallbacks (`zig build behavioral-diff`).
-  - Candidate real-rows gate (`--limit=715` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 715 / 715 (100.0%) passing rows with `local_fail=0`.
-  - Current Failure Boundary: Row 716 (`InternPool.NullTerminatedString.fmt`) across all release modes.
+  - Candidate real-rows gate (`--limit=729` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 729 / 729 (100.0%) passing rows with `local_fail=0`.
+  - Current Failure Boundary: Row 730 (`array_hash_map.Index(u16).setEmpty`) across all release modes.
   - Architectural Strategy Reference: [`docs/roadmap/architectural_batching_strategy.md`](docs/roadmap/architectural_batching_strategy.md).
   - Stage4 emitter check: passes against tracked pin `1c08b09d1` (`zig build check-zig-stage4-emitter`).
 
@@ -514,6 +514,35 @@ flowchart TD
      - `ReleaseSafe`: 715 / 715 (100.0%) passing rows with `local_fail=0`.
      - `ReleaseSmall`: 715 / 715 (100.0%) passing rows with `local_fail=0`.
    - First failure boundary: cleanly confirmed at Row 716 (`InternPool.NullTerminatedString.fmt`) on `unsupported:opcode:ret_ptr`.
+
+---
+
+### Milestone: Frontier Advance (Rows 715 -> 729) & Format Aggregates / IO Clusters — COMPLETED
+**Focus**: SysV sret pointer aggregate returns (`fmt.Alt`), pointer GEP undo, 96-bit/64-bit integer timestamp math, and IO thread group state queries.
+
+1. **Format Aggregate Returns via Hidden Sret Pointer (Rows 716–717)**:
+   - In [`src/zig_air_lowering_typed_v2_aggregate.zig`](src/zig_air_lowering_typed_v2_aggregate.zig): implemented typed lowering for `fmt.Alt` formatters returning composite structs (`FormatData`), emitting fields via `ret_ptr` (%rdi) and returning void/ptr in `%rax`.
+   - In [`src/zig_air_types.zig`](src/zig_air_types.zig): registered `fmt.Alt` aggregate return types and pointer layouts.
+   - Unlocked rows 716 (`InternPool.NullTerminatedString.fmt`) and 717 (`InternPool.NullTerminatedString.fmtId`).
+2. **Sentinel Optional Unwraps (Rows 718, 728)**:
+   - In [`src/zig_air_enum_facts.zig`](src/zig_air_enum_facts.zig): registered `InternPool.OptionalNullTerminatedString` and `Progress.Node.Parent` enum sentinel unwrappers.
+   - Unlocked row 718 (`InternPool.OptionalNullTerminatedString.unwrap`) and row 728 (`Progress.Node.Parent.unwrap`).
+3. **IO Directory & Timestamp Arithmetic (Rows 719, 720, 726)**:
+   - Supported constant struct / descriptor returns for Row 719 (`Io.Dir.cwd`).
+   - Supported wide integer division/conversion in Row 720 (`Io.Duration.toMilliseconds`) and Row 726 (`Io.Timestamp.toSeconds`).
+4. **IO Threaded Cluster & Pointer Undo (Rows 721–725, 727, 729)**:
+   - Handled tag wrapper construction in Rows 722 & 723 (`AwaitableId.fromFuture`, `AwaitableId.fromGroup`).
+   - Handled field loads, status queries, and comparisons in Rows 721 (`Io.Reader.tossBuffered`), 724 (`Io.Threaded.Group.awaiter`), and 725 (`Io.Threaded.Group.status`).
+   - Handled pointer GEP undo and comparison formatting in Row 727 (`Io.Writer.undo`) and Row 729 (`Type.Comparison.fmtType`).
+5. **Verification**:
+   - `zig test src/tests.zig` / `zig build test-unit`: 1,528 / 1,528 pass cleanly.
+   - `zig build check-docs`: passed clean (19 current documents, 135 internal links).
+   - `git diff --check`: passed clean.
+   - Distribution real-rows gate (`--limit=729` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`):
+     - `ReleaseFast`: 729 / 729 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSafe`: 729 / 729 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSmall`: 729 / 729 (100.0%) passing rows with `local_fail=0`.
+   - First failure boundary: cleanly confirmed at Row 730 (`array_hash_map.Index(u16).setEmpty`) on `diagnostic=x86_64-lower:UnsupportedCodegenInstruction:no_emitter:composed-block-store-width`.
 
 ---
 

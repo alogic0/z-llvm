@@ -207,7 +207,7 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
                         return .{ .no_emitter = "composed-block-param-i8-extension" };
                     try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg });
                 },
-                6, 16 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
+                4, 6, 16, 24 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
                 32 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
                 64 => try selector_state.bindValueLoc(selector, param.name, .{ .arg64 = reg }),
                 128 => {
@@ -421,7 +421,10 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
         else
             selector_fp.lowerFcmp(selector, instruction.result, fcmp) catch |err| return instructionValueError(selector, err, "stage2-fcmp-value"),
         .load => |load| selector_memory.lowerLoad(selector, instruction.result, load) catch |err| return instructionValueError(selector, err, "stage2-load-value"),
-        .store => |store| selector_memory.lowerStore(selector, store) catch |err| return instructionValueError(selector, err, "stage2-store-value"),
+        .store => |store| selector_memory.lowerStore(selector, store) catch |err| {
+            std.debug.print("LOWERSTORE FAILED: err={s} store={any}\n", .{ @errorName(err), store });
+            return instructionValueError(selector, err, "stage2-store-value");
+        },
         .gep => |gep| selector_memory.lowerGep(selector, instruction.result, gep) catch |err| return instructionValueError(selector, err, "stage2-gep-value"),
         .call => |call| selector_calls.lowerCall(selector, instruction.result, call) catch |err| return instructionValueError(selector, err, "stage2-call-value"),
         .extractvalue => |extract| selector_calls.lowerExtractValue(selector, instruction.result, extract) catch |err| return instructionValueError(selector, err, "stage2-extractvalue-value"),
@@ -491,6 +494,7 @@ pub fn tryLowerComposedBlockWithContextAndAddressDependencies(
     composed.enable_expired_plan_register_reuse = canUseExpiredPlanRegisterReuse(function);
     defer composed.deinit();
     defer dependency_domain.* = composed.address_dependencies;
+
 
     if (try bindParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try selector_frame.prepareStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);

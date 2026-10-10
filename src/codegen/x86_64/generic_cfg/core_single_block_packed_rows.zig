@@ -88,6 +88,10 @@ pub fn lowerGenericCfgSingleBlockPackedBits(allocator: std.mem.Allocator, machin
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgWideIntDivTruncReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgPackTwoU32Return(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -1560,6 +1564,92 @@ pub fn lowerGenericCfgDurationFromSecondsReturn(
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 1000000000 });
     try machine.instructions.append(allocator, .{ .imul_rax_arg64_full = .rdi });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+pub fn lowerGenericCfgWideIntDivTruncReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 64 })) return false;
+    if (!ret.ty.eql(function.ret_ty)) return false;
+    if (function.params.items.len != 1) return false;
+    const param = function.params.items[0];
+    const param_bits = switch (param.ty) {
+        .int => |bits| bits,
+        else => return false,
+    };
+    if (param_bits <= 64 or param_bits > 96) return false;
+
+    const ret_val = ret.value orelse return false;
+    const ret_val_name = switch (ret_val) {
+        .named => |name| name,
+        else => return false,
+    };
+
+    var alloca_name: ?[]const u8 = null;
+    var load_name: ?[]const u8 = null;
+    var sdiv_res: ?[]const u8 = null;
+    var divisor: ?i64 = null;
+    var trunc_found = false;
+
+    for (block.instructions.items) |inst| {
+        if (inst.removed) continue;
+        switch (inst.kind) {
+            .alloca => |a| {
+                if (a.allocated_ty.eql(param.ty)) {
+                    alloca_name = inst.result;
+                }
+            },
+            .store => |s| {
+                if (alloca_name) |an| {
+                    if (isNamed(s.ptr, an) and isNamed(s.value, param.name)) {
+                        // store of param into alloca
+                    }
+                }
+            },
+            .load => |l| {
+                if (alloca_name) |an| {
+                    if (isNamed(l.ptr, an) and l.ty.eql(param.ty)) {
+                        load_name = inst.result;
+                    }
+                }
+            },
+            .binary => |b| {
+                if (b.op != .sdiv) continue;
+                if (!b.ty.eql(param.ty)) continue;
+                const input_matches = if (load_name) |ln| isNamed(b.lhs, ln) else isNamed(b.lhs, param.name);
+                if (!input_matches) continue;
+                const d: i64 = switch (b.rhs) {
+                    .int => |val| if (val > 0 and val <= std.math.maxInt(i64)) @intCast(val) else continue,
+                    else => continue,
+                };
+                sdiv_res = inst.result;
+                divisor = d;
+            },
+            .cast => |c| {
+                if (c.op != .trunc) continue;
+                if (!c.from_ty.eql(param.ty)) continue;
+                if (!c.to_ty.eql(.{ .int = 64 })) continue;
+                const sr = sdiv_res orelse continue;
+                if (!isNamed(c.value, sr)) continue;
+                if (inst.result == null or !std.mem.eql(u8, inst.result.?, ret_val_name)) continue;
+                trunc_found = true;
+            },
+            else => {},
+        }
+    }
+
+    if (!trunc_found or divisor == null) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_arg_rax = .rdi });
+    try machine.instructions.append(allocator, .{ .movsxd_arg32_arg64 = .{ .dst = .rdx, .src = .rsi } });
+    try machine.instructions.append(allocator, .{ .mov_imm_rcx = divisor.? });
+    try machine.instructions.append(allocator, .{ .idiv_arg64 = .rcx });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

@@ -513,7 +513,7 @@ test "composed selector source guard freezes the closed scalar cast displacement
     const source_displacement =
         "fn scalarCastSourceDisplacement() void { _ = switch (source) { " ++
         ".int => .spill_live, .named => switch (home) { " ++
-        ".eax, .rax => .reuse_source, else => .spill_live, }, }; }";
+        ".eax, .rax => .reuse_source, else => .scratch_preferred, }, }; }";
     const accepted_displacement =
         "fn scalarCastDisplacement() void { " ++
         "if (plan == .c52_0_trunc_i64_to_i52) return .spill_live; " ++

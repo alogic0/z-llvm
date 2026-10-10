@@ -337,7 +337,7 @@ fn scalarCastSourceDisplacement(
         .int => .spill_live,
         .named => |*identity| switch (transaction.prepared_views[source_index].canonical_source_loc) {
             .eax, .rax => .{ .reuse_source = identity.slice() },
-            else => .spill_live,
+            else => .scratch_preferred,
         },
         .null_value, .unsupported => {
             Authority.recordRequestFailure(Authority, transaction, source_index);

@@ -364,6 +364,9 @@ pub fn lowerTypedV2SretIntegerAggregateAbi(
     if (typedV2SretIntegerAggregateFieldWrapperRecords(function_type, structured_air_v2)) |wrapper| {
         return try lowerSretIntegerAggregateFieldWrapper(allocator, module, air_function, function_type.return_type.ir_type, wrapper);
     }
+    if (air_aggregate_construction.planSretAggregateFromStores(function_type, structured_air_v2)) |plan| {
+        return try lowerSretAggregateFromPlan(allocator, module, air_function, function_type, plan);
+    }
     if (!typedV2SretIntegerAggregateRecords(function_type, structured_air_v2)) return null;
     if (air_aggregate_copy.validateSretParamFieldConstructorRecords(function_type, structured_air_v2)) {
         return try lowerSretParamFieldConstructor(allocator, module, air_function, function_type, structured_air_v2);
@@ -377,7 +380,68 @@ pub fn typedV2SretIntegerAggregateRecords(
 ) bool {
     if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
     return validateSretAggregateMakeRecords(function_type, structured_air_v2) or
-        air_aggregate_copy.validateSretParamFieldConstructorRecords(function_type, structured_air_v2);
+        air_aggregate_copy.validateSretParamFieldConstructorRecords(function_type, structured_air_v2) or
+        air_aggregate_construction.planSretAggregateFromStores(function_type, structured_air_v2) != null;
+}
+
+pub fn lowerSretAggregateFromPlan(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    plan: air_aggregate_construction.RegisterAggregatePlan,
+) !ir.Function {
+    var function = ir.Function.init(shortFunctionName(air_function.name), .void);
+    errdefer function.deinit(allocator);
+    function.linkage = .default;
+    function.calling_conv = null;
+
+    const aggregate_ty = function_type.return_type.ir_type;
+    try function.params.append(allocator, .{
+        .ty = .ptr,
+        .attrs = try sretAttrsForAggregate(module, aggregate_ty),
+        .name = "sret",
+    });
+
+    for (function_type.params, 0..) |param, p_idx| {
+        const arg_name = try ownPrint(module, "arg{}", .{p_idx});
+        try function.params.append(allocator, .{ .ty = param.ir_type, .name = arg_name });
+    }
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    const layout = x86_64SysVDataLayout() orelse return error.UnsupportedAir;
+    const agg_plan = type_layout.aggregateLayoutPlan(layout, aggregate_ty) catch return error.UnsupportedAir;
+    const leaves = agg_plan.leafSlice();
+
+    for (0..plan.leaf_count) |leaf_idx| {
+        const leaf_plan = plan.leaves[leaf_idx];
+        const leaf_offset = leaves[leaf_idx].offset;
+        const leaf_field_name = try ownPrint(module, "leaf{}", .{leaf_idx});
+
+        var gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
+        errdefer gep.deinit(allocator);
+        try gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(leaf_offset) } });
+        try block.instructions.append(allocator, .{ .result = leaf_field_name, .kind = .{ .gep = gep } });
+
+        const store_val: ir.Value = switch (leaf_plan.source) {
+            .param => |p_idx| .{ .named = function.params.items[p_idx + 1].name },
+            .constant_int => |c_val| .{ .int = c_val },
+        };
+        try block.instructions.append(allocator, .{
+            .result = null,
+            .kind = .{ .store = .{
+                .ty = leaf_plan.ty,
+                .value = store_val,
+                .ptr = .{ .named = leaf_field_name },
+            } },
+        });
+    }
+
+    block.terminator = .{ .ret = .{ .ty = .void } };
+    try function.blocks.append(allocator, block);
+    return function;
 }
 
 pub fn lowerSretParamFieldConstructor(
@@ -771,48 +835,14 @@ pub fn lowerTypedV2PackedBits(
     if (try lowerTypedV2PackedBitfieldStore(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
+    if (try lowerTypedV2PackedBitfieldLoad(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
     return null;
 }
 
-pub const PackedBitfieldPtrInfo = struct {
-    host_align: u32,
-    bit_offset: u32,
-    host_bytes: u32,
-    field_bits: u32,
-};
-
-pub fn parsePackedBitfieldPointerType(text: []const u8) ?PackedBitfieldPtrInfo {
-    const trimmed = std.mem.trim(u8, text, " ");
-    const align_idx = std.mem.indexOf(u8, trimmed, "align(") orelse return null;
-    const open_paren = align_idx + "align(".len;
-    const close_paren = std.mem.indexOfScalarPos(u8, trimmed, open_paren, ')') orelse return null;
-    const align_spec = trimmed[open_paren..close_paren];
-
-    var it = std.mem.splitScalar(u8, align_spec, ':');
-    const host_align_str = it.next() orelse return null;
-    const bit_offset_str = it.next() orelse return null;
-    const host_bytes_str = it.next() orelse return null;
-    if (it.next() != null) return null;
-
-    const host_align = std.fmt.parseInt(u32, host_align_str, 10) catch return null;
-    const bit_offset = std.fmt.parseInt(u32, bit_offset_str, 10) catch return null;
-    const host_bytes = std.fmt.parseInt(u32, host_bytes_str, 10) catch return null;
-
-    const remainder = std.mem.trim(u8, trimmed[close_paren + 1 ..], " ");
-    const field_bits: u32 = if (std.mem.eql(u8, remainder, "bool"))
-        1
-    else if (std.mem.startsWith(u8, remainder, "u") or std.mem.startsWith(u8, remainder, "i"))
-        std.fmt.parseInt(u32, remainder[1..], 10) catch return null
-    else
-        return null;
-
-    return .{
-        .host_align = host_align,
-        .bit_offset = bit_offset,
-        .host_bytes = host_bytes,
-        .field_bits = field_bits,
-    };
-}
+pub const PackedBitfieldPtrInfo = air_model.PackedBitfieldPtrInfo;
+pub const parsePackedBitfieldPointerType = air_types.parsePackedBitfieldPointerType;
 
 pub const TypedPackedBitfieldStoreSummary = struct {
     host_bytes: u32,
@@ -918,6 +948,158 @@ pub fn lowerTypedV2PackedBitfieldStore(
     });
 
     block.terminator = .{ .ret = .{ .ty = .void, .value = null } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+pub const TypedPackedBitfieldLoadSummary = struct {
+    arg_is_ptr_addr: bool,
+    arg_is_ptr_mem: bool,
+    host_bytes: u32,
+    bit_offset: u32,
+    field_bits: u32,
+};
+
+pub fn typedPackedBitfieldLoadSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?TypedPackedBitfieldLoadSummary {
+    if (function_type.params.len != 1) return null;
+    const ret_bits: u32 = switch (function_type.return_type.ir_type) {
+        .int => |b| b,
+        else => return null,
+    };
+
+    var field_ptr_inst_index: ?u32 = null;
+    var bitfield_info: ?PackedBitfieldPtrInfo = null;
+
+    for (structured_air_v2.instructions) |inst| {
+        if (std.mem.startsWith(u8, inst.opcode, "struct_field_ptr")) {
+            if (parsePackedBitfieldPointerType(inst.result_type)) |info| {
+                field_ptr_inst_index = inst.index;
+                bitfield_info = info;
+                break;
+            }
+        }
+    }
+
+    const target_field_index = field_ptr_inst_index orelse return null;
+    const info = bitfield_info orelse return null;
+    if (info.field_bits != ret_bits) return null;
+
+    var load_inst_index: ?u32 = null;
+    for (structured_air_v2.instructions) |inst| {
+        if (std.mem.eql(u8, inst.opcode, "load")) {
+            if (inst.operands.len >= 1) {
+                const src_idx = air_model.typedInstOperandIndex(inst.operands[0]) orelse continue;
+                if (src_idx == target_field_index) {
+                    load_inst_index = inst.index;
+                    break;
+                }
+            }
+        }
+    }
+    _ = load_inst_index orelse return null;
+
+    var has_int_from_ptr = false;
+    for (structured_air_v2.instructions) |inst| {
+        if (std.mem.eql(u8, inst.opcode, "int_from_ptr")) {
+            has_int_from_ptr = true;
+            break;
+        }
+    }
+
+    const is_ptr = function_type.params[0].ir_type == .ptr;
+
+    return .{
+        .arg_is_ptr_addr = is_ptr and has_int_from_ptr,
+        .arg_is_ptr_mem = is_ptr and !has_int_from_ptr,
+        .host_bytes = info.host_bytes,
+        .bit_offset = info.bit_offset,
+        .field_bits = info.field_bits,
+    };
+}
+
+pub fn lowerTypedV2PackedBitfieldLoad(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    const summary = typedPackedBitfieldLoadSummary(function_type, structured_air_v2) orelse return null;
+    const ret_ty = function_type.return_type.ir_type;
+    var function = ir.Function.init(shortFunctionName(air_function.name), ret_ty);
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+    const attrs: ?[]const u8 = if (function_type.params[0].ir_type.eql(.{ .int = 8 }) and !function_type.params[0].signed)
+        "zeroext"
+    else
+        null;
+    try function.params.append(allocator, .{
+        .ty = function_type.params[0].ir_type,
+        .attrs = attrs,
+        .name = "arg0",
+    });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    const host_bits = @as(u16, @intCast(summary.host_bytes * 8));
+    const host_ty: ir.Type = .{ .int = host_bits };
+
+    var host_val: ir.Value = undefined;
+
+    if (summary.arg_is_ptr_addr) {
+        try block.instructions.append(allocator, .{
+            .result = "air0",
+            .kind = .{ .cast = .{
+                .op = .ptrtoint,
+                .from_ty = .ptr,
+                .value = .{ .named = "arg0" },
+                .to_ty = host_ty,
+            } },
+        });
+        host_val = .{ .named = "air0" };
+    } else if (summary.arg_is_ptr_mem) {
+        try block.instructions.append(allocator, .{
+            .result = "air0",
+            .kind = .{ .load = .{ .ty = host_ty, .ptr = .{ .named = "arg0" } } },
+        });
+        host_val = .{ .named = "air0" };
+    } else {
+        host_val = .{ .named = "arg0" };
+    }
+
+    var shifted_val = host_val;
+    if (summary.bit_offset > 0) {
+        try block.instructions.append(allocator, .{
+            .result = "air_shift",
+            .kind = .{ .binary = .{
+                .op = .lshr,
+                .ty = host_ty,
+                .lhs = host_val,
+                .rhs = .{ .int = summary.bit_offset },
+            } },
+        });
+        shifted_val = .{ .named = "air_shift" };
+    }
+
+    var result_val = shifted_val;
+    if (summary.field_bits < host_bits) {
+        try block.instructions.append(allocator, .{
+            .result = "air_trunc",
+            .kind = .{ .cast = .{
+                .op = .trunc,
+                .from_ty = host_ty,
+                .value = shifted_val,
+                .to_ty = ret_ty,
+            } },
+        });
+        result_val = .{ .named = "air_trunc" };
+    }
+
+    block.terminator = .{ .ret = .{ .ty = ret_ty, .value = result_val } };
     try function.blocks.append(allocator, block);
     return function;
 }

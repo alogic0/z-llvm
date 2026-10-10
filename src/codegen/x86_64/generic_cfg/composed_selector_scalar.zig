@@ -77,17 +77,9 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
         if ((binary.op != .@"and" and binary.op != .@"or") or valueIsInt(binary.lhs) or valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
         return lowerB01NamedScalarBinary(selector, result_name, binary);
     }
-    if (bits == 8) {
-        var op_bin = binary;
-        if (op_bin.op == .@"and" and valueIsInt(op_bin.lhs) and !valueIsInt(op_bin.rhs)) {
-            op_bin.lhs = binary.rhs;
-            op_bin.rhs = binary.lhs;
-        }
-        if (op_bin.op != .@"and" or !valueIsInt(op_bin.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
-        return try lowerBinaryImmediateRhs(selector, result_name, op_bin);
-    }
     const exact_ei_narrow = isExactEiNarrowBits(selector, bits);
-    if (bits != 6 and bits != 7 and bits != 16 and bits != 32 and bits != 64 and bits != 128 and !exact_ei_narrow)
+    const is_imm_scalar = bits > 7 and bits <= 64 and (valueIsInt(binary.rhs) or valueIsInt(binary.lhs));
+    if (bits != 4 and bits != 6 and bits != 7 and bits != 16 and bits != 32 and bits != 64 and bits != 128 and !exact_ei_narrow and !is_imm_scalar)
         return .{ .no_emitter = "composed-block-binary-width" };
 
     if (valueIsInt(binary.rhs)) {
@@ -532,7 +524,7 @@ fn isScalarImmediateFrameless64(selector: *const ComposedBlockSelector, binary: 
     if (selector.stack_frame_bytes != 0) return false;
     if (binary.lhs != .named or binary.rhs != .int) return false;
     const bits = intBits(binary.ty) orelse return false;
-    if (bits != 64) return false;
+    if (bits <= 32 or bits > 64) return false;
     const literal = binary.rhs.int;
     if (binary.op == .@"and" and literal == std.math.maxInt(u32)) return false;
     if ((binary.op == .add or binary.op == .sub) and literal >= std.math.minInt(i32) and literal <= std.math.maxInt(i32)) return false;

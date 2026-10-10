@@ -1328,3 +1328,128 @@ pub fn matchesPointerOffsetIncrementRmwEnvelope(function: ir.Function) ?PointerO
         .offset = gep_offset,
     };
 }
+
+pub const PointerOffsetCopy = struct {
+    src_offset: u8,
+    dst_offset: u8,
+    bits: u16,
+};
+
+pub fn matchesPointerOffsetCopyEnvelope(function: ir.Function) ?PointerOffsetCopy {
+    if (function.ret_ty != .void or function.params.items.len != 1) return null;
+    if (!function.params.items[0].ty.eql(.ptr) or function.blocks.items.len != 1) return null;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (ret.ty != .void or ret.value != null) return null;
+
+    const param_name = function.params.items[0].name;
+    const GepEntry = struct { name: []const u8, offset: u8 };
+    var gep_map: [8]GepEntry = undefined;
+    var gep_count: usize = 0;
+
+    var load_result: ?[]const u8 = null;
+    var src_offset: ?u8 = null;
+    var load_bits: ?u16 = null;
+
+    var store_val: ?[]const u8 = null;
+    var store_ptr: ?[]const u8 = null;
+    var store_bits: ?u16 = null;
+
+    for (block.instructions.items) |inst| {
+        if (inst.removed) continue;
+        switch (inst.kind) {
+            .gep => |gep| {
+                if (gep.source_ty.eql(.{ .int = 8 }) and gep.indices.items.len == 1) {
+                    if (gep.ptr == .named and std.mem.eql(u8, gep.ptr.named, param_name)) {
+                        switch (gep.indices.items[0].value) {
+                            .int => |val| {
+                                if (val >= 0 and val <= std.math.maxInt(u8)) {
+                                    if (inst.result) |res| {
+                                        if (gep_count < gep_map.len) {
+                                            gep_map[gep_count] = .{ .name = res, .offset = @intCast(val) };
+                                            gep_count += 1;
+                                        }
+                                    }
+                                }
+                            },
+                            else => {},
+                        }
+                    }
+                }
+            },
+            .load => |load| {
+                const bits: u16 = switch (load.ty) {
+                    .int => |b| b,
+                    .ptr => 64,
+                    else => return null,
+                };
+                if (bits != 32 and bits != 64) return null;
+                const ptr_name = switch (load.ptr) {
+                    .named => |name| name,
+                    else => return null,
+                };
+                var found_offset: ?u8 = null;
+                if (std.mem.eql(u8, ptr_name, param_name)) {
+                    found_offset = 0;
+                } else {
+                    for (gep_map[0..gep_count]) |entry| {
+                        if (std.mem.eql(u8, ptr_name, entry.name)) {
+                            found_offset = entry.offset;
+                            break;
+                        }
+                    }
+                }
+                if (found_offset) |off| {
+                    load_result = inst.result;
+                    src_offset = off;
+                    load_bits = bits;
+                }
+            },
+            .store => |store| {
+                const bits: u16 = switch (store.ty) {
+                    .int => |b| b,
+                    .ptr => 64,
+                    else => return null,
+                };
+                if (store.value == .named) store_val = store.value.named;
+                if (store.ptr == .named) store_ptr = store.ptr.named;
+                store_bits = bits;
+            },
+            .alloca, .cast => {},
+            else => return null,
+        }
+    }
+
+    const l_res = load_result orelse return null;
+    const s_val = store_val orelse return null;
+    const s_ptr = store_ptr orelse return null;
+    const s_off = src_offset orelse return null;
+    const l_bits = load_bits orelse return null;
+    const s_bits = store_bits orelse return null;
+
+    if (l_bits != s_bits) return null;
+    if (!std.mem.eql(u8, s_val, l_res)) return null;
+
+    var dst_offset: ?u8 = null;
+    if (std.mem.eql(u8, s_ptr, param_name)) {
+        dst_offset = 0;
+    } else {
+        for (gep_map[0..gep_count]) |entry| {
+            if (std.mem.eql(u8, s_ptr, entry.name)) {
+                dst_offset = entry.offset;
+                break;
+            }
+        }
+    }
+
+    const d_off = dst_offset orelse return null;
+
+    return .{
+        .src_offset = s_off,
+        .dst_offset = d_off,
+        .bits = l_bits,
+    };
+}

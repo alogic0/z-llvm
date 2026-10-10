@@ -1748,8 +1748,8 @@ test "generic cfg selector composes constant byte pointer gep" {
         },
     }
 
-    try expectInstruction(machine.instructions.items, .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = 4 } });
-    try expectInstruction(machine.instructions.items, .{ .store_eax_arg_ptr = .rcx });
+    try expectInstruction(machine.instructions.items, .{ .add_arg64_imm32 = .{ .reg = .rdx, .imm = 4 } });
+    try expectInstruction(machine.instructions.items, .{ .store_eax_arg_ptr = .rdx });
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 

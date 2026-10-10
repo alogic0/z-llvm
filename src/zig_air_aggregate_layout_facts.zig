@@ -230,6 +230,37 @@ pub fn nominalFieldByteOffset(nominal_name: []const u8, field_index: usize) ?u64
             else => null,
         };
     }
+    if (std.mem.eql(u8, name, "fmt.parse_float.FloatStream") or std.mem.endsWith(u8, name, ".FloatStream") or std.mem.eql(u8, name, "FloatStream")) {
+        return switch (field_index) {
+            0 => 0, // slice: []const u8
+            1 => 16, // offset: usize
+            2 => 24, // underscore_count: usize
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "libs.mingw.def.Parser") or std.mem.endsWith(u8, name, ".Parser") or std.mem.eql(u8, name, "Parser")) {
+        return switch (field_index) {
+            0 => 0, // tokenizer: *Tokenizer
+            1 => 8, // diagnostics: *Diagnostics
+            2 => 16, // lookahead_tokenizer: Tokenizer
+            3 => 64, // machine_type: IMAGE.FILE.MACHINE
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "libs.mingw.def.Tokenizer") or std.mem.endsWith(u8, name, ".Tokenizer") or std.mem.eql(u8, name, "Tokenizer")) {
+        return switch (field_index) {
+            0 => 0, // source: [:0]const u8
+            1 => 16, // index: usize
+            2 => 24, // error_context_token: ?Token
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "array_hash_map.IndexHeader") or std.mem.endsWith(u8, name, ".IndexHeader") or std.mem.eql(u8, name, "IndexHeader")) {
+        return switch (field_index) {
+            0 => 0, // bit_index: u8
+            else => null,
+        };
+    }
     if (std.mem.eql(u8, name, "Compilation") or std.mem.endsWith(u8, name, ".Compilation")) {
         return switch (field_index) {
             7 => 88, // root_mod: *Module
@@ -239,6 +270,12 @@ pub fn nominalFieldByteOffset(nominal_name: []const u8, field_index: usize) ?u64
     if (std.mem.eql(u8, name, "Module") or std.mem.endsWith(u8, name, ".Module")) {
         return switch (field_index) {
             11 => 622, // strip: bool
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "link.Dwarf") or std.mem.endsWith(u8, name, ".link.Dwarf") or std.mem.eql(u8, name, "Dwarf") or std.mem.endsWith(u8, name, ".Dwarf")) {
+        return switch (field_index) {
+            4 => 26, // address_size: AddressSize
             else => null,
         };
     }
@@ -264,7 +301,31 @@ pub fn nominalFieldByteOffset(nominal_name: []const u8, field_index: usize) ?u64
     }
     if (std.mem.eql(u8, name, "Io.Writer") or std.mem.endsWith(u8, name, ".Io.Writer") or std.mem.eql(u8, name, "Writer") or std.mem.endsWith(u8, name, ".Writer")) {
         return switch (field_index) {
+            0 => 0, // vtable: *const VTable
+            1 => 8, // buffer: []u8
             2 => 24, // end: usize
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "Io.Reader") or std.mem.endsWith(u8, name, ".Io.Reader") or std.mem.eql(u8, name, "Reader") or std.mem.endsWith(u8, name, ".Reader")) {
+        return switch (field_index) {
+            0 => 0, // vtable: *const VTable
+            1 => 8, // buffer: []u8
+            2 => 24, // seek: usize
+            3 => 32, // end: usize
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "Io.Group") or std.mem.endsWith(u8, name, ".Io.Group") or std.mem.eql(u8, name, "Group") or std.mem.endsWith(u8, name, ".Group")) {
+        return switch (field_index) {
+            0 => 0, // token: std.atomic.Value(?*anyopaque)
+            1 => 8, // state: usize
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "Io.Threaded.Group") or std.mem.endsWith(u8, name, ".Io.Threaded.Group")) {
+        return switch (field_index) {
+            0 => 0, // ptr: *Io.Group
             else => null,
         };
     }

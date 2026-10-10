@@ -643,8 +643,11 @@ pub fn categoryForOpcode(opcode: []const u8) InstructionCategory {
     }
     if (std.mem.eql(u8, opcode, "alloc") or
         std.mem.eql(u8, opcode, "load") or
+        std.mem.eql(u8, opcode, "atomic_load") or
         std.mem.eql(u8, opcode, "store") or
         std.mem.eql(u8, opcode, "store_safe") or
+        std.mem.eql(u8, opcode, "atomic_store_monotonic") or
+        std.mem.eql(u8, opcode, "atomic_store_unordered") or
         std.mem.eql(u8, opcode, "memcpy") or
         std.mem.eql(u8, opcode, "memmove") or
         std.mem.eql(u8, opcode, "memset") or
@@ -652,8 +655,7 @@ pub fn categoryForOpcode(opcode: []const u8) InstructionCategory {
         std.mem.eql(u8, opcode, "cmpxchg") or
         std.mem.eql(u8, opcode, "cmpxchg_strong") or
         std.mem.eql(u8, opcode, "cmpxchg_weak") or
-        std.mem.eql(u8, opcode, "atomic_rmw") or
-        std.mem.eql(u8, opcode, "atomic_store_unordered"))
+        std.mem.eql(u8, opcode, "atomic_rmw"))
     {
         return .memory;
     }

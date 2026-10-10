@@ -48,8 +48,10 @@ pub fn castOp(opcode: []const u8, from: ZigType, to: ZigType) ?ir.CastOp {
         std.mem.eql(u8, opcode, "bit_cast_safe") or
         std.mem.eql(u8, opcode, "bitcast_safe") or
         std.mem.eql(u8, opcode, "ptr_cast")) return .bitcast;
-    if (std.mem.eql(u8, opcode, "ptrtoint")) return .ptrtoint;
-    if (std.mem.eql(u8, opcode, "inttoptr")) return .inttoptr;
+    if (std.mem.eql(u8, opcode, "ptrtoint") or
+        std.mem.eql(u8, opcode, "int_from_ptr")) return .ptrtoint;
+    if (std.mem.eql(u8, opcode, "inttoptr") or
+        std.mem.eql(u8, opcode, "ptr_from_int")) return .inttoptr;
     if (std.mem.eql(u8, opcode, "float_from_int")) return if (from.signed) .sitofp else .uitofp;
     if (std.mem.eql(u8, opcode, "int_from_float")) return if (to.signed) .fptosi else .fptoui;
     if (std.mem.eql(u8, opcode, "fpext")) return .fpext;

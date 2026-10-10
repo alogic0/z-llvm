@@ -2056,8 +2056,8 @@ test "generic cfg selector lowers i64 immediate-left variable lshr" {
     }, machine.instructions.items);
 }
 
-test "generic cfg selector lowers exact i16 and i32 immediate-left variable shl" {
-    inline for (.{ 16, 32 }) |bits| {
+test "generic cfg selector lowers exact i16, i32, and i64 immediate-left variable shl" {
+    inline for (.{ 16, 32, 64 }) |bits| {
         var machine = MachineFunction.init("variable-immediate-left-shl", .{ .int = bits });
         defer machine.deinit(std.testing.allocator);
         var plan = SelectorAllocationPlan.init(std.testing.allocator);
@@ -2067,7 +2067,7 @@ test "generic cfg selector lowers exact i16 and i32 immediate-left variable shl"
         defer selector.deinit();
         selector.allocation_plan = &plan;
         selector.current_position = 0;
-        try selector_state.bindValueLoc(&selector, "amount", .{ .arg32 = .rdi });
+        try selector_state.bindValueLoc(&selector, "amount", if (bits <= 32) .{ .arg32 = .rdi } else .{ .arg64 = .rdi });
 
         try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
             .op = .shl,
@@ -2075,7 +2075,7 @@ test "generic cfg selector lowers exact i16 and i32 immediate-left variable shl"
             .lhs = .{ .int = -1 },
             .rhs = .{ .named = "amount" },
         })) == null);
-        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
+        try std.testing.expectEqual(if (bits <= 32) ValueLoc.eax else ValueLoc.rax, selector_state.valueLoc(&selector, "result").?);
         if (bits == 16) {
             try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
                 .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
@@ -2083,16 +2083,22 @@ test "generic cfg selector lowers exact i16 and i32 immediate-left variable shl"
                 .shl_eax_cl,
                 .{ .and_eax_imm32 = 0xffff },
             }, machine.instructions.items);
-        } else {
+        } else if (bits == 32) {
             try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
                 .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
                 .{ .mov_imm_eax = -1 },
                 .shl_eax_cl,
             }, machine.instructions.items);
+        } else {
+            try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+                .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } },
+                .{ .mov_imm_rax = -1 },
+                .shl_rax_cl,
+            }, machine.instructions.items);
         }
     }
 
-    inline for (.{64}) |bits| {
+    inline for (.{128}) |bits| {
         var near_miss_machine = MachineFunction.init("variable-immediate-left-shl-near-miss", .{ .int = bits });
         defer near_miss_machine.deinit(std.testing.allocator);
         var near_miss_selector = ComposedBlockSelector.init(std.testing.allocator, &near_miss_machine);

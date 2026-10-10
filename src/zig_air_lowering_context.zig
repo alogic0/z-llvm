@@ -83,6 +83,8 @@ pub const LoweringContext = struct {
     synthetic_union_field_ptrs: []?air_model.SyntheticUnionFieldPointer,
     synthetic_vector_slots: []?TypedValue,
     synthetic_vector_element_ptrs: []?air_model.SyntheticVectorElementPointer,
+    synthetic_bitfield_ptrs: []?air_model.SyntheticBitfieldPointer,
+    synthetic_aggregate_ptrs: []?ir.Value,
     next_arg_index: usize = 0,
 
     // Typed lowering dispatch and domain-specific lowering operations.
@@ -154,6 +156,7 @@ pub const LoweringContext = struct {
     pub const lowerTypedLoadFromSyntheticVectorElement = typed_memory.lowerTypedLoadFromSyntheticVectorElement;
     pub const lowerTypedLoadFromSliceLenPtr = typed_memory.lowerTypedLoadFromSliceLenPtr;
     pub const lowerTypedLoadFromSlicePtrPtr = typed_memory.lowerTypedLoadFromSlicePtrPtr;
+    pub const lowerTypedLoadFromSyntheticBitfield = typed_memory.lowerTypedLoadFromSyntheticBitfield;
     pub const lowerTypedStore = typed_memory.lowerTypedStore;
     pub const lowerTypedAtomicStore = typed_memory.lowerTypedAtomicStore;
     pub const lowerTypedAtomicStoreMonotonic = typed_memory.lowerTypedAtomicStoreMonotonic;
@@ -161,6 +164,8 @@ pub const LoweringContext = struct {
     pub const lowerTypedStoreToSyntheticVectorSlot = typed_memory.lowerTypedStoreToSyntheticVectorSlot;
     pub const lowerTypedStoreToSyntheticVectorElement = typed_memory.lowerTypedStoreToSyntheticVectorElement;
     pub const lowerTypedStoreToSyntheticUnionField = typed_memory.lowerTypedStoreToSyntheticUnionField;
+    pub const lowerTypedStoreToSyntheticBitfield = typed_memory.lowerTypedStoreToSyntheticBitfield;
+    pub const lowerTypedAggregateCopy = typed_memory.lowerTypedAggregateCopy;
 
     pub const lowerTypedOptionalSemanticInstruction = typed_optional.lowerTypedOptionalSemanticInstruction;
     pub const lowerTypedIsNonNull = typed_optional.lowerTypedIsNonNull;
@@ -207,12 +212,14 @@ pub const LoweringContext = struct {
     pub const lowerTypedAbs = typed_scalar.lowerTypedAbs;
     pub const lowerTypedNeg = typed_scalar.lowerTypedNeg;
     pub const lowerTypedShlSat = typed_scalar.lowerTypedShlSat;
+    pub const lowerTypedSubSat = typed_scalar.lowerTypedSubSat;
     pub const lowerTypedClz = typed_scalar.lowerTypedClz;
     pub const lowerTypedCtz = typed_scalar.lowerTypedCtz;
     pub const lowerTypedZeroCount = typed_scalar.lowerTypedZeroCount;
     pub const lowerTypedPopcount = typed_scalar.lowerTypedPopcount;
     pub const lowerTypedBitCount = typed_scalar.lowerTypedBitCount;
     pub const lowerTypedBitReverse = typed_scalar.lowerTypedBitReverse;
+    pub const lowerTypedNot = typed_scalar.lowerTypedNot;
 
     pub const lowerTypedVectorSemanticInstruction = typed_vector.lowerTypedVectorSemanticInstruction;
     pub const lowerTypedReduce = typed_vector.lowerTypedReduce;
@@ -243,7 +250,7 @@ pub const LoweringContext = struct {
             .binary => try self.lowerBinary(instruction),
             .compare => try self.lowerCompare(instruction),
             .cast => try self.lowerCast(instruction),
-            .add_with_overflow, .sub_with_overflow, .mul_with_overflow, .shl_with_overflow, .byte_swap, .max, .min, .abs, .neg, .shl_sat, .clz, .ctz, .popcount, .bit_reverse, .none => return false,
+            .add_with_overflow, .sub_with_overflow, .mul_with_overflow, .shl_with_overflow, .byte_swap, .max, .min, .abs, .neg, .shl_sat, .sub_sat, .clz, .ctz, .popcount, .bit_reverse, .not, .none => return false,
         }
         return true;
     }
@@ -536,6 +543,16 @@ pub const LoweringContext = struct {
             return error.UnsupportedAir;
         const pointer = try self.resolveValue(fields.next() orelse return error.UnsupportedAir);
         if (fields.next() != null or pointer.ty.ir_type != .ptr) return error.UnsupportedAir;
+        if (result_type.ir_type == .aggregate) {
+            if (instruction.index < self.synthetic_aggregate_ptrs.len) {
+                self.synthetic_aggregate_ptrs[instruction.index] = pointer.value;
+            }
+            self.values[instruction.index] = .{
+                .ty = result_type,
+                .value = pointer.value,
+            };
+            return;
+        }
         const result_name = try self.resultName(instruction.index);
         try self.block.instructions.append(self.allocator, .{
             .result = result_name,
@@ -556,6 +573,10 @@ pub const LoweringContext = struct {
         const pointer = try self.resolveValue(fields.next() orelse return error.UnsupportedAir);
         const value = try self.resolveValue(fields.next() orelse return error.UnsupportedAir);
         if (fields.next() != null or pointer.ty.ir_type != .ptr) return error.UnsupportedAir;
+        if (value.ty.ir_type == .aggregate) {
+            try self.lowerTypedAggregateCopy(instruction.index, pointer.value, value.value, value.ty.ir_type);
+            return;
+        }
         try self.block.instructions.append(self.allocator, .{
             .result = null,
             .kind = .{ .store = .{

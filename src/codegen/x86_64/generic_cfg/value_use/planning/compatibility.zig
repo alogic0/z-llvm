@@ -23,7 +23,11 @@ pub fn validateStorePointerOperand(
     return error.ValueUsePreparedActionFormMismatch;
 }
 pub fn validateStoreI64ValueOperand(request: *const Types.StoredRequest) !void {
-    if (request.form != .gpr64 or !request.expected.ty.eql(.{ .int = 64 }) or
+    const is_i64_width = switch (request.expected.ty) {
+        .int => |bits| bits > 32 and bits <= 64,
+        else => false,
+    };
+    if (request.form != .gpr64 or !is_i64_width or
         request.expected.register_class != .gpr64)
         return error.ValueUsePreparedActionFormMismatch;
 }

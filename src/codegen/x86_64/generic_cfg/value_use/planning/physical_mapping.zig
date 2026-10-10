@@ -96,16 +96,16 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
             }
             const source = mapping.source.?;
             if (source == mapping.destination) {
-                // Byte GEP changes rcx even when staging its base/index is a
+                // Byte GEP changes destination register even when staging its base/index is a
                 // no-op. Preserve that canonical source before exposing views.
-                if (mapping.destination == .rcx) if (request.prepared_action) |action| {
+                if (request.prepared_action) |action| {
                     if (action == .form_byte_address) switch (action.form_byte_address.offset) {
                         .constant => |offset| if (offset != 0) {
                             writes[@intFromEnum(mapping.destination)] = true;
                         },
                         .request => writes[@intFromEnum(mapping.destination)] = true,
                     };
-                };
+                }
                 continue;
             }
             graph[@intFromEnum(source)][@intFromEnum(mapping.destination)] = true;
@@ -141,7 +141,7 @@ pub fn requestDestinationNodes(
             .form_byte_address => |address| switch (address.offset) {
                 .constant => switch (current orelse return error.ValueUseUnresolvedSource) {
                     .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr => {},
-                    else => try result.append(.rcx),
+                    else => try result.append(nodeForArgReg(byteAddressPlanningDestination(transaction.selector, &address.result))),
                 },
                 .request => |handle| {
                     _ = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
@@ -194,7 +194,8 @@ pub fn requestDestinationNodes(
                 );
             },
             .store_i64 => {
-                try result.append(.rcx);
+                const pointer = current orelse return error.ValueUseUnresolvedSource;
+                try appendStorePointerDestinationNodes(&result, pointer, 64);
                 try result.append(.accumulator);
             },
             .store_stack_pointer => try result.append(.rcx),
@@ -493,6 +494,28 @@ fn scalarCastScratchAvailable(selector: *const ComposedBlockSelector, reg: ArgRe
     return selector_state.regConflictStatus(selector, reg) orelse true;
 }
 
+fn byteAddressPlanningDestination(
+    selector: *const ComposedBlockSelector,
+    result: *const ActionIdentity,
+) ArgReg {
+    if (selector.allocation_plan) |plan| {
+        if (plan.assignment(result.slice())) |assignment| {
+            const planned_reg: ?ArgReg = switch (assignment) {
+                .gpr64, .stack_pointer => |reg| reg,
+                else => null,
+            };
+            if (planned_reg) |reg| {
+                if (scalarCastScratchAvailable(selector, reg)) return reg;
+                for (selector_types.selector_allocatable_regs) |candidate| {
+                    if (scalarCastScratchAvailable(selector, candidate)) return candidate;
+                }
+                return reg;
+            }
+        }
+    }
+    return .rcx;
+}
+
 pub fn requestMappings(
     comptime Authority: type,
     transaction: anytype,
@@ -511,7 +534,7 @@ pub fn requestMappings(
                     .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr => return mappings,
                     else => mappings.append(.{
                         .source = scalarSourceNode(current.?),
-                        .destination = .rcx,
+                        .destination = nodeForArgReg(byteAddressPlanningDestination(transaction.selector, &address.result)),
                         .source_request_index = request_index,
                     }),
                 },
@@ -601,11 +624,14 @@ pub fn requestMappings(
             .store_i64 => |store| {
                 const pointer = current orelse return error.ValueUseUnresolvedSource;
                 try compatibility.validateI64StorePointer(pointer);
-                mappings.append(.{
-                    .source = scalarSourceNode(pointer),
-                    .destination = .rcx,
-                    .source_request_index = request_index,
-                });
+                try appendStorePointerMappings(
+                    Authority,
+                    transaction,
+                    &mappings,
+                    pointer,
+                    request_index,
+                    64,
+                );
                 mappings.append(.{
                     .source = scalarSourceNode(try Authority.registeredOperandCurrent(Authority, transaction, store.value)),
                     .destination = .accumulator,
@@ -866,12 +892,12 @@ fn appendStorePointerDestinationNodes(
     bits: u8,
 ) !void {
     switch (pointer) {
-        .stack_scalar => |stack| if ((bits != 1 and bits != 8) or stack.kind != .integer or stack.bits != 8)
+        .stack_scalar => |stack| if (bits > 8 or stack.kind != .integer or stack.bits != 8)
             return error.ValueUseStorePointerFormUnsupported,
-        .arg64, .scratch64 => if (bits != 8 and bits != 32 and bits != 64)
+        .arg64, .scratch64 => if (bits == 0 or bits > 64)
             return error.ValueUseStorePointerFormUnsupported,
         .spill64 => {
-            if (bits != 8 and bits != 32 and bits != 64) return error.ValueUseStorePointerFormUnsupported;
+            if (bits == 0 or bits > 64) return error.ValueUseStorePointerFormUnsupported;
             try nodes.append(.rcx);
         },
         .stack_i32_ptr => |ptr| {
@@ -894,12 +920,12 @@ fn appendStorePointerMappings(
     bits: u8,
 ) !void {
     switch (pointer) {
-        .stack_scalar => |stack| if ((bits != 1 and bits != 8) or stack.kind != .integer or stack.bits != 8)
+        .stack_scalar => |stack| if (bits > 8 or stack.kind != .integer or stack.bits != 8)
             return error.ValueUseStorePointerFormUnsupported,
-        .arg64, .scratch64 => if (bits != 8 and bits != 32 and bits != 64)
+        .arg64, .scratch64 => if (bits == 0 or bits > 64)
             return error.ValueUseStorePointerFormUnsupported,
         .spill64 => {
-            if (bits != 8 and bits != 32 and bits != 64) return error.ValueUseStorePointerFormUnsupported;
+            if (bits == 0 or bits > 64) return error.ValueUseStorePointerFormUnsupported;
             mappings.append(.{ .source = null, .destination = .rcx, .source_request_index = source_request_index });
         },
         .stack_i32_ptr => |ptr| {

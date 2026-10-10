@@ -68,6 +68,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .xor_edx_edx => try writer.writeAll("\txorl %edx, %edx\n"),
             .div_arg32 => |reg| try writer.print("\tdivl {s}\n", .{reg.name32()}),
             .div_arg64 => |reg| try writer.print("\tdivq {s}\n", .{reg.name64()}),
+            .idiv_arg64 => |reg| try writer.print("\tidivq {s}\n", .{reg.name64()}),
             .add_arg64_rax => |reg| try writer.print("\taddq {s}, %rax\n", .{reg.name64()}),
             .add_arg64_imm32 => |add| try writer.print("\taddq ${}, {s}\n", .{ add.imm, add.reg.name64() }),
             .add_arg_high32_eax => |reg| try writer.print("\tmovq {s}, %rcx\n\tshrq $32, %rcx\n\taddl %ecx, %eax\n", .{reg.name64()}),

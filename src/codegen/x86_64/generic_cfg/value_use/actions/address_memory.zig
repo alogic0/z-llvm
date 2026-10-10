@@ -146,7 +146,11 @@ fn prepareScalarLoadAccumulator(
     transaction: anytype,
     session: *AccumulatorDefinitionSession,
 ) !void {
-    if (try session.prepare(.preserve, .spill_live)) |diagnostic| {
+    const displacement: selector_state.AccumulatorDisplacementPolicy = if (transaction.selector.stack_frame_bytes >= 24)
+        .spill_live
+    else
+        .scratch_preferred;
+    if (try session.prepare(.preserve, displacement)) |diagnostic| {
         transaction.action_diagnostic = diagnostic;
         return error.ValueUseActionDiagnostic;
     }
@@ -514,20 +518,30 @@ pub fn executeStoreI64(
     action: Types.StoreI64Action,
 ) !void {
     const pointer = try materialization.preparedViewLoc(pointer_view);
-    switch (pointer) {
-        .arg64, .scratch64, .spill64 => {},
+    const reg: ArgReg = switch (pointer) {
+        .arg64, .scratch64 => |r| r,
+        .spill64 => blk: {
+            try materializeActionPointer(Authority, transaction, pointer, .rcx);
+            break :blk .rcx;
+        },
         else => return error.ValueUseStorePointerFormUnsupported,
-    }
-    try materializeActionPointer(Authority, transaction, pointer, .rcx);
+    };
     const value_view = try Authority.registeredOperandView(Authority, transaction, action.value);
     materializeActionScalar64(Authority, transaction, value_view, .accumulator) catch |err| {
         Authority.noteRegisteredOperandBoundaryError(Authority, transaction, action.value, err);
         return err;
     };
-    try transaction.selector.machine.instructions.append(
-        transaction.selector.allocator,
-        .store_rax_rcx_ptr,
-    );
+    if (reg == .rcx) {
+        try transaction.selector.machine.instructions.append(
+            transaction.selector.allocator,
+            .store_rax_rcx_ptr,
+        );
+    } else {
+        try transaction.selector.machine.instructions.append(
+            transaction.selector.allocator,
+            .{ .store_rax_arg_ptr_disp8 = .{ .reg = reg, .offset = 0 } },
+        );
+    }
 }
 pub fn executeStoreStackPointer(
     comptime Authority: type,
@@ -586,7 +600,7 @@ fn executeStoreEaxToPointer(
     const pointer = try materialization.preparedViewLoc(pointer_view);
     switch (pointer) {
         .stack_scalar => |stack| {
-            if ((bits != 1 and bits != 8) or stack.kind != .integer or stack.bits != 8)
+            if (bits > 8 or stack.kind != .integer or stack.bits != 8)
                 return error.ValueUseStorePointerFormUnsupported;
             try transaction.selector.machine.instructions.append(
                 transaction.selector.allocator,
@@ -597,25 +611,29 @@ fn executeStoreEaxToPointer(
             );
         },
         .arg64, .scratch64 => |reg| {
-            if (bits != 8 and bits != 32 and bits != 64) return error.ValueUseStorePointerFormUnsupported;
+            if (bits == 0 or bits > 64) return error.ValueUseStorePointerFormUnsupported;
             try transaction.selector.machine.instructions.append(
                 transaction.selector.allocator,
-                if (bits == 8)
+                if (bits <= 8)
                     .{ .store_al_arg_ptr_disp8 = .{ .reg = reg, .offset = 0 } }
-                else if (bits == 32)
+                else if (bits <= 16)
+                    .{ .store_ax_arg_ptr_disp8 = .{ .reg = reg, .offset = 0 } }
+                else if (bits <= 32)
                     .{ .store_eax_arg_ptr = reg }
                 else
                     .{ .store_rax_arg_ptr_disp8 = .{ .reg = reg, .offset = 0 } },
             );
         },
         .spill64 => {
-            if (bits != 8 and bits != 32 and bits != 64) return error.ValueUseStorePointerFormUnsupported;
+            if (bits == 0 or bits > 64) return error.ValueUseStorePointerFormUnsupported;
             try materializeActionPointer(Authority, transaction, pointer, .rcx);
             try transaction.selector.machine.instructions.append(
                 transaction.selector.allocator,
-                if (bits == 8)
+                if (bits <= 8)
                     .{ .store_al_arg_ptr_disp8 = .{ .reg = .rcx, .offset = 0 } }
-                else if (bits == 32)
+                else if (bits <= 16)
+                    .{ .store_ax_arg_ptr_disp8 = .{ .reg = .rcx, .offset = 0 } }
+                else if (bits <= 32)
                     .{ .store_eax_arg_ptr = .rcx }
                 else
                     .{ .store_rax_arg_ptr_disp8 = .{ .reg = .rcx, .offset = 0 } },
@@ -737,6 +755,30 @@ fn stackScalarFromPreparedView(
         else => error.ValueUseStorePointerFormUnsupported,
     };
 }
+
+fn scalarCastScratchAvailable(selector: *const ComposedBlockSelector, reg: ArgReg) bool {
+    return selector_state.regConflictStatus(selector, reg) orelse true;
+}
+
+fn byteAddressDestination(selector: *const ComposedBlockSelector, result_name: []const u8) ArgReg {
+    if (selector.allocation_plan) |plan| {
+        if (plan.assignment(result_name)) |assignment| {
+            const planned_reg: ?ArgReg = switch (assignment) {
+                .gpr64, .stack_pointer => |reg| reg,
+                else => null,
+            };
+            if (planned_reg) |reg| {
+                if (scalarCastScratchAvailable(selector, reg)) return reg;
+                for (selector_types.selector_allocatable_regs) |candidate| {
+                    if (scalarCastScratchAvailable(selector, candidate)) return candidate;
+                }
+                return reg;
+            }
+        }
+    }
+    return .rcx;
+}
+
 pub fn executeByteAddress(
     comptime Authority: type,
     transaction: anytype,
@@ -789,13 +831,14 @@ pub fn executeByteAddress(
                     try selector_state.bindValueLoc(transaction.selector, result_name, .{ .readonly_table_ptr = result });
                 },
                 else => {
-                    try materialization.materializeByteAddressPointer(transaction.selector, try materialization.preparedViewLoc(base_view), .rcx);
+                    const dest_reg = byteAddressDestination(transaction.selector, result_name);
+                    try materialization.materializeByteAddressPointer(transaction.selector, try materialization.preparedViewLoc(base_view), dest_reg);
                     if (offset != 0) try selector_state.emitEflagsInstruction(
                         transaction.selector,
-                        .{ .add_arg64_imm32 = .{ .reg = .rcx, .imm = offset } },
+                        .{ .add_arg64_imm32 = .{ .reg = dest_reg, .imm = offset } },
                         .write,
                     );
-                    try selector_state.bindScratch(transaction.selector, result_name, .rcx, 64);
+                    try selector_state.bindScratch(transaction.selector, result_name, dest_reg, 64);
                 },
             }
         },

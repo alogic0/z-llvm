@@ -8,6 +8,7 @@ const type_layout = @import("zig_air_type_layout.zig");
 
 pub const ZigType = air_model.ZigType;
 pub const FunctionType = air_model.FunctionType;
+pub const PackedBitfieldPtrInfo = air_model.PackedBitfieldPtrInfo;
 
 pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !FunctionType {
     const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, text, " "));
@@ -85,6 +86,15 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "anyerror")) return .{ .ir_type = .{ .int = 16 } };
     if (std.mem.eql(u8, trimmed, "anyerror!void")) return .{ .ir_type = .{ .int = 16 } };
     if (std.mem.startsWith(u8, trimmed, "anyerror!")) return .{ .ir_type = .{ .int = 64 } };
+    if (std.mem.eql(u8, trimmed, "anyopaque")) return .{ .ir_type = .void };
+    if (std.mem.startsWith(u8, trimmed, "atomic.Value(") or
+        std.mem.startsWith(u8, trimmed, "std.atomic.Value("))
+    {
+        const open = std.mem.indexOfScalar(u8, trimmed, '(') orelse return null;
+        if (!std.mem.endsWith(u8, trimmed, ")")) return null;
+        const inner = trimmed[open + 1 .. trimmed.len - 1];
+        return parseZigType(inner);
+    }
     if (parseZigVectorType(trimmed)) |vector_ty| return vector_ty;
     if (std.mem.startsWith(u8, trimmed, "*") or
         std.mem.startsWith(u8, trimmed, "?*") or
@@ -109,6 +119,33 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "Io.Duration") or std.mem.eql(u8, trimmed, "std.Io.Duration")) {
         return .{ .ir_type = .{ .int = 96 }, .signed = true };
     }
+    if (std.mem.eql(u8, trimmed, "Io.Timestamp") or std.mem.eql(u8, trimmed, "std.Io.Timestamp")) {
+        return .{ .ir_type = .{ .int = 96 }, .signed = true };
+    }
+    if (std.mem.eql(u8, trimmed, "Io.Reader") or std.mem.endsWith(u8, trimmed, ".Io.Reader") or std.mem.eql(u8, trimmed, "Reader")) {
+        return .{ .ir_type = .ptr };
+    }
+    if (std.mem.eql(u8, trimmed, "Io.Writer") or std.mem.endsWith(u8, trimmed, ".Io.Writer") or std.mem.eql(u8, trimmed, "Writer")) {
+        return .{ .ir_type = .ptr };
+    }
+    if (std.mem.eql(u8, trimmed, "Io.Threaded.AwaitableId") or std.mem.endsWith(u8, trimmed, ".AwaitableId") or std.mem.eql(u8, trimmed, "AwaitableId")) {
+        return .{ .ir_type = .{ .int = 61 } };
+    }
+    if (std.mem.endsWith(u8, trimmed, "AwaitableId.Split") or std.mem.eql(u8, trimmed, "Split")) {
+        return .{ .ir_type = .{ .int = 64 } };
+    }
+    if (std.mem.eql(u8, trimmed, "Io.Threaded.Group") or std.mem.endsWith(u8, trimmed, ".Group") or std.mem.eql(u8, trimmed, "Group")) {
+        return .{ .ir_type = .ptr };
+    }
+    if (std.mem.endsWith(u8, trimmed, "Group.Status") or std.mem.eql(u8, trimmed, "Status")) {
+        return .{ .ir_type = .{ .int = 64 } };
+    }
+    if (std.mem.endsWith(u8, trimmed, "Progress.Node.Parent") or std.mem.endsWith(u8, trimmed, "Progress.Node.Index")) {
+        return .{ .ir_type = .{ .int = 8 } };
+    }
+    if (std.mem.endsWith(u8, trimmed, "IndexHeader") or std.mem.eql(u8, trimmed, "IndexHeader")) {
+        return .{ .ir_type = .{ .int = 8 } };
+    }
     if (std.mem.eql(u8, trimmed, "Compilation.Path")) return .{ .ir_type = .ptr };
     if (std.mem.eql(u8, trimmed, "Compilation.Path.Formatter")) return .{ .ir_type = .void };
     if (std.mem.eql(u8, trimmed, "InternPool.Dependee") or std.mem.eql(u8, trimmed, "std.zig.InternPool.Dependee") or std.mem.eql(u8, trimmed, "Dependee")) {
@@ -123,6 +160,13 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.endsWith(u8, trimmed, "section_64")) return .{ .ir_type = .ptr };
     if (std.mem.endsWith(u8, trimmed, "math.big.int.Managed") or std.mem.eql(u8, trimmed, "Managed")) return .{ .ir_type = .ptr };
     if (std.mem.endsWith(u8, trimmed, "AutoIndentingStream")) return .{ .ir_type = .ptr };
+    if (std.mem.endsWith(u8, trimmed, "FloatStream") or std.mem.eql(u8, trimmed, "FloatStream")) return .{ .ir_type = .ptr };
+    if (std.mem.eql(u8, trimmed, "libs.mingw.def.Tokenizer") or std.mem.endsWith(u8, trimmed, "mingw.def.Tokenizer")) {
+        return .{ .ir_type = .{ .aggregate = "{ ptr, i64, { { i5, i64, i64 }, i1 } }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "libs.mingw.def.Parser") or std.mem.endsWith(u8, trimmed, "mingw.def.Parser")) {
+        return .{ .ir_type = .{ .aggregate = "{ ptr, ptr, { ptr, i64, { { i5, i64, i64 }, i1 } }, i16, i0 }" } };
+    }
     if (std.mem.eql(u8, trimmed, "Sema.Block") or std.mem.eql(u8, trimmed, "std.zig.Sema.Block")) return .{ .ir_type = .ptr };
     if (std.mem.startsWith(u8, trimmed, "bit_set.Integer(") or
         std.mem.startsWith(u8, trimmed, "std.bit_set.Integer("))
@@ -132,6 +176,12 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         const bits = std.fmt.parseInt(u16, std.mem.trim(u8, trimmed[open + 1 .. close], " "), 10) catch return null;
         if (bits == 0) return null;
         return .{ .ir_type = .{ .int = bits } };
+    }
+    if (std.mem.startsWith(u8, trimmed, "compress.flate.token.ShortCode(") or
+        std.mem.startsWith(u8, trimmed, "std.compress.flate.token.ShortCode(") or
+        std.mem.startsWith(u8, trimmed, "ShortCode("))
+    {
+        return .{ .ir_type = .{ .int = 8 } };
     }
     if (std.mem.startsWith(u8, trimmed, "link.Coff.Node.LazyMapRef.Index(") or
         std.mem.startsWith(u8, trimmed, "link.Elf2.Node.LazyMapRef.Index("))
@@ -146,6 +196,9 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "Zcu") or std.mem.eql(u8, trimmed, "codegen.c.type.Zcu")) return .{ .ir_type = .ptr };
     if (std.mem.eql(u8, trimmed, "heap.ArenaAllocator.State")) return .{ .ir_type = .{ .aggregate = "{ ptr, ptr }" } };
+    if (std.mem.eql(u8, trimmed, "heap.ArenaAllocator.Node.Size") or std.mem.endsWith(u8, trimmed, ".ArenaAllocator.Node.Size") or std.mem.eql(u8, trimmed, "Node.Size")) {
+        return .{ .ir_type = .{ .int = 64 } };
+    }
     if (std.mem.eql(u8, trimmed, "mem.Allocator") or std.mem.eql(u8, trimmed, "std.mem.Allocator")) return .{ .ir_type = .{ .aggregate = "{ ptr, ptr }" } };
     if (std.mem.eql(u8, trimmed, "link.Wasm.FunctionType")) return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
     if (std.mem.eql(u8, trimmed, "link.Elf.ZigObject")) return .{ .ir_type = .ptr };
@@ -172,6 +225,11 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.endsWith(u8, trimmed, "Global.Index.FormatData") or std.mem.endsWith(u8, trimmed, "Metadata.String.FormatData")) {
         return .{ .ir_type = .{ .aggregate = "{ i32, ptr }" } };
     }
+    if (std.mem.endsWith(u8, trimmed, "NullTerminatedString.FormatData") or
+        std.mem.endsWith(u8, trimmed, "Builder.String.FormatData"))
+    {
+        return .{ .ir_type = .{ .aggregate = "{ i32, ptr, i8 }" } };
+    }
     if (std.mem.endsWith(u8, trimmed, "FormatAnalUnit")) {
         return .{ .ir_type = .{ .aggregate = "{ i64, ptr }" } };
     }
@@ -179,6 +237,9 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         return .{ .ir_type = .{ .int = 64 } };
     }
     if (std.mem.eql(u8, trimmed, "Compilation")) {
+        return .{ .ir_type = .ptr };
+    }
+    if (std.mem.eql(u8, trimmed, "link.Dwarf") or std.mem.eql(u8, trimmed, "Dwarf")) {
         return .{ .ir_type = .ptr };
     }
     if (std.mem.eql(u8, trimmed, "Module") or std.mem.endsWith(u8, trimmed, ".Module")) {
@@ -225,6 +286,11 @@ pub fn parseZigType(text: []const u8) ?ZigType {
             std.mem.indexOf(u8, trimmed, "Metadata.String.FormatData") != null)
         {
             return .{ .ir_type = .{ .aggregate = "{ { i32, ptr } }" } };
+        }
+        if (std.mem.indexOf(u8, trimmed, "NullTerminatedString.FormatData") != null or
+            std.mem.indexOf(u8, trimmed, "Builder.String.FormatData") != null)
+        {
+            return .{ .ir_type = .{ .aggregate = "{ { i32, ptr, i8 } }" } };
         }
         if (std.mem.indexOf(u8, trimmed, "FormatAnalUnit") != null) {
             return .{ .ir_type = .{ .aggregate = "{ { i64, ptr } }" } };
@@ -483,6 +549,48 @@ pub fn pointerChildText(text: []const u8) ?[]const u8 {
         }
     }
     return std.mem.trim(u8, child, " ");
+}
+
+pub fn parsePackedBitfieldPointerType(text: []const u8) ?PackedBitfieldPtrInfo {
+    const trimmed = std.mem.trim(u8, text, " ");
+    const align_idx = std.mem.indexOf(u8, trimmed, "align(") orelse return null;
+    const open_paren = align_idx + "align(".len;
+    const close_paren = std.mem.indexOfScalarPos(u8, trimmed, open_paren, ')') orelse return null;
+    const align_spec = trimmed[open_paren..close_paren];
+
+    var it = std.mem.splitScalar(u8, align_spec, ':');
+    const host_align_str = it.next() orelse return null;
+    const bit_offset_str = it.next() orelse return null;
+    const host_bytes_str = it.next() orelse return null;
+    if (it.next() != null) return null;
+
+    const host_align = std.fmt.parseInt(u32, host_align_str, 10) catch return null;
+    const bit_offset = std.fmt.parseInt(u32, bit_offset_str, 10) catch return null;
+    const host_bytes = std.fmt.parseInt(u32, host_bytes_str, 10) catch return null;
+
+    var remainder = std.mem.trim(u8, trimmed[close_paren + 1 ..], " ");
+    if (std.mem.startsWith(u8, remainder, "const ")) {
+        remainder = std.mem.trim(u8, remainder["const ".len..], " ");
+    }
+    const field_bits: u32 = if (std.mem.eql(u8, remainder, "bool"))
+        1
+    else if (std.mem.startsWith(u8, remainder, "u") or std.mem.startsWith(u8, remainder, "i"))
+        std.fmt.parseInt(u32, remainder[1..], 10) catch return null
+    else if (parseZigType(remainder)) |parsed| blk: {
+        const bits = switch (parsed.ir_type) {
+            .int => |b| b,
+            else => return null,
+        };
+        break :blk bits;
+    } else
+        return null;
+
+    return .{
+        .host_align = host_align,
+        .bit_offset = bit_offset,
+        .host_bytes = host_bytes,
+        .field_bits = field_bits,
+    };
 }
 
 test "parse qualified Zig function types" {

@@ -711,7 +711,7 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
             if (address.scale != address.shape.stride()) return error.ValueUseAddressScaleMismatch;
         },
         .store_scalar => |store| {
-            if (store.bits != 1 and store.bits != 8 and store.bits != 32) return error.ValueUseStoreWidthUnsupported;
+            if (store.bits == 0 or store.bits > 32) return error.ValueUseStoreWidthUnsupported;
             const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, store.pointer);
             validateStorePointerOperand(&transaction.requests[index], true) catch |err| {
                 Authority.noteRequestBoundaryError(Authority, transaction, index, err);
@@ -719,7 +719,7 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
             };
         },
         .store_immediate => |store| {
-            if (store.bits != 1 and store.bits != 8 and store.bits != 32 and store.bits != 64) return error.ValueUseStoreWidthUnsupported;
+            if (store.bits == 0 or store.bits > 64) return error.ValueUseStoreWidthUnsupported;
             if (store.bits == 1 and store.value != 0 and store.value != 1)
                 return error.ValueUseStoreImmediateOutOfRange;
         },
@@ -1257,7 +1257,11 @@ fn validateStorePointerOperand(
     return error.ValueUsePreparedActionFormMismatch;
 }
 fn validateStoreI64ValueOperand(request: *const Types.StoredRequest) !void {
-    if (request.form != .gpr64 or !request.expected.ty.eql(.{ .int = 64 }) or
+    const is_i64_width = switch (request.expected.ty) {
+        .int => |bits| bits > 32 and bits <= 64,
+        else => false,
+    };
+    if (request.form != .gpr64 or !is_i64_width or
         request.expected.register_class != .gpr64)
         return error.ValueUsePreparedActionFormMismatch;
 }

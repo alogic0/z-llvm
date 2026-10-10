@@ -45,6 +45,18 @@ pub const SyntheticVectorElementPointer = struct {
     lane_index: u32,
 };
 
+pub const PackedBitfieldPtrInfo = struct {
+    host_align: u32,
+    bit_offset: u32,
+    host_bytes: u32,
+    field_bits: u32,
+};
+
+pub const SyntheticBitfieldPointer = struct {
+    base_ptr: ir.Value,
+    info: PackedBitfieldPtrInfo,
+};
+
 pub const TypedBranchMergeResult = struct {
     value: ?TypedValue,
     predecessor_label: []const u8,

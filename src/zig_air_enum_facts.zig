@@ -42,6 +42,14 @@ const intern_pool_anal_unit_optional_enumerators = [_]Enumerator{
     .{ .name = "none", .value = std.math.maxInt(u64) },
 };
 
+const elf_program_header_index_enumerators = [_]Enumerator{
+    .{ .name = "none", .value = std.math.maxInt(u16) },
+};
+
+const ast_node_optional_offset_enumerators = [_]Enumerator{
+    .{ .name = "none", .value = std.math.maxInt(i32) },
+};
+
 const coff_image_file_machine_enumerators = [_]Enumerator{
     .{ .name = "UNKNOWN", .value = 0x0 },
     .{ .name = "ALPHA", .value = 0x184 },
@@ -122,9 +130,29 @@ const intern_pool_tracked_inst_maybe_lost_zir_index_enumerators = [_]Enumerator{
     .{ .name = "lost", .value = std.math.maxInt(u32) },
 };
 
+const progress_node_parent_enumerators = [_]Enumerator{
+    .{ .name = "unused", .value = 254 },
+    .{ .name = "none", .value = 255 },
+};
+
+const dwarf_address_size_enumerators = [_]Enumerator{
+    .{ .name = "32", .value = 4 },
+    .{ .name = "64", .value = 8 },
+};
+
 const no_enumerators = [_]Enumerator{};
 
 const facts = [_]Fact{
+    .{
+        .name = "Progress.Node.Parent",
+        .backing_type = .{ .int = 8 },
+        .enumerators = progress_node_parent_enumerators[0..],
+    },
+    .{
+        .name = "std.Progress.Node.Parent",
+        .backing_type = .{ .int = 8 },
+        .enumerators = progress_node_parent_enumerators[0..],
+    },
     .{
         .name = "math.Order",
         .backing_type = .{ .int = 8 },
@@ -246,6 +274,16 @@ const facts = [_]Fact{
         .enumerators = select_value_index_enumerators[0..],
     },
     .{
+        .name = "codegen.aarch64.encoding.Register.Alias",
+        .backing_type = .{ .int = 7 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Register.Alias",
+        .backing_type = .{ .int = 7 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
         .name = "libs.freebsd.CrtFile",
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],
@@ -325,6 +363,36 @@ const facts = [_]Fact{
         .name = "std.zig.llvm.Builder.Metadata.String.Optional",
         .backing_type = .{ .int = 32 },
         .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "zig.llvm.Builder.String",
+        .backing_type = .{ .int = 32 },
+        .enumerators = zig_llvm_builder_string_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.String",
+        .backing_type = .{ .int = 32 },
+        .enumerators = zig_llvm_builder_string_enumerators[0..],
+    },
+    .{
+        .name = "zig.llvm.Builder.QuoteBehavior",
+        .backing_type = .{ .int = 8 },
+        .enumerators = zig_llvm_builder_quote_behavior_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.QuoteBehavior",
+        .backing_type = .{ .int = 8 },
+        .enumerators = zig_llvm_builder_quote_behavior_enumerators[0..],
+    },
+    .{
+        .name = "?zig.llvm.Builder.QuoteBehavior",
+        .backing_type = .{ .int = 8 },
+        .enumerators = zig_llvm_builder_quote_behavior_enumerators[0..],
+    },
+    .{
+        .name = "?std.zig.llvm.Builder.QuoteBehavior",
+        .backing_type = .{ .int = 8 },
+        .enumerators = zig_llvm_builder_quote_behavior_enumerators[0..],
     },
     .{
         .name = "InternPool.OptionalNullTerminatedString",
@@ -497,6 +565,192 @@ const facts = [_]Fact{
         .enumerators = intern_pool_index_enumerators[0..],
     },
     .{
+        .name = "link.Coff.String",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "link.Coff.String.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "Coff.String",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Coff.String.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "link.Dwarf.AddressSize",
+        .backing_type = .{ .int = 8 },
+        .enumerators = dwarf_address_size_enumerators[0..],
+    },
+    .{
+        .name = "Dwarf.AddressSize",
+        .backing_type = .{ .int = 8 },
+        .enumerators = dwarf_address_size_enumerators[0..],
+    },
+    .{
+        .name = "link.Dwarf.Entry.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "link.Dwarf.Entry.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "Dwarf.Entry.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Dwarf.Entry.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "link.Dwarf.Unit.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "link.Dwarf.Unit.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "Dwarf.Unit.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Dwarf.Unit.Index.Optional",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "link.Elf.ProgramHeaderIndex",
+        .backing_type = .{ .int = 16 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "link.Elf.OptionalProgramHeaderIndex",
+        .backing_type = .{ .int = 16 },
+        .enumerators = elf_program_header_index_enumerators[0..],
+    },
+    .{
+        .name = "Elf.ProgramHeaderIndex",
+        .backing_type = .{ .int = 16 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Elf.OptionalProgramHeaderIndex",
+        .backing_type = .{ .int = 16 },
+        .enumerators = elf_program_header_index_enumerators[0..],
+    },
+    .{
+        .name = "zig.Ast.Node.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Ast.Node.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.Ast.Node.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "zig.Ast.Node.OptionalIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "Ast.Node.OptionalIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.Ast.Node.OptionalIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "zig.Ast.Node.Offset",
+        .backing_type = .{ .int = 32 },
+        .signed = true,
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Ast.Node.Offset",
+        .backing_type = .{ .int = 32 },
+        .signed = true,
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.Ast.Node.Offset",
+        .backing_type = .{ .int = 32 },
+        .signed = true,
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "zig.Ast.Node.OptionalOffset",
+        .backing_type = .{ .int = 32 },
+        .signed = true,
+        .enumerators = ast_node_optional_offset_enumerators[0..],
+    },
+    .{
+        .name = "Ast.Node.OptionalOffset",
+        .backing_type = .{ .int = 32 },
+        .signed = true,
+        .enumerators = ast_node_optional_offset_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.Ast.Node.OptionalOffset",
+        .backing_type = .{ .int = 32 },
+        .signed = true,
+        .enumerators = ast_node_optional_offset_enumerators[0..],
+    },
+    .{
+        .name = "zig.Zir.Inst.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Zir.Inst.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.Zir.Inst.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "zig.Zir.Inst.OptionalIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "Zir.Inst.OptionalIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.Zir.Inst.OptionalIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
         .name = "zig.llvm.Builder.Alignment",
         .backing_type = .{ .int = 6 },
         .enumerators = zig_llvm_builder_alignment_enumerators[0..],
@@ -602,6 +856,17 @@ const ctype_formatter_kind_enumerators = [_]Enumerator{
     .{ .name = "declarator_prefix", .value = 1 },
     .{ .name = "declarator_suffix", .value = 2 },
     .{ .name = "declarator_suffix_ignore_nonstring", .value = 3 },
+};
+
+const zig_llvm_builder_string_enumerators = [_]Enumerator{
+    .{ .name = "none", .value = std.math.maxInt(u31) },
+    .{ .name = "empty", .value = std.math.maxInt(u31) + 1 },
+};
+
+const zig_llvm_builder_quote_behavior_enumerators = [_]Enumerator{
+    .{ .name = "always_quote", .value = 0 },
+    .{ .name = "quote_unless_valid_identifier", .value = 1 },
+    .{ .name = "null", .value = 2 },
 };
 
 pub fn lookup(nominal: []const u8) ?Fact {

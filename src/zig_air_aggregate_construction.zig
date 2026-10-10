@@ -50,6 +50,10 @@ pub fn parseConstIntOperand(instruction: air_export.TypedInstruction, operand_in
     if (!std.mem.eql(u8, operand.kind, "const")) return null;
     const text = air_model.operandTextDetail(instruction, operand_index) orelse operand.value;
     const trimmed = std.mem.trim(u8, text, " ");
+    if (std.mem.eql(u8, trimmed, "@.bool_false")) return 0;
+    if (std.mem.eql(u8, trimmed, "@.bool_true")) return 1;
+    if (std.mem.startsWith(u8, trimmed, "@.zero_")) return 0;
+    if (std.mem.startsWith(u8, trimmed, "@.one_")) return 1;
     if (std.mem.startsWith(u8, trimmed, "<") and std.mem.endsWith(u8, trimmed, ">")) {
         const inner = trimmed[1 .. trimmed.len - 1];
         if (std.mem.indexOfScalar(u8, inner, ',')) |comma| {
@@ -202,7 +206,16 @@ pub fn resolveParamIndex(structured_air_v2: air_export.StructuredAirV2, inst_ind
     }
 }
 
-fn planRegisterAggregateFromStores(
+fn isOperandTypeCompatibleWithLeaf(operand_ty: ir.Type, leaf_ty: ir.Type) bool {
+    if (operand_ty.eql(leaf_ty)) return true;
+    if (operand_ty == .int and leaf_ty == .int) {
+        if ((operand_ty.int == 1 and leaf_ty.int == 8) or (operand_ty.int == 8 and leaf_ty.int == 1)) return true;
+        if (operand_ty.int >= leaf_ty.int) return true;
+    }
+    return false;
+}
+
+pub fn planAggregateConstructionFromStores(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) ?RegisterAggregatePlan {
@@ -215,8 +228,6 @@ fn planRegisterAggregateFromStores(
             break :blk inferred.ty;
         }
     };
-    const is_candidate = isSysVRegisterAggregateCandidate(target_ty);
-    if (!is_candidate) return null;
     const plan = type_layout.aggregateLayoutPlan(layout, target_ty) catch return null;
     const leaves = plan.leafSlice();
     if (leaves.len == 0 or leaves.len > 8) return null;
@@ -248,7 +259,7 @@ fn planRegisterAggregateFromStores(
 
             const field_ty = type_layout.fieldType(target_ty, field_idx) orelse return null;
             const operand_type = parseZigType(instruction.operands[1].type_text) orelse return null;
-            if (!operand_type.ir_type.eql(field_ty)) return null;
+            if (!isOperandTypeCompatibleWithLeaf(operand_type.ir_type, field_ty)) return null;
 
             const path_text = air_model.aggregateIndexPathText(path[0..path_len]) orelse return null;
 
@@ -323,7 +334,7 @@ fn planRegisterAggregateFromStores(
         if (leaf_filled[leaf_index]) return null;
 
         const operand_type = parseZigType(instruction.operands[1].type_text) orelse return null;
-        if (!operand_type.ir_type.eql(target_leaf.ty)) return null;
+        if (!isOperandTypeCompatibleWithLeaf(operand_type.ir_type, target_leaf.ty)) return null;
 
         const path_text = air_model.aggregateIndexPathText(path[0..path_len]) orelse return null;
 
@@ -358,6 +369,22 @@ fn planRegisterAggregateFromStores(
         if (!params_used[p]) return null;
     }
     return result_plan;
+}
+
+fn planRegisterAggregateFromStores(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?RegisterAggregatePlan {
+    if (!isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return null;
+    return planAggregateConstructionFromStores(function_type, structured_air_v2);
+}
+
+pub fn planSretAggregateFromStores(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?RegisterAggregatePlan {
+    if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return null;
+    return planAggregateConstructionFromStores(function_type, structured_air_v2);
 }
 
 fn planRegisterAggregateFromAggregateInit(

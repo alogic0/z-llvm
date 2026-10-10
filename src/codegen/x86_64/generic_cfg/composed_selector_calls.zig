@@ -115,7 +115,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.cttz.i64")) return try lowerCttzI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.ctpop.i64")) return try lowerCtpop(selector, result, call, 64);
     if (std.mem.eql(u8, call.callee, "llvm.ctpop.i128")) return try lowerCtpop(selector, result, call, 128);
-    if (std.mem.eql(u8, call.callee, "llvm.usub.sat.i64")) return try lowerUsubSatI64(selector, result, call);
+    if (std.mem.startsWith(u8, call.callee, "llvm.usub.sat.")) return try lowerUsubSat(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.bswap.i128")) return try lowerBitPermutation(selector, result, call, 128, .byte_swap);
     if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i32")) return try lowerBitPermutation(selector, result, call, 32, .bit_reverse);
     if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i64")) return try lowerBitPermutation(selector, result, call, 64, .bit_reverse);
@@ -184,14 +184,16 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     return null;
 }
 
-pub fn lowerUsubSatI64(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+pub fn lowerUsubSat(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-usub-sat-result" };
     if (call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or
         !isDefaultOrFastcc(call.calling_conv) or call.raw_args != null or call.operand_bundle != null or
-        call.args.items.len != 2 or !call.ret_ty.eql(.{ .int = 64 }))
+        call.args.items.len != 2)
     {
         return .{ .no_emitter = "composed-block-usub-sat-form" };
     }
+    const bits = intBits(call.ret_ty) orelse return .{ .no_emitter = "composed-block-usub-sat-type" };
+    if (bits == 0 or bits > 64) return .{ .no_emitter = "composed-block-usub-sat-width" };
     if (call.tail_kind) |tail_kind| {
         if (!std.mem.eql(u8, tail_kind, "tail") and !std.mem.eql(u8, tail_kind, "notail")) {
             return .{ .no_emitter = "composed-block-usub-sat-tail" };
@@ -199,29 +201,51 @@ pub fn lowerUsubSatI64(selector: *ComposedBlockSelector, result: ?[]const u8, ca
     }
     const lhs = call.args.items[0];
     const rhs = call.args.items[1];
-    if (!lhs.ty.eql(.{ .int = 64 }) or lhs.value != .named or
-        !rhs.ty.eql(.{ .int = 64 }) or rhs.value != .int or rhs.value.int < 0)
+    if (!lhs.ty.eql(call.ret_ty) or lhs.value != .named or
+        !rhs.ty.eql(call.ret_ty) or rhs.value != .int or rhs.value.int < 0)
     {
         return .{ .no_emitter = "composed-block-usub-sat-args" };
     }
-    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-    defer transaction.deinit();
-    if (try transaction.prepare(
-        .preserve,
-        try selector_scalar.accumulatorPreserveCurrentDisplacement(selector, lhs.value, .spill_live),
-    )) |diagnostic| return diagnostic;
-    transaction.materialize(lhs.value, .fullRax()) catch return .{ .unsupported_value = "composed-block-usub-sat-lhs" };
-    try selector_state.clobberArgReg(selector, .rcx);
-    try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs.value.int) });
-    try selector_state.emitEflagsDefinition(selector, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } }, .carry);
-    const no_borrow = try selector_state.allocateEdgeLabel(selector);
-    try selector_state.emitEflagsInstruction(selector, .{ .jae = no_borrow }, .use);
-    try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = 0 });
-    try selector.machine.instructions.append(selector.allocator, .{ .label = no_borrow });
-    try transaction.define(result_name, .fullRax());
-    try transaction.commit();
-    return null;
+    if (bits == 64) {
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(
+            .preserve,
+            try selector_scalar.accumulatorPreserveCurrentDisplacement(selector, lhs.value, .spill_live),
+        )) |diagnostic| return diagnostic;
+        transaction.materialize(lhs.value, .fullRax()) catch return .{ .unsupported_value = "composed-block-usub-sat-lhs" };
+        try selector_state.clobberArgReg(selector, .rcx);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs.value.int) });
+        try selector_state.emitEflagsDefinition(selector, .{ .binary_arg_rax = .{ .op = .sub, .reg = .rcx } }, .carry);
+        const no_borrow = try selector_state.allocateEdgeLabel(selector);
+        try selector_state.emitEflagsInstruction(selector, .{ .jae = no_borrow }, .use);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = 0 });
+        try selector.machine.instructions.append(selector.allocator, .{ .label = no_borrow });
+        try transaction.define(result_name, .fullRax());
+        try transaction.commit();
+        return null;
+    } else {
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        if (try transaction.prepare(
+            .preserve,
+            try selector_scalar.accumulatorPreserveCurrentDisplacement(selector, lhs.value, .spill_live),
+        )) |diagnostic| return diagnostic;
+        transaction.materialize(lhs.value, .zeroExtending(bits)) catch return .{ .unsupported_value = "composed-block-usub-sat-lhs" };
+        try selector_state.clobberArgReg(selector, .rcx);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(rhs.value.int) });
+        try selector_state.emitEflagsDefinition(selector, .{ .binary_arg_eax = .{ .op = .sub, .reg = .rcx } }, .carry);
+        const no_borrow = try selector_state.allocateEdgeLabel(selector);
+        try selector_state.emitEflagsInstruction(selector, .{ .jae = no_borrow }, .use);
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = 0 });
+        try selector.machine.instructions.append(selector.allocator, .{ .label = no_borrow });
+        try transaction.define(result_name, .zeroExtending(bits));
+        try transaction.commit();
+        return null;
+    }
 }
+
+pub const lowerUsubSatI64 = lowerUsubSat;
 
 fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     var plan = try sysv_abi.planScalarCall(selector.allocator, call);

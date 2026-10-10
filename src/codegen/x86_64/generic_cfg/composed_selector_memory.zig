@@ -908,11 +908,26 @@ fn executeValueUseAction(
     authority: *ValueUseTransaction,
     action: ValueUseTransaction.RequestHandle,
 ) !void {
-    try authority.seal();
-    try authority.prepare();
-    try authority.materializeAll();
-    try authority.executePreparedAction(try authority.preparedView(action));
-    try authority.commit();
+    authority.seal() catch |err| {
+        std.debug.print("executeValueUseAction seal err: {s}\n", .{@errorName(err)});
+        return err;
+    };
+    authority.prepare() catch |err| {
+        std.debug.print("executeValueUseAction prepare err: {s}\n", .{@errorName(err)});
+        return err;
+    };
+    authority.materializeAll() catch |err| {
+        std.debug.print("executeValueUseAction materializeAll err: {s}\n", .{@errorName(err)});
+        return err;
+    };
+    authority.executePreparedAction(try authority.preparedView(action)) catch |err| {
+        std.debug.print("executeValueUseAction executePreparedAction err: {s}\n", .{@errorName(err)});
+        return err;
+    };
+    authority.commit() catch |err| {
+        std.debug.print("executeValueUseAction commit err: {s}\n", .{@errorName(err)});
+        return err;
+    };
 }
 
 fn pointerUseForm(

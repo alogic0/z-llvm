@@ -1,3 +1,4 @@
+const std = @import("std");
 const air_export = @import("zig_air_export.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
 const air_model = @import("zig_air_model.zig");

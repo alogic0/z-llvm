@@ -1255,7 +1255,8 @@ pub fn validateScalarCastDisplacementPlan(source: [:0]const u8) !void {
         countPattern(displacement, "scalarCastSourceDisplacement(") != 1 or
         countPattern(source_displacement, ".eax, .rax") != 1 or
         countPattern(source_displacement, ".reuse_source") != 1 or
-        countPattern(source_displacement, ".spill_live") != 2)
+        countPattern(source_displacement, ".scratch_preferred") != 1 or
+        countPattern(source_displacement, ".spill_live") != 1)
     {
         return error.ValueUseScalarCastSequenceMismatch;
     }

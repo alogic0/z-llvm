@@ -55,9 +55,9 @@ pub fn isImmediateRhsScalar(binary: ir.BinaryInst) bool {
     const literal = binary.rhs.int;
     return switch (binary.op) {
         .sdiv => bits == 32 and isPositivePowerOfTwoDivisor(literal),
-        .lshr => bits == 16 or bits == 32 or bits == 64,
+        .lshr => bits <= 32 or bits == 64,
         .shl, .ashr => bits <= 32 or bits == 64,
-        .@"and", .@"or", .add, .sub, .xor => bits <= 32 or bits == 64,
+        .@"and", .@"or", .add, .sub, .xor => bits <= 64,
         .mul => bits <= 32,
         else => false,
     };
@@ -69,7 +69,7 @@ pub fn isImmediateLhsScalar(binary: ir.BinaryInst) bool {
     if (bits == 0 or bits > 64) return false;
     return switch (binary.op) {
         .sub => bits <= 32 or bits == 64,
-        .shl => bits == 16 or bits == 32,
+        .shl => bits == 16 or bits == 32 or bits == 64,
         .lshr => bits <= 32 or bits == 64,
         else => false,
     };
@@ -228,7 +228,10 @@ pub fn executeImmediateLhsScalar(
             }
         },
         .l02_variable_shift_left => {
-            try emitImmediateWrite(transaction, .shl_eax_cl);
+            try emitImmediateWrite(
+                transaction,
+                if (bits <= 32) .shl_eax_cl else .shl_rax_cl,
+            );
             try failImmediateScalarForTest(transaction, .after_first_instruction);
             if (bits == 16) {
                 try emitImmediateWrite(transaction, .{ .and_eax_imm32 = 0xffff });
@@ -265,7 +268,7 @@ fn classifyImmediateRhsSemantic(
             .r00_signed_divide_by_power_of_two
         else
             error.ValueUseImmediateScalarFormUnsupported,
-        .lshr => if (bits == 16 or bits == 32 or bits == 64)
+        .lshr => if (bits <= 32 or bits == 64)
             .r01_logical_shift_right_scratch
         else
             error.ValueUseImmediateScalarWidthUnsupported,
@@ -281,8 +284,6 @@ fn classifyImmediateRhsSemantic(
             error.ValueUseImmediateScalarWidthUnsupported,
         .@"and", .@"or", .add, .sub, .xor => if (bits <= 32)
             .r04_narrow_accumulator_immediate
-        else if (bits != 64)
-            error.ValueUseImmediateScalarWidthUnsupported
         else if (action.operation == .sub)
             if (fitsI32(action.literal))
                 .r06_wide_scratch_immediate
@@ -311,7 +312,7 @@ fn classifyImmediateLhsSemantic(
             .l01_reverse_subtract
         else
             error.ValueUseImmediateScalarWidthUnsupported,
-        .shl => if (bits == 16 or bits == 32)
+        .shl => if (bits == 16 or bits == 32 or bits == 64)
             .l02_variable_shift_left
         else
             error.ValueUseImmediateScalarWidthUnsupported,
@@ -1121,8 +1122,10 @@ fn immediateScratchAvailable(selector: *const ComposedBlockSelector, reg: ArgReg
 fn immediateAccumulatorDefinition(bits: u16) AccumulatorDefinition {
     return if (bits <= 32)
         .zeroExtending(bits)
+    else if (bits == 64)
+        .fullRax()
     else
-        .fullRax();
+        .zeroExtendedRax(bits);
 }
 
 fn emitImmediateWrite(transaction: anytype, instruction: machine_module.Instruction) !void {

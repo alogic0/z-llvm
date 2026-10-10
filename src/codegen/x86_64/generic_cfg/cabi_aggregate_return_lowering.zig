@@ -621,8 +621,8 @@ fn emitConstantEightbyte(
         }
     } else if (combined <= std.math.maxInt(u32)) {
         switch (dst) {
-            .rax => try machine.instructions.append(allocator, .{ .mov_imm_eax = @intCast(combined) }),
-            .rdx => try machine.instructions.append(allocator, .{ .mov_imm_rdx = @intCast(combined) }),
+            .rax => try machine.instructions.append(allocator, .{ .mov_imm_eax = @as(i32, @bitCast(@as(u32, @truncate(combined)))) }),
+            .rdx => try machine.instructions.append(allocator, .{ .mov_imm_rdx = @as(i64, @intCast(combined)) }),
         }
     } else {
         const i64_val: i64 = @bitCast(combined);

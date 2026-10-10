@@ -80,6 +80,7 @@ pub const Instruction = union(enum) {
     xor_edx_edx,
     div_arg32: ArgReg,
     div_arg64: ArgReg,
+    idiv_arg64: ArgReg,
     add_arg64_rax: ArgReg,
     add_arg64_imm32: struct {
         reg: ArgReg,

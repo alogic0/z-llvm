@@ -1116,8 +1116,13 @@ fn lowerFunction(
 
     for (function_type.params, 0..) |param_type, param_index| {
         const name = try ownPrint(module, "arg{}", .{param_index});
+        const attrs: ?[]const u8 = if (param_type.ir_type.eql(.{ .int = 8 }) and !param_type.signed)
+            "zeroext"
+        else
+            null;
         try function.params.append(allocator, .{
             .ty = param_type.ir_type,
+            .attrs = attrs,
             .name = name,
         });
     }
@@ -1145,6 +1150,12 @@ fn lowerFunction(
     const synthetic_vector_element_ptrs = try allocator.alloc(?air_model.SyntheticVectorElementPointer, air_function.instruction_count);
     defer allocator.free(synthetic_vector_element_ptrs);
     @memset(synthetic_vector_element_ptrs, null);
+    const synthetic_bitfield_ptrs = try allocator.alloc(?air_model.SyntheticBitfieldPointer, air_function.instruction_count);
+    defer allocator.free(synthetic_bitfield_ptrs);
+    @memset(synthetic_bitfield_ptrs, null);
+    const synthetic_aggregate_ptrs = try allocator.alloc(?ir.Value, air_function.instruction_count);
+    defer allocator.free(synthetic_aggregate_ptrs);
+    @memset(synthetic_aggregate_ptrs, null);
 
     var context: LoweringContext = .{
         .allocator = allocator,
@@ -1162,6 +1173,8 @@ fn lowerFunction(
         .synthetic_union_field_ptrs = synthetic_union_field_ptrs,
         .synthetic_vector_slots = synthetic_vector_slots,
         .synthetic_vector_element_ptrs = synthetic_vector_element_ptrs,
+        .synthetic_bitfield_ptrs = synthetic_bitfield_ptrs,
+        .synthetic_aggregate_ptrs = synthetic_aggregate_ptrs,
     };
 
     for (air_function.instructions) |instruction| {
@@ -1387,6 +1400,12 @@ fn lowerFunctionTypedV2(
     const synthetic_vector_element_ptrs = try allocator.alloc(?air_model.SyntheticVectorElementPointer, air_function.instruction_count);
     defer allocator.free(synthetic_vector_element_ptrs);
     @memset(synthetic_vector_element_ptrs, null);
+    const synthetic_bitfield_ptrs = try allocator.alloc(?air_model.SyntheticBitfieldPointer, air_function.instruction_count);
+    defer allocator.free(synthetic_bitfield_ptrs);
+    @memset(synthetic_bitfield_ptrs, null);
+    const synthetic_aggregate_ptrs = try allocator.alloc(?ir.Value, air_function.instruction_count);
+    defer allocator.free(synthetic_aggregate_ptrs);
+    @memset(synthetic_aggregate_ptrs, null);
     const typed_view = air_model.TypedFunctionView.init(air_function) orelse return error.UnsupportedAir;
 
     var context: LoweringContext = .{
@@ -1407,6 +1426,8 @@ fn lowerFunctionTypedV2(
         .synthetic_union_field_ptrs = synthetic_union_field_ptrs,
         .synthetic_vector_slots = synthetic_vector_slots,
         .synthetic_vector_element_ptrs = synthetic_vector_element_ptrs,
+        .synthetic_bitfield_ptrs = synthetic_bitfield_ptrs,
+        .synthetic_aggregate_ptrs = synthetic_aggregate_ptrs,
     };
 
     for (main_body.instructions) |instruction_index| {

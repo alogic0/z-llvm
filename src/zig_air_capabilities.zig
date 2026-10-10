@@ -133,10 +133,12 @@ pub const ScalarSemanticOp = enum {
     abs,
     neg,
     shl_sat,
+    sub_sat,
     clz,
     ctz,
     popcount,
     bit_reverse,
+    not,
 };
 
 pub const MemorySemanticOp = enum {
@@ -359,6 +361,7 @@ pub fn scalarSemanticOpForOpcode(opcode: []const u8) ScalarSemanticOp {
     if (std.mem.eql(u8, opcode, "sub_with_overflow")) return .sub_with_overflow;
     if (std.mem.eql(u8, opcode, "mul_with_overflow")) return .mul_with_overflow;
     if (std.mem.eql(u8, opcode, "shl_with_overflow")) return .shl_with_overflow;
+    if (std.mem.eql(u8, opcode, "sub_sat")) return .sub_sat;
     if (isArithmeticOpcode(opcode)) return .binary;
     if (std.mem.eql(u8, opcode, "cmp_lte_errors_len")) return .none;
     if (std.mem.startsWith(u8, opcode, "cmp_")) return .compare;
@@ -373,12 +376,17 @@ pub fn scalarSemanticOpForOpcode(opcode: []const u8) ScalarSemanticOp {
     if (std.mem.eql(u8, opcode, "ctz")) return .ctz;
     if (std.mem.eql(u8, opcode, "popcount")) return .popcount;
     if (std.mem.eql(u8, opcode, "bit_reverse")) return .bit_reverse;
+    if (std.mem.eql(u8, opcode, "not")) return .not;
     return .none;
 }
 
 pub fn memorySemanticOpForOpcode(opcode: []const u8) MemorySemanticOp {
     if (std.mem.eql(u8, opcode, "alloc")) return .alloc;
-    if (std.mem.eql(u8, opcode, "load")) return .load;
+    if (std.mem.eql(u8, opcode, "load") or
+        std.mem.eql(u8, opcode, "atomic_load"))
+    {
+        return .load;
+    }
     if (std.mem.eql(u8, opcode, "store") or
         std.mem.eql(u8, opcode, "store_safe") or
         std.mem.eql(u8, opcode, "atomic_store_monotonic") or
@@ -555,7 +563,7 @@ fn dataKindCategoryFromText(text: []const u8) UnknownOpcodeCategory {
     if (containsAny(text, &.{ "try", "err", "error", "unwrap_err", "errunion" })) return .error_union_try;
     if (containsAny(text, &.{ "optional", "wrap_optional" })) return .optional_shape;
     if (containsAny(text, &.{ "union", "get_union_tag", "set_union_tag", "tag_name" })) return .union_tag_shape;
-    if (equalsAny(text, &.{ "max", "min", "abs", "neg", "shl_exact", "shr_exact", "shl_sat" }) or
+    if (equalsAny(text, &.{ "max", "min", "abs", "neg", "shl_exact", "shr_exact", "shl_sat", "sub_sat" }) or
         containsAny(text, &.{ "byte_swap", "bit_reverse", "popcount", "clz", "ctz" })) return .scalar_transform;
     if (equalsAny(text, &.{ "round", "ceil", "floor", "trunc_float", "sqrt", "exp", "exp2", "log", "log2", "log10", "cos", "sin", "tan", "mul_add" })) return .float_math;
     if (equalsAny(text, &.{"select"})) return .select_shape;
@@ -1006,13 +1014,17 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expectEqual(ScalarSemanticOp.abs, scalarSemanticOpForOpcode("abs"));
     try std.testing.expectEqual(ScalarSemanticOp.neg, scalarSemanticOpForOpcode("neg"));
     try std.testing.expectEqual(ScalarSemanticOp.shl_sat, scalarSemanticOpForOpcode("shl_sat"));
+    try std.testing.expectEqual(ScalarSemanticOp.sub_sat, scalarSemanticOpForOpcode("sub_sat"));
     try std.testing.expectEqual(ScalarSemanticOp.clz, scalarSemanticOpForOpcode("clz"));
     try std.testing.expectEqual(ScalarSemanticOp.ctz, scalarSemanticOpForOpcode("ctz"));
     try std.testing.expectEqual(ScalarSemanticOp.popcount, scalarSemanticOpForOpcode("popcount"));
     try std.testing.expectEqual(ScalarSemanticOp.bit_reverse, scalarSemanticOpForOpcode("bit_reverse"));
+    try std.testing.expectEqual(ScalarSemanticOp.not, scalarSemanticOpForOpcode("not"));
     try std.testing.expectEqual(SemanticDomain.memory, semanticDomainForOpcode("load"));
     try std.testing.expectEqual(MemorySemanticOp.alloc, memorySemanticOpForOpcode("alloc"));
     try std.testing.expectEqual(MemorySemanticOp.load, memorySemanticOpForOpcode("load"));
+    try std.testing.expectEqual(MemorySemanticOp.load, memorySemanticOpForOpcode("atomic_load"));
+    try std.testing.expect(typedV2CanLower(opcodeCapability("atomic_load")));
     try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("store"));
     try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("store_safe"));
     try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("atomic_store_monotonic"));

@@ -111,7 +111,7 @@ pub fn lowerGenericCfgScalarSretParamStores(
     var leaf_count: usize = 0;
     const layout = x86_64SysVDataLayout() catch return error.UnsupportedCodegenAbi;
     try collectScalarSretLeaves(layout, aggregate_ty, 0, &leaves, &leaf_count);
-    if (leaf_count == 0 or function.params.items.len != leaf_count + 1) return false;
+    if (leaf_count == 0 or function.params.items.len > leaf_count + 1) return false;
     if (!function.params.items[0].ty.eql(.ptr)) return false;
     const sret_reg = try paramReg(function, function.params.items[0].name, .ptr);
     if (sret_reg != .rdi) return error.UnsupportedCodegenAbi;
@@ -160,18 +160,21 @@ pub fn lowerGenericCfgScalarSretParamStores(
         };
         if (!store.ty.eql(field_ty) or store.attrs.isBarrier()) return false;
         if (!isNamed(store.ptr, ptr_name)) return false;
-        const store_val_name = switch (store.value) {
-            .named => |n| n,
+
+        switch (store.value) {
+            .named => |store_val_name| {
+                var found_param = false;
+                for (function.params.items[1..]) |param| {
+                    if (std.mem.eql(u8, param.name, store_val_name) and param.ty.eql(field_ty)) {
+                        found_param = true;
+                        break;
+                    }
+                }
+                if (!found_param) return false;
+            },
+            .int => {},
             else => return false,
-        };
-        var found_param = false;
-        for (function.params.items[1..]) |param| {
-            if (std.mem.eql(u8, param.name, store_val_name) and param.ty.eql(field_ty)) {
-                found_param = true;
-                break;
-            }
         }
-        if (!found_param) return false;
         instruction_index += 1;
 
         try emitGenericCfgScalarSretParamStore(allocator, machine, function, block, store.value, field_ty, sret_reg, offset);
@@ -207,68 +210,106 @@ fn emitGenericCfgScalarSretParamStore(
     sret_reg: ArgReg,
     offset: u32,
 ) !void {
-    const name = switch (value) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-    };
-    if (ty.eql(.{ .int = 32 })) {
-        try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, value);
-        try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, offset);
-    } else if (ty.eql(.{ .int = 64 }) or ty.eql(.ptr)) {
-        const maybe_reg = paramRegOrNull(function, name, ty) catch |err| switch (err) {
-            error.UnsupportedCodegenAbi => null,
-            else => return err,
-        };
-        if (maybe_reg) |reg| {
-            try appendStoreArg64ArgPtrDisp(allocator, machine, sret_reg, reg, offset);
-        } else {
-            try appendLoadStackDispRax(allocator, machine, try scalarParamStackDisp8(function, name, ty));
-            try appendStoreRaxArgPtrDisp(allocator, machine, sret_reg, offset);
-        }
-    } else if (ty.eql(.{ .int = 16 })) {
-        const maybe_reg = paramRegOrNull(function, name, ty) catch |err| switch (err) {
-            error.UnsupportedCodegenAbi => null,
-            else => return err,
-        };
-        if (maybe_reg) |reg| {
-            try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
-        } else {
-            try appendLoadStackDispU16Eax(allocator, machine, try scalarParamStackDisp8(function, name, ty));
-        }
-        try appendStoreAxArgPtrDisp(allocator, machine, sret_reg, offset);
-    } else if (ty.eql(.{ .int = 8 })) {
-        const maybe_reg = paramRegOrNull(function, name, ty) catch |err| switch (err) {
-            error.UnsupportedCodegenAbi => null,
-            else => return err,
-        };
-        if (maybe_reg) |reg| {
-            try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
-        } else {
-            try appendLoadStackDispU8Eax(allocator, machine, try scalarParamStackDisp8(function, name, ty));
-        }
-        try appendStoreAlArgPtrDisp(allocator, machine, sret_reg, offset);
-    } else if (ty.eql(.float) or ty.eql(.double)) {
-        const source_index = fpParamIndex(function, name, ty) catch |err| switch (err) {
-            error.UnsupportedCodegenAbi => null,
-            else => return err,
-        };
-        if (source_index) |index| {
-            const source = try XmmReg.fromIndex(index);
-            if (source != .xmm0) {
-                try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm0, .src = source } });
+    switch (value) {
+        .int => |val| {
+            if (ty.eql(.{ .int = 32 })) {
+                try machine.instructions.append(allocator, .{ .mov_imm_eax = @truncate(val) });
+                try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, offset);
+            } else if (ty.eql(.{ .int = 64 }) or ty.eql(.ptr)) {
+                if (offset <= 127 and val >= std.math.minInt(i32) and val <= std.math.maxInt(i32)) {
+                    try machine.instructions.append(allocator, .{
+                        .store_imm64_arg_ptr_disp8 = .{
+                            .reg = sret_reg,
+                            .offset = @intCast(offset),
+                            .imm = @intCast(val),
+                        },
+                    });
+                } else {
+                    try machine.instructions.append(allocator, .{ .mov_imm_rax = @intCast(val) });
+                    try appendStoreRaxArgPtrDisp(allocator, machine, sret_reg, offset);
+                }
+            } else if (ty.eql(.{ .int = 16 })) {
+                try machine.instructions.append(allocator, .{ .mov_imm_eax = @intCast(val) });
+                try appendStoreAxArgPtrDisp(allocator, machine, sret_reg, offset);
+            } else if (ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 1 })) {
+                if (offset <= 127) {
+                    try machine.instructions.append(allocator, .{
+                        .store_imm8_arg_ptr_disp8 = .{
+                            .reg = sret_reg,
+                            .offset = @intCast(offset),
+                            .imm = @truncate(@as(u128, @bitCast(val))),
+                        },
+                    });
+                } else {
+                    try machine.instructions.append(allocator, .{ .mov_imm_eax = @intCast(val) });
+                    try appendStoreAlArgPtrDisp(allocator, machine, sret_reg, offset);
+                }
+            } else {
+                return error.UnsupportedCodegenType;
             }
-        } else if (ty.eql(.float)) {
-            try appendLoadStackDispXmm0F32(allocator, machine, try scalarParamStackDisp8(function, name, ty));
-        } else {
-            try appendLoadStackDispXmm0(allocator, machine, try scalarParamStackDisp8(function, name, ty));
-        }
-        if (ty.eql(.float)) {
-            try appendStoreXmm0F32ArgPtrDisp(allocator, machine, sret_reg, offset);
-        } else {
-            try appendStoreXmm0ArgPtrDisp(allocator, machine, sret_reg, offset);
-        }
-    } else {
-        return error.UnsupportedCodegenType;
+        },
+        .named => |name| {
+            if (ty.eql(.{ .int = 32 })) {
+                try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, value);
+                try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, offset);
+            } else if (ty.eql(.{ .int = 64 }) or ty.eql(.ptr)) {
+                const maybe_reg = paramRegOrNull(function, name, ty) catch |err| switch (err) {
+                    error.UnsupportedCodegenAbi => null,
+                    else => return err,
+                };
+                if (maybe_reg) |reg| {
+                    try appendStoreArg64ArgPtrDisp(allocator, machine, sret_reg, reg, offset);
+                } else {
+                    try appendLoadStackDispRax(allocator, machine, try scalarParamStackDisp8(function, name, ty));
+                    try appendStoreRaxArgPtrDisp(allocator, machine, sret_reg, offset);
+                }
+            } else if (ty.eql(.{ .int = 16 })) {
+                const maybe_reg = paramRegOrNull(function, name, ty) catch |err| switch (err) {
+                    error.UnsupportedCodegenAbi => null,
+                    else => return err,
+                };
+                if (maybe_reg) |reg| {
+                    try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
+                } else {
+                    try appendLoadStackDispU16Eax(allocator, machine, try scalarParamStackDisp8(function, name, ty));
+                }
+                try appendStoreAxArgPtrDisp(allocator, machine, sret_reg, offset);
+            } else if (ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 1 })) {
+                const maybe_reg = paramRegOrNull(function, name, ty) catch |err| switch (err) {
+                    error.UnsupportedCodegenAbi => null,
+                    else => return err,
+                };
+                if (maybe_reg) |reg| {
+                    try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
+                } else {
+                    try appendLoadStackDispU8Eax(allocator, machine, try scalarParamStackDisp8(function, name, ty));
+                }
+                try appendStoreAlArgPtrDisp(allocator, machine, sret_reg, offset);
+            } else if (ty.eql(.float) or ty.eql(.double)) {
+                const source_index = fpParamIndex(function, name, ty) catch |err| switch (err) {
+                    error.UnsupportedCodegenAbi => null,
+                    else => return err,
+                };
+                if (source_index) |index| {
+                    const source = try XmmReg.fromIndex(index);
+                    if (source != .xmm0) {
+                        try machine.instructions.append(allocator, .{ .movapd_xmm = .{ .dst = .xmm0, .src = source } });
+                    }
+                } else if (ty.eql(.float)) {
+                    try appendLoadStackDispXmm0F32(allocator, machine, try scalarParamStackDisp8(function, name, ty));
+                } else {
+                    try appendLoadStackDispXmm0(allocator, machine, try scalarParamStackDisp8(function, name, ty));
+                }
+                if (ty.eql(.float)) {
+                    try appendStoreXmm0F32ArgPtrDisp(allocator, machine, sret_reg, offset);
+                } else {
+                    try appendStoreXmm0ArgPtrDisp(allocator, machine, sret_reg, offset);
+                }
+            } else {
+                return error.UnsupportedCodegenType;
+            }
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     }
 }
 

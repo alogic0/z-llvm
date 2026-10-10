@@ -438,6 +438,34 @@ pub fn lowerTypedFieldPtr(self: anytype, instruction: air_export.TypedInstructio
         }
         break :blk null;
     };
+    if (air_types.parsePackedBitfieldPointerType(instruction.result_type)) |bitfield_info| {
+        var base_ptr = aggregate_ptr.value;
+        if (offset_opt) |offset| {
+            if (offset > 0) {
+                const gep_name = try ownPrint(self.module, "air{}_bitfield_gep", .{instruction.index});
+                var gep: ir.GepInst = .{
+                    .source_ty = .{ .int = 8 },
+                    .ptr = base_ptr,
+                    .indices = .empty,
+                };
+                errdefer gep.deinit(self.allocator);
+                try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(offset) } });
+                try self.block.instructions.append(self.allocator, .{ .result = gep_name, .kind = .{ .gep = gep } });
+                base_ptr = .{ .named = gep_name };
+            }
+        }
+        if (instruction.index < self.synthetic_bitfield_ptrs.len) {
+            self.synthetic_bitfield_ptrs[instruction.index] = .{
+                .base_ptr = base_ptr,
+                .info = bitfield_info,
+            };
+        }
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = base_ptr,
+        };
+        return;
+    }
     if (offset_opt) |offset| {
         if (offset == 0) {
             self.values[instruction.index] = .{
