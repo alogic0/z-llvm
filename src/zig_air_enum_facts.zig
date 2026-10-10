@@ -254,6 +254,46 @@ const facts = [_]Fact{
         .enumerators = intern_pool_index_enumerators[0..],
     },
     .{
+        .name = "InternPool.OptionalMapIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.OptionalMapIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.MapIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.MapIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.OptionalNamespaceIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.OptionalNamespaceIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "InternPool.NamespaceIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.InternPool.NamespaceIndex",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
         .name = "zig.llvm.Builder.Type",
         .backing_type = .{ .int = 32 },
         .enumerators = zig_llvm_builder_type_enumerators[0..],

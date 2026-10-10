@@ -269,7 +269,14 @@ pub fn nominalFieldByteOffset(nominal_name: []const u8, field_index: usize) ?u64
     }
     if (std.mem.eql(u8, name, "Module") or std.mem.endsWith(u8, name, ".Module")) {
         return switch (field_index) {
+            4 => 96, // resolved_target: ResolvedTarget
             11 => 622, // strip: bool
+            else => null,
+        };
+    }
+    if (std.mem.eql(u8, name, "Module.ResolvedTarget") or std.mem.endsWith(u8, name, ".Module.ResolvedTarget") or std.mem.eql(u8, name, "ResolvedTarget") or std.mem.endsWith(u8, name, ".ResolvedTarget")) {
+        return switch (field_index) {
+            0 => 0, // result: Target
             else => null,
         };
     }

@@ -265,6 +265,12 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "Module") or std.mem.endsWith(u8, trimmed, ".Module")) {
         return .{ .ir_type = .ptr };
     }
+    if (std.mem.eql(u8, trimmed, "Target") or std.mem.endsWith(u8, trimmed, ".Target")) {
+        return .{ .ir_type = .ptr };
+    }
+    if (std.mem.eql(u8, trimmed, "Module.ResolvedTarget") or std.mem.endsWith(u8, trimmed, ".ResolvedTarget")) {
+        return .{ .ir_type = .ptr };
+    }
     if (std.mem.eql(u8, trimmed, "link.Elf.Thunk") or std.mem.eql(u8, trimmed, "Elf.Thunk")) {
         return .{ .ir_type = .ptr };
     }
