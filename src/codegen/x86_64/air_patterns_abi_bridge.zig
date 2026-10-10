@@ -669,16 +669,67 @@ fn lowerSysVAggregateFieldReturn(
         break :blk cast.op == .trunc and cast.to_ty.eql(ret.ty);
     };
 
-    const expected_base_len: usize = if (has_trunc) 4 else 3;
+    const value_before_trunc = if (has_trunc)
+        block.instructions.items[block.instructions.items.len - 1].kind.cast.value
+    else
+        ret.value orelse return error.InvalidRet;
+
+    var shift_amount: ?u6 = null;
+    const value_before_shift = blk: {
+        const candidate_index: usize = if (has_trunc)
+            (if (block.instructions.items.len >= 2) block.instructions.items.len - 2 else break :blk value_before_trunc)
+        else
+            (if (block.instructions.items.len >= 1) block.instructions.items.len - 1 else break :blk value_before_trunc);
+        const candidate = block.instructions.items[candidate_index];
+        if (candidate.removed or candidate.result == null) break :blk value_before_trunc;
+        if (!isNamed(value_before_trunc, candidate.result.?)) break :blk value_before_trunc;
+        const binary = switch (candidate.kind) {
+            .binary => |b| b,
+            else => break :blk value_before_trunc,
+        };
+        if (binary.op != .lshr) break :blk value_before_trunc;
+        const shift = switch (binary.rhs) {
+            .int => |imm| if (imm >= 0 and imm < 64) @as(u6, @intCast(imm)) else return false,
+            else => return false,
+        };
+        shift_amount = shift;
+        break :blk binary.lhs;
+    };
+    const has_lshr = shift_amount != null;
+
+    const expected_base_len: usize = 3 + (if (has_trunc) @as(usize, 1) else 0) + (if (has_lshr) @as(usize, 1) else 0);
     if (block.instructions.items.len != expected_base_len and block.instructions.items.len != expected_base_len + 1) return false;
     const has_gep = block.instructions.items.len == expected_base_len + 1;
 
-    const alloca_inst = block.instructions.items[0];
-    const store_inst = block.instructions.items[1];
-    const maybe_gep_inst: ?ir.Instruction = if (has_gep) block.instructions.items[2] else null;
-    const load_inst = if (has_trunc) block.instructions.items[if (has_gep) 3 else 2] else block.instructions.items[block.instructions.items.len - 1];
+    var inst_idx: usize = 0;
+    const alloca_inst = block.instructions.items[inst_idx];
+    inst_idx += 1;
+    const store_inst = block.instructions.items[inst_idx];
+    inst_idx += 1;
+    const maybe_gep_inst: ?ir.Instruction = if (has_gep) blk: {
+        const inst = block.instructions.items[inst_idx];
+        inst_idx += 1;
+        break :blk inst;
+    } else null;
+    const load_inst = block.instructions.items[inst_idx];
+    inst_idx += 1;
+    const maybe_lshr_inst: ?ir.Instruction = if (has_lshr) blk: {
+        const inst = block.instructions.items[inst_idx];
+        inst_idx += 1;
+        break :blk inst;
+    } else null;
+    const maybe_trunc_inst: ?ir.Instruction = if (has_trunc) blk: {
+        const inst = block.instructions.items[inst_idx];
+        inst_idx += 1;
+        break :blk inst;
+    } else null;
+    if (inst_idx != block.instructions.items.len) return false;
+
     if (alloca_inst.removed or store_inst.removed or load_inst.removed) return false;
     if (maybe_gep_inst) |gep_inst| if (gep_inst.removed) return false;
+    if (maybe_lshr_inst) |lshr_inst| if (lshr_inst.removed) return false;
+    if (maybe_trunc_inst) |trunc_inst| if (trunc_inst.removed) return false;
+
     const alloca_name = alloca_inst.result orelse return false;
     const load_name = load_inst.result orelse return false;
 
@@ -704,14 +755,18 @@ fn lowerSysVAggregateFieldReturn(
         else => return false,
     };
     if (load.attrs.isBarrier()) return false;
+    if (!isNamed(value_before_shift, load_name)) return false;
 
+    if (has_lshr) {
+        if (!maybe_lshr_inst.?.kind.binary.ty.eql(load.ty)) return false;
+    }
     if (has_trunc) {
-        const last = block.instructions.items[block.instructions.items.len - 1];
-        if (!isNamed(last.kind.cast.value, load_name)) return false;
-        if (!load.ty.eql(last.kind.cast.from_ty)) return false;
+        const from_ty = maybe_trunc_inst.?.kind.cast.from_ty;
+        const expected_from_ty = if (has_lshr) maybe_lshr_inst.?.kind.binary.ty else load.ty;
+        if (!expected_from_ty.eql(from_ty)) return false;
     } else {
-        if (!isNamed(ret.value orelse return error.InvalidRet, load_name)) return false;
-        if (!load.ty.eql(ret.ty)) return false;
+        const final_ty = if (has_lshr) maybe_lshr_inst.?.kind.binary.ty else load.ty;
+        if (!final_ty.eql(ret.ty)) return false;
     }
 
     const layout = try x86_64SysVDataLayout();
@@ -731,6 +786,16 @@ fn lowerSysVAggregateFieldReturn(
     _ = aggregateFieldIndexAtOffset(alloca.allocated_ty, field_offset, load.ty) orelse return false;
 
     try emitSysVAggregateFieldOffsetReturn(allocator, machine, function, param_name, alloca.allocated_ty, field_offset, load.ty);
+    if (shift_amount) |shift| {
+        if (load.ty.eql(.{ .int = 32 })) {
+            if (shift >= 32) return false;
+            try machine.instructions.append(allocator, .{ .shr_eax_imm5 = @intCast(shift) });
+        } else if (load.ty.eql(.{ .int = 64 })) {
+            try machine.instructions.append(allocator, .{ .shr_rax_imm6 = shift });
+        } else {
+            return false;
+        }
+    }
     if (has_trunc) {
         switch (ret.ty) {
             .int => |bits| {
