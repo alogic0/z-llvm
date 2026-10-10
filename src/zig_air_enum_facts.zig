@@ -274,6 +274,16 @@ const facts = [_]Fact{
         .enumerators = zig_llvm_builder_attributes_enumerators[0..],
     },
     .{
+        .name = "zig.llvm.Builder.Constant",
+        .backing_type = .{ .int = 32 },
+        .enumerators = zig_llvm_builder_constant_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.Constant",
+        .backing_type = .{ .int = 32 },
+        .enumerators = zig_llvm_builder_constant_enumerators[0..],
+    },
+    .{
         .name = "codegen.aarch64.Select.Value.Index",
         .backing_type = .{ .int = 32 },
         .enumerators = select_value_index_enumerators[0..],
@@ -881,6 +891,15 @@ const zig_llvm_builder_quote_behavior_enumerators = [_]Enumerator{
 
 const zig_llvm_builder_attributes_enumerators = [_]Enumerator{
     .{ .name = "none", .value = 0 },
+};
+
+const zig_llvm_builder_constant_enumerators = [_]Enumerator{
+    .{ .name = "false", .value = 0 },
+    .{ .name = "true", .value = 1 },
+    .{ .name = "0", .value = 2 },
+    .{ .name = "1", .value = 3 },
+    .{ .name = "none", .value = 4 },
+    .{ .name = "no_init", .value = (1 << 30) - 1 },
 };
 
 pub fn lookup(nominal: []const u8) ?Fact {
