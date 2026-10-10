@@ -13,8 +13,8 @@ This document defines the actionable implementation plan for taking `z_llvm` fro
   - Unit tests: 1,528 / 1,528 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
   - Documentation validation: passes cleanly (`zig build check-docs`).
   - Behavioral differential gate against Clang-22: 6,528 observations across 8 programs and 3 release modes pass with 0 fallbacks (`zig build behavioral-diff`).
-  - Candidate real-rows gate (`--limit=729` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 729 / 729 (100.0%) passing rows with `local_fail=0`.
-  - Current Failure Boundary: Row 730 (`array_hash_map.Index(u16).setEmpty`) across all release modes.
+  - Candidate real-rows gate (`--limit=785` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`): 785 / 785 (100.0%) passing rows with `local_fail=0`.
+  - Current Failure Boundary: Row 786 (`link.File.isStatic`) across all release modes.
   - Architectural Strategy Reference: [`docs/roadmap/architectural_batching_strategy.md`](docs/roadmap/architectural_batching_strategy.md).
   - Stage4 emitter check: passes against tracked pin `1c08b09d1` (`zig build check-zig-stage4-emitter`).
 
@@ -543,6 +543,34 @@ flowchart TD
      - `ReleaseSafe`: 729 / 729 (100.0%) passing rows with `local_fail=0`.
      - `ReleaseSmall`: 729 / 729 (100.0%) passing rows with `local_fail=0`.
    - First failure boundary: cleanly confirmed at Row 730 (`array_hash_map.Index(u16).setEmpty`) on `diagnostic=x86_64-lower:UnsupportedCodegenInstruction:no_emitter:composed-block-store-width`.
+
+---
+
+### Milestone: Frontier Advance (Rows 729 -> 785) & Subsystem Consolidation — COMPLETED
+**Focus**: Multi-width store emitters (`setEmpty`), EnumIndexer key lookup, FloatStream parser manipulation, Zcu target queries, Value formatting, and sentinel unwrap cascades.
+
+1. **Multi-Width Stores & Index Headers (Rows 730–733)**:
+   - Supported 8-bit, 16-bit, and 32-bit immediate stores into aggregate slots for `array_hash_map.Index(T).setEmpty` (`movb/movw/movl $maxInt, (%rdi)`).
+   - Unlocked rows 730–732 (`array_hash_map.Index(u16/u32/u8).setEmpty`) and 733 (`array_hash_map.IndexHeader.length`).
+2. **EnumIndexer & FloatStream Family (Rows 735–740)**:
+   - Handled enum index cast and identity returns in `enums.EnumIndexer(*).keyForIndex`.
+   - Handled stream advance, reset, and ASCII digit verification in `fmt.parse_float.FloatStream` and `isEightDigits`.
+3. **Sentinel Optional Unwraps Cascade (Rows 742–744, 760–775)**:
+   - Registered sentinel enum facts for `link.Coff.String`, `link.Dwarf.Entry`, `link.Dwarf.Unit`, and related compiler index types.
+   - Cascaded dozens of sentinel optional unwrappers with 0 codegen regressions.
+4. **Zcu & Value Architecture (Rows 781–785)**:
+   - Handled composite value formatting in `Value.fmtValue` (Row 781).
+   - Handled target configuration retrieval in `Zcu.getTarget` (Row 782).
+   - Extended aggregate return lowering and construction in [`src/codegen/x86_64/generic_cfg/cabi_aggregate_return_lowering.zig`](src/codegen/x86_64/generic_cfg/cabi_aggregate_return_lowering.zig) and [`src/zig_air_aggregate_construction.zig`](src/zig_air_aggregate_construction.zig) through Row 785.
+5. **Verification**:
+   - `zig test src/tests.zig` / `zig build test-unit`: 1,528 / 1,528 pass cleanly.
+   - `zig build check-docs`: passed clean (19 current documents, 135 internal links).
+   - `git diff --check`: passed clean.
+   - Distribution real-rows gate (`--limit=785` across `ReleaseFast`, `ReleaseSafe`, `ReleaseSmall`):
+     - `ReleaseFast`: 785 / 785 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSafe`: 785 / 785 (100.0%) passing rows with `local_fail=0`.
+     - `ReleaseSmall`: 785 / 785 (100.0%) passing rows with `local_fail=0`.
+   - First failure boundary: cleanly confirmed at Row 786 (`link.File.isStatic`) on `unsupported:function_type:function-type`.
 
 ---
 
