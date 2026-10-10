@@ -179,13 +179,34 @@ pub fn lowerTypedLoadFromSyntheticVectorElement(self: anytype, instruction: air_
     return true;
 }
 
+fn bitfieldHostBits(info: air_model.PackedBitfieldPtrInfo) u16 {
+    const raw_bytes = @max(info.host_bytes, info.host_align);
+    const power_bytes = std.math.ceilPowerOfTwo(u32, @max(1, raw_bytes)) catch 8;
+    const clamped_bytes: u16 = if (power_bytes <= 1)
+        1
+    else if (power_bytes <= 2)
+        2
+    else if (power_bytes <= 4)
+        4
+    else
+        8;
+    return clamped_bytes * 8;
+}
+
 pub fn lowerTypedLoadFromSyntheticBitfield(self: anytype, instruction: air_export.TypedInstruction) !bool {
     const pointer_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return false;
     if (pointer_index >= self.synthetic_bitfield_ptrs.len) return false;
     const bitfield = self.synthetic_bitfield_ptrs[pointer_index] orelse return false;
-    const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    const result_type = parseZigType(instruction.result_type) orelse blk: {
+        const typed_child = if (instruction.operands.len != 0)
+            pointerLoadResultType(instruction.operands[0].type_text)
+        else
+            null;
+        if (typed_child) |child| break :blk child;
+        break :blk air_model.ZigType{ .ir_type = .{ .int = @intCast(bitfield.info.field_bits) } };
+    };
 
-    const host_bits: u16 = @intCast(bitfield.info.host_bytes * 8);
+    const host_bits: u16 = bitfieldHostBits(bitfield.info);
     const host_ty: ir.Type = .{ .int = host_bits };
 
     const host_load_name = try ownPrint(self.module, "air{}_bitfield_host", .{instruction.index});
@@ -643,7 +664,7 @@ pub fn lowerTypedStoreToSyntheticBitfield(
     const bitfield = self.synthetic_bitfield_ptrs[pointer_index] orelse return false;
     const value = try self.resolveTypedOperand(instruction, 1);
 
-    const host_bits: u16 = @intCast(bitfield.info.host_bytes * 8);
+    const host_bits: u16 = bitfieldHostBits(bitfield.info);
     const host_ty: ir.Type = .{ .int = host_bits };
 
     const host_load_name = try ownPrint(self.module, "air{}_bitfield_store_host", .{instruction.index});

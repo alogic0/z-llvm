@@ -59,7 +59,7 @@ pub fn isAccumulatorScalarCast(cast: ir.CastInst, exact_ei: bool) bool {
     if (cast.op != .zext) return false;
     if (exact_ei and !scalarCastExactEiBits(from_bits) and !scalarCastExactEiBits(to_bits))
         return false;
-    if (from_bits > 32) return exact_ei and to_bits <= 64 and cast.value == .named;
+    if (from_bits > 32) return (exact_ei or (to_bits == 64 and from_bits != 51 and from_bits != 52)) and to_bits <= 64 and cast.value == .named;
     if (to_bits <= 32 or to_bits == 64 or exact_ei)
         return cast.value == .named or cast.value == .int;
     return false;
@@ -101,7 +101,7 @@ pub fn validateAccumulatorScalarCastAction(action: *const Types.AccumulatorScala
         return error.ValueUseScalarCastFormUnsupported;
     }
     if (action.from_bits > 32) {
-        if (!action.exact_ei or action.immediate != null)
+        if ((!action.exact_ei and (action.to_bits != 64 or action.from_bits == 51 or action.from_bits == 52)) or action.immediate != null)
             return error.ValueUseScalarCastFormUnsupported;
         return;
     }

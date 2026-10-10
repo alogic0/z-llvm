@@ -477,7 +477,7 @@ fn scalar_immediate_multi_alias_preservation(
             defer transaction.deinit();
             if (try transaction.prepare(.preserve, try accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
             try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
-            try emitArithmeticWrite(selector, .{ .and_eax_imm32 = try i32Value(literal) });
+            try emitArithmeticWrite(selector, .{ .and_eax_imm32 = try i32BitPattern(literal) });
             try finishArithmeticResult(&transaction, result_name, bits);
         },
         .@"or" => {
@@ -485,7 +485,7 @@ fn scalar_immediate_multi_alias_preservation(
             defer transaction.deinit();
             if (try transaction.prepare(.preserve, try accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
             try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
-            try emitArithmeticWrite(selector, .{ .or_eax_imm32 = try i32Value(literal) });
+            try emitArithmeticWrite(selector, .{ .or_eax_imm32 = try i32BitPattern(literal) });
             try finishArithmeticResult(&transaction, result_name, bits);
         },
         .add => {
@@ -511,7 +511,7 @@ fn scalar_immediate_multi_alias_preservation(
             defer transaction.deinit();
             if (try transaction.prepare(.preserve, try accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
             try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
-            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i32Value(literal) });
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i32BitPattern(literal) });
             try emitArithmeticWrite(selector, .{ .binary_arg_eax = .{ .op = .xor, .reg = .rcx } });
             try finishArithmeticResult(&transaction, result_name, bits);
         },
@@ -928,7 +928,7 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
                 return null;
             }
             const exact_ei_narrow = isExactEiNarrowBits(selector, from_bits) or isExactEiNarrowBits(selector, to_bits);
-            if (from_bits > 32 and (!exact_ei_narrow or to_bits > 64))
+            if ((from_bits == 51 or from_bits == 52 or (from_bits > 32 and to_bits != 64)) and !exact_ei_narrow)
                 return .{ .no_emitter = "composed-block-zext-width" };
             if (to_bits > 32 and to_bits != 64 and !exact_ei_narrow) return .{ .no_emitter = "composed-block-zext-width" };
             if (ValueUseTransaction.isAccumulatorScalarCast(cast, exact_ei_narrow))
