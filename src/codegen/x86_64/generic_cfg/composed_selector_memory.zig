@@ -196,14 +196,18 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
         return .{ .no_emitter = "composed-block-store-readonly-param" };
     if (inspection.isByteVector128(store.ty)) return lowerStoreByteVector(selector, store);
     if (scalarFpStoreBits(store.ty)) |bits| return lowerStoreFp(selector, store, bits);
-    if (store.ty == .ptr) return lowerStoreStackPointer(selector, store);
+    const pointer_class = selector_state.storePointerDiagnosticClass(selector, store.ptr) orelse
+        return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
+    if (store.ty == .ptr) {
+        if (pointer_class == .stack_scalar) return lowerStoreStackPointer(selector, store);
+        if (pointer_class == .register64 or pointer_class == .spill64) return lowerStoreI64Transactional(selector, store, pointer_class);
+        return .{ .no_emitter = "composed-block-store-ptr" };
+    }
     const is_int_store = switch (store.ty) {
         .int => |bits| bits <= 8 or bits == 16 or bits == 32 or bits == 64,
         else => false,
     };
     if (!is_int_store) return .{ .no_emitter = "composed-block-store-width" };
-    const pointer_class = selector_state.storePointerDiagnosticClass(selector, store.ptr) orelse
-        return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
     if (store.ty.eql(.{ .int = 64 })) return lowerStoreI64Transactional(selector, store, pointer_class);
     return lowerStoreScalarTransactional(selector, store, pointer_class, @intCast(store.ty.int));
 }
@@ -771,8 +775,8 @@ fn lowerStoreScalarTransactional(
                 .{ .store_scalar = .{ .pointer = pointer, .bits = bits } },
             ) catch return .{ .unsupported_value = storeValueDetail(selector, store.value) };
         },
-        .int => |int| blk: {
-            const immediate = i32BitPattern(int) catch return .{ .unsupported_value = "composed-block-store-value-other" };
+        .int, .null_value => blk: {
+            const immediate = if (store.value == .null_value) @as(i32, 0) else (i32BitPattern(store.value.int) catch return .{ .unsupported_value = "composed-block-store-value-other" });
             break :blk registerValueUseAction(
                 &transaction,
                 store.ptr,
@@ -782,7 +786,7 @@ fn lowerStoreScalarTransactional(
                 .{ .store_immediate = .{ .value = immediate, .bits = bits } },
             ) catch return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
         },
-        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-store-value-other" },
+        .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-store-value-other" },
     };
     executeValueUseAction(&transaction, action) catch |err| return switch (err) {
         error.ValueUseStoreReadOnlyPointer => .{ .no_emitter = "composed-block-store-readonly-table" },
@@ -806,7 +810,7 @@ fn lowerStoreI64Transactional(
         .register64, .spill64 => {},
         else => return .{ .no_emitter = "composed-block-store-ptr" },
     }
-    if (store.value == .int) {
+    if (store.value == .int or store.value == .null_value) {
         return lowerStoreScalarTransactional(selector, store, pointer_class, 64);
     }
     if (store.value != .named) return .{ .unsupported_value = "composed-block-store-value-other" };
@@ -818,9 +822,9 @@ fn lowerStoreI64Transactional(
     const value = registerValueUseSource(
         &transaction,
         store.value,
-        .{ .int = 64 },
+        if (store.ty == .ptr) .ptr else .{ .int = 64 },
         .gpr64,
-        .gpr64,
+        if (store.ty == .ptr) .pointer else .gpr64,
     ) catch return .{ .unsupported_value = storeValueDetail(selector, store.value) };
     const action = registerValueUseAction(
         &transaction,

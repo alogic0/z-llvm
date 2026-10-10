@@ -75,7 +75,7 @@ fn lowerRegisterAggregateMake(
                 }
                 break :blk .{ .named = arg_names[param_index] };
             },
-            .constant_int => |int_val| .{ .int = int_val },
+            .constant_int => |int_val| if (leaf.ty == .ptr and int_val == 0) .null_value else .{ .int = int_val },
         };
         const result_name = if (index + 1 == plan.leaf_count) "result" else result_names[index];
         try block.instructions.append(allocator, .{
@@ -427,7 +427,7 @@ pub fn lowerSretAggregateFromPlan(
 
         const store_val: ir.Value = switch (leaf_plan.source) {
             .param => |p_idx| .{ .named = function.params.items[p_idx + 1].name },
-            .constant_int => |c_val| .{ .int = c_val },
+            .constant_int => |c_val| if (leaf_plan.ty == .ptr and c_val == 0) .null_value else .{ .int = c_val },
         };
         try block.instructions.append(allocator, .{
             .result = null,

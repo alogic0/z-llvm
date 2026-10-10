@@ -1257,6 +1257,11 @@ fn validateStorePointerOperand(
     return error.ValueUsePreparedActionFormMismatch;
 }
 fn validateStoreI64ValueOperand(request: *const Types.StoredRequest) !void {
+    if (request.expected.ty == .ptr) {
+        if (request.form != .pointer or request.expected.register_class != .gpr64)
+            return error.ValueUsePreparedActionFormMismatch;
+        return;
+    }
     const is_i64_width = switch (request.expected.ty) {
         .int => |bits| bits > 32 and bits <= 64,
         else => false,

@@ -59,6 +59,7 @@ pub fn parseConstIntOperand(instruction: air_export.TypedInstruction, operand_in
         if (std.mem.indexOfScalar(u8, inner, ',')) |comma| {
             const type_str = std.mem.trim(u8, inner[0..comma], " ");
             const val_str = std.mem.trim(u8, inner[comma + 1 ..], " ");
+            if (std.mem.eql(u8, val_str, "null")) return 0;
             if (std.fmt.parseInt(i128, val_str, 0)) |val| {
                 return val;
             } else |_| {
@@ -69,6 +70,7 @@ pub fn parseConstIntOperand(instruction: air_export.TypedInstruction, operand_in
             return null;
         }
     }
+    if (std.mem.eql(u8, trimmed, "null")) return 0;
     return std.fmt.parseInt(i128, trimmed, 0) catch null;
 }
 
