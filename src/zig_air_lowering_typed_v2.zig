@@ -187,6 +187,7 @@ pub const aggregateAbiAttrsForAggregate = typed_v2_aggregate.aggregateAbiAttrsFo
 pub const lowerTypedV2PackedBits = typed_v2_aggregate.lowerTypedV2PackedBits;
 pub const typedV2PackedReadFlagRecords = typed_v2_aggregate.typedV2PackedReadFlagRecords;
 pub const typedV2PackedReplaceLowRecords = typed_v2_aggregate.typedV2PackedReplaceLowRecords;
+pub const typedV2PackedConstructorRecords = typed_v2_aggregate.typedV2PackedConstructorRecords;
 
 pub const lowerTypedV2ErrorUnionPayload = typed_v2_error_union.lowerTypedV2ErrorUnionPayload;
 pub const typedV2ErrorUnionPayloadRecords = typed_v2_error_union.typedV2ErrorUnionPayloadRecords;

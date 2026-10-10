@@ -284,6 +284,16 @@ const facts = [_]Fact{
         .enumerators = zig_llvm_builder_constant_enumerators[0..],
     },
     .{
+        .name = "zig.llvm.Builder.Metadata.Kind",
+        .backing_type = .{ .int = 2 },
+        .enumerators = zig_llvm_builder_metadata_kind_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.Metadata.Kind",
+        .backing_type = .{ .int = 2 },
+        .enumerators = zig_llvm_builder_metadata_kind_enumerators[0..],
+    },
+    .{
         .name = "codegen.aarch64.Select.Value.Index",
         .backing_type = .{ .int = 32 },
         .enumerators = select_value_index_enumerators[0..],
@@ -902,6 +912,17 @@ const zig_llvm_builder_constant_enumerators = [_]Enumerator{
     .{ .name = "no_init", .value = (1 << 30) - 1 },
 };
 
+const zig_llvm_builder_metadata_kind_enumerators = [_]Enumerator{
+    .{ .name = "string", .value = 0 },
+    .{ .name = "node", .value = 1 },
+    .{ .name = "forward", .value = 2 },
+    .{ .name = "local", .value = 3 },
+};
+
+const zig_llvm_builder_metadata_unused_enumerators = [_]Enumerator{
+    .{ .name = "unused", .value = 0 },
+};
+
 pub fn lookup(nominal: []const u8) ?Fact {
     const normalized = stripNominalSigil(std.mem.trim(u8, nominal, " "));
     if (std.mem.startsWith(u8, normalized, "Air.ShuffleOneMask__enum_") or
@@ -918,6 +939,13 @@ pub fn lookup(nominal: []const u8) ?Fact {
             .name = normalized,
             .backing_type = .{ .int = 8 },
             .enumerators = ctype_formatter_kind_enumerators[0..],
+        };
+    }
+    if (std.mem.indexOf(u8, normalized, "Metadata__enum_") != null) {
+        return .{
+            .name = normalized,
+            .backing_type = .{ .int = 1 },
+            .enumerators = zig_llvm_builder_metadata_unused_enumerators[0..],
         };
     }
     for (facts) |fact| {

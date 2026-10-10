@@ -242,6 +242,12 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.endsWith(u8, trimmed, "Builder.FormatFlags") or std.mem.eql(u8, trimmed, "FormatFlags")) {
         return .{ .ir_type = .{ .int = 32 } };
     }
+    if (std.mem.eql(u8, trimmed, "zig.llvm.Builder.Metadata") or
+        std.mem.eql(u8, trimmed, "std.zig.llvm.Builder.Metadata") or
+        std.mem.eql(u8, trimmed, "Metadata"))
+    {
+        return .{ .ir_type = .{ .int = 32 } };
+    }
     if (std.mem.endsWith(u8, trimmed, "FormatAnalUnit")) {
         return .{ .ir_type = .{ .aggregate = "{ i64, ptr }" } };
     }

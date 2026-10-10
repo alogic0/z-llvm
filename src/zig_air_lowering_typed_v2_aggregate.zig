@@ -838,6 +838,9 @@ pub fn lowerTypedV2PackedBits(
     if (try lowerTypedV2PackedBitfieldLoad(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
+    if (try lowerTypedV2PackedConstructor(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
     return null;
 }
 
@@ -1116,4 +1119,264 @@ pub fn typedV2PackedReplaceLowRecords(
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
     return air_model.typedPackedReplaceLowSummary(function_type, structured_air_v2) != null;
+}
+
+pub const PackedConstructorFieldSource = union(enum) {
+    param: usize,
+    constant_int: u128,
+};
+
+pub const PackedConstructorField = struct {
+    bit_offset: u32,
+    field_bits: u32,
+    source: PackedConstructorFieldSource,
+};
+
+pub const PackedConstructorSummary = struct {
+    host_bits: u16,
+    field_count: usize,
+    fields: [16]PackedConstructorField,
+};
+
+pub fn typedPackedConstructorSummary(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?PackedConstructorSummary {
+    const host_bits = switch (function_type.return_type.ir_type) {
+        .int => |b| b,
+        else => return null,
+    };
+    if (host_bits == 0 or host_bits > 64) return null;
+
+    const ret_ptr_index = air_model.typedRetPtrIndex(structured_air_v2) orelse return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return null;
+
+    var summary = PackedConstructorSummary{
+        .host_bits = host_bits,
+        .field_count = 0,
+        .fields = undefined,
+    };
+
+    for (structured_air_v2.instructions) |inst| {
+        if (!std.mem.eql(u8, inst.opcode, "store") and !std.mem.eql(u8, inst.opcode, "store_safe")) continue;
+        if (inst.operands.len < 2) return null;
+
+        const ptr_idx = air_model.typedInstOperandIndex(inst.operands[0]) orelse return null;
+        const ptr_inst = air_model.instructionByIndex(structured_air_v2, ptr_idx) orelse return null;
+        if (!std.mem.startsWith(u8, ptr_inst.opcode, "struct_field_ptr")) return null;
+        if (ptr_inst.operands.len < 1) return null;
+        const base_idx = air_model.typedInstOperandIndex(ptr_inst.operands[0]) orelse return null;
+        if (base_idx != ret_ptr_index) return null;
+
+        const info = parsePackedBitfieldPointerType(ptr_inst.result_type) orelse return null;
+        var field_bits = info.field_bits;
+        if (info.bit_offset >= host_bits) return null;
+        if (field_bits > host_bits - info.bit_offset) {
+            field_bits = host_bits - info.bit_offset;
+        }
+
+        const source: PackedConstructorFieldSource = blk: {
+            if (std.mem.eql(u8, inst.operands[1].kind, "const")) {
+                const c = air_aggregate_construction.parseConstIntOperand(inst, 1) orelse return null;
+                break :blk .{ .constant_int = @intCast(c) };
+            } else if (std.mem.eql(u8, inst.operands[1].kind, "inst")) {
+                const val_idx = air_model.typedInstOperandIndex(inst.operands[1]) orelse return null;
+                const param_idx = air_aggregate_construction.resolveParamIndex(structured_air_v2, val_idx) orelse return null;
+                if (param_idx >= function_type.params.len) return null;
+                break :blk .{ .param = param_idx };
+            } else return null;
+        };
+
+        if (summary.field_count >= summary.fields.len) return null;
+        summary.fields[summary.field_count] = .{
+            .bit_offset = info.bit_offset,
+            .field_bits = field_bits,
+            .source = source,
+        };
+        summary.field_count += 1;
+    }
+
+    if (summary.field_count == 0) return null;
+    return summary;
+}
+
+pub fn typedV2PackedConstructorRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    return typedPackedConstructorSummary(function_type, structured_air_v2) != null;
+}
+
+const packed_arg_names = [_][]const u8{
+    "arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7",
+};
+const packed_cast_names = [_][]const u8{
+    "cast0", "cast1", "cast2", "cast3", "cast4", "cast5", "cast6", "cast7",
+    "cast8", "cast9", "cast10", "cast11", "cast12", "cast13", "cast14", "cast15",
+};
+const packed_mask_names = [_][]const u8{
+    "mask0", "mask1", "mask2", "mask3", "mask4", "mask5", "mask6", "mask7",
+    "mask8", "mask9", "mask10", "mask11", "mask12", "mask13", "mask14", "mask15",
+};
+const packed_shl_names = [_][]const u8{
+    "shl0", "shl1", "shl2", "shl3", "shl4", "shl5", "shl6", "shl7",
+    "shl8", "shl9", "shl10", "shl11", "shl12", "shl13", "shl14", "shl15",
+};
+const packed_comb_names = [_][]const u8{
+    "comb0", "comb1", "comb2", "comb3", "comb4", "comb5", "comb6", "comb7",
+    "comb8", "comb9", "comb10", "comb11", "comb12", "comb13", "comb14", "comb15",
+};
+const packed_const_names = [_][]const u8{
+    "const_or0", "const_or1", "const_or2", "const_or3",
+};
+
+pub fn lowerTypedV2PackedConstructor(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    const summary = typedPackedConstructorSummary(function_type, structured_air_v2) orelse return null;
+    const host_ty: ir.Type = .{ .int = summary.host_bits };
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), host_ty);
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = irCallingConvention(function_type);
+
+    for (function_type.params, 0..) |param, p_idx| {
+        if (p_idx >= packed_arg_names.len) return error.UnsupportedAir;
+        try function.params.append(allocator, .{ .ty = param.ir_type, .name = packed_arg_names[p_idx] });
+    }
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    var constant_accum: u128 = 0;
+    var current_result_name: ?[]const u8 = null;
+    var inst_counter: usize = 0;
+
+    for (summary.fields[0..summary.field_count]) |field| {
+        const mask: u128 = if (field.field_bits >= 128)
+            ~@as(u128, 0)
+        else
+            (@as(u128, 1) << @intCast(field.field_bits)) - 1;
+
+        switch (field.source) {
+            .constant_int => |c| {
+                constant_accum |= (c & mask) << @intCast(field.bit_offset);
+            },
+            .param => |p_idx| {
+                const param_ty = function_type.params[p_idx].ir_type;
+                var val_name = function.params.items[p_idx].name;
+
+                if (!param_ty.eql(host_ty)) {
+                    if (inst_counter >= packed_cast_names.len) return error.UnsupportedAir;
+                    const cast_name = packed_cast_names[inst_counter];
+                    inst_counter += 1;
+                    const param_bits = switch (param_ty) {
+                        .int => |b| b,
+                        else => return error.UnsupportedAir,
+                    };
+                    try block.instructions.append(allocator, .{
+                        .result = cast_name,
+                        .kind = .{ .cast = .{
+                            .op = if (param_bits < summary.host_bits) .zext else .trunc,
+                            .from_ty = param_ty,
+                            .to_ty = host_ty,
+                            .value = .{ .named = val_name },
+                        } },
+                    });
+                    val_name = cast_name;
+                }
+
+                var masked_name = val_name;
+                const full_host_mask: u128 = if (summary.host_bits >= 128)
+                    ~@as(u128, 0)
+                else
+                    (@as(u128, 1) << @intCast(summary.host_bits)) - 1;
+
+                if (mask != full_host_mask) {
+                    if (inst_counter >= packed_mask_names.len) return error.UnsupportedAir;
+                    const m_name = packed_mask_names[inst_counter];
+                    inst_counter += 1;
+                    try block.instructions.append(allocator, .{
+                        .result = m_name,
+                        .kind = .{ .binary = .{
+                            .op = .@"and",
+                            .ty = host_ty,
+                            .lhs = .{ .named = val_name },
+                            .rhs = .{ .int = @intCast(mask) },
+                        } },
+                    });
+                    masked_name = m_name;
+                }
+
+                var shifted_name = masked_name;
+                if (field.bit_offset != 0) {
+                    if (inst_counter >= packed_shl_names.len) return error.UnsupportedAir;
+                    const s_name = packed_shl_names[inst_counter];
+                    inst_counter += 1;
+                    try block.instructions.append(allocator, .{
+                        .result = s_name,
+                        .kind = .{ .binary = .{
+                            .op = .shl,
+                            .ty = host_ty,
+                            .lhs = .{ .named = masked_name },
+                            .rhs = .{ .int = field.bit_offset },
+                        } },
+                    });
+                    shifted_name = s_name;
+                }
+
+                if (current_result_name) |prev| {
+                    if (inst_counter >= packed_comb_names.len) return error.UnsupportedAir;
+                    const comb_name = packed_comb_names[inst_counter];
+                    inst_counter += 1;
+                    try block.instructions.append(allocator, .{
+                        .result = comb_name,
+                        .kind = .{ .binary = .{
+                            .op = .@"or",
+                            .ty = host_ty,
+                            .lhs = .{ .named = prev },
+                            .rhs = .{ .named = shifted_name },
+                        } },
+                    });
+                    current_result_name = comb_name;
+                } else {
+                    current_result_name = shifted_name;
+                }
+            },
+        }
+    }
+
+    if (constant_accum != 0) {
+        if (current_result_name) |prev| {
+            const final_name = packed_const_names[0];
+            try block.instructions.append(allocator, .{
+                .result = final_name,
+                .kind = .{ .binary = .{
+                    .op = .@"or",
+                    .ty = host_ty,
+                    .lhs = .{ .named = prev },
+                    .rhs = .{ .int = @intCast(constant_accum) },
+                } },
+            });
+            current_result_name = final_name;
+        } else {
+            block.terminator = .{ .ret = .{ .ty = host_ty, .value = .{ .int = @intCast(constant_accum) } } };
+            try function.blocks.append(allocator, block);
+            return function;
+        }
+    }
+
+    const ret_val: ir.Value = if (current_result_name) |name|
+        .{ .named = name }
+    else
+        .{ .int = 0 };
+
+    block.terminator = .{ .ret = .{ .ty = host_ty, .value = ret_val } };
+    try function.blocks.append(allocator, block);
+    return function;
 }

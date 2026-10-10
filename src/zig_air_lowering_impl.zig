@@ -124,6 +124,7 @@ const typedV2OptionalPayloadBranchRecords = typed_v2.typedV2OptionalPayloadBranc
 const typedV2OptionalPointerRecords = typed_v2.typedV2OptionalPointerRecords;
 const typedV2PackedReadFlagRecords = typed_v2.typedV2PackedReadFlagRecords;
 const typedV2PackedReplaceLowRecords = typed_v2.typedV2PackedReplaceLowRecords;
+const typedV2PackedConstructorRecords = typed_v2.typedV2PackedConstructorRecords;
 const typedV2SliceSumRecords = typed_v2.typedV2SliceSumRecords;
 const typedV2ConditionalSliceSumRecords = typed_v2.typedV2ConditionalSliceSumRecords;
 const typedV2AccumulatorLoopRecords = typed_v2.typedV2AccumulatorLoopRecords;
@@ -399,7 +400,8 @@ pub fn firstUnsupported(
     const typed_packed_bits =
         if (function.structured_air_v2) |structured_air_v2|
             typedV2PackedReadFlagRecords(function_type, structured_air_v2) or
-                typedV2PackedReplaceLowRecords(function_type, structured_air_v2)
+                typedV2PackedReplaceLowRecords(function_type, structured_air_v2) or
+                typedV2PackedConstructorRecords(function_type, structured_air_v2)
         else
             false;
     const typed_slice_sum =
