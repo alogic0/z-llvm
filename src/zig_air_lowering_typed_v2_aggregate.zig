@@ -55,6 +55,7 @@ fn lowerRegisterAggregateMake(
     errdefer block.deinit(allocator);
     const result_names = [_][]const u8{ "field0", "field1", "field2", "field3", "field4", "field5", "field6", "result" };
     const trunc_names = [_][]const u8{ "trunc0", "trunc1", "trunc2", "trunc3", "trunc4", "trunc5", "trunc6", "trunc7" };
+    const shr_names = [_][]const u8{ "shr0", "shr1", "shr2", "shr3", "shr4", "shr5", "shr6", "shr7" };
     var aggregate_value: ir.Value = .undef;
     for (plan.leaves[0..plan.leaf_count], 0..) |leaf, index| {
         const value: ir.Value = switch (leaf.source) {
@@ -74,6 +75,33 @@ fn lowerRegisterAggregateMake(
                     break :blk .{ .named = trunc_name };
                 }
                 break :blk .{ .named = arg_names[param_index] };
+            },
+            .param_shr => |info| blk: {
+                const param_ty = function_type.params[info.param].ir_type;
+                const shr_name = shr_names[index];
+                try block.instructions.append(allocator, .{
+                    .result = shr_name,
+                    .kind = .{ .binary = .{
+                        .op = .lshr,
+                        .ty = param_ty,
+                        .lhs = .{ .named = arg_names[info.param] },
+                        .rhs = .{ .int = info.shift },
+                    } },
+                });
+                if (param_ty == .int and leaf.ty == .int and param_ty.int > leaf.ty.int) {
+                    const trunc_name = trunc_names[index];
+                    try block.instructions.append(allocator, .{
+                        .result = trunc_name,
+                        .kind = .{ .cast = .{
+                            .op = .trunc,
+                            .from_ty = param_ty,
+                            .value = .{ .named = shr_name },
+                            .to_ty = leaf.ty,
+                        } },
+                    });
+                    break :blk .{ .named = trunc_name };
+                }
+                break :blk .{ .named = shr_name };
             },
             .constant_int => |int_val| if (leaf.ty == .ptr and int_val == 0) .null_value else .{ .int = int_val },
         };
@@ -427,6 +455,7 @@ pub fn lowerSretAggregateFromPlan(
 
         const store_val: ir.Value = switch (leaf_plan.source) {
             .param => |p_idx| .{ .named = function.params.items[p_idx + 1].name },
+            .param_shr => return error.UnsupportedAir,
             .constant_int => |c_val| if (leaf_plan.ty == .ptr and c_val == 0) .null_value else .{ .int = c_val },
         };
         try block.instructions.append(allocator, .{

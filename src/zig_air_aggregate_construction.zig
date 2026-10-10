@@ -30,6 +30,10 @@ pub fn isSysVRegisterAggregateCandidate(ty: ir.Type) bool {
 
 pub const RegisterAggregateLeafSource = union(enum) {
     param: usize,
+    param_shr: struct {
+        param: usize,
+        shift: u6,
+    },
     constant_int: i128,
 };
 
@@ -92,6 +96,11 @@ pub fn registerAggregateLeafPaths(
             .param => |param_index| {
                 if (param_index < leaf_paths.len) {
                     leaf_paths[param_index] = leaf.path_text;
+                }
+            },
+            .param_shr => |info| {
+                if (info.param < leaf_paths.len) {
+                    leaf_paths[info.param] = leaf.path_text;
                 }
             },
             .constant_int => {},
@@ -160,6 +169,74 @@ fn isZeroString(text: []const u8) bool {
     return std.mem.eql(u8, trimmed, "0") or std.mem.eql(u8, trimmed, "0.0") or std.mem.eql(u8, trimmed, "0x0");
 }
 
+pub fn resolveLeafSource(structured_air_v2: air_export.StructuredAirV2, inst_index: usize) ?RegisterAggregateLeafSource {
+    var cur = inst_index;
+    var shift_amount: ?u6 = null;
+    while (true) {
+        var found = false;
+        for (structured_air_v2.instructions) |inst| {
+            if (inst.index == cur) {
+                if (std.mem.eql(u8, inst.opcode, "arg")) {
+                    var arg_idx: usize = 0;
+                    for (structured_air_v2.instructions) |ai| {
+                        if (ai.index == cur) {
+                            if (shift_amount) |sh| {
+                                return .{ .param_shr = .{ .param = arg_idx, .shift = sh } };
+                            } else {
+                                return .{ .param = arg_idx };
+                            }
+                        }
+                        if (std.mem.eql(u8, ai.opcode, "arg")) arg_idx += 1;
+                    }
+                    return null;
+                } else if (std.mem.eql(u8, inst.opcode, "shr") or std.mem.eql(u8, inst.opcode, "shr_safe")) {
+                    if (inst.operands.len >= 2 and std.mem.eql(u8, inst.operands[0].kind, "inst") and std.mem.eql(u8, inst.operands[1].kind, "const")) {
+                        const shift_val = parseConstIntOperand(inst, 1) orelse return null;
+                        if (shift_val < 0 or shift_val > 63) return null;
+                        if (shift_amount != null) return null;
+                        shift_amount = @intCast(shift_val);
+                        cur = std.fmt.parseInt(u32, inst.operands[0].value, 10) catch return null;
+                        found = true;
+                        break;
+                    }
+                    return null;
+                } else if (std.mem.eql(u8, inst.opcode, "bit_cast") or
+                    std.mem.eql(u8, inst.opcode, "bit_cast_safe") or
+                    std.mem.eql(u8, inst.opcode, "bitcast") or
+                    std.mem.eql(u8, inst.opcode, "bitcast_safe") or
+                    std.mem.eql(u8, inst.opcode, "ptr_cast") or
+                    std.mem.eql(u8, inst.opcode, "ptr_cast_safe") or
+                    std.mem.eql(u8, inst.opcode, "int_cast") or
+                    std.mem.eql(u8, inst.opcode, "int_cast_safe") or
+                    std.mem.eql(u8, inst.opcode, "intcast") or
+                    std.mem.eql(u8, inst.opcode, "intcast_safe") or
+                    std.mem.eql(u8, inst.opcode, "trunc") or
+                    std.mem.eql(u8, inst.opcode, "trunc_safe") or
+                    std.mem.eql(u8, inst.opcode, "cast"))
+                {
+                    if (inst.operands.len >= 1 and std.mem.eql(u8, inst.operands[0].kind, "inst")) {
+                        cur = std.fmt.parseInt(u32, inst.operands[0].value, 10) catch return null;
+                        found = true;
+                        break;
+                    }
+                    if (std.mem.eql(u8, inst.opcode, "ptr_cast") or std.mem.eql(u8, inst.opcode, "ptr_cast_safe")) {
+                        for (structured_air_v2.instructions) |other_inst| {
+                            if (other_inst.index < cur and std.mem.eql(u8, other_inst.opcode, "arg")) {
+                                cur = other_inst.index;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (found) break;
+                    }
+                }
+                return null;
+            }
+        }
+        if (!found) return null;
+    }
+}
+
 pub fn resolveParamIndex(structured_air_v2: air_export.StructuredAirV2, inst_index: usize) ?usize {
     var cur = inst_index;
     while (true) {
@@ -183,6 +260,8 @@ pub fn resolveParamIndex(structured_air_v2: air_export.StructuredAirV2, inst_ind
                     std.mem.eql(u8, inst.opcode, "int_cast_safe") or
                     std.mem.eql(u8, inst.opcode, "intcast") or
                     std.mem.eql(u8, inst.opcode, "intcast_safe") or
+                    std.mem.eql(u8, inst.opcode, "trunc") or
+                    std.mem.eql(u8, inst.opcode, "trunc_safe") or
                     std.mem.eql(u8, inst.opcode, "cast"))
                 {
                     if (inst.operands.len >= 1 and std.mem.eql(u8, inst.operands[0].kind, "inst")) {
@@ -267,7 +346,13 @@ pub fn planAggregateConstructionFromStores(
 
             if (std.mem.eql(u8, instruction.operands[1].kind, "inst")) {
                 const raw_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return null;
-                const arg_inst_index = resolveParamIndex(structured_air_v2, raw_inst_index) orelse return null;
+                const leaf_source = resolveLeafSource(structured_air_v2, raw_inst_index) orelse return null;
+                const arg_inst_index = switch (leaf_source) {
+                    .param => |p| p,
+                    .param_shr => |s| s.param,
+                    .constant_int => return null,
+                };
+                if (arg_inst_index >= function_type.params.len) return null;
                 const param_ty = function_type.params[arg_inst_index].ir_type;
                 const types_compatible = param_ty.eql(field_ty) or (param_ty == .int and field_ty == .int and param_ty.int >= field_ty.int);
                 if (!types_compatible) return null;
@@ -275,7 +360,7 @@ pub fn planAggregateConstructionFromStores(
                 result_plan.leaves[field_idx] = .{
                     .path_text = path_text,
                     .ty = field_ty,
-                    .source = .{ .param = arg_inst_index },
+                    .source = leaf_source,
                 };
             } else if (std.mem.eql(u8, instruction.operands[1].kind, "const")) {
                 const const_val = parseConstIntOperand(instruction, 1) orelse return null;
@@ -342,7 +427,13 @@ pub fn planAggregateConstructionFromStores(
 
         if (std.mem.eql(u8, instruction.operands[1].kind, "inst")) {
             const raw_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return null;
-            const arg_inst_index = resolveParamIndex(structured_air_v2, raw_inst_index) orelse return null;
+            const leaf_source = resolveLeafSource(structured_air_v2, raw_inst_index) orelse return null;
+            const arg_inst_index = switch (leaf_source) {
+                .param => |p| p,
+                .param_shr => |s| s.param,
+                .constant_int => return null,
+            };
+            if (arg_inst_index >= function_type.params.len) return null;
             const param_ty = function_type.params[arg_inst_index].ir_type;
             const types_compatible = param_ty.eql(target_leaf.ty) or (param_ty == .int and target_leaf.ty == .int and param_ty.int >= target_leaf.ty.int);
             if (!types_compatible) return null;
@@ -350,7 +441,7 @@ pub fn planAggregateConstructionFromStores(
             result_plan.leaves[leaf_index] = .{
                 .path_text = path_text,
                 .ty = target_leaf.ty,
-                .source = .{ .param = arg_inst_index },
+                .source = leaf_source,
             };
 
         } else if (std.mem.eql(u8, instruction.operands[1].kind, "const")) {

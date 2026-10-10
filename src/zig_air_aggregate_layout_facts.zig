@@ -44,6 +44,16 @@ const facts = [_]Fact{
         },
     },
     .{
+        .name = "Imm64",
+        .aggregate_text = "{ i32, i32 }",
+        .match = .basename,
+        .evidence = .{
+            .construction = true,
+            .store = true,
+            .load = true,
+        },
+    },
+    .{
         .name = "PartIterator",
         .aggregate_text = "{ i32, i5 }",
         .match = .basename,
@@ -346,10 +356,11 @@ pub fn nominalFieldByteOffset(nominal_name: []const u8, field_index: usize) ?u64
 }
 
 test "aggregate layout facts keep exact pair ownership narrow" {
-    try std.testing.expectEqual(@as(usize, 15), count());
+    try std.testing.expectEqual(@as(usize, 16), count());
     try std.testing.expect(lookup("aggregate_abi.Pair") == null);
     try std.testing.expect(lookup("%runtime_aggregate_pair_main.Pair") == null);
     try std.testing.expect(lookup("other.Pair") == null);
+    try std.testing.expect(lookup("codegen.wasm.Mir.Imm64") != null);
     try std.testing.expect(lookup("fmt.parse_float.common.BiasedFp(f64)") != null);
     try std.testing.expect(lookup("fmt.parse_float.common.BiasedFp(f32)") != null);
     try std.testing.expect(lookup("codegen.aarch64.Select.Value.PartIterator") != null);

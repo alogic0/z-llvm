@@ -516,10 +516,61 @@ fn emitInteger32Leaf(
     }
 }
 
+const LeafSourceDesc = struct {
+    reg: ArgReg,
+    shift: u6 = 0,
+};
+
+fn resolveLeafReg(function: ir.Function, block: ir.BasicBlock, leaf: AggregateReturnLeaf) !LeafSourceDesc {
+    switch (leaf.value) {
+        .named => |name| {
+            if (try sysvIntegerParamRegOrNull(function, name, leaf.ty)) |reg| {
+                return .{ .reg = reg, .shift = 0 };
+            }
+            if (findInstruction(block, name)) |inst| {
+                if (inst.kind == .cast and inst.kind.cast.op == .trunc) {
+                    switch (inst.kind.cast.value) {
+                        .named => |cast_name| {
+                            if (try sysvIntegerParamRegOrNull(function, cast_name, inst.kind.cast.from_ty)) |reg| {
+                                return .{ .reg = reg, .shift = 0 };
+                            }
+                            if (findInstruction(block, cast_name)) |cast_inst| {
+                                if (cast_inst.kind == .binary and cast_inst.kind.binary.op == .lshr) {
+                                    if (cast_inst.kind.binary.rhs == .int) {
+                                        const shift_amt: u6 = @intCast(cast_inst.kind.binary.rhs.int);
+                                        if (cast_inst.kind.binary.lhs == .named) {
+                                            if (try sysvIntegerParamRegOrNull(function, cast_inst.kind.binary.lhs.named, cast_inst.kind.binary.ty)) |reg| {
+                                                return .{ .reg = reg, .shift = shift_amt };
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        else => {},
+                    }
+                } else if (inst.kind == .binary and inst.kind.binary.op == .lshr) {
+                    if (inst.kind.binary.rhs == .int) {
+                        const shift_amt: u6 = @intCast(inst.kind.binary.rhs.int);
+                        if (inst.kind.binary.lhs == .named) {
+                            if (try sysvIntegerParamRegOrNull(function, inst.kind.binary.lhs.named, inst.kind.binary.ty)) |reg| {
+                                return .{ .reg = reg, .shift = shift_amt };
+                            }
+                        }
+                    }
+                }
+            }
+            return error.UnsupportedCodegenValue;
+        },
+        else => return error.UnsupportedCodegenValue,
+    }
+}
+
 fn emitPackedTwoI32Leaves(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
+    block: ir.BasicBlock,
     low_leaf: AggregateReturnLeaf,
     high_leaf: AggregateReturnLeaf,
     dst: IntegerReturnDst,
@@ -538,8 +589,45 @@ fn emitPackedTwoI32Leaves(
         }
         return;
     }
-    const low_reg = try paramValueReg(function, low_leaf.value, low_leaf.ty);
-    const high_reg = try paramValueReg(function, high_leaf.value, high_leaf.ty);
+    const low_desc = try resolveLeafReg(function, block, low_leaf);
+    const high_desc = try resolveLeafReg(function, block, high_leaf);
+    if (low_desc.reg == high_desc.reg) {
+        if (low_desc.shift == 32 and high_desc.shift == 0) {
+            switch (dst) {
+                .rax => {
+                    try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_desc.reg } });
+                    try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = 32 });
+                    try machine.instructions.append(allocator, .{ .mov_arg_rax = low_desc.reg });
+                    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 32 });
+                    try machine.instructions.append(allocator, .or_rdx_rax);
+                },
+                .rdx => {
+                    try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rcx, .src = low_desc.reg } });
+                    try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = 32 });
+                    try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_desc.reg } });
+                    try machine.instructions.append(allocator, .{ .shr_arg64_imm6 = .{ .reg = .rdx, .amount = 32 } });
+                    try machine.instructions.append(allocator, .or_rcx_rdx);
+                },
+            }
+            return;
+        } else if (low_desc.shift == 0 and high_desc.shift == 32) {
+            switch (dst) {
+                .rax => {
+                    try machine.instructions.append(allocator, .{ .mov_arg_rax = low_desc.reg });
+                },
+                .rdx => {
+                    if (low_desc.reg != .rdx) {
+                        try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_desc.reg } });
+                    }
+                },
+            }
+            return;
+        }
+        return error.UnsupportedCodegenAbi;
+    }
+    if (low_desc.shift != 0 or high_desc.shift != 0) return error.UnsupportedCodegenAbi;
+    const low_reg = low_desc.reg;
+    const high_reg = high_desc.reg;
     switch (dst) {
         .rax => {
             if (high_leaf.ty.eql(.{ .int = 32 })) {
@@ -735,7 +823,7 @@ fn emitIntegerEightbyte(
         if (l0.ty.eql(.{ .int = 32 }) and
             (l1.ty.eql(.{ .int = 32 }) or l1.ty.eql(.{ .int = 16 }) or l1.ty.eql(.{ .int = 8 })))
         {
-            try emitPackedTwoI32Leaves(allocator, machine, function, l0, l1, dst);
+            try emitPackedTwoI32Leaves(allocator, machine, function, block, l0, l1, dst);
             return;
         }
         return error.UnsupportedCodegenType;
