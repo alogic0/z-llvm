@@ -1,7 +1,7 @@
 # Current architecture
 
-Source baseline: `230a30ef` (2026-09-26), updated for the completed correctness
-checkpoint covering aliases, module references, vector lanes and shift counts.
+Source baseline: `ccf843f3` (2026-11-02), including the current-pin
+correctness, ABI, program and candidate migrations.
 This page describes the
 implementation; the
 [refactor plan](roadmap/architecture_refactor_plan.md) records its completed scope.
@@ -11,7 +11,8 @@ The bounded refactors, memset capability,
 [scalar byte-loop slice](evidence/composed_byte_loops.md),
 [loop-memory repair slice](evidence/loops_memory_repair.md), and
 [cyclic byte-vector transfer slice](evidence/cyclic_byte_transfers.md) are complete.
-The active integration frontier is the compiler-core real-rows denominator migration to tracked Zig 0.17.0.
+The accepted checkpoint uses tracked Zig 0.17.0 and executes an unchanged upstream
+program. Export-cache publication and broader execution coverage are the next work.
 The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
 backend for selected Zig inputs. It does not yet provide a complete LLVM
 replacement or a self-hosting Zig backend.
@@ -150,11 +151,11 @@ these folds so newly constant safety branches disappear before codegen.
 | Integrated preopt/postopt/writer gates | The selected route and wrappers declared by each runner. | Different routes exercise different optimization owners and selector paths. |
 | `distribution-all` | The tracked 17-subgate inventory and its declared populations. | Success does not cover every development pass, input shape, or separate frontier gate. |
 
-The latest [repair validation](roadmap/optimizer_review_repairs.md) reports
-100 compiler-core functions lowered/emitted/linked and four cohort executions
-per release mode. The [accepted record](accepted_status.json) still declares
-three executions. Development evidence does not automatically migrate it.
-Standalone behavioral and compiler-rt counts are separate populations.
+The [current acceptance](evidence/current_pin_acceptance_20261102.json) records
+100 compiler-core functions lowered, emitted and linked, with four cohort
+executions in every release mode. It identifies the source pin, membership audit,
+fresh/cached runs and canonical comparison. Standalone programs, behavioral
+observations and compiler-rt counts retain their own populations.
 
 ## Current design constraints
 

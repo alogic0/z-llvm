@@ -4503,19 +4503,19 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `3ef5b07c00959b260d6b8ae6a886d9c91f0bfd82`; tree: `c32a050427055a2b67de49fcee657dd33a014716`.
+Accepted revision: `ccf843f3c2b6dc952d8851d6a4b4995620be9665`; tree: `70a7282620d835affafb800ab3c704b5af5b31e9`.
 
-Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v2`.
-Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `bdee02bc0c7f227c0f11bc9a449df673fe803540`.
-Candidate SHA-256: `83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`.
+Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
+Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
+Candidate SHA-256: `847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31`.
 
 | Metric | Accepted value per mode | Scope |
 | --- | ---: | --- |
 | Functions lowered | 100 | Compiler-core prefix |
 | Objects emitted | 100 | Compiler-core prefix |
 | Native links | 100 | Compiler-core prefix |
-| Functions executed | 3 | Fixed execution cohort |
-| Paired harnesses accepted | 3 | Legacy real_programs_ok cohort metric |
+| Functions executed | 4 | Fixed execution cohort |
+| Paired harnesses accepted | 4 | Legacy real_programs_ok cohort metric |
 | Local failures | 0 | Compiler-core gate |
 
 Compiler-rt bypass ratchet: 130 (separate 285-function population).

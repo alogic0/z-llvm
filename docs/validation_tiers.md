@@ -142,10 +142,12 @@ The integrated-executable runner also requires Zig's unchanged upstream
 and object emitter. Its one-program/three-mode paired executions form a separate
 population from the original seven cases and the compiler-core cohort.
 
-Inside the i128 and fma cases, the mandatory runner directly uses the same production canary implementation
-as the standalone focused tool to require the frozen __multi3 and fma machine
+Inside the i128 and fma cases, the mandatory runner uses the same production
+canary implementation as the standalone focused tool to require the frozen
+__multi3 and fma machine
 streams, exact symbol bytes, fma ldexp/add_and_denorm helper identities, and
-executable proofs. A mandatory mismatch negative invokes that fixed-hash
+executable proofs. FMA additionally requires 8,192 seeded, bitwise comparisons
+with LLVM compiling the identical frozen IR. A mandatory mismatch negative invokes that fixed-hash
 production validator on every runner execution; accepted identities have no
 runtime override. The ABI gate's paired-execution counters belong only to the
 285-function compiler-rt population and do not describe the separate 100-row

@@ -6,79 +6,48 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `3ef5b07c00959b260d6b8ae6a886d9c91f0bfd82`; tree: `c32a050427055a2b67de49fcee657dd33a014716`.
+Accepted revision: `ccf843f3c2b6dc952d8851d6a4b4995620be9665`; tree: `70a7282620d835affafb800ab3c704b5af5b31e9`.
 
-Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v2`.
-Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `bdee02bc0c7f227c0f11bc9a449df673fe803540`.
-Candidate SHA-256: `83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d`.
+Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
+Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
+Candidate SHA-256: `847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31`.
 
 | Metric | Accepted value per mode | Scope |
 | --- | ---: | --- |
 | Functions lowered | 100 | Compiler-core prefix |
 | Objects emitted | 100 | Compiler-core prefix |
 | Native links | 100 | Compiler-core prefix |
-| Functions executed | 3 | Fixed execution cohort |
-| Paired harnesses accepted | 3 | Legacy real_programs_ok cohort metric |
+| Functions executed | 4 | Fixed execution cohort |
+| Paired harnesses accepted | 4 | Legacy real_programs_ok cohort metric |
 | Local failures | 0 | Compiler-core gate |
 
 Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted values above carry forward the declaration in `docs/current_state.md`
-at `52e538c5`. The older strict-prefix evidence proves lowering/object/link counts;
-it predates the execution cohort. The preserved run manifests contain historical
-execution diagnostics. This migration does not claim a new acceptance run or
-reinterpret older whole-program counters as cohort counters.
+The [2026-11-02 checkpoint](evidence/current_pin_acceptance_20261102.json)
+is an explicit migration to the current Zig pin and frozen selector-v3
+population. Full fresh and cached integration results and their canonical
+comparison back the values above. The membership audit retains 30 prefix
+entries and replaces 70; 63 former names have no runtime AIR at this pin.
+Four audited source-bound functions execute in each mode.
 
-Current development starts at `52e538c5` and includes a four-member execution
-cohort. Its expected `4/4` execution counters remain development expectations
-until the applicable integration evidence is accepted. The independent behavioral
-suite has its own population and does not increase the 100-row compiler-core
-counters or the 285-function compiler-rt ABI population.
+The same checkpoint repairs aggregate and optional snapshots across aliasing
+writes, typed address scaling, displacement boundaries and current SysV carriers.
+The ABI differential passes 60 native cases. Zig's unchanged upstream
+`hello_libc.zig` executes through the local preopt optimizer and object emitter
+in all three release modes. These program, compiler-rt and behavioral populations
+remain separate from the compiler-core prefix.
 
-The [optimizer review repairs](roadmap/optimizer_review_repairs.md), committed as
-`629e2ee7`, have newer development validation: 1,439 unit/structural/storage tests,
-readiness, and all 17 distribution subgates passed. That run lowered, emitted,
-and linked 100 compiler-core functions and executed four cohort members per
-release mode. These results have not migrated the accepted record above.
-The [architecture map](architecture.md) explains which optimizer and codegen
-routes each suite exercises; gate success is not general pass or backend parity.
+The [FMA audit](evidence/current_pin_fma_canary_20261102.json) preserves 29
+exact-result checks and requires 8,192 bitwise comparisons with LLVM compiling
+the identical frozen IR. Tagged optional ABI signatures, wider variadic calls
+and other unimplemented representations remain explicit boundaries.
+IR construction, the system linker/CRT and libc remain dependencies of the
+unchanged-program route.
 
-The artifact authority protocol has been replaced by a small local store. The
-fixed worktree inventory, supplemental control repository, historical INBOX
-fixtures, and installed-system-binary hashes are retired. Migration and cleanup
-are recorded in the [implementation evidence](evidence/project_improvement/implementation.md).
-
-The [correctness checkpoint](roadmap/correctness_checkpoint.md) follows the
-latest review at `230a30ef`. Four optimizer repairs and permanent regressions
-pass 1,503 unit/structural/storage tests, native LLVM comparisons, readiness and
-all 17 integration subgates. The checkpoint before the next memory family is
-complete; these development results do not change the accepted record.
-
-The [architecture refactor plan](roadmap/architecture_refactor_plan.md) is complete
-for its bounded scope. The [fixed-program baseline](evidence/fixed_program_baseline.md)
-records two runs with compile-time, runtime and object/code-section sizes for
-14 supported workload/route pairs, plus the explicit loop-memory `release-o3`
-optimizer rejection. The subsequent
-[checked memcpy family](evidence/composed_memcpy_family.md) supports the retained
-`ssp.__memcpy_chk` and `memcpyFast` definitions through shared composed lowering.
-Native comparisons, ABI differential checks and all 17 integration subgates pass;
-the unchanged performance matrix retains its outcomes and semantic results.
-The subsequent [scalar byte-loop slice](evidence/composed_byte_loops.md) closes
-retained `ssp.__strncpy_chk` and composes retained `bcmp`/`memcmp`, with a bounded
-return-join verification repair. All 17 integration subgates, native and ABI
-comparisons pass. The fixed-program matrix retains its supported outcomes,
-The subsequent [loop-memory repair slice](evidence/loops_memory_repair.md) repairs
-the `release-o3` optimizer `TypeMismatch`, scalarizing single-element aggregates in
-SROA, enforcing alloca-type safety in mem2reg, and recording baseline v2 measurements
-across all 15 supported pairs.
-The subsequent [cyclic byte-vector transfer slice](evidence/cyclic_byte_transfers.md)
-admits cyclic `<16 x i8>` vector loads and stores with a verified loop-carried XMM
-ownership proof, adds focused regression tests, and passes 14 integration subgates
-and all differential canaries.
-These development results and measurements do not advance accepted counters.
-
-See [next steps](next_steps.md), the [improvement plan](roadmap/project_improvement_plan.md),
-and the root [setup instructions](../README.md). Historical milestones remain
-under the roadmap and evidence directories; they do not select current work.
+Fresh export publication still retains duplicate working and cached descriptors.
+The accepted run used a verified cleanup wrapper; capacity forecast acceptance
+remains separate. See [next steps](next_steps.md) for that follow-up and for
+expanding execution coverage within the fixed prefix. Earlier checkpoints and
+measurements remain documented under the roadmap and evidence directories.

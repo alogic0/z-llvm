@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "date": "2026-11-02",
+  "status": "implemented; not integration-accepted",
+  "source_head": "f670c0c5f8156e27189b95f0b5b872a6a52d7097",
+  "evidence_root": "local-state/validations/correctness-trust-20261102",
+  "changes": [
+    "Capture typed AIR aggregate loads as scalar SSA snapshots before alias writes.",
+    "Read optional pointer/tag values and preserve non-null zero and volatile flags.",
+    "Reject tagged optional signatures and stores without a complete ABI/tag contract.",
+    "Share constant GEP resolution, scale indices by allocation size, check offset overflow, and select signed displacement widths.",
+    "Reserve frame preservation for loaded values that survive stores.",
+    "Share normalized aggregate ABI classification and prevent scalar wrappers from overriding known aggregates.",
+    "Narrow the ambiguous .Target suffix type rule.",
+    "Separate skipped/attempted window rows from successful lowering, object, link and execution counters.",
+    "Audit ABI reference wrappers and immutable hashes against the tracked Zig pin.",
+    "Add an unchanged upstream program manifest and repeatable optimizer/codegen/execution gate."
+  ],
+  "validation": {
+    "debug_unit_tests": {
+      "passed": 1612,
+      "failed": 0,
+      "log": "final-checks.log"
+    },
+    "structural_smoke": {
+      "passed": 8,
+      "log": "core-tests-final.log",
+      "final_check": "cached"
+    },
+    "artifact_store_tests": {
+      "passed": 9,
+      "final_check": "cached; storage implementation unchanged"
+    },
+    "checkpoint_tests": {
+      "Debug": 24,
+      "ReleaseFast": 24,
+      "includes_preexisting_tests_matching_filter": true,
+      "logs": [
+        "native-tests-final.log",
+        "native-releasefast-final.log"
+      ]
+    },
+    "real_row_window": {
+      "unit_tests_passed": 2,
+      "strict_cli_skip_rejected": true,
+      "end_to_end": {
+        "skipped_rows": 1,
+        "attempted_rows": 1,
+        "real_functions_lowered": 1,
+        "real_objects_emitted": 1,
+        "real_native_linked": 1,
+        "real_executed": 0,
+        "log": "window-execution.log"
+      }
+    },
+    "behavioral": {
+      "program_modes": 24,
+      "observations": 6528,
+      "distinct_functions": 10,
+      "fallback_functions": 0,
+      "local_fail": 0,
+      "log": "behavioral.log"
+    },
+    "tier3": {
+      "passed_subgates": 9,
+      "inventory_subgates": 17,
+      "fresh": "failed in compiler-core real-row AIR validation",
+      "primary_mode": "ReleaseSmall",
+      "cache_comparison": "not run; no valid fresh export cached",
+      "log": "tier3-fresh.log",
+      "failure_evidence": "failures/32bfa0e88387cf4ca9e22bf182643265.manifest",
+      "current_pin_diagnostic_missing_selected_names_per_mode": 63
+    },
+    "abi_reference": {
+      "pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+      "preflight": "passed",
+      "selected_functions": 10,
+      "emitted_functions": 6,
+      "rejected_functions": [
+        "compiler_rt.shift.__ashlti3",
+        "compiler_rt.__negti2",
+        "compiler_rt.__neghf2",
+        "compiler_rt.fabs.__fabsh"
+      ],
+      "paired_executions": 0,
+      "log": "abi/ReleaseFast/current-codegen.log"
+    },
+    "upstream_program": {
+      "source": "test/standalone/simple/hello_world/hello_libc.zig",
+      "source_unchanged": true,
+      "reference_executions": 3,
+      "local_executions": 0,
+      "matched_program_modes": 0,
+      "failure_stage": "object",
+      "diagnostic": "UnsupportedVarargsAbi",
+      "report": "program/report.json"
+    }
+  },
+  "remaining": [
+    "Audit/migrate the current-pin compiler-core denominator and execution membership before a fresh/cache acceptance pair.",
+    "Close the current-pin i128 aggregate return and half-precision ABI codegen rejections.",
+    "Support the bounded printf varargs requirement before accepting the unchanged hello-world target."
+  ],
+  "accepted_status_changed": false,
+  "commits_created_for_checkpoint": false,
+  "archives_created": false,
+  "cleanup_record": "probe-cleanup.json",
+  "superseded_by": "docs/evidence/current_pin_acceptance_20261102.json",
+  "historical_status_note": "This records the earlier stopped checkpoint; use the later acceptance for current results."
+}

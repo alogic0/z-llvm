@@ -5,6 +5,7 @@ const Status = struct {
     accepted_tree: []const u8,
     source_pin: []const u8,
     candidate_sha256: []const u8,
+    selector_version: []const u8 = "real-candidate-selector-v2",
     modes: []const []const u8,
     candidate_rows: u32,
     lowered: u32,
@@ -60,7 +61,7 @@ pub fn main(init: std.process.Init) !void {
     const modes = try std.mem.join(a, ", ", s.modes);
     defer a.free(modes);
     const generated = try std.fmt.allocPrint(a, "{s}\n\nAccepted revision: `{s}`; tree: `{s}`.\n\n" ++
-        "Population: compiler-core candidate prefix ({} rows), selector `real-candidate-selector-v2`.\n" ++
+        "Population: compiler-core candidate prefix ({} rows), selector `{s}`.\n" ++
         "Modes: {s}. Source pin: `{s}`.\n" ++
         "Candidate SHA-256: `{s}`.\n\n" ++
         "| Metric | Accepted value per mode | Scope |\n| --- | ---: | --- |\n" ++
@@ -70,7 +71,7 @@ pub fn main(init: std.process.Init) !void {
         "| Functions executed | {} | Fixed execution cohort |\n" ++
         "| Paired harnesses accepted | {} | Legacy real_programs_ok cohort metric |\n" ++
         "| Local failures | {} | Compiler-core gate |\n\n" ++
-        "Compiler-rt bypass ratchet: {} (separate 285-function population).\n\n{s}", .{ begin, s.accepted_revision, s.accepted_tree, s.candidate_rows, modes, s.source_pin, s.candidate_sha256, s.lowered, s.objects, s.native_linked, s.executed_functions, s.paired_harnesses_ok, s.local_fail, s.compiler_rt_bypass_ratchet, end });
+        "Compiler-rt bypass ratchet: {} (separate 285-function population).\n\n{s}", .{ begin, s.accepted_revision, s.accepted_tree, s.candidate_rows, s.selector_version, modes, s.source_pin, s.candidate_sha256, s.lowered, s.objects, s.native_linked, s.executed_functions, s.paired_harnesses_ok, s.local_fail, s.compiler_rt_bypass_ratchet, end });
     defer a.free(generated);
     for ([_][]const u8{ "docs/current_state.md", "docs/roadmap/convergence_progress.md" }) |path| {
         const old = try read(a, io, path);

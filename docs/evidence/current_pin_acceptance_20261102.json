@@ -1,0 +1,291 @@
+{
+  "schema": 1,
+  "date": "2026-11-02",
+  "status": "functional checkpoint accepted",
+  "accepted_revision": "ccf843f3c2b6dc952d8851d6a4b4995620be9665",
+  "accepted_tree": "70a7282620d835affafb800ab3c704b5af5b31e9",
+  "validated_working_head": "f670c0c5f8156e27189b95f0b5b872a6a52d7097",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "source_snapshot": "local-state/validations/current-pin-acceptance-20261102-r2/source-snapshot.json",
+  "source_snapshot_sha256": "4ac98dfcab69c72886a65da3c89e1586d860dc440bd0d5c3b108d6ccd2403278",
+  "committed_sources_match_validated_snapshot": true,
+  "selector_version": "real-candidate-selector-v3",
+  "candidate_file": "docs/evidence/real_candidates_release_v3.tsv",
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "membership_audit": "docs/evidence/real_candidates_release_v3_migration.json",
+  "population": {
+    "mode_stable_candidates": 21117,
+    "selected_rows_per_mode": 100,
+    "lowered_per_mode": 100,
+    "objects_per_mode": 100,
+    "native_links_per_mode": 100,
+    "executed_functions_per_mode": 4,
+    "paired_harnesses_per_mode": 4,
+    "modes": [
+      "ReleaseFast",
+      "ReleaseSafe",
+      "ReleaseSmall"
+    ]
+  },
+  "runs": {
+    "fresh": {
+      "returncode": 0,
+      "subgates_passed": 17,
+      "argv": [
+        "zig",
+        "build",
+        "distribution-all",
+        "--",
+        "--serial",
+        "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+        "--real-rows-validation-root=local-state/validations/current-pin-acceptance-20261102-r2",
+        "--real-rows-cache-root=local-state/caches/current-pin-acceptance-20261102-r2",
+        "--fresh-real-rows"
+      ],
+      "raw_log": "local-state/validations/current-pin-acceptance-20261102-r2/fresh.log",
+      "raw_log_sha256": "d90c927b76a39f598563d24dc54cf28bac17f8d28492665a9068a41ef5d8a7bc",
+      "retained_summary": "docs/evidence/current_pin_20261102_fresh.summary",
+      "summary_sha256": "28c144c36336c228806ee3691a22bb0cc125fe19bd8ecf8c98814660ba710c5a",
+      "wall_seconds": 2531.2816553115845,
+      "serial": {
+        "schema_version": "1",
+        "run_id": "2ee60cb99f6e299b735858041d2a9057",
+        "scratch_path": "tmp/distribution_all_serial_2ee60cb99f6e299b735858041d2a9057",
+        "bundle_path": "tmp/distribution_all_serial_2ee60cb99f6e299b735858041d2a9057/release_source_object_bundle",
+        "target": "x86_64-unknown-linux-gnu",
+        "mode": "serial",
+        "real_rows_concurrency": "3",
+        "subgates": "17",
+        "wall_ms": "2529863",
+        "starting_free_bytes": "57554829312",
+        "minimum_observed_free_bytes": "53879730176",
+        "final_free_bytes": "53879730176",
+        "observed_peak_bytes": "3675099136",
+        "reserve_bytes": "49112001332",
+        "required_start_bytes": "53531114292",
+        "local_fail": "0"
+      },
+      "real_rows": [
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseFast",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "4",
+          "real_programs_ok": "4",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseSafe",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "4",
+          "real_programs_ok": "4",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseSmall",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "4",
+          "real_programs_ok": "4",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        }
+      ]
+    },
+    "cached": {
+      "returncode": 0,
+      "subgates_passed": 17,
+      "argv": [
+        "zig",
+        "build",
+        "distribution-all",
+        "--",
+        "--serial",
+        "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+        "--real-rows-validation-root=local-state/validations/current-pin-acceptance-20261102-r2",
+        "--real-rows-cache-root=local-state/caches/current-pin-acceptance-20261102-r2"
+      ],
+      "raw_log": "local-state/validations/current-pin-acceptance-20261102-r2/cached.log",
+      "raw_log_sha256": "d031f2f76a7cc90f022ac401fdeb1cf8570aa068fe371466b760c4f7e6c11688",
+      "retained_summary": "docs/evidence/current_pin_20261102_cached.summary",
+      "summary_sha256": "ea103bdaa7bc654feaa47190d3b3b8f81b87ea068db948a254618877dc4415b7",
+      "wall_seconds": 2386.126631498337,
+      "serial": {
+        "schema_version": "1",
+        "run_id": "a782de5ceea735903fa0910d5054e096",
+        "scratch_path": "tmp/distribution_all_serial_a782de5ceea735903fa0910d5054e096",
+        "bundle_path": "tmp/distribution_all_serial_a782de5ceea735903fa0910d5054e096/release_source_object_bundle",
+        "target": "x86_64-unknown-linux-gnu",
+        "mode": "serial",
+        "real_rows_concurrency": "3",
+        "subgates": "17",
+        "wall_ms": "2386014",
+        "starting_free_bytes": "53843906560",
+        "minimum_observed_free_bytes": "53251969024",
+        "final_free_bytes": "53251985408",
+        "observed_peak_bytes": "591937536",
+        "reserve_bytes": "49112001332",
+        "required_start_bytes": "53531114292",
+        "local_fail": "0"
+      },
+      "real_rows": [
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseFast",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "4",
+          "real_programs_ok": "4",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseSafe",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "4",
+          "real_programs_ok": "4",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseSmall",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "4",
+          "real_programs_ok": "4",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        }
+      ]
+    }
+  },
+  "comparison": {
+    "tool": "tools/compare_distribution_all_logs.zig",
+    "schema_version": 4,
+    "gates": 17,
+    "canonical_records": 1390,
+    "semantic_match": true,
+    "raw_log": "local-state/validations/current-pin-acceptance-20261102-r2/comparison.log",
+    "log_sha256": "ae151bcbf4f2c2134a5faa85ac05bce9b5552348cf897a184829ee5ecf954da8",
+    "cohort_records": 21,
+    "cohort_comparison": "local-state/validations/current-pin-acceptance-20261102-r2/rows-comparison.log"
+  },
+  "tier2": {
+    "unit_tests": 1622,
+    "structural_tests": 9,
+    "candidate_and_object_policy_tests": 6,
+    "real_row_policy_tests": 37,
+    "cohort_policy_tests": 28,
+    "parallel_policy_tests": 25,
+    "comparison_policy_tests": 31,
+    "releasefast_current_pin_tests": 18
+  },
+  "separate_populations": {
+    "abi_differential": {
+      "cohort_functions": 10,
+      "function_modes": 30,
+      "matched_native_cases": 60,
+      "counter_schema": "abi-diff-v2",
+      "log": "local-state/validations/current-pin-20261102/abi-final-r3.log"
+    },
+    "unchanged_program": {
+      "source": "test/standalone/simple/hello_world/hello_libc.zig",
+      "programs": 1,
+      "reference_executions": 3,
+      "local_executions": 3,
+      "matched_program_modes": 3,
+      "dependencies": [
+        "libLLVM IR construction",
+        "system linker and CRT",
+        "libc"
+      ]
+    },
+    "fma": {
+      "fixed_fma_results": 25,
+      "fixed_helper_results": 4,
+      "LLVM_paired_observations": 8192,
+      "audit": "docs/evidence/current_pin_fma_canary_20261102.json"
+    },
+    "behavioral": {
+      "program_modes": 24,
+      "observations": 6528
+    },
+    "memset": {
+      "observations": 8652
+    },
+    "memcpy": {
+      "observations": 53802
+    },
+    "byte_loops": {
+      "observations": 195888
+    }
+  },
+  "split_validation": "local-state/validations/current-pin-20261102/split-validation.json",
+  "storage": {
+    "archives_created": 0,
+    "publication_workaround": "Verified complete cached and raw descriptor hashes before deleting the duplicate raw compiler.air; retained authenticated cache copies.",
+    "cleanup_record": "local-state/validations/current-pin-acceptance-20261102-r2/duplicate-cleanup.json",
+    "raw_export_bytes_retired": 3923825739,
+    "production_footprint_forecast_accepted": false,
+    "follow_up": "Avoid duplicate working/cache exports in production publication and remeasure fresh/cache footprint.",
+    "stale_manifest_repair": "local-state/validations/current-pin-20261102/cache-manifest-repair.json",
+    "ABI_cache_ownership": "All Zig cc compilation caches now belong to the individual ABI run."
+  },
+  "limits": [
+    "The compiler-core gate executes four selected functions per mode; linking 100 functions does not execute 100.",
+    "The unchanged program uses the local optimizer and object emitter while retaining the declared external dependencies.",
+    "This evidence establishes bounded LLVM-input compatibility and does not claim a complete LLVM replacement."
+  ],
+  "committed_source_files_verified": 1406,
+  "documentation_validation": {
+    "current_documents": 19,
+    "internal_file_links": 129,
+    "generated_status_blocks": 2,
+    "result": "pass"
+  }
+}
