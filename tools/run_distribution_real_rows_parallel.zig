@@ -402,7 +402,23 @@ fn parseProbeOutput(allocator: std.mem.Allocator, io: std.Io, output: []const u8
 }
 
 fn verifyPin(allocator: std.mem.Allocator, io: std.Io, pin: CachePin, export_cache_root: []const u8) !void {
-    const air_path = try std.fmt.allocPrint(allocator, "{s}/{s}.air", .{ export_cache_root, &pin.key });
+    for ([_][64]u8{ pin.key, pin.descriptor_sha256 }) |field| for (field) |c| {
+        if (!std.ascii.isDigit(c) and !(c >= 'a' and c <= 'f')) return error.RealRowsPinnedMetadataChanged;
+    };
+    const meta_path = try std.fmt.allocPrint(allocator, "{s}/{s}.meta", .{ export_cache_root, &pin.key });
+    defer allocator.free(meta_path);
+    const meta = try std.Io.Dir.cwd().readFileAlloc(io, meta_path, allocator, .limited(64 * 1024));
+    defer allocator.free(meta);
+    if (!std.mem.eql(u8, metadataValue(meta, "cache_key") orelse "", &pin.key) or
+        !std.mem.eql(u8, metadataValue(meta, "descriptor_sha256") orelse "", &pin.descriptor_sha256))
+        return error.RealRowsPinnedMetadataChanged;
+    const schema = metadataValue(meta, "schema") orelse return error.RealRowsPinnedMetadataChanged;
+    const air_path = if (std.mem.eql(u8, schema, "3"))
+        try std.fmt.allocPrint(allocator, "{s}/{s}.air", .{ export_cache_root, &pin.key })
+    else if (std.mem.eql(u8, schema, "4"))
+        try std.fmt.allocPrint(allocator, "{s}/{s}.{s}.air", .{ export_cache_root, &pin.key, &pin.descriptor_sha256 })
+    else
+        return error.RealRowsPinnedMetadataChanged;
     defer allocator.free(air_path);
     const descriptor = try std.Io.Dir.cwd().readFileAlloc(io, air_path, allocator, .limited(2 * 1024 * 1024 * 1024));
     defer allocator.free(descriptor);
@@ -411,6 +427,43 @@ fn verifyPin(allocator: std.mem.Allocator, io: std.Io, pin: CachePin, export_cac
     std.crypto.hash.sha2.Sha256.hash(descriptor, &digest, .{});
     const actual = std.fmt.bytesToHex(digest, .lower);
     if (!std.mem.eql(u8, &actual, &pin.descriptor_sha256)) return error.RealRowsPinnedDescriptorDigestChanged;
+}
+
+test "cache pin verifies schema 3 and 4 payloads and rejects metadata or content drift" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+    const root = try std.fs.path.join(allocator, &.{ ".zig-cache", "tmp", &temp.sub_path });
+    defer allocator.free(root);
+    const bytes = "validated export";
+    var hash: [32]u8 = undefined;
+    std.crypto.hash.sha2.Sha256.hash(bytes, &hash, .{});
+    const pin: CachePin = .{ .key = @splat('a'), .descriptor_sha256 = std.fmt.bytesToHex(hash, .lower), .descriptor_bytes = bytes.len };
+    const meta_name = try std.fmt.allocPrint(allocator, "{s}.meta", .{pin.key});
+    defer allocator.free(meta_name);
+    for ([_][]const u8{ "3", "4" }) |schema| {
+        const metadata = try std.fmt.allocPrint(allocator, "schema={s}\ncache_key={s}\ndescriptor_sha256={s}\n", .{ schema, &pin.key, &pin.descriptor_sha256 });
+        defer allocator.free(metadata);
+        const payload = if (std.mem.eql(u8, schema, "3"))
+            try std.fmt.allocPrint(allocator, "{s}.air", .{pin.key})
+        else
+            try std.fmt.allocPrint(allocator, "{s}.{s}.air", .{ pin.key, pin.descriptor_sha256 });
+        defer allocator.free(payload);
+        try temp.dir.writeFile(io, .{ .sub_path = meta_name, .data = metadata });
+        try temp.dir.writeFile(io, .{ .sub_path = payload, .data = bytes });
+        try verifyPin(allocator, io, pin, root);
+        try temp.dir.writeFile(io, .{ .sub_path = payload, .data = "tampered  export" });
+        try std.testing.expectError(error.RealRowsPinnedDescriptorDigestChanged, verifyPin(allocator, io, pin, root));
+        try temp.dir.writeFile(io, .{ .sub_path = payload, .data = "truncated" });
+        try std.testing.expectError(error.RealRowsPinnedDescriptorSizeChanged, verifyPin(allocator, io, pin, root));
+        try temp.dir.writeFile(io, .{ .sub_path = meta_name, .data = "schema=4\ncache_key=changed\n" });
+        try std.testing.expectError(error.RealRowsPinnedMetadataChanged, verifyPin(allocator, io, pin, root));
+        const unsupported = try std.fmt.allocPrint(allocator, "schema=5\ncache_key={s}\ndescriptor_sha256={s}\n", .{ &pin.key, &pin.descriptor_sha256 });
+        defer allocator.free(unsupported);
+        try temp.dir.writeFile(io, .{ .sub_path = meta_name, .data = unsupported });
+        try std.testing.expectError(error.RealRowsPinnedMetadataChanged, verifyPin(allocator, io, pin, root));
+    }
 }
 
 fn probeAndPin(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions, paths: *const OwnedPaths) ![mode_count]CachePin {
