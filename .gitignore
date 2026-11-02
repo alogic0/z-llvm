@@ -18,6 +18,10 @@ zig-out/
 /docgen_tmp/
 tmp/
 
+# Generated objects from local compiler probes.
+/*.o
+/scratch/*.o
+
 # agent mailbox (single-writer: docs agent; read-only for the worker)
 docs/worker_inbox.md
 

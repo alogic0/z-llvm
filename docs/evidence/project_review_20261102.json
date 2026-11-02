@@ -1,0 +1,1003 @@
+{
+  "schema": 1,
+  "date": "2026-11-02",
+  "source_revision": "32a780658858e047d06c6de694e9656c4000916d",
+  "scope": "Review of the current working tree, including 39 pre-existing modified compiler files; generated-state cleanup only, with no compiler fixes or acceptance-counter changes.",
+  "direction": "The layered IR/backend architecture and differential tests are useful. Fix the reproduced wrong-code and distinguish skipped rows from tested rows before further frontier expansion. Prefer exported type/layout facts to additional nominal-name rules.",
+  "findings": [
+    {
+      "priority": "P1",
+      "path": "src/zig_air_lowering_context_typed_memory.zig",
+      "line": 179,
+      "title": "Aggregate loads preserve an address rather than a value snapshot",
+      "trigger": "Load a Range containing [7,13]; write 99 to its first field through an alias; store the previously loaded aggregate to another address.",
+      "expected": [
+        7,
+        13
+      ],
+      "actual": [
+        99,
+        13
+      ],
+      "cause": "lowerTypedLoad records the source pointer, and lowerTypedStore/lowerTypedAggregateCopy only reads its fields at the later store.",
+      "repair": "Materialize the aggregate value at the AIR load, or require a verified proof that the source cannot change before every use."
+    },
+    {
+      "priority": "P1",
+      "path": "src/zig_air_lowering_context_typed_optional.zig",
+      "line": 99,
+      "related_path": "src/zig_air_capabilities.zig",
+      "related_line": 406,
+      "title": "Optional pointer checks compare the container address",
+      "trigger": "Use is_null_ptr with a valid pointer to an optional pointer whose stored value is null.",
+      "expected": true,
+      "actual": false,
+      "cause": "is_null_ptr shares the value-form lowering; the generic pointer case emits icmp against the operand address without loading its optional value. The same path also handles is_non_null_ptr.",
+      "repair": "Distinguish value and pointer opcodes and load the payload or representation tag through the pointer, preserving volatile semantics."
+    },
+    {
+      "priority": "P1",
+      "path": "src/distribution_real_rows_gate.zig",
+      "line": 640,
+      "title": "Skipped candidate rows receive success credit",
+      "trigger": "Run a frontier window with --start-index=N.",
+      "evidence": "The loop increments lowered, object and native-link counters for each skipped candidate. The summary omits start_index and has no skipped-row counter or evidence/provenance check.",
+      "impact": "A window run can resemble full-prefix proof even though earlier rows were not tested against the current source. This review did not run or certify the 785-row prefix.",
+      "repair": "Count skipped rows separately, report the tested window, and disallow synthetic credit in acceptance summaries."
+    },
+    {
+      "priority": "P2",
+      "path": "src/zig_air_types.zig",
+      "line": 180,
+      "title": "Nominal-name exceptions continue to grow",
+      "evidence": "The pending diff adds about 2935 lines across 39 files, including about 654 lines of aggregate facts and 183 lines of enum facts. Several type rules accept basenames or suffixes before consulting generic exported layout information.",
+      "impact": "The frontier is becoming dependent on compiler-internal names; row coverage alone is weak evidence of generality.",
+      "repair": "Make compiler-exported facts authoritative, validate conflicts and layout/ABI boundaries, and batch new support by semantic capability with adversarial execution tests."
+    }
+  ],
+  "validation": {
+    "unit_structural_storage": {
+      "command": "zig build test-unit structural-smoke artifact-store-test check-docs -j2 --summary all",
+      "tests_passed": 1551,
+      "unit_tests": 1534,
+      "structural_tests": 8,
+      "storage_tests": 9,
+      "documentation": "19 documents; 135 internal file links; 2 status blocks; passed"
+    },
+    "behavioral": {
+      "command": "zig build behavioral-diff -j2 --summary all",
+      "program_mode_pairs": 24,
+      "observations": 6528,
+      "composed_functions": 10,
+      "fallback_functions": 0,
+      "local_fail": 0
+    },
+    "artifact_store": {
+      "verify": "5 manifests; passed",
+      "gc_dry_run_files": 0,
+      "gc_dry_run_bytes": 0
+    },
+    "targeted_typed_air_probes": {
+      "lowering_accepted": 2,
+      "lowering_unsupported": 0,
+      "ir_verifier": "passed",
+      "expected_aggregate": [
+        7,
+        13
+      ],
+      "expected_null": true,
+      "executions": [
+        {
+          "route": "llvm_ir",
+          "exit_code": 3,
+          "stdout": "snapshot expected=7,13 actual=99,13 input=99,13\noptional_is_null expected=1 actual=0\n",
+          "stderr": ""
+        },
+        {
+          "route": "local_object",
+          "exit_code": 3,
+          "stdout": "snapshot expected=7,13 actual=99,13 input=99,13\noptional_is_null expected=1 actual=0\n",
+          "stderr": ""
+        }
+      ]
+    },
+    "tier3": "Not run during this review, per docs/validation_tiers.md; no capability or accepted-counter advancement claimed."
+  },
+  "reproducer": {
+    "root": "local-state/validations/project-review-20261102",
+    "source": "typed_air_probe.zig",
+    "steps": [
+      "Temporarily place typed_air_probe.zig at the repository root as .project_review_probe.zig so its src/ imports resolve.",
+      "Run zig run .project_review_probe.zig to obtain the two-function LLVM IR module.",
+      "Compile generated IR and aggregate_snapshot_driver.c with clang-22 -O0; both checks currently fail.",
+      "Emit the same IR with zig-out/bin/z_llvm --generic-cfg-selector --target=x86_64-unknown-linux-gnu --emit=obj; link with the same driver; both checks currently fail.",
+      "Remove the temporary root copy."
+    ],
+    "retained_payload_bytes": 7684
+  },
+  "cleanup": {
+    "schema": 1,
+    "date": "2026-11-02",
+    "status": "deleted-and-verified",
+    "source_revision": "32a780658858e047d06c6de694e9656c4000916d",
+    "project_allocated_before": 24027639808,
+    "free_bytes_before": 51924406272,
+    "items": [
+      {
+        "path": "local-state/caches/project-improvement-bdee02bc",
+        "reason": "AIR exports for superseded Zig pin bdee02bc; current pin is 1c08b09d1; no current retention pin or consumer",
+        "allocated_bytes": 4011089920,
+        "file_count": 6,
+        "identity": [
+          66306,
+          54165354,
+          1789040204408574853
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-392493/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40095744,
+        "file_count": 548,
+        "identity": [
+          66306,
+          59024810,
+          1790419840506326940
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-261379/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40091648,
+        "file_count": 548,
+        "identity": [
+          66306,
+          56795988,
+          1790416739458674308
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-208469/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40091648,
+        "file_count": 548,
+        "identity": [
+          66306,
+          56137092,
+          1790415572667970871
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-2316027/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40091648,
+        "file_count": 548,
+        "identity": [
+          66306,
+          56798002,
+          1790465358955066873
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-327589/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40095744,
+        "file_count": 548,
+        "identity": [
+          66306,
+          59022253,
+          1790418498904433144
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-219030/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40095744,
+        "file_count": 548,
+        "identity": [
+          66306,
+          58469171,
+          1790415787489645823
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-4176413/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40095744,
+        "file_count": 548,
+        "identity": [
+          66306,
+          57808992,
+          1790410546335770762
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-2126450/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40091648,
+        "file_count": 548,
+        "identity": [
+          66306,
+          56797939,
+          1790461721279182631
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-522797/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40095744,
+        "file_count": 548,
+        "identity": [
+          66306,
+          59023565,
+          1790422664489486527
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-657033/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40095744,
+        "file_count": 548,
+        "identity": [
+          66306,
+          59133543,
+          1790425283556896613
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-2107682/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40095744,
+        "file_count": 548,
+        "identity": [
+          66306,
+          56140569,
+          1790461505592199923
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-3995752/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40095744,
+        "file_count": 548,
+        "identity": [
+          66306,
+          58721001,
+          1790406948673702435
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-2846860/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40095744,
+        "file_count": 548,
+        "identity": [
+          66306,
+          59257398,
+          1790477237057030086
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/inbox66_abi_diff/run-2786729/global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 40095744,
+        "file_count": 548,
+        "identity": [
+          66306,
+          59255322,
+          1790475844781929237
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSmall/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/link.MachO.CodeSignature.Requirements.slotType/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 24576,
+        "file_count": 2,
+        "identity": [
+          66306,
+          59153682,
+          1790454820611327363
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSmall/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/link.MachO.CodeSignature.Requirements.slotType/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 43692032,
+        "file_count": 819,
+        "identity": [
+          66306,
+          59153683,
+          1790454823958590541
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSmall/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/link.MachO.CodeSignature.Requirements.size/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 24576,
+        "file_count": 2,
+        "identity": [
+          66306,
+          59151001,
+          1790454796322418298
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSmall/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/link.MachO.CodeSignature.Requirements.size/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 43692032,
+        "file_count": 819,
+        "identity": [
+          66306,
+          59151002,
+          1790454799511668901
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSmall/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/coff.WeakExternalDefinition.sizeOf/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 24576,
+        "file_count": 2,
+        "identity": [
+          66306,
+          59150115,
+          1790454771930502309
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSmall/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/coff.WeakExternalDefinition.sizeOf/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 43696128,
+        "file_count": 819,
+        "identity": [
+          66306,
+          59150116,
+          1790454775340770114
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSmall/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/coff.Symbol.sizeOf/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 24576,
+        "file_count": 2,
+        "identity": [
+          66306,
+          59147523,
+          1790454746486504994
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSmall/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/coff.Symbol.sizeOf/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 43687936,
+        "file_count": 819,
+        "identity": [
+          66306,
+          59147524,
+          1790454749657753857
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/real_rows_parallel_ac02bcd386847c1d31fc4d9dd2e40966/ReleaseSmall/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 99598336,
+        "file_count": 365,
+        "identity": [
+          66306,
+          59140558,
+          1790454670889579371
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/real_rows_parallel_ac02bcd386847c1d31fc4d9dd2e40966/ReleaseSmall/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 104828928,
+        "file_count": 1715,
+        "identity": [
+          66306,
+          59140559,
+          1790454668013354192
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/real_rows_parallel_ac02bcd386847c1d31fc4d9dd2e40966/ReleaseSafe/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 99192832,
+        "file_count": 299,
+        "identity": [
+          66306,
+          59140543,
+          1790454635481808799
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/real_rows_parallel_ac02bcd386847c1d31fc4d9dd2e40966/ReleaseSafe/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 104845312,
+        "file_count": 1715,
+        "identity": [
+          66306,
+          59140547,
+          1790454632518577085
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/real_rows_parallel_ac02bcd386847c1d31fc4d9dd2e40966/ReleaseFast/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 99196928,
+        "file_count": 299,
+        "identity": [
+          66306,
+          59140511,
+          1790454602595238548
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/real_rows_parallel_ac02bcd386847c1d31fc4d9dd2e40966/ReleaseFast/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 104841216,
+        "file_count": 1715,
+        "identity": [
+          66306,
+          59140514,
+          1790454599684011167
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSafe/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/link.MachO.CodeSignature.Requirements.slotType/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 28672,
+        "file_count": 2,
+        "identity": [
+          66306,
+          59244564,
+          1790454919743129965
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSafe/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/link.MachO.CodeSignature.Requirements.slotType/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 47316992,
+        "file_count": 819,
+        "identity": [
+          66306,
+          59244565,
+          1790454923693441228
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSafe/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/link.MachO.CodeSignature.Requirements.size/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 24576,
+        "file_count": 2,
+        "identity": [
+          66306,
+          59155460,
+          1790454864653791830
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSafe/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/link.MachO.CodeSignature.Requirements.size/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 47325184,
+        "file_count": 819,
+        "identity": [
+          66306,
+          59155461,
+          1790454868364083846
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSafe/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/coff.WeakExternalDefinition.sizeOf/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 24576,
+        "file_count": 2,
+        "identity": [
+          66306,
+          59152793,
+          1790454808705391435
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSafe/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/coff.WeakExternalDefinition.sizeOf/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 47325184,
+        "file_count": 819,
+        "identity": [
+          66306,
+          59152794,
+          1790454812303674269
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSafe/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/coff.Symbol.sizeOf/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 24576,
+        "file_count": 2,
+        "identity": [
+          66306,
+          59148400,
+          1790454752620986418
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseSafe/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/coff.Symbol.sizeOf/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 47329280,
+        "file_count": 819,
+        "identity": [
+          66306,
+          59148401,
+          1790454756536293724
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseFast/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/link.MachO.CodeSignature.Requirements.slotType/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 28672,
+        "file_count": 3,
+        "identity": [
+          66306,
+          59156421,
+          1790454908909276438
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseFast/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/link.MachO.CodeSignature.Requirements.slotType/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 47321088,
+        "file_count": 819,
+        "identity": [
+          66306,
+          59156422,
+          1790454912670572744
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseFast/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/link.MachO.CodeSignature.Requirements.size/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 24576,
+        "file_count": 2,
+        "identity": [
+          66306,
+          59154601,
+          1790454856494149714
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseFast/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/link.MachO.CodeSignature.Requirements.size/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 47325184,
+        "file_count": 819,
+        "identity": [
+          66306,
+          59154602,
+          1790454860380455529
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseFast/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/coff.WeakExternalDefinition.sizeOf/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 24576,
+        "file_count": 2,
+        "identity": [
+          66306,
+          59151872,
+          1790454803297966446
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseFast/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/coff.WeakExternalDefinition.sizeOf/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 47321088,
+        "file_count": 819,
+        "identity": [
+          66306,
+          59151873,
+          1790454806884248299
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseFast/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/coff.Symbol.sizeOf/zig-local-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 24576,
+        "file_count": 2,
+        "identity": [
+          66306,
+          59147549,
+          1790454750167793884
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/composed-memset-20260926/project-improvement/ReleaseFast/work_ac02bcd386847c1d31fc4d9dd2e40966/execution-cohort-v1/coff.Symbol.sizeOf/zig-global-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 47325184,
+        "file_count": 819,
+        "identity": [
+          66306,
+          59147550,
+          1790454754226112397
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/cyclic-byte-transfers-20261007/project-improvement/ReleaseSmall/work_test/zig-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 178737152,
+        "file_count": 1021,
+        "identity": [
+          66306,
+          56388222,
+          1791386036368070951
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/cyclic-byte-transfers-20261007/project-improvement/ReleaseSafe/work_test/zig-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 178737152,
+        "file_count": 1021,
+        "identity": [
+          66306,
+          56391278,
+          1791387373687840531
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/cyclic-byte-transfers-20261007/project-improvement/ReleaseFast/work_test/zig-cache",
+        "reason": "Regenerable compiler cache in completed historical validation; surrounding sources, logs and measured outputs retained",
+        "allocated_bytes": 178737152,
+        "file_count": 1021,
+        "identity": [
+          66306,
+          56390211,
+          1791386215206048817
+        ],
+        "deleted": true
+      },
+      {
+        "path": "main.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 585728,
+        "file_count": 1,
+        "identity": [
+          66306,
+          53525609,
+          1791655542942042879
+        ],
+        "deleted": true
+      },
+      {
+        "path": "test_bitset.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 8192,
+        "file_count": 1,
+        "identity": [
+          66306,
+          53520776,
+          1791646742807358959
+        ],
+        "deleted": true
+      },
+      {
+        "path": "test_mir.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 28672,
+        "file_count": 1,
+        "identity": [
+          66306,
+          53518944,
+          1791638300323919264
+        ],
+        "deleted": true
+      },
+      {
+        "path": "test_opt.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 4096,
+        "file_count": 1,
+        "identity": [
+          66306,
+          53520650,
+          1791644240967315723
+        ],
+        "deleted": true
+      },
+      {
+        "path": "test_query.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 20480,
+        "file_count": 1,
+        "identity": [
+          66306,
+          53520760,
+          1791645839214201942
+        ],
+        "deleted": true
+      },
+      {
+        "path": "test_zig.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 8192,
+        "file_count": 1,
+        "identity": [
+          66306,
+          53518938,
+          1791638068908311332
+        ],
+        "deleted": true
+      },
+      {
+        "path": "test_zig2.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 4075520,
+        "file_count": 1,
+        "identity": [
+          66306,
+          53518939,
+          1791638094555362688
+        ],
+        "deleted": true
+      },
+      {
+        "path": "scratch/test_abi.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 4096,
+        "file_count": 1,
+        "identity": [
+          66306,
+          54440811,
+          1791637644497345891
+        ],
+        "deleted": true
+      },
+      {
+        "path": "scratch/test_init.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 4096,
+        "file_count": 1,
+        "identity": [
+          66306,
+          54440815,
+          1791637791198580799
+        ],
+        "deleted": true
+      },
+      {
+        "path": "scratch/test_llvm.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 4096,
+        "file_count": 1,
+        "identity": [
+          66306,
+          54440812,
+          1791637718619281195
+        ],
+        "deleted": true
+      },
+      {
+        "path": "scratch/test_opt.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 9252864,
+        "file_count": 1,
+        "identity": [
+          66306,
+          54440857,
+          1791644120626673422
+        ],
+        "deleted": true
+      },
+      {
+        "path": "scratch/test_opt_fast.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 20480,
+        "file_count": 1,
+        "identity": [
+          66306,
+          54440858,
+          1791644163646120595
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/test_ascii.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 8192,
+        "file_count": 1,
+        "identity": [
+          66306,
+          54044750,
+          1791414845152396437
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/test_asm.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 4096,
+        "file_count": 1,
+        "identity": [
+          66306,
+          54044774,
+          1791414944121951214
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/test_fmt.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 0,
+        "file_count": 1,
+        "identity": [
+          66306,
+          54018603,
+          1791538900616207802
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/test_idiv.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 4096,
+        "file_count": 1,
+        "identity": [
+          66306,
+          54018502,
+          1791581959676154173
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/test_inc.o",
+        "reason": "Untracked generated object or incomplete binary output; original scratch source/IR retained",
+        "allocated_bytes": 4096,
+        "file_count": 1,
+        "identity": [
+          66306,
+          54018602,
+          1791538236847661325
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/distribution_real_rows_1086309",
+        "reason": "Abandoned real-row export scratch containing only compiler.air and a compiler cache; current complete mode caches retained",
+        "allocated_bytes": 296460288,
+        "file_count": 734,
+        "identity": [
+          66306,
+          54018642,
+          1791590270957812392
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/distribution_real_rows_1088652",
+        "reason": "Abandoned real-row export scratch containing only compiler.air and a compiler cache; current complete mode caches retained",
+        "allocated_bytes": 296464384,
+        "file_count": 734,
+        "identity": [
+          66306,
+          54167616,
+          1791590331097600958
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/distribution_real_rows_3149397",
+        "reason": "Abandoned real-row export scratch containing only compiler.air and a compiler cache; current complete mode caches retained",
+        "allocated_bytes": 296460288,
+        "file_count": 734,
+        "identity": [
+          66306,
+          55096095,
+          1791524119455942012
+        ],
+        "deleted": true
+      },
+      {
+        "path": "tmp/distribution_real_rows_47241",
+        "reason": "Abandoned real-row export scratch containing only compiler.air and a compiler cache; current complete mode caches retained",
+        "allocated_bytes": 296468480,
+        "file_count": 734,
+        "identity": [
+          66306,
+          54018483,
+          1791428451097828174
+        ],
+        "deleted": true
+      },
+      {
+        "path": "local-state/validations/test-real-rows/compiler.air",
+        "reason": "SHA-256 verified duplicate of retained ReleaseSmall AIR export in local-state/caches/test-real-rows",
+        "allocated_bytes": 1106448384,
+        "file_count": 1,
+        "identity": [
+          66306,
+          56393079,
+          1791408132543484143
+        ],
+        "deleted": true
+      }
+    ],
+    "retained": [
+      "All tracked source and test fixtures",
+      "All existing uncommitted compiler edits",
+      "Unique scratch Zig, LLVM IR and assembly reproducers",
+      "All artifact-store objects and manifests; verified; collector dry-run found 0 candidates",
+      "Current 1c08b09d1 AIR exports in both active cache roots",
+      "Frozen compiler, object and driver performance baselines",
+      "Validation evidence and logs outside disposable cache directories",
+      "tmp/o2_calls_perf and local-state/inputs/o2-calls",
+      "Patched sibling ziglang compiler and build state"
+    ],
+    "tracked_files_verified_unchanged": 2525,
+    "project_allocated_after": 15446913024,
+    "workspace_allocated_reclaimed": 8580726784,
+    "free_bytes_after": 60400185344,
+    "archives_created": false
+  },
+  "maintenance_changes": [
+    "Ignore generated object files at the project root and under scratch/.",
+    "Refresh the retention list to match Zig 0.17.0, active AIR cache roots and the bounded review diagnostics."
+  ],
+  "retained_scratch_sha256": {
+    "scratch/test_abi.s": "d439a7beb674e08b519923b308207f6c510f463ab229af7ca098fd1ce0ccdb15",
+    "scratch/test_abi.zig": "e889e005850511755f57196e564a41e486686b9fd4f98c478482c969b7638d32",
+    "scratch/test_bitset.ll": "b34f6bfd3750284e36ff225111aed27e7961f570048b42628b375cfa99a6d8eb",
+    "scratch/test_bitset.zig": "a0ae945f89311108811a07bdfaf65ddd2e9b453b59436df15c66dce739b6e137",
+    "scratch/test_chunkstate_layout.zig": "8f12f11ced9863d48bb1e949ab5c414db8005d80569fb6bfb27b17a2a91473d6",
+    "scratch/test_init.zig": "38c327156a57e8a989db2d7ff35fafcb6fba9ae761bfafabf965ef92b71c343e",
+    "scratch/test_llvm.ll": "17738822b102735f481bddb59f6bf63b4ddfdf48d9f9812008167e7c7cb35da6",
+    "scratch/test_offset.zig": "8b49ea64bf64a90fbd741d299eb1bacaccf24e5805073a08303dbfa26dec9534",
+    "scratch/test_opt.zig": "c2cfadc84692240bdfaca03406cae67692310b30fd11fcfb94a338fc80c95242",
+    "scratch/test_query.ll": "99d0ca5c1b9472ef33bf9eb2dbf2cf8c05c69aab775588109826b763b233d476",
+    "scratch/test_query.zig": "5c7cbb510723d088f389cc932a67222e72ad736b651189c6b3e88bffd6fe3dbf",
+    "scratch/test_query_debug.ll": "3a0798cb323fe6928565a8e5d450e85312df8437f2a79d5583d2a618a658d11c",
+    "scratch/test_size.zig": "a255ebc31f0eba577c2b616708dbb42a1727b9bc29b839abf2c30a1c35b57f10"
+  }
+}
