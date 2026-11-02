@@ -40,10 +40,12 @@ const ScratchCompareDispatch = union(enum) {
 fn classifyScratchCompare(icmp: ir.IcmpInst) !ScratchCompareDispatch {
     const bits = intBits(icmp.operand_ty);
     if (icmp.predicate == .ne) {
+        if (icmp.operand_ty == .ptr and icmp.rhs == .null_value)
+            return scratchCompareAction(icmp, .null_pointer);
         if (icmp.rhs == .int) {
             const immediate = try i64Value(icmp.rhs.int);
             if (immediate == 0 and
-                (bits == 16 or bits == 32 or bits == 64))
+                (bits == 8 or bits == 16 or bits == 32 or bits == 64))
             {
                 return scratchCompareAction(icmp, .{ .immediate = 0 });
             }
@@ -97,10 +99,15 @@ fn classifyScratchCompare(icmp: ir.IcmpInst) !ScratchCompareDispatch {
             return .{ .diagnostic = .{ .no_emitter = "composed-block-icmp-rhs" } };
         return scratchCompareAction(icmp, .{ .immediate = icmp.rhs.int });
     }
-    if (icmp.predicate == .ugt and (bits == 32 or bits == 64)) {
+    if ((icmp.predicate == .ugt or icmp.predicate == .uge or icmp.predicate == .ule) and
+        (bits == 32 or bits == 64))
+    {
         return switch (icmp.rhs) {
             .named => scratchCompareAction(icmp, .named),
-            .int => scratchCompareAction(icmp, .{ .immediate = icmp.rhs.int }),
+            .int => if (icmp.predicate == .ugt or (icmp.predicate == .ule and bits == 64))
+                scratchCompareAction(icmp, .{ .immediate = icmp.rhs.int })
+            else
+                .legacy,
             .fp,
             .undef,
             .poison,

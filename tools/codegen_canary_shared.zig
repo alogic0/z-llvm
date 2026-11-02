@@ -24,8 +24,8 @@ const Identity = enum {
         return switch (identity) {
             .multi3_instruction_stream => "8f962b4bda72349aac1464efd86f13daf18ae3595171d7f32548feb46ee82e61",
             .multi3_symbol_bytes => "f1c97aee4bb07d1ef27ebd12ec2236a2a390faaa95514436dfb282af5e2149ec",
-            .fma_instruction_stream => "cc791b46ef93f564040e5245874216a7aa267df7319e84135862177f4eff776a",
-            .fma_symbol_bytes => "3571863e4438990f77b5a159b95a85de16dea0d50db7a935406b54b09bee9abb",
+            .fma_instruction_stream => "77da479e910f9d1f3334d1ba961e66a1396689cf9f34c2690dbaefb34ae7f83a",
+            .fma_symbol_bytes => "1d3c0f0ed4fbdc3774e55d57760de6f03385cc9c7fc387465b5b55e2832d73ab",
             .fma_ldexp_symbol_bytes => "d8653232177f52c3636bdfb9746b44bd16259a762e82ac0cec43d9e4798c1689",
             .fma_add_and_denorm_symbol_bytes => "639a29b4ba8eae68fc0b87e7a9be45541616146c5ee14b651129b2eaf427054c",
         };
@@ -148,6 +148,36 @@ pub fn buildAndValidateFmaObjects(
     try emitFmaObject(allocator, io, zllvm_exe, target, fma_object_path, env_map);
     try buildSourceObject(allocator, io, zig_emitter, target, "test/zig/integrated/compiler_rt_fma_helpers.ll", helper_object_path, "fma frozen helpers");
     try inspectFmaObjects(allocator, io, fma_object_path, helper_object_path);
+    try runFmaDifferential(allocator, io, zig_emitter, target, fma_object_path, helper_object_path);
+}
+
+fn runFmaDifferential(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    zig_emitter: []const u8,
+    target: []const u8,
+    fma_object: []const u8,
+    helpers: []const u8,
+) !void {
+    const reference = try std.fmt.allocPrint(allocator, "{s}.reference.o", .{fma_object});
+    defer allocator.free(reference);
+    const renamed = try std.fmt.allocPrint(allocator, "{s}.renamed.o", .{fma_object});
+    defer allocator.free(renamed);
+    const executable = try std.fmt.allocPrint(allocator, "{s}.differential", .{fma_object});
+    defer allocator.free(executable);
+    try buildSourceObject(allocator, io, zig_emitter, target, "test/zig/integrated/compiler_rt_fma.ll", reference, "LLVM frozen fma differential reference");
+    const rename = try common.runCapture(allocator, io, &.{ "llvm-objcopy-22", "--redefine-sym", "compiler_rt.fma.fma=reference_fma", reference, renamed }, "rename LLVM fma reference symbol");
+    defer common.freeRunResult(allocator, rename);
+    const link = try common.runCapture(allocator, io, &.{ "clang-22", "-O2", "-ffp-contract=off", "test/zig/integrated/compiler_rt_fma_diff.c", fma_object, renamed, helpers, "-o", executable }, "link fma differential");
+    defer common.freeRunResult(allocator, link);
+    const result = try common.runCapture(allocator, io, &.{executable}, "execute 8192 paired fma cases");
+    defer common.freeRunResult(allocator, result);
+    const expected = "summary fma-differential cases=8192 matched=8192 reference=llvm22-frozen-ir local_fail=0\n";
+    if (!std.mem.eql(u8, result.stdout, expected) or result.stderr.len != 0) return error.FmaDifferentialResultMismatch;
+    var buffer: [256]u8 = undefined;
+    var stdout = std.Io.File.stdout().writer(io, &buffer);
+    try stdout.interface.writeAll(result.stdout);
+    try stdout.interface.flush();
 }
 
 fn emitFmaObject(
@@ -242,7 +272,7 @@ fn inspectFmaObjects(
         try common.validationError(io, "compiler_rt fma helper object has external dependencies (host fallback forbidden):\n{s}\n", .{helper_undefined.stdout});
     }
 
-    try extractAndCheckText(allocator, io, fma_object_path, fma_text_path, 4114, .fma_symbol_bytes);
+    try extractAndCheckText(allocator, io, fma_object_path, fma_text_path, 4090, .fma_symbol_bytes);
 
     const helper_dump_arg = try std.fmt.allocPrint(allocator, "--dump-section=.text={s}", .{helper_text_path});
     defer allocator.free(helper_dump_arg);

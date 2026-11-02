@@ -70,6 +70,7 @@ const isOpaqueNominalTypeSurface = air_types.isOpaqueNominalTypeSurface;
 const pointerLoadResultType = air_types.pointerLoadResultType;
 const isErrorUnionTypeText = air_types.isErrorUnionTypeText;
 const errorUnionPayloadType = air_types.errorUnionPayloadType;
+const isSysVRegisterAggregateCandidate = air_types.isSysVRegisterAggregateCandidate;
 const parseConstant = air_values.parseConstant;
 const parseSymbolPointer = air_values.parseSymbolPointer;
 const materializedGlobalInitializer = air_values.materializedGlobalInitializer;
@@ -219,6 +220,10 @@ pub fn lowerCompatible(
         exported_aggregate_layout_facts.setActiveProvider(previous_module_aggregate_facts);
     };
 
+    const previous_aggregate_mode = aggregate_layout_facts.active_mode;
+    aggregate_layout_facts.setActiveMode(air_module.mode);
+    defer aggregate_layout_facts.setActiveMode(previous_aggregate_mode);
+
     var module: ir.Module = .{
         .allocator = allocator,
         .source = try allocator.dupe(u8, ""),
@@ -331,6 +336,22 @@ pub fn lowerCompatible(
         .io = undefined,
     };
     _ = try mem2reg.pass.run(&module, &mem2reg_context);
+    // Remove snapshot construction chains after their scalar fields were stored.
+    _ = try @import("passes/dce.zig").pass.run(&module, &mem2reg_context);
+    for (module.functions.items) |*function| {
+        for (function.blocks.items) |*block| {
+            var retained: usize = 0;
+            for (block.instructions.items, 0..) |*instruction, index| {
+                if (instruction.removed) {
+                    instruction.deinit(allocator);
+                } else {
+                    if (retained != index) block.instructions.items[retained] = instruction.*;
+                    retained += 1;
+                }
+            }
+            block.instructions.items.len = retained;
+        }
+    }
     try module.verify();
     return .{
         .module = module,
@@ -687,6 +708,9 @@ fn parseFunctionTypeForLowering(
     allocator: std.mem.Allocator,
     air_function: air_export.Function,
 ) !FunctionType {
+    // A payload-only optional cannot cross the ABI until its tag has an
+    // explicit representation. Signature fallbacks must obey the same rule.
+    try air_types.requireSupportedOptionalSignature(air_function.type_text);
     return parseFunctionType(allocator, air_function.type_text) catch |err| switch (err) {
         error.UnsupportedAir => parseFunctionTypeWithFieldExtractor(allocator, air_function) catch |field_extractor_err| switch (field_extractor_err) {
             error.UnsupportedAir => parseFunctionTypeWithSingleFieldWrapper(allocator, air_function) catch |single_wrapper_err| switch (single_wrapper_err) {
@@ -1108,7 +1132,10 @@ fn lowerFunction(
     const function_type = try parseFunctionTypeForLowering(allocator, air_function);
     defer function_type.deinit(allocator);
 
-    var function = ir.Function.init(shortFunctionName(air_function.name), function_type.return_type.ir_type);
+    const is_sret = !isSysVRegisterAggregateCandidate(function_type.return_type.ir_type) and
+        function_type.return_type.ir_type == .aggregate;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), if (is_sret) .void else function_type.return_type.ir_type);
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
     function.calling_conv = irCallingConvention(function_type);
@@ -1116,9 +1143,17 @@ fn lowerFunction(
         function.attrs = try ownPrint(module, "\"zllvm-tls-symbol\"=\"{s}\"", .{tls_symbol});
     }
 
+    if (is_sret) {
+        try function.params.append(allocator, .{
+            .ty = .ptr,
+            .attrs = try typed_v2.sretAttrsForAggregate(module, function_type.return_type.ir_type),
+            .name = "sret",
+        });
+    }
+
     for (function_type.params, 0..) |param_type, param_index| {
         const name = try ownPrint(module, "arg{}", .{param_index});
-        const attrs: ?[]const u8 = if (param_type.ir_type.eql(.{ .int = 8 }) and !param_type.signed)
+        const attrs: ?[]const u8 = if (param_type.ir_type == .int and param_type.ir_type.int <= 8 and !param_type.signed)
             "zeroext"
         else
             null;
@@ -1158,6 +1193,15 @@ fn lowerFunction(
     const synthetic_aggregate_ptrs = try allocator.alloc(?ir.Value, air_function.instruction_count);
     defer allocator.free(synthetic_aggregate_ptrs);
     @memset(synthetic_aggregate_ptrs, null);
+    const synthetic_aggregate_slots = try allocator.alloc(?ir.Value, air_function.instruction_count);
+    defer allocator.free(synthetic_aggregate_slots);
+    @memset(synthetic_aggregate_slots, null);
+    const synthetic_aggregate_field_ptrs = try allocator.alloc(?air_model.SyntheticAggregateFieldPointer, air_function.instruction_count);
+    defer allocator.free(synthetic_aggregate_field_ptrs);
+    @memset(synthetic_aggregate_field_ptrs, null);
+    const synthetic_optional_ptrs = try allocator.alloc(?air_model.SyntheticOptionalPointer, air_function.instruction_count);
+    defer allocator.free(synthetic_optional_ptrs);
+    @memset(synthetic_optional_ptrs, null);
 
     var context: LoweringContext = .{
         .allocator = allocator,
@@ -1177,6 +1221,9 @@ fn lowerFunction(
         .synthetic_vector_element_ptrs = synthetic_vector_element_ptrs,
         .synthetic_bitfield_ptrs = synthetic_bitfield_ptrs,
         .synthetic_aggregate_ptrs = synthetic_aggregate_ptrs,
+        .synthetic_aggregate_slots = synthetic_aggregate_slots,
+        .synthetic_aggregate_field_ptrs = synthetic_aggregate_field_ptrs,
+        .synthetic_optional_ptrs = synthetic_optional_ptrs,
     };
 
     for (air_function.instructions) |instruction| {
@@ -1220,8 +1267,10 @@ fn lowerFunctionTypedV2(
 
     const function_type = try parseFunctionTypeForLowering(allocator, air_function);
     defer function_type.deinit(allocator);
-    if (try lowerTypedV2SingleFieldWrapper(allocator, air_function, function_type, structured_air_v2)) |function| {
-        return function;
+    if (function_type.return_type.ir_type != .aggregate) {
+        if (try lowerTypedV2SingleFieldWrapper(allocator, air_function, function_type, structured_air_v2)) |function| {
+            return function;
+        }
     }
     if (try typed_v2.lowerTypedV2FieldExtractor(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
@@ -1358,7 +1407,10 @@ fn lowerFunctionTypedV2(
         return function;
     }
 
-    var function = ir.Function.init(shortFunctionName(air_function.name), function_type.return_type.ir_type);
+    const is_sret = !isSysVRegisterAggregateCandidate(function_type.return_type.ir_type) and
+        function_type.return_type.ir_type == .aggregate;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), if (is_sret) .void else function_type.return_type.ir_type);
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
     function.calling_conv = irCallingConvention(function_type);
@@ -1366,9 +1418,17 @@ fn lowerFunctionTypedV2(
         function.attrs = try ownPrint(module, "\"zllvm-tls-symbol\"=\"{s}\"", .{tls_symbol});
     }
 
+    if (is_sret) {
+        try function.params.append(allocator, .{
+            .ty = .ptr,
+            .attrs = try typed_v2.sretAttrsForAggregate(module, function_type.return_type.ir_type),
+            .name = "sret",
+        });
+    }
+
     for (function_type.params, 0..) |param_type, param_index| {
         const name = try ownPrint(module, "arg{}", .{param_index});
-        const attrs: ?[]const u8 = if (param_type.ir_type.eql(.{ .int = 8 }) and !param_type.signed)
+        const attrs: ?[]const u8 = if (param_type.ir_type == .int and param_type.ir_type.int <= 8 and !param_type.signed)
             "zeroext"
         else
             null;
@@ -1408,6 +1468,15 @@ fn lowerFunctionTypedV2(
     const synthetic_aggregate_ptrs = try allocator.alloc(?ir.Value, air_function.instruction_count);
     defer allocator.free(synthetic_aggregate_ptrs);
     @memset(synthetic_aggregate_ptrs, null);
+    const synthetic_aggregate_slots = try allocator.alloc(?ir.Value, air_function.instruction_count);
+    defer allocator.free(synthetic_aggregate_slots);
+    @memset(synthetic_aggregate_slots, null);
+    const synthetic_aggregate_field_ptrs = try allocator.alloc(?air_model.SyntheticAggregateFieldPointer, air_function.instruction_count);
+    defer allocator.free(synthetic_aggregate_field_ptrs);
+    @memset(synthetic_aggregate_field_ptrs, null);
+    const synthetic_optional_ptrs = try allocator.alloc(?air_model.SyntheticOptionalPointer, air_function.instruction_count);
+    defer allocator.free(synthetic_optional_ptrs);
+    @memset(synthetic_optional_ptrs, null);
     const typed_view = air_model.TypedFunctionView.init(air_function) orelse return error.UnsupportedAir;
 
     var context: LoweringContext = .{
@@ -1430,6 +1499,9 @@ fn lowerFunctionTypedV2(
         .synthetic_vector_element_ptrs = synthetic_vector_element_ptrs,
         .synthetic_bitfield_ptrs = synthetic_bitfield_ptrs,
         .synthetic_aggregate_ptrs = synthetic_aggregate_ptrs,
+        .synthetic_aggregate_slots = synthetic_aggregate_slots,
+        .synthetic_aggregate_field_ptrs = synthetic_aggregate_field_ptrs,
+        .synthetic_optional_ptrs = synthetic_optional_ptrs,
     };
 
     for (main_body.instructions) |instruction_index| {
@@ -2051,7 +2123,7 @@ test "lowering constructs pointer register aggregate from ret pointer store" {
     try std.testing.expectEqual(@as(usize, 1), result.accepted_functions);
     try std.testing.expectEqual(@as(usize, 0), result.unsupported.len);
     try std.testing.expectEqual(@as(usize, 1), result.module.functions.items.len);
-    try std.testing.expect(result.module.functions.items[0].ret_ty.eql(.{ .aggregate = "{ ptr }" }));
+    try std.testing.expectEqual(ir.Type{ .aggregate = "{ ptr }" }, result.module.functions.items[0].ret_ty);
 }
 
 test "first unsupported ignores orphan structured block outside main body" {

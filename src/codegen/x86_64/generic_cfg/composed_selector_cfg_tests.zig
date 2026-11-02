@@ -2108,7 +2108,7 @@ test "composed selector rejects duplicate EI switch cases before phi admission" 
     }
 }
 
-test "composed selector rejects an unproven unreachable switch default" {
+test "composed selector traps an unproven unreachable switch default" {
     const input =
         \\define i32 @missing_mask_case(i32 %input) {
         \\entry:
@@ -2137,9 +2137,15 @@ test "composed selector rejects an unproven unreachable switch default" {
     defer machine.deinit(std.testing.allocator);
     const selection = try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]);
     switch (selection) {
-        .unsupported => {},
-        .selected => return error.TestUnexpectedResult,
+        .unsupported => return error.TestUnexpectedResult,
+        .selected => {},
     }
+    try x86_64_verify.verifyFunction(machine);
+    var traps: usize = 0;
+    for (machine.instructions.items) |instruction| {
+        if (instruction == .ud2) traps += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 1), traps);
 }
 
 test "generic cfg selector preserves same-block FP results across framed phi edges" {

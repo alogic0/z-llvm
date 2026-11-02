@@ -353,6 +353,7 @@ test "migrated ordinary load maps only attributed closed variants to the four le
     const cases = [_]struct {
         name: []const u8,
         loc: ValueLoc,
+        bits: u16 = 16,
         detail: []const u8,
     }{
         .{
@@ -373,6 +374,7 @@ test "migrated ordinary load maps only attributed closed variants to the four le
         .{
             .name = "gpr-pointer",
             .loc = .{ .arg64 = .rdi },
+            .bits = 128,
             .detail = "composed-block-load-ptr-width",
         },
         .{
@@ -382,7 +384,7 @@ test "migrated ordinary load maps only attributed closed variants to the four le
         },
     };
     for (cases) |case| {
-        var machine = MachineFunction.init(case.name, .{ .int = 16 });
+        var machine = MachineFunction.init(case.name, .{ .int = case.bits });
         defer machine.deinit(std.testing.allocator);
         var plan = SelectorAllocationPlan.init(std.testing.allocator);
         defer plan.deinit();
@@ -393,7 +395,7 @@ test "migrated ordinary load maps only attributed closed variants to the four le
         try selector_state.bindValueLoc(&selector, "pointer", case.loc);
 
         const diagnostic = (try selector_memory.lowerLoad(&selector, "loaded", .{
-            .ty = .{ .int = 16 },
+            .ty = .{ .int = case.bits },
             .ptr = .{ .named = "pointer" },
         })).?;
         try std.testing.expectEqualStrings(case.detail, diagnostic.no_emitter);
@@ -412,6 +414,29 @@ test "migrated ordinary load maps only attributed closed variants to the four le
             .ptr = .{ .named = "missing" },
         }),
     );
+}
+
+test "migrated ordinary load supports u16 pointer load" {
+    var machine = MachineFunction.init("load-u16", .{ .int = 16 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("pointer", 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "pointer", .{ .arg64 = .rdi });
+
+    try std.testing.expect((try selector_memory.lowerLoad(&selector, "loaded", .{
+        .ty = .{ .int = 16 },
+        .ptr = .{ .named = "pointer" },
+    })) == null);
+    try std.testing.expectEqualSlices(
+        x86_64_machine.Instruction,
+        &.{.{ .load_arg_ptr_disp8_u16_eax = .{ .reg = .rdi, .offset = 0 } }},
+        machine.instructions.items,
+    );
+    try std.testing.expectEqual(ValueLoc.eax, selector.values.get("loaded").?.loc);
 }
 
 test "migrated load production rollback restores full state before and after partial emission" {

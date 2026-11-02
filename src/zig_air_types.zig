@@ -4,13 +4,22 @@ const air_text = @import("zig_air_text.zig");
 const enum_facts = @import("zig_air_enum_facts.zig");
 const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
 const ir = @import("ir.zig");
+const sysv_abi = @import("codegen/x86_64/sysv_abi.zig");
 const type_layout = @import("zig_air_type_layout.zig");
 
 pub const ZigType = air_model.ZigType;
 pub const FunctionType = air_model.FunctionType;
 pub const PackedBitfieldPtrInfo = air_model.PackedBitfieldPtrInfo;
 
+pub fn isSysVRegisterAggregateCandidate(ty: ir.Type) bool {
+    if (ty != .aggregate) return false;
+    const normalized = type_layout.normalizeAggregateTypeChecked(ty) catch return false;
+    const classification = sysv_abi.classifyAggregate(normalized) catch return false;
+    return classification.kind == .register;
+}
+
 pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !FunctionType {
+    try requireSupportedOptionalSignature(text);
     const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, text, " "));
     if (!std.mem.startsWith(u8, trimmed, "fn (")) return error.UnsupportedAir;
     const params_end = air_text.findMatching(trimmed, 3, '(', ')') orelse return error.UnsupportedAir;
@@ -27,8 +36,11 @@ pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !Functi
     while (fields.next()) |field| {
         const param_text = std.mem.trim(u8, field, " ");
         if (param_text.len == 0) continue;
-        const parsed = parseZigType(param_text) orelse return error.UnsupportedAir;
-        if (parsed.ir_type == .void) continue;
+        var parsed = parseZigType(param_text) orelse return error.UnsupportedAir;
+        if (parsed.ir_type == .void or (!c_calling_convention and parsed.ir_type.eql(.{ .int = 0 }))) continue;
+        if (!c_calling_convention and parsed.ir_type == .aggregate) {
+            parsed.ir_type = .ptr;
+        }
         try params.append(allocator, parsed);
     }
     return .{
@@ -37,6 +49,27 @@ pub fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !Functi
         .c_calling_convention = c_calling_convention,
         .non_default_calling_convention = non_default_calling_convention,
     };
+}
+
+pub fn optionalUsesPointerSentinel(text: []const u8) bool {
+    const trimmed = std.mem.trim(u8, text, " ");
+    if (trimmed.len < 2 or trimmed[0] != '?') return false;
+    const child = std.mem.trim(u8, trimmed[1..], " ");
+    return (std.mem.startsWith(u8, child, "*") or std.mem.startsWith(u8, child, "[*]")) and
+        std.mem.indexOf(u8, child, "allowzero") == null;
+}
+
+pub fn requireSupportedOptionalSignature(text: []const u8) error{UnsupportedAir}!void {
+    const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, text, " "));
+    if (!std.mem.startsWith(u8, trimmed, "fn (")) return error.UnsupportedAir;
+    const params_end = air_text.findMatching(trimmed, 3, '(', ')') orelse return error.UnsupportedAir;
+    const return_text = functionReturnTypeText(trimmed) orelse return error.UnsupportedAir;
+    if (std.mem.startsWith(u8, return_text, "?") and !optionalUsesPointerSentinel(return_text)) return error.UnsupportedAir;
+    var fields = air_text.splitTopLevel(trimmed[4..params_end], ',');
+    while (fields.next()) |field| {
+        const param = std.mem.trim(u8, field, " ");
+        if (std.mem.startsWith(u8, param, "?") and !optionalUsesPointerSentinel(param)) return error.UnsupportedAir;
+    }
 }
 
 pub fn functionReturnTypeText(text: []const u8) ?[]const u8 {
@@ -75,6 +108,9 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "void")) return .{ .ir_type = .void };
     if (std.mem.eql(u8, trimmed, "noreturn")) return .{ .ir_type = .void };
     if (std.mem.eql(u8, trimmed, "InternPool.Active")) return .{ .ir_type = .void };
+    // src/link/Elf2.zig: Symbol.Id is a packed struct(u32), shared with
+    // link.File.SymbolId through explicit bit casts.
+    if (std.mem.eql(u8, trimmed, "link.Elf2.Symbol.Id")) return .{ .ir_type = .{ .int = 32 } };
     if (std.mem.eql(u8, trimmed, "bool")) return .{ .ir_type = .{ .int = 1 } };
     if (std.mem.eql(u8, trimmed, "c_int")) return .{ .ir_type = .{ .int = 32 }, .signed = true };
     if (std.mem.eql(u8, trimmed, "c_long")) return .{ .ir_type = .{ .int = 64 }, .signed = true };
@@ -143,6 +179,9 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.endsWith(u8, trimmed, "Progress.Node.Parent") or std.mem.endsWith(u8, trimmed, "Progress.Node.Index")) {
         return .{ .ir_type = .{ .int = 8 } };
     }
+    if (std.mem.endsWith(u8, trimmed, "Progress.Ipc.Index") or std.mem.eql(u8, trimmed, "Progress.Ipc.Index")) {
+        return .{ .ir_type = .{ .int = 32 } };
+    }
     if (std.mem.endsWith(u8, trimmed, "IndexHeader") or std.mem.eql(u8, trimmed, "IndexHeader")) {
         return .{ .ir_type = .{ .int = 8 } };
     }
@@ -167,7 +206,44 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "libs.mingw.def.Parser") or std.mem.endsWith(u8, trimmed, "mingw.def.Parser")) {
         return .{ .ir_type = .{ .aggregate = "{ ptr, ptr, { ptr, i64, { { i5, i64, i64 }, i1 } }, i16, i0 }" } };
     }
+    if (std.mem.eql(u8, trimmed, "libs.mingw.def.ModuleDefinitionType") or std.mem.endsWith(u8, trimmed, "mingw.def.ModuleDefinitionType")) {
+        return .{ .ir_type = .{ .int = 0 } };
+    }
     if (std.mem.eql(u8, trimmed, "Sema.Block") or std.mem.eql(u8, trimmed, "std.zig.Sema.Block")) return .{ .ir_type = .ptr };
+    if (std.mem.eql(u8, trimmed, "Zcu.LazySrcLoc.Baseline") or std.mem.endsWith(u8, trimmed, ".LazySrcLoc.Baseline")) return .{ .ir_type = .{ .int = 64 } };
+    if (std.mem.eql(u8, trimmed, "Zcu.LazySrcLoc.Offset") or std.mem.endsWith(u8, trimmed, ".LazySrcLoc.Offset")) return .{ .ir_type = .ptr };
+    if (std.mem.eql(u8, trimmed, "Zcu.LazySrcLoc") or std.mem.endsWith(u8, trimmed, ".LazySrcLoc")) return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } };
+    if (std.mem.eql(u8, trimmed, "link.File") or std.mem.endsWith(u8, trimmed, ".link.File")) return .{ .ir_type = .ptr };
+    if (std.mem.eql(u8, trimmed, "Compilation.Config") or std.mem.endsWith(u8, trimmed, ".Compilation.Config")) return .{ .ir_type = .ptr };
+    if (std.mem.eql(u8, trimmed, "Progress") or std.mem.endsWith(u8, trimmed, ".Progress")) return .{ .ir_type = .ptr };
+    if (std.mem.eql(u8, trimmed, "Target.Query") or
+        std.mem.eql(u8, trimmed, "std.Target.Query") or
+        std.mem.endsWith(u8, trimmed, ".Target.Query") or
+        std.mem.eql(u8, trimmed, "Query"))
+    {
+        return .{ .ir_type = .{ .aggregate = "Target.Query" } };
+    }
+    if (std.mem.eql(u8, trimmed, "SemanticVersion") or
+        std.mem.eql(u8, trimmed, "std.SemanticVersion") or
+        std.mem.endsWith(u8, trimmed, ".SemanticVersion"))
+    {
+        return .{ .ir_type = .{ .aggregate = "SemanticVersion" } };
+    }
+    if (std.mem.eql(u8, trimmed, "InternPool.PtrInt") or
+        std.mem.eql(u8, trimmed, "std.zig.InternPool.PtrInt") or
+        std.mem.endsWith(u8, trimmed, ".InternPool.PtrInt") or
+        std.mem.eql(u8, trimmed, "PtrInt"))
+    {
+        return .{ .ir_type = .{ .aggregate = "{ i32, i32, i32 }" } };
+    }
+    if (std.mem.startsWith(u8, trimmed, "InternPool.Ptr") or std.mem.startsWith(u8, trimmed, "std.zig.InternPool.Ptr")) return .{ .ir_type = .ptr };
+    if (std.mem.eql(u8, trimmed, "InternPool.Float64") or
+        std.mem.eql(u8, trimmed, "std.zig.InternPool.Float64") or
+        std.mem.endsWith(u8, trimmed, ".InternPool.Float64") or
+        std.mem.eql(u8, trimmed, "Float64"))
+    {
+        return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
+    }
     if (std.mem.startsWith(u8, trimmed, "bit_set.Integer(") or
         std.mem.startsWith(u8, trimmed, "std.bit_set.Integer("))
     {
@@ -181,7 +257,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         std.mem.startsWith(u8, trimmed, "std.compress.flate.token.ShortCode(") or
         std.mem.startsWith(u8, trimmed, "ShortCode("))
     {
-        return .{ .ir_type = .{ .int = 8 } };
+        return .{ .ir_type = .{ .int = 5 } };
     }
     if (std.mem.startsWith(u8, trimmed, "link.Coff.Node.LazyMapRef.Index(") or
         std.mem.startsWith(u8, trimmed, "link.Elf2.Node.LazyMapRef.Index("))
@@ -189,6 +265,12 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         return .{ .ir_type = .{ .int = 32 } };
     }
     if (std.mem.eql(u8, trimmed, "link.File.LazySymbol.Kind")) return .{ .ir_type = .{ .int = 1 } };
+    if (std.mem.eql(u8, trimmed, "codegen.x86_64.bits.Register") or
+        std.mem.eql(u8, trimmed, "bits.Register") or
+        std.mem.endsWith(u8, trimmed, ".bits.Register"))
+    {
+        return .{ .ir_type = .{ .int = 8 } };
+    }
     if (std.mem.eql(u8, trimmed, "codegen.aarch64.encoding.Register")) return .{ .ir_type = .{ .int = 64 } };
     if (std.mem.eql(u8, trimmed, "codegen.aarch64.Disassemble.Case")) return .{ .ir_type = .{ .int = 32 } };
     if (std.mem.eql(u8, trimmed, "Type") or std.mem.eql(u8, trimmed, "type.CType") or std.mem.eql(u8, trimmed, "codegen.c.type.CType")) {
@@ -202,6 +284,28 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "mem.Allocator") or std.mem.eql(u8, trimmed, "std.mem.Allocator")) return .{ .ir_type = .{ .aggregate = "{ ptr, ptr }" } };
     if (std.mem.eql(u8, trimmed, "link.Wasm.FunctionType")) return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
     if (std.mem.eql(u8, trimmed, "link.Elf.ZigObject")) return .{ .ir_type = .ptr };
+    if (std.mem.eql(u8, trimmed, "link.Elf.Ref") or
+        std.mem.eql(u8, trimmed, "Elf.Ref") or
+        std.mem.endsWith(u8, trimmed, ".Elf.Ref") or
+        std.mem.eql(u8, trimmed, "Ref"))
+    {
+        return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "link.Elf.Atom") or
+        std.mem.eql(u8, trimmed, "Elf.Atom") or
+        std.mem.endsWith(u8, trimmed, ".Atom") or
+        std.mem.eql(u8, trimmed, "Atom"))
+    {
+        return .{ .ir_type = .{ .aggregate = "link.Elf.Atom" } };
+    }
+    if (std.mem.eql(u8, trimmed, "elf.Elf64.Phdr") or
+        std.mem.eql(u8, trimmed, "Elf64.Phdr") or
+        std.mem.endsWith(u8, trimmed, ".Elf64.Phdr") or
+        std.mem.eql(u8, trimmed, "Phdr") or
+        std.mem.endsWith(u8, trimmed, ".Phdr"))
+    {
+        return .{ .ir_type = .{ .aggregate = "elf.Elf64.Phdr" } };
+    }
     if (std.mem.eql(u8, trimmed, "Air.ShuffleOneMask") or std.mem.eql(u8, trimmed, "ShuffleOneMask")) {
         return .{ .ir_type = .{ .aggregate = "{ i31, i1 }" } };
     }
@@ -238,10 +342,19 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.endsWith(u8, trimmed, "Constant.FormatData")) {
         return .{ .ir_type = .{ .aggregate = "{ i32, ptr, i32 }" } };
     }
+    if (std.mem.endsWith(u8, trimmed, "Value.FormatData")) {
+        return .{ .ir_type = .{ .aggregate = "{ i32, i32, ptr, i32 }" } };
+    }
     if (std.mem.endsWith(u8, trimmed, "print_value.FormatContext") or
         std.mem.endsWith(u8, trimmed, "FormatContext"))
     {
         return .{ .ir_type = .{ .aggregate = "{ i32, ptr, ptr, i8 }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "codegen.spirv.CodeGen.Temporary.Value") or std.mem.endsWith(u8, trimmed, ".CodeGen.Temporary.Value") or std.mem.endsWith(u8, trimmed, ".Temporary.Value")) {
+        return .{ .ir_type = .{ .aggregate = "{ i64, i32 }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "codegen.spirv.CodeGen.Temporary") or std.mem.endsWith(u8, trimmed, ".CodeGen.Temporary") or std.mem.endsWith(u8, trimmed, ".Temporary") or std.mem.eql(u8, trimmed, "Temporary")) {
+        return .{ .ir_type = .{ .aggregate = "{ i32, { i64, i32 }, i64 }" } };
     }
     if (std.mem.eql(u8, trimmed, "Value") or std.mem.endsWith(u8, trimmed, ".Value")) {
         return .{ .ir_type = .{ .int = 32 } };
@@ -250,6 +363,12 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         return .{ .ir_type = .{ .int = 16 } };
     }
     if (std.mem.endsWith(u8, trimmed, "Builder.FormatFlags") or std.mem.eql(u8, trimmed, "FormatFlags")) {
+        return .{ .ir_type = .{ .int = 32 } };
+    }
+    if (std.mem.eql(u8, trimmed, "zig.llvm.Builder.Function.Index") or
+        std.mem.eql(u8, trimmed, "std.zig.llvm.Builder.Function.Index") or
+        std.mem.endsWith(u8, trimmed, "Builder.Function.Index"))
+    {
         return .{ .ir_type = .{ .int = 32 } };
     }
     if (std.mem.eql(u8, trimmed, "zig.llvm.Builder.Metadata") or
@@ -273,7 +392,7 @@ pub fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "Module") or std.mem.endsWith(u8, trimmed, ".Module")) {
         return .{ .ir_type = .ptr };
     }
-    if (std.mem.eql(u8, trimmed, "Target") or std.mem.endsWith(u8, trimmed, ".Target")) {
+    if (std.mem.eql(u8, trimmed, "Target") or std.mem.eql(u8, trimmed, "std.Target")) {
         return .{ .ir_type = .ptr };
     }
     if (std.mem.eql(u8, trimmed, "Module.ResolvedTarget") or std.mem.endsWith(u8, trimmed, ".ResolvedTarget")) {
@@ -339,6 +458,9 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         if (std.mem.indexOf(u8, trimmed, "Constant.FormatData") != null) {
             return .{ .ir_type = .{ .aggregate = "{ { i32, ptr, i32 } }" } };
         }
+        if (std.mem.indexOf(u8, trimmed, "Value.FormatData") != null) {
+            return .{ .ir_type = .{ .aggregate = "{ { i32, i32, ptr, i32 } }" } };
+        }
         if (std.mem.indexOf(u8, trimmed, "FormatAnalUnit") != null) {
             return .{ .ir_type = .{ .aggregate = "{ { i64, ptr } }" } };
         }
@@ -392,6 +514,9 @@ pub fn parseZigType(text: []const u8) ?ZigType {
         const child = parseZigType(trimmed[1..]) orelse return null;
         if (child.ir_type == .int and child.ir_type.int <= 64) return child;
         if (child.ir_type == .ptr) return child;
+        if (child.ir_type == .aggregate) {
+            return .{ .ir_type = .{ .aggregate = trimmed } };
+        }
         return null;
     }
     if (std.mem.startsWith(u8, trimmed, "[]") or std.mem.startsWith(u8, trimmed, "[:0]")) {
@@ -431,7 +556,7 @@ pub fn isOpaqueNominalTypeSurface(text: []const u8) bool {
             if (paren_depth == 0) return false;
             paren_depth -= 1;
         },
-        ',', ' ' => if (paren_depth == 0) return false,
+        ',', ' ', '?' => if (paren_depth == 0) return false,
         else => return false,
     };
     return paren_depth == 0;
@@ -629,8 +754,7 @@ pub fn parsePackedBitfieldPointerType(text: []const u8) ?PackedBitfieldPtrInfo {
             else => return null,
         };
         break :blk bits;
-    } else
-        return null;
+    } else return null;
 
     return .{
         .host_align = host_align,
@@ -717,6 +841,8 @@ test "parse fact-owned named enum type surfaces" {
 test "opaque nominal type surface accepts comptime argument instantiations" {
     try std.testing.expect(isOpaqueNominalTypeSurface("debug.ConfigurableTrace(2,4,false)"));
     try std.testing.expect(isOpaqueNominalTypeSurface("hash_map.HashMapUnmanaged(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata"));
+    try std.testing.expect(isOpaqueNominalTypeSurface("hash_map.Custom(codegen.spirv.spec.Id,?codegen.spirv.spec.Id,hash_map.AutoContext(codegen.spirv.spec.Id),80).Metadata"));
+    try std.testing.expect(!isOpaqueNominalTypeSurface("pkg.Type?"));
     try std.testing.expect(!isOpaqueNominalTypeSurface("debug.ConfigurableTrace(2 + 4)"));
     try std.testing.expect(!isOpaqueNominalTypeSurface("debug.ConfigurableTrace(2,4,false"));
     try std.testing.expect(!isOpaqueNominalTypeSurface("*pkg.Metadata"));

@@ -85,6 +85,9 @@ pub const LoweringContext = struct {
     synthetic_vector_element_ptrs: []?air_model.SyntheticVectorElementPointer,
     synthetic_bitfield_ptrs: []?air_model.SyntheticBitfieldPointer,
     synthetic_aggregate_ptrs: []?ir.Value,
+    synthetic_aggregate_slots: []?ir.Value,
+    synthetic_aggregate_field_ptrs: []?air_model.SyntheticAggregateFieldPointer,
+    synthetic_optional_ptrs: []?air_model.SyntheticOptionalPointer,
     next_arg_index: usize = 0,
 
     // Typed lowering dispatch and domain-specific lowering operations.
@@ -148,6 +151,7 @@ pub const LoweringContext = struct {
 
     pub const lowerTypedMemorySemanticInstruction = typed_memory.lowerTypedMemorySemanticInstruction;
     pub const lowerTypedAlloca = typed_memory.lowerTypedAlloca;
+    pub const lowerTypedRetPtr = typed_memory.lowerTypedRetPtr;
     pub const lowerTypedLoad = typed_memory.lowerTypedLoad;
     pub const lowerTypedLoadFromSyntheticPointerPayload = typed_memory.lowerTypedLoadFromSyntheticPointerPayload;
     pub const lowerTypedLoadFromSyntheticErrorUnionSlot = typed_memory.lowerTypedLoadFromSyntheticErrorUnionSlot;
@@ -165,9 +169,11 @@ pub const LoweringContext = struct {
     pub const lowerTypedStoreToSyntheticVectorElement = typed_memory.lowerTypedStoreToSyntheticVectorElement;
     pub const lowerTypedStoreToSyntheticUnionField = typed_memory.lowerTypedStoreToSyntheticUnionField;
     pub const lowerTypedStoreToSyntheticBitfield = typed_memory.lowerTypedStoreToSyntheticBitfield;
+    pub const lowerTypedStoreToSyntheticAggregateField = typed_memory.lowerTypedStoreToSyntheticAggregateField;
     pub const lowerTypedAggregateCopy = typed_memory.lowerTypedAggregateCopy;
 
     pub const lowerTypedOptionalSemanticInstruction = typed_optional.lowerTypedOptionalSemanticInstruction;
+    pub const lowerTypedIsNull = typed_optional.lowerTypedIsNull;
     pub const lowerTypedIsNonNull = typed_optional.lowerTypedIsNonNull;
     pub const lowerTypedWrapOptional = typed_optional.lowerTypedWrapOptional;
     pub const lowerTypedOptionalPayload = typed_optional.lowerTypedOptionalPayload;
@@ -263,6 +269,7 @@ pub const LoweringContext = struct {
             .alloc => try self.lowerAlloca(instruction),
             .load => try self.lowerLoad(instruction),
             .store => try self.lowerStore(instruction),
+            .ret_ptr => return error.UnsupportedAir,
             .none => return false,
         }
         return true;
@@ -1042,8 +1049,14 @@ pub const LoweringContext = struct {
         return ownPrint(self.module, "air{}", .{index});
     }
 
+    pub fn hasSretParam(self: LoweringContext) bool {
+        return self.function.params.items.len > 0 and
+            std.mem.eql(u8, self.function.params.items[0].name, "sret");
+    }
+
     pub fn blockParamName(self: LoweringContext, index: usize) []const u8 {
-        return self.function.params.items[index].name;
+        const offset: usize = if (self.hasSretParam()) 1 else 0;
+        return self.function.params.items[index + offset].name;
     }
 
     pub fn qualifiedCalleeName(self: *LoweringContext, callee: []const u8) ![]const u8 {

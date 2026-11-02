@@ -188,7 +188,7 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
             const reg = XmmReg.fromIndex(xmm_index) catch return .{ .unsupported_value = "composed-block-param-xmm-reg" };
             const bits: u16 = if (param.ty == .half) 16 else if (param.ty == .float) 32 else 64;
             try selector_state.bindValueLoc(selector, param.name, .{ .xmm = .{ .reg = reg, .bits = bits } });
-            selector.machine.entry_xmm_defined_bits[@intFromEnum(reg)] = bits;
+            selector.machine.entry_xmm_defined_bits[@backingInt(reg)] = bits;
             xmm_index += 1;
             continue;
         }
@@ -202,14 +202,14 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
             switch (bits) {
                 // SysV zeroext guarantees a canonical low byte. Other narrow
                 // ABI forms remain outside this composed entry envelope.
-                8 => {
+                1, 2, 3, 5, 7, 8 => {
                     if (param.attrs == null or !hasAttrToken(param.attrs.?, "zeroext"))
                         return .{ .no_emitter = "composed-block-param-i8-extension" };
                     try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg });
                 },
-                4, 6, 16, 24 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
+                4, 6, 16, 23, 24 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
                 32 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
-                64 => try selector_state.bindValueLoc(selector, param.name, .{ .arg64 = reg }),
+                37, 64 => try selector_state.bindValueLoc(selector, param.name, .{ .arg64 = reg }),
                 128 => {
                     const high = ArgReg.fromIndex(gpr_index + 1) catch return .{ .unsupported_value = "composed-block-param-reg" };
                     try selector_state.bindValueLoc(selector, param.name, .{ .arg128 = .{ .lo = reg, .hi = high } });
@@ -421,10 +421,7 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
         else
             selector_fp.lowerFcmp(selector, instruction.result, fcmp) catch |err| return instructionValueError(selector, err, "stage2-fcmp-value"),
         .load => |load| selector_memory.lowerLoad(selector, instruction.result, load) catch |err| return instructionValueError(selector, err, "stage2-load-value"),
-        .store => |store| selector_memory.lowerStore(selector, store) catch |err| {
-            std.debug.print("LOWERSTORE FAILED: err={s} store={any}\n", .{ @errorName(err), store });
-            return instructionValueError(selector, err, "stage2-store-value");
-        },
+        .store => |store| selector_memory.lowerStore(selector, store) catch |err| return instructionValueError(selector, err, "stage2-store-value"),
         .gep => |gep| selector_memory.lowerGep(selector, instruction.result, gep) catch |err| return instructionValueError(selector, err, "stage2-gep-value"),
         .call => |call| selector_calls.lowerCall(selector, instruction.result, call) catch |err| return instructionValueError(selector, err, "stage2-call-value"),
         .extractvalue => |extract| selector_calls.lowerExtractValue(selector, instruction.result, extract) catch |err| return instructionValueError(selector, err, "stage2-extractvalue-value"),
@@ -494,7 +491,6 @@ pub fn tryLowerComposedBlockWithContextAndAddressDependencies(
     composed.enable_expired_plan_register_reuse = canUseExpiredPlanRegisterReuse(function);
     defer composed.deinit();
     defer dependency_domain.* = composed.address_dependencies;
-
 
     if (try bindParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try selector_frame.prepareStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);

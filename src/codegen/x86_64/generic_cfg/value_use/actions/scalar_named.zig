@@ -373,7 +373,7 @@ fn classifyNamedScalar(action: *const Types.NamedScalarBinaryAction) Types.Named
     }
     _ = machineBinaryOp(action.operation) orelse
         return error.ValueUseNamedScalarFormUnsupported;
-    if (bits == 4 or bits == 6 or bits == 7 or bits == 16 or bits == 32 or bits == 64 or
+    if (bits == 4 or bits == 6 or bits == 7 or bits == 16 or bits == 23 or bits == 32 or bits == 37 or bits == 64 or
         (action.exact_ei and bits < 32))
         return .b07_general_binary;
     return error.ValueUseNamedScalarWidthUnsupported;

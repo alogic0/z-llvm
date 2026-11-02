@@ -586,6 +586,82 @@ test "generic cfg selector executes named i64 unsigned less-than operand order" 
     for (cases) |case| try std.testing.expectEqual(@intFromBool(case.lhs < case.rhs), less(case.lhs, case.rhs));
 }
 
+test "generic cfg selector executes named i64 unsigned greater-equal operand order" {
+    const input =
+        \\define i32 @named_i64_uge(i64 %lhs, i64 %rhs) {
+        \\entry:
+        \\  %comparison = icmp uge i64 %lhs, %rhs
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("named_i64_uge", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const ge: *const fn (u64, u64) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    const cases = [_]struct { lhs: u64, rhs: u64 }{
+        .{ .lhs = 0, .rhs = 0 },
+        .{ .lhs = 0, .rhs = 1 },
+        .{ .lhs = 1, .rhs = 0 },
+        .{ .lhs = 1, .rhs = 2 },
+        .{ .lhs = 2, .rhs = 1 },
+        .{ .lhs = std.math.maxInt(i64), .rhs = @as(u64, 1) << 63 },
+        .{ .lhs = @as(u64, 1) << 63, .rhs = std.math.maxInt(i64) },
+        .{ .lhs = @as(u64, 1) << 63, .rhs = std.math.maxInt(u64) },
+        .{ .lhs = std.math.maxInt(u64), .rhs = @as(u64, 1) << 63 },
+        .{ .lhs = std.math.maxInt(u64), .rhs = std.math.maxInt(u64) },
+    };
+    for (cases) |case| try std.testing.expectEqual(@intFromBool(case.lhs >= case.rhs), ge(case.lhs, case.rhs));
+}
+
+test "generic cfg selector executes named i64 unsigned less-equal operand order" {
+    const input =
+        \\define i32 @named_i64_ule(i64 %lhs, i64 %rhs) {
+        \\entry:
+        \\  %comparison = icmp ule i64 %lhs, %rhs
+        \\  %result = zext i1 %comparison to i32
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = MachineFunction.init("named_i64_ule", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const le: *const fn (u64, u64) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    const cases = [_]struct { lhs: u64, rhs: u64 }{
+        .{ .lhs = 0, .rhs = 0 },
+        .{ .lhs = 0, .rhs = 1 },
+        .{ .lhs = 1, .rhs = 0 },
+        .{ .lhs = 1, .rhs = 2 },
+        .{ .lhs = 2, .rhs = 1 },
+        .{ .lhs = std.math.maxInt(i64), .rhs = @as(u64, 1) << 63 },
+        .{ .lhs = @as(u64, 1) << 63, .rhs = std.math.maxInt(i64) },
+        .{ .lhs = @as(u64, 1) << 63, .rhs = std.math.maxInt(u64) },
+        .{ .lhs = std.math.maxInt(u64), .rhs = @as(u64, 1) << 63 },
+        .{ .lhs = std.math.maxInt(u64), .rhs = std.math.maxInt(u64) },
+    };
+    for (cases) |case| try std.testing.expectEqual(@intFromBool(case.lhs <= case.rhs), le(case.lhs, case.rhs));
+}
+
 test "generic cfg selector lowers exact named i16 comparisons" {
     inline for (.{ ir.IcmpPredicate.slt, ir.IcmpPredicate.sgt, ir.IcmpPredicate.ne }) |predicate| {
         var machine = MachineFunction.init("named-i16", .{ .int = 1 });

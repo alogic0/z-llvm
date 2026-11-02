@@ -390,7 +390,7 @@ pub const AccumulatorDefinitionSession = struct {
             .int => |int| try session.selector.machine.instructions.append(
                 session.selector.allocator,
                 switch (definition.physicalLoc()) {
-                    .eax => .{ .mov_imm_eax = try i32Value(int) },
+                    .eax => .{ .mov_imm_eax = try composed_helpers.i32BitPattern(int) },
                     .rax => .{ .mov_imm_rax = try i64Value(int) },
                     else => unreachable,
                 },
@@ -1757,7 +1757,7 @@ pub fn emitValueIntoEax(selector: *ComposedBlockSelector, value: ir.Value) !void
     switch (value) {
         .int => |int| {
             try clobberAccumulator(selector);
-            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(int) });
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try composed_helpers.i32BitPattern(int) });
         },
         .named => {
             const loc = resolveValue(selector, value) orelse return error.UnsupportedCodegenValue;

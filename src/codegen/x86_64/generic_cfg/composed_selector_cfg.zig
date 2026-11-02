@@ -210,7 +210,7 @@ pub fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic 
     const value = ret.value orelse return .{ .unsupported_value = "composed-block-missing-ret-value" };
     switch (value) {
         .int => |int| if (bits <= 32)
-            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try i32Value(int) })
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try composed_helpers.i32BitPattern(int) })
         else if (bits <= 64)
             try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = try i64Value(int) })
         else
@@ -303,11 +303,12 @@ pub fn lowerCfgTerminator(
             return null;
         },
         .@"switch" => |switch_term| try lowerSwitch(selector, function, block_index, switch_term),
-        .@"unreachable" => if (blockEndsInTrap(function.blocks.items[block_index]) or
-            isExclusivelyProvenMaskedSwitchDefault(function, function.blocks.items[block_index].name))
-            null
-        else
-            .{ .no_emitter = "stage2-terminator-not-owned" },
+        .@"unreachable" => blk: {
+            if (!blockEndsInTrap(function.blocks.items[block_index]) and
+                !isExclusivelyProvenMaskedSwitchDefault(function, function.blocks.items[block_index].name))
+                try selector_state.emitEflagsInstruction(selector, .ud2, .preserve);
+            break :blk null;
+        },
         .indirectbr => .{ .no_emitter = "stage2-terminator-not-owned" },
     };
 }

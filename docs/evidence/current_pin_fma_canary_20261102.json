@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "date": "2026-11-02",
+  "reference_contract": "LLVM 22 compilation of the unchanged frozen compiler_rt.fma.fma IR",
+  "reason": "Shared selector work changes register homes and spill offsets; the audited emitted code shrinks by 24 bytes.",
+  "frozen_ir": {
+    "path": "test/zig/integrated/compiler_rt_fma.ll",
+    "sha256": "5c2b4d16ed8129bfc82ce06cb5d023c16c614f04adb4d1a352b28172fe249122"
+  },
+  "helpers_ir": {
+    "path": "test/zig/integrated/compiler_rt_fma_helpers.ll",
+    "sha256": "d7da6921d9831512e8967496fadbea7d2942de676d451887a9d677e8f358d1c4"
+  },
+  "before": {
+    "instruction_stream_sha256": "cc791b46ef93f564040e5245874216a7aa267df7319e84135862177f4eff776a",
+    "symbol_bytes": 4114,
+    "symbol_sha256": "3571863e4438990f77b5a159b95a85de16dea0d50db7a935406b54b09bee9abb"
+  },
+  "after": {
+    "instruction_stream_sha256": "77da479e910f9d1f3334d1ba961e66a1396689cf9f34c2690dbaefb34ae7f83a",
+    "symbol_bytes": 4090,
+    "symbol_sha256": "1d3c0f0ed4fbdc3774e55d57760de6f03385cc9c7fc387465b5b55e2832d73ab"
+  },
+  "validation": {
+    "fixed_fma_cases": 25,
+    "fixed_helper_cases": 4,
+    "seeded_paired_cases": 8192,
+    "paired_mismatches": 0,
+    "seed": "0x5eed1234f00dcafe",
+    "driver": "test/zig/integrated/compiler_rt_fma_diff.c",
+    "driver_sha256": "adaa510d9219488791c09d1368a7e1faa36ad2dbcf892769a6f94935934fc656",
+    "mandatory_mismatch_negative": "passed; fixed production identities and no runtime override"
+  },
+  "unchanged_identities": [
+    "multi3 instruction stream",
+    "multi3 symbol bytes",
+    "fma ldexp symbol bytes",
+    "fma add_and_denorm symbol bytes"
+  ],
+  "evidence_root": "local-state/validations/current-pin-acceptance-20261102/fma-audit",
+  "assembly_diff": [
+    "local-state/validations/current-pin-acceptance-20261102/fma-before.s",
+    "local-state/validations/current-pin-acceptance-20261102/fma-after.s"
+  ],
+  "exploratory_reference_check": {
+    "case": 1,
+    "x": "0910e9baedcf9892",
+    "y": "8003521de68fc0f9",
+    "z": "c0dcdedc0c54f414",
+    "system_libm": "c0dcdedc0c54f414",
+    "frozen_llvm_ir_and_both_local_versions": "fff8000000000001",
+    "scope": "The accepted contract is frozen LLVM IR execution; general libm parity is a separate question."
+  }
+}

@@ -1,4 +1,5 @@
 const shared = @import("core_shared.zig");
+const memory_address = @import("cabi_memory_address.zig");
 const core_cfg_emit = @import("core_cfg_emit.zig");
 const core_value_emit = @import("core_value_emit.zig");
 const cabi_abi_helpers = @import("cabi_abi_helpers.zig");
@@ -50,6 +51,7 @@ pub fn lowerGenericCfgSelectedSretStores(
 ) !bool {
     if (try lowerGenericCfgSretCopy(allocator, machine, function, block)) return true;
     if (try lowerGenericCfgScalarSretParamStores(allocator, machine, function, block)) return true;
+    if (try lowerGenericCfgSretFieldLoader(allocator, machine, function, block)) return true;
     if (function.params.items.len < 4) return false;
     const aggregate_ty = sretAggregateType(function.params.items[0].attrs) orelse return false;
     const field_count = aggregateFieldCount(aggregate_ty) orelse return false;
@@ -387,6 +389,153 @@ pub fn lowerGenericCfgSretCopy(
         }
     }
     try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+pub const appendLoadArgPtrDispRax = memory_address.appendLoad64;
+
+pub fn appendLoadArgPtrDispEax(allocator: std.mem.Allocator, machine: *MachineFunction, reg: ArgReg, offset: u32) !void {
+    if (offset <= 127) {
+        try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_eax = .{ .reg = reg, .offset = @intCast(offset) } });
+    } else {
+        return error.UnsupportedCodegenAbi;
+    }
+}
+
+pub fn lowerGenericCfgSretFieldLoader(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+) !bool {
+    if (function.ret_ty != .void or function.blocks.items.len != 1) return false;
+    if (function.params.items.len < 2) return false;
+    _ = sretAggregateType(function.params.items[0].attrs) orelse return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
+    const sret_reg = paramReg(function, function.params.items[0].name, .ptr) catch return false;
+    if (sret_reg != .rdi) return error.UnsupportedCodegenAbi;
+
+    const ret = switch (block.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (ret.ty != .void or ret.value != null) return false;
+
+    const initial_length = machine.instructions.items.len;
+    var selected = false;
+    defer if (!selected) machine.instructions.shrinkRetainingCapacity(initial_length);
+
+    const GepInfo = struct { base_reg: ArgReg, offset: u32, is_sret: bool };
+    const LoadInfo = struct { src_reg: ArgReg, src_offset: u32, ty: ir.Type, store_epoch: usize };
+
+    var gep_names: [32][]const u8 = undefined;
+    var geps: [32]GepInfo = undefined;
+    var gep_count: usize = 0;
+
+    var load_names: [32][]const u8 = undefined;
+    var loads: [32]LoadInfo = undefined;
+    var load_count: usize = 0;
+
+    var store_count: usize = 0;
+
+    for (block.instructions.items) |inst| {
+        if (inst.removed) continue;
+        switch (inst.kind) {
+            .gep => |gep| {
+                const res_name = inst.result orelse return false;
+                const ptr_name = switch (gep.ptr) {
+                    .named => |n| n,
+                    else => return false,
+                };
+                const offset_val = memory_address.constantGepByteOffset(gep) orelse return false;
+                var is_sret = false;
+                var base_reg: ArgReg = undefined;
+                if (std.mem.eql(u8, ptr_name, function.params.items[0].name)) {
+                    is_sret = true;
+                    base_reg = sret_reg;
+                } else {
+                    base_reg = paramReg(function, ptr_name, .ptr) catch return false;
+                }
+                if (gep_count >= geps.len) return false;
+                gep_names[gep_count] = res_name;
+                geps[gep_count] = .{ .base_reg = base_reg, .offset = offset_val, .is_sret = is_sret };
+                gep_count += 1;
+            },
+            .load => |load| {
+                if (load.attrs.isBarrier() or load.ty_addrspace != null or load.ptr_addrspace != null) return false;
+                const res_name = inst.result orelse return false;
+                const ptr_name = switch (load.ptr) {
+                    .named => |n| n,
+                    else => return false,
+                };
+                var found_gep: ?GepInfo = null;
+                for (gep_names[0..gep_count], geps[0..gep_count]) |name, g| {
+                    if (std.mem.eql(u8, name, ptr_name)) {
+                        found_gep = g;
+                        break;
+                    }
+                }
+                const g = found_gep orelse return false;
+                if (g.is_sret) return false;
+                if (load_count >= loads.len) return false;
+                load_names[load_count] = res_name;
+                loads[load_count] = .{ .src_reg = g.base_reg, .src_offset = g.offset, .ty = load.ty, .store_epoch = store_count };
+                load_count += 1;
+            },
+            .store => |store| {
+                if (store.attrs.isBarrier() or store.ty_addrspace != null or store.ptr_addrspace != null) return false;
+                const ptr_name = switch (store.ptr) {
+                    .named => |n| n,
+                    else => return false,
+                };
+                var found_gep: ?GepInfo = null;
+                for (gep_names[0..gep_count], geps[0..gep_count]) |name, g| {
+                    if (std.mem.eql(u8, name, ptr_name)) {
+                        found_gep = g;
+                        break;
+                    }
+                }
+                const g = found_gep orelse return false;
+                if (!g.is_sret) return false;
+                const dst_offset = g.offset;
+
+                switch (store.value) {
+                    .named => |val_name| {
+                        var found_load: ?LoadInfo = null;
+                        for (load_names[0..load_count], loads[0..load_count]) |name, l| {
+                            if (std.mem.eql(u8, name, val_name)) {
+                                found_load = l;
+                                break;
+                            }
+                        }
+                        if (found_load) |l| {
+                            if (l.store_epoch != store_count) return false;
+                            if (l.ty.eql(.{ .int = 64 }) or l.ty.eql(.ptr)) {
+                                try appendLoadArgPtrDispRax(allocator, machine, l.src_reg, l.src_offset);
+                                try appendStoreRaxArgPtrDisp(allocator, machine, sret_reg, dst_offset);
+                            } else if (l.ty.eql(.{ .int = 32 })) {
+                                try appendLoadArgPtrDispEax(allocator, machine, l.src_reg, l.src_offset);
+                                try appendStoreEaxArgPtrDisp(allocator, machine, sret_reg, dst_offset);
+                            } else return false;
+                        } else {
+                            try emitGenericCfgScalarSretParamStore(allocator, machine, function, block, store.value, store.ty, sret_reg, dst_offset);
+                        }
+                    },
+                    .int => {
+                        try emitGenericCfgScalarSretParamStore(allocator, machine, function, block, store.value, store.ty, sret_reg, dst_offset);
+                    },
+                    else => return false,
+                }
+                store_count += 1;
+            },
+            else => return false,
+        }
+    }
+
+    if (store_count == 0) return false;
+    try machine.instructions.append(allocator, .{ .mov_arg_rax = .rdi });
+    try appendGenericCfgReturn(allocator, machine);
+    selected = true;
     return true;
 }
 

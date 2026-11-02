@@ -5,6 +5,7 @@ const air_model = @import("zig_air_model.zig");
 const air_text = @import("zig_air_text.zig");
 const air_types = @import("zig_air_types.zig");
 const air_values = @import("zig_air_values.zig");
+const air_aggregate_construction = @import("zig_air_aggregate_construction.zig");
 
 const parseZigType = air_types.parseZigType;
 const pointerLoadResultType = air_types.pointerLoadResultType;
@@ -12,15 +13,38 @@ const ir = @import("ir.zig");
 const type_layout = @import("zig_air_type_layout.zig");
 const target = @import("target.zig");
 const ownPrint = air_model.ownPrint;
+const aggregate_layout_facts = @import("zig_air_aggregate_layout_facts.zig");
+const aggregate_values = @import("zig_air_aggregate_values.zig");
+const optional_layout = @import("zig_air_optional_layout.zig");
 
 pub fn lowerTypedMemorySemanticInstruction(self: anytype, instruction: air_export.TypedInstruction) !bool {
     switch (air_capabilities.memorySemanticOpForOpcode(instruction.opcode)) {
         .alloc => try self.lowerTypedAlloca(instruction),
         .load => try self.lowerTypedLoad(instruction),
         .store => try self.lowerTypedStore(instruction),
+        .ret_ptr => try self.lowerTypedRetPtr(instruction),
         .none => return false,
     }
     return true;
+}
+
+pub fn lowerTypedRetPtr(self: anytype, instruction: air_export.TypedInstruction) !void {
+    const pointer_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
+    if (self.hasSretParam()) {
+        self.values[instruction.index] = .{
+            .ty = pointer_type,
+            .value = .{ .named = "sret" },
+        };
+        return;
+    }
+    if (self.function_type.return_type.ir_type != .aggregate) return air_model.LowerError.UnsupportedAir;
+    self.values[instruction.index] = .{
+        .ty = pointer_type,
+        .value = .undef,
+    };
+    if (instruction.index < self.synthetic_aggregate_slots.len) {
+        self.synthetic_aggregate_slots[instruction.index] = .undef;
+    }
 }
 
 pub fn lowerTypedAlloca(self: anytype, instruction: air_export.TypedInstruction) !void {
@@ -51,6 +75,18 @@ pub fn lowerTypedAlloca(self: anytype, instruction: air_export.TypedInstruction)
             .value = .undef,
         };
         return;
+    }
+    if (allocated_type == .aggregate) {
+        if (aggregateParamSlotArgPtr(self, instruction.index)) |arg_ptr| {
+            self.values[instruction.index] = .{
+                .ty = pointer_type,
+                .value = arg_ptr,
+            };
+            if (instruction.index < self.synthetic_aggregate_ptrs.len) {
+                self.synthetic_aggregate_ptrs[instruction.index] = arg_ptr;
+            }
+            return;
+        }
     }
     const result_name = try self.resultName(instruction.index);
     try self.block.instructions.append(self.allocator, .{
@@ -109,13 +145,28 @@ pub fn lowerTypedLoad(self: anytype, instruction: air_export.TypedInstruction) !
 
     if (pointer.ty.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
     const result_type = try typedLoadResultType(instruction, pointer.ty);
-    if (result_type.ir_type == .aggregate) {
-        if (instruction.index < self.synthetic_aggregate_ptrs.len) {
-            self.synthetic_aggregate_ptrs[instruction.index] = pointer.value;
+    const optional_type_text: ?[]const u8 = blk: {
+        if (std.mem.startsWith(u8, instruction.result_type, "?")) {
+            break :blk instruction.result_type;
         }
+        if (instruction.operands.len > 0) {
+            if (air_types.pointerChildText(instruction.operands[0].type_text)) |ct| {
+                if (std.mem.startsWith(u8, ct, "?")) {
+                    break :blk ct;
+                }
+            }
+        }
+        break :blk null;
+    };
+    if (optional_type_text) |opt_text| {
+        if (is_atomic) return air_model.LowerError.UnsupportedAir;
+        if (try optional_layout.captureLoad(self, instruction.index, opt_text, pointer.value, pointer.ty.is_volatile_pointer)) return;
+    }
+    if (result_type.ir_type == .aggregate) {
+        if (is_atomic or pointer.ty.is_volatile_pointer) return air_model.LowerError.UnsupportedAir;
         self.values[instruction.index] = .{
             .ty = result_type,
-            .value = pointer.value,
+            .value = try aggregate_values.load(self, instruction.index, result_type.ir_type, pointer.value),
         };
         return;
     }
@@ -193,6 +244,24 @@ fn bitfieldHostBits(info: air_model.PackedBitfieldPtrInfo) u16 {
     return clamped_bytes * 8;
 }
 
+fn isMatchingAllocaBase(self: anytype, base_ptr: ir.Value, target_ty: ir.Type) bool {
+    const name = switch (base_ptr) {
+        .named => |n| n,
+        else => return false,
+    };
+    for (self.block.instructions.items) |inst| {
+        if (inst.result) |res| {
+            if (std.mem.eql(u8, res, name)) {
+                if (inst.kind == .alloca) {
+                    return inst.kind.alloca.allocated_ty.eql(target_ty);
+                }
+                break;
+            }
+        }
+    }
+    return false;
+}
+
 pub fn lowerTypedLoadFromSyntheticBitfield(self: anytype, instruction: air_export.TypedInstruction) !bool {
     const pointer_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return false;
     if (pointer_index >= self.synthetic_bitfield_ptrs.len) return false;
@@ -205,6 +274,10 @@ pub fn lowerTypedLoadFromSyntheticBitfield(self: anytype, instruction: air_expor
         if (typed_child) |child| break :blk child;
         break :blk air_model.ZigType{ .ir_type = .{ .int = @intCast(bitfield.info.field_bits) } };
     };
+
+    if (bitfield.info.bit_offset == 0 and isMatchingAllocaBase(self, bitfield.base_ptr, result_type.ir_type)) {
+        return false;
+    }
 
     const host_bits: u16 = bitfieldHostBits(bitfield.info);
     const host_ty: ir.Type = .{ .int = host_bits };
@@ -404,18 +477,40 @@ pub fn lowerTypedLoadFromSlicePtrPtr(self: anytype, instruction: air_export.Type
 
 pub fn lowerTypedStore(self: anytype, instruction: air_export.TypedInstruction) !void {
     if (std.mem.eql(u8, instruction.opcode, "atomic_store_monotonic") or
-        std.mem.eql(u8, instruction.opcode, "atomic_store_unordered"))
+        std.mem.eql(u8, instruction.opcode, "atomic_store_unordered") or
+        std.mem.eql(u8, instruction.opcode, "atomic_store_release") or
+        std.mem.eql(u8, instruction.opcode, "atomic_store_seq_cst"))
     {
         try lowerTypedAtomicStore(self, instruction);
         return;
     }
     if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
+    const stored_type = std.mem.trim(u8, instruction.operands[1].type_text, " ");
+    if (std.mem.startsWith(u8, stored_type, "?") and !air_types.optionalUsesPointerSentinel(stored_type)) {
+        // A payload store alone would silently discard the optional tag.
+        return air_model.LowerError.UnsupportedAir;
+    }
     const pointer = try self.resolveTypedOperand(instruction, 0);
     if (pointer.ty.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
+    if (!pointer.ty.is_volatile_pointer and std.mem.eql(u8, instruction.operands[1].kind, "const")) {
+        if (air_model.operandTextDetail(instruction, 1)) |text| {
+            const value_text = std.mem.trim(u8, text, " ");
+            const suffix = ", undefined>";
+            if (std.mem.startsWith(u8, value_text, "<") and std.mem.endsWith(u8, value_text, suffix) and
+                std.mem.eql(u8, value_text[1 .. value_text.len - suffix.len], stored_type))
+            {
+                // An ordinary undef store may choose the existing memory bits.
+                // This also handles opaque deinit poisoning without inventing
+                // an aggregate layout. Volatile/atomic stores retain effects.
+                return;
+            }
+        }
+    }
     if (try self.lowerTypedStoreToSyntheticVectorElement(instruction)) return;
     if (try self.lowerTypedStoreToSyntheticUnionField(instruction)) return;
     if (try self.lowerTypedStoreToSyntheticBitfield(instruction)) return;
     const value = try self.resolveTypedOperand(instruction, 1);
+    if (try self.lowerTypedStoreToSyntheticAggregateField(instruction, value)) return;
     if (try self.lowerTypedStoreToSyntheticErrorUnionSlot(instruction, value)) return;
     if (try self.lowerTypedStoreToSyntheticVectorSlot(instruction, value)) return;
     if (air_model.typedInstOperandIndex(instruction.operands[0])) |idx| {
@@ -424,14 +519,18 @@ pub fn lowerTypedStore(self: anytype, instruction: air_export.TypedInstruction) 
         }
     }
     if (value.ty.ir_type == .aggregate) {
+        if (pointer.ty.is_volatile_pointer) return air_model.LowerError.UnsupportedAir;
         if (air_model.typedInstOperandIndex(instruction.operands[1])) |val_idx| {
             if (val_idx < self.synthetic_aggregate_ptrs.len) {
                 if (self.synthetic_aggregate_ptrs[val_idx]) |ptr_val| {
+                    if (pointer.value.eql(ptr_val)) return;
                     try self.lowerTypedAggregateCopy(instruction.index, pointer.value, ptr_val, value.ty.ir_type);
                     return;
                 }
             }
         }
+        try aggregate_values.store(self, instruction.index, value.ty.ir_type, value.value, pointer.value);
+        return;
     }
     try self.block.instructions.append(self.allocator, .{
         .result = null,
@@ -550,18 +649,34 @@ pub fn lowerTypedAtomicStore(self: anytype, instruction: air_export.TypedInstruc
     const value_text = std.mem.trim(u8, fields.next() orelse return air_model.LowerError.UnsupportedAir, " ");
     const ordering = std.mem.trim(u8, fields.next() orelse return air_model.LowerError.UnsupportedAir, " ");
     if (fields.next() != null) return air_model.LowerError.UnsupportedAir;
-    if (!std.mem.eql(u8, ordering, "monotonic") and !std.mem.eql(u8, ordering, "unordered")) return air_model.LowerError.UnsupportedAir;
+    if (!std.mem.eql(u8, ordering, "monotonic") and !std.mem.eql(u8, ordering, "unordered") and !std.mem.eql(u8, ordering, "release") and !std.mem.eql(u8, ordering, "seq_cst")) return air_model.LowerError.UnsupportedAir;
 
     const pointer_index = air_text.instructionRef(pointer_text) orelse return air_model.LowerError.UnsupportedAir;
     if (pointer_index >= self.values.len) return air_model.LowerError.UnsupportedAir;
     const pointer = self.values[pointer_index] orelse return air_model.LowerError.UnsupportedAir;
     if (pointer.ty.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
 
-    const value = air_values.parseConstant(value_text) orelse return air_model.LowerError.UnsupportedAir;
     const child_ty = pointer.ty.pointer_child orelse return air_model.LowerError.UnsupportedAir;
-    if (!child_ty.eql(value.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+    const value = if (air_text.instructionRef(value_text)) |val_idx| blk: {
+        if (val_idx >= self.values.len) return air_model.LowerError.UnsupportedAir;
+        const v = self.values[val_idx] orelse return air_model.LowerError.UnsupportedAir;
+        if (!child_ty.eql(v.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+        break :blk v;
+    } else blk: {
+        const parsed_const = air_values.parseConstant(value_text) orelse return air_model.LowerError.UnsupportedAir;
+        if (!child_ty.eql(parsed_const.ty.ir_type)) return air_model.LowerError.UnsupportedAir;
+        break :blk parsed_const;
+    };
 
-    const atomic_ordering: []const u8 = if (std.mem.eql(u8, ordering, "monotonic")) "monotonic" else "unordered";
+    const atomic_ordering: []const u8 = if (std.mem.eql(u8, ordering, "release"))
+        "release"
+    else if (std.mem.eql(u8, ordering, "seq_cst"))
+        "seq_cst"
+    else if (std.mem.eql(u8, ordering, "monotonic"))
+        "monotonic"
+    else
+        "unordered";
+
     try self.block.instructions.append(self.allocator, .{
         .result = null,
         .kind = .{ .store = .{
@@ -652,6 +767,33 @@ pub fn lowerTypedStoreToSyntheticUnionField(
     if (pointer_index >= self.synthetic_union_field_ptrs.len) return air_model.LowerError.UnsupportedAir;
     const field_ptr = self.synthetic_union_field_ptrs[pointer_index] orelse return false;
     if (field_ptr.slot_index >= self.synthetic_union_tag_slots.len) return air_model.LowerError.UnsupportedAir;
+    return true;
+}
+
+pub fn lowerTypedStoreToSyntheticAggregateField(
+    self: anytype,
+    instruction: air_export.TypedInstruction,
+    value: air_model.TypedValue,
+) !bool {
+    const pointer_index = air_model.typedInstOperandIndex(instruction.operands[0]) orelse return false;
+    if (pointer_index >= self.synthetic_aggregate_field_ptrs.len) return false;
+    const field_ptr = self.synthetic_aggregate_field_ptrs[pointer_index] orelse return false;
+    if (field_ptr.slot_index >= self.synthetic_aggregate_slots.len) return air_model.LowerError.UnsupportedAir;
+    const current_agg = self.synthetic_aggregate_slots[field_ptr.slot_index] orelse return air_model.LowerError.UnsupportedAir;
+
+    const field_name = try ownPrint(self.module, "air{}_insert_field{}", .{ instruction.index, field_ptr.field_index });
+    const index_text = air_model.aggregateIndexPathText(&.{field_ptr.field_index}) orelse return air_model.LowerError.UnsupportedAir;
+    try self.block.instructions.append(self.allocator, .{
+        .result = field_name,
+        .kind = .{ .insertvalue = .{
+            .aggregate_ty = self.function_type.return_type.ir_type,
+            .aggregate = current_agg,
+            .value_ty = value.ty.ir_type,
+            .value = value.value,
+            .indices = index_text,
+        } },
+    });
+    self.synthetic_aggregate_slots[field_ptr.slot_index] = .{ .named = field_name };
     return true;
 }
 
@@ -802,4 +944,27 @@ fn typedUnionTagSlotAlloc(self: anytype, instruction_index: u32) bool {
 fn errorUnionPointerOperandText(type_text: []const u8) bool {
     const child_text = air_types.pointerChildText(std.mem.trim(u8, type_text, " ")) orelse return false;
     return air_types.isErrorUnionTypeText(child_text);
+}
+
+fn aggregateParamSlotArgPtr(self: anytype, alloc_index: u32) ?ir.Value {
+    const view = self.typed_view orelse return null;
+    var arg_idx: ?usize = null;
+    var store_count: usize = 0;
+    for (view.structured_air_v2.instructions) |inst| {
+        if (std.mem.eql(u8, inst.opcode, "store") or std.mem.eql(u8, inst.opcode, "store_safe")) {
+            if (inst.operands.len == 2) {
+                const dst_idx = air_model.typedInstOperandIndex(inst.operands[0]) orelse continue;
+                if (dst_idx == alloc_index) {
+                    store_count += 1;
+                    const val_idx = air_model.typedInstOperandIndex(inst.operands[1]) orelse continue;
+                    arg_idx = air_aggregate_construction.resolveParamIndex(view.structured_air_v2, val_idx);
+                }
+            }
+        }
+    }
+    if (store_count != 1) return null;
+    const param_index = arg_idx orelse return null;
+    if (param_index >= self.function_type.params.len) return null;
+    if (!self.function_type.params[param_index].ir_type.eql(.ptr)) return null;
+    return .{ .named = self.blockParamName(param_index) };
 }

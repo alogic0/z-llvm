@@ -73,6 +73,15 @@ test "value-use dormant scratch compare action reproduces representative streams
         &.{ .write, .write, .write, .write, .definition, .use },
     );
     try executeScratchCompareCase(
+        .{ .int = 8 },
+        .ne,
+        false,
+        .{ .immediate = 0 },
+        .{ .arg32 = .rcx },
+        &.{ .{ .cmp_arg8_imm8 = .{ .reg = .rcx, .imm = 0 } }, .setne_eax },
+        &.{ .definition, .use },
+    );
+    try executeScratchCompareCase(
         .ptr,
         .eq,
         false,
@@ -101,6 +110,24 @@ test "value-use dormant scratch compare action reproduces representative streams
         .{ .named = .{ .arg32 = .rcx } },
         .{ .arg32 = .r8 },
         &.{ .{ .cmp_ecx_arg32 = .r8 }, .setb_eax },
+        &.{ .definition, .use },
+    );
+    try executeScratchCompareCase(
+        .{ .int = 64 },
+        .uge,
+        false,
+        .{ .named = .{ .arg64 = .r8 } },
+        .{ .arg64 = .rcx },
+        &.{ .{ .cmp_rcx_arg64 = .r8 }, .setbe_eax },
+        &.{ .definition, .use },
+    );
+    try executeScratchCompareCase(
+        .{ .int = 64 },
+        .ule,
+        false,
+        .{ .named = .{ .arg64 = .rcx } },
+        .{ .arg64 = .r8 },
+        &.{ .{ .cmp_rcx_arg64 = .r8 }, .setbe_eax },
         &.{ .definition, .use },
     );
 }
@@ -329,6 +356,10 @@ test "value-use dormant scratch compare action classifies the complete twenty-fo
         .{ .ty = .{ .int = 32 }, .predicate = .ult, .rhs = .named },
         .{ .ty = .{ .int = 64 }, .predicate = .ult, .rhs = .named },
         .{ .ty = .{ .int = 64 }, .predicate = .ult, .rhs = .immediate, .immediate = 7 },
+        .{ .ty = .{ .int = 32 }, .predicate = .uge, .rhs = .named },
+        .{ .ty = .{ .int = 64 }, .predicate = .uge, .rhs = .named },
+        .{ .ty = .{ .int = 32 }, .predicate = .ule, .rhs = .named },
+        .{ .ty = .{ .int = 64 }, .predicate = .ule, .rhs = .named },
     };
 
     for (cases, 0..) |case, index| {

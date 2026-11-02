@@ -76,7 +76,7 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
             return err;
         };
         for (destination_nodes.slice()) |destination_node| {
-            const node_index = @intFromEnum(destination_node);
+            const node_index = @backingInt(destination_node);
             if (destinations[node_index]) return error.ValueUseConflictingDestination;
             destinations[node_index] = true;
         }
@@ -91,7 +91,7 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
             mappings[mapping_count] = mapping;
             mapping_count += 1;
             if (mapping.source == null) {
-                if (!deferred_writes) writes[@intFromEnum(mapping.destination)] = true;
+                if (!deferred_writes) writes[@backingInt(mapping.destination)] = true;
                 continue;
             }
             const source = mapping.source.?;
@@ -101,15 +101,15 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
                 if (request.prepared_action) |action| {
                     if (action == .form_byte_address) switch (action.form_byte_address.offset) {
                         .constant => |offset| if (offset != 0) {
-                            writes[@intFromEnum(mapping.destination)] = true;
+                            writes[@backingInt(mapping.destination)] = true;
                         },
-                        .request => writes[@intFromEnum(mapping.destination)] = true,
+                        .request => writes[@backingInt(mapping.destination)] = true,
                     };
                 }
                 continue;
             }
-            graph[@intFromEnum(source)][@intFromEnum(mapping.destination)] = true;
-            if (!deferred_writes) writes[@intFromEnum(mapping.destination)] = true;
+            graph[@backingInt(source)][@backingInt(mapping.destination)] = true;
+            if (!deferred_writes) writes[@backingInt(mapping.destination)] = true;
         }
     }
     try rejectCopyCycles(graph);
@@ -414,6 +414,9 @@ fn appendImmediateRhsDestinationNodes(
         },
         .mul => if (bits <= 32) {
             try result.append(.accumulator);
+        } else if (bits == 64) {
+            try result.append(.accumulator);
+            try result.append(.rcx);
         } else {
             return error.ValueUseImmediateScalarFormUnsupported;
         },

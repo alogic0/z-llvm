@@ -113,6 +113,7 @@ const materialization = @import("../materialization.zig");
 const composition = @import("../composition.zig");
 
 const ScratchCompareKind = enum {
+    ne_zero_i8,
     ne_zero_i16,
     ne_zero_i32,
     ne_zero_i64,
@@ -125,6 +126,8 @@ const ScratchCompareKind = enum {
     eq_i64_immediate,
     unsigned_i16_immediate,
     ugt_named,
+    uge_named,
+    ule_named,
     ugt_i64_immediate,
     ugt_i32_immediate,
     sgt_i64_immediate,
@@ -134,6 +137,7 @@ const ScratchCompareKind = enum {
     ult_i32_named,
     ult_i64_named,
     ult_i64_immediate,
+    ule_i64_immediate,
 };
 
 const ScratchComparePlan = struct {
@@ -229,6 +233,8 @@ pub fn classifyScratchCompare(
 ) !ScratchComparePlan {
     const rhs_tag = std.meta.activeTag(action.rhs);
     if (action.operand_ty == .ptr) {
+        if (action.predicate == .ne and rhs_tag == .null_pointer)
+            return .{ .kind = .ne_zero_i64, .bits = 64 };
         if (action.predicate != .eq) return error.ValueUseScratchCompareFormUnsupported;
         return switch (rhs_tag) {
             .null_pointer => .{ .kind = .eq_pointer_null, .bits = 64 },
@@ -247,6 +253,7 @@ pub fn classifyScratchCompare(
         .null_pointer => return error.ValueUseScratchCompareFormUnsupported,
         .immediate => |immediate| {
             if (action.predicate == .ne and immediate == 0) return switch (bits) {
+                8 => .{ .kind = .ne_zero_i8, .bits = bits },
                 16 => .{ .kind = .ne_zero_i16, .bits = bits },
                 32 => .{ .kind = .ne_zero_i32, .bits = bits },
                 64 => .{ .kind = .ne_zero_i64, .bits = bits },
@@ -287,6 +294,11 @@ pub fn classifyScratchCompare(
                 return .{ .kind = .slt_i64_immediate, .bits = bits };
             if (action.predicate == .ult and bits == 64)
                 return .{ .kind = .ult_i64_immediate, .bits = bits };
+            if (action.predicate == .ule and bits == 64) {
+                _ = composed_helpers.i64Value(immediate) catch
+                    return error.ValueUseScratchCompareImmediateOutOfRange;
+                return .{ .kind = .ule_i64_immediate, .bits = bits };
+            }
         },
         .named => {
             if (!action.samesign and action.predicate == .ne and
@@ -298,6 +310,15 @@ pub fn classifyScratchCompare(
                 return .{ .kind = .eq_named, .bits = bits, .rhs_register = .r8 };
             if (action.predicate == .ugt and (bits == 32 or bits == 64))
                 return .{ .kind = .ugt_named, .bits = bits, .rhs_register = .r8 };
+            if (action.predicate == .uge and (bits == 32 or bits == 64))
+                return .{ .kind = .uge_named, .bits = bits, .rhs_register = .r8 };
+            if (action.predicate == .ule and (bits == 32 or bits == 64))
+                return .{
+                    .kind = .ule_named,
+                    .bits = bits,
+                    .lhs_register = .r8,
+                    .rhs_register = .rcx,
+                };
             if (!action.samesign and (action.predicate == .slt or action.predicate == .sgt) and
                 (bits == 16 or bits == 32 or bits == 64))
             {
@@ -410,6 +431,9 @@ pub fn executeScratchCompare(
     }
 
     const definition: x86_64_machine.Instruction = switch (plan.kind) {
+        .ne_zero_i8 => .{
+            .cmp_arg8_imm8 = .{ .reg = .rcx, .imm = 0 },
+        },
         .ne_zero_i16, .slt_i16_zero => .{
             .cmp_arg16_imm16 = .{ .reg = .rcx, .imm = 0 },
         },
@@ -419,6 +443,7 @@ pub fn executeScratchCompare(
         .eq_pointer_named,
         .eq_named,
         .ugt_named,
+        .uge_named,
         .signed_named,
         => if (plan.bits <= 32)
             .{ .cmp_ecx_arg32 = .r8 }
@@ -430,6 +455,7 @@ pub fn executeScratchCompare(
         .sgt_i64_immediate,
         .slt_i64_immediate,
         .ult_i64_immediate,
+        .ule_i64_immediate,
         => .{ .cmp_arg64_imm64 = .{
             .reg = .rcx,
             .imm = composed_helpers.i64Value(action.rhs.immediate) catch
@@ -443,15 +469,20 @@ pub fn executeScratchCompare(
         .ugt_i32_immediate => .{ .cmp_r8d_arg32 = .rcx },
         .ult_i32_named => .{ .cmp_ecx_arg32 = .r8 },
         .ult_i64_named => .{ .cmp_rcx_arg64 = .r8 },
+        .ule_named => if (plan.bits <= 32)
+            .{ .cmp_ecx_arg32 = .r8 }
+        else
+            .{ .cmp_rcx_arg64 = .r8 },
     };
     try selector_state.emitEflagsInstruction(transaction.selector, definition, .definition);
     try failScratchCompareForTest(Authority, transaction, .after_flags_definition);
 
     const setcc: x86_64_machine.Instruction = switch (plan.kind) {
-        .ne_zero_i16, .ne_zero_i32, .ne_zero_i64, .ne_i64_immediate, .ne_named => .setne_eax,
+        .ne_zero_i8, .ne_zero_i16, .ne_zero_i32, .ne_zero_i64, .ne_i64_immediate, .ne_named => .setne_eax,
         .eq_pointer_null, .eq_pointer_named, .eq_i52_zero, .eq_named, .eq_i64_immediate => .sete_eax,
         .unsigned_i16_immediate => if (action.predicate == .ult) .setb_eax else .seta_eax,
         .ugt_named, .ugt_i64_immediate, .ugt_i32_immediate => .setb_eax,
+        .uge_named, .ule_named, .ule_i64_immediate => .setbe_eax,
         .sgt_i64_immediate => .setg_eax,
         .slt_i16_zero, .slt_i64_immediate => .setl_eax,
         .signed_named => if (action.predicate == .slt) .setg_eax else .setl_eax,

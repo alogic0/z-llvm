@@ -73,6 +73,59 @@ The [behavioral runner](../tools/run_behavioral_diff.zig) checks the ownership
 manifest and rejects every owner except `composed_block` and `composed_cfg`.
 An aggregate `generic_codegen` counter is not a substitute for that assertion.
 
+## Correctness contracts at the AIR/backend boundary
+
+Aggregate AIR loads capture scalar field values at the load instruction. A later
+store consumes that snapshot rather than rereading an aliased source pointer.
+Tagged optional loads likewise capture their null tag; pointer forms load the
+stored pointer or tag before testing it. Non-null zero payloads stay non-null.
+Tagged optional parameter/return ABIs and tagged stores without a complete
+representation reject instead of silently dropping the tag.
+
+[Shared constant address resolution](../src/codegen/x86_64/generic_cfg/cabi_memory_address.zig)
+uses the target data layout to scale typed GEP indices. It checks offset arithmetic
+and chooses signed disp8 only through 127, otherwise disp32 for supported 64-bit
+loads. Narrow forms without a suitable encoder reject. Return reconstruction
+cannot discard side effects or move barrier reads; the sret field loader declines
+when a delayed load could cross an intervening store. Scalar load snapshots that
+survive stores receive frame preservation space.
+
+Upstream mapping for these repairs, inspected in the local pinned sources:
+
+- Zig `src/codegen/llvm/FuncGen.zig`: `airLoad`, `airIsNonNull` and `optCmpNull`;
+  optional layout version 3 puts the tag after the payload's ABI size and retains
+  volatile access semantics.
+- LLVM `llvm/lib/IR/Operator.cpp`: `GEPOperator::accumulateConstantOffset` scales
+  sequential indices by allocation size and handles struct layout offsets.
+- LLVM `llvm/lib/Target/X86/X86ISelLowering.cpp` and
+  `llvm/lib/Target/X86/X86InstrInfo.td`: target addressing and signed displacement
+  forms. Local support remains the bounded, checked subset covered by native tests.
+
+These contracts do not advance accepted counters. Current native regressions,
+the behavioral comparisons and the integration gates establish different scopes.
+
+The current-pin SysV legalization keeps `{ i64, i64 }` returns in RAX/RDX across
+composed control flow and preserves both live operands of i128 subtraction.
+The half-float carrier adapter admits only a nonescaping, nonvolatile aligned
+slot with the audited scalar loads/stores; its unspecified padding is zeroed.
+Exhaustive native tests check all 65,536 half payloads and seeded pair arithmetic.
+Upstream owners are LLVM `X86ISelLoweringCall.cpp` (`LowerReturn` and call
+argument assignment) and Zig `src/codegen/llvm.zig` (float ABI representation).
+
+Unsigned 32-bit returns retain every immediate bit, and unsigned i64 comparisons
+handle the signed-immediate boundaries through the existing compare authority.
+LLVM's X86 instruction definitions and the `icmp` contract in `docs/LangRef.rst`
+define the corresponding register and comparison semantics. Unreachable CFG
+blocks retain earlier side effects and emit a trap when no existing trap or
+exhaustive-switch proof terminates them; the upstream owner is
+`CodeGen/SelectionDAG/SelectionDAGBuilder.cpp::visitUnreachable`.
+
+The [FMA canary migration](evidence/current_pin_fma_canary_20261102.json)
+audits the resulting register/spill changes against the unchanged frozen IR.
+The original 29 exact-result checks and 8,192 seeded LLVM-paired observations
+pass. Two FMA stream/byte identities move together; the helper and `__multi3`
+identities stay fixed, and the production mismatch negative still rejects.
+
 ## What the evidence establishes
 
 | Check | Population and path | Limit of the claim |

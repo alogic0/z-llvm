@@ -376,5 +376,5 @@ test "typed-v2 optional payload lowers helper-return optional flow" {
 
     var function = (try lowerTypedV2OptionalPayload(std.testing.allocator, &module, air_function, function_type, structured_air_v2)).?;
     defer function.deinit(std.testing.allocator);
-    try std.testing.expectEqualStrings("frontier_optional_return_match", function.name);
+    try std.testing.expectEqualStrings("frontier_optionals_errors.frontier_optional_return_match", function.name);
 }

@@ -18,6 +18,13 @@ const fpPredicate = air_semantics.fpPredicate;
 const castOp = air_semantics.castOp;
 const isShiftOpcode = air_capabilities.isShiftOpcode;
 
+fn isCommutativeIrOp(op: ir.BinaryOp) bool {
+    return switch (op) {
+        .add, .mul, .@"and", .@"or", .xor => true,
+        else => false,
+    };
+}
+
 pub fn lowerTypedScalarSemanticInstruction(self: anytype, instruction: air_export.TypedInstruction) !bool {
     switch (air_capabilities.scalarSemanticOpForOpcode(instruction.opcode)) {
         .arg => try self.lowerTypedArg(instruction),
@@ -52,7 +59,22 @@ pub fn lowerTypedArg(self: anytype, instruction: air_export.TypedInstruction) !v
             (self.unusedOpaqueNominalArgType(instruction.index, instruction.result_type, param_index) orelse
                 (self.unionTagOnlyOpaqueNominalArgType(instruction.index, instruction.result_type, param_index) orelse
                     return air_model.LowerError.UnsupportedAir)));
-    if (!parsed_type.ir_type.eql(self.function_type.params[param_index].ir_type)) return air_model.LowerError.UnsupportedAir;
+    if (!parsed_type.ir_type.eql(self.function_type.params[param_index].ir_type)) {
+        if (!self.function_type.c_calling_convention and
+            parsed_type.ir_type == .aggregate and
+            self.function_type.params[param_index].ir_type == .ptr)
+        {
+            self.values[instruction.index] = .{
+                .ty = parsed_type,
+                .value = .{ .named = self.blockParamName(param_index) },
+            };
+            if (instruction.index < self.synthetic_aggregate_ptrs.len) {
+                self.synthetic_aggregate_ptrs[instruction.index] = .{ .named = self.blockParamName(param_index) };
+            }
+            return;
+        }
+        return air_model.LowerError.UnsupportedAir;
+    }
     self.values[instruction.index] = .{
         .ty = parsed_type,
         .value = .{ .named = self.blockParamName(param_index) },
@@ -61,13 +83,18 @@ pub fn lowerTypedArg(self: anytype, instruction: air_export.TypedInstruction) !v
 
 pub fn lowerTypedBinary(self: anytype, instruction: air_export.TypedInstruction) !void {
     if (instruction.operands.len != 2) return air_model.LowerError.UnsupportedAir;
-    const lhs = try self.resolveTypedOperand(instruction, 0);
+    var lhs = try self.resolveTypedOperand(instruction, 0);
     var rhs = try self.resolveTypedOperand(instruction, 1);
     if (!lhs.ty.ir_type.eql(rhs.ty.ir_type)) {
         if (!isShiftOpcode(instruction.opcode)) return air_model.LowerError.UnsupportedAir;
         rhs = try self.extendShiftCount(instruction.index, lhs.ty, rhs);
     }
     const op = binaryOp(instruction.opcode, lhs.ty) orelse return air_model.LowerError.UnsupportedAir;
+    if (isCommutativeIrOp(op) and lhs.value == .int and rhs.value != .int) {
+        const tmp = lhs;
+        lhs = rhs;
+        rhs = tmp;
+    }
     const result_name = try self.resultName(instruction.index);
     try self.block.instructions.append(self.allocator, .{
         .result = result_name,
@@ -301,6 +328,15 @@ pub fn lowerTypedPtrCastOpaque(self: anytype, instruction: air_export.TypedInstr
     }
     if (instruction.index < self.synthetic_aggregate_ptrs.len and source_index < self.synthetic_aggregate_ptrs.len) {
         self.synthetic_aggregate_ptrs[instruction.index] = self.synthetic_aggregate_ptrs[source_index];
+    }
+    if (instruction.index < self.synthetic_aggregate_slots.len and source_index < self.synthetic_aggregate_slots.len) {
+        self.synthetic_aggregate_slots[instruction.index] = self.synthetic_aggregate_slots[source_index];
+    }
+    if (instruction.index < self.synthetic_aggregate_field_ptrs.len and source_index < self.synthetic_aggregate_field_ptrs.len) {
+        self.synthetic_aggregate_field_ptrs[instruction.index] = self.synthetic_aggregate_field_ptrs[source_index];
+    }
+    if (instruction.index < self.synthetic_optional_ptrs.len and source_index < self.synthetic_optional_ptrs.len) {
+        self.synthetic_optional_ptrs[instruction.index] = self.synthetic_optional_ptrs[source_index];
     }
     const source_value = if (source_index < self.synthetic_pointer_payloads.len and
         self.synthetic_pointer_payloads[source_index] != null and
@@ -644,11 +680,35 @@ pub fn lowerTypedSubSat(self: anytype, instruction: air_export.TypedInstruction)
 }
 
 pub fn lowerTypedClz(self: anytype, instruction: air_export.TypedInstruction) !void {
-    try self.lowerTypedZeroCount(instruction, "llvm.ctlz.i32", "clz");
+    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
+    const source = try self.resolveTypedOperand(instruction, 0);
+    const source_bits = switch (source.ty.ir_type) {
+        .int => |bits| bits,
+        else => return air_model.LowerError.UnsupportedAir,
+    };
+    if (source_bits <= 32) {
+        try self.lowerTypedZeroCount(instruction, "llvm.ctlz.i32", "clz");
+    } else if (source_bits <= 64) {
+        try self.lowerTypedZeroCount(instruction, "llvm.ctlz.i64", "clz");
+    } else {
+        return air_model.LowerError.UnsupportedAir;
+    }
 }
 
 pub fn lowerTypedCtz(self: anytype, instruction: air_export.TypedInstruction) !void {
-    try self.lowerTypedZeroCount(instruction, "llvm.cttz.i32", "ctz");
+    if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
+    const source = try self.resolveTypedOperand(instruction, 0);
+    const source_bits = switch (source.ty.ir_type) {
+        .int => |bits| bits,
+        else => return air_model.LowerError.UnsupportedAir,
+    };
+    if (source_bits <= 32) {
+        try self.lowerTypedZeroCount(instruction, "llvm.cttz.i32", "ctz");
+    } else if (source_bits <= 64) {
+        try self.lowerTypedZeroCount(instruction, "llvm.cttz.i64", "ctz");
+    } else {
+        return air_model.LowerError.UnsupportedAir;
+    }
 }
 
 pub fn lowerTypedPopcount(self: anytype, instruction: air_export.TypedInstruction) !void {

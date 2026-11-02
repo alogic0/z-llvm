@@ -37,6 +37,11 @@ pub fn parseConstant(text: []const u8) ?TypedValue {
             .value = .{ .int = code },
         };
         if (air_semantics.isFpType(ty.ir_type)) return .{ .ty = ty, .value = .{ .fp = canonicalFpLiteral(value_text) orelse value_text } };
+        if (std.mem.startsWith(u8, value_text, "@fromBackingInt(") and std.mem.endsWith(u8, value_text, ")")) {
+            const inner = std.mem.trim(u8, value_text["@fromBackingInt(".len .. value_text.len - 1], " ");
+            const value = std.fmt.parseInt(i128, inner, 0) catch return null;
+            return .{ .ty = ty, .value = .{ .int = value } };
+        }
         const value = std.fmt.parseInt(i128, value_text, 10) catch return null;
         return .{ .ty = ty, .value = .{ .int = value } };
     }
@@ -47,6 +52,10 @@ pub fn parseConstant(text: []const u8) ?TypedValue {
     if (std.mem.startsWith(u8, text, "@.one_")) {
         const ty = parseStaticIntegerType(text["@.one_".len..]) orelse return null;
         return .{ .ty = ty, .value = .{ .int = 1 } };
+    }
+    if (std.mem.startsWith(u8, text, "@.four_")) {
+        const ty = parseStaticIntegerType(text["@.four_".len..]) orelse return null;
+        return .{ .ty = ty, .value = .{ .int = 4 } };
     }
     if (std.mem.eql(u8, text, "@.bool_true")) {
         return .{ .ty = .{ .ir_type = .{ .int = 1 } }, .value = .{ .int = 1 } };

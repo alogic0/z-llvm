@@ -85,8 +85,9 @@ pub fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca
             const integer_bits = if (alloca.allocated_ty == .ptr) @as(?u16, 64) else intBits(alloca.allocated_ty);
             const fp_bits = scalarFpStoreBits(alloca.allocated_ty);
             const bits = integer_bits orelse fp_bits orelse return .{ .no_emitter = "composed-block-alloca-plan-type" };
+            const effective_bits = if (integer_bits != null and bits <= 8) 8 else bits;
             const expected_kind: selector_types.StackScalarLoc.Kind = if (fp_bits != null) .fp else .integer;
-            if (stack.bits != bits or stack.kind != expected_kind) return .{ .no_emitter = "composed-block-alloca-plan-type" };
+            if (stack.bits != effective_bits or stack.kind != expected_kind) return .{ .no_emitter = "composed-block-alloca-plan-type" };
         },
         .stack128 => if (!alloca.allocated_ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-alloca-plan-type" },
         .stack_i32_array => |stack_array| {
@@ -111,12 +112,13 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
             return .{ .no_emitter = "composed-block-load-barrier" };
         }
     }
-    if (load.ty.eql(.{ .int = 8 }) and (load.ty_addrspace != null or load.ptr_addrspace != null)) return .{ .no_emitter = "composed-block-byte-load-addrspace" };
+    const int_bits = intBits(load.ty);
+    if (int_bits) |ib| if (ib <= 8 and (load.ty_addrspace != null or load.ptr_addrspace != null)) return .{ .no_emitter = "composed-block-byte-load-addrspace" };
     if (inspection.isByteVector128(load.ty)) return lowerLoadByteVector(selector, result_name, load);
     if (selector_state.resolveValue(selector, load.ptr)) |ptr| if (ptr == .readonly_table_ptr)
         return lowerReadOnlyTableLoad(selector, result_name, load, ptr.readonly_table_ptr);
     if (load.ptr == .named and selector.readonly_pointer_params.contains(load.ptr.named)) {
-        if (intBits(load.ty)) |bits| {
+        if (int_bits) |bits| {
             const exact_ei = if (selector.function) |function| stage2_planning.isExactEiScalarFamily(function.*) else false;
             if (exact_ei or bits == 64 or bits == 96 or bits == 128)
                 return lowerReadOnlyPointerIntegerLoad(selector, result_name, load, bits);
@@ -125,11 +127,12 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
     if (isF32x2(load.ty)) return lowerLoadF32Pair(selector, result_name, load);
     if (scalarFpBits(load.ty)) |bits| return lowerLoadFp(selector, result_name, load, bits);
     const is_ptr = load.ty.eql(.ptr);
-    if (!load.ty.eql(.{ .int = 1 }) and !load.ty.eql(.{ .int = 8 }) and !load.ty.eql(.{ .int = 16 }) and !load.ty.eql(.{ .int = 32 }) and !load.ty.eql(.{ .int = 64 }) and !load.ty.eql(.{ .int = 128 }) and !is_ptr) return .{ .no_emitter = "composed-block-load-width" };
+    const valid_int = if (int_bits) |b| (b >= 1 and b <= 8) or b == 16 or b == 32 or b == 64 or b == 128 else false;
+    if (!valid_int and !is_ptr) return .{ .no_emitter = "composed-block-load-width" };
     var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
     const alias_i128 = load.ty.eql(.{ .int = 128 });
-    const bits: u16 = if (is_ptr) 64 else if (load.ty.eql(.{ .int = 1 })) 8 else @intCast(load.ty.int);
+    const bits: u16 = if (is_ptr) 64 else if (int_bits) |b| (if (b <= 8) 8 else b) else unreachable;
     const pointer_request = try registerValueUseAction(
         &transaction,
         load.ptr,
@@ -156,7 +159,7 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
 
     if (accumulator) |handle| {
         const definition: selector_state.AccumulatorDefinition = switch (bits) {
-            8, 32 => .zeroExtending(bits),
+            8, 16, 32 => .zeroExtending(bits),
             64 => .fullRax(),
             else => unreachable,
         };
@@ -187,7 +190,7 @@ pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagn
     if (store.value == .undef or store.value == .poison) return null;
     if (store.attrs.is_volatile or store.attrs.syncscope != null) return .{ .no_emitter = "composed-block-store-barrier" };
     if (store.attrs.atomic_ordering) |ordering| {
-        if (!std.mem.eql(u8, ordering, "monotonic") and !std.mem.eql(u8, ordering, "unordered")) {
+        if (!std.mem.eql(u8, ordering, "monotonic") and !std.mem.eql(u8, ordering, "unordered") and !std.mem.eql(u8, ordering, "release")) {
             return .{ .no_emitter = "composed-block-store-barrier" };
         }
     }
@@ -455,13 +458,21 @@ fn countInstructionUsesOfName(instruction: ir.Instruction, name: []const u8) usi
 fn countTerminatorUsesOfName(terminator: ir.Terminator, name: []const u8) usize {
     var count: usize = 0;
     switch (terminator) {
-        .ret => |r| if (r.value) |v| if (valueUsesName(v, name)) { count += 1; },
-        .condbr => |c| if (valueUsesName(c.cond, name)) { count += 1; },
+        .ret => |r| if (r.value) |v| if (valueUsesName(v, name)) {
+            count += 1;
+        },
+        .condbr => |c| if (valueUsesName(c.cond, name)) {
+            count += 1;
+        },
         .@"switch" => |s| {
             if (valueUsesName(s.cond, name)) count += 1;
-            for (s.cases.items) |case| if (valueUsesName(case.value, name)) { count += 1; };
+            for (s.cases.items) |case| if (valueUsesName(case.value, name)) {
+                count += 1;
+            };
         },
-        .indirectbr => |i| if (valueUsesName(i.addr, name)) { count += 1; },
+        .indirectbr => |i| if (valueUsesName(i.addr, name)) {
+            count += 1;
+        },
         .br, .@"unreachable" => {},
     }
     return count;

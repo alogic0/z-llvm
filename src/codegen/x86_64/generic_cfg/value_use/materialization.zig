@@ -142,17 +142,17 @@ pub fn prepare(comptime Authority: type, transaction: anytype) !void {
             .int, .null_value, .unsupported => continue,
         };
         if (current == .stack_i32_ptr or current == .stack_scalar or current == .stack128 or current == .stack_i32_array) {
-            nodes[@intFromEnum(PhysicalNode.rcx)] = true;
+            nodes[@backingInt(PhysicalNode.rcx)] = true;
             if (current == .stack_i32_ptr and current.stack_i32_ptr.index != null)
-                nodes[@intFromEnum(PhysicalNode.r8)] = true;
+                nodes[@backingInt(PhysicalNode.r8)] = true;
         }
     }
     for (transaction.early_plans) |plan| {
-        if (plan.destination) |reg| nodes[@intFromEnum(Types.PhysicalNode.fromArgReg(reg))] = false;
+        if (plan.destination) |reg| nodes[@backingInt(Types.PhysicalNode.fromArgReg(reg))] = false;
     }
     for (nodes, 0..) |needed, index| {
         if (!needed) continue;
-        try clobberPhysicalNode(transaction.selector, @enumFromInt(index));
+        try clobberPhysicalNode(transaction.selector, @fromBackingInt(@intCast(index)));
     }
     transaction.request_phase = .prepared;
 }
@@ -1124,7 +1124,7 @@ fn validateOrdinaryLoadHome(
         },
         .arg64, .scratch64, .spill64 => {
             if (alias_i128 or binding.vreg.class != .gpr64 or binding.vreg.bits < 64 or
-                (!is_ptr and bits != 8 and bits != 32 and bits != 64) or (is_ptr and bits != 64))
+                (!is_ptr and bits != 8 and bits != 16 and bits != 32 and bits != 64) or (is_ptr and bits != 64))
             {
                 return error.ValueUseLoadOrdinaryPointerWidth;
             }

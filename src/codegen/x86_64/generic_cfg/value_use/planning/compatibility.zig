@@ -311,7 +311,7 @@ fn validateOrdinaryLoadHome(
         },
         .arg64, .scratch64, .spill64 => {
             if (alias_i128 or binding.vreg.class != .gpr64 or binding.vreg.bits < 64 or
-                (!is_ptr and bits != 8 and bits != 32 and bits != 64) or (is_ptr and bits != 64))
+                (!is_ptr and bits != 8 and bits != 16 and bits != 32 and bits != 64) or (is_ptr and bits != 64))
             {
                 return error.ValueUseLoadOrdinaryPointerWidth;
             }

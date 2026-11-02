@@ -6,6 +6,7 @@ const air_types = @import("zig_air_types.zig");
 const type_layout = @import("zig_air_type_layout.zig");
 const ir = @import("ir.zig");
 const target_mod = @import("target.zig");
+const exported_layouts = @import("zig_air_exported_aggregate_layout_facts.zig");
 
 const ZigType = air_model.ZigType;
 const FunctionType = air_model.FunctionType;
@@ -339,6 +340,15 @@ fn x86_64SysVDataLayout() ?target_mod.DataLayout {
     return target_mod.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128") catch null;
 }
 
+fn installTestAggregateProvider() exported_layouts.Provider {
+    const previous = exported_layouts.active_provider;
+    exported_layouts.setActiveProvider(.{ .facts = &.{
+        .{ .nominal_type_name = "Big3", .aggregate_text = "{ i64, i64, i64 }" },
+        .{ .nominal_type_name = "frontier_sysv_sret_byval.Big12", .aggregate_text = "[12 x i64]" },
+    } });
+    return previous;
+}
+
 test "collect aggregate copy leaves from nested aggregate" {
     const aggregate_ty: ir.Type = .{ .aggregate = "{ i32, { i64, double }, ptr }" };
     const leaves = try collectAggregateCopyLeaves(std.testing.allocator, aggregate_ty);
@@ -352,6 +362,8 @@ test "collect aggregate copy leaves from nested aggregate" {
 }
 
 test "aggregate copy leaf counts use shared layout plan" {
+    const previous_provider = installTestAggregateProvider();
+    defer exported_layouts.setActiveProvider(previous_provider);
     const aggregate_ty: ir.Type = .{ .aggregate = "%frontier_sysv_sret_byval.Big12" };
     try std.testing.expectEqual(@as(usize, 12), supportedAggregateCopyLeafCount(aggregate_ty).?);
     const leaves = try collectAggregateCopyLeaves(std.testing.allocator, aggregate_ty);
@@ -411,6 +423,8 @@ test "aggregate copy validates sret make stores against layout leaves" {
 }
 
 test "aggregate copy validates returned aggregate argument" {
+    const previous_provider = installTestAggregateProvider();
+    defer exported_layouts.setActiveProvider(previous_provider);
     var params = [_]ZigType{.{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } }};
     const function_type = FunctionType{
         .params = params[0..],
@@ -464,6 +478,8 @@ test "aggregate copy validates sret aggregate field wrapper" {
 }
 
 test "aggregate copy validates call wrapper aggregate data flow" {
+    const previous_provider = installTestAggregateProvider();
+    defer exported_layouts.setActiveProvider(previous_provider);
     var params = [_]ZigType{
         .{ .ir_type = .ptr },
         .{ .ir_type = .{ .int = 64 } },
@@ -476,13 +492,13 @@ test "aggregate copy validates call wrapper aggregate data flow" {
         .non_default_calling_convention = false,
     };
     const call_ops = [_]air_export.TypedOperand{
-        testInstOperand("0", "fn"),
+        testInstOperand("0", "*const fn (i64, Big3) Big3"),
         testInstOperand("1", "i64"),
         testInstOperand("2", "Big3"),
     };
     const ret_ops = [_]air_export.TypedOperand{testInstOperand("3", "Big3")};
     var instructions = [_]air_export.TypedInstruction{
-        .{ .index = 0, .opcode = "arg", .result_type = "fn", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 0, .opcode = "arg", .result_type = "*const fn (i64, Big3) Big3", .data_kind = "arg", .operands = &.{} },
         .{ .index = 1, .opcode = "arg", .result_type = "i64", .data_kind = "arg", .operands = &.{} },
         .{ .index = 2, .opcode = "arg", .result_type = "Big3", .data_kind = "arg", .operands = &.{} },
         .{ .index = 3, .opcode = "call", .result_type = "Big3", .data_kind = "call", .operands = @constCast(&call_ops) },
@@ -491,11 +507,11 @@ test "aggregate copy validates call wrapper aggregate data flow" {
     try std.testing.expect(validateSretAggregateCallWrapperRecords(function_type, .{ .instructions = instructions[0..] }));
 
     const wrong_call_ops = [_]air_export.TypedOperand{
-        testInstOperand("0", "fn"),
+        testInstOperand("0", "*const fn (i64, Big3) Big3"),
         testInstOperand("1", "i64"),
     };
     var wrong_instructions = [_]air_export.TypedInstruction{
-        .{ .index = 0, .opcode = "arg", .result_type = "fn", .data_kind = "arg", .operands = &.{} },
+        .{ .index = 0, .opcode = "arg", .result_type = "*const fn (i64, Big3) Big3", .data_kind = "arg", .operands = &.{} },
         .{ .index = 1, .opcode = "arg", .result_type = "i64", .data_kind = "arg", .operands = &.{} },
         .{ .index = 2, .opcode = "arg", .result_type = "Big3", .data_kind = "arg", .operands = &.{} },
         .{ .index = 3, .opcode = "call", .result_type = "Big3", .data_kind = "call", .operands = @constCast(&wrong_call_ops) },
@@ -505,6 +521,8 @@ test "aggregate copy validates call wrapper aggregate data flow" {
 }
 
 test "aggregate copy validates direct call wrapper aggregate data flow" {
+    const previous_provider = installTestAggregateProvider();
+    defer exported_layouts.setActiveProvider(previous_provider);
     var params = [_]ZigType{.{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } }};
     const function_type = FunctionType{
         .params = params[0..],

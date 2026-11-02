@@ -153,8 +153,9 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
             if (alloca.allocated_ty_addrspace != null) return .{ .no_emitter = "composed-block-alloca-addrspace" };
             const integer_bits = if (alloca.allocated_ty == .ptr) @as(?u16, 64) else intBits(alloca.allocated_ty);
             const fp_bits = stackFpBits(alloca.allocated_ty);
-            if (integer_bits orelse fp_bits) |bits| {
-                if (integer_bits != null and bits != 8 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-alloca-form" };
+            if (integer_bits orelse fp_bits) |raw_bits| {
+                if (integer_bits != null and raw_bits > 8 and raw_bits != 64 and raw_bits != 128) return .{ .no_emitter = "composed-block-alloca-form" };
+                const bits: u16 = if (integer_bits != null and raw_bits <= 8) 8 else raw_bits;
                 payload_bytes = @max(payload_bytes, spill_reserved_bytes);
                 scalar_slot_count += 1;
                 const natural_alignment: u32 = if (bits == 128) 16 else @max(@as(u32, 1), @as(u32, bits / 8));

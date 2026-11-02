@@ -7,6 +7,8 @@ const air_types = @import("zig_air_types.zig");
 const ir = @import("ir.zig");
 const target = @import("target.zig");
 const type_layout = @import("zig_air_type_layout.zig");
+const aggregate_layout_facts = @import("zig_air_aggregate_layout_facts.zig");
+const air_capabilities = @import("zig_air_capabilities.zig");
 
 fn x86_64SysVDataLayout() ?target.DataLayout {
     return target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128") catch null;
@@ -56,11 +58,49 @@ fn lowerRegisterAggregateMake(
     const result_names = [_][]const u8{ "field0", "field1", "field2", "field3", "field4", "field5", "field6", "result" };
     const trunc_names = [_][]const u8{ "trunc0", "trunc1", "trunc2", "trunc3", "trunc4", "trunc5", "trunc6", "trunc7" };
     const shr_names = [_][]const u8{ "shr0", "shr1", "shr2", "shr3", "shr4", "shr5", "shr6", "shr7" };
+    const bits_names = [_][]const u8{ "bits0", "bits1", "bits2", "bits3", "bits4", "bits5", "bits6", "bits7" };
+
+    var param_val_names: [8][]const u8 = undefined;
+    var param_val_types: [8]ir.Type = undefined;
+    for (function_type.params, 0..) |param, p_idx| {
+        if (param.ir_type.eql(.double)) {
+            const bits_name = bits_names[p_idx];
+            try block.instructions.append(allocator, .{
+                .result = bits_name,
+                .kind = .{ .cast = .{
+                    .op = .bitcast,
+                    .from_ty = .double,
+                    .value = .{ .named = arg_names[p_idx] },
+                    .to_ty = .{ .int = 64 },
+                } },
+            });
+            param_val_names[p_idx] = bits_name;
+            param_val_types[p_idx] = .{ .int = 64 };
+        } else if (param.ir_type.eql(.float)) {
+            const bits_name = bits_names[p_idx];
+            try block.instructions.append(allocator, .{
+                .result = bits_name,
+                .kind = .{ .cast = .{
+                    .op = .bitcast,
+                    .from_ty = .float,
+                    .value = .{ .named = arg_names[p_idx] },
+                    .to_ty = .{ .int = 32 },
+                } },
+            });
+            param_val_names[p_idx] = bits_name;
+            param_val_types[p_idx] = .{ .int = 32 };
+        } else {
+            param_val_names[p_idx] = arg_names[p_idx];
+            param_val_types[p_idx] = param.ir_type;
+        }
+    }
+
     var aggregate_value: ir.Value = .undef;
     for (plan.leaves[0..plan.leaf_count], 0..) |leaf, index| {
         const value: ir.Value = switch (leaf.source) {
             .param => |param_index| blk: {
-                const param_ty = function_type.params[param_index].ir_type;
+                const param_ty = param_val_types[param_index];
+                const param_name = param_val_names[param_index];
                 if (param_ty == .int and leaf.ty == .int and param_ty.int > leaf.ty.int) {
                     const trunc_name = trunc_names[index];
                     try block.instructions.append(allocator, .{
@@ -68,23 +108,24 @@ fn lowerRegisterAggregateMake(
                         .kind = .{ .cast = .{
                             .op = .trunc,
                             .from_ty = param_ty,
-                            .value = .{ .named = arg_names[param_index] },
+                            .value = .{ .named = param_name },
                             .to_ty = leaf.ty,
                         } },
                     });
                     break :blk .{ .named = trunc_name };
                 }
-                break :blk .{ .named = arg_names[param_index] };
+                break :blk .{ .named = param_name };
             },
             .param_shr => |info| blk: {
-                const param_ty = function_type.params[info.param].ir_type;
+                const param_ty = param_val_types[info.param];
+                const param_name = param_val_names[info.param];
                 const shr_name = shr_names[index];
                 try block.instructions.append(allocator, .{
                     .result = shr_name,
                     .kind = .{ .binary = .{
                         .op = .lshr,
                         .ty = param_ty,
-                        .lhs = .{ .named = arg_names[info.param] },
+                        .lhs = .{ .named = param_name },
                         .rhs = .{ .int = info.shift },
                     } },
                 });
@@ -376,6 +417,537 @@ pub fn aggregateFieldCount(ty: ir.Type) ?usize {
     return type_layout.fieldCount(ty);
 }
 
+pub const SretFieldAction = union(enum) {
+    param_field_load: struct {
+        param_index: usize,
+        src_offset: u64,
+        dst_offset: u64,
+        ty: ir.Type,
+    },
+    param_copy: struct {
+        param_index: usize,
+        dst_offset: u64,
+        byte_count: u64,
+    },
+    param_field_copy: struct {
+        param_index: usize,
+        src_offset: u64,
+        dst_offset: u64,
+        byte_count: u64,
+    },
+    param_scalar: struct {
+        param_index: usize,
+        dst_offset: u64,
+        ty: ir.Type,
+    },
+    constant: struct {
+        dst_offset: u64,
+        value: i128,
+        ty: ir.Type,
+    },
+};
+
+pub const SretFieldLoaderPlan = struct {
+    actions: [8]SretFieldAction = undefined,
+    action_count: usize = 0,
+};
+
+fn pathByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, path: []const usize) ?u64 {
+    if (path.len == 0) return null;
+    var current_ty = aggregate_ty;
+    var offset: u64 = 0;
+    for (path) |field_index| {
+        const field_ty = type_layout.fieldType(current_ty, field_index) orelse return null;
+        offset += type_layout.fieldByteOffset(layout, current_ty, field_index) orelse return null;
+        current_ty = field_ty;
+    }
+    return offset;
+}
+
+pub fn planSretFieldLoaderConstructor(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?SretFieldLoaderPlan {
+    if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return null;
+    if (air_model.typedOpcodeCount(structured_air_v2, "ret_load") != 1) return null;
+    const ret_ptr_index = air_model.typedRetPtrIndex(structured_air_v2) orelse return null;
+
+    var ret_nominal_name: []const u8 = "";
+    for (structured_air_v2.instructions) |inst| {
+        if (inst.index == ret_ptr_index) {
+            var raw = std.mem.trim(u8, inst.result_type, " ");
+            if (std.mem.startsWith(u8, raw, "*const ")) {
+                raw = std.mem.trim(u8, raw[7..], " ");
+            } else if (std.mem.startsWith(u8, raw, "*")) {
+                raw = std.mem.trim(u8, raw[1..], " ");
+            }
+            ret_nominal_name = raw;
+            break;
+        }
+    }
+    const layout = x86_64SysVDataLayout() orelse return null;
+    var plan = SretFieldLoaderPlan{};
+
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "store") and !std.mem.eql(u8, instruction.opcode, "store_safe")) continue;
+        if (instruction.operands.len != 2) return null;
+
+        const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return null;
+        var path: [4]usize = undefined;
+        const path_len = air_model.typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse continue;
+        if (path_len == 0) continue;
+
+        const dst_offset = blk: {
+            if (pathByteOffset(layout, function_type.return_type.ir_type, path[0..path_len])) |off| {
+                break :blk off;
+            }
+            if (path_len == 1) {
+                if (ret_nominal_name.len > 0 and aggregate_layout_facts.nominalFieldByteOffset(ret_nominal_name, path[0]) != null) {
+                    break :blk aggregate_layout_facts.nominalFieldByteOffset(ret_nominal_name, path[0]).?;
+                }
+                if (type_layout.fieldByteOffset(layout, function_type.return_type.ir_type, path[0])) |off| {
+                    break :blk off;
+                }
+            }
+            return null;
+        };
+
+        const val_operand = instruction.operands[1];
+        if (std.mem.eql(u8, val_operand.kind, "inst")) {
+            const val_inst_index = std.fmt.parseInt(u32, val_operand.value, 10) catch {
+                return null;
+            };
+            var val_inst: ?air_export.TypedInstruction = null;
+            for (structured_air_v2.instructions) |inst| {
+                if (inst.index == val_inst_index) {
+                    val_inst = inst;
+                    break;
+                }
+            }
+            const vi = val_inst orelse {
+                return null;
+            };
+            if (std.mem.eql(u8, vi.opcode, "load") or std.mem.eql(u8, vi.opcode, "load_safe")) {
+                if (vi.operands.len < 1) return null;
+                const load_ptr_index = std.fmt.parseInt(u32, vi.operands[0].value, 10) catch return null;
+                var cur_ptr_idx = load_ptr_index;
+                var total_src_offset: u64 = 0;
+                var found_param_idx: ?usize = null;
+
+                while (true) {
+                    var cur_inst: ?air_export.TypedInstruction = null;
+                    for (structured_air_v2.instructions) |inst| {
+                        if (inst.index == cur_ptr_idx) {
+                            cur_inst = inst;
+                            break;
+                        }
+                    }
+                    const ci = cur_inst orelse break;
+
+                    if (air_capabilities.isFieldPtrOpcode(ci.opcode) or air_model.isTypedFieldPtrDataKind(ci.data_kind)) {
+                        const src_field_idx: usize = blk: {
+                            if (typedDetail(ci, "field_index")) |idx_text| {
+                                break :blk std.fmt.parseInt(usize, idx_text, 10) catch return null;
+                            } else if (std.mem.startsWith(u8, ci.opcode, "struct_field_ptr_index_")) {
+                                const idx_part = ci.opcode["struct_field_ptr_index_".len..];
+                                break :blk std.fmt.parseInt(usize, idx_part, 10) catch return null;
+                            } else return null;
+                        };
+
+                        if (ci.operands.len < 1) return null;
+                        var base_nominal_name = std.mem.trim(u8, ci.operands[0].type_text, " ");
+                        if (std.mem.startsWith(u8, base_nominal_name, "*const ")) {
+                            base_nominal_name = std.mem.trim(u8, base_nominal_name[7..], " ");
+                        } else if (std.mem.startsWith(u8, base_nominal_name, "*")) {
+                            base_nominal_name = std.mem.trim(u8, base_nominal_name[1..], " ");
+                        }
+
+                        const field_off = if (base_nominal_name.len > 0 and aggregate_layout_facts.nominalFieldByteOffset(base_nominal_name, src_field_idx) != null)
+                            aggregate_layout_facts.nominalFieldByteOffset(base_nominal_name, src_field_idx).?
+                        else if (parseZigType(base_nominal_name)) |zt|
+                            type_layout.fieldByteOffset(layout, zt.ir_type, src_field_idx) orelse return null
+                        else
+                            return null;
+
+                        total_src_offset += field_off;
+                        if (ci.operands.len >= 1 and std.mem.eql(u8, ci.operands[0].kind, "inst")) {
+                            cur_ptr_idx = std.fmt.parseInt(u32, ci.operands[0].value, 10) catch return null;
+                        } else {
+                            var found_idx: ?usize = null;
+                            var arg_idx: usize = 0;
+                            for (structured_air_v2.instructions) |inst| {
+                                if (std.mem.eql(u8, inst.opcode, "arg")) {
+                                    const arg_ty = std.mem.trim(u8, inst.result_type, " ");
+                                    if (std.mem.eql(u8, arg_ty, base_nominal_name) or
+                                        std.mem.endsWith(u8, arg_ty, base_nominal_name) or
+                                        std.mem.endsWith(u8, base_nominal_name, arg_ty))
+                                    {
+                                        found_idx = arg_idx;
+                                        break;
+                                    }
+                                    arg_idx += 1;
+                                }
+                            }
+                            found_param_idx = found_idx orelse return null;
+                            break;
+                        }
+                    } else if (std.mem.eql(u8, ci.opcode, "ptr_cast") or std.mem.eql(u8, ci.opcode, "ptr_cast_safe") or
+                        std.mem.eql(u8, ci.opcode, "bit_cast") or std.mem.eql(u8, ci.opcode, "bit_cast_safe"))
+                    {
+                        if (ci.operands.len >= 1 and std.mem.eql(u8, ci.operands[0].kind, "inst")) {
+                            cur_ptr_idx = std.fmt.parseInt(u32, ci.operands[0].value, 10) catch return null;
+                        } else {
+                            var found_idx: ?u32 = null;
+                            var search = ci.index;
+                            while (search > 0) {
+                                search -= 1;
+                                if (air_model.instructionByIndex(structured_air_v2, search)) |prior| {
+                                    if (std.mem.eql(u8, prior.opcode, "alloc") or std.mem.eql(u8, prior.opcode, "arg")) {
+                                        found_idx = prior.index;
+                                        break;
+                                    }
+                                }
+                            }
+                            cur_ptr_idx = found_idx orelse return null;
+                        }
+                    } else if (std.mem.eql(u8, ci.opcode, "load") or std.mem.eql(u8, ci.opcode, "load_safe")) {
+                        if (ci.operands.len >= 1 and std.mem.eql(u8, ci.operands[0].kind, "inst")) {
+                            cur_ptr_idx = std.fmt.parseInt(u32, ci.operands[0].value, 10) catch return null;
+                        } else return null;
+                    } else if (std.mem.eql(u8, ci.opcode, "alloc")) {
+                        var found_val_idx: ?u32 = null;
+                        for (structured_air_v2.instructions) |inst| {
+                            if (std.mem.eql(u8, inst.opcode, "store") or std.mem.eql(u8, inst.opcode, "store_safe")) {
+                                if (inst.operands.len == 2 and ((std.fmt.parseInt(u32, inst.operands[0].value, 10) catch 0) == ci.index)) {
+                                    found_val_idx = std.fmt.parseInt(u32, inst.operands[1].value, 10) catch null;
+                                    break;
+                                }
+                            }
+                        }
+                        const val_idx = found_val_idx orelse return null;
+                        found_param_idx = air_aggregate_construction.resolveParamIndex(structured_air_v2, val_idx) orelse return null;
+                        break;
+                    } else if (std.mem.eql(u8, ci.opcode, "arg")) {
+                        found_param_idx = air_aggregate_construction.resolveParamIndex(structured_air_v2, ci.index) orelse return null;
+                        break;
+                    } else {
+                        return null;
+                    }
+                }
+
+                const p_idx = found_param_idx orelse {
+                    return null;
+                };
+                const field_ty = (parseZigType(instruction.operands[1].type_text) orelse {
+                    return null;
+                }).ir_type;
+
+                if (plan.action_count >= plan.actions.len) return null;
+                if (field_ty == .aggregate) {
+                    const byte_count = aggregate_layout_facts.nominalTypeByteSize(instruction.operands[1].type_text) orelse blk: {
+                        const layout_val = x86_64SysVDataLayout() orelse return null;
+                        break :blk layout_val.typeStoreSizeBytes(field_ty) catch return null;
+                    };
+                    plan.actions[plan.action_count] = .{
+                        .param_field_copy = .{
+                            .param_index = p_idx,
+                            .src_offset = total_src_offset,
+                            .dst_offset = dst_offset,
+                            .byte_count = byte_count,
+                        },
+                    };
+                    plan.action_count += 1;
+                } else {
+                    plan.actions[plan.action_count] = .{
+                        .param_field_load = .{
+                            .param_index = p_idx,
+                            .src_offset = total_src_offset,
+                            .dst_offset = dst_offset,
+                            .ty = field_ty,
+                        },
+                    };
+                    plan.action_count += 1;
+                }
+            } else if (air_aggregate_construction.resolveParamIndex(structured_air_v2, val_inst_index)) |p_idx| {
+                if (p_idx >= function_type.params.len) return null;
+                const p_ty = function_type.params[p_idx].ir_type;
+                const store_zig_ty = parseZigType(instruction.operands[1].type_text) orelse parseZigType(vi.result_type);
+                const store_val_ty = if (store_zig_ty) |zt| zt.ir_type else p_ty;
+                if (p_ty == .ptr and store_val_ty == .aggregate) {
+                    if (plan.action_count >= plan.actions.len) return null;
+                    const byte_count = aggregate_layout_facts.nominalTypeByteSize(instruction.operands[1].type_text) orelse blk: {
+                        const layout_val = x86_64SysVDataLayout() orelse return null;
+                        break :blk layout_val.typeStoreSizeBytes(store_val_ty) catch return null;
+                    };
+                    plan.actions[plan.action_count] = .{
+                        .param_copy = .{
+                            .param_index = p_idx,
+                            .dst_offset = dst_offset,
+                            .byte_count = byte_count,
+                        },
+                    };
+                    plan.action_count += 1;
+                } else {
+                    if (plan.action_count >= plan.actions.len) return null;
+                    plan.actions[plan.action_count] = .{
+                        .param_scalar = .{
+                            .param_index = p_idx,
+                            .dst_offset = dst_offset,
+                            .ty = if (store_val_ty == .ptr) .ptr else p_ty,
+                        },
+                    };
+                    plan.action_count += 1;
+                }
+            } else {
+                return null;
+            }
+        } else if (std.mem.eql(u8, val_operand.kind, "const")) {
+            if (std.mem.indexOf(u8, val_operand.value, "undefined") != null or
+                (air_model.operandTextDetail(instruction, 1) != null and
+                    std.mem.indexOf(u8, air_model.operandTextDetail(instruction, 1).?, "undefined") != null))
+            {
+                continue;
+            }
+            const const_val = air_aggregate_construction.parseConstIntOperand(instruction, 1) orelse return null;
+            const val_ty = (parseZigType(instruction.operands[1].type_text) orelse return null).ir_type;
+            if (plan.action_count >= plan.actions.len) return null;
+            plan.actions[plan.action_count] = .{
+                .constant = .{
+                    .dst_offset = dst_offset,
+                    .value = const_val,
+                    .ty = val_ty,
+                },
+            };
+            plan.action_count += 1;
+        } else return null;
+    }
+
+    if (plan.action_count == 0) return null;
+    return plan;
+}
+
+pub fn lowerSretFieldLoaderPlan(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    plan: SretFieldLoaderPlan,
+) !ir.Function {
+    var function = ir.Function.init(shortFunctionName(air_function.name), .void);
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = null;
+
+    const aggregate_ty = function_type.return_type.ir_type;
+    try function.params.append(allocator, .{
+        .ty = .ptr,
+        .attrs = try sretAttrsForAggregate(module, aggregate_ty),
+        .name = "sret",
+    });
+
+    for (function_type.params, 0..) |param, p_idx| {
+        const arg_name = try ownPrint(module, "arg{}", .{p_idx});
+        try function.params.append(allocator, .{ .ty = param.ir_type, .name = arg_name });
+    }
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+
+    var temp_idx: usize = 0;
+    for (plan.actions[0..plan.action_count]) |action| {
+        switch (action) {
+            .param_field_load => |info| {
+                const src_ptr_name = function.params.items[info.param_index + 1].name;
+                const src_gep_name = try ownPrint(module, "src_gep{}", .{temp_idx});
+                const load_name = try ownPrint(module, "val{}", .{temp_idx});
+                const dst_gep_name = try ownPrint(module, "dst_gep{}", .{temp_idx});
+                temp_idx += 1;
+
+                var src_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = src_ptr_name }, .indices = .empty };
+                errdefer src_gep.deinit(allocator);
+                try src_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(info.src_offset) } });
+                try block.instructions.append(allocator, .{ .result = src_gep_name, .kind = .{ .gep = src_gep } });
+
+                try block.instructions.append(allocator, .{ .result = load_name, .kind = .{ .load = .{
+                    .ty = info.ty,
+                    .ptr = .{ .named = src_gep_name },
+                } } });
+
+                var dst_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
+                errdefer dst_gep.deinit(allocator);
+                try dst_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(info.dst_offset) } });
+                try block.instructions.append(allocator, .{ .result = dst_gep_name, .kind = .{ .gep = dst_gep } });
+
+                try block.instructions.append(allocator, .{ .result = null, .kind = .{ .store = .{
+                    .ty = info.ty,
+                    .value = .{ .named = load_name },
+                    .ptr = .{ .named = dst_gep_name },
+                } } });
+            },
+            .param_copy => |info| {
+                const src_ptr_name = function.params.items[info.param_index + 1].name;
+                var chunk: u64 = 0;
+                while (chunk < info.byte_count) {
+                    const remaining = info.byte_count - chunk;
+                    if (remaining >= 8) {
+                        const src_gep_name = try ownPrint(module, "cpy_src{}", .{temp_idx});
+                        const load_name = try ownPrint(module, "cpy_val{}", .{temp_idx});
+                        const dst_gep_name = try ownPrint(module, "cpy_dst{}", .{temp_idx});
+                        temp_idx += 1;
+
+                        var src_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = src_ptr_name }, .indices = .empty };
+                        errdefer src_gep.deinit(allocator);
+                        try src_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(chunk) } });
+                        try block.instructions.append(allocator, .{ .result = src_gep_name, .kind = .{ .gep = src_gep } });
+
+                        try block.instructions.append(allocator, .{ .result = load_name, .kind = .{ .load = .{
+                            .ty = .{ .int = 64 },
+                            .ptr = .{ .named = src_gep_name },
+                        } } });
+
+                        var dst_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
+                        errdefer dst_gep.deinit(allocator);
+                        try dst_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(info.dst_offset + chunk) } });
+                        try block.instructions.append(allocator, .{ .result = dst_gep_name, .kind = .{ .gep = dst_gep } });
+
+                        try block.instructions.append(allocator, .{ .result = null, .kind = .{ .store = .{
+                            .ty = .{ .int = 64 },
+                            .value = .{ .named = load_name },
+                            .ptr = .{ .named = dst_gep_name },
+                        } } });
+                        chunk += 8;
+                    } else if (remaining >= 4) {
+                        const src_gep_name = try ownPrint(module, "cpy_src{}", .{temp_idx});
+                        const load_name = try ownPrint(module, "cpy_val{}", .{temp_idx});
+                        const dst_gep_name = try ownPrint(module, "cpy_dst{}", .{temp_idx});
+                        temp_idx += 1;
+
+                        var src_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = src_ptr_name }, .indices = .empty };
+                        errdefer src_gep.deinit(allocator);
+                        try src_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(chunk) } });
+                        try block.instructions.append(allocator, .{ .result = src_gep_name, .kind = .{ .gep = src_gep } });
+
+                        try block.instructions.append(allocator, .{ .result = load_name, .kind = .{ .load = .{
+                            .ty = .{ .int = 32 },
+                            .ptr = .{ .named = src_gep_name },
+                        } } });
+
+                        var dst_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
+                        errdefer dst_gep.deinit(allocator);
+                        try dst_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(info.dst_offset + chunk) } });
+                        try block.instructions.append(allocator, .{ .result = dst_gep_name, .kind = .{ .gep = dst_gep } });
+
+                        try block.instructions.append(allocator, .{ .result = null, .kind = .{ .store = .{
+                            .ty = .{ .int = 32 },
+                            .value = .{ .named = load_name },
+                            .ptr = .{ .named = dst_gep_name },
+                        } } });
+                        chunk += 4;
+                    } else return error.UnsupportedAir;
+                }
+            },
+            .param_field_copy => |info| {
+                const src_ptr_name = function.params.items[info.param_index + 1].name;
+                var chunk: u64 = 0;
+                while (chunk < info.byte_count) {
+                    const remaining = info.byte_count - chunk;
+                    if (remaining >= 8) {
+                        const src_gep_name = try ownPrint(module, "cpy_src{}", .{temp_idx});
+                        const load_name = try ownPrint(module, "cpy_val{}", .{temp_idx});
+                        const dst_gep_name = try ownPrint(module, "cpy_dst{}", .{temp_idx});
+                        temp_idx += 1;
+
+                        var src_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = src_ptr_name }, .indices = .empty };
+                        errdefer src_gep.deinit(allocator);
+                        try src_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(info.src_offset + chunk) } });
+                        try block.instructions.append(allocator, .{ .result = src_gep_name, .kind = .{ .gep = src_gep } });
+
+                        try block.instructions.append(allocator, .{ .result = load_name, .kind = .{ .load = .{
+                            .ty = .{ .int = 64 },
+                            .ptr = .{ .named = src_gep_name },
+                        } } });
+
+                        var dst_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
+                        errdefer dst_gep.deinit(allocator);
+                        try dst_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(info.dst_offset + chunk) } });
+                        try block.instructions.append(allocator, .{ .result = dst_gep_name, .kind = .{ .gep = dst_gep } });
+
+                        try block.instructions.append(allocator, .{ .result = null, .kind = .{ .store = .{
+                            .ty = .{ .int = 64 },
+                            .value = .{ .named = load_name },
+                            .ptr = .{ .named = dst_gep_name },
+                        } } });
+                        chunk += 8;
+                    } else if (remaining >= 4) {
+                        const src_gep_name = try ownPrint(module, "cpy_src{}", .{temp_idx});
+                        const load_name = try ownPrint(module, "cpy_val{}", .{temp_idx});
+                        const dst_gep_name = try ownPrint(module, "cpy_dst{}", .{temp_idx});
+                        temp_idx += 1;
+
+                        var src_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = src_ptr_name }, .indices = .empty };
+                        errdefer src_gep.deinit(allocator);
+                        try src_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(info.src_offset + chunk) } });
+                        try block.instructions.append(allocator, .{ .result = src_gep_name, .kind = .{ .gep = src_gep } });
+
+                        try block.instructions.append(allocator, .{ .result = load_name, .kind = .{ .load = .{
+                            .ty = .{ .int = 32 },
+                            .ptr = .{ .named = src_gep_name },
+                        } } });
+
+                        var dst_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
+                        errdefer dst_gep.deinit(allocator);
+                        try dst_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(info.dst_offset + chunk) } });
+                        try block.instructions.append(allocator, .{ .result = dst_gep_name, .kind = .{ .gep = dst_gep } });
+
+                        try block.instructions.append(allocator, .{ .result = null, .kind = .{ .store = .{
+                            .ty = .{ .int = 32 },
+                            .value = .{ .named = load_name },
+                            .ptr = .{ .named = dst_gep_name },
+                        } } });
+                        chunk += 4;
+                    } else return error.UnsupportedAir;
+                }
+            },
+            .param_scalar => |info| {
+                const arg_name = function.params.items[info.param_index + 1].name;
+                const dst_gep_name = try ownPrint(module, "dst_gep{}", .{temp_idx});
+                temp_idx += 1;
+
+                var dst_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
+                errdefer dst_gep.deinit(allocator);
+                try dst_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(info.dst_offset) } });
+                try block.instructions.append(allocator, .{ .result = dst_gep_name, .kind = .{ .gep = dst_gep } });
+
+                try block.instructions.append(allocator, .{ .result = null, .kind = .{ .store = .{
+                    .ty = info.ty,
+                    .value = .{ .named = arg_name },
+                    .ptr = .{ .named = dst_gep_name },
+                } } });
+            },
+            .constant => |info| {
+                const dst_gep_name = try ownPrint(module, "dst_gep{}", .{temp_idx});
+                temp_idx += 1;
+
+                var dst_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
+                errdefer dst_gep.deinit(allocator);
+                try dst_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(info.dst_offset) } });
+                try block.instructions.append(allocator, .{ .result = dst_gep_name, .kind = .{ .gep = dst_gep } });
+
+                try block.instructions.append(allocator, .{ .result = null, .kind = .{ .store = .{
+                    .ty = info.ty,
+                    .value = .{ .int = info.value },
+                    .ptr = .{ .named = dst_gep_name },
+                } } });
+            },
+        }
+    }
+
+    block.terminator = .{ .ret = .{ .ty = .void } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
 pub fn lowerTypedV2SretIntegerAggregateAbi(
     allocator: std.mem.Allocator,
     module: *ir.Module,
@@ -395,6 +967,9 @@ pub fn lowerTypedV2SretIntegerAggregateAbi(
     if (air_aggregate_construction.planSretAggregateFromStores(function_type, structured_air_v2)) |plan| {
         return try lowerSretAggregateFromPlan(allocator, module, air_function, function_type, plan);
     }
+    if (planSretFieldLoaderConstructor(function_type, structured_air_v2)) |plan| {
+        return try lowerSretFieldLoaderPlan(allocator, module, air_function, function_type, plan);
+    }
     if (!typedV2SretIntegerAggregateRecords(function_type, structured_air_v2)) return null;
     if (air_aggregate_copy.validateSretParamFieldConstructorRecords(function_type, structured_air_v2)) {
         return try lowerSretParamFieldConstructor(allocator, module, air_function, function_type, structured_air_v2);
@@ -409,7 +984,8 @@ pub fn typedV2SretIntegerAggregateRecords(
     if (isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
     return validateSretAggregateMakeRecords(function_type, structured_air_v2) or
         air_aggregate_copy.validateSretParamFieldConstructorRecords(function_type, structured_air_v2) or
-        air_aggregate_construction.planSretAggregateFromStores(function_type, structured_air_v2) != null;
+        air_aggregate_construction.planSretAggregateFromStores(function_type, structured_air_v2) != null or
+        planSretFieldLoaderConstructor(function_type, structured_air_v2) != null;
 }
 
 pub fn lowerSretAggregateFromPlan(
@@ -1241,19 +1817,19 @@ const packed_arg_names = [_][]const u8{
     "arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7",
 };
 const packed_cast_names = [_][]const u8{
-    "cast0", "cast1", "cast2", "cast3", "cast4", "cast5", "cast6", "cast7",
+    "cast0", "cast1", "cast2",  "cast3",  "cast4",  "cast5",  "cast6",  "cast7",
     "cast8", "cast9", "cast10", "cast11", "cast12", "cast13", "cast14", "cast15",
 };
 const packed_mask_names = [_][]const u8{
-    "mask0", "mask1", "mask2", "mask3", "mask4", "mask5", "mask6", "mask7",
+    "mask0", "mask1", "mask2",  "mask3",  "mask4",  "mask5",  "mask6",  "mask7",
     "mask8", "mask9", "mask10", "mask11", "mask12", "mask13", "mask14", "mask15",
 };
 const packed_shl_names = [_][]const u8{
-    "shl0", "shl1", "shl2", "shl3", "shl4", "shl5", "shl6", "shl7",
+    "shl0", "shl1", "shl2",  "shl3",  "shl4",  "shl5",  "shl6",  "shl7",
     "shl8", "shl9", "shl10", "shl11", "shl12", "shl13", "shl14", "shl15",
 };
 const packed_comb_names = [_][]const u8{
-    "comb0", "comb1", "comb2", "comb3", "comb4", "comb5", "comb6", "comb7",
+    "comb0", "comb1", "comb2",  "comb3",  "comb4",  "comb5",  "comb6",  "comb7",
     "comb8", "comb9", "comb10", "comb11", "comb12", "comb13", "comb14", "comb15",
 };
 const packed_const_names = [_][]const u8{

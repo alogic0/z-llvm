@@ -445,9 +445,9 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_fp.zig", .function = "lowerFloatToHalf", .body_sha256 = "ee1a865fa09595be9ac940a938d7ec3b5996b25a835a92afa7b17fbb72016960" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerHalfExtension", .body_sha256 = "86cd446354c4986acf2cc70c24d18f69f054f2a38703ab9ee7f2e47ae1e6be2c" },
 
-    .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .body_sha256 = "385f68fd00df0594e2e8f6d00cbfcf0a2db631289f4608bd80259325e705a758" },
+    .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .body_sha256 = "9815122b8c60a3b0cf21ce30c3d1df6a03f339ed7b61acc0bce57b96fab4a8a8" },
 
-    .{ .source = "composed_selector_impl.zig", .function = "bindParams", .body_sha256 = "c166731f590258c27accc5c6c50f93c49c175fffc257a2aaf0a193da10ea2508" },
+    .{ .source = "composed_selector_impl.zig", .function = "bindParams", .body_sha256 = "57d9954389696dc118f20864ae522ee3709c8e7dda6816771e950fbf3d496e88" },
     .{ .source = "composed_selector_impl.zig", .function = "bindPhiResults", .body_sha256 = "283fc0d5adddb7c7ac2fad47020bf99b026be3e2c09accabd0077d6e8b7abcf8" },
     .{ .source = "composed_selector_impl.zig", .function = "stabilizeFramedPhiDestinations", .body_sha256 = "84522a7d762d08de43dcffc4c9284f642605be75b0078f0bf74516df20f1196f" },
     .{ .source = "composed_selector_impl.zig", .function = "enterBlock", .body_sha256 = "edb2e130813a5ca0847f5e5060f9088d196db18deaec281dbd95a58b7db92b1f" },
@@ -459,7 +459,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_scalar.zig", .function = "lowerFreeze", .body_sha256 = "110d9c541f057cdb2a9a350cb9c16a1f9eac811c9739ed6cda8826d614b70b84" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerUnsignedRem", .body_sha256 = "8536b14d20e330bce4f1717f6dda9d3f6b663664507cf302d1e4d6a68fccf211" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerBinaryImmediateLhs", .body_sha256 = "00006893705d1a9313e51fff70572cac4aafed354d56edacf66ada2e8203aad1" },
-    .{ .source = "composed_selector_scalar.zig", .function = "lowerPairBinary", .body_sha256 = "16f097aeb8b2391b7ab68a68810854781d3bcfee4c276645d37b7355442ee650" },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerPairBinary", .body_sha256 = "eb1fd1587c460328e15d5fc0a5805364a08b26538f233134211def686696c204" },
 
     .{ .source = "composed_selector_vector.zig", .function = "lowerMask4ToI4", .body_sha256 = "1e62b361133724f37967c07e4ad6896dd1a83c1b5dd48f394a7f677373f2f912" },
     .{ .source = "composed_selector_vector.zig", .function = "lowerI64x2ExtractElement", .body_sha256 = "a2910ce5399d079e9843b0d0cfb84744322f7a8d8c49c70d3656f3b5b4dadca5" },

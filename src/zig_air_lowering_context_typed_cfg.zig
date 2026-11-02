@@ -209,6 +209,47 @@ pub fn lowerTypedSwitchValueBlock(
         if (arm_terminators.items.len != expected_branches) return air_model.LowerError.UnsupportedAir;
     }
 
+    if (has_else_arm and merge_type.ir_type.eql(.{ .int = 1 }) and arm_terminators.items.len == arms.items.len + 1) {
+        var all_arms_true = true;
+        for (arms.items, 0..) |_, arm_idx| {
+            const branch = self.lowerTypedSwitchBranchValue(instruction.index, arm_terminators.items[arm_idx], merge_type) catch {
+                all_arms_true = false;
+                break;
+            };
+            if (branch.value.value != .int or branch.value.value.int != 1) {
+                all_arms_true = false;
+                break;
+            }
+        }
+        if (all_arms_true) {
+            const else_branch = self.lowerTypedSwitchBranchValue(instruction.index, arm_terminators.items[arms.items.len], merge_type) catch null;
+            if (else_branch) |eb| {
+                if (eb.value.value == .int and eb.value.value.int == 0) {
+                    var current_cmp = try lowerSwitchArmCompositeCondition(self, cond, arms.items[0], switch_instruction.index, 0);
+                    for (arms.items[1..], 1..) |arm, arm_index| {
+                        const next_cmp = try lowerSwitchArmCompositeCondition(self, cond, arm, switch_instruction.index, arm_index);
+                        const or_name = try ownPrint(self.module, "switch_{}_arm_or_{}", .{ switch_instruction.index, arm_index });
+                        try self.block.instructions.append(self.allocator, .{
+                            .result = or_name,
+                            .kind = .{ .binary = .{
+                                .op = .@"or",
+                                .ty = .{ .int = 1 },
+                                .lhs = .{ .named = current_cmp },
+                                .rhs = .{ .named = next_cmp },
+                            } },
+                        });
+                        current_cmp = or_name;
+                    }
+                    self.values[instruction.index] = .{
+                        .ty = merge_type,
+                        .value = .{ .named = current_cmp },
+                    };
+                    return true;
+                }
+            }
+        }
+    }
+
     if (arms.items.len == 1 and has_else_arm and arm_terminators.items.len == 2) {
         const case_branch = try self.lowerTypedSwitchBranchValue(instruction.index, arm_terminators.items[0], merge_type);
         const else_branch = try self.lowerTypedSwitchBranchValue(instruction.index, arm_terminators.items[1], merge_type);
@@ -746,15 +787,10 @@ pub fn lowerTypedBranchMergeBlock(
     const then_label = try ownPrint(self.module, "block{}_then", .{instruction.index});
     const else_label = try ownPrint(self.module, "block{}_else", .{instruction.index});
     const merge_label = try ownPrint(self.module, "block{}_merge", .{instruction.index});
-    const merge_type_or_null: ?ZigType = if (parseZigType(instruction.result_type)) |merge_type|
+    const merge_type_or_null: ?ZigType = if (self.typedBlockResultType(instruction)) |merge_type|
         if (merge_type.ir_type == .void) null else merge_type
-    else blk: {
-        const return_type_text = functionReturnTypeText(self.air_function.type_text) orelse break :blk null;
-        if (isErrorUnionTypeText(return_type_text) and self.function_type.return_type.ir_type.eql(.{ .int = 64 })) {
-            break :blk self.function_type.return_type;
-        }
-        break :blk null;
-    };
+    else
+        null;
 
     const entry_error_union_slots = try self.allocator.alloc(?air_model.TypedValue, self.synthetic_error_union_slots.len);
     defer self.allocator.free(entry_error_union_slots);
@@ -1056,9 +1092,28 @@ pub fn lowerTypedBlockBodyUntilCond(
 }
 
 pub fn lowerTypedReturn(self: anytype, instruction: air_export.TypedInstruction) !void {
-    if (self.function_type.return_type.ir_type == .void) {
+    if (self.function_type.return_type.ir_type == .void or
+        (self.hasSretParam() and std.mem.eql(u8, instruction.opcode, "ret_load")))
+    {
         self.block.terminator = .{ .ret = .{ .ty = .void } };
         return;
+    }
+    if (std.mem.eql(u8, instruction.opcode, "ret_load") and !self.hasSretParam()) {
+        const pointer_index = if (instruction.operands.len == 1)
+            air_model.typedInstOperandIndex(instruction.operands[0]) orelse return air_model.LowerError.UnsupportedAir
+        else if (instruction.operands.len == 0)
+            air_model.typedRetPtrIndex(self.structured_air_v2 orelse return air_model.LowerError.UnsupportedAir) orelse return air_model.LowerError.UnsupportedAir
+        else
+            return air_model.LowerError.UnsupportedAir;
+        if (pointer_index < self.synthetic_aggregate_slots.len) {
+            if (self.synthetic_aggregate_slots[pointer_index]) |agg_val| {
+                self.block.terminator = .{ .ret = .{
+                    .ty = self.function_type.return_type.ir_type,
+                    .value = agg_val,
+                } };
+                return;
+            }
+        }
     }
     if (instruction.operands.len != 1) return air_model.LowerError.UnsupportedAir;
     var value = try self.resolveTypedOperand(instruction, 0);

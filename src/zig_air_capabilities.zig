@@ -146,10 +146,12 @@ pub const MemorySemanticOp = enum {
     alloc,
     load,
     store,
+    ret_ptr,
 };
 
 pub const OptionalSemanticOp = enum {
     none,
+    is_null,
     is_non_null,
     wrap_optional,
     optional_payload,
@@ -382,6 +384,7 @@ pub fn scalarSemanticOpForOpcode(opcode: []const u8) ScalarSemanticOp {
 
 pub fn memorySemanticOpForOpcode(opcode: []const u8) MemorySemanticOp {
     if (std.mem.eql(u8, opcode, "alloc")) return .alloc;
+    if (std.mem.eql(u8, opcode, "ret_ptr")) return .ret_ptr;
     if (std.mem.eql(u8, opcode, "load") or
         std.mem.eql(u8, opcode, "atomic_load"))
     {
@@ -390,7 +393,9 @@ pub fn memorySemanticOpForOpcode(opcode: []const u8) MemorySemanticOp {
     if (std.mem.eql(u8, opcode, "store") or
         std.mem.eql(u8, opcode, "store_safe") or
         std.mem.eql(u8, opcode, "atomic_store_monotonic") or
-        std.mem.eql(u8, opcode, "atomic_store_unordered"))
+        std.mem.eql(u8, opcode, "atomic_store_unordered") or
+        std.mem.eql(u8, opcode, "atomic_store_release") or
+        std.mem.eql(u8, opcode, "atomic_store_seq_cst"))
     {
         return .store;
     }
@@ -398,9 +403,10 @@ pub fn memorySemanticOpForOpcode(opcode: []const u8) MemorySemanticOp {
 }
 
 pub fn optionalSemanticOpForOpcode(opcode: []const u8) OptionalSemanticOp {
+    if (std.mem.eql(u8, opcode, "is_null") or std.mem.eql(u8, opcode, "is_null_ptr")) return .is_null;
     if (std.mem.eql(u8, opcode, "is_non_null") or std.mem.eql(u8, opcode, "is_non_null_ptr")) return .is_non_null;
     if (std.mem.eql(u8, opcode, "wrap_optional")) return .wrap_optional;
-    if (std.mem.eql(u8, opcode, "optional_payload")) return .optional_payload;
+    if (std.mem.eql(u8, opcode, "optional_payload") or std.mem.eql(u8, opcode, "optional_payload_ptr")) return .optional_payload;
     return .none;
 }
 
@@ -618,7 +624,6 @@ pub fn isCastOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "fptrunc");
 }
 
-
 pub fn isCallOpcode(opcode: []const u8) bool {
     return air_export.categoryForOpcode(opcode) == .call;
 }
@@ -633,7 +638,8 @@ pub fn isAllocOpcode(opcode: []const u8) bool {
 
 pub fn isReturnOpcode(opcode: []const u8) bool {
     return std.mem.eql(u8, opcode, "ret") or
-        std.mem.eql(u8, opcode, "ret_safe");
+        std.mem.eql(u8, opcode, "ret_safe") or
+        std.mem.eql(u8, opcode, "ret_load");
 }
 
 pub fn isUnreachOpcode(opcode: []const u8) bool {
@@ -1031,11 +1037,16 @@ test "opcode capability registry covers inventory and lowering policies" {
     try std.testing.expect(typedV2CanLower(opcodeCapability("atomic_store_monotonic")));
     try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("atomic_store_unordered"));
     try std.testing.expect(typedV2CanLower(opcodeCapability("atomic_store_unordered")));
+    try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("atomic_store_release"));
+    try std.testing.expect(typedV2CanLower(opcodeCapability("atomic_store_release")));
+    try std.testing.expectEqual(MemorySemanticOp.store, memorySemanticOpForOpcode("atomic_store_seq_cst"));
+    try std.testing.expect(typedV2CanLower(opcodeCapability("atomic_store_seq_cst")));
     try std.testing.expectEqual(SemanticDomain.optional, semanticDomainForOpcode("optional_payload"));
     try std.testing.expectEqual(OptionalSemanticOp.is_non_null, optionalSemanticOpForOpcode("is_non_null"));
     try std.testing.expectEqual(OptionalSemanticOp.is_non_null, optionalSemanticOpForOpcode("is_non_null_ptr"));
     try std.testing.expectEqual(OptionalSemanticOp.wrap_optional, optionalSemanticOpForOpcode("wrap_optional"));
     try std.testing.expectEqual(OptionalSemanticOp.optional_payload, optionalSemanticOpForOpcode("optional_payload"));
+    try std.testing.expectEqual(OptionalSemanticOp.optional_payload, optionalSemanticOpForOpcode("optional_payload_ptr"));
     try std.testing.expectEqual(SemanticDomain.error_union, semanticDomainForOpcode("try"));
     try std.testing.expectEqual(ErrorUnionSemanticOp.is_non_err, errorUnionSemanticOpForOpcode("is_non_err"));
     try std.testing.expectEqual(ErrorUnionSemanticOp.wrap_payload, errorUnionSemanticOpForOpcode("wrap_errunion_payload"));

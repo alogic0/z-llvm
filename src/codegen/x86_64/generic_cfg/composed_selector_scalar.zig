@@ -617,6 +617,8 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
 
 pub fn lowerPairBinary(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
     const op = machineBinaryOp(binary.op) orelse return .{ .no_emitter = "composed-block-pair-binary-op" };
+    const lhs_existing = selector_state.resolvePairValue(selector, binary.lhs);
+    const rhs_existing = selector_state.resolvePairValue(selector, binary.rhs);
     switch (op) {
         .xor => {
             const lhs = selector_state.materializePairValue(selector, binary.lhs, pair_a) catch return .{ .unsupported_value = "composed-block-unknown-lhs" };
@@ -625,8 +627,6 @@ pub fn lowerPairBinary(selector: *ComposedBlockSelector, result_name: []const u8
             try selector_state.bindPairScratch(selector, result_name, rhs);
         },
         .@"or" => {
-            const lhs_existing = selector_state.resolvePairValue(selector, binary.lhs);
-            const rhs_existing = selector_state.resolvePairValue(selector, binary.rhs);
             if (lhs_existing) |lhs_pair| {
                 if (rhs_existing) |rhs_pair| {
                     try selector_state.emitPairOrInPlace(selector, lhs_pair, rhs_pair);
@@ -652,8 +652,19 @@ pub fn lowerPairBinary(selector: *ComposedBlockSelector, result_name: []const u8
             try selector_state.bindPairScratch(selector, result_name, rhs);
         },
         .sub => {
-            const lhs = selector_state.materializePairValue(selector, binary.lhs, pair_b) catch return .{ .unsupported_value = "composed-block-unknown-lhs" };
-            const rhs = selector_state.materializePairValue(selector, binary.rhs, pair_a) catch return .{ .unsupported_value = "composed-block-unknown-rhs" };
+            var lhs: RegPair = undefined;
+            var rhs: RegPair = undefined;
+            if (lhs_existing != null and rhs_existing != null) {
+                lhs = lhs_existing.?;
+                rhs = rhs_existing.?;
+                // Both operands are live at this instruction. Reuse their
+                // disjoint homes before any fixed scratch pair can clobber one.
+                if (!lhs.eql(rhs) and (lhs.contains(rhs.lo) or lhs.contains(rhs.hi)))
+                    return .{ .no_emitter = "composed-block-pair-sub-overlap" };
+            } else {
+                lhs = selector_state.materializePairValue(selector, binary.lhs, pair_b) catch return .{ .unsupported_value = "composed-block-unknown-lhs" };
+                rhs = selector_state.materializePairValue(selector, binary.rhs, pair_a) catch return .{ .unsupported_value = "composed-block-unknown-rhs" };
+            }
             try selector_state.emitPairSubInPlace(selector, lhs, rhs);
             try selector_state.bindPairScratch(selector, result_name, lhs);
         },

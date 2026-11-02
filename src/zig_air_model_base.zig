@@ -45,6 +45,11 @@ pub const SyntheticVectorElementPointer = struct {
     lane_index: u32,
 };
 
+pub const SyntheticAggregateFieldPointer = struct {
+    slot_index: u32,
+    field_index: u32,
+};
+
 pub const PackedBitfieldPtrInfo = struct {
     host_align: u32,
     bit_offset: u32,
@@ -55,6 +60,13 @@ pub const PackedBitfieldPtrInfo = struct {
 pub const SyntheticBitfieldPointer = struct {
     base_ptr: ir.Value,
     info: PackedBitfieldPtrInfo,
+};
+
+pub const SyntheticOptionalPointer = struct {
+    base_ptr: ir.Value,
+    optional_type_text: []const u8,
+    tag_value: ?ir.Value = null,
+    payload_value: ?TypedValue = null,
 };
 
 pub const TypedBranchMergeResult = struct {
@@ -525,8 +537,11 @@ pub const TypedFunctionView = struct {
                 if (!air_capabilities.isCondBrOpcode(child.opcode)) continue;
                 const then_body = self.body(.then_body, child.index) orelse return false;
                 const else_body = self.body(.else_body, child.index) orelse return false;
-                return self.genericCfgBodyContains(then_body, instruction_index) or
-                    self.genericCfgBodyContains(else_body, instruction_index);
+                if (self.genericCfgBodyContains(then_body, instruction_index) or
+                    self.genericCfgBodyContains(else_body, instruction_index))
+                {
+                    return true;
+                }
             }
         }
         return false;
@@ -655,8 +670,14 @@ pub fn runtimeNavFqn(instruction: air_export.TypedInstruction) ?[]const u8 {
 }
 
 pub fn fieldIndex(instruction: air_export.TypedInstruction) ?i128 {
-    const field_index_text = detail(instruction, "field_index") orelse return null;
-    return std.fmt.parseInt(i128, field_index_text, 10) catch null;
+    if (detail(instruction, "field_index")) |field_index_text| {
+        return std.fmt.parseInt(i128, field_index_text, 10) catch null;
+    }
+    const prefix = "struct_field_ptr_index_";
+    if (std.mem.startsWith(u8, instruction.opcode, prefix)) {
+        return std.fmt.parseInt(i128, instruction.opcode[prefix.len..], 10) catch null;
+    }
+    return null;
 }
 
 pub fn fieldIndexUsize(instruction: air_export.TypedInstruction) ?usize {

@@ -4,7 +4,6 @@ const air_export = @import("zig_air_export.zig");
 const exported_aggregate_layout_facts = @import("zig_air_exported_aggregate_layout_facts.zig");
 const air_model = @import("zig_air_model.zig");
 const air_types = @import("zig_air_types.zig");
-const sysv_abi = @import("codegen/x86_64/sysv_abi.zig");
 const ir = @import("ir.zig");
 const target = @import("target.zig");
 const type_layout = @import("zig_air_type_layout.zig");
@@ -23,9 +22,7 @@ fn x86_64SysVDataLayout() ?target.DataLayout {
 }
 
 pub fn isSysVRegisterAggregateCandidate(ty: ir.Type) bool {
-    if (ty != .aggregate) return false;
-    const classification = sysv_abi.classifyAggregate(ty) catch return false;
-    return classification.kind == .register;
+    return air_types.isSysVRegisterAggregateCandidate(ty);
 }
 
 pub const RegisterAggregateLeafSource = union(enum) {
@@ -270,12 +267,21 @@ pub fn resolveParamIndex(structured_air_v2: air_export.StructuredAirV2, inst_ind
                         break;
                     }
                     if (std.mem.eql(u8, inst.opcode, "ptr_cast") or std.mem.eql(u8, inst.opcode, "ptr_cast_safe")) {
-                        for (structured_air_v2.instructions) |other_inst| {
-                            if (other_inst.index < cur and std.mem.eql(u8, other_inst.opcode, "arg")) {
-                                cur = other_inst.index;
-                                found = true;
-                                break;
+                        var search = cur;
+                        while (search > 0) {
+                            search -= 1;
+                            for (structured_air_v2.instructions) |other_inst| {
+                                if (other_inst.index == search and std.mem.eql(u8, other_inst.opcode, "arg")) {
+                                    if (parseZigType(other_inst.result_type)) |arg_zt| {
+                                        if (arg_zt.ir_type == .ptr) {
+                                            cur = other_inst.index;
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                }
                             }
+                            if (found) break;
                         }
                         if (found) break;
                     }
@@ -354,7 +360,10 @@ pub fn planAggregateConstructionFromStores(
                 };
                 if (arg_inst_index >= function_type.params.len) return null;
                 const param_ty = function_type.params[arg_inst_index].ir_type;
-                const types_compatible = param_ty.eql(field_ty) or (param_ty == .int and field_ty == .int and param_ty.int >= field_ty.int);
+                const types_compatible = param_ty.eql(field_ty) or
+                    (param_ty == .int and field_ty == .int and param_ty.int >= field_ty.int) or
+                    (param_ty == .double and field_ty == .int and field_ty.int <= 64) or
+                    (param_ty == .float and field_ty == .int and field_ty.int <= 32);
                 if (!types_compatible) return null;
                 params_used[arg_inst_index] = true;
                 result_plan.leaves[field_idx] = .{
@@ -435,7 +444,10 @@ pub fn planAggregateConstructionFromStores(
             };
             if (arg_inst_index >= function_type.params.len) return null;
             const param_ty = function_type.params[arg_inst_index].ir_type;
-            const types_compatible = param_ty.eql(target_leaf.ty) or (param_ty == .int and target_leaf.ty == .int and param_ty.int >= target_leaf.ty.int);
+            const types_compatible = param_ty.eql(target_leaf.ty) or
+                (param_ty == .int and target_leaf.ty == .int and param_ty.int >= target_leaf.ty.int) or
+                (param_ty == .double and target_leaf.ty == .int and target_leaf.ty.int <= 64) or
+                (param_ty == .float and target_leaf.ty == .int and target_leaf.ty.int <= 32);
             if (!types_compatible) return null;
             params_used[arg_inst_index] = true;
             result_plan.leaves[leaf_index] = .{
@@ -443,7 +455,6 @@ pub fn planAggregateConstructionFromStores(
                 .ty = target_leaf.ty,
                 .source = leaf_source,
             };
-
         } else if (std.mem.eql(u8, instruction.operands[1].kind, "const")) {
             const const_val = parseConstIntOperand(instruction, 1) orelse return null;
             result_plan.leaves[leaf_index] = .{
@@ -468,7 +479,13 @@ fn planRegisterAggregateFromStores(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) ?RegisterAggregatePlan {
-    if (!isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return null;
+    const aggregate_ty = if (type_layout.aggregateLayoutSummary(function_type.return_type.ir_type.aggregate)) |summary|
+        summary.ty
+    else if (inferRegisterAggregateConstructionLayout(function_type, structured_air_v2)) |summary|
+        summary.ty
+    else
+        function_type.return_type.ir_type;
+    if (!isSysVRegisterAggregateCandidate(aggregate_ty)) return null;
     return planAggregateConstructionFromStores(function_type, structured_air_v2);
 }
 

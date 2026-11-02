@@ -2,6 +2,7 @@ const std = @import("std");
 const core = @import("zig_air_model_base.zig");
 const air_export = @import("zig_air_export.zig");
 const air_capabilities = @import("zig_air_capabilities.zig");
+const air_types = @import("zig_air_types.zig");
 
 const FunctionType = core.FunctionType;
 const typedOpcodeCount = core.typedOpcodeCount;
@@ -130,19 +131,36 @@ pub fn typedWrapOptionalSummary(instruction: air_export.TypedInstruction) ?Typed
 }
 
 pub fn typedOptionalPayloadExtractionSummary(instruction: air_export.TypedInstruction) ?TypedOptionalPayloadExtractionSummary {
-    if (!std.mem.eql(u8, instruction.opcode, "optional_payload")) return null;
-    if (instruction.operands.len != 1) return null;
-    const payload_type = std.mem.trim(u8, instruction.result_type, " ");
-    const optional_type = std.mem.trim(u8, instruction.operands[0].type_text, " ");
-    if (!std.mem.startsWith(u8, optional_type, "?")) return null;
-    const optional_payload_type = std.mem.trim(u8, optional_type[1..], " ");
-    if (!std.mem.eql(u8, payload_type, optional_payload_type)) return null;
-    return .{
-        .instruction_index = instruction.index,
-        .optional_index = typedInstOperandIndex(instruction.operands[0]) orelse return null,
-        .optional_type_text = optional_type,
-        .payload_type_text = payload_type,
-    };
+    if (std.mem.eql(u8, instruction.opcode, "optional_payload")) {
+        if (instruction.operands.len != 1) return null;
+        const payload_type = std.mem.trim(u8, instruction.result_type, " ");
+        const optional_type = std.mem.trim(u8, instruction.operands[0].type_text, " ");
+        if (!std.mem.startsWith(u8, optional_type, "?")) return null;
+        const optional_payload_type = std.mem.trim(u8, optional_type[1..], " ");
+        if (!std.mem.eql(u8, payload_type, optional_payload_type)) return null;
+        return .{
+            .instruction_index = instruction.index,
+            .optional_index = typedInstOperandIndex(instruction.operands[0]) orelse return null,
+            .optional_type_text = optional_type,
+            .payload_type_text = payload_type,
+        };
+    } else if (std.mem.eql(u8, instruction.opcode, "optional_payload_ptr")) {
+        if (instruction.operands.len != 1) return null;
+        const payload_type = std.mem.trim(u8, instruction.result_type, " ");
+        const optional_type = std.mem.trim(u8, instruction.operands[0].type_text, " ");
+        const optional_child = air_types.pointerChildText(optional_type) orelse return null;
+        if (!std.mem.startsWith(u8, optional_child, "?")) return null;
+        const optional_inner = std.mem.trim(u8, optional_child[1..], " ");
+        const payload_inner = air_types.pointerChildText(payload_type) orelse return null;
+        if (!std.mem.eql(u8, optional_inner, payload_inner)) return null;
+        return .{
+            .instruction_index = instruction.index,
+            .optional_index = typedInstOperandIndex(instruction.operands[0]) orelse return null,
+            .optional_type_text = optional_type,
+            .payload_type_text = payload_type,
+        };
+    }
+    return null;
 }
 
 pub fn typedOptionalPointerCheckSummary(instruction: air_export.TypedInstruction) ?TypedOptionalPointerCheckSummary {
@@ -542,6 +560,27 @@ test "typed optional model recognizes optional_payload operand relation" {
     try std.testing.expectEqual(@as(u32, 4), summary.optional_index);
     try std.testing.expectEqualStrings("?*const i32", summary.optional_type_text);
     try std.testing.expectEqualStrings("*const i32", summary.payload_type_text);
+}
+
+test "typed optional model recognizes optional_payload_ptr operand relation" {
+    const operand = [_]air_export.TypedOperand{.{
+        .kind = "inst",
+        .value = "8",
+        .type_text = "*?link.MachO.DebugSymbols",
+    }};
+    const instruction = air_export.TypedInstruction{
+        .index = 10,
+        .opcode = "optional_payload_ptr",
+        .result_type = "*link.MachO.DebugSymbols",
+        .data_kind = "ty_op",
+        .operands = &operand,
+    };
+
+    const summary = typedOptionalPayloadExtractionSummary(instruction).?;
+    try std.testing.expectEqual(@as(u32, 10), summary.instruction_index);
+    try std.testing.expectEqual(@as(u32, 8), summary.optional_index);
+    try std.testing.expectEqualStrings("*?link.MachO.DebugSymbols", summary.optional_type_text);
+    try std.testing.expectEqualStrings("*link.MachO.DebugSymbols", summary.payload_type_text);
 }
 
 test "typed optional model rejects unrelated optional_payload types" {

@@ -343,7 +343,7 @@ test "generic cfg selector transaction restores seeded state after mapped error"
         \\  %slot = alloca i64, align 8
         \\  br label %next
         \\next:
-        \\  ret i32 2147483648
+        \\  ret i32 4294967296
         \\}
         \\
     ;

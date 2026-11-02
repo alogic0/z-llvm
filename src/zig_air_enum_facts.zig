@@ -54,6 +54,21 @@ const ast_node_optional_offset_enumerators = [_]Enumerator{
     .{ .name = "none", .value = std.math.maxInt(i32) },
 };
 
+const elf_pt_enumerators = [_]Enumerator{
+    .{ .name = "NULL", .value = 0 },
+    .{ .name = "LOAD", .value = 1 },
+    .{ .name = "DYNAMIC", .value = 2 },
+    .{ .name = "INTERP", .value = 3 },
+    .{ .name = "NOTE", .value = 4 },
+    .{ .name = "SHLIB", .value = 5 },
+    .{ .name = "PHDR", .value = 6 },
+    .{ .name = "TLS", .value = 7 },
+    .{ .name = "NUM", .value = 8 },
+    .{ .name = "GNU_EH_FRAME", .value = 1685382480 },
+    .{ .name = "GNU_STACK", .value = 1685382481 },
+    .{ .name = "GNU_RELRO", .value = 0x6474e552 },
+};
+
 const coff_image_file_machine_enumerators = [_]Enumerator{
     .{ .name = "UNKNOWN", .value = 0x0 },
     .{ .name = "ALPHA", .value = 0x184 },
@@ -115,6 +130,37 @@ const math_order_enumerators = [_]Enumerator{
     .{ .name = "eq", .value = 2 },
 };
 
+const lang_link_mode_enumerators = [_]Enumerator{
+    .{ .name = "static", .value = 0 },
+    .{ .name = "dynamic", .value = 1 },
+};
+
+const lang_output_mode_enumerators = [_]Enumerator{
+    .{ .name = "Exe", .value = 0 },
+    .{ .name = "Lib", .value = 1 },
+    .{ .name = "Obj", .value = 2 },
+};
+
+const io_file_kind_enumerators = [_]Enumerator{
+    .{ .name = "block_device", .value = 0 },
+    .{ .name = "character_device", .value = 1 },
+    .{ .name = "directory", .value = 2 },
+    .{ .name = "named_pipe", .value = 3 },
+    .{ .name = "sym_link", .value = 4 },
+    .{ .name = "file", .value = 5 },
+    .{ .name = "unix_domain_socket", .value = 6 },
+    .{ .name = "whiteout", .value = 7 },
+    .{ .name = "door", .value = 8 },
+    .{ .name = "event_port", .value = 9 },
+    .{ .name = "unknown", .value = 10 },
+};
+
+const io_terminal_mode_enumerators = [_]Enumerator{
+    .{ .name = "no_color", .value = 0 },
+    .{ .name = "escape_codes", .value = 1 },
+    .{ .name = "windows_api", .value = 2 },
+};
+
 const zig_llvm_builder_alignment_enumerators = [_]Enumerator{
     .{ .name = "default", .value = std.math.maxInt(u6) },
 };
@@ -147,6 +193,20 @@ const dwarf_address_size_enumerators = [_]Enumerator{
 const no_enumerators = [_]Enumerator{};
 
 const facts = [_]Fact{
+    // Audited against the tracked 1c08b09d1 source. These are exact owners;
+    // unrelated user types with the same final identifier do not inherit them.
+    .{ .name = "lang.Endian", .backing_type = .{ .int = 1 }, .enumerators = &.{ .{ .name = "big", .value = 0 }, .{ .name = "little", .value = 1 } } },
+    .{ .name = "elf.EM", .backing_type = .{ .int = 16 }, .enumerators = &.{} },
+    .{ .name = "elf.ET", .backing_type = .{ .int = 16 }, .enumerators = &.{} },
+    .{ .name = "link.Elf2.EhdrMachine", .backing_type = .{ .int = 16 }, .enumerators = &.{} },
+    .{ .name = "link.Elf2.EhdrType", .backing_type = .{ .int = 16 }, .enumerators = &.{} },
+    .{ .name = "link.Elf2.Node.UavMapIndex", .backing_type = .{ .int = 32 }, .enumerators = &.{} },
+    .{ .name = "link.Elf2.GotReloc.Index", .backing_type = .{ .int = 32 }, .enumerators = &.{.{ .name = "none", .value = std.math.maxInt(u32) }} },
+    .{ .name = "link.Elf2.Symbol.Global.Index", .backing_type = .{ .int = 32 }, .enumerators = &.{} },
+    .{ .name = "link.Elf2.Symbol.Global.Index.Optional", .backing_type = .{ .int = 32 }, .enumerators = &.{.{ .name = "none", .value = std.math.maxInt(u32) }} },
+    .{ .name = "link.MachO2.Symbol.Index", .backing_type = .{ .int = 32 }, .enumerators = &.{} },
+    .{ .name = "link.MachO2.Symbol.Index.Optional", .backing_type = .{ .int = 32 }, .enumerators = &.{.{ .name = "none", .value = std.math.maxInt(u32) }} },
+    .{ .name = "link.File.SymbolId", .backing_type = .{ .int = 32 }, .enumerators = &.{} },
     .{
         .name = "Progress.Node.Parent",
         .backing_type = .{ .int = 8 },
@@ -218,9 +278,79 @@ const facts = [_]Fact{
         .enumerators = lazy_symbol_kind_enumerators[0..],
     },
     .{
+        .name = "lang.LinkMode",
+        .backing_type = .{ .int = 1 },
+        .enumerators = lang_link_mode_enumerators[0..],
+    },
+    .{
+        .name = "std.lang.LinkMode",
+        .backing_type = .{ .int = 1 },
+        .enumerators = lang_link_mode_enumerators[0..],
+    },
+    .{
+        .name = "lang.OutputMode",
+        .backing_type = .{ .int = 8 },
+        .enumerators = lang_output_mode_enumerators[0..],
+    },
+    .{
+        .name = "std.lang.OutputMode",
+        .backing_type = .{ .int = 8 },
+        .enumerators = lang_output_mode_enumerators[0..],
+    },
+    .{
+        .name = "OutputMode",
+        .backing_type = .{ .int = 8 },
+        .enumerators = lang_output_mode_enumerators[0..],
+    },
+    .{
         .name = "link.Wasm.String",
         .backing_type = .{ .int = 32 },
-        .enumerators = no_enumerators[0..],
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "Wasm.String",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "link.Wasm.OptionalString",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "Wasm.OptionalString",
+        .backing_type = .{ .int = 32 },
+        .enumerators = intern_pool_index_enumerators[0..],
+    },
+    .{
+        .name = "Io.File.Kind",
+        .backing_type = .{ .int = 4 },
+        .enumerators = io_file_kind_enumerators[0..],
+    },
+    .{
+        .name = "File.Kind",
+        .backing_type = .{ .int = 4 },
+        .enumerators = io_file_kind_enumerators[0..],
+    },
+    .{
+        .name = "std.Io.File.Kind",
+        .backing_type = .{ .int = 4 },
+        .enumerators = io_file_kind_enumerators[0..],
+    },
+    .{
+        .name = "Io.Terminal.Mode",
+        .backing_type = .{ .int = 8 },
+        .enumerators = io_terminal_mode_enumerators[0..],
+    },
+    .{
+        .name = "Terminal.Mode",
+        .backing_type = .{ .int = 8 },
+        .enumerators = io_terminal_mode_enumerators[0..],
+    },
+    .{
+        .name = "std.Io.Terminal.Mode",
+        .backing_type = .{ .int = 8 },
+        .enumerators = io_terminal_mode_enumerators[0..],
     },
     .{
         .name = "link.Wasm.DataPayload.Off",
@@ -418,6 +548,36 @@ const facts = [_]Fact{
         .enumerators = no_enumerators[0..],
     },
     .{
+        .name = "Target.Os.Tag",
+        .backing_type = .{ .int = 8 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.Target.Os.Tag",
+        .backing_type = .{ .int = 8 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Target.Abi",
+        .backing_type = .{ .int = 8 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.Target.Abi",
+        .backing_type = .{ .int = 8 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "Target.ObjectFormat",
+        .backing_type = .{ .int = 8 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.Target.ObjectFormat",
+        .backing_type = .{ .int = 8 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
         .name = "libs.openbsd.CrtFile",
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],
@@ -465,6 +625,16 @@ const facts = [_]Fact{
     },
     .{
         .name = "std.zig.llvm.Builder.Global.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "zig.llvm.Builder.Function.Index",
+        .backing_type = .{ .int = 32 },
+        .enumerators = no_enumerators[0..],
+    },
+    .{
+        .name = "std.zig.llvm.Builder.Function.Index",
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],
     },
@@ -779,6 +949,21 @@ const facts = [_]Fact{
         .enumerators = elf_program_header_index_enumerators[0..],
     },
     .{
+        .name = "elf.PT",
+        .backing_type = .{ .int = 32 },
+        .enumerators = elf_pt_enumerators[0..],
+    },
+    .{
+        .name = "PT",
+        .backing_type = .{ .int = 32 },
+        .enumerators = elf_pt_enumerators[0..],
+    },
+    .{
+        .name = "std.elf.PT",
+        .backing_type = .{ .int = 32 },
+        .enumerators = elf_pt_enumerators[0..],
+    },
+    .{
         .name = "zig.Ast.Node.Index",
         .backing_type = .{ .int = 32 },
         .enumerators = no_enumerators[0..],
@@ -1053,6 +1238,16 @@ pub fn lookup(nominal: []const u8) ?Fact {
             .name = normalized,
             .backing_type = .{ .int = 1 },
             .enumerators = zig_llvm_builder_metadata_unused_enumerators[0..],
+        };
+    }
+    if (std.mem.eql(u8, normalized, "codegen.x86_64.bits.Register") or
+        std.mem.eql(u8, normalized, "bits.Register") or
+        std.mem.endsWith(u8, normalized, ".bits.Register"))
+    {
+        return .{
+            .name = normalized,
+            .backing_type = .{ .int = 8 },
+            .enumerators = &.{},
         };
     }
     for (facts) |fact| {

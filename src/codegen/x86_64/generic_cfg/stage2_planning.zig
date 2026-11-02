@@ -426,6 +426,10 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
 
     var preservation_barrier_positions: std.ArrayList(usize) = .empty;
     defer preservation_barrier_positions.deinit(allocator);
+    var store_positions: std.ArrayList(usize) = .empty;
+    defer store_positions.deinit(allocator);
+    var loaded_values = NameSet.init(allocator);
+    defer loaded_values.deinit();
 
     var simple_loop_backedge_values = NameSet.init(allocator);
     defer simple_loop_backedge_values.deinit();
@@ -442,6 +446,7 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
         for (block.instructions.items) |instruction| {
             if (instruction.removed) continue;
             if (instruction.result) |result| {
+                if (instruction.kind == .load) try loaded_values.put(result, {});
                 if (!pressure_exempt_values.contains(result)) {
                     const metadata = selectorInstructionResultMetadata(instruction) orelse return error.UnsupportedCodegenValue;
                     try recordSelectorIntervalDef(allocator, &intervals, &interval_indexes, result, metadata, position);
@@ -450,6 +455,7 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
             if (instruction.kind == .call and callRequiresPreservationFrame(instruction.kind.call)) {
                 try preservation_barrier_positions.append(allocator, position);
             }
+            if (instruction.kind == .store) try store_positions.append(allocator, position);
             position += 1;
         }
         try terminator_positions.append(allocator, position);
@@ -524,6 +530,19 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
     var forward_it = forward_values.iterator();
     while (forward_it.next()) |entry| try plan.forward_values.put(entry.key_ptr.*, entry.value_ptr.*);
     try recordPreservationDemands(&plan, intervals.items, preservation_barrier_positions.items);
+    // Loads can remain in RAX until their next use. Scalar stores also use RAX,
+    // so a loaded snapshot that survives a store needs a preservation slot even
+    // below peak register pressure. Assigned arithmetic registers do not.
+    for (store_positions.items) |store_position| {
+        var live_slots: usize = 0;
+        for (intervals.items) |interval| {
+            if (!loaded_values.contains(interval.name) or interval.start >= store_position or interval.end <= store_position) continue;
+            if (interval.class != .gpr32 and interval.class != .gpr64) continue;
+            live_slots += selectorSpillSlotCount(interval);
+            try plan.preservation_values.put(interval.name, {});
+        }
+        plan.preservation_spill_slots = @max(plan.preservation_spill_slots, live_slots);
+    }
     return plan;
 }
 

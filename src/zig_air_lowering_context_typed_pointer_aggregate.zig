@@ -416,9 +416,24 @@ pub fn lowerTypedFieldPtr(self: anytype, instruction: air_export.TypedInstructio
     if (aggregate_ptr.ty.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
     const result_type = parseZigType(instruction.result_type) orelse return air_model.LowerError.UnsupportedAir;
     if (result_type.ir_type != .ptr) return air_model.LowerError.UnsupportedAir;
-    const field_child = result_type.pointer_child orelse return air_model.LowerError.UnsupportedAir;
+    const field_child = result_type.pointer_child;
     const field_index = air_model.fieldIndex(instruction) orelse return air_model.LowerError.UnsupportedAir;
     if (try self.lowerTypedSyntheticUnionFieldPtr(instruction, result_type, field_index)) return;
+    if (air_model.typedInstOperandIndex(instruction.operands[0])) |base_index| {
+        if (base_index < self.synthetic_aggregate_slots.len and self.synthetic_aggregate_slots[base_index] != null) {
+            if (field_index >= 0 and instruction.index < self.synthetic_aggregate_field_ptrs.len) {
+                self.synthetic_aggregate_field_ptrs[instruction.index] = .{
+                    .slot_index = base_index,
+                    .field_index = @intCast(field_index),
+                };
+                self.values[instruction.index] = .{
+                    .ty = result_type,
+                    .value = .undef,
+                };
+                return;
+            }
+        }
+    }
     const source_ty = aggregate_ptr.ty.pointer_child;
     const offset_opt: ?u64 = blk: {
         if (instruction.operands.len > 0) {
@@ -432,8 +447,10 @@ pub fn lowerTypedFieldPtr(self: anytype, instruction: air_export.TypedInstructio
             }
         }
         if (source_ty) |known_source_ty| {
-            if (aggregateFieldByteOffset(known_source_ty, field_child, field_index)) |offset| {
-                if (offset >= 0) break :blk @intCast(offset);
+            if (field_child) |fc| {
+                if (aggregateFieldByteOffset(known_source_ty, fc, field_index)) |offset| {
+                    if (offset >= 0) break :blk @intCast(offset);
+                }
             }
         }
         break :blk null;
@@ -472,6 +489,16 @@ pub fn lowerTypedFieldPtr(self: anytype, instruction: air_export.TypedInstructio
                 .ty = result_type,
                 .value = aggregate_ptr.value,
             };
+            if (pointerChildText(instruction.result_type)) |opt_text| {
+                if (std.mem.startsWith(u8, opt_text, "?")) {
+                    if (instruction.index < self.synthetic_optional_ptrs.len) {
+                        self.synthetic_optional_ptrs[instruction.index] = .{
+                            .base_ptr = aggregate_ptr.value,
+                            .optional_type_text = opt_text,
+                        };
+                    }
+                }
+            }
             return;
         }
         var base_ptr = aggregate_ptr.value;
@@ -515,18 +542,39 @@ pub fn lowerTypedFieldPtr(self: anytype, instruction: air_export.TypedInstructio
             .ty = result_type,
             .value = .{ .named = result_name },
         };
+        if (pointerChildText(instruction.result_type)) |opt_text| {
+            if (std.mem.startsWith(u8, opt_text, "?")) {
+                if (instruction.index < self.synthetic_optional_ptrs.len) {
+                    self.synthetic_optional_ptrs[instruction.index] = .{
+                        .base_ptr = .{ .named = result_name },
+                        .optional_type_text = opt_text,
+                    };
+                }
+            }
+        }
         return;
     }
 
-    if (field_index == 0 and isPlainFieldPointerChild(field_child)) {
+    const field_child_non_null = field_child orelse return air_model.LowerError.UnsupportedAir;
+    if (field_index == 0 and isPlainFieldPointerChild(field_child_non_null)) {
         self.values[instruction.index] = .{
             .ty = result_type,
             .value = aggregate_ptr.value,
         };
+        if (pointerChildText(instruction.result_type)) |opt_text| {
+            if (std.mem.startsWith(u8, opt_text, "?")) {
+                if (instruction.index < self.synthetic_optional_ptrs.len) {
+                    self.synthetic_optional_ptrs[instruction.index] = .{
+                        .base_ptr = aggregate_ptr.value,
+                        .optional_type_text = opt_text,
+                    };
+                }
+            }
+        }
         return;
     }
 
-    if (!isPlainFieldPointerChild(field_child)) return air_model.LowerError.UnsupportedAir;
+    if (!isPlainFieldPointerChild(field_child_non_null)) return air_model.LowerError.UnsupportedAir;
     const known_source_ty = source_ty orelse return air_model.LowerError.UnsupportedAir;
 
     const result_name = try self.resultName(instruction.index);
@@ -546,6 +594,16 @@ pub fn lowerTypedFieldPtr(self: anytype, instruction: air_export.TypedInstructio
         .ty = result_type,
         .value = .{ .named = result_name },
     };
+    if (pointerChildText(instruction.result_type)) |opt_text| {
+        if (std.mem.startsWith(u8, opt_text, "?")) {
+            if (instruction.index < self.synthetic_optional_ptrs.len) {
+                self.synthetic_optional_ptrs[instruction.index] = .{
+                    .base_ptr = .{ .named = result_name },
+                    .optional_type_text = opt_text,
+                };
+            }
+        }
+    }
 }
 
 pub fn lowerTypedSyntheticUnionFieldPtr(

@@ -630,6 +630,7 @@ pub fn categoryForOpcode(opcode: []const u8) InstructionCategory {
     }
     if (std.mem.eql(u8, opcode, "ret") or
         std.mem.eql(u8, opcode, "ret_safe") or
+        std.mem.eql(u8, opcode, "ret_load") or
         std.mem.eql(u8, opcode, "unreach"))
     {
         return .return_op;
@@ -642,12 +643,15 @@ pub fn categoryForOpcode(opcode: []const u8) InstructionCategory {
         return .call;
     }
     if (std.mem.eql(u8, opcode, "alloc") or
+        std.mem.eql(u8, opcode, "ret_ptr") or
         std.mem.eql(u8, opcode, "load") or
         std.mem.eql(u8, opcode, "atomic_load") or
         std.mem.eql(u8, opcode, "store") or
         std.mem.eql(u8, opcode, "store_safe") or
         std.mem.eql(u8, opcode, "atomic_store_monotonic") or
         std.mem.eql(u8, opcode, "atomic_store_unordered") or
+        std.mem.eql(u8, opcode, "atomic_store_release") or
+        std.mem.eql(u8, opcode, "atomic_store_seq_cst") or
         std.mem.eql(u8, opcode, "memcpy") or
         std.mem.eql(u8, opcode, "memmove") or
         std.mem.eql(u8, opcode, "memset") or

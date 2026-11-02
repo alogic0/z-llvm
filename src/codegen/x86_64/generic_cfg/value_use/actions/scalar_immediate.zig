@@ -58,7 +58,7 @@ pub fn isImmediateRhsScalar(binary: ir.BinaryInst) bool {
         .lshr => bits <= 32 or bits == 64,
         .shl, .ashr => bits <= 32 or bits == 64,
         .@"and", .@"or", .add, .sub, .xor => bits <= 64,
-        .mul => bits <= 32,
+        .mul => bits <= 64,
         else => false,
     };
 }
@@ -293,7 +293,7 @@ fn classifyImmediateRhsSemantic(
             .r06_wide_scratch_immediate
         else
             .r05_wide_accumulator_immediate,
-        .mul => if (bits <= 32)
+        .mul => if (bits <= 64)
             .r04_narrow_accumulator_immediate
         else
             error.ValueUseImmediateScalarWidthUnsupported,
@@ -820,16 +820,20 @@ fn executeImmediateR04R06(
                 return immediateScalarRequestError(Authority, transaction, source_index, err) },
         );
         try failImmediateScalarForTest(transaction, .after_first_instruction);
-        try emitImmediateWrite(transaction, .{ .binary_arg_rax = .{
-            .op = switch (action.operation) {
-                .@"and" => .@"and",
-                .@"or" => .@"or",
-                .add => .add,
-                .xor => .xor,
-                else => unreachable,
-            },
-            .reg = .rcx,
-        } });
+        if (action.operation == .mul) {
+            try emitImmediateWrite(transaction, .{ .imul_rax_arg64 = .rcx });
+        } else {
+            try emitImmediateWrite(transaction, .{ .binary_arg_rax = .{
+                .op = switch (action.operation) {
+                    .@"and" => .@"and",
+                    .@"or" => .@"or",
+                    .add => .add,
+                    .xor => .xor,
+                    else => unreachable,
+                },
+                .reg = .rcx,
+            } });
+        }
         try failImmediateScalarForTest(transaction, .after_second_instruction);
     }
     try finishImmediateAccumulatorResult(

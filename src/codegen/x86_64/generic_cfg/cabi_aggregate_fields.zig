@@ -114,7 +114,7 @@ pub fn aggregateGepByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, 
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
         };
         if (offset < 0) return null;
-        return @intCast(offset);
+        return std.math.cast(u64, offset);
     }
     if (isScalarElementGepType(gep.source_ty) and gep.indices.items.len == 1 and gep.indices.items[0].ty.eql(.{ .int = 64 })) {
         const index = switch (gep.indices.items[0].value) {
@@ -122,8 +122,12 @@ pub fn aggregateGepByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, 
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
         };
         if (index < 0) return null;
-        const element_size = layout.typeStoreSizeBytes(gep.source_ty) catch return null;
-        return @intCast(@as(u128, @intCast(index)) * element_size);
+        const size = layout.typeStoreSizeBytes(gep.source_ty) catch return null;
+        const alignment_bits = layout.typeAbiAlignmentBits(gep.source_ty) catch return null;
+        const alignment = @max(@as(u64, 1), (@as(u64, alignment_bits) + 7) / 8);
+        const stride = std.mem.alignForward(u64, size, alignment);
+        const unsigned_index = std.math.cast(u64, index) orelse return null;
+        return std.math.mul(u64, unsigned_index, stride) catch null;
     }
     _ = aggregate_ty;
     if (isAggregateType(gep.source_ty) and gep.indices.items.len >= 2 and
@@ -139,7 +143,7 @@ pub fn aggregateGepByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, 
             };
             if (field_index < 0 or field_index > std.math.maxInt(usize)) return null;
             const offset = type_layout.fieldByteOffset(layout, current_ty, @intCast(field_index)) orelse return null;
-            byte_offset += offset;
+            byte_offset = std.math.add(u64, byte_offset, offset) catch return null;
             current_ty = type_layout.fieldType(current_ty, @intCast(field_index)) orelse return null;
         }
         return byte_offset;

@@ -96,6 +96,7 @@ test "value-use ordinary load errors preserve source-home classification and pro
     const Case = struct {
         name: []const u8,
         loc: ValueLoc,
+        bits: u16 = 16,
         expected_error: Transaction.LoadRequestError,
         diagnostic: []const u8,
     };
@@ -127,6 +128,7 @@ test "value-use ordinary load errors preserve source-home classification and pro
         .{
             .name = "gpr-pointer",
             .loc = .{ .arg64 = .rdi },
+            .bits = 48,
             .expected_error = error.ValueUseLoadOrdinaryPointerWidth,
             .diagnostic = "composed-block-load-ptr-width",
         },
@@ -139,7 +141,8 @@ test "value-use ordinary load errors preserve source-home classification and pro
     };
 
     for (cases) |case| {
-        var machine = MachineFunction.init(case.name, .{ .int = 16 });
+        const bits = case.bits;
+        var machine = MachineFunction.init(case.name, .{ .int = bits });
         defer machine.deinit(std.testing.allocator);
         var plan = SelectorAllocationPlan.init(std.testing.allocator);
         defer plan.deinit();
@@ -153,7 +156,7 @@ test "value-use ordinary load errors preserve source-home classification and pro
         defer transaction.deinit();
         const action = try transaction.register(loadActionRequest(
             "pointer",
-            .{ .load_scalar = .{ .kind = .ordinary, .bits = 16 } },
+            .{ .load_scalar = .{ .kind = .ordinary, .bits = bits } },
         ));
         try std.testing.expectError(case.expected_error, transaction.seal());
         try std.testing.expect(transaction.failedRequestIs(action));
@@ -215,6 +218,12 @@ test "value-use dormant scalar load actions consume accepted source homes intern
             .loc = .{ .arg64 = .rdi },
             .action = .{ .kind = .ordinary, .bits = 32 },
             .instructions = &.{.{ .load_arg_ptr_eax = .rdi }},
+        },
+        .{
+            .name = "pointer-u16",
+            .loc = .{ .arg64 = .rdi },
+            .action = .{ .kind = .ordinary, .bits = 16 },
+            .instructions = &.{.{ .load_arg_ptr_disp8_u16_eax = .{ .reg = .rdi, .offset = 0 } }},
         },
         .{
             .name = "pointer-spill",
