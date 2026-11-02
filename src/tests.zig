@@ -1,6 +1,7 @@
 const std = @import("std");
 
 comptime {
+    _ = @import("air_export_cache.zig");
     _ = @import("tests/correctness_checkpoint_native.zig");
     _ = @import("tests/composed_byte_loops.zig");
     _ = @import("tests/composed_memcpy.zig");

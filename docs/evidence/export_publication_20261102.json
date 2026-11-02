@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "date": "2026-11-02",
+  "status": "focused checks pass; cumulative Tier 3 pending",
+  "scope": "Atomic, nonduplicating AIR export publication; no compiler instruction-semantics or candidate-selection changes",
+  "metadata_contract": "write schema 4, read schema 3 or 4; generation/content-named immutable payload; atomic metadata commit",
+  "focused_tests": 8,
+  "native_cache_probe": {
+    "mode": "ReleaseFast",
+    "schema": 3,
+    "status": "hit",
+    "rows_lowered": 1,
+    "objects": 1,
+    "links": 1,
+    "executions": 0,
+    "log": "local-state/validations/export-execution-20261102/legacy-cache-probe-absolute.log"
+  },
+  "source_sha256": {
+    "src/air_export_cache.zig": "333f7ddf1b82537d7802116adb67660f0f314e7f0c06fa552d1a39b51aca280f",
+    "src/distribution_real_rows_gate.zig": "bf0d49858890884d88269fd3731334c81115c072854ad9c7a6499de9996053b2",
+    "src/tests.zig": "1512907a68fff76e6d58daef1f90d41eca678dbaf55151c04e348f6e7b988ff4"
+  },
+  "checks": [
+    {
+      "command": [
+        "zig",
+        "test",
+        "src/air_export_cache.zig"
+      ],
+      "log": "local-state/validations/export-execution-20261102/publication-unit-final.log",
+      "returncode": 0
+    },
+    {
+      "command": [
+        "env",
+        "ZLLVM_REAL_ROWS_PRUNING=suspended",
+        "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+        "zig",
+        "run",
+        "-OReleaseFast",
+        "src/distribution_real_rows_gate.zig",
+        "--",
+        "--mode=ReleaseFast",
+        "--limit=1",
+        "--require-cache-hit",
+        "--export-cache-root=local-state/caches/current-pin-acceptance-20261102-r2/ReleaseFast/export"
+      ],
+      "log": "local-state/validations/export-execution-20261102/legacy-cache-probe-absolute.log",
+      "returncode": 0
+    }
+  ],
+  "required_acceptance": "After the authorized execution/program slices, run one full fresh/cache pair against unchanged relevant sources and compare canonical records. No cleanup wrapper may delete raw AIR files during measurement.",
+  "archives_created": 0
+}

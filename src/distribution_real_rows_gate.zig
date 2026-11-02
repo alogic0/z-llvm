@@ -7,6 +7,7 @@ const ir = @import("ir.zig");
 const target = @import("target.zig");
 const helpers = @import("uncurated_air_gate_helpers.zig");
 const execution_cohort = @import("distribution_execution_cohort_v1.zig");
+const export_cache = @import("air_export_cache.zig");
 
 const selector_version = "real-candidate-selector-v3";
 const default_candidate_path = "docs/evidence/real_candidates_release_v3.tsv";
@@ -914,9 +915,10 @@ fn loadOrExportDescriptor(
     errdefer allocator.free(descriptor);
     if (!try descriptorLooksValid(allocator, descriptor, mode, candidates)) {
         try printCacheEvent(stdout, mode, "export-invalid", duration_ms, &cache_key, descriptor.len);
+        allocator.free(descriptor);
         return null;
     }
-    try storeCachedDescriptor(allocator, io, selected_export_cache_root, &cache_key, cache_key_text, ziglang_pin, mode, descriptor);
+    try storeCachedDescriptor(allocator, io, selected_export_cache_root, &cache_key, cache_key_text, ziglang_pin, mode, descriptor_path, descriptor);
     try printCacheEvent(stdout, mode, if (options.fresh_export) "fresh-export" else "miss-export", duration_ms, &cache_key, descriptor.len);
     return descriptor;
 }
@@ -932,19 +934,22 @@ fn loadCachedDescriptor(
 ) !?[]u8 {
     const meta_path = try cachePath(allocator, selected_export_cache_root, cache_key, ".meta");
     defer allocator.free(meta_path);
-    const descriptor_path = try cachePath(allocator, selected_export_cache_root, cache_key, ".air");
-    defer allocator.free(descriptor_path);
-
     const meta = std.Io.Dir.cwd().readFileAlloc(io, meta_path, allocator, .limited(64 * 1024)) catch return null;
     defer allocator.free(meta);
     if (!metadataMatches(meta, cache_key, cache_key_text)) return null;
+    const payload_name = export_cache.payloadName(allocator, cache_key, meta) catch return null;
+    defer allocator.free(payload_name);
+    const descriptor_path = try std.fs.path.join(allocator, &.{ selected_export_cache_root, payload_name });
+    defer allocator.free(descriptor_path);
 
     const descriptor = std.Io.Dir.cwd().readFileAlloc(io, descriptor_path, allocator, .limited(2 * 1024 * 1024 * 1024)) catch return null;
-    errdefer allocator.free(descriptor);
+    var accepted = false;
+    defer if (!accepted) allocator.free(descriptor);
     const expected_hash = metadataValue(meta, "descriptor_sha256") orelse return null;
     const actual_hash = sha256Hex(descriptor);
     if (!std.mem.eql(u8, expected_hash, &actual_hash)) return null;
     if (!try descriptorLooksValid(allocator, descriptor, mode, candidates)) return null;
+    accepted = true;
     return descriptor;
 }
 
@@ -956,29 +961,27 @@ fn storeCachedDescriptor(
     cache_key_text: []const u8,
     ziglang_pin: []const u8,
     mode: Mode,
+    raw_path: []const u8,
     descriptor: []const u8,
 ) !void {
     var cwd = std.Io.Dir.cwd();
     try cwd.createDirPath(io, selected_export_cache_root);
-    const descriptor_path = try cachePath(allocator, selected_export_cache_root, cache_key, ".air");
-    defer allocator.free(descriptor_path);
-    const meta_path = try cachePath(allocator, selected_export_cache_root, cache_key, ".meta");
-    defer allocator.free(meta_path);
+    var cache_dir = try cwd.openDir(io, selected_export_cache_root, .{ .iterate = true, .follow_symlinks = false });
+    defer cache_dir.close(io);
 
     const descriptor_hash = sha256Hex(descriptor);
     const meta = try std.fmt.allocPrint(
         allocator,
-        "schema=3\ncache_key={s}\nziglang_pin={s}\nmode={s}\ndescriptor_sha256={s}\nkey_begin\n{s}key_end\n",
+        "schema=4\ncache_key={s}\nziglang_pin={s}\nmode={s}\ndescriptor_sha256={s}\nkey_begin\n{s}key_end\n",
         .{ cache_key, ziglang_pin, mode.name(), &descriptor_hash, cache_key_text },
     );
     defer allocator.free(meta);
-    try cwd.writeFile(io, .{ .sub_path = descriptor_path, .data = descriptor });
-    try cwd.writeFile(io, .{ .sub_path = meta_path, .data = meta });
+    _ = try export_cache.publish(allocator, io, cwd, raw_path, cache_dir, cache_key, meta, descriptor);
 }
 
 fn metadataMatches(meta: []const u8, cache_key: *const [64]u8, cache_key_text: []const u8) bool {
     const schema = metadataValue(meta, "schema") orelse return false;
-    if (!std.mem.eql(u8, schema, "3")) return false;
+    if (!std.mem.eql(u8, schema, "3") and !std.mem.eql(u8, schema, "4")) return false;
     const stored_key = metadataValue(meta, "cache_key") orelse return false;
     if (!std.mem.eql(u8, stored_key, cache_key)) return false;
     const key_begin = std.mem.indexOf(u8, meta, "key_begin\n") orelse return false;
@@ -1010,16 +1013,15 @@ fn pruneOldPinCacheEntries(allocator: std.mem.Allocator, io: std.Io, selected_ex
         const stem = entry.name[0 .. entry.name.len - ".meta".len];
         const meta_path = try std.fmt.allocPrint(allocator, "{s}/{s}.meta", .{ selected_export_cache_root, stem });
         defer allocator.free(meta_path);
-        const air_path = try std.fmt.allocPrint(allocator, "{s}/{s}.air", .{ selected_export_cache_root, stem });
-        defer allocator.free(air_path);
-
         const meta = std.Io.Dir.cwd().readFileAlloc(io, meta_path, allocator, .limited(64 * 1024)) catch continue;
         defer allocator.free(meta);
         const pin = metadataValue(meta, "ziglang_pin") orelse continue;
         if (std.mem.eql(u8, pin, current_pin)) continue;
+        const payload_name = export_cache.payloadName(allocator, stem, meta) catch continue;
+        defer allocator.free(payload_name);
 
         std.Io.Dir.cwd().deleteFile(io, meta_path) catch {};
-        std.Io.Dir.cwd().deleteFile(io, air_path) catch {};
+        cache_dir.deleteFile(io, payload_name) catch {};
     }
 }
 

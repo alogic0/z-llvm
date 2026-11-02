@@ -12,7 +12,9 @@ The bounded refactors, memset capability,
 [loop-memory repair slice](evidence/loops_memory_repair.md), and
 [cyclic byte-vector transfer slice](evidence/cyclic_byte_transfers.md) are complete.
 The accepted checkpoint uses tracked Zig 0.17.0 and executes an unchanged upstream
-program. Export-cache publication and broader execution coverage are the next work.
+program. Broader execution coverage is the next work; the export publication
+repair is implemented with focused checks and awaits the combined integration
+checkpoint.
 The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
 backend for selected Zig inputs. It does not yet provide a complete LLVM
 replacement or a self-hosting Zig backend.
@@ -33,6 +35,17 @@ replacement or a self-hosting Zig backend.
 Both text and AIR adapters can construct project IR. They do **not** currently
 follow one identical optimize-and-emit route. Case/semantic-descriptor writers
 also remain separate integration adapters; they are not general Zig frontends.
+
+The [AIR export cache](../src/air_export_cache.zig) publishes schema-4 metadata
+atomically after transferring a verified run-owned payload into an immutable
+generation-and-content-named file. Same-filesystem publication renames the
+original file; cross-filesystem publication removes the raw copy after commit.
+Failed metadata commits restore run ownership and leave the previous committed
+payload intact. Readers retain schema-3 compatibility and authenticate payload
+hashes. Cache identity still binds the emitter, source authority, mode, target,
+arguments and closed environment; publication does not cache executions or
+change the frozen candidate selection. This is validation infrastructure rather
+than a change to LLVM instruction semantics.
 
 ## Actual execution routes
 
