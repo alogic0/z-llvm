@@ -87,10 +87,16 @@ pub fn build(b: *std.Build) void {
     addToolStep(b, "byte-loops-diff", "Execute checked strncpy and scalar byte loops against LLVM", "tools/run_byte_loops_diff.zig");
     addToolStep(b, "memcpy-diff", "Execute retained checked memcpy and compositions against LLVM", "tools/run_memcpy_diff.zig");
     addToolStepWithArgs(b, "behavioral-diff", "Execute composed programs against an independent LLVM reference", "tools/run_behavioral_diff.zig");
+    const real_program_run = b.addSystemCommand(&.{ "python3", "tools/run_real_program.py" });
+    real_program_run.step.dependOn(b.getInstallStep());
+    real_program_run.addPassthruArgs();
+    b.step("real-program", "Compare an unchanged pinned upstream Zig program with local optimizer and codegen").dependOn(&real_program_run.step);
     addToolStepWithArgs(b, "check-docs", "Validate current documentation links and accepted status", "tools/check_project_docs.zig");
     addToolStep(b, "check-zig-stage4-emitter", "Check the authoritative Zig stage4 emitter", "tools/check_zig_stage4_emitter.zig");
     addToolStep(b, "focused-codegen-canaries", "Run procedural fma and __multi3 codegen canaries (non-gating)", "tools/run_focused_codegen_canaries.zig");
     addToolStepWithArgs(b, "real-candidates-v2", "Build the mode-stable real-row candidate denominator", "tools/build_real_candidates_v2.zig");
+    const real_policy_tests = b.addSystemCommand(&.{ "python3", "-m", "unittest", "discover", "-s", "tools", "-p", "test_real_*.py" });
+    b.step("real-program-policy-tests", "Check candidate admission and object provenance negative controls").dependOn(&real_policy_tests.step);
     const derive_real_candidate_definition_run = b.addSystemCommand(&.{
         b.graph.zig_exe,
         "run",

@@ -126,6 +126,20 @@ The original 29 exact-result checks and 8,192 seeded LLVM-paired observations
 pass. Two FMA stream/byte identities move together; the helper and `__multi3`
 identities stay fixed, and the production mismatch negative still rejects.
 
+Direct C variadic calls currently admit exactly one fixed pointer argument,
+an i32 result, and no unnamed arguments. The composed caller preserves live
+values, materializes ordinary global addresses, and sets AL to zero immediately
+before the call, matching LLVM `X86ISelLoweringCall.cpp`'s vector-register count.
+Unsupported variadic forms cannot enter legacy or structural callers.
+
+`instcombine` folds direct `strlen` of complete private constant byte strings,
+following LLVM `Transforms/Utils/SimplifyLibCalls.cpp::optimizeStrLen` and
+`optimizeStringLength`. Mutable/interposable data, unknown pointers, missing
+terminators and `nobuiltin` retain calls. Constant flagged truncations fold only
+when each unsigned/signed promise holds, matching LLVM constant-folding rules.
+The accepted release pipeline runs CFG and instruction cleanup again after
+these folds so newly constant safety branches disappear before codegen.
+
 ## What the evidence establishes
 
 | Check | Population and path | Limit of the claim |

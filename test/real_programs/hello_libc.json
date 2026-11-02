@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "source": "test/standalone/simple/hello_world/hello_libc.zig",
+  "source_sha256": "74b71b65dc50361ea9a1385261d8d203318143874c3d2ffa6679bf0aaba2ccf7",
+  "target": "x86_64-linux-gnu",
+  "cpu": "baseline",
+  "modes": ["ReleaseFast", "ReleaseSafe", "ReleaseSmall"],
+  "stdout": "Hello, world!\n",
+  "exit_status": 0,
+  "local_pipeline": "preopt",
+  "remaining_dependencies": ["libLLVM IR construction", "system linker and CRT", "libc"]
+}

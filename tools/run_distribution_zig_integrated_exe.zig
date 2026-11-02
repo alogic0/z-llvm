@@ -295,6 +295,15 @@ pub fn main(init: std.process.Init) !void {
     try @import("run_memset_diff.zig").run(init);
     try @import("run_memcpy_diff.zig").run(init);
     try @import("run_byte_loops_diff.zig").run(init);
+    const program_root = try temp.join(allocator, "unchanged-hello-libc");
+    defer allocator.free(program_root);
+    const program_arg = try std.fmt.allocPrint(allocator, "--output-root={s}", .{program_root});
+    defer allocator.free(program_arg);
+    const program_result = try common.runCapture(allocator, io, &.{ "python3", "tools/run_real_program.py", program_arg }, "unchanged upstream hello libc");
+    defer common.freeRunResult(allocator, program_result);
+    try stdout_writer.interface.writeAll(program_result.stdout);
+    try stdout_writer.interface.flush();
+    if (!common.termOk(program_result.term)) try common.forwardCommandFailure(io, "unchanged upstream hello libc", program_result);
 }
 
 fn emitAggregateSseSemanticObject(

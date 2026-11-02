@@ -135,8 +135,14 @@ them. Current members: the syscall hello (three modes), the compiler_rt
 i128 arithmetic program, the fma program, the setcc predicate program, the
 aggregate-SSE-return program, and the mandatory `abi-differential` gate over
 ten audited accepted compiler-rt functions in all three modes. The existing
-seven integrated-executable cases remain seven. Inside the i128 and fma cases,
-the mandatory runner directly uses the same production canary implementation
+seven integrated-executable cases remain seven.
+
+The integrated-executable runner also requires Zig's unchanged upstream
+`hello_libc.zig` in all three release modes through the local preopt optimizer
+and object emitter. Its one-program/three-mode paired executions form a separate
+population from the original seven cases and the compiler-core cohort.
+
+Inside the i128 and fma cases, the mandatory runner directly uses the same production canary implementation
 as the standalone focused tool to require the frozen __multi3 and fma machine
 streams, exact symbol bytes, fma ldexp/add_and_denorm helper identities, and
 executable proofs. A mandatory mismatch negative invokes that fixed-hash

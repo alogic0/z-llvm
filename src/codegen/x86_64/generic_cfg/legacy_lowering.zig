@@ -8,6 +8,7 @@ pub fn tryLower(
     machine: *machine_model.MachineFunction,
     function: ir.Function,
 ) !bool {
+    if (@import("../sysv_abi.zig").functionHasVariadicCall(function)) return false;
     if (legacy_envelopes.matchesMuloLimb64Envelope(function)) {
         try machine.instructions.append(allocator, .mulo_limb64_rdi_rsi_rdx_cl_r8w_al);
         return true;

@@ -178,6 +178,8 @@ test "Zig mode pipelines expand to stable pass and placeholder sequences" {
         "verify",
         "simplifycfg",
         "instcombine",
+        "simplifycfg",
+        "instcombine",
         "dce",
         "verify",
     };

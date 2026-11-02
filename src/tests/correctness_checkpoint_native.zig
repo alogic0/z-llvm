@@ -360,6 +360,74 @@ test "current pin ABI executes unsigned i32 return bit patterns" {
     }
 }
 
+test "current pin program constant string lengths execute after instcombine" {
+    const cases = [_]struct { text: []const u8, count: usize, length: u64 }{
+        .{ .text = "c\"\\00\"", .count = 1, .length = 0 },
+        .{ .text = "c\"ABC\\00\"", .count = 4, .length = 3 },
+        .{ .text = "c\"A\\00BC\"", .count = 4, .length = 1 },
+        .{ .text = "c\"Hello, world!\\0A\\00\"", .count = 15, .length = 14 },
+        .{ .text = "c\"\\FF\\22\\5C\\00\"", .count = 4, .length = 3 },
+    };
+    for (cases) |case| {
+        const source = try std.fmt.allocPrint(std.testing.allocator, "target triple = \"x86_64-unknown-linux-gnu\"\n@bytes = private constant [{} x i8] {s}\ndeclare i64 @strlen(ptr)\ndefine i64 @length() {{\nentry:\n  %n = call i64 @strlen(ptr @bytes)\n  ret i64 %n\n}}\n", .{ case.count, case.text });
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        var context: @import("../pass_manager.zig").Context = .{ .allocator = std.testing.allocator };
+        try std.testing.expectEqual(@import("../pass_manager.zig").PassResult.changed, try @import("../passes/instcombine.zig").pass.run(&module, &context));
+        try module.verify();
+        const code = try Native.init(module);
+        defer code.deinit();
+        const length: *const fn () callconv(.c) u64 = @ptrCast(code.mapping.ptr);
+        try std.testing.expectEqual(case.length, length());
+    }
+}
+
+test "current pin program strlen fold rejects mutable interposable unterminated and nobuiltin inputs" {
+    const cases = [_][]const u8{
+        "@bytes = private global [4 x i8] c\"ABC\\00\"",
+        "@bytes = constant [4 x i8] c\"ABC\\00\"",
+        "@bytes = private constant [4 x i8] c\"ABCD\"",
+        "@bytes = private constant [4 x i8] c\"ABC\\00\"\nattributes #0 = { nobuiltin }",
+        "@bytes = private constant [4 x i8] c\"ABC\\00\"\ndefine i64 @strlen(ptr %p) {\nentry:\n  ret i64 37\n}",
+    };
+    for (cases) |globals| {
+        const source = try std.fmt.allocPrint(std.testing.allocator, "target triple = \"x86_64-unknown-linux-gnu\"\n{s}\ndeclare i64 @strlen(ptr)\ndefine i64 @length() {{\nentry:\n  %n = call i64 @strlen(ptr @bytes)\n  ret i64 %n\n}}\n", .{globals});
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        const caller = module.functions.items[module.functions.items.len - 1];
+        try std.testing.expectEqual(@as(?ir.Value, null), @import("../passes/constant_string_length.zig").fold(module, caller.blocks.items[0].instructions.items[0]));
+    }
+}
+
+test "current pin program flagged truncations fold only when their promises hold" {
+    const cases = [_]struct { flags: []const u8, value: []const u8, result: ?u32 }{
+        .{ .flags = "nuw", .value = "4294967295", .result = 0xffffffff },
+        .{ .flags = "nuw", .value = "4294967296", .result = null },
+        .{ .flags = "nsw", .value = "-1", .result = 0xffffffff },
+        .{ .flags = "nsw", .value = "2147483648", .result = null },
+        .{ .flags = "nuw nsw", .value = "2147483647", .result = 0x7fffffff },
+        .{ .flags = "nuw nsw", .value = "2147483648", .result = null },
+    };
+    for (cases) |case| {
+        const source = try std.fmt.allocPrint(std.testing.allocator, "define i32 @narrow() {{\nentry:\n  %v = trunc {s} i64 {s} to i32\n  ret i32 %v\n}}\n", .{ case.flags, case.value });
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        const folded = @import("../passes/inst_simplify.zig").simplify(module.functions.items[0].blocks.items[0].instructions.items[0]);
+        if (case.result) |expected| {
+            try std.testing.expectEqual(@as(i128, expected), (folded orelse return error.TestExpectedEqual).int);
+            var context: @import("../pass_manager.zig").Context = .{ .allocator = std.testing.allocator };
+            _ = try @import("../passes/instcombine.zig").pass.run(&module, &context);
+            const code = try Native.init(module);
+            defer code.deinit();
+            const narrow: *const fn () callconv(.c) u32 = @ptrCast(code.mapping.ptr);
+            try std.testing.expectEqual(expected, narrow());
+        } else try std.testing.expect(folded == null);
+    }
+}
+
 test "current pin ABI executes unsigned i64 immediate comparisons at boundaries" {
     const bounds = [_]u64{ 0, 1, 0x7fffffff, 0x80000000, 0x7fffffffffffffff, 0x8000000000000000, 0xffffffffffffffff };
     for (bounds) |bound| {

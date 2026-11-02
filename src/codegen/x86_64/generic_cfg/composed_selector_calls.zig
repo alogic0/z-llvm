@@ -85,6 +85,7 @@ fn isColdAssumeBundle(bundle: []const u8) bool {
 
 pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     if (call.isDebugVariableLocation()) return null;
+    if (sysv_abi.isVariadicCall(call)) try sysv_abi.rejectUnsupportedCallSignature(call);
     if (std.mem.eql(u8, call.callee, "llvm.experimental.noalias.scope.decl"))
         return if (result == null and intrinsic_attrs.isNoAliasScopeDecl(call)) null else .{ .no_emitter = "composed-block-noalias-scope-decl" };
     if (call.inline_asm != null) return lowerFpBarrier(selector, result, call);
@@ -127,7 +128,9 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64") or
         std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64")) return try lowerInlineMemcpy(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.memmove.p0.p0.i64")) return try lowerInlineMemmove(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "strlen")) return try lowerInlineStrlen(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "strlen") and
+        !(call.args.items.len == 1 and ordinaryGlobalArgument(selector, call.args.items[0].value) != null))
+        return try lowerInlineStrlen(selector, result, call);
     if (std.mem.eql(u8, call.callee, "strnlen")) return try lowerInlineStrnlen(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .add);
     if (std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .sub);
@@ -163,6 +166,11 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
 
     const needs_alignment = selector.stack_frame_bytes == 0;
     if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
+    if (sysv_abi.isVariadicCall(call)) {
+        // Caller values are already preserved and the pointer is in RDI.
+        // MOV leaves condition flags unchanged and supplies the SysV AL count.
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = 0 });
+    }
     if (transaction != null)
         try selector_state.emitEflagsInstruction(selector, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } }, .clobber)
     else
@@ -1426,8 +1434,25 @@ pub fn ownedInternalValueName(selector: *ComposedBlockSelector, result_name: []c
     return name;
 }
 
+fn ordinaryGlobalArgument(selector: *ComposedBlockSelector, value: ir.Value) ?[]const u8 {
+    if (value != .named or !std.mem.startsWith(u8, value.named, "@")) return null;
+    const context = selector.module_context orelse return null;
+    const global = context.findGlobal(value.named) orelse return null;
+    if (global.address_attrs) |attrs| {
+        if (std.mem.indexOf(u8, attrs, "thread_local") != null or
+            std.mem.indexOf(u8, attrs, "addrspace") != null) return null;
+    }
+    return global.name;
+}
+
 pub fn lowerDirectCallArg(selector: *ComposedBlockSelector, arg: ir.CallArg, target: ArgReg) !?Diagnostic {
     if (arg.ty == .ptr) {
+        if (ordinaryGlobalArgument(selector, arg.value)) |symbol| {
+            try sysv_abi.rejectUnsupportedCallArgAttrs(arg);
+            try selector_state.clobberArgReg(selector, target);
+            try selector.machine.instructions.append(selector.allocator, .{ .lea_global_arg64 = .{ .reg = target, .symbol = symbol } });
+            return null;
+        }
         const loc = selector_state.resolveValue(selector, arg.value) orelse return .{ .unsupported_value = "composed-block-call-unknown-ptr-arg" };
         switch (loc) {
             .stack_scalar => |stack| {

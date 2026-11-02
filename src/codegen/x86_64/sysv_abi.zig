@@ -578,15 +578,42 @@ fn isAttributeGroupReference(attrs: []const u8) bool {
     return true;
 }
 
+pub fn isVariadicCall(call: ir.CallInst) bool {
+    return if (call.callee_function_ty) |ty| std.mem.indexOf(u8, ty, "...") != null else false;
+}
+
+pub fn functionHasVariadicCall(function: ir.Function) bool {
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (!inst.removed and inst.kind == .call and isVariadicCall(inst.kind.call)) return true;
+    };
+    return false;
+}
+
+// The first supported variadic envelope has one fixed pointer argument and
+// no unnamed arguments. It therefore passes zero vector registers in AL.
+// Wider prototypes need their own argument admission and executable proofs.
+pub fn isSupportedPointerVariadicCall(call: ir.CallInst) bool {
+    if (!isVariadicCall(call) or call.callee_value != null or call.inline_asm != null or
+        call.raw_args != null or call.operand_bundle != null or call.ret_attrs != null or
+        call.args.items.len != 1 or call.args.items[0].ty != .ptr or
+        !call.ret_ty.eql(.{ .int = 32 })) return false;
+    if (call.calling_conv) |cc| if (!std.mem.eql(u8, cc, "ccc")) return false;
+    rejectUnsupportedCallArgAttrs(call.args.items[0]) catch return false;
+    var ty = std.mem.trim(u8, call.callee_function_ty.?, " \t");
+    if (ty.len >= 2 and ty[0] == '(' and ty[ty.len - 1] == ')') ty = ty[1 .. ty.len - 1];
+    var fields = std.mem.splitScalar(u8, ty, ',');
+    if (!std.mem.eql(u8, std.mem.trim(u8, fields.next() orelse return false, " \t"), "ptr")) return false;
+    if (!std.mem.eql(u8, std.mem.trim(u8, fields.next() orelse return false, " \t"), "...")) return false;
+    return fields.next() == null;
+}
+
 pub fn rejectUnsupportedCallSignature(call: ir.CallInst) !void {
     if (call.calling_conv) |calling_conv| {
         if (!std.mem.eql(u8, calling_conv, "ccc") and !std.mem.eql(u8, calling_conv, "fastcc")) {
             return error.UnsupportedCallConvAbi;
         }
     }
-    if (call.callee_function_ty) |function_ty| {
-        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedVarargsAbi;
-    }
+    if (isVariadicCall(call) and !isSupportedPointerVariadicCall(call)) return error.UnsupportedVarargsAbi;
 }
 
 fn rejectUnsupportedAbiAttrPayload(attrs: []const u8) !void {
@@ -623,6 +650,7 @@ fn pointerCallAttrsAreAdvisory(attrs: []const u8) bool {
     while (tokens.next()) |token| {
         saw_attr = true;
         if (std.mem.eql(u8, token, "nonnull")) continue;
+        if (std.mem.eql(u8, token, "readonly")) continue;
         if (!std.mem.eql(u8, token, "align")) return false;
         const alignment_text = tokens.next() orelse return false;
         const alignment = std.fmt.parseUnsigned(u64, alignment_text, 10) catch return false;
@@ -858,6 +886,30 @@ test "SysV call signature helper rejects varargs and non-default callconv" {
         .args = .empty,
     };
     try std.testing.expectError(error.UnsupportedCallConvAbi, rejectUnsupportedCallSignature(callconv_call));
+}
+
+test "SysV variadic pointer envelope admits only a fixed pointer with no unnamed arguments" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\declare i32 @sink(ptr, ...)
+        \\define i32 @caller(ptr %p) {
+        \\entry:
+        \\  %r = call i32 (ptr, ...) @sink(ptr %p)
+        \\  ret i32 %r
+        \\}
+    );
+    defer module.deinit();
+    var call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try rejectUnsupportedCallSignature(call);
+    try std.testing.expect(isSupportedPointerVariadicCall(call));
+    try std.testing.expect(functionHasVariadicCall(module.functions.items[0]));
+    call.calling_conv = "fastcc";
+    try std.testing.expectError(error.UnsupportedVarargsAbi, rejectUnsupportedCallSignature(call));
+    call.calling_conv = null;
+    call.callee_function_ty = "(ptr, i32, ...)";
+    try std.testing.expectError(error.UnsupportedVarargsAbi, rejectUnsupportedCallSignature(call));
+    call.callee_function_ty = "(ptr, ...)";
+    call.ret_ty = .double;
+    try std.testing.expectError(error.UnsupportedVarargsAbi, rejectUnsupportedCallSignature(call));
 }
 
 test "SysV call envelope accepts attribute group references without hiding bundles" {

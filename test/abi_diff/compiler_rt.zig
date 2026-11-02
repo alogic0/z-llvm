@@ -9,6 +9,29 @@ const std = @import("std");
 const builtin = @import("builtin");
 const native_endian = builtin.cpu.arch.endian();
 
+// The pinned x86_64-linux cohort uses the upstream hard-float ABI adapters.
+comptime {
+    if (builtin.cpu.arch != .x86_64 or builtin.os.tag != .linux) @compileError("ABI cohort target is x86_64 Linux");
+    if (std.zig.target.compilerRtFloatAbi(&builtin.target, 16) != .hard or
+        std.zig.target.compilerRtFloatAbi(&builtin.target, 64) != .hard)
+        @compileError("ABI cohort requires the audited hard-float signatures");
+}
+const compiler_rt = struct {
+    pub const @"f16" = hardFloatAbi(f16);
+    pub const @"f64" = hardFloatAbi(f64);
+};
+fn hardFloatAbi(comptime Float: type) type {
+    return struct {
+        pub const Abi = Float;
+        pub inline fn toAbi(raw: Float) Abi {
+            return raw;
+        }
+        pub inline fn fromAbi(abi: Abi) Float {
+            return abi;
+        }
+    };
+}
+
 inline fn exportReal(comptime func: *const anyopaque, comptime name: []const u8) void {
     @export(func, .{ .name = name, .linkage = .weak, .visibility = .hidden });
 }
@@ -47,8 +70,8 @@ pub inline fn fneg(a: anytype) @TypeOf(a) {
     return @bitCast(negated);
 }
 
-fn __neghf2(a: f16) callconv(.c) f16 {
-    return fneg(a);
+fn __neghf2(a: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+    return compiler_rt.f16.toAbi(fneg(compiler_rt.f16.fromAbi(a)));
 }
 
 /// Allows to access underlying bits as two equally sized lower and higher
@@ -146,11 +169,19 @@ pub const mulo = struct {
 };
 
 pub const fabs = struct {
-    pub fn __fabsh(a: f16) callconv(.c) f16 {
+    pub fn __fabsh(a: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+        return compiler_rt.f16.toAbi(fabs_f16(compiler_rt.f16.fromAbi(a)));
+    }
+
+    pub fn fabs_f16(a: f16) f16 {
         return generic_fabs(a);
     }
 
-    pub fn fabs(a: f64) callconv(.c) f64 {
+    pub fn fabs(a: compiler_rt.f64.Abi) callconv(.c) compiler_rt.f64.Abi {
+        return compiler_rt.f64.toAbi(fabs_f64(compiler_rt.f64.fromAbi(a)));
+    }
+
+    pub fn fabs_f64(a: f64) f64 {
         return generic_fabs(a);
     }
 
@@ -166,7 +197,11 @@ pub const fabs = struct {
 pub const fmin = struct {
     const math = std.math;
 
-    pub fn fmin(x: f64, y: f64) callconv(.c) f64 {
+    pub fn fmin(x: compiler_rt.f64.Abi, y: compiler_rt.f64.Abi) callconv(.c) compiler_rt.f64.Abi {
+        return compiler_rt.f64.toAbi(fmin_f64(compiler_rt.f64.fromAbi(x), compiler_rt.f64.fromAbi(y)));
+    }
+
+    pub fn fmin_f64(x: f64, y: f64) f64 {
         return generic_fmin(f64, x, y);
     }
 

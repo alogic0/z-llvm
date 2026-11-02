@@ -86,6 +86,8 @@ const zig_release_accepted_passes = [_][]const u8{
     "verify",
     "simplifycfg",
     "instcombine",
+    "simplifycfg",
+    "instcombine",
     "dce",
     "verify",
 };

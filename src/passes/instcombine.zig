@@ -45,7 +45,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 
                 if (try rewriteWithContext(module.allocator, function, instruction, inserted_vectors, shuffled_vectors)) changed = true;
 
-                if (foldWithContext(instruction.*, inserted_vectors) orelse fold(instruction.*)) |replacement| {
+                if (@import("constant_string_length.zig").fold(module.*, instruction.*) orelse foldWithContext(instruction.*, inserted_vectors) orelse fold(instruction.*)) |replacement| {
                     instruction.removed = true;
                     instruction.replacement = replacement;
                     const result = instruction.result orelse return error.InstructionWithoutResult;

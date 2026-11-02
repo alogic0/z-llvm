@@ -304,11 +304,22 @@ fn foldSignedDivRem(binary: ir.BinaryInst, mode: DivRem) ?ir.Value {
 }
 
 fn simplifyCast(cast: ir.CastInst) ?ir.Value {
-    if (cast.flags.any()) return null;
     if (cast.value != .int) return null;
     const from_bits = intBits(cast.from_ty) orelse return null;
     const to_bits = intBits(cast.to_ty) orelse return null;
     if (from_bits >= 128 or to_bits >= 128) return null;
+    if (cast.flags.any()) {
+        if (cast.op != .trunc or cast.flags.nneg or from_bits > 64 or to_bits == 0 or to_bits >= from_bits) return null;
+        const original = lowBits(cast.value.int, from_bits);
+        const narrowed = lowBits(original, to_bits);
+        if (cast.flags.nuw and original != narrowed) return null;
+        if (cast.flags.nsw) {
+            const before = (signExtendConstant(original, from_bits) orelse return null).int;
+            const after = (signExtendConstant(narrowed, to_bits) orelse return null).int;
+            if (before != after) return null;
+        }
+        return .{ .int = narrowed };
+    }
 
     return switch (cast.op) {
         .trunc => truncateConstant(cast.value.int, to_bits),

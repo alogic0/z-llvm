@@ -15,14 +15,15 @@ readonly objdump="${LLVM_OBJDUMP:-/usr/lib/llvm-22/bin/llvm-objdump}"
 readonly readelf="${LLVM_READELF:-/usr/lib/llvm-22/bin/llvm-readelf}"
 readonly linker="${ABI_DIFF_LINKER:-cc}"
 readonly timeout_bin="${TIMEOUT:-/usr/bin/timeout}"
-readonly zig_pin="${ZIG_PIN:-bdee02bc0c7f227c0f11bc9a449df673fe803540}"
-readonly zig_version="${ZIG_VERSION:-0.17.0-dev.364+bdee02bc0}"
+source test/abi_diff/reference_identity.env
+readonly zig_pin="$ABI_DIFF_SOURCE_REVISION"
+readonly zig_version="$ABI_DIFF_REFERENCE_VERSION"
 readonly accepted_source_head="3deafe0f"
 readonly target="x86_64-linux-gnu"
 readonly cpu="baseline"
 readonly counter_schema="abi-diff-v2"
-readonly accepted_air_sha256="d8da86cae494d7d4a58053ab24b1e8be944859263072b85ffa164880b0110cd4"
-readonly cohort_source_sha256="287d076668232a8fe97a8c94ccacd7c192ce06d21299c3aa5f0e38e28494e1eb"
+readonly historical_accepted_air_sha256="d8da86cae494d7d4a58053ab24b1e8be944859263072b85ffa164880b0110cd4"
+readonly cohort_source_sha256="$ABI_DIFF_COHORT_SHA256"
 readonly scratch_limit=$((512 * 1024 * 1024))
 readonly cohort="test/abi_diff/compiler_rt.zig"
 readonly cohort_manifest="test/abi_diff/cohort_manifest.tsv"
@@ -43,7 +44,7 @@ readonly rows=(
     compiler_rt.fmin.fmin
 )
 readonly aliases=(__negsi2 __ashlsi3 __fabsh __neghf2 __mulosi4 __mulodi4 __negti2 __ashlti3 fabs fmin)
-readonly owners=(composed_block composed_cfg composed_block structural_fallback composed_block composed_cfg composed_block composed_cfg composed_block composed_cfg)
+readonly owners=(composed_block composed_cfg composed_block composed_block composed_block composed_cfg composed_block composed_cfg composed_block composed_cfg)
 
 fail() {
     printf 'INBOX-66 fail-closed: %s\n' "$*" >&2
@@ -67,10 +68,12 @@ require_identity() {
     [[ -x "$nm" && -x "$objdump" && -x "$readelf" && -x "$timeout_bin" ]] ||
         fail "missing pinned object-inspection or timeout tool"
     command -v "$linker" >/dev/null || fail "missing native linker driver: $linker"
+    [[ "$(<docs/evidence/ziglang_pin.txt)" == "$zig_pin" ]] ||
+        fail "ABI reference contract differs from docs/evidence/ziglang_pin.txt; migrate and audit the cohort before running"
     [[ "$(git -C "$zig_source" rev-parse HEAD 2>/dev/null || true)" == "$zig_pin" ]] ||
-        fail "patched Zig source pin mismatch: expected $zig_pin (override via ZIG_SOURCE_DIR/ZIG_PIN; run 'zig build test-unit' for isolated compiler tests)"
+        fail "patched Zig source pin mismatch: expected $zig_pin (select the pinned source via ZIG_SOURCE_DIR; run 'zig build test-unit' for isolated compiler tests)"
     [[ "$($zig version 2>/dev/null || true)" == "$zig_version" ]] ||
-        fail "reference compiler identity mismatch: expected $zig_version (override via ZIG_EMITTER/ZIG_VERSION)"
+        fail "reference compiler identity mismatch: expected $zig_version (select the audited emitter via ZIG_EMITTER)"
     git merge-base --is-ancestor "$accepted_source_head" HEAD || fail "accepted O0 head is not an ancestor"
     [[ "$(digest "$cohort")" == "$cohort_source_sha256" ]] || fail "frozen compiler-rt cohort body source changed"
     [[ "$(wc -l < "$cohort_manifest")" == 11 ]] || fail "audited cohort is not exactly ten rows"
@@ -220,6 +223,10 @@ classify_panic() {
 
 require_identity
 
+# Keep all C-compiler manifests and outputs in the same owned generation as the
+# other reference artifacts, so unrelated project-cache cleanup cannot split them.
+export ZIG_LOCAL_CACHE_DIR="$scratch/common/cc-cache"
+export ZIG_GLOBAL_CACHE_DIR="$scratch/global-cache"
 "$zig" cc -c "$shim" -target "$target" -o "$scratch/common/abi_shim.o"
 
 printf 'mode\tkind\trow_identity\texport_symbol\ttype_binding_visibility\tsection_offset_size\tsection_flags\tbody_sha256\trelocations\n' > "$scratch/provenance.tsv"
@@ -227,7 +234,7 @@ printf 'mode\tkind\trow_identity\texport_symbol\ttype_binding_visibility\tsectio
     printf 'directive=INBOX-66 status=mandatory-tier2 counter_schema=%s\n' "$counter_schema"
     printf 'population=compiler-rt-accepted-285 cohort_functions=10 compiler_core_distribution_rows=separate-not-executed-here\n'
     printf 'zig_source_commit=%s zig_version=%s target=%s cpu=%s features=baseline\n' "$zig_pin" "$zig_version" "$target" "$cpu"
-    printf 'zllvm_commit=%s zllvm_sha256=%s accepted_air_sha256=%s\n' "$(git rev-parse HEAD)" "$(digest "$zllvm")" "$accepted_air_sha256"
+    printf 'zllvm_commit=%s zllvm_sha256=%s historical_accepted_air_sha256=%s\n' "$(git rev-parse HEAD)" "$(digest "$zllvm")" "$historical_accepted_air_sha256"
     printf 'cohort_source_sha256=%s cohort_manifest_sha256=%s harness_sha256=%s shim_sha256=%s panic_source_sha256=%s\n' \
         "$(digest "$cohort")" "$(digest "$cohort_manifest")" "$(digest "$harness")" "$(digest "$shim")" "$(digest "$panic_source")"
     printf 'compiler_rt_body_optimization=ReleaseFast reason=canonical-accepted-cohort harness_modes=ReleaseFast,ReleaseSafe,ReleaseSmall\n'

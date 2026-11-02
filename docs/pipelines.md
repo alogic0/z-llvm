@@ -10,7 +10,7 @@ See [current architecture](architecture.md) for the full route map.
 | Pipeline | Current contract |
 | --- | --- |
 | `zig-debug-accepted` | `verify` only. |
-| `zig-release-fast-accepted`, `zig-release-safe-accepted`, `zig-release-small-accepted` | `verify,simplifycfg,instcombine,dce,verify`. All three share this list. |
+| `zig-release-fast-accepted`, `zig-release-safe-accepted`, `zig-release-small-accepted` | `verify,simplifycfg,instcombine,simplifycfg,instcombine,dce,verify`. All three share this list; the second cleanup consumes newly constant library results and safety branches. |
 | `aarch64-target-independent` | `verify,instcombine,dce,verify`; no AArch64 codegen claim. |
 | `scalar-foundation`, `zig-scalar-foundation` | Shared development scalar list, including SCCP, Early CSE, GVN, and cleanup. |
 | `memory-foundation` | `simplifycfg,sroa,mem2reg,dce`. |

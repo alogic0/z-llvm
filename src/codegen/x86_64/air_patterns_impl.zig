@@ -280,6 +280,9 @@ pub fn lowerFunctionWithOptions(
         }
     }
 
+    // Variadic calls are admitted only by the composed caller, which supplies AL.
+    if (sysv_abi.functionHasVariadicCall(function)) return error.UnsupportedVarargsAbi;
+
     if (try lowerSingleStackSlotCallFunction(allocator, &machine, function)) {
         return try finishStructuralFallback(&machine);
     }
