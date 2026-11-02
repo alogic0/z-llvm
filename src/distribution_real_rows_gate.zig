@@ -3,16 +3,17 @@ const air_export = @import("zig_air_export.zig");
 const air_lowering = @import("zig_air_lowering.zig");
 const codegen = @import("codegen.zig");
 const mc = @import("mc.zig");
+const ir = @import("ir.zig");
 const target = @import("target.zig");
 const helpers = @import("uncurated_air_gate_helpers.zig");
 const execution_cohort = @import("distribution_execution_cohort_v1.zig");
 
-const selector_version = "real-candidate-selector-v2";
-const default_candidate_path = "docs/evidence/real_candidates_release_v2.tsv";
+const selector_version = "real-candidate-selector-v3";
+const default_candidate_path = "docs/evidence/real_candidates_release_v3.tsv";
 const ziglang_pin_path = "docs/evidence/ziglang_pin.txt";
 const export_cache_dir = "tmp/real_rows_air_export_cache";
 const target_triple = "x86_64-unknown-linux-gnu";
-const cohort_denominator_sha256 = "83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d";
+const cohort_denominator_sha256 = "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31";
 const cohort_object_max_bytes = 16 * 1024 * 1024;
 const cohort_executable_max_bytes = 512 * 1024 * 1024;
 const air_generation_contract_schema = "distribution-real-rows-air-generation-v1";
@@ -115,6 +116,9 @@ const Counters = struct {
     mode: Mode,
     limit: usize,
     candidate_rows: usize,
+    start_index: usize = 0,
+    skipped_rows: usize = 0,
+    attempted_rows: usize = 0,
     real_functions_lowered: usize = 0,
     real_objects_emitted: usize = 0,
     real_native_linked: usize = 0,
@@ -133,7 +137,7 @@ const CohortTracker = struct {
     accepted: [execution_cohort.programs.len]bool = @splat(false),
 
     fn record(tracker: *CohortTracker, program: execution_cohort.Program, pair: execution_cohort.PairCounters) !void {
-        const index = @intFromEnum(program);
+        const index = @backingInt(program);
         if (tracker.executed[index] or tracker.accepted[index] or pair.real_executed != 1 or pair.real_programs_ok != 1) {
             return error.ExecutionCohortPartialCredit;
         }
@@ -237,6 +241,7 @@ fn parseRawOptions(io: std.Io, raw_args: []const []const u8) !Options {
         }
     }
     if (options.limit == 0) try validationError(io, "--limit must be greater than zero\n", .{});
+    try validateWindow(options);
     if (options.fresh_export and options.require_cache_hit) {
         return error.FreshExportConflictsWithRequiredCacheHit;
     }
@@ -248,6 +253,28 @@ fn parseRawOptions(io: std.Io, raw_args: []const []const u8) !Options {
     };
     if (options.export_cache_root.len == 0) return error.EmptyExportCacheRoot;
     return options;
+}
+
+fn validateWindow(options: Options) !void {
+    if (options.strict and options.start_index != 0) return error.StrictValidationCannotSkipRows;
+    if (options.start_index >= options.limit) return error.EmptyCandidateWindow;
+}
+
+test "real-row window cannot skip rows during strict validation" {
+    try std.testing.expectError(error.StrictValidationCannotSkipRows, validateWindow(.{ .limit = 100, .start_index = 99, .strict = true }));
+    try std.testing.expectError(error.EmptyCandidateWindow, validateWindow(.{ .limit = 100, .start_index = 100 }));
+    try validateWindow(.{ .limit = 100, .start_index = 99 });
+}
+
+test "real-row window summary reports skipped rows without success credit" {
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const counters: Counters = .{ .mode = .ReleaseFast, .limit = 4, .candidate_rows = 4, .start_index = 3, .skipped_rows = 3, .attempted_rows = 1 };
+    const hash: [64]u8 = @splat('0');
+    try printSummary(&output.writer, counters, &hash);
+    try std.testing.expect(std.mem.indexOf(u8, output.written(), "counter_schema=distribution-real-rows-window-v1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, output.written(), "real_functions_lowered=0 real_objects_emitted=0 real_native_linked=0") != null);
+    try std.testing.expect(std.mem.indexOf(u8, output.written(), "start_index=3 skipped_rows=3 attempted_rows=1") != null);
 }
 
 fn cohortEnabled(options: Options) bool {
@@ -273,7 +300,7 @@ fn requireCohortDenominator(candidates: []const Candidate, candidate_hash: *cons
     }
     var counts: [execution_cohort.programs.len]usize = @splat(0);
     for (candidates) |candidate| if (cohortProgram(candidate)) |program| {
-        counts[@intFromEnum(program)] += 1;
+        counts[@backingInt(program)] += 1;
     };
     for (counts) |count| if (count != 1) return error.ExecutionCohortMembershipMismatch;
 }
@@ -417,10 +444,10 @@ fn syntheticCohortCandidate(source: []const u8, function: []const u8) Candidate 
 
 test "execution cohort denominator is exact rank independent and atomic" {
     var candidates: [100]Candidate = @splat(syntheticCohortCandidate("other", "other"));
-    candidates[17] = syntheticCohortCandidate("../ziglang/src/main.zig", "coff.Symbol.sizeOf");
+    candidates[17] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Signature.size");
     candidates[42] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Requirements.size");
     candidates[61] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Requirements.slotType");
-    candidates[83] = syntheticCohortCandidate("../ziglang/src/main.zig", "coff.WeakExternalDefinition.sizeOf");
+    candidates[83] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Signature.slotType");
     var digest: [64]u8 = undefined;
     @memcpy(&digest, cohort_denominator_sha256);
     try requireCohortDenominator(&candidates, &digest);
@@ -432,12 +459,12 @@ test "execution cohort denominator is exact rank independent and atomic" {
     try std.testing.expectError(error.ExecutionCohortDenominatorDrift, requireCohortDenominator(&candidates, &digest));
 
     var tracker: CohortTracker = .{};
-    try tracker.record(.symbol_size_of, .{ .real_executed = 1, .real_programs_ok = 1 });
+    try tracker.record(.signature_size, .{ .real_executed = 1, .real_programs_ok = 1 });
     var counters: Counters = .{ .mode = .ReleaseFast, .limit = 100, .candidate_rows = 100 };
     try std.testing.expectError(error.ExecutionCohortPartialCredit, tracker.finalize(&counters));
     try std.testing.expectEqual(@as(usize, 0), counters.real_executed);
     try std.testing.expectEqual(@as(usize, 0), counters.real_programs_ok);
-    try tracker.record(.weak_external_definition_size_of, .{ .real_executed = 1, .real_programs_ok = 1 });
+    try tracker.record(.signature_slot_type, .{ .real_executed = 1, .real_programs_ok = 1 });
     try std.testing.expectError(error.ExecutionCohortPartialCredit, tracker.finalize(&counters));
     try tracker.record(.requirements_size, .{ .real_executed = 1, .real_programs_ok = 1 });
     try std.testing.expectError(error.ExecutionCohortPartialCredit, tracker.finalize(&counters));
@@ -512,11 +539,11 @@ test "causal AIR generation cache identity excludes admission parser bytes and b
 }
 
 test "cohort descriptor membership requires each selected function exactly once" {
-    const candidates = [_]Candidate{syntheticCohortCandidate("../ziglang/src/main.zig", "coff.Symbol.sizeOf")};
+    const candidates = [_]Candidate{syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Signature.size")};
     const frame =
         "function_begin\n" ++
-        "name_bytes=18\n" ++
-        "coff.Symbol.sizeOf\n" ++
+        "name_bytes=39\n" ++
+        "link.MachO.CodeSignature.Signature.size\n" ++
         "function_end\n";
     try std.testing.expect(try descriptorContainsAllFunctions(std.testing.allocator, frame, &candidates));
     const duplicate = frame ++ frame;
@@ -551,10 +578,14 @@ fn parseCandidates(allocator: std.mem.Allocator, contents: []const u8, limit: us
         const runtime_refs = fields.next() orelse return error.InvalidCandidateRow;
         const determinism = fields.next() orelse return error.InvalidCandidateRow;
         const harnessable_reason = fields.next() orelse return error.InvalidCandidateRow;
+        try validateCandidateSymbolCell(function);
         try rows.append(allocator, .{
             .rank = try std.fmt.parseUnsigned(usize, rank_text, 10),
             .source = try allocator.dupe(u8, source),
-            .function = try allocator.dupe(u8, function),
+            .function = if (std.mem.startsWith(u8, function, "\""))
+                try std.mem.replaceOwned(u8, allocator, function[1 .. function.len - 1], "\"\"", "\"")
+            else
+                try allocator.dupe(u8, function),
             .instruction_count = try std.fmt.parseUnsigned(usize, instruction_count, 10),
             .signature_class = try allocator.dupe(u8, signature_class),
             .call_class = try allocator.dupe(u8, call_class),
@@ -565,6 +596,30 @@ fn parseCandidates(allocator: std.mem.Allocator, contents: []const u8, limit: us
         });
     }
     return rows;
+}
+
+fn validateCandidateSymbolCell(text: []const u8) !void {
+    if (!std.mem.startsWith(u8, text, "\"")) return;
+    if (text.len < 2 or !std.mem.endsWith(u8, text, "\"")) return error.InvalidCandidateRow;
+    var index: usize = 1;
+    while (index < text.len - 1) : (index += 1) {
+        if (text[index] != '"') continue;
+        if (index + 1 >= text.len - 1 or text[index + 1] != '"') return error.InvalidCandidateRow;
+        index += 1;
+    }
+}
+
+test "candidate TSV accepts literal and CSV-escaped quotes without changing symbol names" {
+    const header = "rank\tsource\tfunction\tinstruction_count\tsignature_class\tcall_class\tglobal_refs\truntime_refs\tdeterminism\tharnessable_reason\n";
+    const suffix = "\t1\tinternal-callable\tleaf\t0\t0\tassumed_nondeterministic\tharnessable:test\n";
+    const text = header ++ "1\tmain.zig\tmap.@\"union\".get" ++ suffix ++
+        "2\tmain.zig\t\"map.@\"\"union\"\".get\"" ++ suffix;
+    var rows = try parseCandidates(std.testing.allocator, text, 2);
+    defer freeCandidates(std.testing.allocator, &rows);
+    try std.testing.expectEqual(@as(usize, 2), rows.items.len);
+    for (rows.items) |row| try std.testing.expectEqualStrings("map.@\"union\".get", row.function);
+    try std.testing.expectError(error.InvalidCandidateRow, validateCandidateSymbolCell("\"unclosed"));
+    try std.testing.expectError(error.InvalidCandidateRow, validateCandidateSymbolCell("\"bad\"quote\""));
 }
 
 fn freeCandidates(allocator: std.mem.Allocator, rows: *std.ArrayList(Candidate)) void {
@@ -593,6 +648,7 @@ fn runMode(
         .mode = mode,
         .limit = options.limit,
         .candidate_rows = candidates.len,
+        .start_index = options.start_index,
     };
     const cohort_selected = cohortSelected(options);
     const cohort_enabled = cohortEnabled(options);
@@ -637,11 +693,10 @@ fn runMode(
     if (options.cache_probe_only) return counters;
     for (candidates, 0..) |candidate, index| {
         if (index < options.start_index) {
-            counters.real_functions_lowered += 1;
-            counters.real_objects_emitted += 1;
-            counters.real_native_linked += 1;
+            counters.skipped_rows += 1;
             continue;
         }
+        counters.attempted_rows += 1;
         try runCandidate(
             allocator,
             io,
@@ -656,7 +711,7 @@ fn runMode(
             zig_emitter,
             if (cohort_enabled) &cohort_tracker else null,
         );
-        if (counters.hasFailure()) break;
+        if (options.strict and counters.hasFailure()) break;
     }
     if (cohort_enabled and !counters.hasFailure()) {
         const cohort_source_final = try observeCohortSourceIdentity(allocator, io, temp.path);
@@ -1308,6 +1363,13 @@ fn runCandidate(
             "debug-real-row-ir source={s} function={s} mode={s} candidate_file_hash={s}\n{s}\n",
             .{ candidate.source, candidate.function, mode.name(), candidate_hash, filtered },
         );
+        var parsed_air = try air_export.parse(allocator, filtered);
+        defer parsed_air.deinit();
+        var lowered_air = try air_lowering.lowerCompatible(allocator, parsed_air);
+        defer lowered_air.deinit();
+        try stderr_writer.interface.print("DEBUG LOWERED IR:\n", .{});
+        try ir.printer.print(lowered_air.module, &stderr_writer.interface);
+        try stderr_writer.interface.writeByte('\n');
         try stderr_writer.interface.flush();
     }
 
@@ -1610,9 +1672,9 @@ fn safeStem(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
 
 fn printSummary(writer: *std.Io.Writer, counters: Counters, candidate_hash: *const [64]u8) !void {
     try writer.print(
-        "summary distribution-real-rows counter_schema={s} mode={s} selector_version={s} candidate_file_hash={s} limit={} candidate_rows={} real_functions_lowered={} real_objects_emitted={} real_native_linked={} real_executed={} real_programs_ok={} first_failing_real_row={s} first_failing_stage={s} local_fail={}\n",
+        "summary distribution-real-rows counter_schema={s} mode={s} selector_version={s} candidate_file_hash={s} limit={} candidate_rows={} real_functions_lowered={} real_objects_emitted={} real_native_linked={} real_executed={} real_programs_ok={} first_failing_real_row={s} first_failing_stage={s} local_fail={}",
         .{
-            counter_schema_version,
+            if (counters.start_index == 0) counter_schema_version else "distribution-real-rows-window-v1",
             counters.mode.name(),
             selector_version,
             candidate_hash,
@@ -1628,6 +1690,8 @@ fn printSummary(writer: *std.Io.Writer, counters: Counters, candidate_hash: *con
             @intFromBool(counters.hasFailure()),
         },
     );
+    if (counters.start_index != 0) try writer.print(" start_index={} skipped_rows={} attempted_rows={}", .{ counters.start_index, counters.skipped_rows, counters.attempted_rows });
+    try writer.writeByte('\n');
 }
 
 fn candidateFileHash(contents: []const u8) [64]u8 {

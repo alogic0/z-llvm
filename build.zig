@@ -95,6 +95,9 @@ pub fn build(b: *std.Build) void {
     addToolStep(b, "check-zig-stage4-emitter", "Check the authoritative Zig stage4 emitter", "tools/check_zig_stage4_emitter.zig");
     addToolStep(b, "focused-codegen-canaries", "Run procedural fma and __multi3 codegen canaries (non-gating)", "tools/run_focused_codegen_canaries.zig");
     addToolStepWithArgs(b, "real-candidates-v2", "Build the mode-stable real-row candidate denominator", "tools/build_real_candidates_v2.zig");
+    const candidates_v3_run = b.addSystemCommand(&.{ "python3", "tools/build_real_candidates_v3.py" });
+    candidates_v3_run.addPassthruArgs();
+    b.step("real-candidates-v3", "Derive the audited current-pin candidate population").dependOn(&candidates_v3_run.step);
     const real_policy_tests = b.addSystemCommand(&.{ "python3", "-m", "unittest", "discover", "-s", "tools", "-p", "test_real_*.py" });
     b.step("real-program-policy-tests", "Check candidate admission and object provenance negative controls").dependOn(&real_policy_tests.step);
     const derive_real_candidate_definition_run = b.addSystemCommand(&.{

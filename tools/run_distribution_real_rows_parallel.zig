@@ -1584,7 +1584,7 @@ test "fixed capacity admits exact start boundary emits schema two and rejects in
 
 test "normalization removes only frozen volatile scheduling fields" {
     const input =
-        "distribution-real-rows selector_version=real-candidate-selector-v2 candidate_file=x candidate_file_hash=abc limit=100 strict=true\n" ++
+        "distribution-real-rows selector_version=real-candidate-selector-v3 candidate_file=x candidate_file_hash=abc limit=100 strict=true\n" ++
         "air-export-cache mode=ReleaseFast status=hit duration_ms=12 cache_key=key-fast descriptor_bytes=44\n" ++
         "summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode=ReleaseFast candidate_file_hash=abc real_native_linked=100 real_programs_ok=4 local_fail=0\n" ++
         "real-rows-mode-parallel schema_version=2 normalization_schema=2 wall_ms=9 root=owned/run local_fail=0\n" ++

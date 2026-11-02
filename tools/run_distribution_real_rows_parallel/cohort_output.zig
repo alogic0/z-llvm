@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub const CacheMode = enum { fresh, require_hit };
 
-const denominator_sha256 = "83e81a860bb173c3b8c294153faff7af1f1dea73d1217969d6e87b6c08933d5d";
+const denominator_sha256 = "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31";
 
 const Member = struct {
     function: []const u8,
@@ -11,8 +11,8 @@ const Member = struct {
 };
 
 const members = [_]Member{
-    .{ .function = "coff.Symbol.sizeOf", .result = "18", .witness = "61" },
-    .{ .function = "coff.WeakExternalDefinition.sizeOf", .result = "18", .witness = "61" },
+    .{ .function = "link.MachO.CodeSignature.Signature.size", .result = "8", .witness = "31" },
+    .{ .function = "link.MachO.CodeSignature.Signature.slotType", .result = "65536", .witness = "196615" },
     .{ .function = "link.MachO.CodeSignature.Requirements.size", .result = "12", .witness = "43" },
     .{ .function = "link.MachO.CodeSignature.Requirements.slotType", .result = "2", .witness = "13" },
 };
@@ -56,7 +56,7 @@ pub fn validate(output: []const u8, mode: []const u8, cache_mode: CacheMode) !vo
             if (!std.mem.eql(u8, fieldValue(line, "mode=") orelse return error.RealRowsOutputCohortModeMismatch, mode)) {
                 return error.RealRowsOutputCohortModeMismatch;
             }
-            if (!std.mem.eql(u8, fieldValue(line, "schema=") orelse return error.RealRowsOutputCohortUnauthenticated, "distribution-execution-cohort-v1") or
+            if (!std.mem.eql(u8, fieldValue(line, "schema=") orelse return error.RealRowsOutputCohortUnauthenticated, "distribution-execution-cohort-v2") or
                 !std.mem.eql(u8, fieldValue(line, "source=") orelse return error.RealRowsOutputCohortUnauthenticated, "../ziglang/src/main.zig") or
                 !std.mem.eql(u8, fieldValue(line, "reference_status=") orelse return error.RealRowsOutputCohortUnauthenticated, "0") or
                 !std.mem.eql(u8, fieldValue(line, "linked_status=") orelse return error.RealRowsOutputCohortUnauthenticated, "0") or
@@ -149,7 +149,7 @@ fn checkFields(line: []const u8, record_prefix: []const u8, allowed: []const u8)
         count += 1;
     }
     if (count != std.mem.count(u8, allowed, " ") + 1) return error.RealRowsOutputMissingField;
-    if (containsWord(allowed, "selector_version") and !std.mem.eql(u8, fieldValue(line, "selector_version=").?, "real-candidate-selector-v2")) return error.RealRowsOutputDenominatorMismatch;
+    if (containsWord(allowed, "selector_version") and !std.mem.eql(u8, fieldValue(line, "selector_version=").?, "real-candidate-selector-v3")) return error.RealRowsOutputDenominatorMismatch;
 }
 
 test "summary rejects substring counters duplicate keys and malformed tokens" {
@@ -192,13 +192,13 @@ test "field lookup matches a complete key and parser rejects malformed hashes" {
 pub fn syntheticOutputForTest(mode: []const u8, cache_status: []const u8, allocator: std.mem.Allocator) ![]u8 {
     return std.fmt.allocPrint(
         allocator,
-        "distribution-real-rows selector_version=real-candidate-selector-v2 candidate_file=docs/evidence/real_candidates_release_v2.tsv candidate_file_hash={s} limit=100 strict=true\n" ++
+        "distribution-real-rows selector_version=real-candidate-selector-v3 candidate_file=docs/evidence/real_candidates_release_v3.tsv candidate_file_hash={s} limit=100 strict=true\n" ++
             "air-export-cache mode={s} status={s} duration_ms=1 cache_key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa descriptor_bytes=1\n" ++
-            "execution-cohort-row schema=distribution-execution-cohort-v1 mode={s} source=../ziglang/src/main.zig function=coff.Symbol.sizeOf descriptor_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object_bytes=1 object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_bytes=1 reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa linked_bytes=1 linked_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa result=18 witness=61 result_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
-            "execution-cohort-row schema=distribution-execution-cohort-v1 mode={s} source=../ziglang/src/main.zig function=coff.WeakExternalDefinition.sizeOf descriptor_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object_bytes=1 object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_bytes=1 reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa linked_bytes=1 linked_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa result=18 witness=61 result_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
-            "execution-cohort-row schema=distribution-execution-cohort-v1 mode={s} source=../ziglang/src/main.zig function=link.MachO.CodeSignature.Requirements.size descriptor_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object_bytes=1 object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_bytes=1 reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa linked_bytes=1 linked_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa result=12 witness=43 result_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
-            "execution-cohort-row schema=distribution-execution-cohort-v1 mode={s} source=../ziglang/src/main.zig function=link.MachO.CodeSignature.Requirements.slotType descriptor_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object_bytes=1 object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_bytes=1 reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa linked_bytes=1 linked_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa result=2 witness=13 result_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
-            "summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode={s} selector_version=real-candidate-selector-v2 candidate_file_hash={s} limit=100 candidate_rows=100 real_functions_lowered=100 real_objects_emitted=100 real_native_linked=100 real_executed=4 real_programs_ok=4 first_failing_real_row=- first_failing_stage=- local_fail=0\n",
+            "execution-cohort-row schema=distribution-execution-cohort-v2 mode={s} source=../ziglang/src/main.zig function=link.MachO.CodeSignature.Signature.size descriptor_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object_bytes=1 object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_bytes=1 reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa linked_bytes=1 linked_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa result=8 witness=31 result_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
+            "execution-cohort-row schema=distribution-execution-cohort-v2 mode={s} source=../ziglang/src/main.zig function=link.MachO.CodeSignature.Signature.slotType descriptor_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object_bytes=1 object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_bytes=1 reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa linked_bytes=1 linked_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa result=65536 witness=196615 result_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
+            "execution-cohort-row schema=distribution-execution-cohort-v2 mode={s} source=../ziglang/src/main.zig function=link.MachO.CodeSignature.Requirements.size descriptor_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object_bytes=1 object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_bytes=1 reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa linked_bytes=1 linked_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa result=12 witness=43 result_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
+            "execution-cohort-row schema=distribution-execution-cohort-v2 mode={s} source=../ziglang/src/main.zig function=link.MachO.CodeSignature.Requirements.slotType descriptor_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object_bytes=1 object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_bytes=1 reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa linked_bytes=1 linked_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa result=2 witness=13 result_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
+            "summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode={s} selector_version=real-candidate-selector-v3 candidate_file_hash={s} limit=100 candidate_rows=100 real_functions_lowered=100 real_objects_emitted=100 real_native_linked=100 real_executed=4 real_programs_ok=4 first_failing_real_row=- first_failing_stage=- local_fail=0\n",
         .{ denominator_sha256, mode, cache_status, mode, mode, mode, mode, mode, denominator_sha256 },
     );
 }
@@ -222,7 +222,7 @@ test "four-member cohort output is exact and fails closed on drift" {
     const wrong_denominator = try std.mem.replaceOwned(u8, allocator, valid, denominator_sha256, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     defer allocator.free(wrong_denominator);
     try std.testing.expectError(error.RealRowsOutputDenominatorMismatch, validate(wrong_denominator, "ReleaseFast", .require_hit));
-    const duplicate = try std.mem.replaceOwned(u8, allocator, valid, "link.MachO.CodeSignature.Requirements.size", "coff.Symbol.sizeOf");
+    const duplicate = try std.mem.replaceOwned(u8, allocator, valid, "link.MachO.CodeSignature.Requirements.size", "link.MachO.CodeSignature.Signature.size");
     defer allocator.free(duplicate);
     try std.testing.expectError(error.RealRowsOutputCohortDuplicate, validate(duplicate, "ReleaseFast", .require_hit));
     const semantic_drift = try std.mem.replaceOwned(u8, allocator, valid, "result=12 witness=43", "result=18 witness=61");

@@ -12,6 +12,7 @@ const Options = struct {
     mode: ?Mode = null,
     preserve_temp: bool = false,
     real_candidates_tsv: ?[]const u8 = null,
+    descriptor_path: ?[]const u8 = null,
 };
 
 const InventorySlice = enum {
@@ -308,6 +309,28 @@ pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
     const options = try parseOptions(init.minimal.args);
+    if (options.descriptor_path) |path| {
+        if (options.slice != .compiler_core_module or options.mode == null or options.real_candidates_tsv == null)
+            return error.DescriptorInventoryRequiresModeAndCandidateOutput;
+        const mode = options.mode.?;
+        const file = try std.Io.Dir.cwd().openFile(io, path, .{});
+        defer file.close(io);
+        var buffer: [4096]u8 = undefined;
+        var reader = file.reader(io, &buffer);
+        try expectLine(&reader.interface, "zllvm-air-export-v1");
+        inline for (.{ "contract_version", "payload", "producer", "root_source", "wrapper" }) |key|
+            _ = try readValueLine(&reader.interface, key);
+        if (!std.mem.eql(u8, try readValueLine(&reader.interface, "mode"), mode.name()))
+            return error.DescriptorInventoryModeMismatch;
+        var counters: Counters = .{ .sources = 1, .inventory_ok_sources = 1, .real_module_context = 1, .generated_imports_available = 1, .instruction_payload_scan = 1 };
+        defer counters.deinit(allocator);
+        var candidates: CandidateRows = .{};
+        defer candidates.deinit(allocator);
+        try scanLargeDescriptor(allocator, io, path, &counters, "../ziglang/src/main.zig", &candidates);
+        try printSummary(allocator, .compiler_core_module, mode, counters);
+        try writeRealCandidatesTsv(allocator, io, options.real_candidates_tsv.?, .compiler_core_module, mode, &candidates);
+        return;
+    }
 
     const zig_emitter_env = init.minimal.environ.getAlloc(allocator, "ZIG_EMITTER") catch |err| switch (err) {
         error.EnvironmentVariableMissing => null,
@@ -352,6 +375,8 @@ fn parseOptions(args: std.process.Args) !Options {
             options.preserve_temp = true;
         } else if (std.mem.startsWith(u8, arg, "--real-candidates-tsv=")) {
             options.real_candidates_tsv = arg["--real-candidates-tsv=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--descriptor=")) {
+            options.descriptor_path = arg["--descriptor=".len..];
         } else {
             return error.UnsupportedDistributionInventoryArgument;
         }
@@ -888,8 +913,8 @@ fn scanLargeDescriptor(
 
 fn snapshotCounters(counters: *const Counters) CounterSnapshot {
     var unsupported_categories: [unsupported_category_count]usize = undefined;
-    inline for (std.meta.fields(UnsupportedCategory)) |field| {
-        unsupported_categories[field.value] = counters.unsupported_categories[field.value].count;
+    inline for (@typeInfo(UnsupportedCategory).@"enum".field_values) |field_value| {
+        unsupported_categories[field_value] = counters.unsupported_categories[field_value].count;
     }
     return .{
         .calls = counters.calls,
@@ -950,9 +975,9 @@ fn appendCandidateRow(
 }
 
 fn firstUnsupportedCategory(before: CounterSnapshot, after: CounterSnapshot) ?UnsupportedCategory {
-    inline for (std.meta.fields(UnsupportedCategory)) |field| {
-        if (after.unsupported_categories[field.value] > before.unsupported_categories[field.value]) {
-            return @enumFromInt(field.value);
+    inline for (@typeInfo(UnsupportedCategory).@"enum".field_values) |field_value| {
+        if (after.unsupported_categories[field_value] > before.unsupported_categories[field_value]) {
+            return @fromBackingInt(@intCast(field_value));
         }
     }
     return null;
@@ -1437,7 +1462,7 @@ fn noteAggregateSurface(
     source: []const u8,
     function: []const u8,
 ) !void {
-    const index = @intFromEnum(category);
+    const index = @backingInt(category);
     counters.aggregate_surface_categories[index].count += 1;
     if (counters.aggregate_surface_categories[index].first_source == null) {
         counters.aggregate_surface_categories[index].first_source = try allocator.dupe(u8, source);
@@ -1452,7 +1477,7 @@ fn noteUnknownOpcodeCategory(
     source: []const u8,
     function: []const u8,
 ) !void {
-    const index = @intFromEnum(category);
+    const index = @backingInt(category);
     counters.unknown_opcode_categories[index].count += 1;
     if (counters.unknown_opcode_categories[index].first_source == null) {
         counters.unknown_opcode_categories[index].first_source = try allocator.dupe(u8, source);
@@ -1506,7 +1531,7 @@ fn noteUnsupported(
     source: []const u8,
     function: []const u8,
 ) !void {
-    const index = @intFromEnum(category);
+    const index = @backingInt(category);
     counters.unsupported_categories[index].count += 1;
     if (counters.unsupported_categories[index].first_source == null) {
         counters.unsupported_categories[index].first_source = try allocator.dupe(u8, source);
@@ -1522,7 +1547,7 @@ fn noteBoundary(
     reason: []const u8,
 ) !void {
     counters.boundary_sources += 1;
-    const index = @intFromEnum(category);
+    const index = @backingInt(category);
     counters.boundary_categories[index].count += 1;
     if (counters.boundary_categories[index].first_source == null) {
         counters.boundary_categories[index].first_source = try allocator.dupe(u8, source);
@@ -1637,9 +1662,9 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
             counters.unsupported_opcodes,
         },
     );
-    inline for (std.meta.fields(AggregateSurfaceCategory)) |field| {
-        const category: AggregateSurfaceCategory = @enumFromInt(field.value);
-        const stat = counters.aggregate_surface_categories[field.value];
+    inline for (@typeInfo(AggregateSurfaceCategory).@"enum".field_values) |field_value| {
+        const category: AggregateSurfaceCategory = @fromBackingInt(@intCast(field_value));
+        const stat = counters.aggregate_surface_categories[field_value];
         try writer.print(
             "aggregate_surface slice={s} mode={s} category={s} count={} first_source={s} first_function={s}\n",
             .{
@@ -1652,9 +1677,9 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
             },
         );
     }
-    inline for (std.meta.fields(UnsupportedCategory)) |field| {
-        const category: UnsupportedCategory = @enumFromInt(field.value);
-        const stat = counters.unsupported_categories[field.value];
+    inline for (@typeInfo(UnsupportedCategory).@"enum".field_values) |field_value| {
+        const category: UnsupportedCategory = @fromBackingInt(@intCast(field_value));
+        const stat = counters.unsupported_categories[field_value];
         try writer.print(
             "unsupported slice={s} mode={s} category={s} count={} first_source={s} first_function={s}\n",
             .{
@@ -1668,9 +1693,9 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
         );
     }
     try printTopUnsupported(writer, slice, mode, counters);
-    inline for (std.meta.fields(air_capabilities.UnknownOpcodeCategory)) |field| {
-        const category: air_capabilities.UnknownOpcodeCategory = @enumFromInt(field.value);
-        const stat = counters.unknown_opcode_categories[field.value];
+    inline for (@typeInfo(air_capabilities.UnknownOpcodeCategory).@"enum".field_values) |field_value| {
+        const category: air_capabilities.UnknownOpcodeCategory = @fromBackingInt(@intCast(field_value));
+        const stat = counters.unknown_opcode_categories[field_value];
         try writer.print(
             "unknown_opcode slice={s} mode={s} category={s} count={} first_source={s} first_function={s}\n",
             .{
@@ -1686,9 +1711,9 @@ fn printSummary(allocator: std.mem.Allocator, slice: InventorySlice, mode: Mode,
     try printTopUnknownOpcodes(writer, slice, mode, counters);
     try printTopUnknownOpcodePairs(allocator, writer, slice, mode, counters, top_unknown_opcode_pair_limit);
     try printTopUnknownOpcodeCategoryPairs(allocator, writer, slice, mode, counters, top_unknown_opcode_category_pair_limit);
-    inline for (std.meta.fields(BoundaryCategory)) |field| {
-        const category: BoundaryCategory = @enumFromInt(field.value);
-        const stat = counters.boundary_categories[field.value];
+    inline for (@typeInfo(BoundaryCategory).@"enum".field_values) |field_value| {
+        const category: BoundaryCategory = @fromBackingInt(@intCast(field_value));
+        const stat = counters.boundary_categories[field_value];
         try writer.print(
             "boundary slice={s} mode={s} category={s} count={} first_source={s} first_reason={s}\n",
             .{
@@ -1911,10 +1936,10 @@ fn printTopUnsupported(
     counters: Counters,
 ) !void {
     var entries: [unsupported_category_count]UnsupportedTopEntry = undefined;
-    inline for (std.meta.fields(UnsupportedCategory)) |field| {
-        const category: UnsupportedCategory = @enumFromInt(field.value);
-        const stat = counters.unsupported_categories[field.value];
-        entries[field.value] = .{
+    inline for (@typeInfo(UnsupportedCategory).@"enum".field_values) |field_value| {
+        const category: UnsupportedCategory = @fromBackingInt(@intCast(field_value));
+        const stat = counters.unsupported_categories[field_value];
+        entries[field_value] = .{
             .category = category,
             .count = stat.count,
             .first_source = stat.first_source orelse "-",
@@ -1966,8 +1991,8 @@ fn printTopUnknownOpcodeCategoryPairs(
     counters: Counters,
     limit: usize,
 ) !void {
-    inline for (std.meta.fields(air_capabilities.UnknownOpcodeCategory)) |field| {
-        const category: air_capabilities.UnknownOpcodeCategory = @enumFromInt(field.value);
+    inline for (@typeInfo(air_capabilities.UnknownOpcodeCategory).@"enum".field_values) |field_value| {
+        const category: air_capabilities.UnknownOpcodeCategory = @fromBackingInt(@intCast(field_value));
         const category_name = category.name();
         var entries = try allocator.alloc(UnknownOpcodePairTopEntry, counters.unknown_opcode_pair_counts.count());
         defer allocator.free(entries);
@@ -2006,10 +2031,10 @@ fn printTopUnknownOpcodes(
     counters: Counters,
 ) !void {
     var entries: [unknown_opcode_category_count]UnknownOpcodeTopEntry = undefined;
-    inline for (std.meta.fields(air_capabilities.UnknownOpcodeCategory)) |field| {
-        const category: air_capabilities.UnknownOpcodeCategory = @enumFromInt(field.value);
-        const stat = counters.unknown_opcode_categories[field.value];
-        entries[field.value] = .{
+    inline for (@typeInfo(air_capabilities.UnknownOpcodeCategory).@"enum".field_values) |field_value| {
+        const category: air_capabilities.UnknownOpcodeCategory = @fromBackingInt(@intCast(field_value));
+        const stat = counters.unknown_opcode_categories[field_value];
+        entries[field_value] = .{
             .category = category,
             .count = stat.count,
             .first_source = stat.first_source orelse "-",

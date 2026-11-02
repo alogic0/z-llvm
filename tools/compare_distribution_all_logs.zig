@@ -105,7 +105,7 @@ fn canonicalLog(
 
 fn validateRealRowsRecords(contents: []const u8) !usize {
     const modes = [_][]const u8{ "ReleaseFast", "ReleaseSafe", "ReleaseSmall" };
-    var seen = [_]bool{false} ** modes.len;
+    var seen: [modes.len]bool = @splat(false);
     var start: ?usize = null;
     var offset: usize = 0;
     var cache_mode: ?cohort_output.CacheMode = null;
