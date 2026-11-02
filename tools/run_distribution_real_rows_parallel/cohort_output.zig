@@ -8,6 +8,7 @@ const Member = struct {
     function: []const u8,
     result: []const u8,
     witness: []const u8,
+    observations: []const u8 = "1",
 };
 
 const members = [_]Member{
@@ -15,6 +16,7 @@ const members = [_]Member{
     .{ .function = "link.MachO.CodeSignature.Signature.slotType", .result = "65536", .witness = "196615" },
     .{ .function = "link.MachO.CodeSignature.Requirements.size", .result = "12", .witness = "43" },
     .{ .function = "link.MachO.CodeSignature.Requirements.slotType", .result = "2", .witness = "13" },
+    .{ .function = "ascii.isAscii", .result = "128", .witness = "8256", .observations = "256" },
 };
 
 pub fn validate(output: []const u8, mode: []const u8, cache_mode: CacheMode) !void {
@@ -51,12 +53,12 @@ pub fn validate(output: []const u8, mode: []const u8, cache_mode: CacheMode) !vo
             continue;
         }
         if (std.mem.startsWith(u8, line, "execution-cohort-row ")) {
-            try checkFields(line, "execution-cohort-row ", "schema mode source function descriptor_sha256 object_bytes object_sha256 reference_bytes reference_sha256 linked_bytes linked_sha256 result witness result_sha256 reference_status linked_status real_executed real_programs_ok");
+            try checkFields(line, "execution-cohort-row ", "schema mode source function descriptor_sha256 object_bytes object_sha256 reference_bytes reference_sha256 linked_bytes linked_sha256 result witness observations result_sha256 reference_status linked_status real_executed real_programs_ok");
             cohort_row_count += 1;
             if (!std.mem.eql(u8, fieldValue(line, "mode=") orelse return error.RealRowsOutputCohortModeMismatch, mode)) {
                 return error.RealRowsOutputCohortModeMismatch;
             }
-            if (!std.mem.eql(u8, fieldValue(line, "schema=") orelse return error.RealRowsOutputCohortUnauthenticated, "distribution-execution-cohort-v2") or
+            if (!std.mem.eql(u8, fieldValue(line, "schema=") orelse return error.RealRowsOutputCohortUnauthenticated, "distribution-execution-cohort-v3") or
                 !std.mem.eql(u8, fieldValue(line, "source=") orelse return error.RealRowsOutputCohortUnauthenticated, "../ziglang/src/main.zig") or
                 !std.mem.eql(u8, fieldValue(line, "reference_status=") orelse return error.RealRowsOutputCohortUnauthenticated, "0") or
                 !std.mem.eql(u8, fieldValue(line, "linked_status=") orelse return error.RealRowsOutputCohortUnauthenticated, "0") or
@@ -71,7 +73,8 @@ pub fn validate(output: []const u8, mode: []const u8, cache_mode: CacheMode) !vo
                 if (!std.mem.eql(u8, function, member.function)) continue;
                 if (cohort_seen[index]) return error.RealRowsOutputCohortDuplicate;
                 if (!std.mem.eql(u8, fieldValue(line, "result=") orelse return error.RealRowsOutputCohortUnauthenticated, member.result) or
-                    !std.mem.eql(u8, fieldValue(line, "witness=") orelse return error.RealRowsOutputCohortUnauthenticated, member.witness))
+                    !std.mem.eql(u8, fieldValue(line, "witness=") orelse return error.RealRowsOutputCohortUnauthenticated, member.witness) or
+                    !std.mem.eql(u8, fieldValue(line, "observations=") orelse return error.RealRowsOutputCohortUnauthenticated, member.observations))
                 {
                     return error.RealRowsOutputCohortUnauthenticated;
                 }
@@ -90,7 +93,7 @@ pub fn validate(output: []const u8, mode: []const u8, cache_mode: CacheMode) !vo
             const required = [_][]const u8{
                 "counter_schema=distribution-real-rows-v2",   "limit=100",                  "candidate_rows=100",
                 "candidate_file_hash=" ++ denominator_sha256, "real_functions_lowered=100", "real_objects_emitted=100",
-                "real_native_linked=100",                     "real_executed=4",            "real_programs_ok=4",
+                "real_native_linked=100",                     "real_executed=5",            "real_programs_ok=5",
                 "first_failing_real_row=-",                   "first_failing_stage=-",      "local_fail=0",
             };
             for (required) |field| {
@@ -137,7 +140,7 @@ fn checkFields(line: []const u8, record_prefix: []const u8, allowed: []const u8)
         while (previous.next()) |prior| {
             if (std.mem.startsWith(u8, prior, field[0 .. equals + 1])) return error.RealRowsOutputDuplicateField;
         }
-        if (containsWord("limit candidate_rows real_functions_lowered real_objects_emitted real_native_linked real_executed real_programs_ok local_fail duration_ms descriptor_bytes object_bytes reference_bytes linked_bytes result witness reference_status linked_status", key)) {
+        if (containsWord("limit candidate_rows real_functions_lowered real_objects_emitted real_native_linked real_executed real_programs_ok local_fail duration_ms descriptor_bytes object_bytes reference_bytes linked_bytes result witness observations reference_status linked_status", key)) {
             if (value.len > 1 and value[0] == '0') return error.RealRowsOutputInvalidField;
             for (value) |c| if (!std.ascii.isDigit(c)) return error.RealRowsOutputInvalidField;
             _ = std.fmt.parseInt(u64, value, 10) catch return error.RealRowsOutputInvalidField;
@@ -160,7 +163,7 @@ test "summary rejects substring counters duplicate keys and malformed tokens" {
         try validate(valid, mode, .require_hit);
         const mutations = [_][2][]const u8{
             .{ "real_functions_lowered=100", "real_functions_lowered=1000" },
-            .{ "real_executed=4 real_programs_ok=4", "real_executed=40 real_programs_ok=40" },
+            .{ "real_executed=5 real_programs_ok=5", "real_executed=40 real_programs_ok=40" },
             .{ "local_fail=0", "local_fail=01" },
             .{ "local_fail=0", "not_local_fail=0" },
             .{ "local_fail=0", "local_fail=0 local_fail=1" },
@@ -190,20 +193,20 @@ test "field lookup matches a complete key and parser rejects malformed hashes" {
 }
 
 pub fn syntheticOutputForTest(mode: []const u8, cache_status: []const u8, allocator: std.mem.Allocator) ![]u8 {
-    return std.fmt.allocPrint(
-        allocator,
-        "distribution-real-rows selector_version=real-candidate-selector-v3 candidate_file=docs/evidence/real_candidates_release_v3.tsv candidate_file_hash={s} limit=100 strict=true\n" ++
-            "air-export-cache mode={s} status={s} duration_ms=1 cache_key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa descriptor_bytes=1\n" ++
-            "execution-cohort-row schema=distribution-execution-cohort-v2 mode={s} source=../ziglang/src/main.zig function=link.MachO.CodeSignature.Signature.size descriptor_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object_bytes=1 object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_bytes=1 reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa linked_bytes=1 linked_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa result=8 witness=31 result_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
-            "execution-cohort-row schema=distribution-execution-cohort-v2 mode={s} source=../ziglang/src/main.zig function=link.MachO.CodeSignature.Signature.slotType descriptor_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object_bytes=1 object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_bytes=1 reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa linked_bytes=1 linked_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa result=65536 witness=196615 result_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
-            "execution-cohort-row schema=distribution-execution-cohort-v2 mode={s} source=../ziglang/src/main.zig function=link.MachO.CodeSignature.Requirements.size descriptor_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object_bytes=1 object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_bytes=1 reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa linked_bytes=1 linked_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa result=12 witness=43 result_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
-            "execution-cohort-row schema=distribution-execution-cohort-v2 mode={s} source=../ziglang/src/main.zig function=link.MachO.CodeSignature.Requirements.slotType descriptor_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object_bytes=1 object_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_bytes=1 reference_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa linked_bytes=1 linked_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa result=2 witness=13 result_sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n" ++
-            "summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode={s} selector_version=real-candidate-selector-v3 candidate_file_hash={s} limit=100 candidate_rows=100 real_functions_lowered=100 real_objects_emitted=100 real_native_linked=100 real_executed=4 real_programs_ok=4 first_failing_real_row=- first_failing_stage=- local_fail=0\n",
-        .{ denominator_sha256, mode, cache_status, mode, mode, mode, mode, mode, denominator_sha256 },
-    );
+    var output = std.Io.Writer.Allocating.init(allocator);
+    defer output.deinit();
+    const writer = &output.writer;
+    const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    try writer.print("distribution-real-rows selector_version=real-candidate-selector-v3 candidate_file=docs/evidence/real_candidates_release_v3.tsv candidate_file_hash={s} limit=100 strict=true\n" ++
+        "air-export-cache mode={s} status={s} duration_ms=1 cache_key={s} descriptor_bytes=1\n", .{ denominator_sha256, mode, cache_status, hash });
+    for (members) |member| {
+        try writer.print("execution-cohort-row schema=distribution-execution-cohort-v3 mode={s} source=../ziglang/src/main.zig function={s} descriptor_sha256={s} object_bytes=1 object_sha256={s} reference_bytes=1 reference_sha256={s} linked_bytes=1 linked_sha256={s} result={s} witness={s} observations={s} result_sha256={s} reference_status=0 linked_status=0 real_executed=1 real_programs_ok=1\n", .{ mode, member.function, hash, hash, hash, hash, member.result, member.witness, member.observations, hash });
+    }
+    try writer.print("summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode={s} selector_version=real-candidate-selector-v3 candidate_file_hash={s} limit=100 candidate_rows=100 real_functions_lowered=100 real_objects_emitted=100 real_native_linked=100 real_executed=5 real_programs_ok=5 first_failing_real_row=- first_failing_stage=- local_fail=0\n", .{ mode, denominator_sha256 });
+    return output.toOwnedSlice();
 }
 
-test "four-member cohort output is exact and fails closed on drift" {
+test "five-member cohort output is exact and fails closed on drift" {
     const allocator = std.testing.allocator;
     const valid = try syntheticOutputForTest("ReleaseFast", "hit", allocator);
     defer allocator.free(valid);
@@ -213,7 +216,7 @@ test "four-member cohort output is exact and fails closed on drift" {
     try validate(fresh, "ReleaseFast", .fresh);
     try std.testing.expectError(error.RealRowsOutputCacheStatusMismatch, validate(fresh, "ReleaseFast", .require_hit));
 
-    const partial = try std.mem.replaceOwned(u8, allocator, valid, "real_executed=4 real_programs_ok=4", "real_executed=3 real_programs_ok=3");
+    const partial = try std.mem.replaceOwned(u8, allocator, valid, "real_executed=5 real_programs_ok=5", "real_executed=3 real_programs_ok=3");
     defer allocator.free(partial);
     try std.testing.expectError(error.RealRowsOutputCounterMismatch, validate(partial, "ReleaseFast", .require_hit));
     const wrong_mode = try std.mem.replaceOwned(u8, allocator, valid, "mode=ReleaseFast source=", "mode=ReleaseSafe source=");
@@ -240,4 +243,7 @@ test "four-member cohort output is exact and fails closed on drift" {
         error.RealRowsOutputCohortUnauthenticated,
         validate(slot_type_drift, "ReleaseFast", .require_hit),
     );
+    const partial_ascii = try std.mem.replaceOwned(u8, allocator, valid, "observations=256", "observations=255");
+    defer allocator.free(partial_ascii);
+    try std.testing.expectError(error.RealRowsOutputCohortUnauthenticated, validate(partial_ascii, "ReleaseFast", .require_hit));
 }

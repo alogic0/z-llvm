@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "date": "2026-11-02",
+  "status": "focused native and policy checks pass; cumulative Tier 3 pending",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "candidate_file": "docs/evidence/real_candidates_release_v3.tsv",
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "candidate_rows_per_mode": 100,
+  "selection_unchanged": true,
+  "cohort_schema": "distribution-execution-cohort-v3",
+  "executed_functions_per_mode": 5,
+  "ascii_input_observations_per_mode": 256,
+  "paired_ascii_observations": 768,
+  "oracle": "Independent high-bit classification, full 256-bit transcript, count 128, weighted witness 8256, exact stdout/stderr and exit status",
+  "native_negative_controls": [
+    {
+      "mode": "ReleaseFast",
+      "constant_result": 0,
+      "status": 1,
+      "rejected": true
+    },
+    {
+      "mode": "ReleaseFast",
+      "constant_result": 1,
+      "status": 1,
+      "rejected": true
+    },
+    {
+      "mode": "ReleaseSafe",
+      "constant_result": 0,
+      "status": 1,
+      "rejected": true
+    },
+    {
+      "mode": "ReleaseSafe",
+      "constant_result": 1,
+      "status": 1,
+      "rejected": true
+    },
+    {
+      "mode": "ReleaseSmall",
+      "constant_result": 0,
+      "status": 1,
+      "rejected": true
+    },
+    {
+      "mode": "ReleaseSmall",
+      "constant_result": 1,
+      "status": 1,
+      "rejected": true
+    }
+  ],
+  "native_evidence": "local-state/validations/export-execution-20261102/ascii-native/report.json",
+  "native_report_sha256": "1ef7b87c6ffde7eed6fd58f29b0931227340dd5906e0856f6844799cf6d5f146",
+  "fixtures": {
+    "src/testdata/ascii_ReleaseSmall.air": "47e5ea1bb331f730188d3d0f28e748a9a317fa9a60adb15416ddedb8526c9495",
+    "src/testdata/ascii_ReleaseSafe.air": "11a45e72d2bec6a1db582122c125c659cfd0deea350aef59076b746ec4df0e3e",
+    "src/testdata/ascii_ReleaseFast.air": "50d151a73c7ff04cd35cc02cbbd8d3f107603e4fdd2dcd5957127842e447ca33"
+  },
+  "remaining_acceptance": "Full fresh/cache pair against the final combined source snapshot. Accepted counters are unchanged until then.",
+  "archives_created": 0
+}

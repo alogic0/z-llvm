@@ -3,7 +3,7 @@ const air_export = @import("zig_air_export.zig");
 
 const Sha256 = std.crypto.hash.sha2.Sha256;
 
-pub const schema = "distribution-execution-cohort-v2";
+pub const schema = "distribution-execution-cohort-v3";
 pub const repository_root = "/home/oleg/prog/z_llvm";
 pub const external_repository_root = "/home/oleg/prog/ziglang";
 pub const external_revision = "1c08b09d1c847f4f02c8216e3b62df323861a437";
@@ -12,6 +12,7 @@ pub const import_path = "lib/std/std.zig";
 pub const use_path = "src/libs/mingw/implib.zig";
 pub const requirements_definition_path = "src/link/MachO/CodeSignature.zig";
 pub const requirements_import_path = "src/link/MachO.zig";
+pub const ascii_definition_path = "lib/std/ascii.zig";
 pub const expected_result: usize = 8;
 pub const expected_witness: usize = 31;
 pub const expected_stdout = "execution-oracle-v2 result=8 witness=31\n";
@@ -30,6 +31,7 @@ pub const Program = enum {
     signature_slot_type,
     requirements_size,
     requirements_slot_type,
+    ascii_is_ascii,
 
     pub fn functionName(program: Program) []const u8 {
         return switch (program) {
@@ -37,6 +39,7 @@ pub const Program = enum {
             .signature_slot_type => "link.MachO.CodeSignature.Signature.slotType",
             .requirements_size => "link.MachO.CodeSignature.Requirements.size",
             .requirements_slot_type => "link.MachO.CodeSignature.Requirements.slotType",
+            .ascii_is_ascii => "ascii.isAscii",
         };
     }
 
@@ -51,6 +54,7 @@ pub const Program = enum {
             .signature_slot_type => weak_external_linked_harness_source,
             .requirements_size => requirements_linked_harness_source,
             .requirements_slot_type => requirements_slot_type_linked_harness_source,
+            .ascii_is_ascii => ascii_linked_harness_source,
         };
     }
 
@@ -60,6 +64,7 @@ pub const Program = enum {
             .signature_slot_type => signature_slot_reference_harness_source,
             .requirements_size => requirements_reference_harness_source,
             .requirements_slot_type => requirements_slot_type_reference_harness_source,
+            .ascii_is_ascii => ascii_reference_harness_source,
         };
     }
 
@@ -69,11 +74,17 @@ pub const Program = enum {
             .signature_slot_type => 65536,
             .requirements_size => 12,
             .requirements_slot_type => 2,
+            .ascii_is_ascii => 128,
         };
     }
 
     pub fn expectedWitness(program: Program) usize {
+        if (program == .ascii_is_ascii) return 8256;
         return program.expectedResult() *% 3 +% 7;
+    }
+
+    pub fn observations(program: Program) usize {
+        return if (program == .ascii_is_ascii) 256 else 1;
     }
 
     pub fn expectedStdout(program: Program) []const u8 {
@@ -82,6 +93,7 @@ pub const Program = enum {
             .signature_slot_type => signature_slot_expected_stdout,
             .requirements_size => requirements_expected_stdout,
             .requirements_slot_type => requirements_slot_type_expected_stdout,
+            .ascii_is_ascii => ascii_expected_stdout,
         };
     }
 
@@ -89,6 +101,7 @@ pub const Program = enum {
         return switch (program) {
             .signature_size, .signature_slot_type => "fn (link.MachO.CodeSignature.Signature) u32",
             .requirements_size, .requirements_slot_type => "fn (link.MachO.CodeSignature.Requirements) u32",
+            .ascii_is_ascii => "fn (u8) bool",
         };
     }
 
@@ -96,6 +109,7 @@ pub const Program = enum {
         return switch (program) {
             .signature_size, .signature_slot_type => "u32",
             .requirements_size, .requirements_slot_type => "u32",
+            .ascii_is_ascii => "bool",
         };
     }
 };
@@ -105,6 +119,7 @@ pub const programs = [_]Program{
     .signature_slot_type,
     .requirements_size,
     .requirements_slot_type,
+    .ascii_is_ascii,
 };
 
 // Only harnesses are generated here. Every called definition is authenticated
@@ -140,6 +155,36 @@ pub const requirements_slot_type_linked_harness_source = makeLinkedHarness("link
 pub const signature_slot_expected_stdout = "execution-oracle-v2 result=65536 witness=196615\n";
 pub const requirements_expected_stdout = "execution-oracle-v2 result=12 witness=43\n";
 pub const requirements_slot_type_expected_stdout = "execution-oracle-v2 result=2 witness=13\n";
+
+const ascii_reference_harness_source = makeAsciiHarness(false);
+const ascii_linked_harness_source = makeAsciiHarness(true);
+const ascii_expected_stdout = "execution-oracle-v3 cases=256 result=128 witness=8256 bits=" ++
+    @as([128]u8, @splat('1')) ++ @as([128]u8, @splat('0')) ++ "\n";
+
+fn makeAsciiHarness(comptime linked: bool) []const u8 {
+    return "const std = @import(\"std\");\n" ++
+        (if (linked) "const is_ascii = @extern(*const fn (u8) callconv(.{ .x86_64_sysv = .{} }) bool, .{ .name = \"ascii.isAscii\" });\n" else "") ++
+        \\pub fn main(init: std.process.Init) !void {
+        \\    var result: u32 = 0;
+        \\    var witness: usize = 0;
+        \\    var bits: [256]u8 = undefined;
+        \\    for (0..256) |input| {
+        \\        const byte: u8 = @intCast(input);
+        \\
+    ++ (if (linked) "        const actual = is_ascii(byte);\n" else "        const actual = (input & 128) == 0;\n        _ = byte;\n") ++
+        \\        if (actual != ((input & 128) == 0)) return error.AsciiOracleMismatch;
+        \\        bits[input] = if (actual) '1' else '0';
+        \\        result += @intFromBool(actual);
+        \\        witness += if (actual) input + 1 else 0;
+        \\    }
+        \\    var buffer: [1024]u8 = undefined;
+        \\    var writer = std.Io.File.stdout().writer(init.io, &buffer);
+        \\    try writer.interface.print("execution-oracle-v3 cases=256 result={} witness={} bits={s}\n", .{ result, witness, &bits });
+        \\    try writer.interface.flush();
+        \\}
+        \\
+    ;
+}
 
 pub const Termination = enum {
     exited,
@@ -230,6 +275,7 @@ pub const SourceIdentity = struct {
     use_sha256: [Sha256.digest_length]u8,
     requirements_definition_sha256: [Sha256.digest_length]u8,
     requirements_import_sha256: [Sha256.digest_length]u8,
+    ascii_definition_sha256: [Sha256.digest_length]u8,
 };
 
 pub const OwnedSourceFiles = struct {
@@ -238,8 +284,10 @@ pub const OwnedSourceFiles = struct {
     use_source: []u8,
     requirements_definition: []u8,
     requirements_import_source: []u8,
+    ascii_definition: []u8,
 
     pub fn deinit(files: *OwnedSourceFiles, allocator: std.mem.Allocator) void {
+        allocator.free(files.ascii_definition);
         allocator.free(files.requirements_import_source);
         allocator.free(files.requirements_definition);
         allocator.free(files.use_source);
@@ -255,14 +303,28 @@ pub const OwnedSourceFiles = struct {
             .use_sha256 = sha256(files.use_source),
             .requirements_definition_sha256 = sha256(files.requirements_definition),
             .requirements_import_sha256 = sha256(files.requirements_import_source),
+            .ascii_definition_sha256 = sha256(files.ascii_definition),
         };
     }
 
     pub fn validate(files: *const OwnedSourceFiles) !void {
         try validateRequirementsSources(files.requirements_definition, files.requirements_import_source);
         try validateSignatureSource(files.requirements_definition);
+        try validateAsciiSource(files.ascii_definition, files.import_source);
     }
 };
+
+fn validateAsciiSource(definition: []const u8, import_source: []const u8) !void {
+    const body =
+        \\pub fn isAscii(c: u8) bool {
+        \\    return c < 128;
+        \\}
+    ;
+    if (std.mem.count(u8, definition, body) != 1 or
+        std.mem.count(u8, definition, "pub fn isAscii(") != 1 or
+        std.mem.count(u8, import_source, "pub const ascii = @import(\"ascii.zig\");") != 1)
+        return error.CohortSourceBindingMismatch;
+}
 
 fn validateSignatureSource(definition: []const u8) !void {
     const size_block =
@@ -326,11 +388,28 @@ pub fn sha256(bytes: []const u8) [Sha256.digest_length]u8 {
 
 pub fn validateHarnesses(program: Program) !void {
     const reference = program.referenceHarness();
+    if (program == .ascii_is_ascii) {
+        const linked = program.linkedHarness();
+        if (std.mem.count(u8, reference, "const actual = (input & 128) == 0;") != 1 or
+            std.mem.count(u8, reference, "ascii.isAscii") != 0 or
+            std.mem.count(u8, linked, "ascii.isAscii") != 1 or
+            std.mem.count(u8, linked, "const actual = is_ascii(byte);") != 1 or
+            std.mem.count(u8, linked, "fn (u8) callconv(.{ .x86_64_sysv = .{} }) bool") != 1)
+            return error.HarnessBindingMismatch;
+        for ([_][]const u8{ reference, linked }) |harness| {
+            if (std.mem.count(u8, harness, "for (0..256)") != 1 or
+                std.mem.count(u8, harness, "return error.AsciiOracleMismatch;") != 1 or
+                std.mem.count(u8, harness, "bits[input] = if (actual) '1' else '0';") != 1)
+                return error.HarnessBindingMismatch;
+        }
+        return;
+    }
     const reference_result = switch (program) {
         .signature_size => "const result: u32 = 8;",
         .signature_slot_type => "const result: u32 = 65536;",
         .requirements_size => "const result: u32 = 12;",
         .requirements_slot_type => "const result: u32 = 2;",
+        .ascii_is_ascii => unreachable,
     };
     if (std.mem.count(u8, reference, reference_result) != 1 or
         std.mem.count(u8, reference, "witness={}\\n") != 1 or
@@ -577,12 +656,15 @@ pub fn readCurrentSources(allocator: std.mem.Allocator, io: std.Io, max_bytes: u
     const requirements_definition = try root.readFileAlloc(io, requirements_definition_path, allocator, .limited(max_bytes));
     errdefer allocator.free(requirements_definition);
     const requirements_import_source = try root.readFileAlloc(io, requirements_import_path, allocator, .limited(max_bytes));
+    errdefer allocator.free(requirements_import_source);
+    const ascii_definition = try root.readFileAlloc(io, ascii_definition_path, allocator, .limited(max_bytes));
     return .{
         .definition = definition,
         .import_source = import_source,
         .use_source = use_source,
         .requirements_definition = requirements_definition,
         .requirements_import_source = requirements_import_source,
+        .ascii_definition = ascii_definition,
     };
 }
 
@@ -648,6 +730,51 @@ fn requireSemanticReturn(program: Program, function: air_export.Function) !void 
     if (matching_return_count != 1) return error.CohortDescriptorBindingMismatch;
 }
 
+fn requireAsciiDescriptor(function: air_export.Function) !void {
+    const structured = function.structured_air_v2 orelse return error.CohortDescriptorBindingMismatch;
+    var argument: ?air_export.TypedInstruction = null;
+    var comparison: ?air_export.TypedInstruction = null;
+    var returned: ?air_export.TypedInstruction = null;
+    for (structured.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, "arg")) {
+            if (argument != null or !std.mem.eql(u8, instruction.result_type, "u8") or
+                !std.mem.eql(u8, instruction.data_kind, "arg") or instruction.operands.len != 0)
+                return error.CohortDescriptorBindingMismatch;
+            argument = instruction;
+        } else if (std.mem.eql(u8, instruction.opcode, "cmp_lt")) {
+            if (comparison != null or !std.mem.eql(u8, instruction.result_type, "bool") or
+                !std.mem.eql(u8, instruction.data_kind, "bin_op") or instruction.operands.len != 2)
+                return error.CohortDescriptorBindingMismatch;
+            comparison = instruction;
+        } else if (std.mem.eql(u8, instruction.opcode, "ret") or std.mem.eql(u8, instruction.opcode, "ret_safe")) {
+            if (returned != null or !std.mem.eql(u8, instruction.result_type, "noreturn") or
+                !std.mem.eql(u8, instruction.data_kind, "un_op") or instruction.operands.len != 1)
+                return error.CohortDescriptorBindingMismatch;
+            returned = instruction;
+        } else if (!std.mem.eql(u8, instruction.opcode, "dbg_stmt") or
+            !std.mem.eql(u8, instruction.result_type, "void") or instruction.operands.len != 0)
+            return error.CohortDescriptorBindingMismatch;
+    }
+    const arg = argument orelse return error.CohortDescriptorBindingMismatch;
+    const cmp = comparison orelse return error.CohortDescriptorBindingMismatch;
+    const ret = returned orelse return error.CohortDescriptorBindingMismatch;
+    if (!std.mem.eql(u8, cmp.operands[0].kind, "inst") or !std.mem.eql(u8, cmp.operands[0].type_text, "u8") or
+        (std.fmt.parseUnsigned(u32, cmp.operands[0].value, 10) catch return error.CohortDescriptorBindingMismatch) != arg.index or
+        !std.mem.eql(u8, cmp.operands[1].kind, "const") or !std.mem.eql(u8, cmp.operands[1].type_text, "u8") or
+        !std.mem.eql(u8, ret.operands[0].kind, "inst") or !std.mem.eql(u8, ret.operands[0].type_text, "bool") or
+        (std.fmt.parseUnsigned(u32, ret.operands[0].value, 10) catch return error.CohortDescriptorBindingMismatch) != cmp.index)
+        return error.CohortDescriptorBindingMismatch;
+    var literal: ?[]const u8 = null;
+    for (cmp.details) |detail| {
+        if (!std.mem.eql(u8, detail.key, "operand1_text")) continue;
+        if (literal != null) return error.CohortDescriptorBindingMismatch;
+        literal = detail.value;
+    }
+    const threshold = try parseSemanticReturn(literal orelse return error.CohortDescriptorBindingMismatch);
+    if (!std.mem.eql(u8, threshold.type_text, "u8") or threshold.value != 128)
+        return error.CohortDescriptorBindingMismatch;
+}
+
 pub fn validateDescriptor(allocator: std.mem.Allocator, program: Program, descriptor: []const u8) !void {
     var module = air_export.parse(allocator, descriptor) catch
         return error.CohortDescriptorBindingMismatch;
@@ -659,7 +786,7 @@ pub fn validateDescriptor(allocator: std.mem.Allocator, program: Program, descri
     {
         return error.CohortDescriptorBindingMismatch;
     }
-    try requireSemanticReturn(program, function);
+    if (program == .ascii_is_ascii) try requireAsciiDescriptor(function) else try requireSemanticReturn(program, function);
 }
 
 pub fn canonicalExecutionRecord(
@@ -859,7 +986,7 @@ fn semanticDescriptorForTest(allocator: std.mem.Allocator, fixture: SemanticDesc
 }
 
 test "fixed cohort identities and harnesses are exact" {
-    try std.testing.expectEqual(@as(usize, 4), programs.len);
+    try std.testing.expectEqual(@as(usize, 5), programs.len);
     try std.testing.expectEqualStrings("link.MachO.CodeSignature.Signature.size", programs[0].functionName());
     try std.testing.expectEqualStrings("link.MachO.CodeSignature.Signature.slotType", programs[1].functionName());
     try std.testing.expectEqualStrings("link.MachO.CodeSignature.Requirements.size", programs[2].functionName());
@@ -875,6 +1002,75 @@ test "fixed cohort identities and harnesses are exact" {
     try std.testing.expectEqual(@as(usize, 43), programs[2].expectedWitness());
     try std.testing.expectEqual(@as(usize, 2), programs[3].expectedResult());
     try std.testing.expectEqual(@as(usize, 13), programs[3].expectedWitness());
+    try std.testing.expectEqual(@as(usize, 256), programs[4].observations());
+    try std.testing.expectEqual(@as(usize, 128), programs[4].expectedResult());
+    try std.testing.expectEqual(@as(usize, 8256), programs[4].expectedWitness());
+}
+
+test "ASCII source binding rejects threshold signature import and duplicate drift" {
+    const definition = "pub fn isAscii(c: u8) bool {\n    return c < 128;\n}";
+    const import_source = "pub const ascii = @import(\"ascii.zig\");";
+    try validateAsciiSource(definition, import_source);
+    try std.testing.expectError(error.CohortSourceBindingMismatch, validateAsciiSource("pub fn isAscii(c: u8) bool {\n    return c < 127;\n}", import_source));
+    try std.testing.expectError(error.CohortSourceBindingMismatch, validateAsciiSource("pub fn isAscii(c: i8) bool {\n    return c < 128;\n}", import_source));
+    try std.testing.expectError(error.CohortSourceBindingMismatch, validateAsciiSource(definition, ""));
+    try std.testing.expectError(error.CohortSourceBindingMismatch, validateAsciiSource(definition ++ definition, import_source));
+}
+
+test "ASCII descriptor binds argument unsigned comparison threshold and return in every mode" {
+    const fixtures = [_][]const u8{
+        @embedFile("testdata/ascii_ReleaseFast.air"),
+        @embedFile("testdata/ascii_ReleaseSafe.air"),
+        @embedFile("testdata/ascii_ReleaseSmall.air"),
+    };
+    for (fixtures) |fixture| {
+        try validateDescriptor(std.testing.allocator, .ascii_is_ascii, fixture);
+        var module = try air_export.parse(std.testing.allocator, fixture);
+        defer module.deinit();
+        const function = module.functions[0];
+        for (function.structured_air_v2.?.instructions) |*instruction| {
+            if (!std.mem.eql(u8, instruction.opcode, "cmp_lt")) continue;
+            const old_opcode = instruction.opcode;
+            instruction.opcode = "cmp_lte";
+            try std.testing.expectError(error.CohortDescriptorBindingMismatch, requireAsciiDescriptor(function));
+            instruction.opcode = old_opcode;
+            for (@constCast(instruction.details)) |*detail| {
+                if (!std.mem.eql(u8, detail.key, "operand1_text")) continue;
+                const old_value = detail.value;
+                detail.value = "<u8, 127>";
+                try std.testing.expectError(error.CohortDescriptorBindingMismatch, requireAsciiDescriptor(function));
+                detail.value = old_value;
+            }
+            const operand = &@constCast(instruction.operands)[0];
+            const old_value = operand.value;
+            operand.value = "999";
+            try std.testing.expectError(error.CohortDescriptorBindingMismatch, requireAsciiDescriptor(function));
+            operand.value = old_value;
+        }
+        var wrong_signature = function;
+        wrong_signature.type_text = "fn (i8) bool";
+        // The production entry validates the signature before inspecting the body.
+        const changed = try std.mem.replaceOwned(u8, std.testing.allocator, fixture, "fn (u8) bool", wrong_signature.type_text);
+        defer std.testing.allocator.free(changed);
+        try std.testing.expectError(error.CohortDescriptorBindingMismatch, validateDescriptor(std.testing.allocator, .ascii_is_ascii, changed));
+    }
+}
+
+test "ASCII execution transcript requires all 256 bits including the 127 to 128 boundary" {
+    const program: Program = .ascii_is_ascii;
+    const stdout = try std.testing.allocator.dupe(u8, program.expectedStdout());
+    defer std.testing.allocator.free(stdout);
+    var result: OwnedProcessResult = .{ .term = .{ .exited = 0 }, .stdout = stdout, .stderr = @constCast("") };
+    _ = try canonicalProgramExecutionRecord(result, program, true);
+    const start = std.mem.indexOf(u8, stdout, "bits=").? + "bits=".len;
+    for ([_]usize{ 0, 127, 128, 255 }) |input| {
+        const old = stdout[start + input];
+        stdout[start + input] = if (old == '1') '0' else '1';
+        try std.testing.expectError(error.ProcessInconsistent, canonicalProgramExecutionRecord(result, program, true));
+        stdout[start + input] = old;
+    }
+    result.stdout = stdout[0 .. stdout.len - 1];
+    try std.testing.expectError(error.ProcessInconsistent, canonicalProgramExecutionRecord(result, program, true));
 }
 
 test "signature source binding rejects changed constants and duplicate definitions" {

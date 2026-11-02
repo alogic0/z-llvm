@@ -446,6 +446,7 @@ fn syntheticCohortCandidate(source: []const u8, function: []const u8) Candidate 
 test "execution cohort denominator is exact rank independent and atomic" {
     var candidates: [100]Candidate = @splat(syntheticCohortCandidate("other", "other"));
     candidates[17] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Signature.size");
+    candidates[23] = syntheticCohortCandidate("../ziglang/src/main.zig", "ascii.isAscii");
     candidates[42] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Requirements.size");
     candidates[61] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Requirements.slotType");
     candidates[83] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Signature.slotType");
@@ -470,9 +471,11 @@ test "execution cohort denominator is exact rank independent and atomic" {
     try tracker.record(.requirements_size, .{ .real_executed = 1, .real_programs_ok = 1 });
     try std.testing.expectError(error.ExecutionCohortPartialCredit, tracker.finalize(&counters));
     try tracker.record(.requirements_slot_type, .{ .real_executed = 1, .real_programs_ok = 1 });
+    try std.testing.expectError(error.ExecutionCohortPartialCredit, tracker.finalize(&counters));
+    try tracker.record(.ascii_is_ascii, .{ .real_executed = 1, .real_programs_ok = 1 });
     try tracker.finalize(&counters);
-    try std.testing.expectEqual(@as(usize, 4), counters.real_executed);
-    try std.testing.expectEqual(@as(usize, 4), counters.real_programs_ok);
+    try std.testing.expectEqual(@as(usize, 5), counters.real_executed);
+    try std.testing.expectEqual(@as(usize, 5), counters.real_programs_ok);
 }
 
 fn airGenerationCacheKeyForTest(identity: DescriptorCacheIdentity) ![64]u8 {
@@ -1308,7 +1311,7 @@ fn runCohortPair(
     const linked_hex = std.fmt.bytesToHex(linked_identity.sha256, .lower);
     const result_hex = std.fmt.bytesToHex(reference_record.stdout_sha256, .lower);
     try stdout.print(
-        "execution-cohort-row schema={s} mode={s} source={s} function={s} descriptor_sha256={s} object_bytes={} object_sha256={s} reference_bytes={} reference_sha256={s} linked_bytes={} linked_sha256={s} result={} witness={} result_sha256={s} reference_status={} linked_status={} real_executed=1 real_programs_ok=1\n",
+        "execution-cohort-row schema={s} mode={s} source={s} function={s} descriptor_sha256={s} object_bytes={} object_sha256={s} reference_bytes={} reference_sha256={s} linked_bytes={} linked_sha256={s} result={} witness={} observations={} result_sha256={s} reference_status={} linked_status={} real_executed=1 real_programs_ok=1\n",
         .{
             execution_cohort.schema,
             mode.name(),
@@ -1323,6 +1326,7 @@ fn runCohortPair(
             &linked_hex,
             program.expectedResult(),
             program.expectedWitness(),
+            program.observations(),
             &result_hex,
             reference_record.status,
             linked_record.status,

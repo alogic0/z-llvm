@@ -4,6 +4,15 @@ The project has separate optimizer and backend comparisons. Their populations
 and transformation owners must remain explicit; see [current architecture](architecture.md)
 and [pipelines](pipelines.md).
 
+The compiler-core execution cohort now includes `ascii.isAscii` within the
+unchanged 100-row selector-v3 population. Its independent bit-mask oracle checks
+all 256 byte inputs and the entire ordered result transcript in each release
+mode. The [focused evidence](evidence/ascii_execution_20261102.json) records 768
+matching observations and six rejected constant-result implementations.
+Schema-3 cohort records distinguish five executed functions from their input
+observations: 256 for ASCII and one for each retained constant method. Accepted
+counters remain at the previous checkpoint until cumulative Tier 3 passes.
+
 | Runner | Local path | Independent reference and boundary |
 | --- | --- | --- |
 | `zig build compare-opt` | Named optimizer fixture/pass pairs. | Normalized LLVM `opt-22` output for equivalent rows; local golden output for explicitly conservative/preservation rows. |
