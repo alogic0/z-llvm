@@ -1,0 +1,392 @@
+{
+  "schema": 1,
+  "source_revision": "0ebd90dd4baa29c001c9b282f12c4863112d9660",
+  "project_allocated_before": 19692404736,
+  "filesystem_available_before": 52927352832,
+  "archives_created": 0,
+  "export_checks": [
+    {
+      "mode": "ReleaseFast",
+      "retained_accepted": {
+        "path": "local-state/caches/current-pin-acceptance-20261102-r2/ReleaseFast/export/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.air",
+        "sha256": "e4cc24d5efee4cc82691b4a54a532b19227ef2790948bf39933503e458132995",
+        "bytes": 1343891552,
+        "metadata": "local-state/caches/current-pin-acceptance-20261102-r2/ReleaseFast/export/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.meta",
+        "metadata_sha256": "99072c2adc01e299ae4c02903863cd92c8ee4a70c11453f8dfb961214147150e"
+      },
+      "retained_frozen_input": {
+        "path": "local-state/caches/test-real-rows/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.air",
+        "sha256": "c174c6552a17794c0f82f936b0373f7a8d0cf943460007182d7c20c06beabd2a",
+        "bytes": 1343891552
+      },
+      "obsolete_failed_export": {
+        "path": "local-state/validations/cyclic-byte-transfers-20261007/project-improvement/ReleaseFast/work_test/compiler.air",
+        "sha256": "5c84587d19cb2a5867e337d5cf6bd46a40f829de8d6343d90cecee6900e16784",
+        "bytes": 1343891552,
+        "identical_to_accepted": false,
+        "identical_to_frozen": false
+      }
+    },
+    {
+      "mode": "ReleaseSafe",
+      "retained_accepted": {
+        "path": "local-state/caches/current-pin-acceptance-20261102-r2/ReleaseSafe/export/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.air",
+        "sha256": "83e45f02dcec330b298d7610dff0ec4c145904e9af7d00aa375bbc9766b63508",
+        "bytes": 1473501276,
+        "metadata": "local-state/caches/current-pin-acceptance-20261102-r2/ReleaseSafe/export/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.meta",
+        "metadata_sha256": "40eb1144e7d015ac86e815940c80390cbb529652d3672ce5326a4b334671d819"
+      },
+      "retained_frozen_input": {
+        "path": "local-state/caches/test-real-rows/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.air",
+        "sha256": "7b34676ca48eaeec0416bdb50a77b910c038dac88a40df3e7ed703c2e0d714c6",
+        "bytes": 1473501276
+      },
+      "obsolete_failed_export": {
+        "path": "local-state/validations/cyclic-byte-transfers-20261007/project-improvement/ReleaseSafe/work_test/compiler.air",
+        "sha256": "3ff282f914261e7618d33a290b78d9e18ed55cc7f32163352f7a1329539b4a3c",
+        "bytes": 1473501276,
+        "identical_to_accepted": false,
+        "identical_to_frozen": false
+      }
+    },
+    {
+      "mode": "ReleaseSmall",
+      "retained_accepted": {
+        "path": "local-state/caches/current-pin-acceptance-20261102-r2/ReleaseSmall/export/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.air",
+        "sha256": "e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809",
+        "bytes": 1106432911,
+        "metadata": "local-state/caches/current-pin-acceptance-20261102-r2/ReleaseSmall/export/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.meta",
+        "metadata_sha256": "705a9f0c043d8e195215966cf705bb97dfe4b0cdbf1830f141d3441385e7ae05"
+      },
+      "retained_frozen_input": {
+        "path": "local-state/caches/test-real-rows/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.air",
+        "sha256": "5ff91e8e1a86d214c7af8e6ab1c72b3b509564470b5d225b1433dc9b8cc25f5d",
+        "bytes": 1106432911
+      },
+      "obsolete_failed_export": {
+        "path": "local-state/validations/cyclic-byte-transfers-20261007/project-improvement/ReleaseSmall/work_test/compiler.air",
+        "sha256": "e91f082b74e2c322b00ea2ac478eaf07162166f18637ff036cc4ac89d7c6fc8b",
+        "bytes": 1106432911,
+        "identical_to_accepted": false,
+        "identical_to_frozen": false
+      }
+    }
+  ],
+  "date": "2026-11-02",
+  "status": "deleted-and-verified",
+  "items": [
+    {
+      "path": ".zig-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        54302392,
+        4096,
+        1793652060552112204,
+        16893
+      ],
+      "allocated_bytes": 3585601536,
+      "files_removed": 1479,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/current-pin-20261102/hello-final/global-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        54426517,
+        4096,
+        1793643030795049985,
+        16893
+      ],
+      "allocated_bytes": 42078208,
+      "files_removed": 561,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/current-pin-20261102/ReleaseFast/discovery-3/execution-cohort-v1/link.MachO.CodeSignature.Requirements.slotType/zig-global-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        54701499,
+        4096,
+        1793642321976839347,
+        16893
+      ],
+      "allocated_bytes": 48971776,
+      "files_removed": 704,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/current-pin-20261102/ReleaseFast/discovery-3/execution-cohort-v1/link.MachO.CodeSignature.Requirements.size/zig-global-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        54700393,
+        4096,
+        1793642292095536395,
+        16893
+      ],
+      "allocated_bytes": 48975872,
+      "files_removed": 704,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/current-pin-20261102/ReleaseFast/discovery-3/execution-cohort-v1/link.MachO.CodeSignature.Signature.slotType/zig-global-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        54831193,
+        4096,
+        1793642382604516759,
+        16893
+      ],
+      "allocated_bytes": 48988160,
+      "files_removed": 704,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/current-pin-20261102/ReleaseFast/discovery-3/execution-cohort-v1/link.MachO.CodeSignature.Signature.size/zig-global-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        54824804,
+        4096,
+        1793642351724133567,
+        16893
+      ],
+      "allocated_bytes": 48971776,
+      "files_removed": 704,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/current-pin-20261102/ReleaseFast/discovery/execution-cohort-v1/link.MachO.CodeSignature.Requirements.slotType/zig-global-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        54422318,
+        4096,
+        1793641335573646423,
+        16893
+      ],
+      "allocated_bytes": 48971776,
+      "files_removed": 704,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/current-pin-20261102/ReleaseFast/discovery/execution-cohort-v1/link.MachO.CodeSignature.Requirements.size/zig-global-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        54305477,
+        4096,
+        1793641306066536331,
+        16893
+      ],
+      "allocated_bytes": 48988160,
+      "files_removed": 704,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/current-pin-20261102/ReleaseFast/discovery/execution-cohort-v1/link.MachO.CodeSignature.Signature.slotType/zig-global-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        54425068,
+        4096,
+        1793641393929850647,
+        16893
+      ],
+      "allocated_bytes": 48971776,
+      "files_removed": 704,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/current-pin-20261102/ReleaseFast/discovery/execution-cohort-v1/link.MachO.CodeSignature.Signature.size/zig-global-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        54423889,
+        4096,
+        1793641364749743423,
+        16893
+      ],
+      "allocated_bytes": 48975872,
+      "files_removed": 704,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/current-pin-20261102/abi-final-r3/global-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        54422159,
+        4096,
+        1793649028222269764,
+        16893
+      ],
+      "allocated_bytes": 42070016,
+      "files_removed": 560,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/current-pin-20261102/hello-folded/global-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        55086936,
+        4096,
+        1793642811232719846,
+        16893
+      ],
+      "allocated_bytes": 42074112,
+      "files_removed": 561,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/current-pin-20261102/abi-verified/global-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        54431738,
+        4096,
+        1793641632388379739,
+        16893
+      ],
+      "allocated_bytes": 42070016,
+      "files_removed": 560,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/test-real-rows/zig-cache",
+      "kind": "directory",
+      "reason": "Rebuildable idle compiler cache; remove the whole owned cache including manifests and objects. Surrounding sources, outputs and logs remain.",
+      "identity": [
+        66306,
+        56392339,
+        4096,
+        1791387980502653297,
+        16893
+      ],
+      "allocated_bytes": 188338176,
+      "files_removed": 1029,
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/cyclic-byte-transfers-20261007/project-improvement/ReleaseFast/work_test/compiler.air",
+      "kind": "file",
+      "reason": "Superseded selector-v2 failed-run output: ReleaseSmall rejected the export at math.raiseInvalid and the other modes were reaped. Selector-v3 migration and accepted fresh/cache runs supersede that failure. Preserve failure manifest/results/logs and cyclic-transfer measurements. This is not a byte-identical duplicate.",
+      "identity": [
+        66306,
+        56390951,
+        1343891552,
+        1791386240131925267,
+        33204
+      ],
+      "allocated_bytes": 1343897600,
+      "sha256": "5c84587d19cb2a5867e337d5cf6bd46a40f829de8d6343d90cecee6900e16784",
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/cyclic-byte-transfers-20261007/project-improvement/ReleaseSafe/work_test/compiler.air",
+      "kind": "file",
+      "reason": "Superseded selector-v2 failed-run output: ReleaseSmall rejected the export at math.raiseInvalid and the other modes were reaped. Selector-v3 migration and accepted fresh/cache runs supersede that failure. Preserve failure manifest/results/logs and cyclic-transfer measurements. This is not a byte-identical duplicate.",
+      "identity": [
+        66306,
+        56392037,
+        1473501276,
+        1791387398284774768,
+        33204
+      ],
+      "allocated_bytes": 1473515520,
+      "sha256": "3ff282f914261e7618d33a290b78d9e18ed55cc7f32163352f7a1329539b4a3c",
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/cyclic-byte-transfers-20261007/project-improvement/ReleaseSmall/work_test/compiler.air",
+      "kind": "file",
+      "reason": "Superseded selector-v2 failed-run output: ReleaseSmall rejected the export at math.raiseInvalid and the other modes were reaped. Selector-v3 migration and accepted fresh/cache runs supersede that failure. Preserve failure manifest/results/logs and cyclic-transfer measurements. This is not a byte-identical duplicate.",
+      "identity": [
+        66306,
+        56389909,
+        1106432911,
+        1791386056215648029,
+        33204
+      ],
+      "allocated_bytes": 1106440192,
+      "sha256": "e91f082b74e2c322b00ea2ac478eaf07162166f18637ff036cc4ac89d7c6fc8b",
+      "deleted": true
+    }
+  ],
+  "tracked_files_verified": 2548,
+  "scratch_files_verified": 13,
+  "protected_files_verified": 23982,
+  "outside_project_deletions": 0,
+  "completed_utc": "2026-11-02T21:37:45.914104+00:00",
+  "allocated_bytes_removed": 8257900544,
+  "project_allocated_after_deletion": 11441938432,
+  "filesystem_available_after_deletion": 61177397248,
+  "validation": "All tracked files and scratch inputs match their before-cleanup SHA-256. Protected validation outputs, artifact objects, inputs, baseline worktree and installed compiler match before-cleanup file identities.",
+  "project_allocated_reclaimed_after_deletion": 8250466304,
+  "scope": "User-authorized generated-state cleanup inside /home/oleg/prog/z_llvm; no compiler, selector, gate, acceptance-counter, toolchain or source-probe changes.",
+  "retained": [
+    "Accepted fresh/cached full logs, summaries, source snapshot and comparison evidence",
+    "Three authenticated accepted AIR exports and three separately frozen selector inputs, verified against their own hashes",
+    "All 13 original source probes in scratch/",
+    "Frozen performance inputs, outputs and baseline checkout",
+    "Installed project compiler and required sibling Zig/LLVM toolchains",
+    "Artifact-store objects and manifests",
+    "Historical failed-run manifests, result records and logs"
+  ],
+  "diagnostic_classification": "The retired raw exports have the same lengths as current exports but different SHA-256 values. They belong to an obsolete selector-v2 run: ReleaseSmall reported export-invalid at math.raiseInvalid, then ReleaseFast and ReleaseSafe were killed by the runner. The selector-v3 membership audit and accepted fresh/cache run supersede that failure. These outputs are not classified as byte-identical duplicates.",
+  "validation_policy": "Documentation and generated-state cleanup only. Reuse unchanged accepted compiler/integration evidence; do not repeat distribution-all.",
+  "operating_evidence": "local-state/validations/space-cleanup-20261102",
+  "next_priorities": [
+    "Publish AIR exports atomically without retaining duplicate working/cache payloads; preserve authenticated identity and failure evidence, then measure one fresh/cache pair.",
+    "Expand execution inside the fixed 100-row compiler-core population: ascii.isAscii over all 256 byte values in every release mode.",
+    "Run a further unchanged upstream program with input-dependent branching or memory effects."
+  ],
+  "checks": [
+    {
+      "argv": [
+        "zig",
+        "build",
+        "check-docs"
+      ],
+      "returncode": 0,
+      "result": "documentation check ok: 19 current documents, 131 internal file links, 2 status blocks"
+    },
+    {
+      "argv": [
+        "zig",
+        "build",
+        "artifact-store",
+        "--",
+        "gc",
+        "--pins",
+        "docs/evidence/artifacts"
+      ],
+      "returncode": 0,
+      "result": "artifact-store gc files=0 bytes=0 deleted=false"
+    }
+  ],
+  "no_compiler_tests_repeated": true,
+  "project_allocated_after_checks": 11464744960,
+  "project_allocated_reclaimed_after_checks": 8227659776,
+  "filesystem_available_after_checks": 61114654720,
+  "recreated_build_cache_bytes": 22790144,
+  "measurement_note": "Removed-byte totals are measured allocated blocks of classified targets. Net project recovery subtracts rebuilt documentation/artifact tools and cleanup metadata. Global filesystem free space can vary with unrelated processes."
+}

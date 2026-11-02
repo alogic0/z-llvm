@@ -76,8 +76,15 @@ The fresh validation used a hash-checked cleanup wrapper; its disk observations
 do not establish the existing footprint forecast. Keep ownership, cache identity
 and failure evidence intact, and measure both fresh and cached behavior.
 
+The [space cleanup](evidence/space_cleanup_20261102.json) retired obsolete
+selector-v2 failed-run exports and idle compiler caches while preserving the
+accepted exports, frozen selector inputs, logs, measurements and source probes.
+This reclaims generated state; production export publication still needs the
+repair above.
+
 Then increase execution coverage within the fixed 100-row population, starting
-with a finite-input function such as `ascii.isAscii`. Prefer a subsequent
+with a finite-input function such as `ascii.isAscii`, checking all 256 byte
+inputs in each release mode against an independent oracle. Prefer a subsequent
 unchanged upstream program with input-dependent branching or memory effects.
 Keep unsupported optional ABIs, wider varargs and runtime boundaries explicit.
 Use the frozen performance baseline for measured comparisons and the

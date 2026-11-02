@@ -1,11 +1,11 @@
 # Current keep-list, reviewed 2026-11-02. Historical pins retired by the authorized improvement plan.
-# Obsolete compiler caches were removed from retained validation roots; sources, logs and frozen measurement outputs remain.
+# The 2026-11-02 space cleanup retired superseded failed exports and idle compiler caches; sources, logs and frozen measurement outputs remain.
 path	class	pin_or_key	reason
 local-state/artifacts	retained-evidence	manifests/*.json + docs/evidence/artifacts/*.json	Verified legacy payloads, accepted evidence, unique source and unresolved diagnostics; collect only with versioned pins
 local-state/inputs/o2-calls	current-input	compiler-rt-v1	Small adopted performance input metadata
 tmp/o2_calls_perf	current-consumer	tools/o2_compiler_rt_v1_calls_performance.zig	Adopted compiler-rt workload and baseline checkout; migrate this consumer before removal
 ../ziglang	compiler-dependency	1c08b09d1c847f4f02c8216e3b62df323861a437	Required patched source, stage4 emitter and build state; outside blanket cleanup
-.zig-cache	current-build-cache	.zigversion=0.17.0	Current unit, compiler and integration builds; reuse during this development state
+.zig-cache	disposable-build-cache	.zigversion=0.17.0	Rebuildable current tools; remove the complete cache only while idle, including both object and manifest directories
 zig-out	current-build-output	current project build	Current z_llvm executable used by native and integration checks
 local-state/validations/project-improvement	validation-root	completed fresh/cache pair	Empty root reserved for next runs; completed logs are versioned in docs/evidence/project_improvement
 local-state/caches/project-improvement	reserved-cache-root	empty root	Reserved for future runs; the superseded bdee02bc export generation was removed in the 2026-11-02 cleanup
@@ -20,8 +20,9 @@ local-state/validations/fixed-program-baseline-20260926	measurement-evidence	doc
 local-state/validations/composed-memcpy-20260926	validation-evidence	docs/evidence/composed_memcpy_family.md	Retained input identities, baseline compiler, native differential checks, discovery comparison, full integration and fixed-program comparison; retain through next memory-family checkpoint
 local-state/validations/cyclic-byte-memory-20260926	validation-evidence	docs/evidence/composed_byte_loops.md	Exact strncpy/comparison definitions, return-join reproduction, native and ABI checks, final discovery, full integration and fixed-program comparison; retain through next capability checkpoint
 local-state/validations/loops-memory-repair-20261007	measurement-evidence	docs/evidence/loops_memory_repair.md	Two baseline runs, exact compiler/objects/drivers, commands and verified 15-pair matrix; retain for comparison with future optimizer updates
-local-state/validations/cyclic-byte-transfers-20261007	validation-evidence	docs/evidence/cyclic_byte_transfers.md	Cyclic byte-vector transfers, loop-carried XMM ownership proof, verifier dead_on_unwind support, and integration gates
+local-state/validations/cyclic-byte-transfers-20261007	validation-evidence	docs/evidence/cyclic_byte_transfers.md	Cyclic byte-vector transfers, loop-carried XMM ownership proof, verifier dead_on_unwind support, and measurements; obsolete selector-v2 failed-run AIR outputs retired, failure records retained
 local-state/validations/current-pin-20261102	frozen-input-and-validation	selector-v3 inventory SHA 02467d46d90511ba3f88647aa62267a4ee69ea92a56811f59618c5b45a4cca51	Retain the eligibility inventory, membership derivation, staged-slice proofs and final ABI evidence; disposable compiler caches may be removed
 local-state/validations/current-pin-acceptance-20261102	superseded-diagnostics	FMA identity audit	Retain the stopped-run log, exact assembly comparison, FMA native audit and cache-retirement records; retired AIR cache payloads are not current consumers
 local-state/validations/current-pin-acceptance-20261102-r2	accepted-validation	docs/evidence/current_pin_acceptance_20261102.json	Full fresh/cached logs, source snapshot, comparison, exact commands, exit statuses and verified duplicate-cleanup records
 local-state/caches/current-pin-acceptance-20261102-r2	current-air-cache	generation schema 3; Zig pin 1c08b09d1	Three authenticated release-mode exports backing the accepted strict 100-row population; executions are never cached
+local-state/validations/space-cleanup-20261102	cleanup-evidence	docs/evidence/space_cleanup_20261102.json	Classified deletion plan, before/after identities and hashes, physical-space measurements, and documentation/artifact-store checks; metadata only, no archives

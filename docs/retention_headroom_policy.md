@@ -33,6 +33,17 @@ AIR exports. Exclude active processes and runs. Record the classified paths,
 retained evidence, remaining exceptions, and measured physical space reclaimed.
 Do not create a permanent duplicate archive of the original run trees.
 
+Remove idle compiler caches as complete owned roots, including their object
+and manifest directories together. Keeping manifests after removing only the
+referenced objects can leave stale compiler-cache entries. Preserve final
+outputs, captured inputs, logs and measurements outside those cache roots;
+the next build recreates the cache.
+
+The [2026-11-02 cleanup](evidence/space_cleanup_20261102.json) records the
+retirement of the superseded selector-v2 failed-run exports and idle compiler
+caches. The authenticated accepted exports and the separately frozen selector
+inputs remain pinned. Equal file sizes do not establish duplicate content.
+
 Use unique run-owned directories for new work. Successful temporary tests clean
 up their own fixtures. A failed test may retain a bounded diagnostic fixture,
 but it must report that location and must not turn it into a test prerequisite.
