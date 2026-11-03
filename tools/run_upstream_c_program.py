@@ -46,6 +46,13 @@ def run_variadic_canary(runner, directory, zllvm, environment):
 
 
 MEMORY_CANARIES = {
+    "module_dependencies": {
+        "prefix": "module-dependencies", "fixture": "module_dependencies",
+        "functions": {"module_entry_impl", "module_middle", "module_leaf", "debug.module_callback_impl", "module_slot_impl", "module_get_slot", "module_fib_impl"},
+        "codegen_args": ["--codegen-reachable"],
+        "observations": 55,
+        "stdout": "module-dependencies observations=55 aliases=helpers=recursion=callbacks=imports=guards=preserved\n",
+    },
     "array_stride": {
         "prefix": "array-stride", "fixture": "array_stride",
         "functions": {"array_stride_eight", "array_stride_padding", "array_stride_nested", "array_stride_loaded"},
@@ -108,6 +115,64 @@ MEMORY_CANARIES = {
 }
 
 
+def require_module_dependency_object(path):
+    contract = object_contract(path)
+    symbols = {row[0]: row for row in contract["symbols"]}
+    imports = {name for name, row in symbols.items() if row[3] == ""}
+    if imports != {"module_external_word"} or any(name.startswith("module_dead") for name in symbols):
+        raise RuntimeError("module dependency imports or dead-definition exclusion differ")
+    exported = {"module_entry", "module_fib", "module_callback", "module_callback_alias", "module_get_slot"}
+    local = {"module_entry_alias", "module_entry_impl", "module_middle", "module_leaf", "module_fib_impl",
+             "debug.module_callback_impl", "module_callback_first", "module_callback_second", "module_slot_impl", "module_private_slot"}
+    for names, binding in ((exported, 1), (local, 0)):
+        if any(name not in symbols or symbols[name][1] >> 4 != binding or not symbols[name][3] for name in names):
+            raise RuntimeError("module dependency definition or symbol binding differs")
+    for alias, target in (("module_entry", "module_entry_impl"), ("module_callback_alias", "module_callback"),
+                          ("module_callback_first", "debug.module_callback_impl")):
+        if symbols[alias][3:] != symbols[target][3:]:
+            raise RuntimeError("module dependency alias target differs")
+    if any(symbols[name][2] != 2 for name in ("module_callback_alias", "module_get_slot")):
+        raise RuntimeError("module dependency hidden visibility differs")
+    write_json(path.with_suffix(".contract.json"), contract)
+
+
+def run_module_dependency_controls(runner, directory, zllvm, environment, report):
+    fixture = (ROOT / "test/real_programs/module_dependencies.ll").read_text()
+    cases = {
+        "reachable-unsupported": (fixture.replace("@module_dead_alias = internal alias", "@module_dead_alias = alias"), "function=module_dead"),
+        "opaque-coverage": (fixture + "\n!0 = !{ptr @module_dead}\n", "coverage=conservative"),
+        "alias-cycle": ("@a = alias i64 (), ptr @b\n@b = internal alias i64 (), ptr @a\n", "UnresolvedAliasTarget"),
+        "alias-external": ("@a = alias i64 (), ptr @external\ndeclare i64 @external()\n", "UnresolvedAliasTarget"),
+        "unsupported-global": ("@value = global double 1.0\n", "UnsupportedGlobalData"),
+        "weak-alias": (fixture.replace("@module_entry = alias", "@module_entry = weak alias"), "UnsupportedAliasLinkage"),
+        "weak-function": (fixture.replace("define hidden ptr @module_get_slot", "define weak hidden ptr @module_get_slot"), "UnsupportedFunctionLinkage"),
+        "module-assembly": ('module asm ".quad missing"\n', "UnsupportedModuleAssembly"),
+    }
+    for name, (source, diagnostic) in cases.items():
+        path = directory / ("module-dependencies-" + name + ".ll")
+        path.write_text(source)
+        stem = path.with_suffix("")
+        status = runner.run([zllvm, "--codegen-reachable", "--generic-cfg-selector", "--report-all-codegen-failures",
+                             "--target=x86_64-unknown-linux-gnu", "--emit=obj", path], stem, environment)
+        if status == 0 or stem.with_suffix(".stdout").read_bytes() or diagnostic not in stem.with_suffix(".stderr").read_text(errors="replace"):
+            raise RuntimeError("module dependency rejection did not fail before object publication: " + name)
+        report["module_dependencies_negative_controls"] = report.get("module_dependencies_negative_controls", 0) + 1
+    # Separate stderr writers must append when redirected to a regular file:
+    # both the selection coverage and the immediate function error are evidence.
+    path = directory / "module-dependencies-reachable-unsupported.ll"
+    stem = directory / "module-dependencies-immediate-failure"
+    status = runner.run([zllvm, "--codegen-reachable", "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", "--emit=obj", path], stem, environment)
+    diagnostic = stem.with_suffix(".stderr").read_text(errors="replace")
+    if status == 0 or stem.with_suffix(".stdout").read_bytes() or not diagnostic.startswith("summary zllvm-codegen-selection mode=reachable coverage=complete ") or "codegen failed for function module_dead:" not in diagnostic:
+        raise RuntimeError("immediate module dependency failure lost selection or function diagnostics")
+    report["module_dependencies_negative_controls"] += 1
+    stem = directory / "module-dependencies-assembly-boundary"
+    status = runner.run([zllvm, "--codegen-reachable", "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", "--emit=asm", path], stem, environment)
+    if status == 0 or stem.with_suffix(".stdout").read_bytes() or "UnsupportedReachableAssembly" not in stem.with_suffix(".stderr").read_text(errors="replace"):
+        raise RuntimeError("unsupported reachable assembly output did not reject")
+    report["module_dependencies_negative_controls"] += 1
+
+
 def run_memory_canary(runner, directory, zllvm, environment, mode, report, population):
     canary = MEMORY_CANARIES[population]
     prefix = canary["prefix"]
@@ -131,11 +196,21 @@ def run_memory_canary(runner, directory, zllvm, environment, mode, report, popul
             source = directory / (prefix + "-optimized.ll")
             source.write_bytes(stem.with_suffix(".stdout").read_bytes())
         stem = directory / (prefix + "-" + route + "-object")
-        arguments = ["--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", source]
+        arguments = [*canary.get("codegen_args", []), "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", source]
         if runner.run([zllvm, "--emit=obj", *arguments], stem, environment):
             raise RuntimeError(prefix + " local object failed")
         obj = directory / (prefix + "-" + route + ".o")
         obj.write_bytes(stem.with_suffix(".stdout").read_bytes())
+        if population == "module_dependencies":
+            if "coverage=complete" not in stem.with_suffix(".stderr").read_text():
+                raise RuntimeError("module dependency native fixture lost complete reference coverage")
+            require_module_dependency_object(obj)
+            if route == "direct":
+                env_stem = directory / (prefix + "-environment-object")
+                env_args = [arg for arg in arguments if arg != "--codegen-reachable"]
+                if runner.run([zllvm, "--emit=obj", *env_args], env_stem, {**environment, "ZLLVM_CODEGEN_REACHABLE": "1"}) or env_stem.with_suffix(".stdout").read_bytes() != obj.read_bytes():
+                    raise RuntimeError("module dependency CLI/environment selection differs")
+                report["module_dependencies_environment_checks"] = report.get("module_dependencies_environment_checks", 0) + 1
         stem = directory / (prefix + "-" + route + "-owners")
         if runner.run([zllvm, "--emit=selection-owner-manifest", *arguments], stem, environment):
             raise RuntimeError(prefix + " ownership inspection failed")
@@ -147,6 +222,8 @@ def run_memory_canary(runner, directory, zllvm, environment, mode, report, popul
             raise RuntimeError(prefix + " local link failed")
         require_observation(runner, executable, expected, directory / (prefix + "-" + route + "-run"), environment)
         report[population + "_local_observations"] += canary["observations"]
+    if population == "module_dependencies":
+        run_module_dependency_controls(runner, directory, zllvm, environment, report)
 
 
 def main():
@@ -175,7 +252,8 @@ def main():
               "global_addresses_local_observations": 0, "global_addresses_reference_observations": 0,
               "global_memory_local_observations": 0, "global_memory_reference_observations": 0,
               "boolean_calls_local_observations": 0, "boolean_calls_reference_observations": 0,
-              "array_stride_local_observations": 0, "array_stride_reference_observations": 0, "rows": []}
+              "array_stride_local_observations": 0, "array_stride_reference_observations": 0,
+              "module_dependencies_local_observations": 0, "module_dependencies_reference_observations": 0, "rows": []}
     try:
         if platform.system() != "Linux" or platform.machine() != "x86_64":
             raise RuntimeError("this bounded gate requires x86_64 Linux")
@@ -216,7 +294,7 @@ def main():
                            "global_addresses.ll", "global_addresses_driver.c",
                            "global_memory.ll", "global_memory_driver.c",
                            "boolean_calls.ll", "boolean_calls_driver.c",
-                           "array_stride.ll", "array_stride_driver.c")}})
+                           "array_stride.ll", "array_stride_driver.c", "module_dependencies.ll", "module_dependencies_driver.c")}})
         environment = {k: v for k, v in os.environ.items() if not k.startswith(("ZLLVM_", "ZIG_USE_ZLLVM"))}
         environment.update({"ZIG_LOCAL_CACHE_DIR": str(output / "frontend-cache"),
                             "ZIG_GLOBAL_CACHE_DIR": str(output / "global-cache")})
@@ -295,8 +373,9 @@ def main():
         print(f"summary integer-pointer-casts population=standalone-integer-pointer-casts routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['integer_pointer_local_observations']} reference_observations={report['integer_pointer_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary signed-nonnegative population=standalone-signed-nonnegative routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['signed_nonnegative_local_observations']} reference_observations={report['signed_nonnegative_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary type-layout-padding population=standalone-type-allocation-padding routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['type_layout_padding_local_observations']} reference_observations={report['type_layout_padding_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
-        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride"):
-            print(f"summary {population.replace('_', '-')} population=standalone-{population.replace('_', '-')} routes=direct,release modes={report.get('program_modes', 0)} local_observations={report[population + '_local_observations']} reference_observations={report[population + '_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
+        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies"):
+            extra = f" negative_controls={report.get('module_dependencies_negative_controls', 0)} environment_checks={report.get('module_dependencies_environment_checks', 0)}" if population == "module_dependencies" else ""
+            print(f"summary {population.replace('_', '-')} population=standalone-{population.replace('_', '-')} routes=direct,release modes={report.get('program_modes', 0)} local_observations={report[population + '_local_observations']} reference_observations={report[population + '_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}{extra}")
         print(f"evidence: {output / 'report.json'}")
         if "error" in report:
             print(report["error"], file=sys.stderr)

@@ -6,6 +6,10 @@ pub const ReadOnlyModuleContext = struct {
     globals: []const ir.Global,
     named_types: []const ir.NamedTypeDefinition,
     target_datalayout: ?[]const u8,
+    /// The caller has selected a complete module dependency closure. Retain
+    /// its globals even when only another object refers to an exported root.
+    emit_all_globals: bool = false,
+    require_resolved_aliases: bool = false,
 
     pub fn findGlobal(context: ReadOnlyModuleContext, symbol: []const u8) ?ir.Global {
         const name = if (std.mem.startsWith(u8, symbol, "@")) symbol[1..] else symbol;

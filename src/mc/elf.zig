@@ -140,7 +140,12 @@ fn buildObjectWithOptionalModuleContext(
             .value = start,
             .size = bytes.len,
             .section_index = 1,
-            .info = 0x12,
+            .info = switch (function.symbol_linkage) {
+                .default, .external => 0x12,
+                .internal, .private => 0x02,
+                else => return error.UnsupportedFunctionLinkage,
+            },
+            .other = symbolOtherForVisibility(function.symbol_visibility),
         });
         try symbol_indices.put(function.name, @intCast(symbols.items.len));
     }
@@ -151,7 +156,7 @@ fn buildObjectWithOptionalModuleContext(
     try appendReachableGlobals(allocator, &data, &data_alignment, &data_fixups, &symbols, &symbol_indices, functions, aliases, module_context);
     try appendSupportedGlobals(allocator, &data, &tdata, &symbols, &symbol_indices, globals, module_context);
     try appendSyntheticF128Constants(allocator, &data, &symbols, &symbol_indices, functions);
-    try appendLocalFunctionAliases(allocator, &symbols, &symbol_indices, aliases);
+    try appendLocalFunctionAliases(allocator, &symbols, &symbol_indices, aliases, if (module_context) |context| context.require_resolved_aliases else false);
     const first_global = try orderLocalSymbols(allocator, &symbols, &symbol_indices);
 
     var relocations: std.ArrayList(Relocation) = .empty;
@@ -273,8 +278,9 @@ fn buildObjectWithOptionalModuleContext(
     return object;
 }
 
-/// Decode only the closure rooted in the new symbolic-address form. Pointer
-/// fields in unrelated runtime objects must not introduce undefined imports.
+/// Decode the symbolic-address closure, plus all globals when the caller has
+/// explicitly selected a complete module. The legacy route remains bounded
+/// to machine references so unrelated runtime objects do not add imports.
 fn appendReachableGlobals(
     allocator: std.mem.Allocator,
     data: *std.ArrayList(u8),
@@ -291,6 +297,9 @@ fn appendReachableGlobals(
     defer queue.deinit(allocator);
     var seen = std.StringHashMap(void).init(allocator);
     defer seen.deinit();
+    if (context.emit_all_globals) {
+        for (context.globals) |global| try queue.append(allocator, global.name);
+    }
     for (functions) |function| for (function.instructions.items) |instruction| switch (instruction) {
         .lea_global_offset_rax => |address| try queue.append(allocator, address.symbol),
         else => {},
@@ -303,7 +312,11 @@ fn appendReachableGlobals(
         if (entry.found_existing) continue;
         if (seen.count() > 4096) return error.UnsupportedGlobalData;
         const global = context.findGlobal(name) orelse {
-            for (aliases) |alias| if (std.mem.eql(u8, alias.name, name)) return error.UnsupportedGlobalData;
+            for (aliases) |alias| if (std.mem.eql(u8, alias.name, name)) {
+                if (!context.require_resolved_aliases) return error.UnsupportedGlobalData;
+                try queue.append(allocator, alias.target);
+                break;
+            };
             continue; // A referenced function or an external symbol.
         };
         if (global.initializer == .none) {
@@ -597,7 +610,41 @@ fn appendLocalFunctionAliases(
     symbols: *std.ArrayList(Symbol),
     symbol_indices: *std.StringHashMap(u32),
     aliases: []const ir.GlobalAlias,
+    require_resolved: bool,
 ) !void {
+    if (require_resolved) {
+        // Definition order need not match dependency order. Each pass either
+        // resolves another alias or proves a cycle/unsupported target remains.
+        while (true) {
+            var unresolved = false;
+            var progress = false;
+            for (aliases) |alias| {
+                switch (alias.linkage) {
+                    .default, .external, .internal, .private => {},
+                    else => return error.UnsupportedAliasLinkage,
+                }
+                if (symbol_indices.contains(alias.name)) continue;
+                const target_index = symbol_indices.get(alias.target) orelse {
+                    unresolved = true;
+                    continue;
+                };
+                const target_symbol = symbols.items[target_index - 1];
+                if (target_symbol.section_index == 0) return error.UnresolvedAliasTarget;
+                try symbols.append(allocator, .{
+                    .name = alias.name,
+                    .value = target_symbol.value,
+                    .size = target_symbol.size,
+                    .section_index = target_symbol.section_index,
+                    .info = (if (alias.linkage == .private or alias.linkage == .internal) @as(u8, 0) else @as(u8, 0x10)) | (target_symbol.info & 0x0f),
+                    .other = symbolOtherForVisibility(alias.visibility),
+                });
+                try symbol_indices.put(alias.name, @intCast(symbols.items.len));
+                progress = true;
+            }
+            if (!unresolved) return;
+            if (!progress) return error.UnresolvedAliasTarget;
+        }
+    }
     for (aliases) |alias| {
         if (symbol_indices.contains(alias.name)) continue;
         const target_index = symbol_indices.get(alias.target) orelse continue;

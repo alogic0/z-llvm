@@ -799,6 +799,8 @@ pub const Limb64OverflowOp = enum {
 
 pub const MachineFunction = struct {
     name: []const u8,
+    symbol_linkage: ir.FunctionLinkage = .default,
+    symbol_visibility: ir.FunctionVisibility = .default,
     ret_ty: ir.Type,
     instructions: std.ArrayList(Instruction),
     owned_labels: std.ArrayList([]const u8),

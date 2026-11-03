@@ -1,7 +1,5 @@
 const std = @import("std");
-const codegen = @import("codegen.zig");
 const ir = @import("ir.zig");
-const mc = @import("mc.zig");
 const pass_manager = @import("pass_manager.zig");
 const pipelines = @import("pipelines.zig");
 const target = @import("target.zig");
@@ -23,13 +21,14 @@ const fatal = main_flow_writer.fatal;
 const Emit = main_flow_writer.Emit;
 
 const usage =
-    \\usage: z_llvm [--emit=ir|asm|obj|ir-writer|semantic-descriptor|selection-owner-manifest] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--report-all-codegen-failures] [--generic-cfg-selector] [--pass-limit=N] [--input-limit=N] <input.ll>
+    \\usage: z_llvm [--emit=ir|asm|obj|ir-writer|semantic-descriptor|selection-owner-manifest] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--report-all-codegen-failures] [--generic-cfg-selector] [--codegen-reachable] [--pass-limit=N] [--input-limit=N] <input.ll>
     \\       z_llvm --emit=ir-writer
     \\       z_llvm --emit=semantic-descriptor
     \\
     \\Supported passes: instcombine,dce,adce,early-cse,gvn,licm,simplifycfg,mem2reg,sroa,function-attrs,inline,vector-combine,slp-vectorizer,verify plus inventory placeholders
     \\Supported pipelines: scalar-foundation,memory-foundation,zig-scalar-foundation,debug-o0,zig-debug-accepted,zig-release-safe-accepted,zig-release-fast-accepted,zig-release-small-accepted,aarch64-target-independent,release-o3,release-oz,lto-prelink-o3,lto-prelink-oz
     \\Default input limit: 1048576 bytes
+    \\--codegen-reachable selects module dependencies for object/owner output; opaque references retain all definitions.
     \\
 ;
 
@@ -49,6 +48,7 @@ pub fn main(init: std.process.Init) !void {
     var quiet = false;
     var report_all_codegen_failures = envFlag(init.environ_map, "ZLLVM_CODEGEN_REPORT_ALL");
     var generic_cfg_selector = envFlag(init.environ_map, "ZLLVM_GENERIC_CFG_SELECTOR");
+    var codegen_reachable = envFlag(init.environ_map, "ZLLVM_CODEGEN_REACHABLE");
     var pass_limit: ?usize = null;
     var input_limit: usize = default_input_limit;
     var emit: Emit = .ir;
@@ -73,6 +73,8 @@ pub fn main(init: std.process.Init) !void {
             report_all_codegen_failures = true;
         } else if (std.mem.eql(u8, arg, "--generic-cfg-selector")) {
             generic_cfg_selector = true;
+        } else if (std.mem.eql(u8, arg, "--codegen-reachable")) {
+            codegen_reachable = true;
         } else if (std.mem.startsWith(u8, arg, "--pass-limit=")) {
             pass_limit = try std.fmt.parseInt(usize, arg["--pass-limit=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--input-limit=")) {
@@ -157,6 +159,7 @@ pub fn main(init: std.process.Init) !void {
                 .quiet = quiet,
                 .report_all_failures = report_all_codegen_failures,
                 .generic_cfg_selector = generic_cfg_selector,
+                .codegen_reachable = codegen_reachable,
             });
             return;
         }
@@ -190,6 +193,7 @@ pub fn main(init: std.process.Init) !void {
                 .quiet = quiet,
                 .report_all_failures = report_all_codegen_failures,
                 .generic_cfg_selector = generic_cfg_selector,
+                .codegen_reachable = codegen_reachable,
             });
             return;
         }
@@ -220,6 +224,7 @@ pub fn main(init: std.process.Init) !void {
                 .quiet = quiet,
                 .report_all_failures = report_all_codegen_failures,
                 .generic_cfg_selector = generic_cfg_selector,
+                .codegen_reachable = codegen_reachable,
             });
             return;
         }
@@ -252,6 +257,7 @@ pub fn main(init: std.process.Init) !void {
             .quiet = quiet,
             .report_all_failures = report_all_codegen_failures,
             .generic_cfg_selector = generic_cfg_selector,
+            .codegen_reachable = codegen_reachable,
         });
         return;
     }
@@ -309,55 +315,4 @@ fn parseInputLimit(text: []const u8) !usize {
     const limit = try std.fmt.parseInt(usize, text, 10);
     if (limit == 0) return error.InvalidInputLimit;
     return limit;
-}
-
-fn shouldLowerCodegenFunction(module: ir.Module, function: ir.Function) bool {
-    if (isCodegenRuntimeBoundaryFunction(function.name)) return false;
-    if (isCodegenRootFunction(module, function)) return true;
-    if (function.linkage != .private and function.linkage != .internal) return false;
-    if (!isCodegenSelectedDirectPrivateHelper(function.name)) return false;
-    for (module.functions.items) |caller| {
-        if (std.mem.eql(u8, caller.name, function.name)) continue;
-        if (!isCodegenRootFunction(module, caller)) continue;
-        if (functionDirectlyCalls(caller, function.name)) return true;
-    }
-    return false;
-}
-
-fn isCodegenRootFunction(module: ir.Module, function: ir.Function) bool {
-    if (std.mem.eql(u8, function.name, "main.testOne")) return true;
-    if (module.aliases.items.len == 0) return true;
-    if (function.linkage != .private and function.linkage != .internal) return true;
-    for (module.aliases.items) |alias| {
-        if (std.mem.eql(u8, alias.target, function.name)) return true;
-    }
-    return false;
-}
-
-fn isCodegenRuntimeBoundaryFunction(name: []const u8) bool {
-    return std.mem.startsWith(u8, name, "debug.") or
-        std.mem.startsWith(u8, name, "\"debug.");
-}
-
-fn isCodegenSelectedDirectPrivateHelper(name: []const u8) bool {
-    return std.mem.eql(u8, name, "runtime_tls_bump_main.bumpTls") or
-        std.mem.eql(u8, name, "runtime_side_effect_free_main.sideEffectFree") or
-        std.mem.eql(u8, name, "runtime_hidden_access_main.getHidden") or
-        std.mem.eql(u8, name, "runtime_hidden_access_main.updateHidden") or
-        std.mem.eql(u8, name, "runtime_mix_c_add_zig_main.add_zig") or
-        std.mem.eql(u8, name, "runtime_mix_c_add_may_panic_main.add_may_panic");
-}
-
-fn functionDirectlyCalls(function: ir.Function, callee_name: []const u8) bool {
-    for (function.blocks.items) |block| {
-        for (block.instructions.items) |instruction| {
-            if (instruction.removed) continue;
-            const call = switch (instruction.kind) {
-                .call => |call| call,
-                else => continue,
-            };
-            if (std.mem.eql(u8, call.callee, callee_name)) return true;
-        }
-    }
-    return false;
 }

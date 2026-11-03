@@ -139,6 +139,7 @@ def main():
     parser.add_argument("--linker", default="cc")
     parser.add_argument("--manifest", type=Path, default=ROOT / "test/real_programs/hello_libc.json")
     parser.add_argument("--mode", choices=("ReleaseFast", "ReleaseSafe", "ReleaseSmall"))
+    parser.add_argument("--codegen-reachable", action="store_true", help="select transitive module dependencies; opaque references conservatively retain all definitions")
     args = parser.parse_args()
     output = args.output_root.resolve()
     if not output.is_relative_to(ROOT) or output == ROOT:
@@ -147,7 +148,8 @@ def main():
     runner = Runner(output)
     report = {"schema": "real-program-v1", "population": "unchanged-upstream-zig-program",
               "status": "failed", "local_executions": 0, "reference_executions": 0,
-              "matched_program_modes": 0, "rows": []}
+              "matched_program_modes": 0, "codegen_selection": "reachable" if args.codegen_reachable else "legacy", "rows": []}
+    selection_args = ["--codegen-reachable"] if args.codegen_reachable else []
     try:
         if platform.system() != "Linux" or platform.machine() != "x86_64":
             raise RuntimeError("this bounded gate requires x86_64 Linux")
@@ -210,6 +212,8 @@ def main():
             local_env = {**base_env, "ZIG_USE_ZLLVM_OBJECT": "1", "ZLLVM_PIPELINE": manifest["local_pipeline"],
                          "ZLLVM_EXE": str(proxy), "ZLLVM_CAPTURE_EXE": str(zllvm), "ZLLVM_CAPTURE_DIR": str(capture),
                          "ZLLVM_ZIG_MODE": mode, "ZLLVM_GENERIC_CFG_SELECTOR": "1", "ZLLVM_MARKER_PATH": str(marker)}
+            if args.codegen_reachable:
+                local_env["ZLLVM_CODEGEN_REACHABLE"] = "1"
             if runner.run([*common, "--cache-dir", directory / "candidate-cache", f"-femit-bin={candidate}"], directory / "local-compile", local_env):
                 diagnostic = (directory / "local-compile.stderr").read_text(errors="replace")
                 stage = re.search(r"failure_category=(\w+)", diagnostic)
@@ -219,7 +223,7 @@ def main():
                 if row["failure_stage"] == "object":
                     object_input = capture / "object-input.ll"
                     if object_input.is_file():
-                        runner.run([zllvm, "--report-all-codegen-failures", "--generic-cfg-selector", "--emit=obj",
+                        runner.run([zllvm, *selection_args, "--report-all-codegen-failures", "--generic-cfg-selector", "--emit=obj",
                                     "--target=x86_64-unknown-linux-gnu", "--input-limit=67108864", object_input], directory / "codegen-failures", base_env)
                         row["codegen_diagnostic"] = (directory / "codegen-failures.stderr").read_text(errors="replace")[-8192:]
                 continue
@@ -241,7 +245,7 @@ def main():
             write_json(directory / "object-contract.json", hook_contract)
             row["hook_object_sha256"] = digest(capture / "local.o")
             owners = directory / "owners"
-            if runner.run([zllvm, "--emit=selection-owner-manifest", "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", "--input-limit=67108864", optimized], owners, base_env):
+            if runner.run([zllvm, *selection_args, "--emit=selection-owner-manifest", "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", "--input-limit=67108864", optimized], owners, base_env):
                 row["failure_stage"] = "selection-owner-manifest"
                 continue
             owner_lines = owners.with_suffix(".stdout").read_text().splitlines()[1:]

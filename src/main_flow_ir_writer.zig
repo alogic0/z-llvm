@@ -13,6 +13,7 @@ const zae = @import("zig_air_export.zig");
 const zal = @import("zig_air_lowering.zig");
 const zsl = @import("zig_semantic_lowering.zig");
 const base64_rows = @import("main_base64_rows.zig");
+const dependencies = @import("analysis/global_dependencies.zig");
 
 const writeBase64SourceByte = base64_rows.writeBase64SourceByte;
 const writeBase64OutputStore = base64_rows.writeBase64OutputStore;
@@ -90,11 +91,12 @@ pub const CodegenEmitOptions = struct {
     quiet: bool = false,
     report_all_failures: bool = false,
     generic_cfg_selector: bool = false,
+    codegen_reachable: bool = false,
 };
 
 pub fn fatal(io: std.Io, comptime fmt: []const u8, args: anytype) noreturn {
     var stderr_buffer: [4096]u8 = undefined;
-    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
+    var stderr_writer = std.Io.File.stderr().writerStreaming(io, &stderr_buffer);
     stderr_writer.interface.print(fmt, args) catch {};
     stderr_writer.interface.flush() catch {};
     std.process.exit(2);
@@ -470,14 +472,46 @@ pub fn emitCodegenModule(
     var first_failing_selector_tag: []const u8 = "-";
     var first_failing_selector_detail: []const u8 = "-";
     var stderr_buffer: [4096]u8 = undefined;
-    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
+    var stderr_writer = std.Io.File.stderr().writerStreaming(io, &stderr_buffer);
+    var reachable: ?dependencies.Reachability = null;
+    defer if (reachable) |*selection| selection.deinit();
+    var selected_globals: std.ArrayList(ir.Global) = .empty;
+    defer selected_globals.deinit(allocator);
+    var selected_aliases: std.ArrayList(ir.GlobalAlias) = .empty;
+    defer selected_aliases.deinit(allocator);
+    if (options.codegen_reachable) {
+        if (emit == .@"asm") return error.UnsupportedReachableAssembly;
+        if (module.module_asm.items.len != 0) return error.UnsupportedModuleAssembly;
+        var graph = try dependencies.Graph.build(allocator, module);
+        defer graph.deinit();
+        reachable = try graph.reachable();
+        for (module.globals.items) |global| {
+            if (reachable.?.contains(.global, global.name)) try selected_globals.append(allocator, global);
+        }
+        for (module.aliases.items) |alias| {
+            if (reachable.?.contains(.alias, alias.name)) try selected_aliases.append(allocator, alias);
+        }
+        try stderr_writer.interface.print("summary zllvm-codegen-selection mode=reachable coverage={s} selected_globals={} selected_aliases={}\n", .{
+            if (reachable.?.has_unknown) "conservative" else "complete",
+            selected_globals.items.len,
+            selected_aliases.items.len,
+        });
+        try stderr_writer.interface.flush();
+    }
     const module_context: codegen.x86_64.ReadOnlyModuleContext = .{
-        .globals = module.globals.items,
+        .globals = if (reachable != null) selected_globals.items else module.globals.items,
         .named_types = module.named_types.items,
         .target_datalayout = module.target_datalayout,
+        .emit_all_globals = options.codegen_reachable,
+        .require_resolved_aliases = options.codegen_reachable,
     };
     for (module.functions.items) |function| {
-        if (!shouldLowerCodegenFunction(module, function)) continue;
+        const selected = if (reachable) |selection| selection.contains(.function, function.name) else shouldLowerCodegenFunction(module, function);
+        if (!selected) continue;
+        if (options.codegen_reachable) switch (function.linkage) {
+            .default, .external, .internal, .private => {},
+            else => return error.UnsupportedFunctionLinkage,
+        };
         selected_functions += 1;
         var selector_diagnostic_tag: ?[]const u8 = null;
         var selector_diagnostic_detail: ?[]const u8 = null;
@@ -509,6 +543,10 @@ pub fn emitCodegenModule(
             try fatal(io, "codegen failed for function {s}: {any}\n", .{ function.name, err });
         };
         errdefer machine.deinit(allocator);
+        if (options.codegen_reachable) {
+            machine.symbol_linkage = function.linkage;
+            machine.symbol_visibility = function.visibility;
+        }
         try machines.append(allocator, machine);
     }
     var stdout_buffer: [4096]u8 = undefined;
@@ -549,7 +587,7 @@ pub fn emitCodegenModule(
     if (emit == .@"asm") {
         for (machines.items) |machine| try mc.assembly.printFunction(machine, stdout);
     } else {
-        try mc.elf.writeObjectWithModuleContext(allocator, machines.items, module.aliases.items, module_context, stdout);
+        try mc.elf.writeObjectWithModuleContext(allocator, machines.items, if (reachable != null) selected_aliases.items else module.aliases.items, module_context, stdout);
     }
     try stdout.flush();
 }
