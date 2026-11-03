@@ -158,3 +158,10 @@ three work roots and three export roots. It includes retained cached payloads;
 it does not identify every byte as new allocation. Filesystem free-space changes
 also include unrelated processes, and sampled observations are not atomic
 snapshots. Keep these scopes separate when comparing forecasts and measurements.
+
+The [boolean-call checkpoint](evidence/boolean_call_acceptance_20261103.json)
+passes a further 17-stage cached run under the same policy. It starts with
+44.90 GB free; the reported minimum is 42.97 GB and the independent sampled
+minimum is 42.94 GB. The reported decrease is 1.94 GB, within the 8 GiB
+allowance. All three AIR exports are authenticated cache hits and execution
+checks run again. The 32 GiB runtime reserve remains enforced.

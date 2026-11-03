@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "db272521bfcd49fae366985fa47a0ff5ef58dc27",
-  "accepted_tree": "2de39921e5dbef2335a7687b01edffd3b73f4d8c",
+  "accepted_revision": "43fa83d2536d53dbc07135aa96c83a9b6b11fd69",
+  "accepted_tree": "cc69fe7cc225c4c90feedeee7ff304991b631b7d",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,11 +17,11 @@
   "paired_harnesses_ok": 5,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "db272521",
+  "declaration_revision": "43fa83d2",
   "evidence": [
+    "docs/evidence/boolean_call_acceptance_20261103.json",
+    "docs/evidence/boolean_call_20261103_cached.summary",
     "docs/evidence/global_memory_acceptance_20261103.json",
-    "docs/evidence/global_memory_20261103_fresh.summary",
-    "docs/evidence/global_memory_20261103_cached.summary",
     "docs/evidence/real_candidates_release_v3_migration.json"
   ],
   "selector_version": "real-candidate-selector-v3"

@@ -188,6 +188,14 @@ defined global bytes, pointer fixups, alignment, local symbols, full integer
 bits, guarded 2/12/16/80-byte copies, narrow stores and live-value preservation.
 These standalone populations leave all previous counts unchanged.
 
+The mandatory [boolean-call canary](evidence/boolean_call_acceptance_20261103.json)
+adds four scalar/branch/frame-pointer/live-return functions. Direct/release routes
+in all three modes produce 1,536 local observations against 768 LLVM references
+reused across routes. The callees dirty upper RAX bits and clobber volatile integer
+registers; the branch consumes the result before any extending cast. Three
+recorded controls reject removal of call-result normalization. Existing population
+counts remain separate and unchanged.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

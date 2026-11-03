@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `db272521bfcd49fae366985fa47a0ff5ef58dc27`; tree: `2de39921e5dbef2335a7687b01edffd3b73f4d8c`.
+Accepted revision: `43fa83d2536d53dbc07135aa96c83a9b6b11fd69`; tree: `cc69fe7cc225c4c90feedeee7ff304991b631b7d`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,16 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [global-memory checkpoint](evidence/global_memory_acceptance_20261103.json)
+The accepted [boolean call-return checkpoint](evidence/boolean_call_acceptance_20261103.json)
+passes all 17 integration stages on a frozen 2,630-file source snapshot. Exact
+i1 direct calls use the existing typed call action, normalize the low bit before
+publishing the result, and preserve live values and transaction rollback. Four
+native functions pass 1,536 local observations against 768 LLVM references across
+direct/release routes in three modes. Three controls reject missing normalization.
+All 1,679 unit tests, focused checks and 60 ABI cases pass; compiler-core counts,
+previous native populations and the bypass ratchet remain unchanged.
+
+The earlier [global-memory checkpoint](evidence/global_memory_acceptance_20261103.json)
 passes a fresh/cached pair of all 17 integration stages, with all 1,403 canonical
 records matching on an unchanged 2,624-file snapshot. Symbolic byte addresses,
 reachable integer/pointer global storage and ELF data relocations now share the
@@ -56,8 +65,9 @@ Five source-bound functions execute per mode: four constant methods and
 turn 100 native links into 100 executions.
 
 AIR publication atomically writes schema-4 metadata and transfers the verified
-payload into the cache. The current pair authenticates three new exports and
-reruns execution checks on cache hits. At the user's direction, serial admission
+payload into the cache. The global-memory pair authenticates three exports; the
+boolean checkpoint reuses them and reruns execution checks on cache hits. At the
+user's direction, serial admission
 now uses a fixed 32 GiB reserve plus the existing 8 GiB working budget: 40 GiB
 (about 42.95 GB) free at the start. Nested workers inherit that admission and
 continue enforcing the reserve. Reported fresh/cached free-space decreases are
@@ -67,9 +77,10 @@ Unchanged upstream `hello_libc.zig` and the C fixture execute in all three modes
 the C fixture's six paired cases and 66 call/heap observations remain separate.
 The ABI gate passes 60 cases. The frozen FMA canary retains 29 exact-result
 checks and 8,192 LLVM-paired observations. Fibonacci selection advances through
-the scalar and global-memory operations but stops at a `fastcc i1` call-return
-width with zero local executions. LLVM IR construction, the system linker/CRT and libc remain
-external dependencies of that route.
+the boolean call and following global byte store, then stops at a variable-index
+`getelementptr [8 x i8]` in `start.main`, with zero local executions. LLVM IR
+construction, the system linker/CRT and libc remain external dependencies of
+that route.
 
 The [scalar cleanup](evidence/scalar_startup_cleanup_20261103.json) retains the
 13 original source probes, performance baselines and required evidence. The
@@ -82,5 +93,5 @@ history are retired without archives. The latest
 [generation cleanup](evidence/global_memory_cleanup_20261103.json) retires 3.92 GB
 of superseded AIR after verifying the accepted replacement and all payload hashes;
 metadata and historical proofs remain. See [next steps](next_steps.md) for
-the exact boolean call-return slice. Historical checkpoints
+the array-stride pointer calculation. Historical checkpoints
 remain under the roadmap and evidence directories.

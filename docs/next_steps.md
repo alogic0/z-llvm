@@ -41,7 +41,16 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The current accepted [global-memory checkpoint](evidence/global_memory_acceptance_20261103.json)
+The current accepted [boolean call-return checkpoint](evidence/boolean_call_acceptance_20261103.json)
+at `43fa83d2` passes all 17 integration stages on a frozen 2,630-file snapshot.
+Exact i1 direct-call returns now use the typed call action and normalize the low
+bit before publication. Four native functions pass 1,536 local observations
+against 768 LLVM references through direct/release routes in three modes; three
+controls reject missing normalization. All 1,679 unit tests, focused checks and
+60 ABI cases pass. The unchanged 100-row selection, five-function execution
+cohort, earlier native populations and bypass ratchet remain fixed.
+
+The earlier accepted [global-memory checkpoint](evidence/global_memory_acceptance_20261103.json)
 at `db272521`, with disk policy commit `61dfbb3b`, passes both full 17-stage
 fresh/cached runs. All 1,403 canonical records match on an unchanged 2,624-file
 snapshot. Four global-address functions pass 192 local observations against 96
@@ -163,20 +172,17 @@ immediate sources, cast flags, pointer targets and unproved compare forms retain
 explicit boundaries; frozen residual fingerprints and the bypass ratchet stay
 unchanged.
 
-Next, admit exact boolean direct-call returns through the existing typed call
-action and accumulator definition authority. Unchanged
-`test/cases/recursive_fibonacci.zig` now selects its global copies and following
-i16 store, then stops in `start.main` at
-`no_emitter:composed-block-call-ret-width` on
-`call fastcc i1 @process.Environ.PosixBlock.isEmpty(ptr ... %4)`.
-Its reference executes once and local execution remains zero. Normalize the
-declared one-bit result before publishing it: dirty upper return-register bits
-must not escape into a scalar use or branch. Preserve the existing named-argument,
-calling-convention, attribute, liveness and rollback boundaries; keep frozen
-residual fingerprints and the bypass ratchet unchanged. An existing three-mode
-LLVM oracle covers 192 dirty-register observations, with no local executions yet.
-Add permanent native coverage, retry the unchanged program and accept this ABI
-slice under the validation policy. Further startup boundaries may follow.
+Next, extend the existing scaled-address action to a proved array-stride pointer
+calculation. Unchanged `test/cases/recursive_fibonacci.zig` now selects the
+`process.Environ.PosixBlock.isEmpty` call and following global byte store, then
+stops in `start.main` at `no_emitter:composed-block-gep-source` on
+`%29 = getelementptr [8 x i8], ptr %28, i64 %27`. Its LLVM reference executes
+once and local execution remains zero. Derive the stride from allocation size,
+check the pointer/index layout, and preserve both operands and live values through
+the existing value-use authority. Compare native address results with LLVM,
+including negative indexes, before retrying the unchanged program. Keep unsupported
+layouts, index forms and storage homes explicit; do not advance compiler-core
+counts without a separate selection migration. Further startup boundaries may follow.
 Keep broader optional ABIs and
 floating/indirect/aggregate/stack varargs as explicit boundaries. Use the frozen
 performance baseline for measured comparisons and the
