@@ -895,6 +895,10 @@ fn appendStorePointerDestinationNodes(
     bits: u8,
 ) !void {
     switch (pointer) {
+        .rax => {
+            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            try nodes.append(.rcx);
+        },
         .stack_scalar => |stack| if (bits > 8 or stack.kind != .integer or stack.bits != 8)
             return error.ValueUseStorePointerFormUnsupported,
         .arg64, .scratch64 => if (bits == 0 or bits > 64)
@@ -923,6 +927,10 @@ fn appendStorePointerMappings(
     bits: u8,
 ) !void {
     switch (pointer) {
+        .rax => {
+            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            mappings.append(.{ .source = .accumulator, .destination = .rcx, .source_request_index = source_request_index });
+        },
         .stack_scalar => |stack| if (bits > 8 or stack.kind != .integer or stack.bits != 8)
             return error.ValueUseStorePointerFormUnsupported,
         .arg64, .scratch64 => if (bits == 0 or bits > 64)

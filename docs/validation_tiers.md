@@ -142,6 +142,13 @@ The integrated-executable runner also requires Zig's unchanged upstream
 and object emitter. Its one-program/three-mode paired executions form a separate
 population from the original seven cases and the compiler-core cohort.
 
+It also requires the unchanged C compiler fixture from the pinned Zig tree in
+three local pipeline modes. Two argument cases per mode and 66 native call/heap
+observations are separate populations. The latter include 48 integer-variadic
+and 18 heap-call observations. C sanitizers are disabled; full Zig startup is
+still an explicit boundary. The frozen compiler-core population remains 100
+rows, with five cohort functions and 256 ASCII inputs per mode.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

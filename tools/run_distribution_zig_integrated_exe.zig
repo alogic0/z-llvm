@@ -304,6 +304,15 @@ pub fn main(init: std.process.Init) !void {
     try stdout_writer.interface.writeAll(program_result.stdout);
     try stdout_writer.interface.flush();
     if (!common.termOk(program_result.term)) try common.forwardCommandFailure(io, "unchanged upstream hello libc", program_result);
+    const c_program_root = try temp.join(allocator, "unchanged-upstream-c");
+    defer allocator.free(c_program_root);
+    const c_program_arg = try std.fmt.allocPrint(allocator, "--output-root={s}", .{c_program_root});
+    defer allocator.free(c_program_arg);
+    const c_program_result = try common.runCapture(allocator, io, &.{ "python3", "tools/run_upstream_c_program.py", c_program_arg }, "unchanged upstream C fixture");
+    defer common.freeRunResult(allocator, c_program_result);
+    try stdout_writer.interface.writeAll(c_program_result.stdout);
+    try stdout_writer.interface.flush();
+    if (!common.termOk(c_program_result.term)) try common.forwardCommandFailure(io, "unchanged upstream C fixture", c_program_result);
 }
 
 fn emitAggregateSseSemanticObject(

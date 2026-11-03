@@ -20,6 +20,7 @@ counters remain at the previous checkpoint until cumulative Tier 3 passes.
 | `zig build behavioral-diff` | Local object emission from unoptimized LLVM IR; every function must have composed selector ownership. | LLVM objects from the same source with independent optimization, linked with the same harness. Reference/harness modes do not select local optimizer passes. |
 | `zig build generated-scalar-diff` | Six scalar identity comparisons, two rejection cases, optional execution smoke, then the behavioral suite. | `opt-22`, optional `lli-22`, and the behavioral suite's independent LLVM reference. |
 | `zig build real-program -- --output-root=local-state/validations/<new-run>` | An unchanged, hash-pinned upstream Zig program through local preopt optimization and object emission in three release modes. | The pinned Zig LLVM route, exact stdout, stderr and exit status. IR construction, the system linker/CRT and libc remain external dependencies. A failed stage earns no execution credit. |
+| `zig build upstream-c-program -- --output-root=local-state/validations/<new-run>` | Zig's unchanged C compiler fixture, local memory/release pipelines, local objects, two argument cases per mode. | LLVM 22 compiles the identical unoptimized input; exact stdout/stderr/status and separate integer-call/heap canaries. C sanitizers are disabled; this does not establish Zig startup support. |
 
 ## Current generated inputs
 
@@ -84,7 +85,15 @@ they do not establish runtime performance or a speedup.
 The mandatory integrated-executable gate invokes this runner in all three
 release modes. It verifies that Zig's relocatable link preserves the local
 object's allocated bytes, symbols and relocations, allowing ELF table repacking.
-The local C variadic envelope admits one fixed pointer and no unnamed arguments;
-float arguments, additional arguments and indirect variadic calls still reject.
+The local C variadic envelope admits one or two fixed pointers and at most one
+unnamed i32; floating, aggregate, stack and indirect variadic calls still reject.
 Constant `strlen` folding and a second CFG cleanup remove the statically
 unreachable length panic without changing the upstream source.
+
+The [C fixture](evidence/upstream_c_program_20261102.json) adds one separate
+program in three local pipeline modes, with six paired argument-case executions.
+Its mandatory native canary contributes 48 integer-varargs and 18 heap-call
+observations across those modes. Assembly shims check AL directly, and boundary
+integers and a register permutation exercise the caller. These observations do
+not advance compiler-core or compiler-rt function counts. The captured Fibonacci
+probe remains blocked in standard Zig startup at aggregate allocations.

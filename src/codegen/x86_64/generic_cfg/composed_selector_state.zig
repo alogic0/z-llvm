@@ -1328,7 +1328,7 @@ pub fn storePointerDiagnosticClass(selector: *const ComposedBlockSelector, value
     const binding = selector.values.get(name) orelse return null;
     return switch (binding.loc) {
         .stack_scalar => |stack| .{ .stack_scalar = .{ .bits = stack.bits, .kind = stack.kind } },
-        .arg64, .scratch64 => .register64,
+        .arg64, .scratch64, .rax => .register64,
         .spill64 => .spill64,
         .stack_i32_ptr => .stack_i32_ptr,
         .stack_i32_array => .stack_i32_array,
@@ -1424,6 +1424,18 @@ pub fn bindEax(selector: *ComposedBlockSelector, name: []const u8) !void {
 
 pub fn bindRax(selector: *ComposedBlockSelector, name: []const u8) !void {
     try bindResultLoc(selector, name, .rax);
+}
+
+/// A global load has no SSA address operand. Keep its accumulator definition
+/// in the state authority, including preservation of previous live values.
+pub fn defineGlobalPointerLoad(selector: *ComposedBlockSelector, result: []const u8, symbol: []const u8) !?Diagnostic {
+    var definition = try AccumulatorDefinitionTransaction.begin(selector);
+    defer definition.deinit();
+    if (try definition.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+    try selector.machine.instructions.append(selector.allocator, .{ .load_global_ptr_rax = symbol });
+    try definition.define(result, .fullRax());
+    try definition.commit();
+    return null;
 }
 
 pub fn bindAccumulator(selector: *ComposedBlockSelector, name: []const u8, bits: u16) !void {
@@ -2683,6 +2695,50 @@ fn addressOwnerMatchesBinding(owner: AddressDependencyDomain.OwnerView, loc: Val
 
 pub fn spillValueOrError(selector: *ComposedBlockSelector, name: []const u8) !void {
     if (try spillValue(selector, name)) |_| return error.UnsupportedCodegenValue;
+}
+
+/// Outgoing bounded variadic arguments are simultaneous values. Preserve a
+/// later source before an earlier argument overwrites its current ABI register,
+/// even when the source's last use is this call instruction itself.
+pub fn preserveVariadicArgumentSources(selector: *ComposedBlockSelector, call: ir.CallInst) !?Diagnostic {
+    if (call.args.items.len > 3) return .{ .no_emitter = "composed-block-variadic-argument-count" };
+    for (call.args.items, 0..) |arg, index| {
+        if (arg.value != .named) continue;
+        const binding = selector.values.get(arg.value.named) orelse continue;
+        const register = switch (binding.loc) {
+            .arg32, .arg64, .scratch32, .scratch64 => |reg| reg,
+            else => continue,
+        };
+        for (0..index) |earlier| {
+            if (register == try ArgReg.fromIndex(earlier)) {
+                // At most three scalar arguments: an overlapping source and
+                // destination leave a spare ABI register outside both sets.
+                // Use that register without requiring a spill frame solely
+                // to break an argument permutation.
+                var used: [6]bool = @splat(false);
+                for (0..call.args.items.len) |destination| used[destination] = true;
+                for (call.args.items) |source| {
+                    if (source.value != .named) continue;
+                    const current = selector.values.get(source.value.named) orelse continue;
+                    switch (current.loc) {
+                        .arg32, .arg64, .scratch32, .scratch64 => |reg| used[selector_types.argRegIndex(reg)] = true,
+                        else => {},
+                    }
+                }
+                var spare: ?ArgReg = null;
+                for (used, 0..) |occupied, candidate| {
+                    if (!occupied) {
+                        spare = try ArgReg.fromIndex(candidate);
+                        break;
+                    }
+                }
+                const target = spare orelse return .{ .no_emitter = "composed-block-variadic-argument-registers" };
+                try emitValueIntoScratchAndRelocate(selector, arg.value, target, binding.vreg.bits);
+                break;
+            }
+        }
+    }
+    return null;
 }
 
 pub fn spillPairValueOrError(selector: *ComposedBlockSelector, name: []const u8) !void {

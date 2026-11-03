@@ -126,6 +126,18 @@ pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir
     }
     if (isF32x2(load.ty)) return lowerLoadF32Pair(selector, result_name, load);
     if (scalarFpBits(load.ty)) |bits| return lowerLoadFp(selector, result_name, load, bits);
+    if (load.ty == .ptr and load.ptr == .named and std.mem.startsWith(u8, load.ptr.named, "@")) {
+        if (load.ptr_addrspace != null or load.ty_addrspace != null or load.attrs.isAtomic())
+            return .{ .no_emitter = "composed-block-global-pointer-load-boundary" };
+        const context = selector.module_context orelse return .{ .no_emitter = "composed-block-global-pointer-load-context" };
+        const global = context.findGlobal(load.ptr.named) orelse return .{ .no_emitter = "composed-block-global-pointer-load-symbol" };
+        if (global.ty != .ptr) return .{ .no_emitter = "composed-block-global-pointer-load-type" };
+        if (global.address_attrs) |attrs| {
+            if (std.mem.indexOf(u8, attrs, "thread_local") != null or std.mem.indexOf(u8, attrs, "addrspace") != null)
+                return .{ .no_emitter = "composed-block-global-pointer-load-boundary" };
+        }
+        return selector_state.defineGlobalPointerLoad(selector, result_name, global.name);
+    }
     const is_ptr = load.ty.eql(.ptr);
     const valid_int = if (int_bits) |b| (b >= 1 and b <= 8) or b == 16 or b == 32 or b == 64 or b == 128 else false;
     if (!valid_int and !is_ptr) return .{ .no_emitter = "composed-block-load-width" };

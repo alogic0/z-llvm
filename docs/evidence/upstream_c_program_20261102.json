@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "date": "2026-11-02",
+  "status": "focused native and unit checks pass; cumulative Tier 3 pending",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "source": "/home/oleg/prog/ziglang/test/standalone/c_compiler/test.c",
+  "source_sha256": "bd015ad1d29128457434b36774c8bdae427eb29ca1bd6a241f5897bd388ed6e7",
+  "language": "C",
+  "programs": 1,
+  "program_modes": 3,
+  "reference_case_executions": 6,
+  "local_case_executions": 6,
+  "integer_variadic_observations": 48,
+  "heap_call_observations": 18,
+  "native_call_observations": 66,
+  "local_pipeline": "memory-foundation followed by the accepted release-mode alias",
+  "mode_scope": "Local release pipelines; C assertions stay enabled, C sanitizers are disabled.",
+  "rows": [
+    {
+      "local_cases": 2,
+      "local_object_sha256": "3ddebe773cca42b1313b454ba9f178025c5146bbfc75e84b7387dac2fb5916c3",
+      "mode": "ReleaseFast",
+      "owners": [
+        "getVal\tcomposed_block",
+        "main\tcomposed_cfg"
+      ],
+      "reference_cases": 2,
+      "status": "matched"
+    },
+    {
+      "local_cases": 2,
+      "local_object_sha256": "3ddebe773cca42b1313b454ba9f178025c5146bbfc75e84b7387dac2fb5916c3",
+      "mode": "ReleaseSafe",
+      "owners": [
+        "getVal\tcomposed_block",
+        "main\tcomposed_cfg"
+      ],
+      "reference_cases": 2,
+      "status": "matched"
+    },
+    {
+      "local_cases": 2,
+      "local_object_sha256": "3ddebe773cca42b1313b454ba9f178025c5146bbfc75e84b7387dac2fb5916c3",
+      "mode": "ReleaseSmall",
+      "owners": [
+        "getVal\tcomposed_block",
+        "main\tcomposed_cfg"
+      ],
+      "reference_cases": 2,
+      "status": "matched"
+    }
+  ],
+  "remaining_dependencies": [
+    "pinned Zig C frontend and Clang IR construction",
+    "system linker and CRT",
+    "libc malloc/free/stdio/assertions"
+  ],
+  "native_evidence": "local-state/validations/export-execution-20261102/c-program-final/report.json",
+  "native_report_sha256": "5b7d9d8ad8b2c1156f2989d6269bee351caee6a6077644f2d46338e72c8319a3",
+  "upstream_mapping": [
+    "llvm/lib/Analysis/InstructionSimplify.cpp::simplifyGEPInst (all-zero scalar GEP)",
+    "llvm/lib/Target/X86/X86ISelLoweringCall.cpp::LowerCall (GPR arguments and AL vector-register count)",
+    "llvm/include/llvm/IR/Attributes.td (NoAlias and NoUndef representation contracts)",
+    "llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp::visitLoad and visitStore (ordinary typed memory operations)"
+  ],
+  "zig_startup_boundary": {
+    "source": "test/cases/recursive_fibonacci.zig",
+    "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+    "mode": "ReleaseFast",
+    "local_executions": 0,
+    "first_function": "start.main",
+    "selector_tag": "unsupported_type",
+    "selector_detail": "alloca",
+    "evidence": "local-state/validations/export-execution-20261102/fibonacci-scout/report.json"
+  },
+  "archives_created": 0
+}

@@ -140,11 +140,32 @@ The original 29 exact-result checks and 8,192 seeded LLVM-paired observations
 pass. Two FMA stream/byte identities move together; the helper and `__multi3`
 identities stay fixed, and the production mismatch negative still rejects.
 
-Direct C variadic calls currently admit exactly one fixed pointer argument,
-an i32 result, and no unnamed arguments. The composed caller preserves live
-values, materializes ordinary global addresses, and sets AL to zero immediately
+Direct C variadic calls admit one or two fixed pointer arguments, an i32
+result, and at most one unnamed i32 after C's default integer promotions.
+The composed caller preserves live values and overlapping outgoing argument
+sources, materializes ordinary global addresses and integer constants, and sets AL to zero immediately
 before the call, matching LLVM `X86ISelLoweringCall.cpp`'s vector-register count.
-Unsupported variadic forms cannot enter legacy or structural callers.
+Floating, indirect, aggregate and stack variadic forms cannot enter legacy or
+structural callers. Pointer-return `noalias` and argument `noundef` remain
+advisory representation attributes, matching LLVM `IR/Attributes.td`; extension
+and memory-return ABI attributes retain their separate admission checks.
+
+All-zero scalar GEPs fold to their base pointer following
+`Analysis/InstructionSimplify.cpp::simplifyGEPInst`; vector indices and nondefault
+address spaces retain their boundaries. An i32 store through a returned RAX
+pointer stages its address before scalar materialization, under the existing
+value-use plan. Ordinary global pointer loads use the state authority's
+accumulator definition and the existing ELF load instruction; atomic, TLS and
+nondefault-address-space global loads remain outside this added form.
+
+The [unchanged C compiler fixture](evidence/upstream_c_program_20261102.json)
+comes from the pinned Zig repository. The pinned `zig cc` command constructs
+sanitizer-free, unoptimized IR; local `memory-foundation` and the accepted release
+pipeline optimize it before local object emission. LLVM 22 compiles the same
+input for the reference. Both command-line paths execute in each mode, and an
+independent native driver checks integer varargs, AL, argument permutations,
+live-value preservation and heap accesses. The C mode labels select local
+pipelines and do not claim Zig safety semantics for C.
 
 `instcombine` folds direct `strlen` of complete private constant byte strings,
 following LLVM `Transforms/Utils/SimplifyLibCalls.cpp::optimizeStrLen` and

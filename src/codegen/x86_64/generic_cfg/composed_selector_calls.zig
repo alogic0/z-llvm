@@ -138,7 +138,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128")) return try lowerSmulOverflowI128(selector, result, call);
     if (std.mem.startsWith(u8, call.callee, "llvm.")) return .{ .no_emitter = "composed-block-llvm-intrinsic" };
     if (call.callee_value != null) return .{ .unsupported_value = "composed-block-indirect-call" };
-    if (!isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
+    if (!isDefaultOrFastcc(call.calling_conv) or !sysv_abi.callReturnAttrsSupported(call) or call.raw_args != null or call.operand_bundle != null) {
         return .{ .no_emitter = "composed-block-call-form" };
     }
     if (sysv_abi.callHasScalarSseType(call)) return lowerScalarSseCall(selector, result, call);
@@ -156,6 +156,9 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (transaction) |*active| {
         if (try active.prepareCallBeforeArguments(.clobber)) |diagnostic| return diagnostic;
     } else if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+    if (sysv_abi.isVariadicCall(call)) {
+        if (try selector_state.preserveVariadicArgumentSources(selector, call)) |diagnostic| return diagnostic;
+    }
     for (call.args.items) |arg| {
         const target = ArgReg.fromIndex(abi_index) catch return .{ .unsupported_value = "composed-block-call-arg-reg" };
         if (try lowerDirectCallArg(selector, arg, target)) |diagnostic| return diagnostic;
@@ -167,7 +170,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     const needs_alignment = selector.stack_frame_bytes == 0;
     if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
     if (sysv_abi.isVariadicCall(call)) {
-        // Caller values are already preserved and the pointer is in RDI.
+        // Caller values are preserved and integer/pointer arguments materialized.
         // MOV leaves condition flags unchanged and supplies the SysV AL count.
         try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = 0 });
     }
@@ -1496,6 +1499,19 @@ pub fn lowerDirectCallArg(selector: *ComposedBlockSelector, arg: ir.CallArg, tar
 
     const bits = intBits(arg.ty) orelse return .{ .no_emitter = "composed-block-call-arg-type" };
     if (bits != 32 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-call-arg-width" };
+    if (arg.value == .int and bits != 128) {
+        const immediate: i64 = if (bits == 32) try composed_helpers.i32BitPattern(arg.value.int) else try i64Value(arg.value.int);
+        try selector_state.clobberArgReg(selector, target);
+        try selector.machine.instructions.append(selector.allocator, switch (target) {
+            .rdi => .{ .mov_imm_rdi = immediate },
+            .rsi => .{ .mov_imm_rsi = immediate },
+            .rdx => .{ .mov_imm_rdx = immediate },
+            .rcx => .{ .mov_imm_rcx = immediate },
+            .r8 => .{ .mov_imm_r8 = immediate },
+            .r9 => .{ .mov_imm_r9 = immediate },
+        });
+        return null;
+    }
     const loc = selector_state.resolveValue(selector, arg.value) orelse return .{ .unsupported_value = "composed-block-call-unknown-arg" };
     if (bits == 128) {
         const target_hi = ArgReg.fromIndex(argRegIndex(target) + 1) catch return .{ .unsupported_value = "composed-block-call-arg-reg" };

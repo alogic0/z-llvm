@@ -137,6 +137,8 @@ def main():
     parser.add_argument("--zig-emitter", type=Path)
     parser.add_argument("--zllvm", type=Path, default=ROOT / "zig-out/bin/z_llvm")
     parser.add_argument("--linker", default="cc")
+    parser.add_argument("--manifest", type=Path, default=ROOT / "test/real_programs/hello_libc.json")
+    parser.add_argument("--mode", choices=("ReleaseFast", "ReleaseSafe", "ReleaseSmall"))
     args = parser.parse_args()
     output = args.output_root.resolve()
     if not output.is_relative_to(ROOT) or output == ROOT:
@@ -149,7 +151,10 @@ def main():
     try:
         if platform.system() != "Linux" or platform.machine() != "x86_64":
             raise RuntimeError("this bounded gate requires x86_64 Linux")
-        manifest = json.loads((ROOT / "test/real_programs/hello_libc.json").read_text())
+        manifest = json.loads(args.manifest.read_text())
+        modes = [args.mode] if args.mode else manifest["modes"]
+        if any(mode not in manifest["modes"] for mode in modes):
+            raise RuntimeError("mode is outside the program's frozen manifest")
         zig_source = args.zig_source.resolve()
         zig = (args.zig_emitter or zig_source / "build/stage4/bin/zig").resolve()
         zllvm = args.zllvm.resolve()
@@ -169,11 +174,12 @@ def main():
         report.update({"source": str(source), "source_sha256": digest(source), "zig_revision": pin,
                        "zllvm_sha256": digest(zllvm), "source_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                        "target": manifest["target"], "cpu": manifest["cpu"], "pipeline": manifest["local_pipeline"],
-                       "remaining_dependencies": manifest["remaining_dependencies"], "programs": 1, "program_modes": len(manifest["modes"])})
+                       "remaining_dependencies": manifest["remaining_dependencies"], "programs": 1, "program_modes": len(modes),
+                       "manifest": str(args.manifest), "program": args.manifest.stem})
         base_env = {key: value for key, value in os.environ.items()
                     if not key.startswith(("ZLLVM_", "ZIG_USE_ZLLVM"))}
         global_cache = output / "global-cache"
-        for mode in manifest["modes"]:
+        for mode in modes:
             directory = output / mode
             directory.mkdir()
             row = {"mode": mode, "status": "failed", "failure_stage": "reference-compile", "local_executions": 0}
@@ -181,6 +187,7 @@ def main():
             common = [zig, "build-obj", source, "-lc", f"-O{mode}", "-target", manifest["target"],
                       f"-mcpu={manifest['cpu']}", "-fllvm", "-flibllvm", "-fno-lto", "-fno-stack-protector",
                       "-fno-unwind-tables", "--global-cache-dir", global_cache]
+            common.extend(manifest.get("extra_compile_args", []))
             reference = directory / "reference.o"
             if runner.run([*common, "--cache-dir", directory / "reference-cache", f"-femit-bin={reference}"], directory / "reference-compile", base_env):
                 continue
@@ -254,12 +261,12 @@ def main():
                 continue
             row.update({"status": "matched", "failure_stage": None})
             report["matched_program_modes"] += 1
-        report["status"] = "passed" if report["matched_program_modes"] == len(manifest["modes"]) else "blocked"
+        report["status"] = "passed" if report["matched_program_modes"] == len(modes) else "blocked"
     except (KeyError, OSError, RuntimeError, subprocess.SubprocessError, ValueError) as error:
         report["error"] = str(error)
     finally:
         write_json(output / "report.json", report)
-        print(f"summary real-program schema=real-program-v1 programs=1 program_modes=3 reference_executions={report['reference_executions']} local_executions={report['local_executions']} matched_program_modes={report['matched_program_modes']} local_fail={int(report['status'] != 'passed')}")
+        print(f"summary real-program schema=real-program-v1 program={args.manifest.stem} programs=1 program_modes={report.get('program_modes', 0)} reference_executions={report['reference_executions']} local_executions={report['local_executions']} matched_program_modes={report['matched_program_modes']} local_fail={int(report['status'] != 'passed')}")
         print(json.dumps({key: report[key] for key in ("status", "local_executions", "reference_executions", "matched_program_modes")}, sort_keys=True))
         print(f"evidence: {output / 'report.json'}")
     return 0 if report["status"] == "passed" else 1

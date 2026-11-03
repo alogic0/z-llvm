@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "source": "test/standalone/c_compiler/test.c",
+  "source_sha256": "bd015ad1d29128457434b36774c8bdae427eb29ca1bd6a241f5897bd388ed6e7",
+  "target": "x86_64-linux-gnu",
+  "modes": [
+    "ReleaseFast",
+    "ReleaseSafe",
+    "ReleaseSmall"
+  ],
+  "cases": [
+    {
+      "id": "quiet",
+      "argv": [],
+      "stdout": "",
+      "exit_status": 0
+    },
+    {
+      "id": "show",
+      "argv": [
+        "show"
+      ],
+      "stdout": "val=123\n",
+      "exit_status": 0
+    }
+  ],
+  "remaining_dependencies": [
+    "pinned Zig C frontend and Clang IR construction",
+    "system linker and CRT",
+    "libc malloc/free/stdio/assertions"
+  ],
+  "local_pipeline": "memory-foundation followed by the accepted release-mode pipeline",
+  "unsupported_boundaries": [
+    "C sanitizers disabled",
+    "Zig standard startup remains blocked by aggregate allocations",
+    "floating, indirect, aggregate and stack variadic arguments"
+  ],
+  "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e"
+}

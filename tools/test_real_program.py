@@ -3,8 +3,11 @@ import struct
 import subprocess
 import tempfile
 import unittest
+import os
+import sys
 
-from run_real_program import ROOT, object_contract
+from run_real_program import ROOT, Runner, object_contract
+from run_upstream_c_program import require_observation
 
 
 class ObjectContract(unittest.TestCase):
@@ -41,6 +44,21 @@ class ObjectContract(unittest.TestCase):
             path.write_bytes(b"not an ELF object")
             with self.assertRaisesRegex(RuntimeError, "ELF relocatable"):
                 object_contract(path)
+
+
+class ProgramObservation(unittest.TestCase):
+    def test_argument_dependent_output_and_failure_status_are_checked(self):
+        (ROOT / "tmp").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=ROOT / "tmp") as temporary:
+            directory = Path(temporary)
+            runner = Runner(directory)
+            case = {"argv": ["-c", "print('val=123')"], "stdout": "val=123\n", "exit_status": 0}
+            require_observation(runner, sys.executable, case, directory / "matching", os.environ)
+            for name, code in [("wrong-output", "print('val=456')"), ("nonzero", "raise SystemExit(1)"),
+                               ("stderr", "import sys; print('val=123'); print('failure', file=sys.stderr)")]:
+                changed = {**case, "argv": ["-c", code]}
+                with self.assertRaisesRegex(RuntimeError, "observation differs"):
+                    require_observation(runner, sys.executable, changed, directory / name, os.environ)
 
 
 if __name__ == "__main__":

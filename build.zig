@@ -91,6 +91,10 @@ pub fn build(b: *std.Build) void {
     real_program_run.step.dependOn(b.getInstallStep());
     real_program_run.addPassthruArgs();
     b.step("real-program", "Compare an unchanged pinned upstream Zig program with local optimizer and codegen").dependOn(&real_program_run.step);
+    const upstream_c_run = b.addSystemCommand(&.{ "python3", "tools/run_upstream_c_program.py" });
+    upstream_c_run.step.dependOn(b.getInstallStep());
+    upstream_c_run.addPassthruArgs();
+    b.step("upstream-c-program", "Compare the unchanged upstream C fixture and integer-varargs native canary").dependOn(&upstream_c_run.step);
     addToolStepWithArgs(b, "check-docs", "Validate current documentation links and accepted status", "tools/check_project_docs.zig");
     addToolStep(b, "check-zig-stage4-emitter", "Check the authoritative Zig stage4 emitter", "tools/check_zig_stage4_emitter.zig");
     addToolStep(b, "focused-codegen-canaries", "Run procedural fma and __multi3 codegen canaries (non-gating)", "tools/run_focused_codegen_canaries.zig");

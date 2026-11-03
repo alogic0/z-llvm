@@ -24,8 +24,20 @@ pub fn simplify(instruction: ir.Instruction) ?ir.Value {
         .fcmp => |fcmp| simplifyFcmp(fcmp),
         .select => |select| simplifySelect(select),
         .call => |call| simplifyCall(call),
-        .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => null,
+        .gep => |gep| simplifyZeroGep(gep),
+        .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => null,
     };
+}
+
+fn simplifyZeroGep(gep: ir.GepInst) ?ir.Value {
+    // LLVM InstructionSimplify::simplifyGEPInst: an all-zero scalar GEP is
+    // the same pointer, independent of aggregate padding or nominal type.
+    // Vector indices can splat a pointer and must retain their result shape.
+    if (gep.ptr_addrspace != null) return null;
+    for (gep.indices.items) |index| {
+        if (index.ty != .int or index.ty.int == 0 or index.value != .int or index.value.int != 0) return null;
+    }
+    return gep.ptr;
 }
 
 pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {

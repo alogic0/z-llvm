@@ -490,8 +490,15 @@ pub fn executeStoreScalar(
     value_view: *const Types.PreparedView,
     action: Types.StoreScalarAction,
 ) !void {
+    var staged: Types.PreparedView = undefined;
+    const before = try Authority.registeredOperandView(Authority, transaction, action.pointer);
+    const staged_address = (try materialization.preparedViewLoc(before)) == .rax;
+    if (staged_address) {
+        staged = before.*;
+        try stageAccumulatorStorePointer(Authority, transaction, &staged);
+    }
     try materializeActionScalar32(Authority, transaction, value_view, .accumulator);
-    const pointer_view = try Authority.registeredOperandView(Authority, transaction, action.pointer);
+    const pointer_view = if (staged_address) &staged else try Authority.registeredOperandView(Authority, transaction, action.pointer);
     executeStoreEaxToPointer(Authority, transaction, pointer_view, action.bits) catch |err| {
         Authority.noteRegisteredOperandBoundaryError(Authority, transaction, action.pointer, err);
         return err;
@@ -503,6 +510,12 @@ pub fn executeStoreImmediate(
     pointer_view: *const Types.PreparedView,
     action: Types.StoreImmediateAction,
 ) !void {
+    var staged_pointer: Types.PreparedView = undefined;
+    const actual_pointer = if ((try materialization.preparedViewLoc(pointer_view)) == .rax) blk: {
+        staged_pointer = pointer_view.*;
+        try stageAccumulatorStorePointer(Authority, transaction, &staged_pointer);
+        break :blk &staged_pointer;
+    } else pointer_view;
     try materialization.clobberPhysicalNode(transaction.selector, .accumulator);
     if (action.bits == 64 and action.value < 0) {
         try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
@@ -513,7 +526,16 @@ pub fn executeStoreImmediate(
             .mov_imm_eax = action.value,
         });
     }
-    try executeStoreEaxToPointer(Authority, transaction, pointer_view, action.bits);
+    try executeStoreEaxToPointer(Authority, transaction, actual_pointer, action.bits);
+}
+
+fn stageAccumulatorStorePointer(comptime Authority: type, transaction: anytype, view: *Types.PreparedView) !void {
+    const pointer = try materialization.preparedViewLoc(view);
+    if (pointer != .rax) return;
+    // The plan owns this RAX -> RCX transfer. Stage the address before scalar
+    // materialization overwrites EAX; retain the original canonical ownership.
+    try materializeActionPointer(Authority, transaction, pointer, .rcx);
+    view.* = .{ .register = .{ .register = .{ .gpr64 = .rcx }, .bits = 64 } };
 }
 pub fn executeStoreI64(
     comptime Authority: type,

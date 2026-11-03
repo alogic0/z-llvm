@@ -547,3 +547,49 @@ test "current pin ABI carrier legalization rejects barriers and escaping pointer
         try std.testing.expectEqual(@as(?ir.Function, null), try legalize.paddedHalf(arena.allocator(), module.functions.items[0]));
     }
 }
+
+test "upstream C zero field GEP folds while preserving volatile memory reads" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\%Record = type { i32, i64 }
+        \\define i32 @get_head(ptr %p) {
+        \\entry:
+        \\  %field = getelementptr inbounds %Record, ptr %p, i32 0, i32 0
+        \\  %value = load volatile i32, ptr %field, align 4
+        \\  ret i32 %value
+        \\}
+    );
+    defer module.deinit();
+    const gep = &module.functions.items[0].blocks.items[0].instructions.items[0];
+    const simplify = @import("../passes/inst_simplify.zig").simplify;
+    try std.testing.expect(simplify(gep.*).?.eql(.{ .named = "p" }));
+    gep.kind.gep.indices.items[1].value = .{ .int = 1 };
+    try std.testing.expectEqual(@as(?ir.Value, null), simplify(gep.*));
+    gep.kind.gep.indices.items[1].value = .{ .int = 0 };
+    gep.kind.gep.ptr_addrspace = "addrspace(1)";
+    try std.testing.expectEqual(@as(?ir.Value, null), simplify(gep.*));
+    gep.kind.gep.ptr_addrspace = null;
+    var context: @import("../pass_manager.zig").Context = .{ .allocator = std.testing.allocator };
+    _ = try @import("../passes/instcombine.zig").pass.run(&module, &context);
+    try module.verify();
+    try std.testing.expect(module.functions.items[0].blocks.items[0].instructions.items[1].kind.load.attrs.is_volatile);
+    const ordinary_source =
+        \\%Record = type { i32, i64 }
+        \\define i32 @get_head(ptr %p) {
+        \\entry:
+        \\  %field = getelementptr inbounds %Record, ptr %p, i32 0, i32 0
+        \\  %value = load i32, ptr %field, align 4
+        \\  ret i32 %value
+        \\}
+    ;
+    var ordinary = try ir.Module.parse(std.testing.allocator, ordinary_source);
+    defer ordinary.deinit();
+    _ = try @import("../passes/instcombine.zig").pass.run(&ordinary, &context);
+    const code = try Native.init(ordinary);
+    defer code.deinit();
+    const read: *const fn (*const i32) callconv(.c) i32 = @ptrCast(code.mapping.ptr);
+    var value: i32 = 0;
+    for ([_]i32{ -2147483648, -1, 0, 123, 2147483647 }) |input| {
+        value = input;
+        try std.testing.expectEqual(input, read(&value));
+    }
+}
