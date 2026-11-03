@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `ccf843f3c2b6dc952d8851d6a4b4995620be9665`; tree: `70a7282620d835affafb800ab3c704b5af5b31e9`.
+Accepted revision: `a78431ae6bc74409da7410dfb44ffc6dfe5ef2fe`; tree: `a3bc581590ca819fb26796e7fbfb87e9031c069f`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -17,8 +17,8 @@ Candidate SHA-256: `847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe
 | Functions lowered | 100 | Compiler-core prefix |
 | Objects emitted | 100 | Compiler-core prefix |
 | Native links | 100 | Compiler-core prefix |
-| Functions executed | 4 | Fixed execution cohort |
-| Paired harnesses accepted | 4 | Legacy real_programs_ok cohort metric |
+| Functions executed | 5 | Fixed execution cohort |
+| Paired harnesses accepted | 5 | Legacy real_programs_ok cohort metric |
 | Local failures | 0 | Compiler-core gate |
 
 Compiler-rt bypass ratchet: 130 (separate 285-function population).

@@ -41,52 +41,65 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The [2026-11-02 acceptance](evidence/current_pin_acceptance_20261102.json)
-repairs aggregate/optional snapshots, typed addresses and ABI carriers, and
-migrates the frozen compiler-core selection to Zig source pin
-`1c08b09d1c847f4f02c8216e3b62df323861a437`. The selected 100 functions lower,
-emit objects and link in every release mode. Four source-bound functions
-execute against independent reference harnesses per mode. Compilation and
-linking counts remain separate from executions.
+The [export/execution acceptance](evidence/export_execution_acceptance_20261102.json)
+at `a78431ae` completes the three follow-ups from the prior checkpoint. Both
+full distribution runs pass all 17 subgates against one frozen source snapshot,
+and all 1,395 canonical records match. The source pin remains
+`1c08b09d1c847f4f02c8216e3b62df323861a437`.
 
-The [membership audit](evidence/real_candidates_release_v3_migration.json)
-records 30 retained and 70 replaced prefix entries. Sixty-three former names
-have no runtime AIR at this pin. The former COFF size methods now return
-`comptime_int`; two Signature methods replace them while the two Requirements
-methods remain. Selection uses frozen static facts across all three modes and
-never takes lowering outcomes as ranking input.
+The compiler-core selection remains the same 100-row selector-v3 prefix. Every
+row lowers, emits an object and links in each release mode; five source-bound
+functions execute per mode. The four constant methods remain in the cohort.
+`ascii.isAscii` adds all 256 byte inputs per mode, compared with an independent
+high-bit oracle and exact ordered output: 768 paired observations. Six native
+constant-result negative controls reject. These input observations do not turn
+100 links into 100 executions.
 
-Zig's unchanged `hello_libc.zig` runs through the local preopt optimizer and
-object emitter in all three release modes. Its manifest checks source bytes and
-pinned Git contents. Bounded direct C variadic calls admit one fixed pointer
-and no unnamed arguments. The pipeline consumes constant string lengths and
-removes newly constant safety branches. The program still depends on libLLVM
-IR construction, libc, the system linker and CRT.
+Production AIR publication writes schema-4 metadata atomically and transfers
+ownership of the verified payload. Same-filesystem publication renames the
+original file; cross-filesystem publication removes raw only after commit.
+Readers support schemas 3 and 4, including the parent's cache-pin verifier.
+Two-second observations identify the same inode as raw and cached in all three
+modes, with one complete payload per mode and no manual cleanup wrapper.
+Rollback, legacy migration, reuse and actual cross-filesystem tests pass.
 
-The ABI differential keeps its ten functions and passes 60 native cases.
-The [FMA identity audit](evidence/current_pin_fma_canary_20261102.json) retains
-29 exact-result cases and adds 8,192 mandatory comparisons against LLVM's
-compilation of the identical frozen IR. Helper and `__multi3` identities stay
-fixed. The acceptance evidence records full fresh/cached results separately
-from these bounded populations.
+The unchanged upstream `hello_libc.zig` still executes in all three release
+modes. Zig's unchanged [C compiler fixture](evidence/upstream_c_program_20261102.json)
+adds an input-dependent branch, heap stores/loads and stdio. Its two argument
+paths pass against LLVM in each local release pipeline: six paired case
+executions. A separate native canary adds 48 integer-varargs and 18 heap-call
+observations, checking AL, pointer identities, argument permutations, live
+values and integer boundaries. C assertions stay enabled and C sanitizers are
+disabled; these mode labels do not establish Zig safety behavior. Pinned
+Zig/Clang IR construction, libc, the system linker and CRT remain dependencies.
 
-Next, repair export publication so the production runner avoids retaining a
-second complete `compiler.air` after its verified cache copy is published.
-The fresh validation used a hash-checked cleanup wrapper; its disk observations
-do not establish the existing footprint forecast. Keep ownership, cache identity
-and failure evidence intact, and measure both fresh and cached behavior.
+The ABI cohort retains ten functions and passes 60 cases plus its negative
+controls. The frozen FMA canary still passes its 29 exact-result cases and
+8,192 LLVM-paired observations with unchanged identities. The combined focused
+checks pass 1,633 compiler unit tests, 11 structural tests and seven Python
+policy tests. Standalone, compiler-core and compiler-rt populations remain
+separate; the compiler-rt bypass ratchet remains 130.
 
-The [space cleanup](evidence/space_cleanup_20261102.json) retired obsolete
-selector-v2 failed-run exports and idle compiler caches while preserving the
-accepted exports, frozen selector inputs, logs, measurements and source probes.
-This reclaims generated state; production export publication still needs the
-repair above.
+The earlier [space cleanup](evidence/space_cleanup_20261102.json) retained frozen
+selector inputs and source probes. The
+[checkpoint cleanup](evidence/export_execution_cleanup_20261102.json) replaces
+superseded AIR payloads with the accepted schema-4 generation and removes idle
+build caches while retaining metadata, logs and native evidence. No backup
+archives are created. Follow the [current keep-list](evidence/tmp_retention_pins.tsv).
 
-Then increase execution coverage within the fixed 100-row population, starting
-with a finite-input function such as `ascii.isAscii`, checking all 256 byte
-inputs in each release mode against an independent oracle. Prefer a subsequent
-unchanged upstream program with input-dependent branching or memory effects.
-Keep unsupported optional ABIs, wider varargs and runtime boundaries explicit.
+Next, reconcile the footprint forecast with the retained two-second samples.
+The fresh run's global free-space decrease exceeds the coarse 4.419 GB forecast;
+post-subgate samples miss the row group's transient caches. Same-inode
+publication is established, while the forecast remains unaccepted. Keep the
+existing reserve and distinguish owned bytes from unrelated filesystem changes.
+
+The next compiler capability should target the captured unchanged
+`test/cases/recursive_fibonacci.zig` probe. Its LLVM reference executes, but local
+preopt emission stops in `start.main` at aggregate allocations, before earning
+any local execution credit. Reduce the captured startup IR to a typed aggregate
+allocation/copy case, extend the existing memory or scalarization authority with
+native comparisons, then retry the unchanged program. Keep broader optional
+ABIs and floating/indirect/aggregate/stack varargs as explicit boundaries.
 Use the frozen performance baseline for measured comparisons and the
 [validation policy](validation_tiers.md) for matching evidence reuse.
 

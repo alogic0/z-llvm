@@ -11,7 +11,9 @@ mode. The [focused evidence](evidence/ascii_execution_20261102.json) records 768
 matching observations and six rejected constant-result implementations.
 Schema-3 cohort records distinguish five executed functions from their input
 observations: 256 for ASCII and one for each retained constant method. Accepted
-counters remain at the previous checkpoint until cumulative Tier 3 passes.
+counters explicitly migrate to five in the
+[combined acceptance](evidence/export_execution_acceptance_20261102.json): both
+full 17-subgate runs pass and all 1,395 canonical records match.
 
 | Runner | Local path | Independent reference and boundary |
 | --- | --- | --- |

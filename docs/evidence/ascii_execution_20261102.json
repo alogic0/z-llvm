@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-11-02",
-  "status": "focused native and policy checks pass; cumulative Tier 3 pending",
+  "status": "accepted in the combined full fresh/cached checkpoint",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_file": "docs/evidence/real_candidates_release_v3.tsv",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
@@ -57,6 +57,8 @@
     "src/testdata/ascii_ReleaseSafe.air": "11a45e72d2bec6a1db582122c125c659cfd0deea350aef59076b746ec4df0e3e",
     "src/testdata/ascii_ReleaseFast.air": "50d151a73c7ff04cd35cc02cbbd8d3f107603e4fdd2dcd5957127842e447ca33"
   },
-  "remaining_acceptance": "Full fresh/cache pair against the final combined source snapshot. Accepted counters are unchanged until then.",
-  "archives_created": 0
+  "remaining_acceptance": "Completed; accepted execution counters explicitly migrate from four to five functions per mode, retaining the fixed 100-row selection.",
+  "archives_created": 0,
+  "accepted_revision": "a78431ae6bc74409da7410dfb44ffc6dfe5ef2fe",
+  "acceptance_evidence": "docs/evidence/export_execution_acceptance_20261102.json"
 }

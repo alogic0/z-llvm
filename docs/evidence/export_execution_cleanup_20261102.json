@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "date": "2026-11-02",
+  "status": "deleted and verified; sources, current exports, frozen inputs and evidence retained",
+  "accepted_revision": "a78431ae6bc74409da7410dfb44ffc6dfe5ef2fe",
+  "acceptance_evidence": "docs/evidence/export_execution_acceptance_20261102.json",
+  "filesystem_available_before": 54096277504,
+  "project_allocated_before": 17587499008,
+  "retired_payloads": [
+    {
+      "path": "local-state/caches/current-pin-acceptance-20261102-r2/ReleaseFast/export/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.air",
+      "reason": "superseded accepted AIR generation",
+      "mode": "ReleaseFast",
+      "sha256": "e4cc24d5efee4cc82691b4a54a532b19227ef2790948bf39933503e458132995",
+      "bytes": 1343891552,
+      "allocated_bytes": 1343905792,
+      "device": 66306,
+      "inode": 54421489,
+      "links": 1,
+      "deleted": true
+    },
+    {
+      "path": "local-state/caches/current-pin-acceptance-20261102-r2/ReleaseSafe/export/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.air",
+      "reason": "superseded accepted AIR generation",
+      "mode": "ReleaseSafe",
+      "sha256": "83e45f02dcec330b298d7610dff0ec4c145904e9af7d00aa375bbc9766b63508",
+      "bytes": 1473501276,
+      "allocated_bytes": 1473519616,
+      "device": 66306,
+      "inode": 54421491,
+      "links": 1,
+      "deleted": true
+    },
+    {
+      "path": "local-state/caches/current-pin-acceptance-20261102-r2/ReleaseSmall/export/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.air",
+      "reason": "superseded accepted AIR generation",
+      "mode": "ReleaseSmall",
+      "sha256": "e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106448384,
+      "device": 66306,
+      "inode": 54421487,
+      "links": 1,
+      "deleted": true
+    }
+  ],
+  "retained_current_caches": [
+    {
+      "mode": "ReleaseFast",
+      "path": "local-state/caches/export-execution-20261102-r2/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.4b757112cdbe3d4d95000dd8aaedbe4918d3a3e187447225cc05649a0a12d821.air",
+      "bytes": 1343891552,
+      "allocated_bytes": 1343905792,
+      "sha256": "4b757112cdbe3d4d95000dd8aaedbe4918d3a3e187447225cc05649a0a12d821",
+      "final_inode": 55209413,
+      "sampled_maximum_complete_payload_inodes": 1,
+      "same_inode_observed_as_raw_and_cache": true
+    },
+    {
+      "mode": "ReleaseSafe",
+      "path": "local-state/caches/export-execution-20261102-r2/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.83e45f02dcec330b298d7610dff0ec4c145904e9af7d00aa375bbc9766b63508.air",
+      "bytes": 1473501276,
+      "allocated_bytes": 1473527808,
+      "sha256": "83e45f02dcec330b298d7610dff0ec4c145904e9af7d00aa375bbc9766b63508",
+      "final_inode": 55209408,
+      "sampled_maximum_complete_payload_inodes": 1,
+      "same_inode_observed_as_raw_and_cache": true
+    },
+    {
+      "mode": "ReleaseSmall",
+      "path": "local-state/caches/export-execution-20261102-r2/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.40b80a4344adc99d8b4818f4879d1a23d4e586d8ef1713d5baa328c79717c69f.air",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106448384,
+      "sha256": "40b80a4344adc99d8b4818f4879d1a23d4e586d8ef1713d5baa328c79717c69f",
+      "final_inode": 55209410,
+      "sampled_maximum_complete_payload_inodes": 1,
+      "same_inode_observed_as_raw_and_cache": true
+    }
+  ],
+  "archives_created": 0,
+  "failure_diagnostics_retained": true,
+  "original_scratch_probes_retained": true,
+  "old_metadata_and_logs_retained": true,
+  "retired_payload_allocated_bytes": 3923873792,
+  "retained_frozen_inputs": [
+    {
+      "path": "local-state/caches/test-real-rows/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.air",
+      "sha256": "c174c6552a17794c0f82f936b0373f7a8d0cf943460007182d7c20c06beabd2a",
+      "bytes": 1343891552,
+      "device": 66306,
+      "inode": 54832908,
+      "links": 2
+    },
+    {
+      "path": "local-state/caches/test-real-rows/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.air",
+      "sha256": "7b34676ca48eaeec0416bdb50a77b910c038dac88a40df3e7ed703c2e0d714c6",
+      "bytes": 1473501276,
+      "device": 66306,
+      "inode": 54826136,
+      "links": 2
+    },
+    {
+      "path": "local-state/caches/test-real-rows/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.air",
+      "sha256": "5ff91e8e1a86d214c7af8e6ab1c72b3b509564470b5d225b1433dc9b8cc25f5d",
+      "bytes": 1106432911,
+      "device": 66306,
+      "inode": 54827145,
+      "links": 2
+    }
+  ],
+  "filesystem_available_after_payload_retirement": 58020073472,
+  "earlier_unaccepted_payload_retirement": {
+    "evidence": "local-state/validations/export-execution-20261102/failed-cache-retirement.json",
+    "removed_allocated_bytes": 3923869696,
+    "scope": "Earlier in this task; excluded from the later before/after cleanup measurements."
+  },
+  "idle_cache_cleanup": [
+    {
+      "path": ".zig-cache",
+      "reason": "Idle, rebuildable compiler/interpreter cache; remove the entire cache including manifests and objects.",
+      "device": 66306,
+      "inode": 54038572,
+      "allocated_unique_bytes": 1949528064,
+      "reclaimable_allocated_bytes": 1949528064,
+      "unique_file_inodes": 2010,
+      "directories": 748,
+      "deleted": true
+    },
+    {
+      "path": "tools/__pycache__",
+      "reason": "Idle, rebuildable compiler/interpreter cache; remove the entire cache including manifests and objects.",
+      "device": 66306,
+      "inode": 54167663,
+      "allocated_unique_bytes": 86016,
+      "reclaimable_allocated_bytes": 86016,
+      "unique_file_inodes": 5,
+      "directories": 1,
+      "deleted": true
+    }
+  ],
+  "idle_cache_reclaimable_allocated_bytes": 1949614080,
+  "total_reclaimed_allocated_bytes": 5873487872,
+  "filesystem_available_after": 59968770048,
+  "project_allocated_after": 11714039808,
+  "project_allocated_decrease_bytes": 5873459200,
+  "measurement_scope": "Allocated bytes count unique file inodes; idle-cache reclaim excludes any inode with links outside the removed cache. Filesystem free-space and project du changes are separate observations and may include concurrent activity and new metadata. Earlier unaccepted-payload retirement is excluded from this cleanup interval.",
+  "verification": {
+    "documentation": {
+      "argv": [
+        "zig",
+        "build",
+        "check-docs"
+      ],
+      "returncode": 0,
+      "documents": 19,
+      "internal_links": 134,
+      "status_blocks": 2,
+      "log": "local-state/validations/export-execution-20261102-r2/docs-final.log"
+    },
+    "artifact_store": {
+      "argv": [
+        "zig",
+        "build",
+        "artifact-store",
+        "--",
+        "verify"
+      ],
+      "returncode": 0,
+      "manifests": 5,
+      "log": "local-state/validations/export-execution-20261102-r2/artifacts-final.log"
+    },
+    "source_and_population_checks": "Non-document sources still match the accepted snapshot; selector-v3 candidate hash, 100 rows and compiler-rt bypass ratchet unchanged."
+  }
+}

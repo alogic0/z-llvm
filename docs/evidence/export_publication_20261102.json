@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-11-02",
-  "status": "focused checks pass; cumulative Tier 3 pending",
+  "status": "accepted in the combined full fresh/cached checkpoint",
   "scope": "Atomic, nonduplicating AIR export publication; no compiler instruction-semantics or candidate-selection changes",
   "metadata_contract": "write schema 4, read schema 3 or 4; generation/content-named immutable payload; atomic metadata commit",
   "focused_tests": 8,
@@ -49,6 +49,10 @@
       "returncode": 0
     }
   ],
-  "required_acceptance": "After the authorized execution/program slices, run one full fresh/cache pair against unchanged relevant sources and compare canonical records. No cleanup wrapper may delete raw AIR files during measurement.",
-  "archives_created": 0
+  "required_acceptance": "Completed: 17 fresh and 17 cached subgates, with 1,395 matching canonical records and no manual raw-export cleanup.",
+  "archives_created": 0,
+  "accepted_revision": "a78431ae6bc74409da7410dfb44ffc6dfe5ef2fe",
+  "acceptance_evidence": "docs/evidence/export_execution_acceptance_20261102.json",
+  "source_sha256_scope": "Publication-only slice at b31fb051; the gate subsequently gained the ASCII cohort. Final source identities are in the combined acceptance manifest.",
+  "parent_pin_verifier_fix": "41824688; both schema-3 and schema-4 payload names are verified with metadata and payload drift rejection."
 }

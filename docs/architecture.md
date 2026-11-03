@@ -1,7 +1,7 @@
 # Current architecture
 
-Source baseline: `ccf843f3` (2026-11-02), including the current-pin
-correctness, ABI, program and candidate migrations.
+Source baseline: `a78431ae` (2026-11-02), including the current-pin
+correctness, ABI, export publication and execution migrations.
 This page describes the
 implementation; the
 [refactor plan](roadmap/architecture_refactor_plan.md) records its completed scope.
@@ -11,10 +11,10 @@ The bounded refactors, memset capability,
 [scalar byte-loop slice](evidence/composed_byte_loops.md),
 [loop-memory repair slice](evidence/loops_memory_repair.md), and
 [cyclic byte-vector transfer slice](evidence/cyclic_byte_transfers.md) are complete.
-The accepted checkpoint uses tracked Zig 0.17.0 and executes an unchanged upstream
-program. Broader execution coverage is the next work; the export publication
-repair is implemented with focused checks and awaits the combined integration
-checkpoint.
+The accepted checkpoint uses tracked Zig 0.17.0, executes all byte inputs for
+the selected ASCII function, and runs unchanged upstream Zig and C programs.
+Production export publication transfers the original payload into the cache;
+fresh and cached full integration runs pass against the same source snapshot.
 The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
 backend for selected Zig inputs. It does not yet provide a complete LLVM
 replacement or a self-hosting Zig backend.
@@ -185,11 +185,14 @@ these folds so newly constant safety branches disappear before codegen.
 | Integrated preopt/postopt/writer gates | The selected route and wrappers declared by each runner. | Different routes exercise different optimization owners and selector paths. |
 | `distribution-all` | The tracked 17-subgate inventory and its declared populations. | Success does not cover every development pass, input shape, or separate frontier gate. |
 
-The [current acceptance](evidence/current_pin_acceptance_20261102.json) records
-100 compiler-core functions lowered, emitted and linked, with four cohort
-executions in every release mode. It identifies the source pin, membership audit,
-fresh/cached runs and canonical comparison. Standalone programs, behavioral
-observations and compiler-rt counts retain their own populations.
+The [current acceptance](evidence/export_execution_acceptance_20261102.json)
+records 100 compiler-core functions lowered, emitted and linked, with five cohort
+executions in every release mode. ASCII contributes 256 input observations per
+mode; the retained constant methods contribute one each. Both 17-subgate runs
+pass and all 1,395 canonical records match. Standalone programs, behavioral
+observations and compiler-rt counts retain their own populations. Two-second
+filesystem samples establish same-inode publication but expose a larger transient
+global disk decrease than the coarse forecast; that forecast is not accepted.
 
 ## Current design constraints
 

@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "ccf843f3c2b6dc952d8851d6a4b4995620be9665",
-  "accepted_tree": "70a7282620d835affafb800ab3c704b5af5b31e9",
+  "accepted_revision": "a78431ae6bc74409da7410dfb44ffc6dfe5ef2fe",
+  "accepted_tree": "a3bc581590ca819fb26796e7fbfb87e9031c069f",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -13,15 +13,15 @@
   "lowered": 100,
   "objects": 100,
   "native_linked": 100,
-  "executed_functions": 4,
-  "paired_harnesses_ok": 4,
+  "executed_functions": 5,
+  "paired_harnesses_ok": 5,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "ccf843f3",
+  "declaration_revision": "a78431ae",
   "evidence": [
-    "docs/evidence/current_pin_acceptance_20261102.json",
-    "docs/evidence/current_pin_20261102_fresh.summary",
-    "docs/evidence/current_pin_20261102_cached.summary",
+    "docs/evidence/export_execution_acceptance_20261102.json",
+    "docs/evidence/export_execution_20261102_fresh.summary",
+    "docs/evidence/export_execution_20261102_cached.summary",
     "docs/evidence/real_candidates_release_v3_migration.json"
   ],
   "selector_version": "real-candidate-selector-v3"

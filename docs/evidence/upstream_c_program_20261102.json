@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-11-02",
-  "status": "focused native and unit checks pass; cumulative Tier 3 pending",
+  "status": "accepted in the combined full fresh/cached checkpoint",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "source": "/home/oleg/prog/ziglang/test/standalone/c_compiler/test.c",
   "source_sha256": "bd015ad1d29128457434b36774c8bdae427eb29ca1bd6a241f5897bd388ed6e7",
@@ -73,5 +73,7 @@
     "selector_detail": "alloca",
     "evidence": "local-state/validations/export-execution-20261102/fibonacci-scout/report.json"
   },
-  "archives_created": 0
+  "archives_created": 0,
+  "accepted_revision": "a78431ae6bc74409da7410dfb44ffc6dfe5ef2fe",
+  "acceptance_evidence": "docs/evidence/export_execution_acceptance_20261102.json"
 }
