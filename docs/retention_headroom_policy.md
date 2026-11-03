@@ -49,8 +49,8 @@ inputs remain pinned. Equal file sizes do not establish duplicate content.
 
 The [export-generation cleanup](evidence/startup_headroom_cleanup_20261103.json) retires
 the superseded export/execution generation after its replacement fresh run
-passed and all replacement hashes were verified. The accepted generation now
-lives under `local-state/caches/startup-headroom-20261102`. That checkpoint kept
+passed and all replacement hashes were verified. The accepted generation then
+lived under `local-state/caches/startup-headroom-20261102`. That checkpoint kept
 the frozen raw audit inputs; their later semantic migration is recorded below.
 Historical metadata, logs and source probes remain.
 
@@ -86,9 +86,9 @@ offline replay entrypoint; historical raw paths in old evidence record provenanc
 The three historical payloads had six hardlink paths under `test-real-rows` and
 `current-pin-20261102`. All six paths are retired after verification; metadata and
 retirement records remain. Distinct raw allocation falls by 3.92 GB and the new
-fact inputs use about 74 MB, for a 3.85 GB retained-input reduction. Current
-production AIR under `startup-headroom-20261102`, source probes and performance
-baselines stay pinned. No archives are created. See the
+fact inputs use about 74 MB, for a 3.85 GB retained-input reduction. Audit facts,
+current production AIR, source probes and performance baselines stay pinned.
+No archives are created. See the
 [replay command](build_steps.md) for checking the adopted inputs.
 
 Use unique run-owned directories for new work. Successful temporary tests clean
@@ -101,6 +101,15 @@ finish. Sources, accepted and provisional proofs, performance baselines, current
 AIR, audit facts and all 13 source probes remain. Cache allocation and global
 free-space movement are recorded separately; no archives are created.
 
+The [global-memory generation cleanup](evidence/global_memory_cleanup_20261103.json)
+retires 3.92 GB of superseded AIR payload allocation only after the replacement
+passes both full 17-stage runs, all 1,403 canonical records match, and old/new
+payload hashes are reverified with no active consumers. Historical metadata,
+logs, sources and performance baselines remain. Current production exports and
+their paired work selection use `global-memory-headroom-20261103`; the old
+`startup-headroom-20261102` cache retains metadata and its retirement record.
+No archives are created.
+
 ## Headroom
 
 The runner's numerical headroom checks remain owned by
@@ -112,16 +121,30 @@ unchanged inputs. The obsolete `clean-tmp` INBOX classifier and its fixture are
 retired; use the artifact-store collector for objects and classify other generated
 roots against the current keep-list before removing them.
 
-The [headroom calibration](evidence/headroom_calibration_20261102.json) replaces
-the coarse 4.419 GB forecast with 8 GiB: a 25% margin over the retained 6.05 GB
-fresh-run free-space decrease, rounded upward to a whole GiB. The serial reserve
-remains the larger of 32 GiB and 5% of filesystem capacity. Nested row workers
-inherit that reserve while running, and their transient minimum enters the
-serial report before cleanup. The
+The [headroom calibration](evidence/headroom_calibration_20261102.json) established
+the 8 GiB forecast: a 25% margin over the retained 6.05 GB fresh-run free-space
+decrease, rounded upward to a whole GiB. At the user's direction on 2026-11-03,
+headroom policy schema 2 uses a fixed 32 GiB serial reserve plus that unchanged
+8 GiB working allowance. Serial admission therefore requires 40 GiB
+(42,949,672,960 bytes, approximately 42.95 GB) free. This replaces the earlier
+capacity-based reserve that required 57.70 GB on this filesystem. Nested workers
+continue to inherit and enforce the caller's reserve, including any stronger
+caller floor, and their transient minimum enters the serial report before cleanup.
+The separate sharding policy is unchanged.
+
+The earlier
 [combined checkpoint](evidence/startup_headroom_acceptance_20261103.json)
-passes both full 17-subgate runs with all 1,396 canonical records matching.
-Sampled fresh/cached global decreases are 6.10 GB and 1.60 GB, within the forecast;
-the reserve remains enforced independently.
+passed both full 17-subgate runs with all 1,396 canonical records matching under
+the previous reserve policy. Its sampled fresh/cached global decreases were
+6.10 GB and 1.60 GB.
+
+The [fixed-reserve/global-memory acceptance](evidence/global_memory_acceptance_20261103.json)
+passes its own fresh/cached 17-stage pair with all 1,403 canonical records matching
+on unchanged implementation inputs. Reported free-space decreases are 5.86 GB
+and 2.16 GB, within the 8 GiB forecast. Reported minima are 44.09 GB and 43.31 GB;
+independent two-second samples reach 44.02 GB and 43.28 GB. Both remain above the
+34.36 GB reserve. The 51 runner/policy and 41 comparison tests pass. These
+filesystem measurements do not establish a performance improvement.
 
 The serial parent records its original admission. Row workers validate that
 record's filesystem, starting free space, reserve and forecast, then consume the

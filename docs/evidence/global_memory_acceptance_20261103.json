@@ -1,0 +1,1211 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "recorded_utc": "2026-11-03T18:14:00.044533+00:00",
+  "status": "bounded global-memory and fixed serial headroom checkpoint accepted",
+  "accepted_revision": "db272521bfcd49fae366985fa47a0ff5ef58dc27",
+  "accepted_tree": "2de39921e5dbef2335a7687b01edffd3b73f4d8c",
+  "headroom_policy_revision": "61dfbb3b9ac9c25201cdeeaf211654230f8f256d",
+  "validated_working_head": "16cad664888a23d01fbeed2fa438dbc8de4634ea",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "selector_version": "real-candidate-selector-v3",
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "population": {
+    "modes": [
+      "ReleaseFast",
+      "ReleaseSafe",
+      "ReleaseSmall"
+    ],
+    "selected_rows_per_mode": 100,
+    "lowered_per_mode": 100,
+    "objects_per_mode": 100,
+    "native_links_per_mode": 100,
+    "executed_functions_per_mode": 5,
+    "paired_harnesses_per_mode": 5,
+    "ascii_observations_per_mode": 256,
+    "paired_ascii_observations": 768
+  },
+  "selection_unchanged": true,
+  "compiler_rt_bypass_ratchet": 130,
+  "scope": [
+    "RIP-relative symbolic byte addresses with signed i32 offsets and checked default 64-bit pointer/index layout",
+    "Reachable ordinary native integer/pointer globals, named unpacked structs, arrays, explicit alignment/local visibility and ELF absolute data relocations",
+    "Private SSA materialization for global memcpy/store pointers, using existing transactional memory actions",
+    "Constant memcpy lengths, preservation of dying source/length ABI operands and RAX-address narrow scalar stores"
+  ],
+  "boundaries": [
+    "No new TLS, weak linkage, custom sections, nondefault address spaces, floating/vector initializers or zero-sized global placement",
+    "Bounded 1 MiB objects, 4096 reachable symbols and 16 MiB global data",
+    "Existing fp128/floating-table and zero-sized return paths preserved",
+    "General cyclic ABI moves and direct-call small return widths remain explicit boundaries"
+  ],
+  "headroom_policy": {
+    "schema_version": 2,
+    "user_direction": "Use this new estimations.",
+    "reserve_bytes": 34359738368,
+    "projected_peak_bytes": 8589934592,
+    "required_start_bytes": 42949672960,
+    "old_required_start_bytes_on_this_filesystem": 57701935924,
+    "runtime_reserve_enforced": true,
+    "stronger_caller_floors_preserved": true,
+    "sharding_policy_unchanged": true,
+    "focused_runner_policy_tests": 51,
+    "focused_comparison_tests": 41
+  },
+  "focused_validation": {
+    "unit_tests": 1675,
+    "unit_log": "local-state/validations/global-memory-20261103/global-unit-r13.log",
+    "unit_log_sha256": "c3079c3bae29954d7d5809c02ac6322fe2a5d20d149fe42aa679b50c5c522cd2",
+    "tier2_steps": "14/14",
+    "tier2_log": "local-state/validations/global-memory-20261103/global-tier2.log",
+    "tier2_log_sha256": "7d91d52388cf8cc2c3036630c7820c76e853320d6214cdb3966e83c3c7affbd4",
+    "structural_tests": 13,
+    "abi_cases": 60,
+    "python_policy_tests": 15,
+    "native_report": "local-state/validations/global-memory-20261103/global-native/report.json",
+    "native_report_sha256": "6be1e8a45f63fbef34d058e74e865d85af250d9b9d81c37a0bd2b4aeb347b101",
+    "old_generic_object_fixtures_byte_identical": 12,
+    "fp128_return_compatibility": "byte-identical baseline"
+  },
+  "native_global_addresses": {
+    "functions": 4,
+    "routes": [
+      "direct",
+      "release"
+    ],
+    "modes": 3,
+    "local_observations": 192,
+    "reference_observations": 96,
+    "reference_reused_per_route": true
+  },
+  "native_global_memory": {
+    "functions": 7,
+    "routes": [
+      "direct",
+      "release"
+    ],
+    "modes": 3,
+    "copy_bytes": [
+      2,
+      12,
+      16,
+      80
+    ],
+    "store_bits": [
+      8,
+      16,
+      32
+    ],
+    "local_observations": 240,
+    "reference_observations": 120,
+    "reference_reused_per_route": true
+  },
+  "actual_startup_object_probe": {
+    "report": "local-state/validations/global-memory-20261103/startup-global-object-r1/report.json",
+    "report_sha256": "004a7a68c0925bec4be82028fb5bb24750faa616f7434134c55883866afbe874",
+    "object_sizes_bytes": [
+      1136,
+      8,
+      32,
+      32
+    ],
+    "pointer_relocations": 11,
+    "meaning": "Exact captured startup object bytes, local binding and fixups compared with LLVM; an object-layout probe, not unchanged-program execution."
+  },
+  "source_snapshot": "local-state/validations/global-memory-20261103/global-headroom-pair-source-snapshot.json",
+  "source_snapshot_sha256": "b0a99f2bf55c4e07c537daeceb7c2eac857f1ea51188bf3daa24ad45992cfc7d",
+  "source_snapshot_files": 2624,
+  "committed_implementation_sources_match_validated_snapshot": true,
+  "final_implementation_sha256": {
+    "src/codegen/x86_64/generic_cfg/composed_selector_calls.zig": "124defee49e63e961d9fc1dbb5fa4f4e79ecc793a6b937330997f03b8e5dbebb",
+    "src/codegen/x86_64/generic_cfg/composed_selector_calls_tests.zig": "e532d4eafa13650ce8b392b52a345f427f661cbebc4397f1397c8b235563e9ea",
+    "src/codegen/x86_64/generic_cfg/composed_selector_eflags.zig": "6ef9885248ad7577b6a4126433eea09d1cb7c28034bf1a8d220dedfdd763e803",
+    "src/codegen/x86_64/generic_cfg/composed_selector_memory.zig": "07c15bbfe987728b22944da1bdeed5b12ca799d182074214e06425130fb2357c",
+    "src/codegen/x86_64/generic_cfg/composed_selector_state.zig": "315b3fa8f7cb118070d2693777af179d5e1f29de7b88eccfcc8692464bbdaf98",
+    "src/codegen/x86_64/generic_cfg/global_memory.zig": "29f81aa892bba4ce37b0a7d1c6ab3df030adda59e34003cf6fc79ddc0fc3ae2c",
+    "src/codegen/x86_64/generic_cfg/global_memory_tests.zig": "7dd873b6baec5893c78005ac5a7618f841b4df82e53cd86d21a632c14b03814a",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/calls.zig": "bd8302e034f452eecc8ff939c4ac08cb521830cdea20de4b45f65914637d4a06",
+    "src/codegen/x86_64/generic_cfg/value_use/core.zig": "4191a7d2576d0cd9bc74ab7e3d4265e63b4369b0e66a243b93d5f979bc84982d",
+    "src/codegen/x86_64/generic_cfg/value_use/model.zig": "953ba365430020fbeed2b197dba2ef13d34538990669007c0c97b89e775ed869",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/physical_mapping.zig": "e1da4f7ed840fa0b28fd9bfdd5e4e1e4ecf0ea72509886b80e1274f19e2958c7",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/semantic_ordering.zig": "a046cc0008e6ff5e7d23eb60ddea526dbfa176846434be9dd7d84f47f593af5b",
+    "src/codegen/x86_64/generic_cfg_selector.zig": "3ffb930ddbb62b518e7fc2c6215667fc74107b77eaa6aff0bb22f0092c154b4c",
+    "src/codegen/x86_64/machine.zig": "f850db84b130ffb4a07b2dfdcb08d859b9676a6ab9d9e08668fac585bbad4e90",
+    "src/codegen/x86_64/verify.zig": "f537aa5fcfe42ed3c93fb2816562a76d945f44b7d58904efc6060f76ef890972",
+    "src/mc/assembly.zig": "94fdcb2c791e2ce83d57db81fcc969047a6fc6713e6ea050fc0f15612ead6adb",
+    "src/mc/elf.zig": "f9b32daabb53e1d0902559566c74bdfe99140c07772db20a97c98ed25ab8f7d6",
+    "src/mc/encoding.zig": "0d67ae237ef778a0180e9f68c8c60090b46640df70fc98ccca020ad5b991a33a",
+    "src/tests.zig": "66e423e6f444be833e11f6aedddb159a054c60613131be12cd01620798920335",
+    "src/tests/composed_memcpy.zig": "ae47e7ba49bf76e5ebbdbed7a3ad1480dae897b2cfd5dc0b300910ba533726bd",
+    "test/real_programs/global_addresses.ll": "1e85aa60cd72e697021374d476f7653e0bdd315bfe0295c447e53ae2acc34742",
+    "test/real_programs/global_addresses_driver.c": "a95bb460563eb354acd98892f5870fe5f675a72d0a58eacfd6870857b003ae04",
+    "test/real_programs/global_memory.ll": "39abf58722a767fbff87abbae595385046b6896712f89262b3950d4a3d6b5997",
+    "test/real_programs/global_memory_driver.c": "6175c5e168c536d68c8447a4950e768f534d31c56077e2a53cbfac83ed6d60df",
+    "tools/distribution_headroom_policy.zig": "d0ba35398f4f5a248424231c6efe70633430ff07004e56fcaf6311dc44ca569c",
+    "tools/distribution_real_rows_parallel_policy.zig": "7691ea9a9e5a8fd9744da4794ccaf51a18a8e9647eca8b7c08ff16c7d2dab0f8",
+    "tools/run_upstream_c_program.py": "d40731ea143b7d1594ce69b241e4708e9a91d72a1788eb17899ce87b5ba98035"
+  },
+  "post_validation_changes": "Implementation bytes unchanged; policy/compiler commits split the validated working tree, followed by acceptance documents. Original 13 scratch probes remain preserved and untracked.",
+  "runs": {
+    "fresh": {
+      "argv": [
+        "zig",
+        "build",
+        "distribution-all",
+        "--",
+        "--serial",
+        "--fresh-real-rows",
+        "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+        "--real-rows-validation-root=local-state/validations/global-memory-headroom-20261103",
+        "--real-rows-cache-root=local-state/caches/global-memory-headroom-20261103"
+      ],
+      "returncode": 0,
+      "wall_ns": 2648653137725,
+      "raw_log": "local-state/validations/global-memory-20261103/full-global-fresh-r2.log",
+      "raw_log_sha256": "e8170f90fd662b6473c54f399bfbc1c32ee634fa6ccce7f64362179b60b326aa",
+      "telemetry_sha256": "a844d5272bc8aea24c45dd09e634abb84959c1680746ea43b5125d61614079c9",
+      "gates": [
+        {
+          "id": "selected-object-suite",
+          "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+          "exit_status": "0",
+          "duration_ms": "63037",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "1956",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "3757",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "3641",
+          "cache_status": "none"
+        },
+        {
+          "id": "zig-source-native-link",
+          "tool": "tools/run_distribution_zig_source_native_link.zig",
+          "exit_status": "0",
+          "duration_ms": "20275",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-postopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "82342",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-preopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "--pipeline": "preopt",
+          "exit_status": "0",
+          "duration_ms": "672894",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-ir-writer",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "22239",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-release",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "72848",
+          "cache_status": "none"
+        },
+        {
+          "id": "real-rows-release-fast",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseFast",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "647009",
+          "cache_status": "miss"
+        },
+        {
+          "id": "real-rows-release-safe",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSafe",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "679642",
+          "cache_status": "miss"
+        },
+        {
+          "id": "real-rows-release-small",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSmall",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "481966",
+          "cache_status": "miss"
+        },
+        {
+          "id": "integrated-executable",
+          "tool": "tools/run_distribution_zig_integrated_exe.zig",
+          "exit_status": "0",
+          "duration_ms": "911800",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "551",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "1207",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "1118",
+          "cache_status": "none"
+        },
+        {
+          "id": "boundary-gates",
+          "tool": "tools/run_distribution_boundary_gates.zig",
+          "exit_status": "0",
+          "duration_ms": "848",
+          "cache_status": "none"
+        }
+      ],
+      "serial": {
+        "schema_version": "1",
+        "run_id": "102db867668ab281332a64e9c66b079a",
+        "scratch_path": "tmp/distribution_all_serial_102db867668ab281332a64e9c66b079a",
+        "bundle_path": "tmp/distribution_all_serial_102db867668ab281332a64e9c66b079a/release_source_object_bundle",
+        "target": "x86_64-unknown-linux-gnu",
+        "mode": "serial",
+        "real_rows_concurrency": "3",
+        "subgates": "17",
+        "wall_ms": "2648609",
+        "starting_free_bytes": "49946337280",
+        "minimum_observed_free_bytes": "44088942592",
+        "final_free_bytes": "45533093888",
+        "observed_peak_bytes": "5857394688",
+        "reserve_bytes": "34359738368",
+        "required_start_bytes": "42949672960",
+        "local_fail": "0"
+      },
+      "real_rows": [
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseFast",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "5",
+          "real_programs_ok": "5",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseSafe",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "5",
+          "real_programs_ok": "5",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseSmall",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "5",
+          "real_programs_ok": "5",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        }
+      ],
+      "cache_events": [
+        {
+          "mode": "ReleaseFast",
+          "status": "fresh-export",
+          "duration_ms": "102445",
+          "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+          "descriptor_bytes": "1343891552"
+        },
+        {
+          "mode": "ReleaseSafe",
+          "status": "fresh-export",
+          "duration_ms": "104297",
+          "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+          "descriptor_bytes": "1473501276"
+        },
+        {
+          "mode": "ReleaseSmall",
+          "status": "fresh-export",
+          "duration_ms": "97258",
+          "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+          "descriptor_bytes": "1106432911"
+        }
+      ],
+      "real_rows_resources": {
+        "schema_version": "3",
+        "normalization_schema": "3",
+        "memory_policy": "os-managed-non-gating",
+        "concurrency": "3",
+        "workers": "3",
+        "modes": "ReleaseFast,ReleaseSafe,ReleaseSmall",
+        "run_id": "e7ab4733520bf719788e9b1f0e013b76",
+        "root": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_e7ab4733520bf719788e9b1f0e013b76",
+        "work_selection_root": "local-state/validations/global-memory-headroom-20261103",
+        "export_cache_selection_root": "local-state/caches/global-memory-headroom-20261103",
+        "fast_temp": "local-state/validations/global-memory-headroom-20261103/ReleaseFast/work_e7ab4733520bf719788e9b1f0e013b76",
+        "fast_local_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_e7ab4733520bf719788e9b1f0e013b76/ReleaseFast/zig-local-cache",
+        "fast_global_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_e7ab4733520bf719788e9b1f0e013b76/ReleaseFast/zig-global-cache",
+        "fast_air_cache": "local-state/caches/global-memory-headroom-20261103/ReleaseFast/export",
+        "safe_temp": "local-state/validations/global-memory-headroom-20261103/ReleaseSafe/work_e7ab4733520bf719788e9b1f0e013b76",
+        "safe_local_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_e7ab4733520bf719788e9b1f0e013b76/ReleaseSafe/zig-local-cache",
+        "safe_global_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_e7ab4733520bf719788e9b1f0e013b76/ReleaseSafe/zig-global-cache",
+        "safe_air_cache": "local-state/caches/global-memory-headroom-20261103/ReleaseSafe/export",
+        "small_temp": "local-state/validations/global-memory-headroom-20261103/ReleaseSmall/work_e7ab4733520bf719788e9b1f0e013b76",
+        "small_local_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_e7ab4733520bf719788e9b1f0e013b76/ReleaseSmall/zig-local-cache",
+        "small_global_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_e7ab4733520bf719788e9b1f0e013b76/ReleaseSmall/zig-global-cache",
+        "small_air_cache": "local-state/caches/global-memory-headroom-20261103/ReleaseSmall/export",
+        "pin_manifest_sha256": "a63ac7b894e7a2bb1008d5eaf964cc3c1ce24d057e08c1433ee28f5731c5f7ee",
+        "cache_status": "fresh-export,fresh-export,fresh-export",
+        "air_cache": "populated-authenticated",
+        "pruning": "suspended",
+        "wall_ms": "789561",
+        "summed_child_ms": "1808617",
+        "filesystem_total_bytes": "982240026624",
+        "post_run_free_floor_bytes": "34359738368",
+        "projected_peak_bytes": "8589934592",
+        "required_start_bytes": "42949672960",
+        "admission_source": "serial_preflight",
+        "admission_starting_free_bytes": "49946337280",
+        "starting_free_bytes": "48020480000",
+        "minimum_free_bytes": "44088942592",
+        "final_free_bytes": "44088942592",
+        "peak_disk_bytes": "5911441408",
+        "peak_aggregate_rss_bytes": "6192005120",
+        "minimum_available_memory_bytes": "12092657664",
+        "load_start": "2.61",
+        "load_end": "3.53",
+        "execution_results_cached": "false",
+        "local_fail": "0"
+      },
+      "native_memory_populations": {
+        "word-pair-memory": {
+          "population": "standalone-two-word-stack-memory",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "384",
+          "reference_observations": "192",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "pointer-stack-memory": {
+          "population": "standalone-runtime-pointer-stack",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "768",
+          "reference_observations": "384",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "scalar-stack-memory": {
+          "population": "standalone-scalar-stack",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "486",
+          "reference_observations": "243",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "integer-pointer-casts": {
+          "population": "standalone-integer-pointer-casts",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "1536",
+          "reference_observations": "768",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "signed-nonnegative": {
+          "population": "standalone-signed-nonnegative",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "1536",
+          "reference_observations": "768",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "type-layout-padding": {
+          "population": "standalone-type-allocation-padding",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "768",
+          "reference_observations": "384",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "global-addresses": {
+          "population": "standalone-global-addresses",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "192",
+          "reference_observations": "96",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "global-memory": {
+          "population": "standalone-global-memory",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "240",
+          "reference_observations": "120",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        }
+      },
+      "c_program": {
+        "schema": "upstream-c-program-v1",
+        "programs": "1",
+        "program_modes": "3",
+        "matched_program_modes": "3",
+        "reference_case_executions": "6",
+        "local_case_executions": "6",
+        "integer_variadic_observations": "48",
+        "heap_call_observations": "18",
+        "native_call_observations": "66",
+        "local_fail": "0"
+      },
+      "ascii_rows": [
+        {
+          "schema": "distribution-execution-cohort-v3",
+          "mode": "ReleaseFast",
+          "source": "../ziglang/src/main.zig",
+          "function": "ascii.isAscii",
+          "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+          "object_bytes": "712",
+          "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+          "reference_bytes": "4154120",
+          "reference_sha256": "16fe022a2833432df154d0cf98676bfdf4e26232399a2f281b683fdd30792c26",
+          "linked_bytes": "6292382",
+          "linked_sha256": "008ef7d2d1171d7f837af7369ef7a4577f331bbe06ab25628d366a557748082f",
+          "result": "128",
+          "witness": "8256",
+          "observations": "256",
+          "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+          "reference_status": "0",
+          "linked_status": "0",
+          "real_executed": "1",
+          "real_programs_ok": "1"
+        },
+        {
+          "schema": "distribution-execution-cohort-v3",
+          "mode": "ReleaseSafe",
+          "source": "../ziglang/src/main.zig",
+          "function": "ascii.isAscii",
+          "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+          "object_bytes": "712",
+          "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+          "reference_bytes": "4040136",
+          "reference_sha256": "a63706f2a0dd8287a36ea8ca06410aea3810dd59dac70d7abb1cbb8c1de4e5bd",
+          "linked_bytes": "6147574",
+          "linked_sha256": "ce040130d7acc592cc3d1f80f9d636f507b9ede675288841a4c6595d62434e58",
+          "result": "128",
+          "witness": "8256",
+          "observations": "256",
+          "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+          "reference_status": "0",
+          "linked_status": "0",
+          "real_executed": "1",
+          "real_programs_ok": "1"
+        },
+        {
+          "schema": "distribution-execution-cohort-v3",
+          "mode": "ReleaseSmall",
+          "source": "../ziglang/src/main.zig",
+          "function": "ascii.isAscii",
+          "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+          "object_bytes": "712",
+          "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+          "reference_bytes": "149824",
+          "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+          "linked_bytes": "356150",
+          "linked_sha256": "78cfc1873d6ab5800639017ceee1adc64c9ab85893136fb49c34e2b3732ef8c6",
+          "result": "128",
+          "witness": "8256",
+          "observations": "256",
+          "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+          "reference_status": "0",
+          "linked_status": "0",
+          "real_executed": "1",
+          "real_programs_ok": "1"
+        }
+      ],
+      "fma": {
+        "cases": "8192",
+        "matched": "8192",
+        "reference": "llvm22-frozen-ir",
+        "local_fail": "0"
+      },
+      "source_snapshot": "local-state/validations/global-memory-20261103/global-headroom-pair-source-snapshot.json",
+      "source_snapshot_sha256": "b0a99f2bf55c4e07c537daeceb7c2eac857f1ea51188bf3daa24ad45992cfc7d",
+      "source_snapshot_files": 2624,
+      "sources_unchanged": true,
+      "headroom_policy": {
+        "schema_version": "2",
+        "filesystem_total_bytes": "982240026624",
+        "reserve_bytes": "34359738368",
+        "projected_peak_bytes": "8589934592",
+        "required_start_bytes": "42949672960",
+        "authority": "tools/distribution_headroom_policy.zig",
+        "local_fail": "0"
+      },
+      "expected_cache_status": "fresh-export",
+      "sampled_minimum_free_bytes": 44020686848,
+      "archives_created": 0
+    },
+    "cached": {
+      "argv": [
+        "zig",
+        "build",
+        "distribution-all",
+        "--",
+        "--serial",
+        "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+        "--real-rows-validation-root=local-state/validations/global-memory-headroom-20261103",
+        "--real-rows-cache-root=local-state/caches/global-memory-headroom-20261103"
+      ],
+      "returncode": 0,
+      "wall_ns": 2536148374224,
+      "raw_log": "local-state/validations/global-memory-20261103/full-global-cached.log",
+      "raw_log_sha256": "6cd4d192ae338154b1bb060514ea21fb175d9b6572f899c48317d020bff80402",
+      "telemetry_sha256": "811a27cd59d67fc71763c364f14fb13d0ec11d6035826708d28c38b5e28f38ef",
+      "gates": [
+        {
+          "id": "selected-object-suite",
+          "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+          "exit_status": "0",
+          "duration_ms": "60939",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "1932",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "3396",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "3418",
+          "cache_status": "none"
+        },
+        {
+          "id": "zig-source-native-link",
+          "tool": "tools/run_distribution_zig_source_native_link.zig",
+          "exit_status": "0",
+          "duration_ms": "18516",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-postopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "83284",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-preopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "--pipeline": "preopt",
+          "exit_status": "0",
+          "duration_ms": "665879",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-ir-writer",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "22214",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-release",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "75798",
+          "cache_status": "none"
+        },
+        {
+          "id": "real-rows-release-fast",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseFast",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "520359",
+          "cache_status": "hit"
+        },
+        {
+          "id": "real-rows-release-safe",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSafe",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "547949",
+          "cache_status": "hit"
+        },
+        {
+          "id": "real-rows-release-small",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSmall",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "361752",
+          "cache_status": "hit"
+        },
+        {
+          "id": "integrated-executable",
+          "tool": "tools/run_distribution_zig_integrated_exe.zig",
+          "exit_status": "0",
+          "duration_ms": "927026",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "507",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "1157",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "1083",
+          "cache_status": "none"
+        },
+        {
+          "id": "boundary-gates",
+          "tool": "tools/run_distribution_boundary_gates.zig",
+          "exit_status": "0",
+          "duration_ms": "787",
+          "cache_status": "none"
+        }
+      ],
+      "serial": {
+        "schema_version": "1",
+        "run_id": "16f7f3aef5a67a79d7e3022e1dfbf757",
+        "scratch_path": "tmp/distribution_all_serial_16f7f3aef5a67a79d7e3022e1dfbf757",
+        "bundle_path": "tmp/distribution_all_serial_16f7f3aef5a67a79d7e3022e1dfbf757/release_source_object_bundle",
+        "target": "x86_64-unknown-linux-gnu",
+        "mode": "serial",
+        "real_rows_concurrency": "3",
+        "subgates": "17",
+        "wall_ms": "2536118",
+        "starting_free_bytes": "45478576128",
+        "minimum_observed_free_bytes": "43313741824",
+        "final_free_bytes": "44235292672",
+        "observed_peak_bytes": "2164834304",
+        "reserve_bytes": "34359738368",
+        "required_start_bytes": "42949672960",
+        "local_fail": "0"
+      },
+      "real_rows": [
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseFast",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "5",
+          "real_programs_ok": "5",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseSafe",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "5",
+          "real_programs_ok": "5",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseSmall",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "5",
+          "real_programs_ok": "5",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        }
+      ],
+      "cache_events": [
+        {
+          "mode": "ReleaseFast",
+          "status": "hit",
+          "duration_ms": "15210",
+          "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+          "descriptor_bytes": "1343891552"
+        },
+        {
+          "mode": "ReleaseSafe",
+          "status": "hit",
+          "duration_ms": "16689",
+          "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+          "descriptor_bytes": "1473501276"
+        },
+        {
+          "mode": "ReleaseSmall",
+          "status": "hit",
+          "duration_ms": "12434",
+          "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+          "descriptor_bytes": "1106432911"
+        }
+      ],
+      "real_rows_resources": {
+        "schema_version": "3",
+        "normalization_schema": "3",
+        "memory_policy": "os-managed-non-gating",
+        "concurrency": "3",
+        "workers": "3",
+        "modes": "ReleaseFast,ReleaseSafe,ReleaseSmall",
+        "run_id": "0879b6d762cfea01d6f1db2923d326ec",
+        "root": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_0879b6d762cfea01d6f1db2923d326ec",
+        "work_selection_root": "local-state/validations/global-memory-headroom-20261103",
+        "export_cache_selection_root": "local-state/caches/global-memory-headroom-20261103",
+        "fast_temp": "local-state/validations/global-memory-headroom-20261103/ReleaseFast/work_0879b6d762cfea01d6f1db2923d326ec",
+        "fast_local_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_0879b6d762cfea01d6f1db2923d326ec/ReleaseFast/zig-local-cache",
+        "fast_global_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_0879b6d762cfea01d6f1db2923d326ec/ReleaseFast/zig-global-cache",
+        "fast_air_cache": "local-state/caches/global-memory-headroom-20261103/ReleaseFast/export",
+        "safe_temp": "local-state/validations/global-memory-headroom-20261103/ReleaseSafe/work_0879b6d762cfea01d6f1db2923d326ec",
+        "safe_local_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_0879b6d762cfea01d6f1db2923d326ec/ReleaseSafe/zig-local-cache",
+        "safe_global_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_0879b6d762cfea01d6f1db2923d326ec/ReleaseSafe/zig-global-cache",
+        "safe_air_cache": "local-state/caches/global-memory-headroom-20261103/ReleaseSafe/export",
+        "small_temp": "local-state/validations/global-memory-headroom-20261103/ReleaseSmall/work_0879b6d762cfea01d6f1db2923d326ec",
+        "small_local_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_0879b6d762cfea01d6f1db2923d326ec/ReleaseSmall/zig-local-cache",
+        "small_global_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_0879b6d762cfea01d6f1db2923d326ec/ReleaseSmall/zig-global-cache",
+        "small_air_cache": "local-state/caches/global-memory-headroom-20261103/ReleaseSmall/export",
+        "pin_manifest_sha256": "a63ac7b894e7a2bb1008d5eaf964cc3c1ce24d057e08c1433ee28f5731c5f7ee",
+        "cache_status": "hit,hit,hit",
+        "air_cache": "read-only",
+        "pruning": "suspended",
+        "wall_ms": "669778",
+        "summed_child_ms": "1430060",
+        "filesystem_total_bytes": "982240026624",
+        "post_run_free_floor_bytes": "34359738368",
+        "projected_peak_bytes": "8589934592",
+        "required_start_bytes": "42949672960",
+        "admission_source": "serial_preflight",
+        "admission_starting_free_bytes": "45478576128",
+        "starting_free_bytes": "45003239424",
+        "minimum_free_bytes": "43313741824",
+        "final_free_bytes": "43313741824",
+        "peak_disk_bytes": "5375275008",
+        "peak_aggregate_rss_bytes": "5253992448",
+        "minimum_available_memory_bytes": "12148584448",
+        "load_start": "3.08",
+        "load_end": "2.73",
+        "execution_results_cached": "false",
+        "local_fail": "0"
+      },
+      "native_memory_populations": {
+        "word-pair-memory": {
+          "population": "standalone-two-word-stack-memory",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "384",
+          "reference_observations": "192",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "pointer-stack-memory": {
+          "population": "standalone-runtime-pointer-stack",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "768",
+          "reference_observations": "384",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "scalar-stack-memory": {
+          "population": "standalone-scalar-stack",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "486",
+          "reference_observations": "243",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "integer-pointer-casts": {
+          "population": "standalone-integer-pointer-casts",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "1536",
+          "reference_observations": "768",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "signed-nonnegative": {
+          "population": "standalone-signed-nonnegative",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "1536",
+          "reference_observations": "768",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "type-layout-padding": {
+          "population": "standalone-type-allocation-padding",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "768",
+          "reference_observations": "384",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "global-addresses": {
+          "population": "standalone-global-addresses",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "192",
+          "reference_observations": "96",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "global-memory": {
+          "population": "standalone-global-memory",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "240",
+          "reference_observations": "120",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        }
+      },
+      "c_program": {
+        "schema": "upstream-c-program-v1",
+        "programs": "1",
+        "program_modes": "3",
+        "matched_program_modes": "3",
+        "reference_case_executions": "6",
+        "local_case_executions": "6",
+        "integer_variadic_observations": "48",
+        "heap_call_observations": "18",
+        "native_call_observations": "66",
+        "local_fail": "0"
+      },
+      "ascii_rows": [
+        {
+          "schema": "distribution-execution-cohort-v3",
+          "mode": "ReleaseFast",
+          "source": "../ziglang/src/main.zig",
+          "function": "ascii.isAscii",
+          "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+          "object_bytes": "712",
+          "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+          "reference_bytes": "4154120",
+          "reference_sha256": "8d505eb70f0d6717a9bb6dce56910513454253c93a271a3cefe2240456bc3a0e",
+          "linked_bytes": "6292382",
+          "linked_sha256": "7e8a81c01a71dd44c850b8e241efdba49ebde734615c622b5c77c83d0b29521f",
+          "result": "128",
+          "witness": "8256",
+          "observations": "256",
+          "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+          "reference_status": "0",
+          "linked_status": "0",
+          "real_executed": "1",
+          "real_programs_ok": "1"
+        },
+        {
+          "schema": "distribution-execution-cohort-v3",
+          "mode": "ReleaseSafe",
+          "source": "../ziglang/src/main.zig",
+          "function": "ascii.isAscii",
+          "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+          "object_bytes": "712",
+          "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+          "reference_bytes": "4040136",
+          "reference_sha256": "73ad77509634229353baa202a92f875833fb0fd6edb207c8b42dcb0fdc67a069",
+          "linked_bytes": "6147574",
+          "linked_sha256": "dadff0dd3d45b107c26be0e6fb00be2fa61399469c98de76ce0c428781a87df8",
+          "result": "128",
+          "witness": "8256",
+          "observations": "256",
+          "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+          "reference_status": "0",
+          "linked_status": "0",
+          "real_executed": "1",
+          "real_programs_ok": "1"
+        },
+        {
+          "schema": "distribution-execution-cohort-v3",
+          "mode": "ReleaseSmall",
+          "source": "../ziglang/src/main.zig",
+          "function": "ascii.isAscii",
+          "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+          "object_bytes": "712",
+          "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+          "reference_bytes": "149824",
+          "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+          "linked_bytes": "356150",
+          "linked_sha256": "78cfc1873d6ab5800639017ceee1adc64c9ab85893136fb49c34e2b3732ef8c6",
+          "result": "128",
+          "witness": "8256",
+          "observations": "256",
+          "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+          "reference_status": "0",
+          "linked_status": "0",
+          "real_executed": "1",
+          "real_programs_ok": "1"
+        }
+      ],
+      "fma": {
+        "cases": "8192",
+        "matched": "8192",
+        "reference": "llvm22-frozen-ir",
+        "local_fail": "0"
+      },
+      "source_snapshot": "local-state/validations/global-memory-20261103/global-headroom-pair-source-snapshot.json",
+      "source_snapshot_sha256": "b0a99f2bf55c4e07c537daeceb7c2eac857f1ea51188bf3daa24ad45992cfc7d",
+      "source_snapshot_files": 2624,
+      "sources_unchanged": true,
+      "headroom_policy": {
+        "schema_version": "2",
+        "filesystem_total_bytes": "982240026624",
+        "reserve_bytes": "34359738368",
+        "projected_peak_bytes": "8589934592",
+        "required_start_bytes": "42949672960",
+        "authority": "tools/distribution_headroom_policy.zig",
+        "local_fail": "0"
+      },
+      "expected_cache_status": "hit",
+      "sampled_minimum_free_bytes": 43282583552,
+      "archives_created": 0
+    }
+  },
+  "comparison": {
+    "argv": [
+      "zig",
+      "run",
+      "tools/compare_distribution_all_logs.zig",
+      "--",
+      "local-state/validations/global-memory-20261103/full-global-fresh-r2.log",
+      "local-state/validations/global-memory-20261103/full-global-cached.log"
+    ],
+    "returncode": 0,
+    "schema_version": 4,
+    "gates": 17,
+    "canonical_records": 1403,
+    "semantic_match": true,
+    "summary": "summary distribution-all-equivalence schema_version=4 expected=local-state/validations/global-memory-20261103/full-global-fresh-r2.log actual=local-state/validations/global-memory-20261103/full-global-cached.log gates=17 canonical_records=1403 semantic_match=true local_fail=0",
+    "raw_log": "local-state/validations/global-memory-20261103/global-pair-comparison.log",
+    "raw_log_sha256": "316b65fb289eb755d35f5e22f52ea3877069f9e615164de90a0b2073d2aa1709"
+  },
+  "retained_summaries": [
+    {
+      "path": "docs/evidence/global_memory_20261103_fresh.summary",
+      "sha256": "209477f88069c7fedf1d4422446c07949abf0b81632d04124f6fa0388bc610ef",
+      "records": 119
+    },
+    {
+      "path": "docs/evidence/global_memory_20261103_cached.summary",
+      "sha256": "b94c79927a51826d3d23a90da3d50e9043b3024d807e309f7ee014d54f9d24c6",
+      "records": 119
+    }
+  ],
+  "current_production_air": [
+    {
+      "mode": "ReleaseFast",
+      "path": "local-state/caches/global-memory-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.4b757112cdbe3d4d95000dd8aaedbe4918d3a3e187447225cc05649a0a12d821.air",
+      "metadata": "local-state/caches/global-memory-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.meta",
+      "metadata_sha256": "891ac2dfe59a62c38d43f3c59026413a327850f3c8203f7e3d2329fe2edc8cfe",
+      "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+      "sha256": "4b757112cdbe3d4d95000dd8aaedbe4918d3a3e187447225cc05649a0a12d821",
+      "bytes": 1343891552,
+      "allocated_bytes": 1343918080,
+      "device": 66306,
+      "inode": 54439883,
+      "links": 1
+    },
+    {
+      "mode": "ReleaseSafe",
+      "path": "local-state/caches/global-memory-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429.air",
+      "metadata": "local-state/caches/global-memory-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.meta",
+      "metadata_sha256": "80d6a17a837ca621dd332a30381d2b6ed0174791f5325b9642f5a81acc1058bc",
+      "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+      "sha256": "6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429",
+      "bytes": 1473501276,
+      "allocated_bytes": 1473527808,
+      "device": 66306,
+      "inode": 54439881,
+      "links": 1
+    },
+    {
+      "mode": "ReleaseSmall",
+      "path": "local-state/caches/global-memory-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6.air",
+      "metadata": "local-state/caches/global-memory-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.meta",
+      "metadata_sha256": "d29639eb569be72cca3063f413509ac00d4d11aa36562d523679eef458980eaf",
+      "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+      "sha256": "92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106448384,
+      "device": 66306,
+      "inode": 54439882,
+      "links": 1
+    }
+  ],
+  "unchanged_fibonacci": {
+    "report": "local-state/validations/global-memory-20261103/fibonacci-global-r3/report.json",
+    "report_sha256": "699e7b1bedee5945816486dc31d684f6fa7d45c6d6275035106b3ca5c7e9f2f0",
+    "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+    "reference_executions": 1,
+    "local_executions": 0,
+    "selection_progress": "Global copies and following i16 store select; whole start.main selection stops at the next call.",
+    "boundary": "start.main no_emitter:composed-block-call-ret-width",
+    "instruction": "%41 = call fastcc i1 @process.Environ.PosixBlock.isEmpty(ptr noundef nonnull readonly align 8 %4)"
+  },
+  "interrupted_attempt": {
+    "raw_log": "local-state/validations/global-memory-20261103/full-global-fresh.log",
+    "raw_log_sha256": "a112d7492411c3b60ee0fc52ddbe2fdd4aa0c63bc542de525bbe53d3a6e208ec",
+    "completed_gates": 6,
+    "exec_session_exit_status": 143,
+    "accepted": false,
+    "note": "External SIGTERM during preopt; retained as incomplete evidence. The complete retry ran in a durable background session."
+  },
+  "emitter": {
+    "path": "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+    "version": "0.17.0-dev.11+1c08b09d1",
+    "sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e"
+  },
+  "cli_after_full_sha256": "986299fdacbc5d12c2d3a05860452d946d2711b5e0a69509ef4c6b1c6e5631ff",
+  "performance_claim": "No speedup claim; resource samples include filesystem activity and are sampled, non-atomic observations.",
+  "archives_created": 0,
+  "validation_plans": [
+    "local-state/validations/global-memory-20261103/validation-plan.json",
+    "local-state/validations/global-memory-20261103/fixed-reserve-validation-plan.json"
+  ],
+  "upstream_mapping": [
+    {
+      "path": "../llvm-project-22/llvm/lib/CodeGen/AsmPrinter/AsmPrinter.cpp",
+      "owners": "emitGlobalVariable and emitGlobalConstantArray/Struct/Impl",
+      "contract": "Use allocation strides, explicit alignment, padding/zero fill and symbolic constant relocations."
+    },
+    {
+      "path": "../llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp",
+      "owners": "visitGetElementPtr and Intrinsic::memcpy",
+      "contract": "Form target-width addresses and stage destination, source and length as independent operands."
+    }
+  ],
+  "isolated_probe_provenance": {
+    "note": "These retained reports identify their historical auxiliary compiler artifacts and paths. That worktree was retired after transfer verification. They are not claims that those compiler binaries equal the final full-run binary; current focused/native evidence and the full source snapshot are recorded separately.",
+    "reports": [
+      {
+        "path": "local-state/validations/global-memory-20261103/startup-global-object-r1/report.json",
+        "sha256": "004a7a68c0925bec4be82028fb5bb24750faa616f7434134c55883866afbe874"
+      },
+      {
+        "path": "local-state/validations/global-memory-20261103/existing-generic-objects/report.json",
+        "sha256": "926a5dd639a8d6aee05e41b9f9b552b2ab6741111f60672b642d243e93053645"
+      },
+      {
+        "path": "local-state/validations/global-memory-20261103/global-return-compatibility/after.json",
+        "sha256": "70792e764f5f01d940b13b00bed5c7d3bb1a64b99409544b05e8ce693d1afebd"
+      },
+      {
+        "path": "local-state/validations/global-memory-20261103/global-source-transfer.json",
+        "sha256": "d7d769f76e98cc76c7e5c02ec95bde751ed02fee8a6e05bb4cbf706992728d52"
+      },
+      {
+        "path": "local-state/validations/global-memory-20261103/worktree-retirement.json",
+        "sha256": "f95175ebdfa22e0fdf0a75662ed3cb5c2a4e256a7b440c822f97320cdbe1daef"
+      }
+    ]
+  },
+  "cleanup_receipt": "docs/evidence/global_memory_cleanup_20261103.json",
+  "post_acceptance_checks": {
+    "implementation_files_matching_validated_snapshot": 27,
+    "original_source_probes_preserved": 13,
+    "current_air_payloads": 3,
+    "retired_generation_payloads": 0,
+    "artifact_manifests_verified": 5,
+    "artifact_log": "local-state/validations/global-memory-20261103/acceptance-artifacts.log",
+    "documentation_log": "local-state/validations/global-memory-20261103/acceptance-docs-final.log",
+    "archives_created": 0
+  }
+}

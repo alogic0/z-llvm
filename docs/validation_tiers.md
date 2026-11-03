@@ -180,6 +180,14 @@ produce 768 local observations against 384 LLVM references reused across routes.
 It checks allocation padding for `i24` and `x86_fp80`, including nested layouts;
 all existing populations remain separate.
 
+The mandatory [global-memory canaries](evidence/global_memory_acceptance_20261103.json)
+add four address functions (192 local/96 reference observations) and seven
+copy/store functions (240 local/120 reference observations). Direct/release
+routes run in all three modes, reusing references across routes. They check
+defined global bytes, pointer fixups, alignment, local symbols, full integer
+bits, guarded 2/12/16/80-byte copies, narrow stores and live-value preservation.
+These standalone populations leave all previous counts unchanged.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

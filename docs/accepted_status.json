@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "d4403016c8da556487d96cdb86223182e169600c",
-  "accepted_tree": "0b7f9e73a2412b4d48c6ee7541139aaf618f2d58",
+  "accepted_revision": "db272521bfcd49fae366985fa47a0ff5ef58dc27",
+  "accepted_tree": "2de39921e5dbef2335a7687b01edffd3b73f4d8c",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,10 +17,11 @@
   "paired_harnesses_ok": 5,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "d4403016",
+  "declaration_revision": "db272521",
   "evidence": [
-    "docs/evidence/allocation_padding_acceptance_20261103.json",
-    "docs/evidence/allocation_padding_20261103_cached.summary",
+    "docs/evidence/global_memory_acceptance_20261103.json",
+    "docs/evidence/global_memory_20261103_fresh.summary",
+    "docs/evidence/global_memory_20261103_cached.summary",
     "docs/evidence/real_candidates_release_v3_migration.json"
   ],
   "selector_version": "real-candidate-selector-v3"

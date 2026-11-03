@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "recorded_utc": "2026-11-03T18:14:53.731017+00:00",
+  "accepted_revision": "db272521bfcd49fae366985fa47a0ff5ef58dc27",
+  "acceptance_evidence": "docs/evidence/global_memory_acceptance_20261103.json",
+  "validation": "Completed fresh/cached 17-subgate pair and all 1403 canonical records match; both old and replacement metadata/payload hashes reverified immediately before retirement.",
+  "active_consumers": [],
+  "retired_payloads": [
+    {
+      "mode": "ReleaseFast",
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32.air",
+      "metadata": "local-state/caches/startup-headroom-20261102/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.meta",
+      "metadata_sha256": "83d710ec0502456468f42fce7d1fb894e7a53d2d66029bf5ee4ebeb32e594765",
+      "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+      "sha256": "29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32",
+      "bytes": 1343891552,
+      "allocated_bytes": 1343905792,
+      "device": 66306,
+      "inode": 55212693,
+      "links": 1
+    },
+    {
+      "mode": "ReleaseSafe",
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e.air",
+      "metadata": "local-state/caches/startup-headroom-20261102/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.meta",
+      "metadata_sha256": "9cfa7780d2ad85de48ddf2f17b4b54c48b1a8ab5e65b39d2d06f2c0e9b482d76",
+      "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+      "sha256": "277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e",
+      "bytes": 1473501148,
+      "allocated_bytes": 1473536000,
+      "device": 66306,
+      "inode": 55212700,
+      "links": 1
+    },
+    {
+      "mode": "ReleaseSmall",
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6.air",
+      "metadata": "local-state/caches/startup-headroom-20261102/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.meta",
+      "metadata_sha256": "d29639eb569be72cca3063f413509ac00d4d11aa36562d523679eef458980eaf",
+      "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+      "sha256": "92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106444288,
+      "device": 66306,
+      "inode": 55212710,
+      "links": 1
+    }
+  ],
+  "replacement_payloads": [
+    {
+      "mode": "ReleaseFast",
+      "path": "local-state/caches/global-memory-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.4b757112cdbe3d4d95000dd8aaedbe4918d3a3e187447225cc05649a0a12d821.air",
+      "metadata": "local-state/caches/global-memory-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.meta",
+      "metadata_sha256": "891ac2dfe59a62c38d43f3c59026413a327850f3c8203f7e3d2329fe2edc8cfe",
+      "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+      "sha256": "4b757112cdbe3d4d95000dd8aaedbe4918d3a3e187447225cc05649a0a12d821",
+      "bytes": 1343891552,
+      "allocated_bytes": 1343918080,
+      "device": 66306,
+      "inode": 54439883,
+      "links": 1
+    },
+    {
+      "mode": "ReleaseSafe",
+      "path": "local-state/caches/global-memory-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429.air",
+      "metadata": "local-state/caches/global-memory-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.meta",
+      "metadata_sha256": "80d6a17a837ca621dd332a30381d2b6ed0174791f5325b9642f5a81acc1058bc",
+      "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+      "sha256": "6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429",
+      "bytes": 1473501276,
+      "allocated_bytes": 1473527808,
+      "device": 66306,
+      "inode": 54439881,
+      "links": 1
+    },
+    {
+      "mode": "ReleaseSmall",
+      "path": "local-state/caches/global-memory-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6.air",
+      "metadata": "local-state/caches/global-memory-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.meta",
+      "metadata_sha256": "d29639eb569be72cca3063f413509ac00d4d11aa36562d523679eef458980eaf",
+      "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+      "sha256": "92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106448384,
+      "device": 66306,
+      "inode": 54439882,
+      "links": 1
+    }
+  ],
+  "retired_logical_bytes": 3923825611,
+  "retired_unique_allocated_bytes": 3923886080,
+  "before_available_bytes": 44006682624,
+  "historical_metadata_retained": true,
+  "preserved": [
+    "13 original scratch source probes",
+    "All accepted/provisional logs, snapshots, inputs and unresolved diagnostics",
+    "Semantic audit facts and static inventory",
+    "Current production AIR and performance baselines",
+    "Shared global caches and sibling toolchains"
+  ],
+  "archives_created": 0,
+  "after_available_bytes": 47930568704,
+  "global_available_change_bytes": 3923886080,
+  "remaining_old_air_payloads": 0,
+  "note": "Allocated payload bytes and global free-space movement are separate measurements. No archive or source copy was made."
+}

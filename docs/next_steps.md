@@ -41,7 +41,23 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The current accepted [allocation-padding repair](evidence/allocation_padding_acceptance_20261103.json)
+The current accepted [global-memory checkpoint](evidence/global_memory_acceptance_20261103.json)
+at `db272521`, with disk policy commit `61dfbb3b`, passes both full 17-stage
+fresh/cached runs. All 1,403 canonical records match on an unchanged 2,624-file
+snapshot. Four global-address functions pass 192 local observations against 96
+LLVM references; seven copy/store functions pass 240 against 120 through
+direct/release routes in three modes. The 1,675 unit tests, focused checks and
+60-case ABI gate pass. Candidate, execution and bypass counts stay fixed.
+
+Symbolic byte addresses now reach bounded ordinary native integer/pointer global
+objects, including named unpacked structs, arrays, explicit alignment, local
+symbols and pointer fixups in `.rela.data`. Private legalization feeds the existing
+transactional memcpy/store consumers. Constant copy lengths, dying ABI operands
+and narrow RAX-address stores have permanent native and rollback coverage. TLS,
+weak linkage, custom sections, nondefault address spaces, floating/vector
+initializers and zero-sized global placement retain explicit boundaries.
+
+The earlier accepted [allocation-padding repair](evidence/allocation_padding_acceptance_20261103.json)
 at `d4403016` fixes a native mismatch with LLVM: `{ i24, i8 }` previously
 placed the second field at byte 3 instead of 4. Nested structs/arrays and 80-bit
 floating allocation padding are covered by a permanent all-mode canary. The
@@ -100,8 +116,8 @@ inputs, performance baselines and 13 original source probes remain. The subseque
 [audit input migration](evidence/candidate_facts_retention_20261103.json) retains
 74 MB of verified semantic facts and retires the old raw descriptors, reducing
 input allocation by 3.85 GB. All 21,117 rows, selected mode facts and rejection
-identities replay unchanged; 15 offline policy tests pass. Current production
-AIR and the compiler checkpoint remain unchanged. No archives are created.
+identities replay unchanged; 15 offline policy tests pass. That migration left
+the production AIR and compiler checkpoint unchanged. No archives are created.
 Follow the [current keep-list](evidence/tmp_retention_pins.tsv).
 
 The earlier [disk calibration](evidence/headroom_calibration_20261102.json) is accepted:
@@ -109,12 +125,20 @@ an 8 GiB forecast covers the sampled 6.10 GB fresh and 1.60 GB cached decreases.
 The original serial admission is inherited by nested row workers, whose reserve
 stays enforced and whose transient minimum enters the serial report. Allocated
 disk telemetry covers all seven owned roots, including retained exports. The
-49 runner/policy and 39 comparison tests pass. Filesystem noise and sampled,
+earlier 49 runner/policy and 39 comparison tests passed. Filesystem noise and sampled,
 non-atomic observations remain measurement limits.
-The allocation-padding cached run reports a 3.37 GB decrease with the same reserve
-and forecast. The sample includes concurrent isolated development; no timing or
-space-efficiency comparison is claimed. AIR publication and runner infrastructure
-are unchanged.
+The allocation-padding cached run reported a 3.37 GB decrease under the previous
+reserve. At the user's direction, headroom policy schema 2 now uses a fixed
+32 GiB reserve plus the unchanged 8 GiB working budget: 40 GiB (about 42.95 GB)
+free at admission. Runtime reserve checks and stronger caller floors remain.
+The new pair reports 5.86 GB fresh and 2.16 GB cached decreases; reported minima
+are 44.09 GB and 43.31 GB, above the 34.36 GB reserve. The 51 runner/policy and
+41 comparison tests pass. These filesystem observations do not establish a speedup.
+The [generation cleanup](evidence/global_memory_cleanup_20261103.json) retires
+3.92 GB of superseded AIR after both full runs and replacement hash verification.
+Current exports and their paired work selection now use
+`global-memory-headroom-20261103`; historical metadata, proofs and source probes
+remain, with no archives.
 
 The [bounded memory slice](evidence/startup_word_pair_memory_20261102.json)
 reuses existing 128-bit frame storage for an exact 16-byte pointer/length object
@@ -139,17 +163,21 @@ immediate sources, cast flags, pointer targets and unproved compare forms retain
 explicit boundaries; frozen residual fingerprints and the bypass ratchet stay
 unchanged.
 
-Next, extend symbolic global-address memory support. Unchanged
-`test/cases/recursive_fibonacci.zig` passes the new scalar operations and stops
-in `start.main` at `unsupported_value:composed-block-memcpy-dst`, on a 16-byte
-copy to `getelementptr i8, ptr @Io.Threaded.global_single_threaded_instance, 888`.
-Its reference executes once and local execution remains zero. Establish address
-formation, actual global initializer bytes/layout and relocations together;
-accepting an address without emitting its defined storage is insufficient.
-Prove stack/global and global/global copies against LLVM, including guarded
-2-, 12-, 16- and 80-byte lengths, live values and rejection boundaries, then retry
-the unchanged program. Keep TLS and nondefault address spaces explicit. Further
-startup boundaries may follow. Keep broader optional ABIs and
+Next, admit exact boolean direct-call returns through the existing typed call
+action and accumulator definition authority. Unchanged
+`test/cases/recursive_fibonacci.zig` now selects its global copies and following
+i16 store, then stops in `start.main` at
+`no_emitter:composed-block-call-ret-width` on
+`call fastcc i1 @process.Environ.PosixBlock.isEmpty(ptr ... %4)`.
+Its reference executes once and local execution remains zero. Normalize the
+declared one-bit result before publishing it: dirty upper return-register bits
+must not escape into a scalar use or branch. Preserve the existing named-argument,
+calling-convention, attribute, liveness and rollback boundaries; keep frozen
+residual fingerprints and the bypass ratchet unchanged. An existing three-mode
+LLVM oracle covers 192 dirty-register observations, with no local executions yet.
+Add permanent native coverage, retry the unchanged program and accept this ABI
+slice under the validation policy. Further startup boundaries may follow.
+Keep broader optional ABIs and
 floating/indirect/aggregate/stack varargs as explicit boundaries. Use the frozen
 performance baseline for measured comparisons and the
 [validation policy](validation_tiers.md) for matching evidence reuse.
