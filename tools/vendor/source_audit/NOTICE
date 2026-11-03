@@ -1,0 +1,11 @@
+zig-source-audit source provenance
+
+The initial structure_metrics.zig, import_graph.zig and source_readability.zig
+were extracted from tools/lib/ in the project-owned zg-front repository at
+ef6142fffa8979f1c1c56e1f727147318b6854f9 on 2026-11-03. Original explanatory
+comments, algorithms and regression cases are retained. Product-specific import
+rules remain in that consumer. The owned report, configurable rule evaluator
+and standalone CLI are new package surfaces.
+
+The code uses the installed Zig compiler's standard AST/tokenizer libraries;
+no compiler or third-party source tree is bundled in this package.

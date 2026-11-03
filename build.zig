@@ -37,6 +37,15 @@ pub fn build(b: *std.Build) void {
     b.step("verify-regex-source", "Verify the pinned public regex source snapshot").dependOn(&verify_regex.step);
     b.step("test-tool-regex", "Check production regex assertions through owned child processes").dependOn(&run_regex_tests.step);
 
+    const verify_audit = b.addSystemCommand(&.{ "sha256sum", "--check", "--quiet", "tools/vendor/source_audit.SHA256SUMS" });
+    verify_audit.setCwd(b.path("."));
+    b.step("verify-source-audit", "Verify the pinned shared source-audit snapshot").dependOn(&verify_audit.step);
+    const source_audit = b.addSystemCommand(&.{ b.graph.zig_exe, "run", "tools/vendor/source_audit/src/main.zig", "--", "--include", "src" });
+    source_audit.setCwd(b.path("."));
+    source_audit.addPassthruArgs();
+    source_audit.step.dependOn(&verify_audit.step);
+    b.step("source-audit", "Report source metrics and imports with optional consumer rule JSON").dependOn(&source_audit.step);
+
     const exe = b.addExecutable(.{
         .name = "z_llvm",
         .root_module = b.createModule(.{

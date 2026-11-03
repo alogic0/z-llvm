@@ -30,6 +30,19 @@ with per-file digests. See [tool dependency provenance](tools/vendor/README.md).
 Standalone and nested `zig run tools/FILE.zig` commands keep their existing
 interface; `zig build verify-regex-source` verifies the snapshot.
 
+The independent source-analysis CLI is also pinned for this repository:
+
+```sh
+zig build source-audit
+zig build source-audit -- --json
+zig build source-audit -- --include tools --rules architecture.json
+```
+
+It scans `src` by default; additional includes and optional rule JSON are passed
+to the shared CLI. Metrics and cycles advise review. This adds no new compiler
+architecture gate or ABI acceptance claim. [Snapshot identities](tools/vendor/README.md)
+record the independent source owner and digests.
+
 Unit tests and storage tests do not require the patched sibling compiler,
 historical worktrees, or LLVM utilities. `zig build test` additionally runs the
 ABI integration gate and retains its external requirements.
