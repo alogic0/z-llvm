@@ -69,3 +69,11 @@ test "nested real rows preserve the caller reserve and never weaken their own fl
     try std.testing.expectEqual(post_run_free_floor_bytes, (try forFilesystemWithFloor(total, 1)).post_run_free_floor_bytes);
     try std.testing.expectError(error.RealRowsParallelPolicyOverflow, forFilesystemWithFloor(std.math.maxInt(u64), std.math.maxInt(u64)));
 }
+
+test "nested real rows still enforce a caller reserve above the fixed serial floor" {
+    const total = 982_240_026_624;
+    const stronger_floor = post_run_free_floor_bytes + 1024 * 1024 * 1024;
+    const nested = try forFilesystemWithFloor(total, stronger_floor);
+    try std.testing.expectEqual(stronger_floor, nested.post_run_free_floor_bytes);
+    try std.testing.expectEqual(stronger_floor + projected_disk_peak_bytes, nested.required_start_bytes);
+}

@@ -1,8 +1,9 @@
 const std = @import("std");
 
-pub const schema_version: u32 = 1;
+pub const schema_version: u32 = 2;
+// User-directed 2026-11-03: retain a fixed reserve independently of the
+// filesystem's capacity. The measured working allowance remains separate.
 pub const serial_reserve_floor_bytes: u64 = 32 * 1024 * 1024 * 1024;
-pub const serial_reserve_fraction_denominator: u64 = 20;
 // The 2026-11-02 full fresh run sampled a 6,048,505,856-byte global
 // decrease. Round its 25% margin upward to a whole GiB. The observation
 // includes worker caches and filesystem activity, not just published AIR.
@@ -78,14 +79,11 @@ pub const Tracker = struct {
 };
 
 pub fn forFilesystem(filesystem_total_bytes: u64) Policy {
-    const fraction = filesystem_total_bytes / serial_reserve_fraction_denominator +
-        @intFromBool(filesystem_total_bytes % serial_reserve_fraction_denominator != 0);
-    const reserve = @max(serial_reserve_floor_bytes, fraction);
     return .{
         .filesystem_total_bytes = filesystem_total_bytes,
-        .reserve_bytes = reserve,
+        .reserve_bytes = serial_reserve_floor_bytes,
         .projected_peak_bytes = serial_projected_peak_bytes,
-        .required_start_bytes = reserve +| serial_projected_peak_bytes,
+        .required_start_bytes = serial_reserve_floor_bytes + serial_projected_peak_bytes,
     };
 }
 
@@ -100,13 +98,30 @@ pub fn shardingForFilesystem(filesystem_total_bytes: u64) ShardingPolicy {
     };
 }
 
-test "policy derives the accepted serial threshold from filesystem size" {
-    const policy = forFilesystem(982_240_026_624);
-    try std.testing.expectEqual(@as(u64, 49_112_001_332), policy.reserve_bytes);
-    try std.testing.expectEqual(@as(u64, 8_589_934_592), policy.projected_peak_bytes);
-    try std.testing.expectEqual(@as(u64, 57_701_935_924), policy.required_start_bytes);
+test "serial policy keeps the approved fixed reserve across filesystem capacities" {
+    try std.testing.expectEqual(@as(u32, 2), schema_version);
+    for ([_]u64{ 42_949_672_960, 982_240_026_624, 4 * 1024 * 1024 * 1024 * 1024, std.math.maxInt(u64) }) |total| {
+        const policy = forFilesystem(total);
+        try std.testing.expectEqual(total, policy.filesystem_total_bytes);
+        try std.testing.expectEqual(@as(u64, 34_359_738_368), policy.reserve_bytes);
+        try std.testing.expectEqual(@as(u64, 8_589_934_592), policy.projected_peak_bytes);
+        try std.testing.expectEqual(@as(u64, 42_949_672_960), policy.required_start_bytes);
+    }
     try std.testing.expect(serial_projected_peak_bytes >= measured_serial_peak_bytes + (measured_serial_peak_bytes + 3) / 4);
     try std.testing.expect(serial_projected_peak_bytes - 1024 * 1024 * 1024 < measured_serial_peak_bytes + (measured_serial_peak_bytes + 3) / 4);
+}
+
+test "fixed serial budget admits its exact boundary and rejects one byte less" {
+    const policy = forFilesystem(982_240_026_624);
+    var admission: Admission = .{
+        .filesystem_total_bytes = policy.filesystem_total_bytes,
+        .starting_free_bytes = policy.required_start_bytes,
+        .reserve_bytes = policy.reserve_bytes,
+        .projected_peak_bytes = policy.projected_peak_bytes,
+    };
+    try admission.validate(policy.filesystem_total_bytes, policy.reserve_bytes, policy.projected_peak_bytes);
+    admission.starting_free_bytes -= 1;
+    try std.testing.expectError(error.InvalidInheritedHeadroomAdmission, admission.validate(policy.filesystem_total_bytes, policy.reserve_bytes, policy.projected_peak_bytes));
 }
 
 test "tracker initializes minimum from the first sample without a sentinel" {
