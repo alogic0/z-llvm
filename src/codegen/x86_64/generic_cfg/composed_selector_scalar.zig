@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
+const target = @import("../../../target.zig");
 const x86_64_machine = @import("../machine.zig");
 const x86_64_types = @import("../types.zig");
 const inspection = @import("inspection.zig");
@@ -893,6 +894,17 @@ pub fn lowerBinaryImmediateLhs(selector: *ComposedBlockSelector, result_name: []
     if (binary.op != .lshr) return .{ .no_emitter = "composed-block-binary-imm-lhs" };
     if (bits > 32 and bits != 64) return .{ .no_emitter = "composed-block-variable-shift-width" };
     return .{ .no_emitter = "composed-block-binary-imm-lhs" };
+}
+
+pub fn lowerIntToPtr(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir.CastInst) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+    if (cast.op != .inttoptr or !cast.from_ty.eql(.{ .int = 64 }) or cast.to_ty != .ptr or cast.value != .named or cast.flags.any())
+        return .{ .no_emitter = "composed-block-inttoptr-form" };
+    const text = if (selector.module_context) |context| context.target_datalayout else null;
+    const layout = target.DataLayout.parse(text orelse "") catch return .{ .no_emitter = "composed-block-inttoptr-layout" };
+    if ((layout.pointerSizeBits() catch return .{ .no_emitter = "composed-block-inttoptr-layout" }) != 64)
+        return .{ .no_emitter = "composed-block-inttoptr-layout" };
+    return lowerAccumulatorScalarCast(selector, result_name, cast, 64, 64, false);
 }
 
 pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir.CastInst) !?Diagnostic {

@@ -307,8 +307,8 @@ pub fn requestDestinationNodes(
             )),
             .accumulator_scalar_cast => |cast| {
                 try result.append(.accumulator);
-                if ((cast.from_bits > 32 and cast.from_bits != 52) or
-                    (cast.from_bits == 64 and cast.to_bits == 52))
+                if (cast.op != .inttoptr and ((cast.from_bits > 32 and cast.from_bits != 52) or
+                    (cast.from_bits == 64 and cast.to_bits == 52)))
                 {
                     try result.append(.rcx);
                 }

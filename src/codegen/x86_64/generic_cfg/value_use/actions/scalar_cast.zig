@@ -18,6 +18,7 @@ const Types = model;
 const composition = @import("../composition.zig");
 
 const AccumulatorScalarCastPlan = enum {
+    pointer_bits,
     c04_exact_ei,
     c05_narrow_zext,
     c52_0_trunc_i64_to_i52,
@@ -83,6 +84,11 @@ pub fn validateAccumulatorScalarCastAction(action: *const Types.AccumulatorScala
         action.to_bits == 0 or action.to_bits > 64)
     {
         return error.ValueUseScalarCastFormUnsupported;
+    }
+    if (action.op == .inttoptr) {
+        if (action.from_bits != 64 or action.to_bits != 64 or action.immediate != null or action.exact_ei)
+            return error.ValueUseScalarCastFormUnsupported;
+        return;
     }
     if (action.from_bits == 52 or action.to_bits == 52) {
         if (action.immediate != null) return error.ValueUseScalarCastImmediateMismatch;
@@ -176,7 +182,9 @@ pub fn executeAccumulatorScalarCast(
     const source = try scalarCastSourceValue(Authority, transaction, source_index, action);
     const plan = scalarCastPlan(action);
     const displacement = try scalarCastDisplacement(Authority, transaction, source_index, plan);
-    const effect: AccumulatorPreparationEffect = if (action.from_bits == 52)
+    const effect: AccumulatorPreparationEffect = if (action.op == .inttoptr)
+        .preserve
+    else if (action.from_bits == 52)
         if (action.to_bits == 32 or action.to_bits == 64) .preserve else .clobber
     else if (action.from_bits < 32 or action.from_bits > 32)
         .clobber
@@ -205,8 +213,8 @@ pub fn executeAccumulatorScalarCast(
     };
     try failScalarCastForTest(Authority, transaction, .after_accumulator_materialization);
 
-    if ((action.from_bits > 32 and action.from_bits != 52) or
-        (action.from_bits == 64 and action.to_bits == 52))
+    if (action.op != .inttoptr and ((action.from_bits > 32 and action.from_bits != 52) or
+        (action.from_bits == 64 and action.to_bits == 52)))
     {
         const mask: u64 = if (action.to_bits == 52)
             (@as(u64, 1) << 52) - 1
@@ -347,6 +355,7 @@ fn scalarCastSourceDisplacement(
 }
 
 fn scalarCastPlan(action: *const Types.AccumulatorScalarCastAction) AccumulatorScalarCastPlan {
+    if (action.op == .inttoptr) return .pointer_bits;
     if (action.from_bits == 52) {
         return if (action.op == .zext)
             .c52_2_zext_i52_to_i64

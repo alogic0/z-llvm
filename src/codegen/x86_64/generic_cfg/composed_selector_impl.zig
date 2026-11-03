@@ -409,6 +409,8 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
             selector_conversion.lowerFpToSignedIntCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-fp-int-cast-value")
         else if (cast.op == .fpext or cast.op == .fptrunc or (cast.op == .bitcast and selector_fp.isFpIntBitcast(cast)))
             selector_fp.lowerFpCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-fp-cast-value")
+        else if (cast.op == .inttoptr)
+            selector_scalar.lowerIntToPtr(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-int-pointer-cast-value")
         else
             selector_scalar.lowerCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-cast-value"),
         .freeze => |freeze| selector_scalar.lowerFreeze(selector, instruction.result, freeze) catch |err| return instructionValueError(selector, err, "stage2-freeze-value"),
