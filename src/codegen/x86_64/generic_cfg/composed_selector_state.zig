@@ -1438,6 +1438,18 @@ pub fn defineGlobalPointerLoad(selector: *ComposedBlockSelector, result: []const
     return null;
 }
 
+/// Symbolic addresses have no SSA source. The existing definition transaction
+/// owns live accumulator preservation, flag preservation and rollback.
+pub fn defineGlobalAddress(selector: *ComposedBlockSelector, result: []const u8, address: @import("../symbol_address.zig").Address) !?Diagnostic {
+    var definition = try AccumulatorDefinitionTransaction.begin(selector);
+    defer definition.deinit();
+    if (try definition.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+    try selector.machine.instructions.append(selector.allocator, .{ .lea_global_offset_rax = address });
+    try definition.define(result, .fullRax());
+    try definition.commit();
+    return null;
+}
+
 pub fn bindAccumulator(selector: *ComposedBlockSelector, name: []const u8, bits: u16) !void {
     if (bits == 64) try bindRax(selector, name) else try bindEax(selector, name);
 }

@@ -756,16 +756,18 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
         },
         .inline_memcpy => |memcpy| {
             const source = try Authority.validateRegisteredOperandHandle(Authority, transaction, memcpy.source);
-            const length = try Authority.validateRegisteredOperandHandle(Authority, transaction, memcpy.length);
             validateMemcpyPointerOperand(&transaction.requests[source]) catch |err| {
                 Authority.noteRequestBoundaryError(Authority, transaction, source, err);
                 return err;
             };
-            validateMemcpyLengthOperand(&transaction.requests[length]) catch |err| {
-                Authority.noteRequestBoundaryError(Authority, transaction, length, err);
-                return err;
-            };
-            if (source == length) return error.ValueUseIncompatibleDuplicate;
+            if (memcpy.length) |handle| {
+                const length = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
+                validateMemcpyLengthOperand(&transaction.requests[length]) catch |err| {
+                    Authority.noteRequestBoundaryError(Authority, transaction, length, err);
+                    return err;
+                };
+                if (source == length) return error.ValueUseIncompatibleDuplicate;
+            }
         },
         // Load widths are classified only after the canonical named
         // source resolves. This preserves the legacy precedence between
@@ -838,7 +840,7 @@ fn core_validateActionDependenciesCanonical(comptime Authority: type, transactio
         },
         .inline_memcpy => |memcpy| {
             try Authority.validateOperandCanonical(Authority, transaction, memcpy.source);
-            try Authority.validateOperandCanonical(Authority, transaction, memcpy.length);
+            if (memcpy.length) |handle| try Authority.validateOperandCanonical(Authority, transaction, handle);
         },
         .scratch_compare => |compare| switch (compare.rhs) {
             .named => |handle| try Authority.validateOperandCanonical(Authority, transaction, handle),
@@ -1183,7 +1185,7 @@ fn actionTertiaryOperand(
     action: PreparedAction,
 ) !?u8 {
     return switch (action) {
-        .inline_memcpy => |memcpy| try Authority.validateRegisteredOperandHandle(Authority, transaction, memcpy.length),
+        .inline_memcpy => |memcpy| if (memcpy.length) |handle| try Authority.validateRegisteredOperandHandle(Authority, transaction, handle) else null,
         .inline_memset => |fill| if (fill.fill != null) (if (fill.length) |handle| try Authority.validateRegisteredOperandHandle(Authority, transaction, handle) else null) else null,
         .validate_shape,
         .emit_copy_to,

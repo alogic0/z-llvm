@@ -687,9 +687,9 @@ pub fn requestMappings(
                     .source_request_index = memcpy.source.index,
                 });
                 mappings.append(.{
-                    .source = scalarSourceNode(try Authority.registeredOperandCurrent(Authority, transaction, memcpy.length)),
+                    .source = if (memcpy.length) |handle| scalarSourceNode(try Authority.registeredOperandCurrent(Authority, transaction, handle)) else null,
                     .destination = .rdx,
-                    .source_request_index = memcpy.length.index,
+                    .source_request_index = if (memcpy.length) |handle| handle.index else null,
                 });
             },
             .load_scalar => |load| {
@@ -897,7 +897,7 @@ fn appendStorePointerDestinationNodes(
 ) !void {
     switch (pointer) {
         .rax => {
-            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            if (bits == 0 or (bits > 8 and bits != 16 and bits != 32)) return error.ValueUseStorePointerFormUnsupported;
             try nodes.append(.rcx);
         },
         .stack_scalar => |stack| if (bits == 64) {
@@ -931,7 +931,7 @@ fn appendStorePointerMappings(
 ) !void {
     switch (pointer) {
         .rax => {
-            if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
+            if (bits == 0 or (bits > 8 and bits != 16 and bits != 32)) return error.ValueUseStorePointerFormUnsupported;
             mappings.append(.{ .source = .accumulator, .destination = .rcx, .source_request_index = source_request_index });
         },
         .stack_scalar => |stack| if (bits == 64) {

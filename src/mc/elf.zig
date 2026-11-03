@@ -3,6 +3,8 @@ const encoding = @import("encoding.zig");
 const ir = @import("../ir.zig");
 const x86_64 = @import("../codegen/x86_64.zig");
 const constant_table = @import("../codegen/x86_64/constant_table.zig");
+const global_data = @import("global_data.zig");
+const symbol_address = @import("../codegen/x86_64/symbol_address.zig");
 
 const Section = struct {
     name_offset: u32,
@@ -31,6 +33,8 @@ const Relocation = struct {
     kind: u32,
     addend: i64,
 };
+
+const DataFixup = struct { offset: u64, address: symbol_address.Address };
 
 pub fn writeObject(allocator: std.mem.Allocator, functions: []const x86_64.MachineFunction, writer: anytype) !void {
     const object = try buildObject(allocator, functions);
@@ -141,14 +145,29 @@ fn buildObjectWithOptionalModuleContext(
         try symbol_indices.put(function.name, @intCast(symbols.items.len));
     }
 
+    var data_fixups: std.ArrayList(DataFixup) = .empty;
+    defer data_fixups.deinit(allocator);
+    var data_alignment: u32 = 16;
+    try appendReachableGlobals(allocator, &data, &data_alignment, &data_fixups, &symbols, &symbol_indices, functions, aliases, module_context);
     try appendSupportedGlobals(allocator, &data, &tdata, &symbols, &symbol_indices, globals, module_context);
     try appendSyntheticF128Constants(allocator, &data, &symbols, &symbol_indices, functions);
     try appendLocalFunctionAliases(allocator, &symbols, &symbol_indices, aliases);
+    const first_global = try orderLocalSymbols(allocator, &symbols, &symbol_indices);
 
     var relocations: std.ArrayList(Relocation) = .empty;
     defer relocations.deinit(allocator);
     for (functions, 0..) |function, function_index| {
         try collectCallRelocations(allocator, &relocations, &symbols, &symbol_indices, function_offsets[function_index], function);
+    }
+    var data_relocations: std.ArrayList(Relocation) = .empty;
+    defer data_relocations.deinit(allocator);
+    for (data_fixups.items) |fixup| {
+        try data_relocations.append(allocator, .{
+            .offset = fixup.offset,
+            .symbol_index = try symbolIndexForCall(allocator, &symbols, &symbol_indices, fixup.address.symbol),
+            .kind = 1, // R_X86_64_64
+            .addend = fixup.address.addend,
+        });
     }
 
     var strtab: std.ArrayList(u8) = .empty;
@@ -172,12 +191,13 @@ fn buildObjectWithOptionalModuleContext(
     const symtab_name = try appendString(&shstrtab, allocator, ".symtab");
     const strtab_name = try appendString(&shstrtab, allocator, ".strtab");
     const shstrtab_name = try appendString(&shstrtab, allocator, ".shstrtab");
+    const rela_data_name = if (data_relocations.items.len != 0) try appendString(&shstrtab, allocator, ".rela.data") else 0;
 
     const ehdr_size: u64 = 64;
     var cursor = alignForward(ehdr_size, 16);
     const text_offset = cursor;
     cursor += text.items.len;
-    cursor = alignForward(cursor, 16);
+    cursor = alignForward(cursor, data_alignment);
 
     const data_offset = cursor;
     cursor += data.items.len;
@@ -192,6 +212,10 @@ fn buildObjectWithOptionalModuleContext(
     cursor += rela_text_size;
     cursor = alignForward(cursor, 8);
 
+    const rela_data_offset = cursor;
+    const rela_data_size = data_relocations.items.len * 24;
+    cursor += rela_data_size;
+
     const symtab_offset = cursor;
     const symtab_entry_count = symbols.items.len + 1;
     const symtab_size = symtab_entry_count * 24;
@@ -205,7 +229,7 @@ fn buildObjectWithOptionalModuleContext(
     cursor = alignForward(cursor, 8);
     const shoff = cursor;
 
-    const section_count = 8;
+    const section_count: u16 = if (data_relocations.items.len == 0) 8 else 9;
     const total_size = shoff + section_count * 64;
     var object = try allocator.alloc(u8, total_size);
     errdefer allocator.free(object);
@@ -216,6 +240,7 @@ fn buildObjectWithOptionalModuleContext(
     @memcpy(object[data_offset..][0..data.items.len], data.items);
     @memcpy(object[tdata_offset..][0..tdata.items.len], tdata.items);
     writeRelocationTable(object[rela_text_offset..][0..rela_text_size], relocations.items);
+    writeRelocationTable(object[rela_data_offset..][0..rela_data_size], data_relocations.items);
     writeSymbolTable(object[symtab_offset..][0..symtab_size], symbols.items, symbol_name_offsets);
     @memcpy(object[strtab_offset..][0..strtab.items.len], strtab.items);
     @memcpy(object[shstrtab_offset..][0..shstrtab.items.len], shstrtab.items);
@@ -223,18 +248,116 @@ fn buildObjectWithOptionalModuleContext(
     const sections = [_]Section{
         .{ .name_offset = 0, .kind = 0, .flags = 0, .offset = 0, .size = 0, .addralign = 0 },
         .{ .name_offset = text_name, .kind = 1, .flags = 0x6, .offset = text_offset, .size = text.items.len, .addralign = 16 },
-        .{ .name_offset = data_name, .kind = 1, .flags = 0x3, .offset = data_offset, .size = data.items.len, .addralign = 16 },
+        .{ .name_offset = data_name, .kind = 1, .flags = 0x3, .offset = data_offset, .size = data.items.len, .addralign = data_alignment },
         .{ .name_offset = tdata_name, .kind = 1, .flags = 0x403, .offset = tdata_offset, .size = tdata.items.len, .addralign = 4 },
         .{ .name_offset = rela_text_name, .kind = 4, .flags = 0, .offset = rela_text_offset, .size = rela_text_size, .link = 5, .info = 1, .addralign = 8, .entsize = 24 },
-        .{ .name_offset = symtab_name, .kind = 2, .flags = 0, .offset = symtab_offset, .size = symtab_size, .link = 6, .info = 1, .addralign = 8, .entsize = 24 },
+        .{ .name_offset = symtab_name, .kind = 2, .flags = 0, .offset = symtab_offset, .size = symtab_size, .link = 6, .info = first_global, .addralign = 8, .entsize = 24 },
         .{ .name_offset = strtab_name, .kind = 3, .flags = 0, .offset = strtab_offset, .size = strtab.items.len },
         .{ .name_offset = shstrtab_name, .kind = 3, .flags = 0, .offset = shstrtab_offset, .size = shstrtab.items.len },
     };
     for (sections, 0..) |section, index| {
         writeSectionHeader(object[shoff + index * 64 ..][0..64], section);
     }
+    if (data_relocations.items.len != 0) writeSectionHeader(object[shoff + 8 * 64 ..][0..64], .{
+        .name_offset = rela_data_name,
+        .kind = 4,
+        .flags = 0,
+        .offset = rela_data_offset,
+        .size = rela_data_size,
+        .link = 5,
+        .info = 2,
+        .addralign = 8,
+        .entsize = 24,
+    });
 
     return object;
+}
+
+/// Decode only the closure rooted in the new symbolic-address form. Pointer
+/// fields in unrelated runtime objects must not introduce undefined imports.
+fn appendReachableGlobals(
+    allocator: std.mem.Allocator,
+    data: *std.ArrayList(u8),
+    data_alignment: *u32,
+    fixups: *std.ArrayList(DataFixup),
+    symbols: *std.ArrayList(Symbol),
+    indices: *std.StringHashMap(u32),
+    functions: []const x86_64.MachineFunction,
+    aliases: []const ir.GlobalAlias,
+    module_context: ?x86_64.ReadOnlyModuleContext,
+) !void {
+    const context = module_context orelse return;
+    var queue: std.ArrayList([]const u8) = .empty;
+    defer queue.deinit(allocator);
+    var seen = std.StringHashMap(void).init(allocator);
+    defer seen.deinit();
+    for (functions) |function| for (function.instructions.items) |instruction| switch (instruction) {
+        .lea_global_offset_rax => |address| try queue.append(allocator, address.symbol),
+        else => {},
+    };
+    var cursor: usize = 0;
+    while (cursor < queue.items.len) : (cursor += 1) {
+        const name = queue.items[cursor];
+        if (indices.contains(name)) continue;
+        const entry = try seen.getOrPut(name);
+        if (entry.found_existing) continue;
+        if (seen.count() > 4096) return error.UnsupportedGlobalData;
+        const global = context.findGlobal(name) orelse {
+            for (aliases) |alias| if (std.mem.eql(u8, alias.name, name)) return error.UnsupportedGlobalData;
+            continue; // A referenced function or an external symbol.
+        };
+        if (global.initializer == .none) {
+            _ = try symbol_address.globalProperties(global);
+            continue;
+        }
+        var decoded = try global_data.decode(allocator, context, global);
+        defer decoded.deinit(allocator);
+        // Zero-sized symbol placement depends on section/linkage conventions.
+        // Keep it outside this ordinary, nonempty global-object envelope.
+        if (decoded.bytes.len == 0) return error.UnsupportedGlobalData;
+        if (data.items.len + decoded.bytes.len + decoded.alignment > 16 * 1024 * 1024) return error.UnsupportedGlobalData;
+        try alignArrayList(data, allocator, decoded.alignment);
+        const start: u64 = data.items.len;
+        try data.appendSlice(allocator, decoded.bytes);
+        data_alignment.* = @max(data_alignment.*, decoded.alignment);
+        try symbols.append(allocator, .{
+            .name = global.name,
+            .value = start,
+            .size = decoded.bytes.len,
+            .section_index = 2,
+            .info = if (decoded.local) 0x01 else 0x11,
+            .other = decoded.visibility,
+        });
+        try indices.put(global.name, @intCast(symbols.items.len));
+        for (decoded.relocations) |relocation| {
+            try fixups.append(allocator, .{ .offset = start + relocation.offset, .address = relocation.address });
+            try queue.append(allocator, relocation.address.symbol);
+        }
+    }
+}
+
+fn orderLocalSymbols(allocator: std.mem.Allocator, symbols: *std.ArrayList(Symbol), indices: *std.StringHashMap(u32)) !u32 {
+    var count: u32 = 0;
+    for (symbols.items) |symbol| if (symbol.info >> 4 == 0) {
+        count += 1;
+    };
+    if (count == 0) return 1;
+    const ordered = try allocator.alloc(Symbol, symbols.items.len);
+    defer allocator.free(ordered);
+    var local_index: usize = 0;
+    var global_index: usize = count;
+    for (symbols.items) |symbol| {
+        if (symbol.info >> 4 == 0) {
+            ordered[local_index] = symbol;
+            local_index += 1;
+        } else {
+            ordered[global_index] = symbol;
+            global_index += 1;
+        }
+    }
+    @memcpy(symbols.items, ordered);
+    for (symbols.items, 0..) |symbol, index| try indices.put(symbol.name, @intCast(index + 1));
+    return count + 1;
 }
 
 fn appendSupportedGlobals(
@@ -564,6 +687,15 @@ fn collectCallRelocations(
                     .symbol_index = symbol_index,
                     .kind = 2,
                     .addend = -4,
+                });
+            },
+            .lea_global_offset_rax => |address| {
+                const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, address.symbol);
+                try relocations.append(allocator, .{
+                    .offset = function_offset + offset + 3,
+                    .symbol_index = symbol_index,
+                    .kind = 2,
+                    .addend = @as(i64, address.addend) - 4,
                 });
             },
             .spinlocked_memcpy_rsi_to_rdx_len_edi => |symbol| {

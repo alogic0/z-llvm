@@ -134,7 +134,7 @@ pub fn setCallTestFailureForTest(
     argument_index: u8,
 ) !void {
     if (!builtin.is_test) return error.ValueUseTestHookUnavailable;
-    transaction.call_test_failure = if (failure) |value| @intFromEnum(value) else null;
+    transaction.call_test_failure = if (failure) |value| @backingInt(value) else null;
     transaction.call_test_argument_index = argument_index;
 }
 
@@ -329,7 +329,7 @@ fn executeDirectCall(
     try refreshCallArguments(Authority, transaction, action.arguments[0..action.argument_count]);
     mutateCallSourceForTest(transaction, .mutate_after_refresh, null);
     if (builtin.is_test and
-        transaction.call_test_failure == @intFromEnum(CallTestFailure.after_preservation))
+        transaction.call_test_failure == @backingInt(CallTestFailure.after_preservation))
         try transaction.selector.eflags.validateSnapshot(preservation_eflags);
     try failCallForTest(transaction, .after_preservation, null);
 
@@ -576,7 +576,7 @@ fn failCallForTest(
 ) !void {
     if (builtin.is_test) {
         const configured = transaction.call_test_failure orelse return;
-        if (configured != @intFromEnum(boundary)) return;
+        if (configured != @backingInt(boundary)) return;
         if (argument_index) |index| {
             if (transaction.call_test_argument_index != index) return;
         }
@@ -591,7 +591,7 @@ fn mutateCallSourceForTest(
 ) void {
     if (!builtin.is_test) return;
     const configured = transaction.call_test_failure orelse return;
-    if (configured != @intFromEnum(boundary)) return;
+    if (configured != @backingInt(boundary)) return;
     if (argument_index) |index| {
         if (transaction.call_test_argument_index != index) return;
     }
@@ -616,6 +616,11 @@ pub fn executeInlineMemcpy(
         transaction.action_diagnostic = diagnostic;
         return error.ValueUseActionDiagnostic;
     }
+    // These operands may die at this call, yet must survive earlier ABI
+    // argument writes. Keep their canonical home stable before exposing the
+    // refreshed records; live-after-call preservation alone is insufficient.
+    try preserveMemcpyOperandBeforeStaging(Authority, transaction, action.source.index, false);
+    if (action.length) |handle| try preserveMemcpyOperandBeforeStaging(Authority, transaction, handle.index, true);
     // Caller preservation may durably relocate an operand that dies at this
     // call (the legacy accumulator path is the notable case). Refresh the
     // transaction-owned canonical records immediately after that sole
@@ -623,14 +628,19 @@ pub fn executeInlineMemcpy(
     // no-rebind post-validation without inventing post-call liveness.
     try refreshMemcpyPreparedOperand(Authority, transaction, destination_index);
     try refreshMemcpyPreparedOperand(Authority, transaction, action.source.index);
-    try refreshMemcpyPreparedOperand(Authority, transaction, action.length.index);
+    if (action.length) |handle| try refreshMemcpyPreparedOperand(Authority, transaction, handle.index);
     try failMemcpyForTest(Authority, transaction, .after_preservation);
 
     try materializeMemcpyRequest(Authority, transaction, destination_index, .rdi);
     try failMemcpyForTest(Authority, transaction, .after_destination);
     try materializeMemcpyHandle(Authority, transaction, action.source, .rsi);
     try failMemcpyForTest(Authority, transaction, .after_source);
-    try materializeMemcpyHandle(Authority, transaction, action.length, .rdx);
+    if (action.length) |handle| {
+        try materializeMemcpyHandle(Authority, transaction, handle, .rdx);
+    } else {
+        try selector_state.clobberArgReg(transaction.selector, .rdx);
+        try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{ .mov_imm_rdx = @bitCast(action.length_immediate) });
+    }
     try failMemcpyForTest(Authority, transaction, .after_length);
 
     try selector_state.emitEflagsInstruction(
@@ -677,6 +687,21 @@ pub fn executeInlineMemset(
     try failMemcpyForTest(Authority, transaction, .after_call_append);
 }
 
+fn preserveMemcpyOperandBeforeStaging(comptime Authority: type, transaction: anytype, index: u8, is_length: bool) !void {
+    const current = (try Authority.validateRequestAt(Authority, transaction, index)) orelse return error.ValueUseUnsupportedSource;
+    const source_reg: ?ArgReg = switch (current) {
+        .arg64, .scratch64 => |reg| reg,
+        .arg128, .scratch128 => |pair| pair.lo,
+        else => null,
+    };
+    const reg = source_reg orelse return;
+    if (reg != .rdi and !(is_length and reg == .rsi)) return;
+    const name = transaction.requests[index].source.named.slice();
+    if (try selector_state.spillValue(transaction.selector, name)) |diagnostic| {
+        transaction.action_diagnostic = diagnostic;
+        return error.ValueUseActionDiagnostic;
+    }
+}
 fn refreshMemcpyPreparedOperand(comptime Authority: type, transaction: anytype, index: u8) !void {
     if (!transaction.prepared_view_valid[index]) {
         Authority.recordRequestFailure(Authority, transaction, index);

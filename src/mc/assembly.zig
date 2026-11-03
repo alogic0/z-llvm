@@ -1608,6 +1608,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .load_global_i32_eax => |symbol| try writer.print("\tmovl {s}(%rip), %eax\n", .{symbol}),
             .load_global_ptr_rax => |symbol| try writer.print("\tmovq {s}(%rip), %rax\n", .{symbol}),
             .lea_global_rax => |symbol| try writer.print("\tleaq {s}(%rip), %rax\n", .{symbol}),
+            .lea_global_offset_rax => |address| try writer.print("\tleaq {s}{s}{d}(%rip), %rax\n", .{ address.symbol, if (address.addend < 0) "" else "+", address.addend }),
             .lea_global_rdi => |symbol| try writer.print("\tleaq {s}(%rip), %rdi\n", .{symbol}),
             .lea_global_rsi => |symbol| try writer.print("\tleaq {s}(%rip), %rsi\n", .{symbol}),
             .lea_global_rdx => |symbol| try writer.print("\tleaq {s}(%rip), %rdx\n", .{symbol}),

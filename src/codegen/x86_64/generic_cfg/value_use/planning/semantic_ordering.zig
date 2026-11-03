@@ -103,7 +103,7 @@ fn actionTertiaryOperand(
     action: PreparedAction,
 ) !?u8 {
     return switch (action) {
-        .inline_memcpy => |memcpy| try Authority.validateRegisteredOperandHandle(Authority, transaction, memcpy.length),
+        .inline_memcpy => |memcpy| if (memcpy.length) |handle| try Authority.validateRegisteredOperandHandle(Authority, transaction, handle) else null,
         .inline_memset => |fill| if (fill.fill != null) (if (fill.length) |handle| try Authority.validateRegisteredOperandHandle(Authority, transaction, handle) else null) else null,
         .validate_shape,
         .emit_copy_to,

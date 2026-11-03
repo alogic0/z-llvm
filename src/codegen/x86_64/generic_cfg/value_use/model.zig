@@ -266,7 +266,8 @@ pub const StoreStackPointerAction = struct {
 /// supplied by the consumer.
 pub const MemcpyAction = struct {
     source: RequestHandle,
-    length: RequestHandle,
+    length: ?RequestHandle = null,
+    length_immediate: u64 = 0,
 };
 
 /// Byte fill with named operands or typed immediate values. The destination

@@ -173,7 +173,7 @@ test "production inline memcpy rejects cycles and operand forms before mutation"
         .{ .dst = .null_value, .src = .{ .named = "src" }, .len = .{ .named = "len" }, .detail = "composed-block-memcpy-dst" },
         .{ .dst = .{ .named = "dst" }, .src = .null_value, .len = .{ .named = "len" }, .detail = "composed-block-memcpy-src" },
         .{ .dst = .{ .named = "dst" }, .src = .{ .named = "missing-src" }, .len = .{ .named = "len" }, .detail = "composed-block-memcpy-src" },
-        .{ .dst = .{ .named = "dst" }, .src = .{ .named = "src" }, .len = .{ .int = 16 }, .detail = "composed-block-memcpy-len" },
+        .{ .dst = .{ .named = "dst" }, .src = .{ .named = "src" }, .len = .{ .int = -1 }, .detail = "composed-block-memcpy-len" },
     };
     for (bad_operands) |case| {
         var call = ir.CallInst{ .ret_ty = .void, .callee = "llvm.memcpy.inline.p0.p0.i64", .args = .empty };

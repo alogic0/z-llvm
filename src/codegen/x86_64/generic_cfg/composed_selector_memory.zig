@@ -3,6 +3,7 @@ const ir = @import("../../../ir.zig");
 const target = @import("../../../target.zig");
 const cfg = @import("../../../analysis/cfg.zig");
 const constant_table = @import("../constant_table.zig");
+const symbol_address = @import("../symbol_address.zig");
 const x86_64_machine = @import("../machine.zig");
 const x86_64_types = @import("../types.zig");
 const inspection = @import("inspection.zig");
@@ -1017,6 +1018,15 @@ fn isStructAggregateType(ty: ir.Type) bool {
 
 pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.GepInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+    if (symbol_address.fromGep(gep)) |address| {
+        const context = selector.module_context orelse return .{ .no_emitter = "composed-block-gep-global-context" };
+        if (!symbol_address.supportsLayout(context.target_datalayout)) return .{ .no_emitter = "composed-block-gep-global-layout" };
+        const global = context.findGlobal(address.symbol) orelse return .{ .no_emitter = "composed-block-gep-global-symbol" };
+        _ = symbol_address.globalProperties(global) catch return .{ .no_emitter = "composed-block-gep-global-properties" };
+        // The legalized GEP can live in a short-lived arena. Retain the
+        // module-owned symbol name when constructing the machine instruction.
+        return selector_state.defineGlobalAddress(selector, result_name, .{ .symbol = global.name, .addend = address.addend });
+    }
     if (gep.ptr == .named and std.mem.startsWith(u8, gep.ptr.named, "@"))
         return try lowerReadOnlyTableGep(selector, result_name, gep);
     const exact_ei = if (selector.function) |function| stage2_planning.isExactEiScalarFamily(function.*) else false;

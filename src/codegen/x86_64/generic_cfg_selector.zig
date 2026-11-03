@@ -8,6 +8,7 @@ const composed_selector = @import("generic_cfg/composed_selector.zig");
 const address_dependencies = @import("generic_cfg/composed_selector_address_dependencies.zig");
 const abi_legalization = @import("generic_cfg/abi_legalization.zig");
 const word_pair_memory = @import("generic_cfg/word_pair_memory.zig");
+const global_memory = @import("generic_cfg/global_memory.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 
@@ -52,6 +53,9 @@ pub fn tryLowerWithContext(
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try word_pair_memory.legalize(arena.allocator(), function, module_context)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
+    if (try global_memory.legalize(arena.allocator(), function, module_context)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     switch (inspected) {

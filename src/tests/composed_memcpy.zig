@@ -47,7 +47,7 @@ test "composed memcpy rejects malformed markers and unsupported intrinsic neighb
         .{ .call = "call void @llvm.memcpy.p0.p0.i64(ptr %d, ptr %s, i64 %n, i1 true)", .detail = "composed-block-memcpy-args" },
         .{ .call = "call void @llvm.memcpy.p0.p0.i64(ptr addrspace(1) %d, ptr %s, i64 %n, i1 false)", .detail = "composed-block-memcpy-attrs" },
         .{ .call = "call void @llvm.memcpy.p0.p0.i64(ptr %d, ptr byval(i64) %s, i64 %n, i1 false)", .detail = "composed-block-memcpy-attrs" },
-        .{ .call = "call void @llvm.memcpy.p0.p0.i64(ptr %d, ptr %s, i64 0, i1 false)", .detail = "composed-block-memcpy-len" },
+        .{ .call = "call void @llvm.memcpy.p0.p0.i64(ptr %d, ptr %s, i64 -1, i1 false)", .detail = "composed-block-memcpy-len" },
         .{ .call = "call void @llvm.memcpy.p0.p0.i32(ptr %d, ptr %s, i32 1, i1 false)", .detail = "composed-block-llvm-intrinsic" },
         .{ .call = "call void @llvm.memcpy.p1.p0.i64(ptr %d, ptr %s, i64 %n, i1 false)", .detail = "composed-block-llvm-intrinsic" },
         .{ .call = "call void @llvm.memmove.p1.p0.i64(ptr %d, ptr %s, i64 %n, i1 false)", .detail = "composed-block-llvm-intrinsic" },

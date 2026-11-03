@@ -673,7 +673,8 @@ pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, 
         .form = .memcpy_pointer,
         .destination = .prepared_source,
     }) catch return .{ .unsupported_value = "composed-block-memcpy-src" };
-    const length_request = authority.register(.{
+    const length_immediate: u64 = if (len.value == .int) std.math.cast(u64, len.value.int) orelse return .{ .unsupported_value = "composed-block-memcpy-len" } else 0;
+    const length_request: ?ValueUseTransaction.RequestHandle = if (len.value == .int) null else authority.register(.{
         .source = len.value,
         .expected = .{ .ty = .{ .int = 64 }, .register_class = .gpr64 },
         .form = .memcpy_length,
@@ -687,6 +688,7 @@ pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, 
         .prepared_action = .{ .inline_memcpy = .{
             .source = source_request,
             .length = length_request,
+            .length_immediate = length_immediate,
         } },
     }) catch return .{ .unsupported_value = "composed-block-memcpy-dst" };
     authority.seal() catch |err| return inlineMemcpyValueUseDiagnostic(
@@ -820,14 +822,14 @@ fn inlineMemcpyValueUseDiagnostic(
     err: anyerror,
     destination: ValueUseTransaction.RequestHandle,
     source: ValueUseTransaction.RequestHandle,
-    length: ValueUseTransaction.RequestHandle,
+    length: ?ValueUseTransaction.RequestHandle,
 ) ?Diagnostic {
     if (err == error.ValueUseActionDiagnostic) return transaction.actionDiagnostic();
     if (transaction.failedRequestIs(destination))
         return .{ .unsupported_value = "composed-block-memcpy-dst" };
     if (transaction.failedRequestIs(source))
         return .{ .unsupported_value = "composed-block-memcpy-src" };
-    if (transaction.failedRequestIs(length))
+    if (length) |handle| if (transaction.failedRequestIs(handle))
         return .{ .unsupported_value = "composed-block-memcpy-len" };
     return null;
 }
