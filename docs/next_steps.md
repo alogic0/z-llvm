@@ -41,10 +41,10 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The [export/execution acceptance](evidence/export_execution_acceptance_20261102.json)
-at `a78431ae` completes the three follow-ups from the prior checkpoint. Both
+The [startup-memory/headroom acceptance](evidence/startup_headroom_acceptance_20261103.json)
+at `ea1e1e1a` completes the two follow-ups from the prior checkpoint. Both
 full distribution runs pass all 17 subgates against one frozen source snapshot,
-and all 1,395 canonical records match. The source pin remains
+and all 1,396 canonical records match. The source pin remains
 `1c08b09d1c847f4f02c8216e3b62df323861a437`.
 
 The compiler-core selection remains the same 100-row selector-v3 prefix. Every
@@ -76,29 +76,41 @@ Zig/Clang IR construction, libc, the system linker and CRT remain dependencies.
 The ABI cohort retains ten functions and passes 60 cases plus its negative
 controls. The frozen FMA canary still passes its 29 exact-result cases and
 8,192 LLVM-paired observations with unchanged identities. The combined focused
-checks pass 1,633 compiler unit tests, 11 structural tests and seven Python
+checks pass 1,637 compiler unit tests, 11 structural tests and seven Python
 policy tests. Standalone, compiler-core and compiler-rt populations remain
 separate; the compiler-rt bypass ratchet remains 130.
 
 The earlier [space cleanup](evidence/space_cleanup_20261102.json) retained frozen
 selector inputs and source probes. The
-[checkpoint cleanup](evidence/export_execution_cleanup_20261102.json) replaces
-superseded AIR payloads with the accepted schema-4 generation and removes idle
+[checkpoint cleanup](evidence/startup_headroom_cleanup_20261103.json) replaces
+superseded AIR payloads with the current schema-4 generation and removes idle
 build caches while retaining metadata, logs and native evidence. No backup
 archives are created. Follow the [current keep-list](evidence/tmp_retention_pins.tsv).
 
-Next, reconcile the footprint forecast with the retained two-second samples.
-The fresh run's global free-space decrease exceeds the coarse 4.419 GB forecast;
-post-subgate samples miss the row group's transient caches. Same-inode
-publication is established, while the forecast remains unaccepted. Keep the
-existing reserve and distinguish owned bytes from unrelated filesystem changes.
+The [disk calibration](evidence/headroom_calibration_20261102.json) is accepted:
+an 8 GiB forecast covers the sampled 6.10 GB fresh and 1.60 GB cached decreases.
+The original serial admission is inherited by nested row workers, whose reserve
+stays enforced and whose transient minimum enters the serial report. Allocated
+disk telemetry covers all seven owned roots, including retained exports. The
+49 runner/policy and 39 comparison tests pass. Filesystem noise and sampled,
+non-atomic observations remain measurement limits.
 
-The next compiler capability should target the captured unchanged
-`test/cases/recursive_fibonacci.zig` probe. Its LLVM reference executes, but local
-preopt emission stops in `start.main` at aggregate allocations, before earning
-any local execution credit. Reduce the captured startup IR to a typed aggregate
-allocation/copy case, extend the existing memory or scalarization authority with
-native comparisons, then retry the unchanged program. Keep broader optional
+The [bounded memory slice](evidence/startup_word_pair_memory_20261102.json)
+reuses existing 128-bit frame storage for an exact 16-byte pointer/length object
+and transparent wrappers. Constructor stores, field extraction and bounded memcpy
+pass 384 local observations through direct/release routes in three modes, against
+192 LLVM-reference observations reused across routes. This does not establish
+general aggregate memory or ABI support.
+
+Next, extend value-use-owned stores of runtime pointer values from ABI registers
+or spills into typed 64-bit frame slots. Keep stored pointer values distinct from
+addresses of frame objects, and prove preservation of live caller values with
+native comparisons. Then retry the unchanged
+`test/cases/recursive_fibonacci.zig` probe. It now advances past allocation/copy
+but stops in `start.main` at
+`no_emitter:composed-block-store-stack-pointer-value`; its reference executes once
+and local execution remains zero. Further startup boundaries may follow.
+Keep broader optional
 ABIs and floating/indirect/aggregate/stack varargs as explicit boundaries.
 Use the frozen performance baseline for measured comparisons and the
 [validation policy](validation_tiers.md) for matching evidence reuse.

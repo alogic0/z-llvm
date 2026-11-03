@@ -1,4 +1,4 @@
-# Current keep-list, reviewed 2026-11-02. Historical pins retired by the authorized improvement plan.
+# Current keep-list, reviewed 2026-11-03. Historical pins retired by the authorized improvement plan.
 # The 2026-11-02 space cleanup retired superseded failed exports and idle compiler caches; sources, logs and frozen measurement outputs remain.
 path	class	pin_or_key	reason
 local-state/artifacts	retained-evidence	manifests/*.json + docs/evidence/artifacts/*.json	Verified legacy payloads, accepted evidence, unique source and unresolved diagnostics; collect only with versioned pins
@@ -9,7 +9,7 @@ tmp/o2_calls_perf	current-consumer	tools/o2_compiler_rt_v1_calls_performance.zig
 zig-out	current-build-output	current project build	Current z_llvm executable used by native and integration checks
 local-state/validations/project-improvement	validation-root	completed fresh/cache pair	Empty root reserved for next runs; completed logs are versioned in docs/evidence/project_improvement
 local-state/caches/project-improvement	reserved-cache-root	empty root	Reserved for future runs; the superseded bdee02bc export generation was removed in the 2026-11-02 cleanup
-local-state/caches/test-real-rows	current-air-cache	generation schema 3; Zig pin 1c08b09d1	Frozen raw inputs for the selector-v3 membership audit; retain with the static inventory SHA
+local-state/caches/test-real-rows	frozen-air-input	generation schema 3; Zig pin 1c08b09d1	Frozen raw inputs for the selector-v3 membership audit; retain with the static inventory SHA
 tmp/real_rows_air_export_cache	retired-cache-root	empty after verified cache retirement	The redundant default export generation was removed; current validation uses the explicit accepted cache root
 local-state/validations/project-review-20261102	unresolved-diagnostics	docs/evidence/project_review_20261102.json	Small typed-AIR reproducers, generated IR, native driver and results for aggregate snapshot and optional pointer wrong-code; reassess after repairs
 local-state/validations/correctness-trust-20261102	validation-evidence	2026-11-02 user-directed correctness repairs	Native regressions, behavioral comparison, current-pin ABI failures, unchanged upstream program captures and integration logs; superseded probe caches are disposable
@@ -28,5 +28,7 @@ local-state/caches/current-pin-acceptance-20261102-r2	retired-cache-root	superse
 local-state/validations/space-cleanup-20261102	cleanup-evidence	docs/evidence/space_cleanup_20261102.json	Classified deletion plan, before/after identities and hashes, physical-space measurements, and documentation/artifact-store checks; metadata only, no archives
 local-state/validations/export-execution-20261102	validation-and-failure-evidence	docs/evidence/export_execution_acceptance_20261102.json	Focused publication/ASCII/C tests, unchanged Fibonacci boundary, exact commands and parent-verifier failure diagnostics; no current AIR payload consumer
 local-state/caches/export-execution-20261102	retired-cache-root	unaccepted schema-4 first attempt	Payloads retired after the parent filename mismatch; metadata and hash-bound retirement evidence remain
-local-state/validations/export-execution-20261102-r2	accepted-validation	a78431ae; docs/evidence/export_execution_acceptance_20261102.json	Frozen source snapshot, full fresh/cached logs and comparison, read-only two-second inode/free-space samples and cleanup records
-local-state/caches/export-execution-20261102-r2	current-air-cache	generation schema 4; Zig pin 1c08b09d1	Three authenticated immutable exports backing the unchanged 100-row selection and five-function execution cohort; retain current generation, executions are never cached
+local-state/validations/export-execution-20261102-r2	historical-accepted-validation	a78431ae; docs/evidence/export_execution_acceptance_20261102.json	Frozen source snapshot, full fresh/cached logs and comparison, read-only two-second inode/free-space samples and cleanup records
+local-state/caches/export-execution-20261102-r2	retired-cache-root	superseded by ea1e1e1a headroom/startup-memory checkpoint	Three verified payloads retired only after the replacement fresh run passed and its exports were hash-verified; metadata, retirement note and historical logs remain
+local-state/validations/startup-headroom-20261102	accepted-validation	ea1e1e1a; docs/evidence/startup_headroom_acceptance_20261103.json	Frozen source snapshot, full fresh/cached logs and comparison, resource samples, native memory checks, unchanged Fibonacci boundary, stopped-attempt diagnostics and cleanup records
+local-state/caches/startup-headroom-20261102	current-air-cache	generation schema 4; Zig pin 1c08b09d1	Three authenticated immutable exports backing the unchanged 100-row selection and five-function execution cohort; retain current generation, executions are never cached

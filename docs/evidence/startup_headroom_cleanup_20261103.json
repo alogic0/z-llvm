@@ -1,0 +1,190 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "status": "deleted and verified; sources, current exports, frozen inputs and evidence retained",
+  "accepted_revision": "ea1e1e1abb047f47374528f4fc6f6db706f87645",
+  "acceptance_evidence": "docs/evidence/startup_headroom_acceptance_20261103.json",
+  "preflight_cleanup_evidence": [
+    "local-state/validations/startup-headroom-20261102/preflight-cleanup.json",
+    "local-state/validations/startup-headroom-20261102/preflight-cleanup-final.json"
+  ],
+  "between_runs_cleanup_evidence": "local-state/validations/startup-headroom-20261102/between-runs-cleanup.json",
+  "between_runs_cleanup_sha256": "e6b17487ca34c9b2d5c0dafcf8b4ced456282072e378ce0c9936be20da73869b",
+  "retirement_timing": "The full fresh replacement passed all 17 gates with the unchanged 100-row/five-function population. Retire the superseded accepted AIR generation and the complete idle build cache before the cached run; keep the replacement exports, metadata, logs, frozen selector inputs and source.",
+  "retired_payloads": [
+    {
+      "path": "local-state/caches/export-execution-20261102-r2/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.4b757112cdbe3d4d95000dd8aaedbe4918d3a3e187447225cc05649a0a12d821.air",
+      "sha256": "4b757112cdbe3d4d95000dd8aaedbe4918d3a3e187447225cc05649a0a12d821",
+      "bytes": 1343891552,
+      "allocated_bytes": 1343905792,
+      "device": 66306,
+      "inode": 55209413,
+      "deleted": true
+    },
+    {
+      "path": "local-state/caches/export-execution-20261102-r2/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.83e45f02dcec330b298d7610dff0ec4c145904e9af7d00aa375bbc9766b63508.air",
+      "sha256": "83e45f02dcec330b298d7610dff0ec4c145904e9af7d00aa375bbc9766b63508",
+      "bytes": 1473501276,
+      "allocated_bytes": 1473527808,
+      "device": 66306,
+      "inode": 55209408,
+      "deleted": true
+    },
+    {
+      "path": "local-state/caches/export-execution-20261102-r2/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.40b80a4344adc99d8b4818f4879d1a23d4e586d8ef1713d5baa328c79717c69f.air",
+      "sha256": "40b80a4344adc99d8b4818f4879d1a23d4e586d8ef1713d5baa328c79717c69f",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106448384,
+      "device": 66306,
+      "inode": 55209410,
+      "deleted": true
+    }
+  ],
+  "retired_payload_allocated_bytes": 3923881984,
+  "retained_current_caches": [
+    {
+      "mode": "ReleaseFast",
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32.air",
+      "bytes": 1343891552,
+      "allocated_bytes": 1343905792,
+      "sha256": "29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32",
+      "final_inode": 55212693,
+      "sampled_maximum_complete_payload_inodes": 1,
+      "same_inode_observed_as_raw_and_cache": true
+    },
+    {
+      "mode": "ReleaseSafe",
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e.air",
+      "bytes": 1473501148,
+      "allocated_bytes": 1473536000,
+      "sha256": "277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e",
+      "final_inode": 55212700,
+      "sampled_maximum_complete_payload_inodes": 1,
+      "same_inode_observed_as_raw_and_cache": true
+    },
+    {
+      "mode": "ReleaseSmall",
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6.air",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106444288,
+      "sha256": "92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6",
+      "final_inode": 55212710,
+      "sampled_maximum_complete_payload_inodes": 1,
+      "same_inode_observed_as_raw_and_cache": true
+    }
+  ],
+  "current_cache_hashes_verified": true,
+  "retained_frozen_inputs": [
+    {
+      "path": "local-state/caches/test-real-rows/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.air",
+      "sha256": "c174c6552a17794c0f82f936b0373f7a8d0cf943460007182d7c20c06beabd2a",
+      "bytes": 1343891552,
+      "device": 66306,
+      "inode": 54832908,
+      "links": 2,
+      "hash_verified": true
+    },
+    {
+      "path": "local-state/caches/test-real-rows/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.air",
+      "sha256": "7b34676ca48eaeec0416bdb50a77b910c038dac88a40df3e7ed703c2e0d714c6",
+      "bytes": 1473501276,
+      "device": 66306,
+      "inode": 54826136,
+      "links": 2,
+      "hash_verified": true
+    },
+    {
+      "path": "local-state/caches/test-real-rows/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.air",
+      "sha256": "5ff91e8e1a86d214c7af8e6ab1c72b3b509564470b5d225b1433dc9b8cc25f5d",
+      "bytes": 1106432911,
+      "device": 66306,
+      "inode": 54827145,
+      "links": 2,
+      "hash_verified": true
+    }
+  ],
+  "original_scratch_probes_retained": [
+    "scratch/test_abi.s",
+    "scratch/test_abi.zig",
+    "scratch/test_bitset.ll",
+    "scratch/test_bitset.zig",
+    "scratch/test_chunkstate_layout.zig",
+    "scratch/test_init.zig",
+    "scratch/test_llvm.ll",
+    "scratch/test_offset.zig",
+    "scratch/test_opt.zig",
+    "scratch/test_query.ll",
+    "scratch/test_query.zig",
+    "scratch/test_query_debug.ll",
+    "scratch/test_size.zig"
+  ],
+  "failure_diagnostics_retained": true,
+  "old_metadata_and_logs_retained": true,
+  "final_idle_cache_cleanup": [
+    {
+      "path": ".zig-cache",
+      "reason": "Complete idle rebuildable compiler/interpreter cache, including manifests and objects.",
+      "device": 66306,
+      "inode": 54038572,
+      "allocated_unique_bytes": 159485952,
+      "reclaimable_allocated_bytes": 159485952,
+      "unique_inodes": 1183,
+      "deleted": true
+    },
+    {
+      "path": "tools/__pycache__",
+      "reason": "Complete idle rebuildable compiler/interpreter cache, including manifests and objects.",
+      "device": 66306,
+      "inode": 54168030,
+      "allocated_unique_bytes": 94208,
+      "reclaimable_allocated_bytes": 94208,
+      "unique_inodes": 6,
+      "deleted": true
+    }
+  ],
+  "archives_created": 0,
+  "measurement_scope": "Payload-retirement allocated bytes describe the between-runs interval. Final idle-cache deletion is a separate interval; filesystem free-space movement can include unrelated activity. Earlier preflight cache deletions are not added as net task savings.",
+  "final_cleanup_idle_process_check": {
+    "active_project_compilers_or_gates": [],
+    "checked_utc": "2026-11-03T06:31:19.015005+00:00"
+  },
+  "final_idle_cleanup_filesystem_available_before": 57534554112,
+  "final_idle_cleanup_project_allocated_before": 12109279232,
+  "final_idle_cache_reclaimable_allocated_bytes": 159580160,
+  "final_idle_cleanup_filesystem_available_after": 57694134272,
+  "final_idle_cleanup_project_allocated_after": 11949699072,
+  "final_idle_cleanup_project_allocated_decrease_bytes": 159580160,
+  "verification": {
+    "documentation": {
+      "argv": [
+        "zig",
+        "build",
+        "check-docs"
+      ],
+      "returncode": 0,
+      "wall_ns": 42935318,
+      "log": "local-state/validations/startup-headroom-20261102/docs-final.log",
+      "log_sha256": "baa7ebe0ec57df3659c07fd100ad3eba434e4e3dd15c84ff82ecc874a2dedf24",
+      "documents": 19,
+      "internal_links": 141,
+      "status_blocks": 2
+    },
+    "artifact_store": {
+      "argv": [
+        "zig",
+        "build",
+        "artifact-store",
+        "--",
+        "verify"
+      ],
+      "returncode": 0,
+      "wall_ns": 6343640356,
+      "log": "local-state/validations/startup-headroom-20261102/artifacts-final.log",
+      "log_sha256": "e8586851043012f7df59a7f8e7d39e576be7213ce6cab2f6cce68ba287f90501",
+      "manifests": 5
+    },
+    "non_document_snapshot_files": 1424,
+    "all_non_document_sources_still_match_snapshot": true
+  },
+  "completed_utc": "2026-11-03T06:31:19.876716+00:00"
+}

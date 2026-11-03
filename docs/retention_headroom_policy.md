@@ -1,6 +1,6 @@
 # Artifact retention and disk headroom
 
-Updated 2026-09-10 for the user-authorized storage simplification and cleanup.
+Updated 2026-11-03 for the user-authorized storage simplification and cleanup.
 Historical frozen INBOX roots and the exact 43-worktree inventory are retired.
 
 ## Retained state
@@ -44,6 +44,12 @@ retirement of the superseded selector-v2 failed-run exports and idle compiler
 caches. The authenticated accepted exports and the separately frozen selector
 inputs remain pinned. Equal file sizes do not establish duplicate content.
 
+The [current cleanup](evidence/startup_headroom_cleanup_20261103.json) retires
+the superseded export/execution generation after its replacement fresh run
+passed and all replacement hashes were verified. The accepted generation now
+lives under `local-state/caches/startup-headroom-20261102`; the frozen
+`test-real-rows` inputs, historical metadata, logs and source probes remain.
+
 Use unique run-owned directories for new work. Successful temporary tests clean
 up their own fixtures. A failed test may retain a bounded diagnostic fixture,
 but it must report that location and must not turn it into a test prerequisite.
@@ -64,8 +70,11 @@ the coarse 4.419 GB forecast with 8 GiB: a 25% margin over the retained 6.05 GB
 fresh-run free-space decrease, rounded upward to a whole GiB. The serial reserve
 remains the larger of 32 GiB and 5% of filesystem capacity. Nested row workers
 inherit that reserve while running, and their transient minimum enters the
-serial report before cleanup. Full fresh/cached acceptance for this change is
-pending the combined checkpoint.
+serial report before cleanup. The
+[combined checkpoint](evidence/startup_headroom_acceptance_20261103.json)
+passes both full 17-subgate runs with all 1,396 canonical records matching.
+Sampled fresh/cached global decreases are 6.10 GB and 1.60 GB, within the forecast;
+the reserve remains enforced independently.
 
 The serial parent records its original admission. Row workers validate that
 record's filesystem, starting free space, reserve and forecast, then consume the

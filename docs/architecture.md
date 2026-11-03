@@ -1,7 +1,7 @@
 # Current architecture
 
-Source baseline: `a78431ae` (2026-11-02), including the current-pin
-correctness, ABI, export publication and execution migrations.
+Source baseline: `ea1e1e1a` (2026-11-03), including the current-pin
+correctness, ABI, export publication, execution and bounded startup-memory work.
 This page describes the
 implementation; the
 [refactor plan](roadmap/architecture_refactor_plan.md) records its completed scope.
@@ -118,6 +118,22 @@ Upstream mapping for these repairs, inspected in the local pinned sources:
 These contracts do not advance accepted counters. Current native regressions,
 the behavioral comparisons and the integration gates establish different scopes.
 
+The [pointer/length memory slice](evidence/startup_word_pair_memory_20261102.json)
+admits an exact 16-byte `{ ptr, i64 }` object and transparent named wrappers.
+A private codegen view decomposes defined constructors and aggregate stores into
+scalar fields and reuses the existing 128-bit frame object. Bounded byte addresses
+and memcpy use the existing value-use authority. The caller's IR, including
+nested call arguments, remains unchanged. Other layouts, volatile/atomic aggregate
+stores, unsupported address spaces, excessive alignment and escaping aggregate
+SSA values retain explicit boundaries. Direct and release routes pass 384 local
+observations against 192 LLVM-reference observations reused across the two routes,
+plus independent expected fields and output guards.
+
+The unchanged Fibonacci retry advances past aggregate allocation and stops in
+`start.main` at `no_emitter:composed-block-store-stack-pointer-value`. Its LLVM
+reference executes; it still earns zero local executions. Runtime pointer values
+stored into typed 64-bit frame slots are the next memory boundary.
+
 The current-pin SysV legalization keeps `{ i64, i64 }` returns in RAX/RDX across
 composed control flow and preserves both live operands of i128 subtraction.
 The half-float carrier adapter admits only a nonescaping, nonvolatile aligned
@@ -185,14 +201,18 @@ these folds so newly constant safety branches disappear before codegen.
 | Integrated preopt/postopt/writer gates | The selected route and wrappers declared by each runner. | Different routes exercise different optimization owners and selector paths. |
 | `distribution-all` | The tracked 17-subgate inventory and its declared populations. | Success does not cover every development pass, input shape, or separate frontier gate. |
 
-The [current acceptance](evidence/export_execution_acceptance_20261102.json)
+The [current acceptance](evidence/startup_headroom_acceptance_20261103.json)
 records 100 compiler-core functions lowered, emitted and linked, with five cohort
 executions in every release mode. ASCII contributes 256 input observations per
 mode; the retained constant methods contribute one each. Both 17-subgate runs
-pass and all 1,395 canonical records match. Standalone programs, behavioral
-observations and compiler-rt counts retain their own populations. Two-second
-filesystem samples establish same-inode publication but expose a larger transient
-global disk decrease than the coarse forecast; that forecast is not accepted.
+pass and all 1,396 canonical records match. Standalone programs, behavioral
+observations and compiler-rt counts retain their own populations. The calibrated
+8 GiB disk forecast covers sampled fresh/cached decreases of 6.10 GB and 1.60 GB.
+Nested row workers inherit the original serial admission and enforce its reserve;
+their transient minimum enters the serial report. Schema-3 row telemetry measures
+allocated bytes across all seven owned roots, including retained exports.
+Two-second samples and filesystem activity limit the measurement; these results
+do not establish a runtime speedup.
 
 ## Current design constraints
 

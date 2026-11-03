@@ -11,9 +11,9 @@ mode. The [focused evidence](evidence/ascii_execution_20261102.json) records 768
 matching observations and six rejected constant-result implementations.
 Schema-3 cohort records distinguish five executed functions from their input
 observations: 256 for ASCII and one for each retained constant method. Accepted
-counters explicitly migrate to five in the
-[combined acceptance](evidence/export_execution_acceptance_20261102.json): both
-full 17-subgate runs pass and all 1,395 canonical records match.
+counters retain five in the
+[current acceptance](evidence/startup_headroom_acceptance_20261103.json): both
+full 17-subgate runs pass and all 1,396 canonical records match.
 
 | Runner | Local path | Independent reference and boundary |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ full 17-subgate runs pass and all 1,395 canonical records match.
 | `zig build behavioral-diff` | Local object emission from unoptimized LLVM IR; every function must have composed selector ownership. | LLVM objects from the same source with independent optimization, linked with the same harness. Reference/harness modes do not select local optimizer passes. |
 | `zig build generated-scalar-diff` | Six scalar identity comparisons, two rejection cases, optional execution smoke, then the behavioral suite. | `opt-22`, optional `lli-22`, and the behavioral suite's independent LLVM reference. |
 | `zig build real-program -- --output-root=local-state/validations/<new-run>` | An unchanged, hash-pinned upstream Zig program through local preopt optimization and object emission in three release modes. | The pinned Zig LLVM route, exact stdout, stderr and exit status. IR construction, the system linker/CRT and libc remain external dependencies. A failed stage earns no execution credit. |
-| `zig build upstream-c-program -- --output-root=local-state/validations/<new-run>` | Zig's unchanged C compiler fixture, local memory/release pipelines, local objects, two argument cases per mode. | LLVM 22 compiles the identical unoptimized input; exact stdout/stderr/status and separate integer-call/heap canaries. C sanitizers are disabled; this does not establish Zig startup support. |
+| `zig build upstream-c-program -- --output-root=local-state/validations/<new-run>` | Zig's unchanged C compiler fixture, local memory/release pipelines, local objects, two argument cases per mode. Separate pointer/length memory canaries use direct and release routes. | LLVM 22 compiles the identical inputs; exact stdout/stderr/status, integer-call/heap checks and pointer/length field/guard checks. C sanitizers are disabled; this does not establish Zig startup support. |
 
 ## Current generated inputs
 
@@ -97,5 +97,17 @@ program in three local pipeline modes, with six paired argument-case executions.
 Its mandatory native canary contributes 48 integer-varargs and 18 heap-call
 observations across those modes. Assembly shims check AL directly, and boundary
 integers and a register permutation exercise the caller. These observations do
-not advance compiler-core or compiler-rt function counts. The captured Fibonacci
-probe remains blocked in standard Zig startup at aggregate allocations.
+not advance compiler-core or compiler-rt function counts.
+
+The mandatory [pointer/length memory canary](evidence/startup_word_pair_memory_20261102.json)
+checks two functions through direct and release routes in all three modes.
+Four pointer values and eight full-width lengths give 384 local observations,
+compared with 192 LLVM-reference observations reused across routes and independent
+expected fields. It checks copy independence after source mutation, exact pointer
+and length bits, output guards and composed lowering ownership. These are separate
+from the C fixture cases and its 66 call/heap observations.
+
+The unchanged Fibonacci retry now passes the allocation/copy shape but remains
+blocked in `start.main` at
+`no_emitter:composed-block-store-stack-pointer-value`. Its reference executes
+once and local execution remains zero; this program is not accepted.

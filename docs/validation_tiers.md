@@ -149,6 +149,15 @@ and 18 heap-call observations. C sanitizers are disabled; full Zig startup is
 still an explicit boundary. The frozen compiler-core population remains 100
 rows, with five cohort functions and 256 ASCII inputs per mode.
 
+The same runner also requires the
+[pointer/length memory canary](evidence/startup_word_pair_memory_20261102.json).
+Two functions use direct and release routes in all three modes, producing 384
+local observations against 192 LLVM-reference observations reused across routes.
+Independent expected fields and guards check copy independence, pointer and length
+preservation, and composed ownership. This standalone population does not change
+the original seven integrated cases, the C fixture's six paired cases/66 call
+observations, or compiler-core and compiler-rt counters.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

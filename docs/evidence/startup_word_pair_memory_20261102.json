@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-11-02",
-  "status": "focused native and unit checks pass; combined Tier 3 pending",
+  "status": "accepted by the combined fresh/cached Tier 3 checkpoint",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "scope": "Private codegen view for an exact 16-byte pointer/length object and transparent named wrappers. Reuse existing 128-bit stack storage and value-use address/memcpy actions. No LLVM codegen fallback.",
   "native_evidence": "local-state/validations/startup-headroom-20261102/c-program-final-r2/report.json",
@@ -69,5 +69,7 @@
     "report_sha256": "cde32484422c729313987e80ade3fd771026c7fe2f3ec248b5ccb7a68ea9e42e",
     "interpretation": "Allocation/copy shape advances to the next scalar-pointer-store boundary; the unchanged program is not accepted and earns no local execution credit."
   },
-  "archives_created": 0
+  "archives_created": 0,
+  "accepted_revision": "ea1e1e1abb047f47374528f4fc6f6db706f87645",
+  "acceptance_evidence": "docs/evidence/startup_headroom_acceptance_20261103.json"
 }

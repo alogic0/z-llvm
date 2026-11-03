@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-11-02",
-  "status": "focused tests pass; combined Tier 3 pending",
+  "status": "accepted by the combined fresh/cached Tier 3 checkpoint",
   "scope": "Disk forecasting, transient minimum propagation, nested reserve enforcement and allocated-byte scope",
   "basis_revision": "a78431ae6bc74409da7410dfb44ffc6dfe5ef2fe",
   "basis_evidence": "docs/evidence/export_execution_acceptance_20261102.json",
@@ -57,5 +57,7 @@
     "Two-second observations and du traversal are sampled, not atomic snapshots.",
     "Forecast includes a measured margin; the reserve remains enforced independently."
   ],
-  "archives_created": 0
+  "archives_created": 0,
+  "accepted_revision": "ea1e1e1abb047f47374528f4fc6f6db706f87645",
+  "acceptance_evidence": "docs/evidence/startup_headroom_acceptance_20261103.json"
 }
