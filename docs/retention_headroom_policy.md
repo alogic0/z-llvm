@@ -165,3 +165,10 @@ passes a further 17-stage cached run under the same policy. It starts with
 minimum is 42.94 GB. The reported decrease is 1.94 GB, within the 8 GiB
 allowance. All three AIR exports are authenticated cache hits and execution
 checks run again. The 32 GiB runtime reserve remains enforced.
+
+The [boolean-checkpoint cache cleanup](evidence/boolean_call_cleanup_20261103.json)
+retires ten complete idle cache roots after the 17-stage acceptance run. About
+1.16 GB of regenerable compiler state is removed. Captured Fibonacci inputs,
+the installed compiler, full logs, source snapshots, current AIR, audit facts,
+performance baselines and all 13 original probes remain. Open-file and mapping
+checks found no active cache consumers. No archives are created.

@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "status": "retired complete idle cache roots; retained evidence verified",
+  "recorded_utc": "2026-11-03T19:27:00.865470+00:00",
+  "source_revision": "12c945c21443dff7db13696d98df22e00591cf5c",
+  "targets": [
+    ".zig-cache",
+    "local-state/validations/boolean-call-20261103/fibonacci-r1/global-cache",
+    "local-state/validations/boolean-call-20261103/fibonacci-r1/ReleaseFast/candidate-cache",
+    "local-state/validations/boolean-call-20261103/fibonacci-r1/ReleaseFast/reference-cache",
+    "local-state/validations/boolean-call-20261103/native-r1/frontend-cache",
+    "local-state/validations/boolean-call-20261103/native-r1/global-cache",
+    "local-state/validations/boolean-call-20261103/native-r2/frontend-cache",
+    "local-state/validations/boolean-call-20261103/native-r2/global-cache",
+    "local-state/validations/boolean-call-20261103/native-r3/frontend-cache",
+    "local-state/validations/boolean-call-20261103/native-r3/global-cache"
+  ],
+  "reason": "Complete regenerable compiler caches from completed, accepted or superseded runs. The installed compiler and captured source/evidence remain outside these roots.",
+  "inventory": "local-state/validations/boolean-call-20261103/cache-retirement-inventory.json",
+  "inventory_sha256": "f670b94a6a2ca3b2ce22c01da10025fa1510e54e8b56bc8194de108d488c35d4",
+  "inventory_entries": 4009,
+  "allocated_bytes_before": 1158377472,
+  "logical_bytes_before": 1291844096,
+  "free_bytes_before": 43458039808,
+  "retained_sha256": {
+    "local-state/validations/boolean-call-20261103/fibonacci-r1/ReleaseFast/capture/preopt.ll": "12dc183a99fae7839de823ea0ff3b0ae57d7fbf392e70caac9dd8f59603a5859",
+    "local-state/validations/boolean-call-20261103/fibonacci-r1/ReleaseFast/capture/optimized.ll": "65c1c33d2e241244d9e0bbe4e7a4a6d716d3186d550e9868c52eb13c27fb4682",
+    "local-state/validations/boolean-call-20261103/full-boolean-cached.log": "cb82574539aeb6268ee43d6d4c67dae8740e6ab9ea25fb740555e86e528497da",
+    "local-state/validations/boolean-call-20261103/boolean-full-source-snapshot.json": "c049a705239f0f615d7d83f625c3ab055e310a5d77c176847b4245bae967bf6c",
+    "zig-out/bin/z_llvm": "3a509a02728dfc8b308786b1e6aed86145db8916a3447359202852243339677d"
+  },
+  "active_consumers_found": [],
+  "protected": [
+    "13 original scratch probes",
+    "current global-memory-headroom-20261103 AIR exports",
+    "semantic audit facts",
+    "performance inputs and baseline worktree",
+    "sibling dependencies and shared global caches"
+  ],
+  "archives_created": 0,
+  "free_bytes_after": 44616454144,
+  "observed_free_bytes_increase": 1158414336,
+  "remaining_targets": []
+}
