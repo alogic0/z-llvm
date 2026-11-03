@@ -88,6 +88,7 @@ pub const ParentOptions = struct {
     export_cache_path: ?[]const u8 = null,
     cache_mode: CacheMode = .require_hit,
     concurrency: u8,
+    minimum_free_floor_bytes: u64 = 0,
     test_options: ?*TestOptions = null,
 };
 
@@ -707,13 +708,24 @@ fn sampleFilesystem(allocator: std.mem.Allocator, io: std.Io, path: []const u8, 
     return .{ .total_bytes = try std.fmt.parseUnsigned(u64, total, 10), .free_bytes = try std.fmt.parseUnsigned(u64, free, 10) };
 }
 
-fn sampleDiskBytes(allocator: std.mem.Allocator, io: std.Io, path: []const u8, options: ParentOptions) !u64 {
+fn sampleDiskBytes(allocator: std.mem.Allocator, io: std.Io, paths: *const OwnedPaths, options: ParentOptions) !u64 {
     if (options.test_options) |test_options| return test_options.disk_bytes;
-    const argv = [_][]const u8{ "du", "-sb", path };
+    // The work directories and publication cache are outside paths.root.
+    // Sample all seven disjoint roots in one du invocation, in allocated bytes.
+    const argv = [_][]const u8{ "du", "-s", "-B1", paths.root, paths.mode_paths[0].work, paths.mode_paths[1].work, paths.mode_paths[2].work, paths.mode_paths[0].export_cache, paths.mode_paths[1].export_cache, paths.mode_paths[2].export_cache };
     const result = try common.runCapture(allocator, io, &argv, "real-row parallel disk sample");
     defer common.freeRunResult(allocator, result);
-    var fields = std.mem.tokenizeAny(u8, result.stdout, " \t\r\n");
-    return std.fmt.parseUnsigned(u64, fields.next() orelse return error.InvalidRealRowsDiskSample, 10);
+    var lines = std.mem.tokenizeScalar(u8, result.stdout, '\n');
+    var total: u64 = 0;
+    var count: usize = 0;
+    while (lines.next()) |line| {
+        var fields = std.mem.tokenizeAny(u8, line, " \t");
+        const bytes = try std.fmt.parseUnsigned(u64, fields.next() orelse return error.InvalidRealRowsDiskSample, 10);
+        total = try std.math.add(u64, total, bytes);
+        count += 1;
+    }
+    if (count != 7) return error.InvalidRealRowsDiskSample;
+    return total;
 }
 
 fn sampleProcessTreeRssBytes(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions) !u64 {
@@ -822,7 +834,7 @@ fn parseLoadAverage(allocator: std.mem.Allocator, contents: []const u8) ![]u8 {
 fn observeResources(allocator: std.mem.Allocator, io: std.Io, options: ParentOptions, paths: *const OwnedPaths, resource: *ResourceState) !void {
     try resource.observe(
         try sampleFilesystem(allocator, io, paths.root, options),
-        try sampleDiskBytes(allocator, io, paths.root, options),
+        try sampleDiskBytes(allocator, io, paths, options),
         try sampleProcessTreeRssBytes(allocator, io, options),
         try sampleAvailableMemory(allocator, io, options),
     );
@@ -1157,7 +1169,7 @@ pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, provided_options: Pare
     defer paths.deinit();
     const wall_start = std.Io.Timestamp.now(io, .awake);
     const preflight = try sampleFilesystem(allocator, io, paths.root, options);
-    const policy = try policy_authority.forFilesystem(preflight.total_bytes);
+    const policy = try policy_authority.forFilesystemWithFloor(preflight.total_bytes, options.minimum_free_floor_bytes);
     if (preflight.free_bytes < policy.required_start_bytes) return error.InsufficientRealRowsParallelHeadroom;
     const available_memory = try sampleAvailableMemory(allocator, io, options);
     var pins: [mode_count]CachePin = undefined;
@@ -1318,7 +1330,7 @@ pub fn writeEvidence(writer: *std.Io.Writer, evidence: *const Evidence) !void {
 fn requireParallelEvidenceSchema(line: []const u8) !void {
     const schema = fieldValue(line, "schema_version=") orelse return error.RealRowsParallelEvidenceSchemaMissing;
     const normalization = fieldValue(line, "normalization_schema=") orelse return error.RealRowsParallelEvidenceSchemaMissing;
-    if (!std.mem.eql(u8, schema, "2") or !std.mem.eql(u8, normalization, "2")) {
+    if (!std.mem.eql(u8, schema, "3") or !std.mem.eql(u8, normalization, "3")) {
         return error.RealRowsParallelEvidenceSchemaMismatch;
     }
 }
@@ -1593,7 +1605,7 @@ test "root selections reject missing absolute escape symlink owner and mode drif
     try std.testing.expectEqual(@as(usize, 0), audit.launched[0] + audit.launched[1] + audit.launched[2]);
 }
 
-test "fixed capacity admits exact start boundary emits schema two and rejects insufficient capacity" {
+test "fixed capacity admits exact start boundary emits schema three and rejects insufficient capacity" {
     const allocator = std.testing.allocator;
     const io = std.testing.io;
     var temp = std.testing.tmpDir(.{});
@@ -1619,10 +1631,10 @@ test "fixed capacity admits exact start boundary emits schema two and rejects in
     var evidence_writer = std.Io.Writer.fixed(&evidence_buffer);
     try writeEvidence(&evidence_writer, &result.evidence);
     const evidence = evidence_writer.buffered();
-    try std.testing.expect(std.mem.indexOf(u8, evidence, "schema_version=2 normalization_schema=2") != null);
+    try std.testing.expect(std.mem.indexOf(u8, evidence, "schema_version=3 normalization_schema=3") != null);
     try std.testing.expect(std.mem.indexOf(u8, evidence, "post_run_free_floor_bytes=34359738368") != null);
-    try std.testing.expect(std.mem.indexOf(u8, evidence, "projected_peak_bytes=4834125664") != null);
-    try std.testing.expect(std.mem.indexOf(u8, evidence, "required_start_bytes=39193864032") != null);
+    try std.testing.expect(std.mem.indexOf(u8, evidence, "projected_peak_bytes=8589934592") != null);
+    try std.testing.expect(std.mem.indexOf(u8, evidence, "required_start_bytes=42949672960") != null);
 
     audit = .{};
     test_options.filesystem_sample = .{ .total_bytes = policy_authority.required_start_bytes, .free_bytes = policy_authority.required_start_bytes - 1 };
@@ -1640,7 +1652,7 @@ test "normalization removes only frozen volatile scheduling fields" {
         "distribution-real-rows selector_version=real-candidate-selector-v3 candidate_file=x candidate_file_hash=abc limit=100 strict=true\n" ++
         "air-export-cache mode=ReleaseFast status=hit duration_ms=12 cache_key=key-fast descriptor_bytes=44\n" ++
         "summary distribution-real-rows counter_schema=distribution-real-rows-v2 mode=ReleaseFast candidate_file_hash=abc real_native_linked=100 real_programs_ok=4 local_fail=0\n" ++
-        "real-rows-mode-parallel schema_version=2 normalization_schema=2 wall_ms=9 root=owned/run local_fail=0\n" ++
+        "real-rows-mode-parallel schema_version=3 normalization_schema=3 wall_ms=9 root=owned/run local_fail=0\n" ++
         "air-export-cache mode=ReleaseSafe status=hit duration_ms=13 cache_key=key-safe descriptor_bytes=45\n" ++
         "air-export-cache mode=ReleaseSmall status=hit duration_ms=14 cache_key=key-small descriptor_bytes=46\n";
     var buffer: [4096]u8 = undefined;
@@ -1656,13 +1668,13 @@ test "normalization removes only frozen volatile scheduling fields" {
     const small = std.mem.indexOf(u8, normalized, "mode=ReleaseSmall").?;
     try std.testing.expect(fast < safe and safe < small);
 
-    const schema_one = try std.mem.replaceOwned(u8, std.testing.allocator, input, "schema_version=2", "schema_version=1");
+    const schema_one = try std.mem.replaceOwned(u8, std.testing.allocator, input, "schema_version=3", "schema_version=1");
     defer std.testing.allocator.free(schema_one);
     var schema_one_buffer: [4096]u8 = undefined;
     var schema_one_writer = std.Io.Writer.fixed(&schema_one_buffer);
     try std.testing.expectError(error.RealRowsParallelEvidenceSchemaMismatch, writeNormalizedOutput(schema_one, &schema_one_writer));
 
-    const normalization_one = try std.mem.replaceOwned(u8, std.testing.allocator, input, "normalization_schema=2", "normalization_schema=1");
+    const normalization_one = try std.mem.replaceOwned(u8, std.testing.allocator, input, "normalization_schema=3", "normalization_schema=1");
     defer std.testing.allocator.free(normalization_one);
     var normalization_one_buffer: [4096]u8 = undefined;
     var normalization_one_writer = std.Io.Writer.fixed(&normalization_one_buffer);
@@ -1939,6 +1951,33 @@ test "fresh cache preflight preserves files and rejects dangling mode symlinks" 
 
 fn fixtureRoots(allocator: std.mem.Allocator, io: std.Io, temp: *std.testing.TmpDir) !FixtureRoots {
     return fixtureRootsWithCaches(allocator, io, temp, true);
+}
+
+test "allocated disk sampling includes work and export roots outside the parent root" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+    var roots = try fixtureRootsWithCaches(allocator, io, &temp, false);
+    defer roots.deinit(allocator);
+    var paths = try OwnedPaths.init(allocator, io, roots.scratch, roots.cache, .fresh);
+    defer paths.deinit();
+    const options: ParentOptions = .{ .target_assignment = "TARGET=test", .scratch_path = roots.scratch, .export_cache_path = roots.cache, .cache_mode = .fresh, .concurrency = 3 };
+    const empty = try sampleDiskBytes(allocator, io, &paths, options);
+    const work_file = try std.fs.path.join(allocator, &.{ paths.mode_paths[1].work, "compiler.air" });
+    defer allocator.free(work_file);
+    const cache_file = try std.fs.path.join(allocator, &.{ paths.mode_paths[2].export_cache, "published.air" });
+    defer allocator.free(cache_file);
+    const bytes: [64 * 1024]u8 = @splat('a');
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = work_file, .data = &bytes });
+    const with_work = try sampleDiskBytes(allocator, io, &paths, options);
+    try std.testing.expect(with_work > empty);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = cache_file, .data = &bytes });
+    const with_cache = try sampleDiskBytes(allocator, io, &paths, options);
+    try std.testing.expect(with_cache > with_work);
+    try std.Io.Dir.cwd().deleteFile(io, work_file);
+    try std.Io.Dir.cwd().deleteFile(io, cache_file);
+    try std.testing.expectEqual(empty, try sampleDiskBytes(allocator, io, &paths, options));
 }
 
 fn fixtureRootsWithCaches(allocator: std.mem.Allocator, io: std.Io, temp: *std.testing.TmpDir, populate_caches: bool) !FixtureRoots {

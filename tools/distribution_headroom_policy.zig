@@ -3,7 +3,11 @@ const std = @import("std");
 pub const schema_version: u32 = 1;
 pub const serial_reserve_floor_bytes: u64 = 32 * 1024 * 1024 * 1024;
 pub const serial_reserve_fraction_denominator: u64 = 20;
-pub const serial_projected_peak_bytes: u64 = 4_419_112_960;
+// The 2026-11-02 full fresh run sampled a 6,048,505,856-byte global
+// decrease. Round its 25% margin upward to a whole GiB. The observation
+// includes worker caches and filesystem activity, not just published AIR.
+pub const measured_serial_peak_bytes: u64 = 6_048_505_856;
+pub const serial_projected_peak_bytes: u64 = 8 * 1024 * 1024 * 1024;
 pub const sharding_floor_fraction_denominator: u64 = 10;
 pub const sharding_projected_peak_bytes: u64 = 16 * 1024 * 1024 * 1024;
 
@@ -69,8 +73,10 @@ pub fn shardingForFilesystem(filesystem_total_bytes: u64) ShardingPolicy {
 test "policy derives the accepted serial threshold from filesystem size" {
     const policy = forFilesystem(982_240_026_624);
     try std.testing.expectEqual(@as(u64, 49_112_001_332), policy.reserve_bytes);
-    try std.testing.expectEqual(@as(u64, 4_419_112_960), policy.projected_peak_bytes);
-    try std.testing.expectEqual(@as(u64, 53_531_114_292), policy.required_start_bytes);
+    try std.testing.expectEqual(@as(u64, 8_589_934_592), policy.projected_peak_bytes);
+    try std.testing.expectEqual(@as(u64, 57_701_935_924), policy.required_start_bytes);
+    try std.testing.expect(serial_projected_peak_bytes >= measured_serial_peak_bytes + (measured_serial_peak_bytes + 3) / 4);
+    try std.testing.expect(serial_projected_peak_bytes - 1024 * 1024 * 1024 < measured_serial_peak_bytes + (measured_serial_peak_bytes + 3) / 4);
 }
 
 test "tracker initializes minimum from the first sample without a sentinel" {

@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "date": "2026-11-02",
+  "status": "focused tests pass; combined Tier 3 pending",
+  "scope": "Disk forecasting, transient minimum propagation, nested reserve enforcement and allocated-byte scope",
+  "basis_revision": "a78431ae6bc74409da7410dfb44ffc6dfe5ef2fe",
+  "basis_evidence": "docs/evidence/export_execution_acceptance_20261102.json",
+  "measurements": {
+    "full-fresh": {
+      "telemetry": "local-state/validations/export-execution-20261102-r2/full-fresh.json",
+      "sha256": "a2947b3562704fc85fcb14e90b8c02f8118ced1bcc3efd142ac0e2bd247b0dee",
+      "samples": 1282,
+      "interval_seconds": 2,
+      "starting_free_bytes": 58454343680,
+      "minimum_free_bytes": 52405837824,
+      "global_free_space_decrease_bytes": 6048505856
+    },
+    "full-cached": {
+      "telemetry": "local-state/validations/export-execution-20261102-r2/full-cached.json",
+      "sha256": "4a69e65c34bb3b8e4a71cc767fc4ab2b73d4b7c31b72ea3a96ef419f0b2918ea",
+      "samples": 1216,
+      "interval_seconds": 2,
+      "starting_free_bytes": 54344224768,
+      "minimum_free_bytes": 52876582912,
+      "global_free_space_decrease_bytes": 1467641856
+    }
+  },
+  "calibration": {
+    "observed_global_peak_bytes": 6048505856,
+    "margin_percent": 25,
+    "with_margin_bytes": 7560632320,
+    "round_up_unit_bytes": 1073741824,
+    "projected_peak_bytes": 8589934592,
+    "serial_reserve_unchanged": true,
+    "sample_filesystem_total_bytes": 982240026624,
+    "sample_serial_reserve_bytes": 49112001332,
+    "sample_serial_required_start_bytes": 57701935924,
+    "standalone_row_floor_unchanged_bytes": 34359738368,
+    "standalone_row_required_start_bytes": 42949672960
+  },
+  "telemetry_schema": 3,
+  "normalization_schema": 3,
+  "repairs": [
+    "Serial tracker incorporates the row monitor minimum before worker cleanup can hide it.",
+    "Nested row workers enforce max(standalone floor, caller reserve), including while running.",
+    "Allocated disk telemetry covers the parent scratch root, three work roots and three export roots in one invocation.",
+    "Existing cached payloads are included in owned footprint; these bytes are not all newly allocated."
+  ],
+  "tests": {
+    "serial_and_imported_policy_tests": 47,
+    "comparison_and_imported_policy_tests": 37,
+    "log": "local-state/validations/startup-headroom-20261102/headroom-unit.log"
+  },
+  "measurement_limits": [
+    "Filesystem free-space changes include unrelated processes.",
+    "Two-second observations and du traversal are sampled, not atomic snapshots.",
+    "Forecast includes a measured margin; the reserve remains enforced independently."
+  ],
+  "archives_created": 0
+}

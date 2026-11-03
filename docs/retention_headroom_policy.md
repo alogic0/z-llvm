@@ -9,7 +9,7 @@ Historical frozen INBOX roots and the exact 43-worktree inventory are retired.
   All local manifests are pins; accepted copies are tracked under
   `docs/evidence/artifacts/`. Use the artifact-store dry-run/apply collector.
 - Schema-2 AIR export cache generations have been removed: the current reader
-  requires schema 3. Retain a new generation only for active fresh/cache validation
+  accepts schemas 3 and 4. Retain a new generation only for active fresh/cache validation
   or near-term reuse with matching inputs.
 - `tmp/o2_calls_perf`: the existing performance tool still reads adopted inputs
   and its baseline checkout here. Keep until that consumer is migrated.
@@ -58,3 +58,17 @@ full integration and reuse matching evidence rather than repeatedly rebuilding
 unchanged inputs. The obsolete `clean-tmp` INBOX classifier and its fixture are
 retired; use the artifact-store collector for objects and classify other generated
 roots against the current keep-list before removing them.
+
+The [headroom calibration](evidence/headroom_calibration_20261102.json) replaces
+the coarse 4.419 GB forecast with 8 GiB: a 25% margin over the retained 6.05 GB
+fresh-run free-space decrease, rounded upward to a whole GiB. The serial reserve
+remains the larger of 32 GiB and 5% of filesystem capacity. Nested row workers
+inherit that reserve while running, and their transient minimum enters the
+serial report before cleanup. Full fresh/cached acceptance for this change is
+pending the combined checkpoint.
+
+Row telemetry schema 3 measures allocated bytes across the parent scratch root,
+three work roots and three export roots. It includes retained cached payloads;
+it does not identify every byte as new allocation. Filesystem free-space changes
+also include unrelated processes, and sampled observations are not atomic
+snapshots. Keep these scopes separate when comparing forecasts and measurements.

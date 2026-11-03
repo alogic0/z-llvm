@@ -500,12 +500,15 @@ fn executeSerialTools(
     var tool_index: usize = 0;
     while (tool_index < tools.len) {
         if (tool_index == 9) {
+            var nested_options = real_rows_options;
+            nested_options.minimum_free_floor_bytes = @max(nested_options.minimum_free_floor_bytes, policy.reserve_bytes);
             var group = try real_rows_parallel.runGroup(
                 allocator,
                 io,
-                real_rows_options,
+                nested_options,
             );
             defer group.deinit(allocator);
+            try observeNestedMinimum(policy, tracker, group.evidence.filesystem_total_bytes, group.evidence.minimum_free_bytes);
             for (0..real_rows_parallel.mode_count) |offset| {
                 const current_index = tool_index + offset;
                 try sampleBeforeTool(allocator, io, writer, scratch_path, current_index, policy, tracker, sampler);
@@ -527,6 +530,23 @@ fn executeSerialTools(
         try recordToolCompletion(writer, tool_index, completed, metrics);
         tool_index += 1;
     }
+}
+
+fn observeNestedMinimum(policy: headroom_policy.Policy, tracker: *headroom_policy.Tracker, filesystem_total_bytes: u64, minimum_free_bytes: u64) !void {
+    if (filesystem_total_bytes != policy.filesystem_total_bytes) return error.FilesystemIdentityChanged;
+    tracker.observe(minimum_free_bytes);
+    if (minimum_free_bytes < policy.reserve_bytes) return error.SerialHeadroomReserveViolated;
+}
+
+test "serial tracker retains a nested transient low even after free space recovers" {
+    const policy: headroom_policy.Policy = .{ .filesystem_total_bytes = 1000, .reserve_bytes = 100, .projected_peak_bytes = 200, .required_start_bytes = 300 };
+    var tracker = headroom_policy.Tracker.init(900);
+    try observeNestedMinimum(policy, &tracker, 1000, 500);
+    tracker.observe(850);
+    try std.testing.expectEqual(@as(u64, 500), tracker.minimum_free_bytes);
+    try std.testing.expectEqual(@as(u64, 400), tracker.observedPeakBytes());
+    try std.testing.expectError(error.FilesystemIdentityChanged, observeNestedMinimum(policy, &tracker, 1001, 400));
+    try std.testing.expectError(error.SerialHeadroomReserveViolated, observeNestedMinimum(policy, &tracker, 1000, 99));
 }
 
 fn sampleBeforeTool(
@@ -1020,7 +1040,7 @@ test "filesystem sample parser reads df size and available bytes" {
 test "bounded fake serial orchestration uses all 17 authoritative subgates in order" {
     const allocator = std.testing.allocator;
     const io = std.testing.io;
-    const total_bytes = 1_000_000;
+    const total_bytes = 100 * 1024 * 1024 * 1024;
     var samples: [tools.len]FilesystemSample = undefined;
     for (&samples, 0..) |*sample, index| {
         sample.* = .{
@@ -1096,7 +1116,7 @@ test "bounded fake serial orchestration uses all 17 authoritative subgates in or
     try std.testing.expectEqual(@as(usize, tools.len), std.mem.count(u8, writer.buffered(), "gate-start id="));
     try std.testing.expectEqual(@as(usize, tools.len), std.mem.count(u8, writer.buffered(), "gate-end id="));
     try std.testing.expectEqual(@as(usize, tools.len), std.mem.count(u8, writer.buffered(), "headroom-before index="));
-    try std.testing.expect(std.mem.indexOf(u8, writer.buffered(), "schema_version=2 normalization_schema=2") != null);
+    try std.testing.expect(std.mem.indexOf(u8, writer.buffered(), "schema_version=3 normalization_schema=3") != null);
     try std.testing.expect(std.mem.indexOf(u8, writer.buffered(), "serial-fallback") == null);
 }
 
