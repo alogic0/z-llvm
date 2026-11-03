@@ -196,6 +196,14 @@ registers; the branch consumes the result before any extending cast. Three
 recorded controls reject removal of call-result normalization. Existing population
 counts remain separate and unchanged.
 
+The mandatory [array-stride canary](evidence/array_stride_acceptance_20261103.json)
+adds four functions with eight-byte, padded i24, nested-array and frame-reloaded
+pointer/index cases. Direct/release routes in three modes check 1,536 local
+observations against 768 LLVM references reused across routes. Negative indexes,
+wrapping addresses, live operands and guarded stores are checked. Six recorded
+controls reject a wrong scale or stale store-value ordering. Its standalone
+population does not change compiler-core execution counts.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

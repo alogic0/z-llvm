@@ -41,7 +41,18 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The current accepted [boolean call-return checkpoint](evidence/boolean_call_acceptance_20261103.json)
+The accepted [integer array-stride checkpoint](evidence/array_stride_acceptance_20261103.json)
+at `4f69c581`, with correctness repairs `d1fe039a` and `e2fb5841`, passes
+all 17 integration stages on a frozen 2,635-file snapshot. Named i64 indexes now
+form runtime addresses for bounded literal integer arrays using allocation
+strides, including padding and nesting. Live values receive preservation space;
+in-place address operands survive scratch writes, and stores consume their value
+before staging a spilled destination pointer. Four functions pass 1,536 local
+observations against 768 LLVM references across direct/release routes in three
+modes. Six negative controls are rejected. All 1,685 units, focused checks and
+60 ABI cases pass; prior populations and the bypass ratchet remain fixed.
+
+The earlier accepted [boolean call-return checkpoint](evidence/boolean_call_acceptance_20261103.json)
 at `43fa83d2` passes all 17 integration stages on a frozen 2,630-file snapshot.
 Exact i1 direct-call returns now use the typed call action and normalize the low
 bit before publication. Four native functions pass 1,536 local observations
@@ -172,17 +183,25 @@ immediate sources, cast flags, pointer targets and unproved compare forms retain
 explicit boundaries; frozen residual fingerprints and the bypass ratchet stay
 unchanged.
 
-Next, extend the existing scaled-address action to a proved array-stride pointer
-calculation. Unchanged `test/cases/recursive_fibonacci.zig` now selects the
-`process.Environ.PosixBlock.isEmpty` call and following global byte store, then
-stops in `start.main` at `no_emitter:composed-block-gep-source` on
-`%29 = getelementptr [8 x i8], ptr %28, i64 %27`. Its LLVM reference executes
-once and local execution remains zero. Derive the stride from allocation size,
-check the pointer/index layout, and preserve both operands and live values through
-the existing value-use authority. Compare native address results with LLVM,
-including negative indexes, before retrying the unchanged program. Keep unsupported
-layouts, index forms and storage homes explicit; do not advance compiler-core
-counts without a separate selection migration. Further startup boundaries may follow.
+Next, give unchanged programs a proved module dependency selection. Fibonacci
+now emits `start.main`, but the current alias-root filter omits 13 private
+definitions needed by calls and retained function pointers. Every missing symbol
+exists in the captured IR. Use parsed function/global/alias references and
+transitive reachability, including recursion and initializer references, with
+explicit external imports and deterministic rejection of unsupported reachable
+definitions. Audit compatibility with existing selection contracts before changing
+the default; avoid extending the current function-name allowlist.
+
+The retained diagnostic copy removes only alias root filtering: 33 selected
+functions yield nine emitted and 24 rejected, beginning with
+`start.expandStackSize unsupported_type:alloca`. That probe is not an
+unchanged-program execution or a closure proof. The isolated recursive arithmetic
+body passes 31 inputs against LLVM, while the unchanged program still has zero
+local executions. Prove the new selection with native helper chains, recursion,
+global function pointers and unreachable unsupported bodies, then retry the
+unchanged source and record the next actual lowering boundary. Keep the fixed
+compiler-core population and bypass ratchet unchanged without a separate migration.
+
 Keep broader optional ABIs and
 floating/indirect/aggregate/stack varargs as explicit boundaries. Use the frozen
 performance baseline for measured comparisons and the

@@ -110,6 +110,12 @@ their paired work selection use `global-memory-headroom-20261103`; the old
 `startup-headroom-20261102` cache retains metadata and its retirement record.
 No archives are created.
 
+The [array-stride checkpoint](evidence/array_stride_acceptance_20261103.json)
+records retirement of 1.42 GB of complete idle compiler-cache allocation before
+its full run. Captured inputs, final outputs, diagnostics, current AIR and all
+13 original probes remain. Builds regenerate the main cache, so this deletion
+interval is not net task savings. No archives are created.
+
 ## Headroom
 
 The runner's numerical headroom checks remain owned by
@@ -145,6 +151,12 @@ and 2.16 GB, within the 8 GiB forecast. Reported minima are 44.09 GB and 43.31 G
 independent two-second samples reach 44.02 GB and 43.28 GB. Both remain above the
 34.36 GB reserve. The 51 runner/policy and 41 comparison tests pass. These
 filesystem measurements do not establish a performance improvement.
+
+The array-stride cached run passes all 17 stages under the same fixed policy.
+It starts with 43.97 GB free and reports a 2.11 GB decrease; the reported and
+two-second sampled minima both round to 41.86 GB, above the 34.36 GB reserve.
+The source snapshot and three authenticated cache hits are verified. No cache
+or headroom implementation changed in this compiler checkpoint.
 
 The serial parent records its original admission. Row workers validate that
 record's filesystem, starting free space, reserve and forecast, then consume the

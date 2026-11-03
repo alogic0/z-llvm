@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `43fa83d2536d53dbc07135aa96c83a9b6b11fd69`; tree: `cc69fe7cc225c4c90feedeee7ff304991b631b7d`.
+Accepted revision: `4f69c5814e6e6d78bfb78368242344f3e0ad6e21`; tree: `6a1148b47a2b42c13b6bd681e8095668f355516c`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,18 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [boolean call-return checkpoint](evidence/boolean_call_acceptance_20261103.json)
+The accepted [integer array-stride checkpoint](evidence/array_stride_acceptance_20261103.json)
+at `4f69c581`, with correctness repairs `d1fe039a` and `e2fb5841`, passes
+all 17 integration stages on a frozen 2,635-file snapshot. Named i64 indexes now
+form runtime addresses for bounded literal integer arrays using allocation
+strides, including padding and nesting. Live values receive preservation space;
+in-place address operands survive scratch writes, and stores consume their value
+before staging a spilled destination pointer. Four functions pass 1,536 local
+observations against 768 LLVM references across direct/release routes in three
+modes. Six negative controls are rejected. All 1,685 units, focused checks and
+60 ABI cases pass; prior populations and the bypass ratchet remain fixed.
+
+The earlier [boolean call-return checkpoint](evidence/boolean_call_acceptance_20261103.json)
 passes all 17 integration stages on a frozen 2,630-file source snapshot. Exact
 i1 direct calls use the existing typed call action, normalize the low bit before
 publishing the result, and preserve live values and transaction rollback. Four
@@ -66,8 +77,8 @@ turn 100 native links into 100 executions.
 
 AIR publication atomically writes schema-4 metadata and transfers the verified
 payload into the cache. The global-memory pair authenticates three exports; the
-boolean checkpoint reuses them and reruns execution checks on cache hits. At the
-user's direction, serial admission
+boolean and array-stride checkpoints reuse them and rerun execution checks on
+cache hits. At the user's direction, serial admission
 now uses a fixed 32 GiB reserve plus the existing 8 GiB working budget: 40 GiB
 (about 42.95 GB) free at the start. Nested workers inherit that admission and
 continue enforcing the reserve. Reported fresh/cached free-space decreases are
@@ -76,11 +87,13 @@ continue enforcing the reserve. Reported fresh/cached free-space decreases are
 Unchanged upstream `hello_libc.zig` and the C fixture execute in all three modes;
 the C fixture's six paired cases and 66 call/heap observations remain separate.
 The ABI gate passes 60 cases. The frozen FMA canary retains 29 exact-result
-checks and 8,192 LLVM-paired observations. Fibonacci selection advances through
-the boolean call and following global byte store, then stops at a variable-index
-`getelementptr [8 x i8]` in `start.main`, with zero local executions. LLVM IR
-construction, the system linker/CRT and libc remain external dependencies of
-that route.
+checks and 8,192 LLVM-paired observations. Fibonacci now emits `start.main`
+through composed selection, then fails to link because 13 required private
+symbols are omitted despite having definitions in the captured IR. The unchanged
+program retains one LLVM reference execution and zero local executions. Its
+isolated arithmetic body passes 31 local/LLVM observations, which does not prove
+whole-program execution. LLVM IR construction, the system linker/CRT and libc
+remain external dependencies of that route.
 
 The [scalar cleanup](evidence/scalar_startup_cleanup_20261103.json) retains the
 13 original source probes, performance baselines and required evidence. The
@@ -93,5 +106,5 @@ history are retired without archives. The latest
 [generation cleanup](evidence/global_memory_cleanup_20261103.json) retires 3.92 GB
 of superseded AIR after verifying the accepted replacement and all payload hashes;
 metadata and historical proofs remain. See [next steps](next_steps.md) for
-the array-stride pointer calculation. Historical checkpoints
+module dependency selection. Historical checkpoints
 remain under the roadmap and evidence directories.

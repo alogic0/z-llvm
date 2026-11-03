@@ -1,0 +1,767 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "recorded_utc": "2026-11-03T20:31:15.671053+00:00",
+  "status": "bounded integer array-stride checkpoint accepted",
+  "accepted_revision": "4f69c5814e6e6d78bfb78368242344f3e0ad6e21",
+  "accepted_tree": "6a1148b47a2b42c13b6bd681e8095668f355516c",
+  "validated_working_head": "807275d5c7578b94a12bef5b3c16b8da697f811d",
+  "commits": [
+    {
+      "revision": "d1fe039accffbef21c753c74bf1c3ceb4ced23ec",
+      "title": "fix(x86_64): consume stored values before staging spilled pointers",
+      "paths": [
+        "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory.zig",
+        "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory_store_tests.zig"
+      ]
+    },
+    {
+      "revision": "e2fb584145fd71609186fc8eba08d3778f877775",
+      "title": "fix(x86_64): preserve in-place scaled-address operands",
+      "paths": [
+        "src/codegen/x86_64/generic_cfg/value_use/planning/physical_mapping.zig",
+        "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory_gep_tests.zig"
+      ]
+    },
+    {
+      "revision": "4f69c5814e6e6d78bfb78368242344f3e0ad6e21",
+      "title": "feat(x86_64): lower bounded integer array strides transactionally",
+      "paths": [
+        "src/codegen/x86_64/generic_cfg/composed_selector_memory.zig",
+        "src/codegen/x86_64/generic_cfg/composed_selector_memory_tests.zig",
+        "src/codegen/x86_64/generic_cfg/stage2_planning.zig",
+        "src/tests/codegen_x86_64_generic_cfg_selector_limb.zig",
+        "test/real_programs/array_stride.ll",
+        "test/real_programs/array_stride_driver.c",
+        "tools/run_upstream_c_program.py"
+      ]
+    }
+  ],
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "selector_version": "real-candidate-selector-v3",
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "population": {
+    "modes": [
+      "ReleaseFast",
+      "ReleaseSafe",
+      "ReleaseSmall"
+    ],
+    "selected_rows_per_mode": 100,
+    "lowered_per_mode": 100,
+    "objects_per_mode": 100,
+    "native_links_per_mode": 100,
+    "executed_functions_per_mode": 5,
+    "paired_harnesses_per_mode": 5,
+    "ascii_observations_per_mode": 256
+  },
+  "selection_unchanged": true,
+  "compiler_rt_bypass_ratchet": 130,
+  "scope": [
+    "One named i64 index and a named ordinary runtime pointer",
+    "Literal nested integer arrays with nonzero power-of-two allocation stride 1..128; nonstandard integer widths require an exact alignment entry",
+    "Integral little-endian 64-bit default pointers and indexes, checked against module data layout",
+    "Reuse typed requests, physical conflict planning, flags authority and scaled-address action; no new machine opcode or raw register lowering",
+    "Reserve preservation slots for values live across dynamic one-index array GEPs",
+    "Preserve scaled-address sources already in scratch destinations",
+    "Consume stored value before staging a spilled destination to prevent stale RCX views"
+  ],
+  "boundaries": [
+    "No new globals, stack-object descriptors or named type resolution",
+    "Other index counts, widths, constants, layouts and non-power-of-two or oversized strides remain boundaries",
+    "Existing byte, four-byte element and stack-i32-array consumers stay unchanged",
+    "Struct, FP, pointer and named array leaves remain explicit provider boundaries"
+  ],
+  "upstream_mapping": [
+    {
+      "path": "../llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp",
+      "owner": "visitGetElementPtr",
+      "contract": "Use sequential allocation stride and index width; sign-extend/truncate index and form pointer plus index times stride."
+    }
+  ],
+  "validation_tier": 3,
+  "tier3_trigger": "Capability closure, shared preservation/frame planning and a confirmed pointer-store wrong-code repair require full integration.",
+  "why_existing_full_cannot_be_reused": "The accepted boolean checkpoint still rejects the array-stride GEP; it has no native coverage for the new consumer.",
+  "architecture_owners": [
+    "composed_selector_memory.zig::lowerArrayStrideGep and supportsIntegerArrayStride",
+    "stage2_planning.zig::arrayStrideRequiresPreservationFrame",
+    "value_use/planning/physical_mapping.zig::seal",
+    "value_use/actions/address_memory.zig::executeStoreI64"
+  ],
+  "focused_validation": {
+    "status": "focused validation passed",
+    "base_revision": "807275d5c7578b94a12bef5b3c16b8da697f811d",
+    "unit_tests": 1685,
+    "tier2_steps": "14/14",
+    "structural_tests": 13,
+    "abi_cases": 60,
+    "python_policy_tests": 15,
+    "native_report": "local-state/validations/array-stride-20261103/native-r4/report.json",
+    "native_report_sha256": "9898e8b9ed594480fe1d73d4bdca904b5076d95974c8a1d877b4d273158641c1",
+    "array_stride_local": 1536,
+    "array_stride_llvm": 768,
+    "negative_controls": 6,
+    "near_miss_local": 9,
+    "near_miss_llvm": 9,
+    "fibonacci": {
+      "cpu": "baseline",
+      "local_executions": 0,
+      "manifest": "local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+      "matched_program_modes": 0,
+      "pipeline": "preopt",
+      "population": "unchanged-upstream-zig-program",
+      "program": "recursive_fibonacci",
+      "program_modes": 1,
+      "programs": 1,
+      "reference_executions": 1,
+      "remaining_dependencies": [
+        "libLLVM IR construction",
+        "system linker and CRT",
+        "libc",
+        "single-threaded Zig startup"
+      ],
+      "rows": [
+        {
+          "failure_stage": "local-link",
+          "hook_object_sha256": "b7c70b3da0d358652a5a952418755b1229697ca970ecae3ceb4d2552906b4500",
+          "local_executions": 0,
+          "mode": "ReleaseFast",
+          "object_bytes": 5088,
+          "object_sha256": "5e50735ee4f399bf40299dde0f29a2990f829bac8e9eae6f1201ad290df2526f",
+          "selector_owners": {
+            "composed_cfg": 1
+          },
+          "status": "failed"
+        }
+      ],
+      "schema": "real-program-v1",
+      "source": "/home/oleg/prog/ziglang/test/cases/recursive_fibonacci.zig",
+      "source_head": "807275d5c7578b94a12bef5b3c16b8da697f811d",
+      "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+      "status": "blocked",
+      "target": "x86_64-linux-gnu",
+      "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+      "zllvm_sha256": "ba31536316d3956db6b40000f720f94c14c4021b9b7baff06b09cf40ff86e9ff"
+    },
+    "evidence": {
+      "local-state/validations/array-stride-20261103/unit-r5.log": "8505527257b63985bd5e3dc1f01a42cc1c46c9f79cb3e6be3aff7d07ee923e61",
+      "local-state/validations/array-stride-20261103/tier2-r1.log": "f0a7f803c551f44182611d14d6b08f52d996b3d806b2efc35783235c49bb0409",
+      "local-state/validations/array-stride-20261103/negative-controls/report.json": "0d0914ab249b708a3f1ed5f0bd5dcf3bd61b8562044825bde14505bb64c0c73b",
+      "local-state/validations/array-stride-20261103/near-miss-native/report.json": "86c0dd04194c8823202804ede571d378f29b078fc165a0912e832f4b7cdbc2ef"
+    },
+    "files": {
+      "src/codegen/x86_64/generic_cfg/composed_selector_memory.zig": "95f4d6bf8d1ae44bc0cd66e7e75afc705721ca3967f96b207914e4c454ad247c",
+      "src/codegen/x86_64/generic_cfg/composed_selector_memory_tests.zig": "b9e822780dfcdaf3807908aa012aef6e05bd88e05847b5078af6fac3ad263a42",
+      "src/codegen/x86_64/generic_cfg/stage2_planning.zig": "7d314ae871b1d11bf1ab53c6b43eeb43fd0c45cf4f61f472108f3216aa1625b3",
+      "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory.zig": "780bc7a5491a2daee4aba1e4bed5df0b711e75ad4c30ea839afc23511cbc21f4",
+      "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory_gep_tests.zig": "7fd6e29d845b457ad9a2cd7cafb99077f5d6344ed428bc805969d8f460f33149",
+      "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory_store_tests.zig": "2ac354f2d5d269b8e09e1b8fc1d351654f85735fefd95fe5eb9c99f9b62dab68",
+      "src/codegen/x86_64/generic_cfg/value_use/planning/physical_mapping.zig": "30c1bdb5269e9d706cd3b3305f3b9ac1ff9fdb5d0b12e26f447e7e34822e27b2",
+      "src/tests/codegen_x86_64_generic_cfg_selector_limb.zig": "5b1c9c73bd6f2e2fe2726eb6af1a4fb229886fd7ee9bf82baeff09e05cfc95ad",
+      "tools/run_upstream_c_program.py": "21e8dc08183e26eee831d2b88b4ea3d6bb46824851cda647f573156d44a1f50c",
+      "test/real_programs/array_stride.ll": "49a64e2a6a6a1d40494f44c2a686476d05915f12054976b00a86dc3800f0d15c",
+      "test/real_programs/array_stride_driver.c": "3d292fc2592f8f778a6fdfcdbe04bc0eaca10ec7657ebffbab07d5bc7ee53b1b"
+    },
+    "original_scratch": {
+      "scratch/test_abi.s": "d439a7beb674e08b519923b308207f6c510f463ab229af7ca098fd1ce0ccdb15",
+      "scratch/test_abi.zig": "e889e005850511755f57196e564a41e486686b9fd4f98c478482c969b7638d32",
+      "scratch/test_bitset.ll": "b34f6bfd3750284e36ff225111aed27e7961f570048b42628b375cfa99a6d8eb",
+      "scratch/test_bitset.zig": "a0ae945f89311108811a07bdfaf65ddd2e9b453b59436df15c66dce739b6e137",
+      "scratch/test_chunkstate_layout.zig": "8f12f11ced9863d48bb1e949ab5c414db8005d80569fb6bfb27b17a2a91473d6",
+      "scratch/test_init.zig": "38c327156a57e8a989db2d7ff35fafcb6fba9ae761bfafabf965ef92b71c343e",
+      "scratch/test_llvm.ll": "17738822b102735f481bddb59f6bf63b4ddfdf48d9f9812008167e7c7cb35da6",
+      "scratch/test_offset.zig": "8b49ea64bf64a90fbd741d299eb1bacaccf24e5805073a08303dbfa26dec9534",
+      "scratch/test_opt.zig": "c2cfadc84692240bdfaca03406cae67692310b30fd11fcfb94a338fc80c95242",
+      "scratch/test_query.ll": "99d0ca5c1b9472ef33bf9eb2dbf2cf8c05c69aab775588109826b763b233d476",
+      "scratch/test_query.zig": "5c7cbb510723d088f389cc932a67222e72ad736b651189c6b3e88bffd6fe3dbf",
+      "scratch/test_query_debug.ll": "3a0798cb323fe6928565a8e5d450e85312df8437f2a79d5583d2a618a658d11c",
+      "scratch/test_size.zig": "a255ebc31f0eba577c2b616708dbb42a1727b9bc29b839abf2c30a1c35b57f10"
+    },
+    "archives_created": 0
+  },
+  "native_array_stride": {
+    "functions": 4,
+    "routes": [
+      "direct",
+      "release"
+    ],
+    "modes": 3,
+    "local_observations": 1536,
+    "llvm_reference_observations": 768,
+    "reference_reused_per_route": true,
+    "cases": [
+      "eight-byte allocation stride",
+      "i24 allocation padding",
+      "nested integer arrays",
+      "reloaded frame pointer and index",
+      "negative and wrapping indexes",
+      "live operands and guarded stores"
+    ],
+    "negative_controls": 6,
+    "negative_control_contract": "Wrong stride and restored stale RCX store order each reject in all three modes."
+  },
+  "unchanged_fibonacci": {
+    "report": "local-state/validations/array-stride-20261103/fibonacci-r2/report.json",
+    "report_sha256": "8a05a5f1c78ff04aa3b3c8cf2b207d452da3b482060c4fe2f6965c0e08bf82fa",
+    "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+    "reference_executions": 1,
+    "local_executions": 0,
+    "emitted_function": "start.main",
+    "selection_owner": "composed_cfg",
+    "failure_stage": "local-link",
+    "missing_defined_symbols": [
+      "Io.File.Writer.drain",
+      "Io.File.Writer.sendFile",
+      "Io.Writer.defaultFlush",
+      "Io.Writer.defaultRebase",
+      "Thread.maybeAttachSignalStack",
+      "debug.maybeEnableSegfaultHandler",
+      "mem.Allocator.noAlloc",
+      "mem.Allocator.unreachableFree",
+      "mem.Allocator.unreachableRemap",
+      "mem.Allocator.unreachableResize",
+      "process.Environ.PosixBlock.isEmpty",
+      "recursive_fibonacci.main",
+      "start.expandStackSize"
+    ],
+    "meaning": "The array-stride boundary is passed and startup emits. Alias-root selection omits required private definitions; the unchanged program still does not link or execute.",
+    "isolated_arithmetic_body": {
+      "local_observations": 31,
+      "llvm_observations": 31,
+      "scope": "Original recursive function body with linkage exposed and unrelated definitions removed for a diagnostic harness; not whole-program execution."
+    },
+    "diagnostic_copy": {
+      "selected_functions": 33,
+      "emitted_functions": 9,
+      "failed_functions": 24,
+      "first_boundary": "start.expandStackSize unsupported_type:alloca",
+      "scope": "Alias filter removed from a diagnostic copy only; not a proof of reachable closure."
+    }
+  },
+  "full_cached_integration": {
+    "argv": [
+      "zig",
+      "build",
+      "distribution-all",
+      "--",
+      "--serial",
+      "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+      "--real-rows-validation-root=local-state/validations/global-memory-headroom-20261103",
+      "--real-rows-cache-root=local-state/caches/global-memory-headroom-20261103"
+    ],
+    "returncode": 0,
+    "wall_ns": 2485700737473,
+    "raw_log": "local-state/validations/array-stride-20261103/full-array-cached.log",
+    "raw_log_sha256": "a56705c2bf9c760f4713487323e5f0728b24870506cee76af94434872de74320",
+    "telemetry_sha256": "d1f14cc28b638a059c8d69aaea4115fd51534855ef4808e9f309db79b2d26a01",
+    "gates": [
+      {
+        "id": "selected-object-suite",
+        "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+        "exit_status": "0",
+        "duration_ms": "61503",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "1945",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "3451",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "3455",
+        "cache_status": "none"
+      },
+      {
+        "id": "zig-source-native-link",
+        "tool": "tools/run_distribution_zig_source_native_link.zig",
+        "exit_status": "0",
+        "duration_ms": "18796",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-postopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "80651",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-preopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "--pipeline": "preopt",
+        "exit_status": "0",
+        "duration_ms": "652446",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-ir-writer",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "21530",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-release",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "71940",
+        "cache_status": "none"
+      },
+      {
+        "id": "real-rows-release-fast",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseFast",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "503842",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-safe",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSafe",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "532503",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-small",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSmall",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "351255",
+        "cache_status": "hit"
+      },
+      {
+        "id": "integrated-executable",
+        "tool": "tools/run_distribution_zig_integrated_exe.zig",
+        "exit_status": "0",
+        "duration_ms": "912755",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "567",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "1184",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "1104",
+        "cache_status": "none"
+      },
+      {
+        "id": "boundary-gates",
+        "tool": "tools/run_distribution_boundary_gates.zig",
+        "exit_status": "0",
+        "duration_ms": "792",
+        "cache_status": "none"
+      }
+    ],
+    "serial": {
+      "schema_version": "1",
+      "run_id": "7aed54028a8c44b7a8271973be9cde08",
+      "scratch_path": "tmp/distribution_all_serial_7aed54028a8c44b7a8271973be9cde08",
+      "bundle_path": "tmp/distribution_all_serial_7aed54028a8c44b7a8271973be9cde08/release_source_object_bundle",
+      "target": "x86_64-unknown-linux-gnu",
+      "mode": "serial",
+      "real_rows_concurrency": "3",
+      "subgates": "17",
+      "wall_ms": "2485009",
+      "starting_free_bytes": "43969609728",
+      "minimum_observed_free_bytes": "41859788800",
+      "final_free_bytes": "42141491200",
+      "observed_peak_bytes": "2109820928",
+      "reserve_bytes": "34359738368",
+      "required_start_bytes": "42949672960",
+      "local_fail": "0"
+    },
+    "real_rows": [
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseFast",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSafe",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSmall",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      }
+    ],
+    "cache_events": [
+      {
+        "mode": "ReleaseFast",
+        "status": "hit",
+        "duration_ms": "14925",
+        "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+        "descriptor_bytes": "1343891552"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "status": "hit",
+        "duration_ms": "16336",
+        "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+        "descriptor_bytes": "1473501276"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "status": "hit",
+        "duration_ms": "12326",
+        "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+        "descriptor_bytes": "1106432911"
+      }
+    ],
+    "real_rows_resources": {
+      "schema_version": "3",
+      "normalization_schema": "3",
+      "memory_policy": "os-managed-non-gating",
+      "concurrency": "3",
+      "workers": "3",
+      "modes": "ReleaseFast,ReleaseSafe,ReleaseSmall",
+      "run_id": "30584254f8c66498a598181ead5ff932",
+      "root": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_30584254f8c66498a598181ead5ff932",
+      "work_selection_root": "local-state/validations/global-memory-headroom-20261103",
+      "export_cache_selection_root": "local-state/caches/global-memory-headroom-20261103",
+      "fast_temp": "local-state/validations/global-memory-headroom-20261103/ReleaseFast/work_30584254f8c66498a598181ead5ff932",
+      "fast_local_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_30584254f8c66498a598181ead5ff932/ReleaseFast/zig-local-cache",
+      "fast_global_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_30584254f8c66498a598181ead5ff932/ReleaseFast/zig-global-cache",
+      "fast_air_cache": "local-state/caches/global-memory-headroom-20261103/ReleaseFast/export",
+      "safe_temp": "local-state/validations/global-memory-headroom-20261103/ReleaseSafe/work_30584254f8c66498a598181ead5ff932",
+      "safe_local_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_30584254f8c66498a598181ead5ff932/ReleaseSafe/zig-local-cache",
+      "safe_global_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_30584254f8c66498a598181ead5ff932/ReleaseSafe/zig-global-cache",
+      "safe_air_cache": "local-state/caches/global-memory-headroom-20261103/ReleaseSafe/export",
+      "small_temp": "local-state/validations/global-memory-headroom-20261103/ReleaseSmall/work_30584254f8c66498a598181ead5ff932",
+      "small_local_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_30584254f8c66498a598181ead5ff932/ReleaseSmall/zig-local-cache",
+      "small_global_cache": "local-state/validations/global-memory-headroom-20261103/real_rows_parallel_30584254f8c66498a598181ead5ff932/ReleaseSmall/zig-global-cache",
+      "small_air_cache": "local-state/caches/global-memory-headroom-20261103/ReleaseSmall/export",
+      "pin_manifest_sha256": "a63ac7b894e7a2bb1008d5eaf964cc3c1ce24d057e08c1433ee28f5731c5f7ee",
+      "cache_status": "hit,hit,hit",
+      "air_cache": "read-only",
+      "pruning": "suspended",
+      "wall_ms": "652467",
+      "summed_child_ms": "1387600",
+      "filesystem_total_bytes": "982240026624",
+      "post_run_free_floor_bytes": "34359738368",
+      "projected_peak_bytes": "8589934592",
+      "required_start_bytes": "42949672960",
+      "admission_source": "serial_preflight",
+      "admission_starting_free_bytes": "43969609728",
+      "starting_free_bytes": "43578298368",
+      "minimum_free_bytes": "41859788800",
+      "final_free_bytes": "41859788800",
+      "peak_disk_bytes": "5375725568",
+      "peak_aggregate_rss_bytes": "5263437824",
+      "minimum_available_memory_bytes": "12291371008",
+      "load_start": "2.19",
+      "load_end": "2.93",
+      "execution_results_cached": "false",
+      "local_fail": "0"
+    },
+    "native_memory_populations": {
+      "word-pair-memory": {
+        "population": "standalone-two-word-stack-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "384",
+        "reference_observations": "192",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "pointer-stack-memory": {
+        "population": "standalone-runtime-pointer-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-stack-memory": {
+        "population": "standalone-scalar-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "486",
+        "reference_observations": "243",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "integer-pointer-casts": {
+        "population": "standalone-integer-pointer-casts",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "signed-nonnegative": {
+        "population": "standalone-signed-nonnegative",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "type-layout-padding": {
+        "population": "standalone-type-allocation-padding",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-addresses": {
+        "population": "standalone-global-addresses",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "192",
+        "reference_observations": "96",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-memory": {
+        "population": "standalone-global-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "240",
+        "reference_observations": "120",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "boolean-calls": {
+        "population": "standalone-boolean-calls",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "array-stride": {
+        "population": "standalone-array-stride",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    },
+    "c_program": {
+      "schema": "upstream-c-program-v1",
+      "programs": "1",
+      "program_modes": "3",
+      "matched_program_modes": "3",
+      "reference_case_executions": "6",
+      "local_case_executions": "6",
+      "integer_variadic_observations": "48",
+      "heap_call_observations": "18",
+      "native_call_observations": "66",
+      "local_fail": "0"
+    },
+    "ascii_rows": [
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseFast",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+        "object_bytes": "712",
+        "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+        "reference_bytes": "4154120",
+        "reference_sha256": "5cd42c4511361901103fc7c8dc968aede26bb5dbf3fa59ca2679809024fb229d",
+        "linked_bytes": "6292382",
+        "linked_sha256": "08e55220021ef8304fc073da6acc3f2cc88d5587bbf6451ff11cf551134c0e93",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      },
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseSafe",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+        "object_bytes": "712",
+        "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+        "reference_bytes": "4040136",
+        "reference_sha256": "d54f2803f658986b1723ac2a71f4d769abcf376e8c79f03417b6d1684e2094dc",
+        "linked_bytes": "6147574",
+        "linked_sha256": "47e1834897f69ee1e371ca959478e12468131fcadb924375a3ebfcd3d9047dd4",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      },
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseSmall",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+        "object_bytes": "712",
+        "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+        "reference_bytes": "149824",
+        "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+        "linked_bytes": "356150",
+        "linked_sha256": "7e348c9fc0494d469c5497c440fc9f98b8fa6da6300881e21b3d4bc221c17a85",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      }
+    ],
+    "fma": {
+      "cases": "8192",
+      "matched": "8192",
+      "reference": "llvm22-frozen-ir",
+      "local_fail": "0"
+    },
+    "source_snapshot": "local-state/validations/array-stride-20261103/array-full-source-snapshot.json",
+    "source_snapshot_sha256": "3ab15f9fdc6b4851f741833e6e4992791d248ff7e89cd86a6a2c1da2ca0bcb77",
+    "source_snapshot_files": 2635,
+    "sources_unchanged": true,
+    "headroom_policy": {
+      "schema_version": "2",
+      "filesystem_total_bytes": "982240026624",
+      "reserve_bytes": "34359738368",
+      "projected_peak_bytes": "8589934592",
+      "required_start_bytes": "42949672960",
+      "authority": "tools/distribution_headroom_policy.zig",
+      "local_fail": "0"
+    },
+    "expected_cache_status": "hit",
+    "sampled_minimum_free_bytes": 41858174976,
+    "archives_created": 0
+  },
+  "pre_full_cache_cleanup": {
+    "status": "removed complete idle regenerable caches",
+    "recorded_utc": "2026-11-03T19:46:45.765722+00:00",
+    "targets": [
+      ".zig-cache",
+      "local-state/validations/array-stride-20261103/fibonacci-r1/global-cache",
+      "local-state/validations/array-stride-20261103/fibonacci-r1/ReleaseFast/candidate-cache",
+      "local-state/validations/array-stride-20261103/fibonacci-r1/ReleaseFast/reference-cache",
+      "local-state/validations/array-stride-20261103/fibonacci-r2/global-cache",
+      "local-state/validations/array-stride-20261103/fibonacci-r2/ReleaseFast/candidate-cache",
+      "local-state/validations/array-stride-20261103/fibonacci-r2/ReleaseFast/reference-cache",
+      "local-state/validations/array-stride-20261103/native-r1/frontend-cache",
+      "local-state/validations/array-stride-20261103/native-r1/global-cache",
+      "local-state/validations/array-stride-20261103/native-r2/frontend-cache",
+      "local-state/validations/array-stride-20261103/native-r2/global-cache",
+      "local-state/validations/array-stride-20261103/native-r3/frontend-cache",
+      "local-state/validations/array-stride-20261103/native-r3/global-cache",
+      "local-state/validations/array-stride-20261103/native-r4/frontend-cache",
+      "local-state/validations/array-stride-20261103/native-r4/global-cache"
+    ],
+    "inventory": "local-state/validations/array-stride-20261103/pre-full-cache-inventory.json",
+    "inventory_sha256": "4de3ada3f63156a62c6c1e73128e5f6ec94d6a7c977fd502c6cd2066190c9c58",
+    "inventory_entries": 1801,
+    "allocated_bytes_before": 1419763712,
+    "free_bytes_before": 42622242816,
+    "retained_sha256": {
+      "zig-out/bin/z_llvm": "ba31536316d3956db6b40000f720f94c14c4021b9b7baff06b09cf40ff86e9ff",
+      "local-state/validations/array-stride-20261103/verified-focused.json": "85744c0244a842cf244d51523e7cb115a4a536882cc48b25af11b9efd99239fb",
+      "local-state/validations/array-stride-20261103/fibonacci-r2/ReleaseFast/capture/preopt.ll": "033aa9ece4626e2e315b8001c0f545e9a104642bcf8f629d9b3a14408e8d16e5",
+      "local-state/validations/array-stride-20261103/fibonacci-r2/ReleaseFast/capture/local.o": "b7c70b3da0d358652a5a952418755b1229697ca970ecae3ceb4d2552906b4500"
+    },
+    "active_consumers_found": [],
+    "archives_created": 0,
+    "free_bytes_after": 44042002432,
+    "remaining_targets": []
+  },
+  "cache_cleanup_measurement_limit": "Complete idle regenerable caches were retired before the run. Subsequent builds regenerate caches; this interval is not net task savings.",
+  "evidence_sha256": {
+    "local-state/validations/array-stride-20261103/verified-focused.json": "85744c0244a842cf244d51523e7cb115a4a536882cc48b25af11b9efd99239fb",
+    "local-state/validations/array-stride-20261103/committed-source-proof.json": "504f5b04a9d21271f0e914f8620072f7eeafec2fd1218bc25cefb944cc6887bb",
+    "local-state/validations/array-stride-20261103/array-full-source-snapshot.json": "3ab15f9fdc6b4851f741833e6e4992791d248ff7e89cd86a6a2c1da2ca0bcb77",
+    "local-state/validations/array-stride-20261103/native-r4/report.json": "9898e8b9ed594480fe1d73d4bdca904b5076d95974c8a1d877b4d273158641c1",
+    "local-state/validations/array-stride-20261103/negative-controls/report.json": "0d0914ab249b708a3f1ed5f0bd5dcf3bd61b8562044825bde14505bb64c0c73b",
+    "local-state/validations/array-stride-20261103/near-miss-native/report.json": "86c0dd04194c8823202804ede571d378f29b078fc165a0912e832f4b7cdbc2ef",
+    "local-state/validations/array-stride-20261103/fibonacci-r2/report.json": "8a05a5f1c78ff04aa3b3c8cf2b207d452da3b482060c4fe2f6965c0e08bf82fa",
+    "local-state/validations/array-stride-20261103/fibonacci-next-boundary.json": "51c3b8f0679c561eb9111c5062ba8157906e8bae7de33eb4ebfce22edf9a3c6f",
+    "local-state/validations/array-stride-20261103/dependency-diagnostic-command.json": "4615e6aeabad02ea96e8b75a694d65a6e153c1a0b7a72b816f25a3f20ef363b0",
+    "local-state/validations/array-stride-20261103/dependency-diagnostic.stderr": "0a41599406d8c35b6fdd5554708a7e53f0cd41041baf072d19b100b84e25e017",
+    "local-state/validations/array-stride-20261103/fib-body-diagnostic/report.json": "d4f3d11f347c14dc5d4041c23dfb9bd0de4e4bf42a353bc50a6c8d9d63b68fea",
+    "local-state/validations/array-stride-20261103/module-closure-next-plan.json": "a5d1dd6f82f1cf865db50b8026579d3956b162a5b95bb6dfc570188b17db5ef9",
+    "local-state/validations/array-stride-20261103/pre-full-cache-cleanup.json": "e28de83bfa0580bb2e5278e78452e73922c9042256c7870ac554703fc7b115c0",
+    "local-state/validations/array-stride-20261103/pre-full-cache-inventory.json": "4de3ada3f63156a62c6c1e73128e5f6ec94d6a7c977fd502c6cd2066190c9c58"
+  },
+  "archives_created": 0
+}
