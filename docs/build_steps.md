@@ -22,6 +22,21 @@ is for. Use `zig build --help` to see the authoritative current list.
 | `zig build run -- <args>` | Run `z_llvm` with arguments passed after `--`. |
 | `zig build test` | Run the unit test suite. Use this for ordinary implementation slices that touch parser, verifier, optimizer, codegen, or shared tool behavior. |
 
+The historical selector-v3 membership audit replays from the checked
+[semantic fact manifest](evidence/real_candidates_release_v3_facts_manifest.json).
+Its [retention proof](evidence/candidate_facts_retention_20261103.json) verifies
+all 21,117 candidate rows and selected mode facts before retiring the original
+raw audit inputs. Production lowering retains its separate authenticated AIR.
+Use a new output directory for an audit replay:
+
+```sh
+zig build real-candidates-v3 -- \
+  --facts-manifest=docs/evidence/real_candidates_release_v3_facts_manifest.json \
+  --releasefast-inventory=local-state/validations/current-pin-20261102/current-releasefast.tsv \
+  --out=local-state/validations/candidate-audit-replay/candidates.tsv \
+  --audit=local-state/validations/candidate-audit-replay/audit.json
+```
+
 ## Validation Gates
 
 | Step | Purpose |

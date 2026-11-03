@@ -11,6 +11,9 @@ Historical frozen INBOX roots and the exact 43-worktree inventory are retired.
 - Schema-2 AIR export cache generations have been removed: the current reader
   accepts schemas 3 and 4. Retain a new generation only for active fresh/cache validation
   or near-term reuse with matching inputs.
+- `local-state/inputs/real-candidates-v3`: checked semantic facts for the frozen
+  offline membership audit, bound by the versioned fact manifest. Retain these
+  facts and the original static classification inventory for audit replay.
 - `tmp/o2_calls_perf`: the existing performance tool still reads adopted inputs
   and its baseline checkout here. Keep until that consumer is migrated.
 - The udivmoddi4 null-pointer diagnostic is pinned by
@@ -47,8 +50,9 @@ inputs remain pinned. Equal file sizes do not establish duplicate content.
 The [export-generation cleanup](evidence/startup_headroom_cleanup_20261103.json) retires
 the superseded export/execution generation after its replacement fresh run
 passed and all replacement hashes were verified. The accepted generation now
-lives under `local-state/caches/startup-headroom-20261102`; the frozen
-`test-real-rows` inputs, historical metadata, logs and source probes remain.
+lives under `local-state/caches/startup-headroom-20261102`. That checkpoint kept
+the frozen raw audit inputs; their later semantic migration is recorded below.
+Historical metadata, logs and source probes remain.
 
 The [scalar frame-store cleanup](evidence/scalar_frame_cleanup_20261103.json)
 preserves all paths and hashes while hardlinking 228 byte-identical immutable
@@ -68,6 +72,24 @@ current/frozen AIR, accepted evidence and sibling dependencies stay outside this
 retirement. Complete idle build caches are removed in separately recorded
 intervals; regenerated caches are not counted as net savings. No archives are
 created.
+
+The [audit fact migration](evidence/candidate_facts_retention_20261103.json)
+retains 74 MB of signatures, counts, reference effects, defined-result facts and
+typed-body hashes. Every raw-derived function fact matches in all three modes;
+the normal builder reproduces the entire 21,117-row candidate table byte-for-byte,
+every selected mode fact and all 1,863 raw/fact rejection identities. The old
+audit's rejection count also matches. The versioned
+[fact manifest](evidence/real_candidates_release_v3_facts_manifest.json) binds
+payload hashes, raw parent identities and the static inventory. It is the current
+offline replay entrypoint; historical raw paths in old evidence record provenance.
+
+The three historical payloads had six hardlink paths under `test-real-rows` and
+`current-pin-20261102`. All six paths are retired after verification; metadata and
+retirement records remain. Distinct raw allocation falls by 3.92 GB and the new
+fact inputs use about 74 MB, for a 3.85 GB retained-input reduction. Current
+production AIR under `startup-headroom-20261102`, source probes and performance
+baselines stay pinned. No archives are created. See the
+[replay command](build_steps.md) for checking the adopted inputs.
 
 Use unique run-owned directories for new work. Successful temporary tests clean
 up their own fixtures. A failed test may retain a bounded diagnostic fixture,

@@ -55,9 +55,13 @@ operations but remains blocked at a global-copy destination with zero local
 executions. LLVM IR construction, the system linker/CRT and libc remain
 external dependencies of that route.
 
-The [current cleanup](evidence/scalar_startup_cleanup_20261103.json) retains the
-13 original source probes, current/frozen inputs, performance baselines and
-required evidence. Obsolete generated copies and a source copy exactly present
-in Git history are retired without archives. See [next steps](next_steps.md) for
+The [scalar cleanup](evidence/scalar_startup_cleanup_20261103.json) retains the
+13 original source probes, performance baselines and required evidence. The
+[audit input migration](evidence/candidate_facts_retention_20261103.json) replaces
+historical raw descriptors with 74 MB of exact checked semantic facts, reducing
+retained input allocation by 3.85 GB. Audit replay preserves the entire candidate
+table and selected mode facts. Current authenticated production AIR remains
+pinned. Obsolete generated copies and a source copy exactly present in Git
+history are retired without archives. See [next steps](next_steps.md) for
 the symbolic global-address/initializer/relocation slice. Historical checkpoints
 remain under the roadmap and evidence directories.

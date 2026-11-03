@@ -1,0 +1,357 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "recorded_utc": "2026-11-03T10:22:51.492907+00:00",
+  "status": "retired and verified; compact audit inputs and current production AIR retained",
+  "tool_revision": "cac57c5dc17e8910f1a7b7a38223bb5b57cf4253",
+  "production_compiler_checkpoint": "1f92385ebeaf6d189d651afd71689f51a5ba0649",
+  "scope": "Historical selector-v3 raw descriptors and their superseded export-cache hardlinks have been replaced for offline audit replay by exact checked semantic facts. Current production AIR remains authenticated and retained.",
+  "manifest": "docs/evidence/real_candidates_release_v3_facts_manifest.json",
+  "manifest_sha256": "6e4dcfa3d58ee2a061f1a346a661ec62d3a51db97455d569f44b42117cfea9b7",
+  "extraction_proof": "local-state/validations/candidate-facts-20261103/extraction-proof.json",
+  "extraction_proof_sha256": "db15d6752571d21c577d3c518b0dd30aa7478908d26c3b1044ebe2778b330eb6",
+  "independent_replay": {
+    "schema": 1,
+    "raw_facts_proof": "local-state/validations/candidate-facts-20261103/extraction-proof.json",
+    "raw_facts_proof_sha256": "db15d6752571d21c577d3c518b0dd30aa7478908d26c3b1044ebe2778b330eb6",
+    "manifest": "docs/evidence/real_candidates_release_v3_facts_manifest.json",
+    "manifest_sha256": "6e4dcfa3d58ee2a061f1a346a661ec62d3a51db97455d569f44b42117cfea9b7",
+    "independent_replay": {
+      "argv": [
+        "zig",
+        "build",
+        "real-candidates-v3",
+        "--",
+        "--facts-manifest=docs/evidence/real_candidates_release_v3_facts_manifest.json",
+        "--releasefast-inventory=local-state/validations/current-pin-20261102/current-releasefast.tsv",
+        "--out=local-state/validations/candidate-facts-20261103/replayed-candidates.tsv",
+        "--audit=local-state/validations/candidate-facts-20261103/replayed-audit.json"
+      ],
+      "status": "finished",
+      "started_ns": 1793700918704941236,
+      "samples": [
+        {
+          "time_ns": 1793700918705094917,
+          "available_bytes": 56161599488
+        }
+      ],
+      "pid": 2129956,
+      "returncode": 0,
+      "wall_ns": 1862094085,
+      "finished_ns": 1793700920567168371
+    },
+    "replay_log_sha256": "3ffbdf979af1a4baa4f5ca85d9447ab8e5d54e4735341419440c89313594e779",
+    "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+    "all_21117_rows_byte_identical": true,
+    "all_selected_mode_facts_equal": true,
+    "raw_and_fact_rejection_names_equal": true,
+    "rejection_count": 1863,
+    "frozen_facts_sha256": {
+      "ReleaseFast": "8c0fe94458c68580e68d83d58d3ada0821747603d2e8c5388223ea8a24b8fc14",
+      "ReleaseSafe": "b54f8e99138e866f888fe67c47a05cdfc452b8667d92854fe9298390dfc068bf",
+      "ReleaseSmall": "0c1f5fa27f5619d8b53982d40ae2f83a776efdfbba85e417392bef30d4447ef1"
+    },
+    "archives_created": 0
+  },
+  "retired_raw_inputs": [
+    {
+      "path": "local-state/caches/test-real-rows/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.air",
+      "sha256": "c174c6552a17794c0f82f936b0373f7a8d0cf943460007182d7c20c06beabd2a",
+      "device": 66306,
+      "inode": 54832908,
+      "links": 2,
+      "bytes": 1343891552,
+      "allocated_bytes": 1343905792,
+      "metadata_path": "local-state/caches/test-real-rows/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.meta",
+      "metadata_sha256": "320658e9f841023936a091de782074618e8007b50416093add32b8dd2e4f08e7",
+      "allocated_bytes_before_retirement": 1343905792,
+      "all_hardlink_paths": [
+        "local-state/caches/test-real-rows/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.air",
+        "local-state/caches/current-pin-20261102/ReleaseFast/export/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.air"
+      ]
+    },
+    {
+      "path": "local-state/caches/test-real-rows/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.air",
+      "sha256": "7b34676ca48eaeec0416bdb50a77b910c038dac88a40df3e7ed703c2e0d714c6",
+      "device": 66306,
+      "inode": 54826136,
+      "links": 2,
+      "bytes": 1473501276,
+      "allocated_bytes": 1473515520,
+      "metadata_path": "local-state/caches/test-real-rows/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.meta",
+      "metadata_sha256": "46f0d239571e5760e881f3726b057fcc8a27049e89ab2b962f9cb557a69bc3f6",
+      "allocated_bytes_before_retirement": 1473515520,
+      "all_hardlink_paths": [
+        "local-state/caches/test-real-rows/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.air",
+        "local-state/caches/current-pin-20261102/ReleaseSafe/export/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.air"
+      ]
+    },
+    {
+      "path": "local-state/caches/test-real-rows/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.air",
+      "sha256": "5ff91e8e1a86d214c7af8e6ab1c72b3b509564470b5d225b1433dc9b8cc25f5d",
+      "device": 66306,
+      "inode": 54827145,
+      "links": 2,
+      "bytes": 1106432911,
+      "allocated_bytes": 1106448384,
+      "metadata_path": "local-state/caches/test-real-rows/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.meta",
+      "metadata_sha256": "99f2026eb213ab521982f251a471526eee4a27d49777743ad015d3107159a646",
+      "allocated_bytes_before_retirement": 1106448384,
+      "all_hardlink_paths": [
+        "local-state/caches/test-real-rows/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.air",
+        "local-state/caches/current-pin-20261102/ReleaseSmall/export/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.air"
+      ]
+    }
+  ],
+  "retired_hardlink_paths": [
+    {
+      "path": "local-state/caches/test-real-rows/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.air",
+      "device": 66306,
+      "inode": 54832908,
+      "sha256": "c174c6552a17794c0f82f936b0373f7a8d0cf943460007182d7c20c06beabd2a",
+      "bytes": 1343891552,
+      "metadata_path": "local-state/caches/test-real-rows/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.meta",
+      "metadata_sha256": "320658e9f841023936a091de782074618e8007b50416093add32b8dd2e4f08e7",
+      "deleted": true
+    },
+    {
+      "path": "local-state/caches/current-pin-20261102/ReleaseFast/export/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.air",
+      "device": 66306,
+      "inode": 54832908,
+      "sha256": "c174c6552a17794c0f82f936b0373f7a8d0cf943460007182d7c20c06beabd2a",
+      "bytes": 1343891552,
+      "metadata_path": "local-state/caches/current-pin-20261102/ReleaseFast/export/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.meta",
+      "metadata_sha256": "320658e9f841023936a091de782074618e8007b50416093add32b8dd2e4f08e7",
+      "deleted": true
+    },
+    {
+      "path": "local-state/caches/test-real-rows/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.air",
+      "device": 66306,
+      "inode": 54826136,
+      "sha256": "7b34676ca48eaeec0416bdb50a77b910c038dac88a40df3e7ed703c2e0d714c6",
+      "bytes": 1473501276,
+      "metadata_path": "local-state/caches/test-real-rows/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.meta",
+      "metadata_sha256": "46f0d239571e5760e881f3726b057fcc8a27049e89ab2b962f9cb557a69bc3f6",
+      "deleted": true
+    },
+    {
+      "path": "local-state/caches/current-pin-20261102/ReleaseSafe/export/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.air",
+      "device": 66306,
+      "inode": 54826136,
+      "sha256": "7b34676ca48eaeec0416bdb50a77b910c038dac88a40df3e7ed703c2e0d714c6",
+      "bytes": 1473501276,
+      "metadata_path": "local-state/caches/current-pin-20261102/ReleaseSafe/export/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.meta",
+      "metadata_sha256": "46f0d239571e5760e881f3726b057fcc8a27049e89ab2b962f9cb557a69bc3f6",
+      "deleted": true
+    },
+    {
+      "path": "local-state/caches/test-real-rows/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.air",
+      "device": 66306,
+      "inode": 54827145,
+      "sha256": "5ff91e8e1a86d214c7af8e6ab1c72b3b509564470b5d225b1433dc9b8cc25f5d",
+      "bytes": 1106432911,
+      "metadata_path": "local-state/caches/test-real-rows/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.meta",
+      "metadata_sha256": "99f2026eb213ab521982f251a471526eee4a27d49777743ad015d3107159a646",
+      "deleted": true
+    },
+    {
+      "path": "local-state/caches/current-pin-20261102/ReleaseSmall/export/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.air",
+      "device": 66306,
+      "inode": 54827145,
+      "sha256": "5ff91e8e1a86d214c7af8e6ab1c72b3b509564470b5d225b1433dc9b8cc25f5d",
+      "bytes": 1106432911,
+      "metadata_path": "local-state/caches/current-pin-20261102/ReleaseSmall/export/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.meta",
+      "metadata_sha256": "99f2026eb213ab521982f251a471526eee4a27d49777743ad015d3107159a646",
+      "deleted": true
+    }
+  ],
+  "retained_production_air": [
+    {
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6.air",
+      "device": 66306,
+      "inode": 55212710,
+      "bytes": 1106432911,
+      "sha256": "92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6"
+    },
+    {
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e.air",
+      "device": 66306,
+      "inode": 55212700,
+      "bytes": 1473501148,
+      "sha256": "277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e"
+    },
+    {
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32.air",
+      "device": 66306,
+      "inode": 55212693,
+      "bytes": 1343891552,
+      "sha256": "29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32"
+    }
+  ],
+  "raw_allocated_bytes": 3923869696,
+  "replacement_fact_bytes": 74092214,
+  "replacement_fact_allocated_bytes": 74108928,
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "candidate_rows": 21117,
+  "selected_rows": 100,
+  "rejection_count": 1863,
+  "every_raw_function_fact_equal": true,
+  "entire_candidate_table_byte_identical": true,
+  "all_selected_mode_facts_equal": true,
+  "raw_and_compact_rejection_names_equal": true,
+  "historical_rejection_count_unchanged": true,
+  "compiler_gate_cache_and_pin_sources_unchanged": true,
+  "filesystem_available_before_retirement": 55816482816,
+  "archives_created": 0,
+  "performance_baselines_and_original_probes_excluded": true,
+  "metadata_retained": true,
+  "measurement_scope": "Each of three distinct payloads has two hardlinks. Allocated reclaim counts the three physical allocations once; global free-space movement also includes unrelated work.",
+  "filesystem_available_after_retirement": 59740340224,
+  "reclaimed_allocated_bytes": 3923869696,
+  "net_retained_input_allocation_reduction_bytes": 3849760768,
+  "post_retirement_replay": {
+    "argv": [
+      "zig",
+      "build",
+      "real-candidates-v3",
+      "--",
+      "--facts-manifest=docs/evidence/real_candidates_release_v3_facts_manifest.json",
+      "--releasefast-inventory=local-state/validations/current-pin-20261102/current-releasefast.tsv",
+      "--out=local-state/validations/candidate-facts-20261103/post-retirement-candidates.tsv",
+      "--audit=local-state/validations/candidate-facts-20261103/post-retirement-audit.json"
+    ],
+    "status": "finished",
+    "started_ns": 1793701505518324727,
+    "samples": [
+      {
+        "time_ns": 1793701505518485801,
+        "available_bytes": 59668983808
+      }
+    ],
+    "pid": 2196719,
+    "returncode": 0,
+    "wall_ns": 1164880263,
+    "finished_ns": 1793701506683346436,
+    "log": "local-state/validations/candidate-facts-20261103/post-retirement-replay.log",
+    "log_sha256": "3ffbdf979af1a4baa4f5ca85d9447ab8e5d54e4735341419440c89313594e779",
+    "candidate_and_audit_outputs_identical_to_pre_retirement": true,
+    "raw_paths_absent": 6
+  },
+  "validation": {
+    "policy_tests": 15,
+    "policy_log": "local-state/validations/candidate-facts-20261103/policy-r4.log",
+    "policy_log_sha256": "51c965862c343d66aaa04718459302891606494d3b9c821f44f44f22050c3031",
+    "production_full_integration_reused_from": "docs/evidence/scalar_startup_acceptance_20261103.json",
+    "reuse_reason": "Only offline inventory tools, input representation and documentation change. Production compiler, gates, pin, target, pipelines, candidate table, cache implementation and expected execution contracts are unchanged.",
+    "documentation": {
+      "argv": [
+        "zig",
+        "build",
+        "check-docs"
+      ],
+      "status": "finished",
+      "started_ns": 1793701572324751270,
+      "samples": [
+        {
+          "time_ns": 1793701572324918216,
+          "available_bytes": 59662630912
+        }
+      ],
+      "pid": 2201085,
+      "returncode": 0,
+      "wall_ns": 52089408,
+      "finished_ns": 1793701572376985751,
+      "log": "local-state/validations/candidate-facts-20261103/docs-final.log",
+      "log_sha256": "de164b48ac33c9134b30ebebf53781eacb3427c95d6ad6fe630ba1d93fc505d9",
+      "documents": 19,
+      "internal_links": 159,
+      "status_blocks": 2
+    },
+    "artifact_store": {
+      "argv": [
+        "zig",
+        "build",
+        "artifact-store",
+        "--",
+        "verify"
+      ],
+      "status": "finished",
+      "started_ns": 1793701572432545929,
+      "samples": [
+        {
+          "time_ns": 1793701572432723085,
+          "available_bytes": 59662614528
+        },
+        {
+          "time_ns": 1793701574432823449,
+          "available_bytes": 59662598144
+        },
+        {
+          "time_ns": 1793701576433003447,
+          "available_bytes": 59662598144
+        },
+        {
+          "time_ns": 1793701578433192581,
+          "available_bytes": 59662704640
+        }
+      ],
+      "pid": 2201091,
+      "returncode": 0,
+      "wall_ns": 6313191861,
+      "finished_ns": 1793701578745893645,
+      "log": "local-state/validations/candidate-facts-20261103/artifacts-final.log",
+      "log_sha256": "e8586851043012f7df59a7f8e7d39e576be7213ce6cab2f6cce68ba287f90501",
+      "manifests": 5
+    }
+  },
+  "exploratory_failures": [
+    {
+      "log": "local-state/validations/candidate-facts-20261103/extraction.log",
+      "reason": "The pinned LLVM descriptor target uses the expanded Linux/glibc triple; the corrected check accepts both recorded x86_64 spellings and rejects other architectures."
+    },
+    {
+      "log": "local-state/validations/candidate-facts-20261103/extraction-r2.log",
+      "reason": "The historical audit stores the rejection count rather than a name list. The final proof checks that count and every raw/fact rejection identity; temporary fact outputs were retired and regenerated byte-identically."
+    },
+    {
+      "log": "retirement preflight",
+      "reason": "Each old payload had two hardlinks. The first preflight stopped before deletion; the final inventory locates and verifies all six superseded paths before physical retirement."
+    }
+  ],
+  "final_idle_cleanup_filesystem_available_before": 59658469376,
+  "final_idle_cache_cleanup": [
+    {
+      "path": ".zig-cache",
+      "device": 66306,
+      "inode": 54044871,
+      "reclaimable_allocated_bytes": 22790144,
+      "deleted": true
+    },
+    {
+      "path": "tools/__pycache__",
+      "device": 66306,
+      "inode": 53909131,
+      "reclaimable_allocated_bytes": 126976,
+      "deleted": true
+    }
+  ],
+  "final_idle_cleanup_filesystem_available_after": 59681386496,
+  "original_scratch_probes_sha256": {
+    "scratch/test_bitset.ll": "b34f6bfd3750284e36ff225111aed27e7961f570048b42628b375cfa99a6d8eb",
+    "scratch/test_llvm.ll": "17738822b102735f481bddb59f6bf63b4ddfdf48d9f9812008167e7c7cb35da6",
+    "scratch/test_query_debug.ll": "3a0798cb323fe6928565a8e5d450e85312df8437f2a79d5583d2a618a658d11c",
+    "scratch/test_size.zig": "a255ebc31f0eba577c2b616708dbb42a1727b9bc29b839abf2c30a1c35b57f10",
+    "scratch/test_opt.zig": "c2cfadc84692240bdfaca03406cae67692310b30fd11fcfb94a338fc80c95242",
+    "scratch/test_abi.zig": "e889e005850511755f57196e564a41e486686b9fd4f98c478482c969b7638d32",
+    "scratch/test_bitset.zig": "a0ae945f89311108811a07bdfaf65ddd2e9b453b59436df15c66dce739b6e137",
+    "scratch/test_init.zig": "38c327156a57e8a989db2d7ff35fafcb6fba9ae761bfafabf965ef92b71c343e",
+    "scratch/test_chunkstate_layout.zig": "8f12f11ced9863d48bb1e949ab5c414db8005d80569fb6bfb27b17a2a91473d6",
+    "scratch/test_query.ll": "99d0ca5c1b9472ef33bf9eb2dbf2cf8c05c69aab775588109826b763b233d476",
+    "scratch/test_offset.zig": "8b49ea64bf64a90fbd741d299eb1bacaccf24e5805073a08303dbfa26dec9534",
+    "scratch/test_query.zig": "5c7cbb510723d088f389cc932a67222e72ad736b651189c6b3e88bffd6fe3dbf",
+    "scratch/test_abi.s": "d439a7beb674e08b519923b308207f6c510f463ab229af7ca098fd1ce0ccdb15"
+  },
+  "completed_utc": "2026-11-03T10:27:35.729378+00:00",
+  "unchanged_production_execution_cohort_per_mode": 5,
+  "production_execution_evidence": "docs/evidence/scalar_startup_acceptance_20261103.json"
+}

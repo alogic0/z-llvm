@@ -78,8 +78,8 @@ Zig/Clang IR construction, libc, the system linker and CRT remain dependencies.
 
 The ABI cohort retains ten functions and passes 60 cases plus its negative
 controls. The frozen FMA canary still passes its 29 exact-result cases and
-8,192 LLVM-paired observations with unchanged identities. The combined focused
-checks pass 1,649 compiler unit tests, 11 structural tests and seven Python
+8,192 LLVM-paired observations with unchanged identities. The scalar checkpoint
+checks passed 1,649 compiler unit tests, 11 structural tests and seven Python
 policy tests. Standalone, compiler-core and compiler-rt populations remain
 separate; the compiler-rt bypass ratchet remains 130.
 
@@ -89,8 +89,13 @@ hello captures. A redundant 2,465-file source copy exactly matches Git commit
 `56e66794` and is removed with its reconstruction proof retained. The preceding
 [frame-store cleanup](evidence/scalar_frame_cleanup_20261103.json) preserves all
 228 paths and hashes of deduplicated immutable evidence. Current exports, frozen
-inputs, performance baselines and 13 original source probes remain. No archives
-are created. Follow the [current keep-list](evidence/tmp_retention_pins.tsv).
+inputs, performance baselines and 13 original source probes remain. The subsequent
+[audit input migration](evidence/candidate_facts_retention_20261103.json) retains
+74 MB of verified semantic facts and retires the old raw descriptors, reducing
+input allocation by 3.85 GB. All 21,117 rows, selected mode facts and rejection
+identities replay unchanged; 15 offline policy tests pass. Current production
+AIR and the compiler checkpoint remain unchanged. No archives are created.
+Follow the [current keep-list](evidence/tmp_retention_pins.tsv).
 
 The earlier [disk calibration](evidence/headroom_calibration_20261102.json) is accepted:
 an 8 GiB forecast covers the sampled 6.10 GB fresh and 1.60 GB cached decreases.

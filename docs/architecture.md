@@ -50,6 +50,15 @@ arguments and closed environment; publication does not cache executions or
 change the frozen candidate selection. This is validation infrastructure rather
 than a change to LLVM instruction semantics.
 
+The historical selector-v3 membership audit now consumes checked
+[semantic facts](evidence/real_candidates_release_v3_facts_manifest.json).
+These preserve signatures, effects, definedness and typed-body hashes from every
+unambiguous function in the old exports. The offline builder verifies the original
+audit identity and reproduces the entire candidate table and selected mode facts.
+The [retention proof](evidence/candidate_facts_retention_20261103.json) permits
+retirement of the old raw audit generation. Production lowering continues to
+consume the current authenticated AIR cache.
+
 ## Actual execution routes
 
 The dispatch is in [main_flow.zig](../src/main_flow.zig).
