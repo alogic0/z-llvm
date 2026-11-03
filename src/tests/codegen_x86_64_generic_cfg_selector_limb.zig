@@ -6,6 +6,16 @@ const ir = common.ir;
 const mc = common.mc;
 const selector = @import("../codegen/x86_64/generic_cfg_selector.zig");
 
+fn expectComposedNearMissLoad(machine: codegen.x86_64.MachineFunction) !void {
+    // The new array-stride consumer admits this ordinary load, but it must
+    // never select a limb-count pseudo instruction for the incomplete pattern.
+    try std.testing.expectEqual(.composed_block, machine.selection_owner);
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .popcount_limb64_rdi_si_ax, .ctz_limb64_rdi_si_ax, .clz_limb64_rdi_si_ax => return error.TestUnexpectedResult,
+        else => {},
+    };
+}
+
 fn expectInstruction(instructions: []const codegen.x86_64.Instruction, expected: codegen.x86_64.Instruction) !void {
     for (instructions) |instruction| {
         if (std.meta.eql(instruction, expected)) return;
@@ -605,7 +615,7 @@ test "generic cfg selector emits limb64 popcount envelope through opt-in selecto
     try std.testing.expectEqual(@as(u16, 33), popcount(&values, 127));
 }
 
-test "generic cfg selector keeps limb64 popcount near miss fail-closed" {
+test "generic cfg selector routes limb64 popcount near miss through composed selection" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -629,11 +639,11 @@ test "generic cfg selector keeps limb64 popcount near miss fail-closed" {
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    switch (result) {
+        .selected => {},
+        .unsupported => return error.TestExpectedSelected,
+    }
+    try expectComposedNearMissLoad(machine);
 }
 
 test "generic cfg selector emits limb64 ctz envelope through opt-in selector" {
@@ -708,7 +718,7 @@ test "generic cfg selector emits limb64 ctz envelope through opt-in selector" {
     try std.testing.expectEqual(.ctz_limb64_rdi_si_ax, machine.instructions.items[0]);
 }
 
-test "generic cfg selector keeps limb64 ctz near miss fail-closed" {
+test "generic cfg selector routes limb64 ctz near miss through composed selection" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -732,11 +742,11 @@ test "generic cfg selector keeps limb64 ctz near miss fail-closed" {
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    switch (result) {
+        .selected => {},
+        .unsupported => return error.TestExpectedSelected,
+    }
+    try expectComposedNearMissLoad(machine);
 }
 
 test "generic cfg selector emits limb64 clz envelope through opt-in selector" {
@@ -822,7 +832,7 @@ test "generic cfg selector emits limb64 clz envelope through opt-in selector" {
     try std.testing.expectEqual(.clz_limb64_rdi_si_ax, machine.instructions.items[0]);
 }
 
-test "generic cfg selector keeps limb64 clz near miss fail-closed" {
+test "generic cfg selector routes limb64 clz near miss through composed selection" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -846,11 +856,11 @@ test "generic cfg selector keeps limb64 clz near miss fail-closed" {
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    switch (result) {
+        .selected => {},
+        .unsupported => return error.TestExpectedSelected,
+    }
+    try expectComposedNearMissLoad(machine);
 }
 
 test "generic cfg selector emits limb64 not envelope through opt-in selector" {

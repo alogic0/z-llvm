@@ -455,6 +455,12 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
             if (instruction.kind == .call and callRequiresPreservationFrame(instruction.kind.call)) {
                 try preservation_barrier_positions.append(allocator, position);
             }
+            // Dynamic array strides use a scaled-address action with fixed
+            // scratch destinations. Values live across it can need spilling
+            // even when the overall register pressure is low.
+            if (instruction.kind == .gep and arrayStrideRequiresPreservationFrame(instruction.kind.gep)) {
+                try preservation_barrier_positions.append(allocator, position);
+            }
             if (instruction.kind == .store) try store_positions.append(allocator, position);
             position += 1;
         }
@@ -607,6 +613,14 @@ fn callRequiresPreservationFrame(call: ir.CallInst) bool {
         std.mem.eql(u8, call.callee, "llvm.abs.i32") or
         std.mem.eql(u8, call.callee, "llvm.abs.i64") or
         std.mem.eql(u8, call.callee, "llvm.abs.i128");
+}
+
+fn arrayStrideRequiresPreservationFrame(gep: ir.GepInst) bool {
+    return gep.source_ty == .aggregate and
+        std.mem.startsWith(u8, std.mem.trim(u8, gep.source_ty.aggregate, " \t"), "[") and
+        gep.indices.items.len == 1 and
+        gep.indices.items[0].ty.eql(.{ .int = 64 }) and
+        gep.indices.items[0].value == .named;
 }
 
 fn recordPreservationDemands(plan: *SelectorAllocationPlan, intervals: []const SelectorValueInterval, barrier_positions: []const usize) !void {

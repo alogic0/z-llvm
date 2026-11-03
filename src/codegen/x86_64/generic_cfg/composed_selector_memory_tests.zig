@@ -26,6 +26,183 @@ const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
 const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
 
+test "array strides reserve preservation space only for values live across the action" {
+    const source =
+        \\define ptr @dead_operands(ptr %base, i64 %index) {
+        \\entry:
+        \\  %address = getelementptr [8 x i8], ptr %base, i64 %index
+        \\  ret ptr %address
+        \\}
+        \\define i64 @live_operands(ptr %base, i64 %index, i64 %live, ptr %output, i64 %salt) {
+        \\entry:
+        \\  %address = getelementptr [8 x i8], ptr %base, i64 %index
+        \\  store ptr %address, ptr %output, align 8
+        \\  %bits = ptrtoint ptr %base to i64
+        \\  %a = xor i64 %bits, %index
+        \\  %b = xor i64 %a, %live
+        \\  %result = xor i64 %b, %salt
+        \\  ret i64 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    var dead = try stage2_planning.buildSelectorAllocationPlan(std.testing.allocator, module.functions.items[0]);
+    defer dead.deinit();
+    try std.testing.expectEqual(@as(usize, 0), dead.preservation_spill_slots);
+    var live = try stage2_planning.buildSelectorAllocationPlan(std.testing.allocator, module.functions.items[1]);
+    defer live.deinit();
+    try std.testing.expectEqual(@as(usize, 5), live.preservation_spill_slots);
+    for ([_][]const u8{ "base", "index", "live", "output", "salt" }) |name|
+        try std.testing.expect(live.preservation_values.contains(name));
+}
+
+test "array strides execute allocation padding nested arrays and wrapping indexes" {
+    const cases = [_]struct { source: []const u8, layout: []const u8 = "e-p:64:64-i64:64", stride: u64 }{
+        .{ .source = "[1 x i1]", .stride = 1 },
+        .{ .source = "[2 x i8]", .stride = 2 },
+        .{ .source = "[128 x i8]", .stride = 128 },
+        .{ .source = "[2 x i8]", .layout = "e-p:64:64-i8:32", .stride = 8 },
+        .{ .source = "[1 x i24]", .layout = "e-p:64:64-i24:32", .stride = 4 },
+        .{ .source = "[2 x [2 x i64]]", .stride = 32 },
+    };
+    for (cases) |case| {
+        const source = try std.fmt.allocPrint(std.testing.allocator,
+            \\target datalayout = "{s}"
+            \\define i64 @address(ptr %base, i64 %index) {{
+            \\entry:
+            \\  %p = getelementptr {s}, ptr %base, i64 %index
+            \\  %bits = ptrtoint ptr %p to i64
+            \\  ret i64 %bits
+            \\}}
+        , .{ case.layout, case.source });
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        try module.verify();
+        const context: x86_64_machine.ReadOnlyModuleContext = .{
+            .globals = module.globals.items,
+            .named_types = module.named_types.items,
+            .target_datalayout = module.target_datalayout,
+        };
+        var machine = MachineFunction.init("address", .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        switch (try impl.tryLowerComposedCfgWithContext(std.testing.allocator, &machine, module.functions.items[0], &context)) {
+            .selected => {},
+            .unsupported => return error.TestUnexpectedResult,
+        }
+        try x86_64_verify.verifyFunction(machine);
+        const code = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(code);
+        const mapping = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping[0..code.len], code);
+        const call: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(mapping.ptr);
+        for ([_]u64{ 0, 1, 4096, std.math.maxInt(u64), 0x8000000000000000 }) |base| {
+            for ([_]u64{ 0, 1, 7, std.math.maxInt(u64), 0x8000000000000000 }) |index|
+                try std.testing.expectEqual(base +% (index *% case.stride), call(base, index));
+        }
+    }
+}
+
+test "array stride admission rejects unsupported layouts strides and operands without mutation" {
+    const cases = [_]struct {
+        source: []const u8 = "[8 x i8]",
+        layout: []const u8 = "e-p:64:64",
+        index_ty: ir.Type = .{ .int = 64 },
+        index: ir.Value = .{ .named = "index" },
+        base: ValueLoc = .{ .arg64 = .rdi },
+        pointer_address_space: ?[]const u8 = null,
+        diagnostic: []const u8 = "composed-block-array-gep-layout",
+    }{
+        .{ .layout = "E-p:64:64" },
+        .{ .layout = "e-p:32:32" },
+        .{ .layout = "e-p:64:64:64:32" },
+        .{ .layout = "e-p:64:64-ni:0" },
+        .{ .source = "[1 x i24]", .layout = "e-p:64:64-i32:64" },
+        .{ .source = "[1 x i24]", .layout = "e-p:64:64-i24:24" },
+        .{ .source = "[1 x %opaque]" },
+        .{ .source = "[1 x { i8, i64 }]" },
+        .{ .source = "[1 x double]", .layout = "e-p:64:64-f64:128" },
+        .{ .source = "[0 x i8]", .diagnostic = "composed-block-array-gep-stride" },
+        .{ .source = "[3 x i8]", .diagnostic = "composed-block-array-gep-stride" },
+        .{ .source = "[256 x i8]", .diagnostic = "composed-block-array-gep-stride" },
+        .{ .index_ty = .{ .int = 32 }, .diagnostic = "composed-block-gep-elem-index-ty" },
+        .{ .index = .{ .int = 1 }, .diagnostic = "composed-block-gep-index-form" },
+        .{ .base = .{ .stack_scalar = .{ .base_disp = 0, .bits = 64, .kind = .integer } }, .diagnostic = "composed-block-array-gep-ptr" },
+        .{ .pointer_address_space = "addrspace(1)", .diagnostic = "composed-block-gep-addrspace" },
+    };
+    for (cases) |case| {
+        var machine = MachineFunction.init("rejected-array", .ptr);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("base", 5);
+        try plan.interval_ends.put("index", 5);
+        const context: x86_64_machine.ReadOnlyModuleContext = .{
+            .globals = &.{},
+            .named_types = &.{},
+            .target_datalayout = case.layout,
+        };
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.module_context = &context;
+        try selector_state.bindValueLoc(&selector, "base", case.base);
+        try selector_state.bindValueLoc(&selector, "index", .{ .arg64 = .rsi });
+        const base = selector.values.get("base").?;
+        const index = selector.values.get("index").?;
+        const next_vreg = selector.next_virtual_reg;
+        var indices = [_]ir.GepIndex{.{ .ty = case.index_ty, .value = case.index }};
+        const diagnostic = (try selector_memory.lowerGep(&selector, "result", .{
+            .source_ty = .{ .aggregate = case.source },
+            .ptr = .{ .named = "base" },
+            .ptr_addrspace = case.pointer_address_space,
+            .indices = .fromOwnedSlice(&indices),
+        })).?;
+        try std.testing.expectEqualStrings(case.diagnostic, diagnostic.detail());
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(base, selector.values.get("base").?);
+        try std.testing.expectEqual(index, selector.values.get("index").?);
+        try std.testing.expectEqual(next_vreg, selector.next_virtual_reg);
+        try std.testing.expect(selector.values.get("result") == null);
+    }
+}
+
+test "array stride EFLAGS rejection rolls back preserved scratch operands" {
+    var machine = MachineFunction.init("array-rollback", .ptr);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    for ([_][]const u8{ "base", "index", "result" }) |name| try plan.interval_ends.put(name, 5);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.stack_frame_bytes = 128;
+    try selector_state.bindValueLoc(&selector, "base", .{ .arg64 = .rcx });
+    try selector_state.bindValueLoc(&selector, "index", .{ .arg64 = .r8 });
+    try selector.eflags.apply(.definition);
+    const flags = selector.eflags.snapshot();
+    const base = selector.values.get("base").?;
+    const index = selector.values.get("index").?;
+    const next_vreg = selector.next_virtual_reg;
+    const next_spill = selector.next_spill_slot;
+    var indices = [_]ir.GepIndex{.{ .ty = .{ .int = 64 }, .value = .{ .named = "index" } }};
+    try std.testing.expectError(error.EflagsClobberedWhileLive, selector_memory.lowerGep(&selector, "result", .{
+        .source_ty = .{ .aggregate = "[8 x i8]" },
+        .ptr = .{ .named = "base" },
+        .indices = .fromOwnedSlice(&indices),
+    }));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    try std.testing.expectEqual(base, selector.values.get("base").?);
+    try std.testing.expectEqual(index, selector.values.get("index").?);
+    try std.testing.expectEqual(next_vreg, selector.next_virtual_reg);
+    try std.testing.expectEqual(next_spill, selector.next_spill_slot);
+    try selector.eflags.validateSnapshot(flags);
+    try std.testing.expect(selector.values.get("result") == null);
+}
+
 const floateidf_i56_fixture =
     \\define double @compiler_rt.floateidf.__floateidf(ptr nonnull readonly %p, i64 %bits) {
     \\Entry:

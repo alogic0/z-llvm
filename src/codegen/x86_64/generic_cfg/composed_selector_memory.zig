@@ -1041,6 +1041,14 @@ pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.G
         if (diagnostic == null and readonly_base) try selector.readonly_pointer_params.put(result_name, {});
         return diagnostic;
     }
+    if (gep.source_ty == .aggregate and
+        std.mem.startsWith(u8, std.mem.trim(u8, gep.source_ty.aggregate, " \t"), "[") and
+        gep.indices.items.len == 1)
+    {
+        const diagnostic = try lowerArrayStrideGep(selector, result_name, gep);
+        if (diagnostic == null and readonly_base) try selector.readonly_pointer_params.put(result_name, {});
+        return diagnostic;
+    }
     if (isStructAggregateType(gep.source_ty)) {
         const diagnostic = try lowerAggregateFieldGep(selector, result_name, gep);
         if (diagnostic == null and readonly_base) try selector.readonly_pointer_params.put(result_name, {});
@@ -1096,6 +1104,78 @@ pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.G
         else => return err,
     };
     return null;
+}
+
+fn lowerArrayStrideGep(selector: *ComposedBlockSelector, result_name: []const u8, gep: ir.GepInst) !?Diagnostic {
+    if (gep.ptr_addrspace != null) return .{ .no_emitter = "composed-block-gep-addrspace" };
+    const layout_text = if (selector.module_context) |context| context.target_datalayout else null;
+    if (!symbol_address.supportsLayout(layout_text)) return .{ .no_emitter = "composed-block-array-gep-layout" };
+    if (!supportsIntegerArrayStride(gep.source_ty.aggregate, layout_text orelse ""))
+        return .{ .no_emitter = "composed-block-array-gep-layout" };
+    const layout = target.DataLayout.parse(layout_text orelse "") catch
+        return .{ .no_emitter = "composed-block-array-gep-layout" };
+    const allocation_size = layout.typeAllocSizeBytes(gep.source_ty) catch
+        return .{ .no_emitter = "composed-block-array-gep-layout" };
+    const scale = std.math.cast(u8, allocation_size) orelse return .{ .no_emitter = "composed-block-array-gep-stride" };
+    if (scale == 0 or !std.math.isPowerOfTwo(scale)) return .{ .no_emitter = "composed-block-array-gep-stride" };
+    const index = gep.indices.items[0];
+    if (!index.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-gep-elem-index-ty" };
+    if (index.value != .named) return .{ .no_emitter = "composed-block-gep-index-form" };
+    if (gep.ptr != .named or selector_state.valueRegisterClass(selector, gep.ptr) != .gpr64)
+        return .{ .unsupported_value = "composed-block-array-gep-ptr" };
+    if (selector_state.valueRegisterClass(selector, index.value) != .gpr64)
+        return .{ .unsupported_value = "composed-block-gep-dynamic-index" };
+
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    const index_handle = try registerValueUseSource(&transaction, index.value, .{ .int = 64 }, .gpr64, .gpr64);
+    const action = try registerValueUseAction(
+        &transaction,
+        gep.ptr,
+        .ptr,
+        .gpr64,
+        .pointer,
+        .{ .form_scaled_address = .{
+            .result = try valueUseActionIdentity(result_name),
+            .index = .{ .request = index_handle },
+            .scale = scale,
+        } },
+    );
+    executeValueUseAction(&transaction, action) catch |err| return switch (err) {
+        error.ValueUseUnresolvedSource, error.ValueUseExpiredSource => .{ .unsupported_value = "composed-block-gep-dynamic-index" },
+        error.ValueUseUnsupportedAddressForm, error.ValueUseSourceViewMismatch, error.ValueUseRegisterClassMismatch, error.ValueUseTypeMismatch => .{ .unsupported_value = "composed-block-array-gep-ptr" },
+        else => return err,
+    };
+    return null;
+}
+
+fn supportsIntegerArrayStride(source: []const u8, layout_text: []const u8) bool {
+    // Keep this consumer within the allocation provider's integer-array
+    // contract. Struct/FP alignment overrides and named types need a richer
+    // provider; nonstandard integer widths require an exact alignment entry.
+    var element = std.mem.trim(u8, source, " \t");
+    while (element.len >= 2 and element[0] == '[' and element[element.len - 1] == ']') {
+        const body = std.mem.trim(u8, element[1 .. element.len - 1], " \t");
+        const separator = std.mem.indexOf(u8, body, " x ") orelse return false;
+        _ = std.fmt.parseUnsigned(u64, std.mem.trim(u8, body[0..separator], " \t"), 10) catch return false;
+        element = std.mem.trim(u8, body[separator + 3 ..], " \t");
+    }
+    if (element.len < 2 or element[0] != 'i') return false;
+    const bits = std.fmt.parseUnsigned(u16, element[1..], 10) catch return false;
+    if (bits == 0 or bits > 128) return false;
+    var exact_alignment = false;
+    var fields = std.mem.splitScalar(u8, layout_text, '-');
+    while (fields.next()) |field| {
+        if (field.len < 3 or field[0] != 'i') continue;
+        const colon = std.mem.indexOfScalar(u8, field, ':') orelse return false;
+        const width = std.fmt.parseUnsigned(u16, field[1..colon], 10) catch return false;
+        if (width != bits) continue;
+        var alignments = std.mem.splitScalar(u8, field[colon + 1 ..], ':');
+        const alignment = std.fmt.parseUnsigned(u16, alignments.next() orelse return false, 10) catch return false;
+        if (alignment < 8 or !std.math.isPowerOfTwo(alignment)) return false;
+        exact_alignment = true;
+    }
+    return exact_alignment or bits == 1 or bits == 8 or bits == 16 or bits == 32 or bits == 64 or bits == 128;
 }
 
 pub fn lowerI32ElementPointerGep(selector: *ComposedBlockSelector, result_name: []const u8, gep: ir.GepInst) !?Diagnostic {
