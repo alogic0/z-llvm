@@ -556,10 +556,7 @@ pub fn executeStoreI64(
     }
     const reg: ArgReg = switch (pointer) {
         .arg64, .scratch64 => |r| r,
-        .spill64 => blk: {
-            try materializeActionPointer(Authority, transaction, pointer, .rcx);
-            break :blk .rcx;
-        },
+        .spill64 => .rcx,
         else => return error.ValueUseStorePointerFormUnsupported,
     };
     const value_view = try Authority.registeredOperandView(Authority, transaction, action.value);
@@ -567,6 +564,10 @@ pub fn executeStoreI64(
         Authority.noteRegisteredOperandBoundaryError(Authority, transaction, action.value, err);
         return err;
     };
+    // Consume the value view before staging a spilled pointer into RCX.
+    // That staging can displace a value currently in RCX and invalidate its
+    // prepared physical view even though its canonical binding is preserved.
+    if (pointer == .spill64) try materializeActionPointer(Authority, transaction, pointer, .rcx);
     if (reg == .rcx) {
         try transaction.selector.machine.instructions.append(
             transaction.selector.allocator,

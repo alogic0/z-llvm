@@ -617,6 +617,53 @@ test "value-use closed immediate and i64 stores retain accepted staging order" {
         }, machine.instructions.items);
     }
 }
+test "value-use i64 store consumes RCX value before staging a spilled pointer" {
+    inline for (.{ false, true }) |live_after| {
+        var machine = MachineFunction.init("store-rcx-value", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "pointer", "value" }) |name| {
+            if (live_after) try addLive(&plan, name) else try addAtCurrent(&plan, name);
+        }
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        selector.next_spill_slot = 1;
+        try selector_state.bindValueLoc(&selector, "pointer", .{ .spill64 = .slot0 });
+        try selector_state.bindValueLoc(&selector, "value", .{ .scratch64 = .rcx });
+        const value_before = selector.values.get("value").?;
+        const pointer_before = selector.values.get("pointer").?;
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const value = try transaction.register(preparedSourceRequest("value", .ptr, .gpr64, .pointer));
+        const action = try transaction.register(preparedRequest(
+            "pointer",
+            .ptr,
+            .gpr64,
+            .pointer,
+            .{ .store_i64 = .{ .value = value } },
+        ));
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(action));
+        try std.testing.expectEqual(machine_module.Instruction{ .mov_arg_rax = .rcx }, machine.instructions.items[0]);
+        try std.testing.expectEqual(machine_module.Instruction{ .reload_arg64_rsp = .{ .reg = .rcx, .frame_index = .slot0 } }, machine.instructions.items[machine.instructions.items.len - 2]);
+        try std.testing.expectEqual(machine_module.Instruction.store_rax_rcx_ptr, machine.instructions.items[machine.instructions.items.len - 1]);
+        if (live_after) {
+            try std.testing.expect(selector.values.get("value").?.loc == .spill64);
+            try std.testing.expectEqual(value_before.vreg, selector.values.get("value").?.vreg);
+        }
+        try transaction.rollback();
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(@as(usize, 1), selector.next_spill_slot);
+        try std.testing.expectEqual(value_before, selector.values.get("value").?);
+        try std.testing.expectEqual(pointer_before, selector.values.get("pointer").?);
+    }
+}
+
 test "value-use store rollback covers scalar dependency and stack-pointer partial stages" {
     {
         var machine = MachineFunction.init("value-use-store-index-rollback", .void);
