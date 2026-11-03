@@ -502,6 +502,12 @@ fn executeSerialTools(
         if (tool_index == 9) {
             var nested_options = real_rows_options;
             nested_options.minimum_free_floor_bytes = @max(nested_options.minimum_free_floor_bytes, policy.reserve_bytes);
+            nested_options.inherited_admission = .{
+                .filesystem_total_bytes = policy.filesystem_total_bytes,
+                .starting_free_bytes = tracker.starting_free_bytes,
+                .reserve_bytes = policy.reserve_bytes,
+                .projected_peak_bytes = policy.projected_peak_bytes,
+            };
             var group = try real_rows_parallel.runGroup(
                 allocator,
                 io,
@@ -1045,18 +1051,13 @@ test "bounded fake serial orchestration uses all 17 authoritative subgates in or
     for (&samples, 0..) |*sample, index| {
         sample.* = .{
             .total_bytes = total_bytes,
-            .free_bytes = 900_000 - @as(u64, @intCast(index * 1_000)),
+            .free_bytes = 90 * 1024 * 1024 * 1024 - @as(u64, @intCast(index * 1_000)),
         };
     }
     var sampler_context: FakeSamplerContext = .{ .samples = &samples };
     var executor_context: FakeExecutorContext = .{};
-    var tracker = headroom_policy.Tracker.init(901_000);
-    const policy: headroom_policy.Policy = .{
-        .filesystem_total_bytes = total_bytes,
-        .reserve_bytes = 100_000,
-        .projected_peak_bytes = 10_000,
-        .required_start_bytes = 110_000,
-    };
+    var tracker = headroom_policy.Tracker.init(90 * 1024 * 1024 * 1024 + 1_000);
+    const policy = headroom_policy.forFilesystem(total_bytes);
     var output_buffer: [128 * 1024]u8 = undefined;
     var writer = std.Io.Writer.fixed(&output_buffer);
     var metrics: RunMetrics = .{};

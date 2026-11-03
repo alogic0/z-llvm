@@ -18,6 +18,36 @@ pub const Policy = struct {
     required_start_bytes: u64,
 };
 
+/// A caller already admitted the entire serial run. Its descendants consume
+/// that allowance while continuing to enforce the reserve at every sample.
+pub const Admission = struct {
+    filesystem_total_bytes: u64,
+    starting_free_bytes: u64,
+    reserve_bytes: u64,
+    projected_peak_bytes: u64,
+
+    pub fn validate(admission: Admission, total_bytes: u64, floor_bytes: u64, forecast_bytes: u64) !void {
+        if (admission.filesystem_total_bytes != total_bytes or admission.reserve_bytes < floor_bytes or
+            admission.projected_peak_bytes < forecast_bytes) return error.InvalidInheritedHeadroomAdmission;
+        const required = std.math.add(u64, admission.reserve_bytes, admission.projected_peak_bytes) catch
+            return error.InvalidInheritedHeadroomAdmission;
+        if (admission.starting_free_bytes < required) return error.InvalidInheritedHeadroomAdmission;
+    }
+};
+
+test "inherited admission binds the filesystem reserve forecast and original free space" {
+    const admission: Admission = .{ .filesystem_total_bytes = 1000, .starting_free_bytes = 300, .reserve_bytes = 100, .projected_peak_bytes = 200 };
+    try admission.validate(1000, 100, 200);
+    try std.testing.expectError(error.InvalidInheritedHeadroomAdmission, admission.validate(1001, 100, 200));
+    try std.testing.expectError(error.InvalidInheritedHeadroomAdmission, admission.validate(1000, 101, 200));
+    try std.testing.expectError(error.InvalidInheritedHeadroomAdmission, admission.validate(1000, 100, 201));
+    var invalid = admission;
+    invalid.starting_free_bytes = 299;
+    try std.testing.expectError(error.InvalidInheritedHeadroomAdmission, invalid.validate(1000, 100, 200));
+    invalid = .{ .filesystem_total_bytes = 1000, .starting_free_bytes = std.math.maxInt(u64), .reserve_bytes = std.math.maxInt(u64), .projected_peak_bytes = 1 };
+    try std.testing.expectError(error.InvalidInheritedHeadroomAdmission, invalid.validate(1000, 100, 1));
+}
+
 pub const ShardingPolicy = struct {
     filesystem_total_bytes: u64,
     floor_bytes: u64,

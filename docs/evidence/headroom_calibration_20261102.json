@@ -44,12 +44,13 @@
     "Serial tracker incorporates the row monitor minimum before worker cleanup can hide it.",
     "Nested row workers enforce max(standalone floor, caller reserve), including while running.",
     "Allocated disk telemetry covers the parent scratch root, three work roots and three export roots in one invocation.",
-    "Existing cached payloads are included in owned footprint; these bytes are not all newly allocated."
+    "Existing cached payloads are included in owned footprint; these bytes are not all newly allocated.",
+    "Nested admission validates the original full-run budget instead of demanding it again after earlier gates consume part; standalone admission and runtime reserve enforcement remain strict."
   ],
   "tests": {
-    "serial_and_imported_policy_tests": 47,
-    "comparison_and_imported_policy_tests": 37,
-    "log": "local-state/validations/startup-headroom-20261102/headroom-unit.log"
+    "serial_and_imported_policy_tests": 49,
+    "comparison_and_imported_policy_tests": 39,
+    "log": "local-state/validations/startup-headroom-20261102/headroom-unit-inherited.log"
   },
   "measurement_limits": [
     "Filesystem free-space changes include unrelated processes.",

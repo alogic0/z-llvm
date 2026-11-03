@@ -1,6 +1,7 @@
 const std = @import("std");
 const common = @import("tool_common.zig");
 const policy_authority = @import("distribution_real_rows_parallel_policy.zig");
+const headroom_policy = @import("distribution_headroom_policy.zig");
 const cohort_output = @import("run_distribution_real_rows_parallel/cohort_output.zig");
 
 pub const mode_count = 3;
@@ -43,6 +44,8 @@ pub const Evidence = struct {
     projected_peak_bytes: u64,
     required_start_bytes: u64,
     starting_free_bytes: u64,
+    admission_source: enum { own_preflight, serial_preflight },
+    admission_starting_free_bytes: u64,
     minimum_free_bytes: u64,
     final_free_bytes: u64,
     peak_disk_bytes: u64,
@@ -89,6 +92,7 @@ pub const ParentOptions = struct {
     cache_mode: CacheMode = .require_hit,
     concurrency: u8,
     minimum_free_floor_bytes: u64 = 0,
+    inherited_admission: ?headroom_policy.Admission = null,
     test_options: ?*TestOptions = null,
 };
 
@@ -1170,7 +1174,10 @@ pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, provided_options: Pare
     const wall_start = std.Io.Timestamp.now(io, .awake);
     const preflight = try sampleFilesystem(allocator, io, paths.root, options);
     const policy = try policy_authority.forFilesystemWithFloor(preflight.total_bytes, options.minimum_free_floor_bytes);
-    if (preflight.free_bytes < policy.required_start_bytes) return error.InsufficientRealRowsParallelHeadroom;
+    if (options.inherited_admission) |admission| {
+        try admission.validate(preflight.total_bytes, policy.post_run_free_floor_bytes, policy.projected_peak_bytes);
+        if (preflight.free_bytes < policy.post_run_free_floor_bytes) return error.RealRowsParallelDiskFloorCrossed;
+    } else if (preflight.free_bytes < policy.required_start_bytes) return error.InsufficientRealRowsParallelHeadroom;
     const available_memory = try sampleAvailableMemory(allocator, io, options);
     var pins: [mode_count]CachePin = undefined;
     if (options.cache_mode == .require_hit) pins = try probeAndPin(allocator, io, options, &paths);
@@ -1251,6 +1258,8 @@ pub fn runGroup(allocator: std.mem.Allocator, io: std.Io, provided_options: Pare
             .projected_peak_bytes = policy.projected_peak_bytes,
             .required_start_bytes = policy.required_start_bytes,
             .starting_free_bytes = resource.starting_free_bytes,
+            .admission_source = if (options.inherited_admission != null) .serial_preflight else .own_preflight,
+            .admission_starting_free_bytes = if (options.inherited_admission) |admission| admission.starting_free_bytes else preflight.free_bytes,
             .minimum_free_bytes = resource.minimum_free_bytes,
             .final_free_bytes = resource.final_free_bytes,
             .peak_disk_bytes = resource.peak_disk_bytes,
@@ -1307,7 +1316,7 @@ pub fn writeEvidence(writer: *std.Io.Writer, evidence: *const Evidence) !void {
         },
     );
     try writer.print(
-        "wall_ms={} summed_child_ms={} filesystem_total_bytes={} post_run_free_floor_bytes={} projected_peak_bytes={} required_start_bytes={} starting_free_bytes={} minimum_free_bytes={} final_free_bytes={} peak_disk_bytes={} peak_aggregate_rss_bytes={} minimum_available_memory_bytes={} load_start={s} load_end={s} execution_results_cached=false local_fail=0\n",
+        "wall_ms={} summed_child_ms={} filesystem_total_bytes={} post_run_free_floor_bytes={} projected_peak_bytes={} required_start_bytes={} admission_source={s} admission_starting_free_bytes={} starting_free_bytes={} minimum_free_bytes={} final_free_bytes={} peak_disk_bytes={} peak_aggregate_rss_bytes={} minimum_available_memory_bytes={} load_start={s} load_end={s} execution_results_cached=false local_fail=0\n",
         .{
             evidence.wall_ms,
             evidence.summed_child_ms,
@@ -1315,6 +1324,8 @@ pub fn writeEvidence(writer: *std.Io.Writer, evidence: *const Evidence) !void {
             evidence.post_run_free_floor_bytes,
             evidence.projected_peak_bytes,
             evidence.required_start_bytes,
+            @tagName(evidence.admission_source),
+            evidence.admission_starting_free_bytes,
             evidence.starting_free_bytes,
             evidence.minimum_free_bytes,
             evidence.final_free_bytes,
@@ -1978,6 +1989,49 @@ test "allocated disk sampling includes work and export roots outside the parent 
     try std.Io.Dir.cwd().deleteFile(io, work_file);
     try std.Io.Dir.cwd().deleteFile(io, cache_file);
     try std.testing.expectEqual(empty, try sampleDiskBytes(allocator, io, &paths, options));
+}
+
+test "nested admission consumes the parent allowance without admitting an invalid original budget" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var temp = std.testing.tmpDir(.{});
+    defer temp.cleanup();
+    var roots = try fixtureRoots(allocator, io, &temp);
+    defer roots.deinit(allocator);
+    const total = 982_240_026_624;
+    const outer = headroom_policy.forFilesystem(total);
+    const current_free = outer.required_start_bytes - 1024 * 1024 * 1024;
+    var audit: LifecycleAudit = .{};
+    var test_options: TestOptions = .{
+        .worker_fixture = .success,
+        .filesystem_sample = .{ .total_bytes = total, .free_bytes = current_free },
+        .failure_evidence_dir = roots.scratch,
+        .audit = &audit,
+    };
+    var options: ParentOptions = .{
+        .target_assignment = "TARGET=test",
+        .scratch_path = roots.scratch,
+        .export_cache_path = roots.cache,
+        .cache_mode = .require_hit,
+        .concurrency = 3,
+        .minimum_free_floor_bytes = outer.reserve_bytes,
+        .test_options = &test_options,
+    };
+    try std.testing.expectError(error.InsufficientRealRowsParallelHeadroom, runGroup(allocator, io, options));
+    options.inherited_admission = .{
+        .filesystem_total_bytes = total,
+        .starting_free_bytes = outer.required_start_bytes,
+        .reserve_bytes = outer.reserve_bytes,
+        .projected_peak_bytes = outer.projected_peak_bytes,
+    };
+    var group = try runGroup(allocator, io, options);
+    defer group.deinit(allocator);
+    try std.testing.expectEqual(.serial_preflight, group.evidence.admission_source);
+    try std.testing.expectEqual(outer.required_start_bytes, group.evidence.admission_starting_free_bytes);
+    try std.testing.expectEqual(outer.reserve_bytes, group.evidence.post_run_free_floor_bytes);
+    try std.testing.expectEqual(current_free, group.evidence.minimum_free_bytes);
+    options.inherited_admission.?.starting_free_bytes -= 1;
+    try std.testing.expectError(error.InvalidInheritedHeadroomAdmission, runGroup(allocator, io, options));
 }
 
 fn fixtureRootsWithCaches(allocator: std.mem.Allocator, io: std.Io, temp: *std.testing.TmpDir, populate_caches: bool) !FixtureRoots {

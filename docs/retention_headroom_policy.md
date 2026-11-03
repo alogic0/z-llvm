@@ -67,6 +67,13 @@ inherit that reserve while running, and their transient minimum enters the
 serial report before cleanup. Full fresh/cached acceptance for this change is
 pending the combined checkpoint.
 
+The serial parent records its original admission. Row workers validate that
+record's filesystem, starting free space, reserve and forecast, then consume the
+remaining allowance rather than demand the entire forecast a second time.
+Their monitor still enforces the inherited reserve. Standalone workers continue
+to require a complete initial allowance. Telemetry reports the admission source
+and original admitted free space separately from the row group's starting space.
+
 Row telemetry schema 3 measures allocated bytes across the parent scratch root,
 three work roots and three export roots. It includes retained cached payloads;
 it does not identify every byte as new allocation. Filesystem free-space changes
