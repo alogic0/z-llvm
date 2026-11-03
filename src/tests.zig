@@ -26,6 +26,7 @@ comptime {
     _ = @import("tests/integer_semantics.zig");
     _ = @import("tests/module_references.zig");
     _ = @import("tests/globaldce_references.zig");
+    _ = @import("tests/global_dependencies.zig");
     _ = @import("tests/adce_operands.zig");
     _ = @import("tests/verifier_allocation.zig");
 }
