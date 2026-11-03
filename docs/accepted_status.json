@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "1f92385ebeaf6d189d651afd71689f51a5ba0649",
-  "accepted_tree": "39b2c7e669608ea89085a2e54d886371e14c7d73",
+  "accepted_revision": "d4403016c8da556487d96cdb86223182e169600c",
+  "accepted_tree": "0b7f9e73a2412b4d48c6ee7541139aaf618f2d58",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,10 +17,10 @@
   "paired_harnesses_ok": 5,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "1f92385e",
+  "declaration_revision": "d4403016",
   "evidence": [
-    "docs/evidence/scalar_startup_acceptance_20261103.json",
-    "docs/evidence/scalar_startup_20261103_cached.summary",
+    "docs/evidence/allocation_padding_acceptance_20261103.json",
+    "docs/evidence/allocation_padding_20261103_cached.summary",
     "docs/evidence/real_candidates_release_v3_migration.json"
   ],
   "selector_version": "real-candidate-selector-v3"

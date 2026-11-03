@@ -41,6 +41,13 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
+The current accepted [allocation-padding repair](evidence/allocation_padding_acceptance_20261103.json)
+at `d4403016` fixes a native mismatch with LLVM: `{ i24, i8 }` previously
+placed the second field at byte 3 instead of 4. Nested structs/arrays and 80-bit
+floating allocation padding are covered by a permanent all-mode canary. The
+1,662 units, focused ABI/native checks and all 17 integration gates pass on a
+verified 2,615-file source snapshot. Candidate, execution and bypass counts stay fixed.
+
 The [scalar startup acceptance](evidence/scalar_startup_acceptance_20261103.json)
 at `1f92385e` completes exact named i64-to-pointer conversion and signed i32/i64
 nonnegative comparisons through the existing value-use authorities. The preceding
@@ -104,8 +111,10 @@ stays enforced and whose transient minimum enters the serial report. Allocated
 disk telemetry covers all seven owned roots, including retained exports. The
 49 runner/policy and 39 comparison tests pass. Filesystem noise and sampled,
 non-atomic observations remain measurement limits.
-The current cached run reports a 2.32 GB decrease with the same reserve and
-forecast; AIR publication and runner infrastructure are unchanged.
+The allocation-padding cached run reports a 3.37 GB decrease with the same reserve
+and forecast. The sample includes concurrent isolated development; no timing or
+space-efficiency comparison is claimed. AIR publication and runner infrastructure
+are unchanged.
 
 The [bounded memory slice](evidence/startup_word_pair_memory_20261102.json)
 reuses existing 128-bit frame storage for an exact 16-byte pointer/length object

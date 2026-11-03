@@ -116,6 +116,13 @@ cannot discard side effects or move barrier reads; the sret field loader decline
 when a delayed load could cross an intervening store. Scalar load snapshots that
 survive stores receive frame preservation space.
 
+The shared [target layout](../src/target/datalayout.zig) now advances struct
+fields by allocation size, including each scalar field's ABI tail padding. The
+field after `i24` starts at byte 4 and the field after `x86_fp80` at byte 16;
+nested structs and arrays preserve those strides. Arithmetic overflow rejects
+instead of wrapping. The [accepted repair](evidence/allocation_padding_acceptance_20261103.json)
+includes executable LLVM comparisons in all three modes.
+
 Upstream mapping for these repairs, inspected in the local pinned sources:
 
 - Zig `src/codegen/llvm/FuncGen.zig`: `airLoad`, `airIsNonNull` and `optCmpNull`;

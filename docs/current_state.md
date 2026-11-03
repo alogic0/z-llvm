@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `1f92385ebeaf6d189d651afd71689f51a5ba0649`; tree: `39b2c7e669608ea89085a2e54d886371e14c7d73`.
+Accepted revision: `d4403016c8da556487d96cdb86223182e169600c`; tree: `0b7f9e73a2412b4d48c6ee7541139aaf618f2d58`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -24,6 +24,14 @@ Candidate SHA-256: `847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe
 Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
+
+The [allocation-padding repair](evidence/allocation_padding_acceptance_20261103.json)
+passes all 17 integration subgates. Struct fields now advance by allocation size: the
+field after `i24` starts at byte 4 and the field after `x86_fp80` at byte 16. Four
+permanent native regressions pass 768 local observations against 384 LLVM references
+across direct/release routes in three modes. The 1,662 unit tests and focused
+60-case ABI gate pass. Symbolic global-data helpers are present; their integration
+remains a separate work item.
 
 The [scalar startup checkpoint](evidence/scalar_startup_acceptance_20261103.json)
 passes all 17 integration subgates on its frozen source snapshot. Exact named

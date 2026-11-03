@@ -174,6 +174,12 @@ bits/booleans, signed extrema, register/spill/returned inputs, caller clobbers,
 live values and output guards. These standalone observations leave all earlier
 population counters unchanged.
 
+The mandatory [allocation-padding canary](evidence/allocation_padding_acceptance_20261103.json)
+adds four scalar/nested/array GEP functions. Direct/release routes in three modes
+produce 768 local observations against 384 LLVM references reused across routes.
+It checks allocation padding for `i24` and `x86_fp80`, including nested layouts;
+all existing populations remain separate.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine
