@@ -51,6 +51,12 @@ MEMORY_CANARIES = {
         "functions": {"word_pair_copy", "word_pair_extract"}, "observations": 64,
         "stdout": "word-pair-memory observations=64 copy=independent pointers=preserved guards=preserved\n",
     },
+    "signed_nonnegative": {
+        "prefix": "signed-nonnegative", "fixture": "signed_nonnegative",
+        "functions": {"nonnegative_i32", "nonnegative_i64", "nonnegative_returned", "nonnegative_spilled"},
+        "observations": 256,
+        "stdout": "signed-nonnegative observations=256 signed=preserved live=preserved guards=preserved\n",
+    },
     "integer_pointer": {
         "prefix": "integer-pointer", "fixture": "integer_pointer",
         "functions": {"integer_pointer_roundtrip", "integer_pointer_spilled", "integer_pointer_returned", "integer_pointer_identity"},
@@ -133,7 +139,8 @@ def main():
               "word_pair_local_observations": 0, "word_pair_reference_observations": 0,
               "pointer_stack_local_observations": 0, "pointer_stack_reference_observations": 0,
               "scalar_stack_local_observations": 0, "scalar_stack_reference_observations": 0,
-              "integer_pointer_local_observations": 0, "integer_pointer_reference_observations": 0, "rows": []}
+              "integer_pointer_local_observations": 0, "integer_pointer_reference_observations": 0,
+              "signed_nonnegative_local_observations": 0, "signed_nonnegative_reference_observations": 0, "rows": []}
     try:
         if platform.system() != "Linux" or platform.machine() != "x86_64":
             raise RuntimeError("this bounded gate requires x86_64 Linux")
@@ -168,7 +175,8 @@ def main():
                            "word_pair_memory.ll", "word_pair_memory_driver.c",
                            "runtime_pointer_stack.ll", "runtime_pointer_stack_driver.c",
                            "scalar_stack_memory.ll", "scalar_stack_memory_driver.c",
-                           "integer_pointer.ll", "integer_pointer_driver.c")}})
+                           "integer_pointer.ll", "integer_pointer_driver.c",
+                           "signed_nonnegative.ll", "signed_nonnegative_driver.c")}})
         environment = {k: v for k, v in os.environ.items() if not k.startswith(("ZLLVM_", "ZIG_USE_ZLLVM"))}
         environment.update({"ZIG_LOCAL_CACHE_DIR": str(output / "frontend-cache"),
                             "ZIG_GLOBAL_CACHE_DIR": str(output / "global-cache")})
@@ -245,6 +253,7 @@ def main():
         print(f"summary pointer-stack-memory population=standalone-runtime-pointer-stack routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['pointer_stack_local_observations']} reference_observations={report['pointer_stack_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary scalar-stack-memory population=standalone-scalar-stack routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['scalar_stack_local_observations']} reference_observations={report['scalar_stack_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary integer-pointer-casts population=standalone-integer-pointer-casts routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['integer_pointer_local_observations']} reference_observations={report['integer_pointer_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
+        print(f"summary signed-nonnegative population=standalone-signed-nonnegative routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['signed_nonnegative_local_observations']} reference_observations={report['signed_nonnegative_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"evidence: {output / 'report.json'}")
         if "error" in report:
             print(report["error"], file=sys.stderr)

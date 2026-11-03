@@ -55,10 +55,10 @@ const expectTableLoadFailure = support.expectTableLoadFailure;
 const I128PairRollbackBoundary = support.I128PairRollbackBoundary;
 const expectI128PairRollbackExact = support.expectI128PairRollbackExact;
 
-test "value-use dormant current-home sign-bit action classifies only named i32 i64 slt zero" {
+test "value-use current-home sign-bit action classifies named i32 i64 slt and sge zero" {
     inline for ([_]u16{ 32, 64 }) |bits| {
-        try std.testing.expect(Transaction.isCurrentHomeSignBitIcmp(.{
-            .predicate = .slt,
+        inline for ([_]ir.IcmpPredicate{ .slt, .sge }) |predicate| try std.testing.expect(Transaction.isCurrentHomeSignBitIcmp(.{
+            .predicate = predicate,
             .operand_ty = .{ .int = bits },
             .lhs = .{ .named = "source" },
             .rhs = .{ .int = 0 },

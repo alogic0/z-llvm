@@ -458,6 +458,7 @@ fn lowerCurrentHomeSignBitIcmp(
         .prepared_action = .{ .current_home_sign_bit = .{
             .result = try ValueUseTransaction.ActionIdentity.init(result_name),
             .operand_ty = icmp.operand_ty,
+            .invert = icmp.predicate == .sge,
         } },
     });
     transaction.seal() catch |err|

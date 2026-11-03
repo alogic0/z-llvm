@@ -172,7 +172,7 @@ const CurrentHomeEqZeroTest = union(enum) {
 };
 
 pub fn isCurrentHomeSignBitIcmp(icmp: ir.IcmpInst) bool {
-    if (icmp.predicate != .slt or icmp.samesign) return false;
+    if ((icmp.predicate != .slt and icmp.predicate != .sge) or icmp.samesign) return false;
     const bits = switch (icmp.operand_ty) {
         .int => |value| value,
         else => return false,
@@ -996,6 +996,8 @@ pub fn executeCurrentHomeSignBit(
 
     try selector_state.emitEflagsInstruction(transaction.selector, plan.shift, .write);
     try failCurrentHomeSignBitForTest(Authority, transaction, .after_shift);
+    if (action.invert)
+        try selector_state.emitEflagsInstruction(transaction.selector, .{ .xor_eax_imm32 = 1 }, .write);
 
     const stored_action =
         &transaction.requests[source_index].prepared_action.?.current_home_sign_bit;

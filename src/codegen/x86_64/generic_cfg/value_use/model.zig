@@ -488,15 +488,16 @@ pub const SetccEaxCompareTestFailure = enum {
     after_finalization,
 };
 
-/// Closed semantic intent for i32/i64 sign-bit extraction. The operand
-/// type alone determines EAX/RAX and the logical shift count.
+/// Closed semantic intent for i32/i64 sign-bit extraction or its complement.
+/// The operand type determines EAX/RAX and the logical shift count.
 pub const CurrentHomeSignBitAction = struct {
     result: ActionIdentity,
     operand_ty: ir.Type,
+    invert: bool = false,
 };
 
 /// Pure future-dispatch classifier. It observes only the ICMP semantic
-/// form and admits exactly `slt i32/i64 <named>, 0`.
+/// form and admits `slt/sge i32/i64 <named>, 0`.
 pub const CurrentHomeSignBitRequestError = error{
     ValueUseCurrentHomeSignBitWidthUnsupported,
     ValueUseCurrentHomeSignBitLocationUnsupported,
