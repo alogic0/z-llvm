@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
+const target = @import("../../../target.zig");
 const cfg = @import("../../../analysis/cfg.zig");
 const constant_table = @import("../constant_table.zig");
 const x86_64_machine = @import("../machine.zig");
@@ -300,6 +301,7 @@ fn readOnlyPointerLoadValueUseDiagnostic(
 
 fn lowerStoreStackPointer(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
     if (store.ty_addrspace != null or store.ptr_addrspace != null) return .{ .no_emitter = "composed-block-store-stack-pointer-addrspace" };
+    if (!has64BitDefaultPointerLayout(selector)) return .{ .no_emitter = "composed-block-store-stack-pointer-layout" };
     const destination_class = selector_state.storePointerDiagnosticClass(selector, store.ptr) orelse
         return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
     switch (destination_class) {
@@ -307,8 +309,11 @@ fn lowerStoreStackPointer(selector: *ComposedBlockSelector, store: ir.StoreInst)
             return .{ .no_emitter = "composed-block-store-stack-pointer-width" },
         else => return .{ .no_emitter = "composed-block-store-stack-pointer-ptr" },
     }
+    if (store.value == .null_value) return lowerStoreI64Transactional(selector, store, destination_class);
     const source_class = selector_state.storePointerDiagnosticClass(selector, store.value) orelse
         return .{ .unsupported_value = "composed-block-store-stack-pointer-value" };
+    if (source_class == .register64 or source_class == .spill64)
+        return lowerStoreI64Transactional(selector, store, destination_class);
     if (source_class != .stack_scalar)
         return .{ .no_emitter = "composed-block-store-stack-pointer-value" };
 
@@ -341,6 +346,13 @@ fn lowerStoreStackPointer(selector: *ComposedBlockSelector, store: ir.StoreInst)
         else => return err,
     };
     return null;
+}
+
+fn has64BitDefaultPointerLayout(selector: *const ComposedBlockSelector) bool {
+    const context = selector.module_context orelse return true;
+    const text = context.target_datalayout orelse return true;
+    const layout = target.DataLayout.parse(text) catch return false;
+    return (layout.pointerSizeBits() catch return false) == 64;
 }
 
 fn scalarFpBits(ty: ir.Type) ?u16 {
@@ -799,7 +811,10 @@ fn lowerStoreScalarTransactional(
             ) catch return .{ .unsupported_value = storeValueDetail(selector, store.value) };
         },
         .int, .null_value => blk: {
-            const immediate = if (store.value == .null_value) @as(i32, 0) else (i32BitPattern(store.value.int) catch return .{ .unsupported_value = "composed-block-store-value-other" });
+            const immediate: i64 = if (store.value == .null_value) 0 else if (bits == 64)
+                (i64Value(store.value.int) catch return .{ .unsupported_value = "composed-block-store-value-other" })
+            else
+                (i32BitPattern(store.value.int) catch return .{ .unsupported_value = "composed-block-store-value-other" });
             break :blk registerValueUseAction(
                 &transaction,
                 store.ptr,
@@ -831,6 +846,12 @@ fn lowerStoreI64Transactional(
 ) !?Diagnostic {
     switch (pointer_class) {
         .register64, .spill64 => {},
+        .stack_scalar => |stack| {
+            if (store.ty_addrspace != null or store.ptr_addrspace != null)
+                return .{ .no_emitter = "composed-block-store-stack-addrspace" };
+            if (stack.bits != 64 or stack.kind != .integer)
+                return .{ .no_emitter = "composed-block-store-stack-width" };
+        },
         else => return .{ .no_emitter = "composed-block-store-ptr" },
     }
     if (store.value == .int or store.value == .null_value) {
@@ -859,6 +880,8 @@ fn lowerStoreI64Transactional(
     ) catch return .{ .unsupported_value = "composed-block-unknown-store-ptr" };
     executeValueUseAction(&transaction, action) catch |err| return switch (err) {
         error.ValueUseUnresolvedSource, error.ValueUseExpiredSource => .{ .unsupported_value = storeValueDetail(selector, store.value) },
+        error.ValueUseStorePointerAlignment => .{ .no_emitter = "composed-block-store-stack-pointer-align" },
+        error.ValueUseStorePointerFrame => .{ .no_emitter = "composed-block-store-stack-pointer-frame" },
         error.ValueUseStorePointerFormUnsupported,
         error.ValueUseSourceViewMismatch,
         error.ValueUseRegisterClassMismatch,
@@ -874,7 +897,7 @@ fn scalarStorePointerDiagnostic(
     bits: u8,
 ) ?Diagnostic {
     return switch (pointer_class) {
-        .stack_scalar => |stack| if (bits <= 8 and stack.bits == 8 and stack.kind == .integer)
+        .stack_scalar => |stack| if (((bits <= 8 and stack.bits == 8) or (bits == 64 and stack.bits == 64)) and stack.kind == .integer)
             null
         else
             .{ .no_emitter = "composed-block-store-stack-width" },

@@ -240,15 +240,16 @@ pub const StoreScalarAction = struct {
     bits: u8,
 };
 
-/// Store an inline i1/i32 value. The immediate is semantic intent rather
-/// than a discovered source home and is emitted before pointer staging.
+/// Store an inline scalar value through 64 bits. The immediate is semantic
+/// intent rather than a discovered home and precedes pointer staging.
 pub const StoreImmediateAction = struct {
-    value: i32,
+    value: i64,
     bits: u8,
 };
 
-/// Store a named i64 value. The action is owned by the pointer request and
-/// stages that pointer before the value, matching the accepted helper.
+/// Store a named i64 or runtime pointer value. The destination request owns
+/// the action; a typed frame slot denotes storage, never its stored value.
+/// Register/spilled destinations retain pointer-before-value staging.
 pub const StoreI64Action = struct {
     value: RequestHandle,
 };

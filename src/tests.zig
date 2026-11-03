@@ -3,6 +3,7 @@ const std = @import("std");
 comptime {
     _ = @import("air_export_cache.zig");
     _ = @import("codegen/x86_64/generic_cfg/word_pair_memory_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/runtime_pointer_stack_tests.zig");
     _ = @import("tests/correctness_checkpoint_native.zig");
     _ = @import("tests/composed_byte_loops.zig");
     _ = @import("tests/composed_memcpy.zig");

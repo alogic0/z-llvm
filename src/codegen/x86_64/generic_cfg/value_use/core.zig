@@ -720,6 +720,8 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
         },
         .store_immediate => |store| {
             if (store.bits == 0 or store.bits > 64) return error.ValueUseStoreWidthUnsupported;
+            if (store.bits < 64 and (store.value < std.math.minInt(i32) or store.value > std.math.maxInt(i32)))
+                return error.ValueUseStoreImmediateOutOfRange;
             if (store.bits == 1 and store.value != 0 and store.value != 1)
                 return error.ValueUseStoreImmediateOutOfRange;
         },

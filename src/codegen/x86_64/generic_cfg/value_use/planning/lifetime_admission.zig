@@ -167,8 +167,7 @@ pub fn validateFormAndDestination(request: *const Types.StoredRequest) !void {
                 error.ValueUsePreparedActionFormMismatch,
             .store_immediate => if (request.form != .pointer and request.form != .stack_object_address)
                 error.ValueUsePreparedActionFormMismatch,
-            .store_i64 => if (request.form != .pointer or request.expected.ty != .ptr)
-                error.ValueUsePreparedActionFormMismatch,
+            .store_i64 => compatibility.validateStorePointerOperand(request, true),
             .store_stack_pointer => if (request.form != .stack_object_address or
                 request.expected.ty != .ptr or request.expected.register_class != .stack_object)
                 error.ValueUsePreparedActionFormMismatch,

@@ -517,13 +517,13 @@ pub fn executeStoreImmediate(
         break :blk &staged_pointer;
     } else pointer_view;
     try materialization.clobberPhysicalNode(transaction.selector, .accumulator);
-    if (action.bits == 64 and action.value < 0) {
+    if (action.bits == 64 and (action.value < 0 or action.value > std.math.maxInt(u32))) {
         try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
             .mov_imm_rax = @as(i64, action.value),
         });
     } else {
         try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
-            .mov_imm_eax = action.value,
+            .mov_imm_eax = @truncate(action.value),
         });
     }
     try executeStoreEaxToPointer(Authority, transaction, actual_pointer, action.bits);
@@ -544,6 +544,16 @@ pub fn executeStoreI64(
     action: Types.StoreI64Action,
 ) !void {
     const pointer = try materialization.preparedViewLoc(pointer_view);
+    if (pointer == .stack_scalar) {
+        const frame_index = try scalar64StoreFrameIndex(transaction.selector, pointer.stack_scalar);
+        const value_view = try Authority.registeredOperandView(Authority, transaction, action.value);
+        materializeActionScalar64(Authority, transaction, value_view, .accumulator) catch |err| {
+            Authority.noteRegisteredOperandBoundaryError(Authority, transaction, action.value, err);
+            return err;
+        };
+        try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{ .spill_rax_rsp = frame_index });
+        return;
+    }
     const reg: ArgReg = switch (pointer) {
         .arg64, .scratch64 => |r| r,
         .spill64 => blk: {
@@ -626,6 +636,11 @@ fn executeStoreEaxToPointer(
     const pointer = try materialization.preparedViewLoc(pointer_view);
     switch (pointer) {
         .stack_scalar => |stack| {
+            if (bits == 64) {
+                const frame_index = try scalar64StoreFrameIndex(transaction.selector, stack);
+                try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{ .spill_rax_rsp = frame_index });
+                return;
+            }
             if (bits > 8 or stack.kind != .integer or stack.bits != 8)
                 return error.ValueUseStorePointerFormUnsupported;
             try transaction.selector.machine.instructions.append(
@@ -697,6 +712,13 @@ fn executeStoreStackI32(
     } else {
         try appendStoreEaxStack(Authority, transaction, disp, false);
     }
+}
+fn scalar64StoreFrameIndex(selector: *const ComposedBlockSelector, stack: selector_types.StackScalarLoc) !FrameIndex {
+    if (stack.kind != .integer or stack.bits != 64) return error.ValueUseStorePointerFormUnsupported;
+    if (stack.base_disp % 4 != 0) return error.ValueUseStorePointerAlignment;
+    const frame_index = FrameIndex.fromSlot(stack.base_disp / 4) catch return error.ValueUseStorePointerFrame;
+    if (!selector_state.frameIndexFitsFrame(selector, frame_index)) return error.ValueUseStorePointerFrame;
+    return frame_index;
 }
 fn appendStoreEaxStack(
     comptime _: type,

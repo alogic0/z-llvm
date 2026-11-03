@@ -195,7 +195,8 @@ pub fn requestDestinationNodes(
             },
             .store_i64 => {
                 const pointer = current orelse return error.ValueUseUnresolvedSource;
-                try appendStorePointerDestinationNodes(&result, pointer, 64);
+                try compatibility.validateI64StorePointer(pointer);
+                if (pointer != .stack_scalar) try appendStorePointerDestinationNodes(&result, pointer, 64);
                 try result.append(.accumulator);
             },
             .store_stack_pointer => try result.append(.rcx),
@@ -627,7 +628,7 @@ pub fn requestMappings(
             .store_i64 => |store| {
                 const pointer = current orelse return error.ValueUseUnresolvedSource;
                 try compatibility.validateI64StorePointer(pointer);
-                try appendStorePointerMappings(
+                if (pointer != .stack_scalar) try appendStorePointerMappings(
                     Authority,
                     transaction,
                     &mappings,
@@ -899,7 +900,9 @@ fn appendStorePointerDestinationNodes(
             if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
             try nodes.append(.rcx);
         },
-        .stack_scalar => |stack| if (bits > 8 or stack.kind != .integer or stack.bits != 8)
+        .stack_scalar => |stack| if (bits == 64) {
+            try compatibility.validateI64StorePointer(pointer);
+        } else if (bits > 8 or stack.kind != .integer or stack.bits != 8)
             return error.ValueUseStorePointerFormUnsupported,
         .arg64, .scratch64 => if (bits == 0 or bits > 64)
             return error.ValueUseStorePointerFormUnsupported,
@@ -931,7 +934,9 @@ fn appendStorePointerMappings(
             if (bits != 32) return error.ValueUseStorePointerFormUnsupported;
             mappings.append(.{ .source = .accumulator, .destination = .rcx, .source_request_index = source_request_index });
         },
-        .stack_scalar => |stack| if (bits > 8 or stack.kind != .integer or stack.bits != 8)
+        .stack_scalar => |stack| if (bits == 64) {
+            try compatibility.validateI64StorePointer(pointer);
+        } else if (bits > 8 or stack.kind != .integer or stack.bits != 8)
             return error.ValueUseStorePointerFormUnsupported,
         .arg64, .scratch64 => if (bits == 0 or bits > 64)
             return error.ValueUseStorePointerFormUnsupported,

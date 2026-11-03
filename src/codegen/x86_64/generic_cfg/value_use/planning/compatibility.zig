@@ -5,6 +5,7 @@ const planning_model = @import("model.zig");
 const ValueBinding = selector_types.ValueBinding;
 const ValueLoc = selector_types.ValueLoc;
 const VirtualRegClass = selector_types.VirtualRegClass;
+const FrameIndex = selector_types.FrameIndex;
 
 pub fn validateStorePointerOperand(
     request: *const Types.StoredRequest,
@@ -60,8 +61,19 @@ pub fn validateMemcpyLengthOperand(request: *const Types.StoredRequest) !void {
 pub fn validateI64StorePointer(pointer: ValueLoc) !void {
     switch (pointer) {
         .arg64, .scratch64, .spill64 => {},
+        .stack_scalar => _ = try stackStoreFrameIndex(pointer),
         else => return error.ValueUseStorePointerFormUnsupported,
     }
+}
+fn stackStoreFrameIndex(pointer: ValueLoc) !FrameIndex {
+    const stack = switch (pointer) {
+        .stack_scalar => |stack| stack,
+        else => return error.ValueUseStorePointerFormUnsupported,
+    };
+    if (stack.kind != .integer or stack.bits != 64)
+        return error.ValueUseStorePointerFormUnsupported;
+    if (stack.base_disp % 4 != 0) return error.ValueUseStorePointerAlignment;
+    return FrameIndex.fromSlot(stack.base_disp / 4) catch error.ValueUseStorePointerFrame;
 }
 pub fn validateStackPointerStoreViews(source: ValueLoc, destination: ValueLoc) !void {
     const source_stack = switch (source) {
