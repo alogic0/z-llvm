@@ -43,8 +43,14 @@ automatically rejected. JSON output is sorted and reproducible for fixed inputs.
 ## Library
 
 Add `.source_audit = .{ .path = "../zig-source-audit" }` during development, or
-pin the verified source archive with `zig fetch --save-exact=source_audit
-file:vendor/zig-source-audit-0.1.0.tar.gz`. Wire it into a consuming root:
+pin the verified source archive. Copy it to `vendor/`, run
+`zig fetch vendor/zig-source-audit-0.1.1.tar.gz`, and compare the printed hash
+with the distribution receipt. Add a `.source_audit` dependency with
+`.url = "file:vendor/zig-source-audit-0.1.1.tar.gz"` and `.hash` set to that
+verified hash. The command uses a filesystem path; relative `file:` URLs belong
+in the manifest. Commit both files and check the consumer with an empty global
+cache. Version 0.1.1 corrects these installation instructions without changing
+the 0.1.0 analysis algorithms. Wire the module into a consuming root:
 
 ```zig
 const dep = b.dependency("source_audit", .{ .target = target, .optimize = optimize });

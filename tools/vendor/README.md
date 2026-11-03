@@ -29,14 +29,16 @@ do not establish compiler output or ABI-differential acceptance.
 ## Source audit
 
 `source_audit/` contains the verbatim public `src/` tree and notices from the
-independent `zig-source-audit` 0.1.0 package at
-`0100482bcde962fb00df2501519344c2b45e746a`.
+independent `zig-source-audit` 0.1.1 package at
+`9de0c09b4e8c8bfe70b733e6ef176c602918943d`.
 
 Full archive SHA-256:
-`e38276fffa0694f7c3d6f6a9db4fc9c3d9af2af6005329d770af34aac6a02e8c`.
+`5c7ee8ca69a228bfd19c72883e4021c582bc4c9540a90b4dd44dccd3c2de5d08`.
 Full Zig package hash:
-`source_audit-0.1.0-FaX7WKTmAADERZP5Go94dU_twwEgI8pC16Qf29Pq71Jw`.
+`source_audit-0.1.1-FaX7WF_oAADBJ5D5MSdARP5HboAWqUWaH3j0k8vv3gBx`.
 `source_audit.SHA256SUMS` records the selected file digests. This uses the same
 standalone-runner boundary as regex; `zig build source-audit` verifies the source
 then runs the shared CLI. No product paths are added to the provider. Supply
 consumer-owned `--rules` JSON explicitly when enforcing architecture constraints.
+The 0.1.1 patch corrects installation documentation; the analysis source is
+byte-identical to the initial 0.1.0 adoption.
