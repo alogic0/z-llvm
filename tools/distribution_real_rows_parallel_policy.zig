@@ -2,12 +2,12 @@ const std = @import("std");
 const serial_policy = @import("distribution_headroom_policy.zig");
 
 pub const schema_version: u32 = 3;
-pub const post_run_free_floor_bytes: u64 = 34_359_738_368;
+pub const post_run_free_floor_bytes: u64 = serial_policy.serial_reserve_floor_bytes;
 // Include work directories and published exports, which live outside the
 // parent's temporary root. Use the full-run calibration as the conservative
 // admission forecast; owned-byte telemetry is a separate measurement.
 pub const projected_disk_peak_bytes: u64 = serial_policy.serial_projected_peak_bytes;
-pub const required_start_bytes: u64 = 42_949_672_960;
+pub const required_start_bytes: u64 = post_run_free_floor_bytes + projected_disk_peak_bytes;
 pub const worker_count: usize = 3;
 
 pub const Policy = struct {
@@ -43,9 +43,9 @@ pub fn forFilesystemWithFloor(filesystem_total_bytes: u64, caller_floor_bytes: u
 test "real-row parallel policy uses exact fixed floor projected peak and checked start" {
     const policy = try forFilesystem(982_240_026_624);
     try std.testing.expectEqual(@as(u32, 3), schema_version);
-    try std.testing.expectEqual(@as(u64, 34_359_738_368), policy.post_run_free_floor_bytes);
+    try std.testing.expectEqual(@as(u64, 24_359_738_368), policy.post_run_free_floor_bytes);
     try std.testing.expectEqual(@as(u64, 8_589_934_592), policy.projected_peak_bytes);
-    try std.testing.expectEqual(@as(u64, 42_949_672_960), policy.required_start_bytes);
+    try std.testing.expectEqual(@as(u64, 32_949_672_960), policy.required_start_bytes);
     try std.testing.expectEqual(@as(usize, 3), worker_count);
 }
 

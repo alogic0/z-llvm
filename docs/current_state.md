@@ -92,11 +92,14 @@ turn 100 native links into 100 executions.
 AIR publication atomically writes schema-4 metadata and transfers the verified
 payload into the cache. The global-memory pair authenticates three exports; the
 boolean and array-stride checkpoints reuse them and rerun execution checks on
-cache hits. At the user's direction, serial admission
-now uses a fixed 32 GiB reserve plus the existing 8 GiB working budget: 40 GiB
-(about 42.95 GB) free at the start. Nested workers inherit that admission and
-continue enforcing the reserve. Reported fresh/cached free-space decreases are
-5.86 GB and 2.16 GB, within the forecast. Raw AIR needs no manual cleanup wrapper.
+cache hits. The user has reduced serial admission and its runtime reserve by
+10 decimal GB: policy schema 3 requires 32,949,672,960 bytes (about 32.95 GB)
+at the start and reserves 24,359,738,368 bytes (about 24.36 GB) during execution.
+The working budget remains 8 GiB. Nested workers inherit that admission and
+continue enforcing the reserve, including stronger caller floors. Full fresh/cache
+validation of the revised limits is pending. The earlier accepted pair reported
+5.86 GB and 2.16 GB decreases under policy schema 2. Raw AIR needs no manual
+cleanup wrapper.
 
 Unchanged upstream `hello_libc.zig` and the C fixture execute in all three modes;
 the C fixture's six paired cases and 66 call/heap observations remain separate.

@@ -162,12 +162,16 @@ disk telemetry covers all seven owned roots, including retained exports. The
 earlier 49 runner/policy and 39 comparison tests passed. Filesystem noise and sampled,
 non-atomic observations remain measurement limits.
 The allocation-padding cached run reported a 3.37 GB decrease under the previous
-reserve. At the user's direction, headroom policy schema 2 now uses a fixed
+reserve. The accepted headroom policy schema 2 used a fixed
 32 GiB reserve plus the unchanged 8 GiB working budget: 40 GiB (about 42.95 GB)
 free at admission. Runtime reserve checks and stronger caller floors remain.
-The new pair reports 5.86 GB fresh and 2.16 GB cached decreases; reported minima
+That pair reports 5.86 GB fresh and 2.16 GB cached decreases; reported minima
 are 44.09 GB and 43.31 GB, above the 34.36 GB reserve. The 51 runner/policy and
 41 comparison tests pass. These filesystem observations do not establish a speedup.
+The user subsequently lowered both admission and reserve by 10 decimal GB.
+Policy schema 3 now requires 32.95 GB at admission and maintains a 24.36 GB
+runtime reserve, with the same 8 GiB working budget. Validate the revised limits
+with a fresh/cache integration pair alongside the pending IR serialization repair.
 The [generation cleanup](evidence/global_memory_cleanup_20261103.json) retires
 3.92 GB of superseded AIR after both full runs and replacement hash verification.
 Current exports and their paired work selection now use

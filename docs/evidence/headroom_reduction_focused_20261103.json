@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "recorded_utc": "2026-11-03T23:19:37.541588+00:00",
+  "status": "focused checks passed; full fresh/cache integration pending",
+  "user_direction": "Can we reduce on 10 GB before starting and reserve during execution?",
+  "reduction_bytes": 10000000000,
+  "units": "GB is decimal; GiB is binary",
+  "policy": {
+    "schema_version": 3,
+    "reserve_bytes": 24359738368,
+    "projected_peak_bytes": 8589934592,
+    "required_start_bytes": 32949672960,
+    "previous_reserve_bytes": 34359738368,
+    "previous_required_start_bytes": 42949672960,
+    "runtime_reserve_enforced": true,
+    "stronger_caller_floors_preserved": true,
+    "sharding_policy_unchanged": true
+  },
+  "source_sha256": {
+    "tools/distribution_headroom_policy.zig": "e205cadaaf1023ac211d2b867af68a08a4737b1d53b56ee083a472f7d1f9b9fe",
+    "tools/distribution_real_rows_parallel_policy.zig": "1178ca1a7ce4df6667c0048563ac811827cbfde9dba9713fe29e965774910964",
+    "tools/run_distribution_real_rows_parallel.zig": "a43e68ef5b1bc40fca3ffc5c121a6e4f7626e9c470b9c89de690ed7513212381"
+  },
+  "focused_checks": {
+    "headroom-policy-tests": {
+      "argv": [
+        "/home/oleg/.zig/0.17.0/files/zig",
+        "test",
+        "tools/run_distribution_all_gates.zig"
+      ],
+      "returncode": 0,
+      "tests_passed": 51,
+      "log": "local-state/validations/numeric-ssa-20261103/headroom-policy-tests.log",
+      "log_sha256": "eff51183688af40f8a5141dd201f56d45e7416e8df2d01abba4acc0a3b09d29a"
+    },
+    "headroom-comparison-tests": {
+      "argv": [
+        "/home/oleg/.zig/0.17.0/files/zig",
+        "test",
+        "tools/compare_distribution_all_logs.zig"
+      ],
+      "returncode": 0,
+      "tests_passed": 41,
+      "log": "local-state/validations/numeric-ssa-20261103/headroom-comparison-tests.log",
+      "log_sha256": "0ccc1c2b03694f74aadd7842f17d14dfe04a7fba0d25378bcb338fa84170b882"
+    }
+  },
+  "tier3_reason": "docs/validation_tiers.md requires full distribution and fresh/cache comparison for changes to gate infrastructure. Combine the policy change and pending IR repair in one frozen-source pair.",
+  "full_evidence_root": "local-state/validations/numeric-ssa-20261103",
+  "archives_created": 0,
+  "pip_cache": "Unmodified; pending deletion request superseded because the revised admission fits available space.",
+  "available_bytes_after_focused_checks": 39230156800
+}
