@@ -1097,6 +1097,98 @@ test "composed selector leaves generic narrow returns and unsupported return att
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
+test "composed boolean calls route default ccc and fastcc through typed arguments" {
+    const cases = [_]struct { ty: ir.Type, loc: ValueLoc }{
+        .{ .ty = .{ .int = 32 }, .loc = .{ .spill64 = .slot3 } },
+        .{ .ty = .{ .int = 64 }, .loc = .{ .spill64 = .slot3 } },
+        .{ .ty = .ptr, .loc = .{ .stack_scalar = .{ .base_disp = 24, .bits = 64 } } },
+        .{ .ty = .ptr, .loc = .{ .stack128 = 32 } },
+    };
+    for ([_]?[]const u8{ null, "ccc", "fastcc" }) |convention| {
+        for (cases) |case| {
+            for ([_]usize{ 0, 1, 6 }) |count| {
+                var machine = MachineFunction.init("boolean-call-arguments", .{ .int = 1 });
+                defer machine.deinit(std.testing.allocator);
+                var plan = SelectorAllocationPlan.init(std.testing.allocator);
+                defer plan.deinit();
+                try plan.interval_ends.put("argument", 1);
+                var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+                defer selector.deinit();
+                selector.allocation_plan = &plan;
+                selector.stack_frame_bytes = 128;
+                try selector_state.bindValueLoc(&selector, "argument", case.loc);
+                var call = ir.CallInst{ .ret_ty = .{ .int = 1 }, .callee = "callee", .calling_conv = convention, .args = .empty };
+                defer call.deinit(std.testing.allocator);
+                for (0..count) |_| try call.args.append(std.testing.allocator, .{
+                    .ty = case.ty,
+                    .value = .{ .named = "argument" },
+                    .attrs = if (case.ty == .ptr) "noundef nonnull align 8" else "noundef",
+                });
+                try std.testing.expect((try selector_calls.lowerCall(&selector, "result", call)) == null);
+                try std.testing.expectEqual(ValueLoc.eax, selector.values.get("result").?.loc);
+                try std.testing.expectEqual(@as(u16, 1), selector.accumulator_domain.occupant.?.logical_bits);
+            }
+        }
+    }
+}
+
+test "composed boolean calls retain the bounded argument and call envelope" {
+    const cases = [_]struct {
+        calling_conv: ?[]const u8 = null,
+        ret_attrs: ?[]const u8 = null,
+        tail_kind: ?[]const u8 = null,
+        function_ty: ?[]const u8 = null,
+        indirect: bool = false,
+        argument: ?ir.CallArg = null,
+        count: usize = 1,
+        diagnostic: ?[]const u8 = null,
+        failure: ?anyerror = null,
+    }{
+        .{ .ret_attrs = "zeroext", .diagnostic = "composed-block-call-form" },
+        .{ .ret_attrs = "signext", .diagnostic = "composed-block-call-form" },
+        .{ .calling_conv = "coldcc", .diagnostic = "composed-block-call-form" },
+        .{ .indirect = true, .diagnostic = "composed-block-indirect-call" },
+        .{ .tail_kind = "musttail", .failure = error.UnsupportedTailCallAbi },
+        .{ .function_ty = "i1 (i64, ...)", .failure = error.UnsupportedVarargsAbi },
+        .{ .argument = .{ .ty = .{ .int = 8 }, .value = .{ .named = "argument" } }, .diagnostic = "composed-block-boolean-call-arg-type" },
+        .{ .argument = .{ .ty = .{ .int = 64 }, .value = .{ .int = 1 } }, .diagnostic = "composed-block-boolean-call-arg-value" },
+        .{ .argument = .{ .ty = .ptr, .value = .{ .named = "@global" } }, .diagnostic = "composed-block-boolean-call-arg-value" },
+        .{ .argument = .{ .ty = .{ .int = 64 }, .attrs = "zeroext", .value = .{ .named = "argument" } }, .failure = error.UnsupportedCallAttributeAbi },
+        .{ .argument = .{ .ty = .{ .int = 64 }, .value = .{ .named = "argument" } }, .count = 7, .diagnostic = "composed-block-boolean-call-arg-count" },
+    };
+    for (cases) |case| {
+        var machine = MachineFunction.init("boolean-call-boundary", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        const saved_flags = selector.eflags.snapshot();
+        var call = ir.CallInst{
+            .ret_ty = .{ .int = 1 },
+            .callee = "callee",
+            .args = .empty,
+            .ret_attrs = case.ret_attrs,
+            .calling_conv = case.calling_conv,
+            .tail_kind = case.tail_kind,
+            .callee_function_ty = case.function_ty,
+            .callee_value = if (case.indirect) .{ .named = "callee" } else null,
+        };
+        defer call.deinit(std.testing.allocator);
+        if (case.argument) |argument| for (0..case.count) |_| {
+            try call.args.append(std.testing.allocator, argument);
+        };
+        if (case.failure) |failure| {
+            try std.testing.expectError(failure, selector_calls.lowerCall(&selector, "result", call));
+        } else {
+            const diagnostic = (try selector_calls.lowerCall(&selector, "result", call)).?;
+            try std.testing.expectEqualStrings(case.diagnostic.?, diagnostic.detail());
+        }
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+        try std.testing.expectEqual(@as(usize, 0), selector.values.count());
+        try selector.eflags.validateSnapshot(saved_flags);
+    }
+}
+
 test "composed selector lowers tail and notail calls ordinarily and rejects musttail" {
     const input =
         \\declare float @callee(float)

@@ -595,6 +595,74 @@ test "value-use dormant direct call retains scalar and pointer results after tea
     }
 }
 
+test "value-use boolean call retains a normalized result across argument homes and teardown" {
+    const cases = [_]struct { ty: ir.Type, source: ValueLoc }{
+        .{ .ty = .{ .int = 32 }, .source = .{ .arg32 = .r8 } },
+        .{ .ty = .{ .int = 64 }, .source = .{ .spill64 = .slot3 } },
+        .{ .ty = .ptr, .source = .{ .stack_scalar = .{ .base_disp = 24, .bits = 64 } } },
+        .{ .ty = .ptr, .source = .{ .stack128 = 32 } },
+    };
+    for (cases) |case| {
+        var machine = MachineFunction.init("value-use-boolean-call-result", .{ .int = 1 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "argument");
+        try addLive(&plan, "live");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "argument", case.source);
+        try selector_state.bindValueLoc(&selector, "live", .rax);
+        {
+            var transaction = try Transaction.begin(&selector);
+            defer transaction.deinit();
+            const argument = try transaction.register(callRequest("argument", case.ty));
+            try runAttachedCall(&transaction, .{ .direct_call = try Transaction.DirectCallAction.init(
+                "callee_boolean",
+                "result",
+                .{ .int = 1 },
+                &.{argument},
+                &.{case.ty},
+            ) });
+            try transaction.commit();
+        }
+        const result = selector.values.get("result").?;
+        try std.testing.expectEqual(ValueLoc.eax, result.loc);
+        try std.testing.expectEqual(@as(u16, 32), result.vreg.bits);
+        try std.testing.expectEqual(selector_types.VirtualRegClass.gpr32, result.vreg.class);
+        try std.testing.expectEqual(@as(u16, 1), selector.accumulator_domain.occupant.?.logical_bits);
+        try std.testing.expectEqual(@as(u16, 64), selector.accumulator_domain.defined_bits);
+        try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector.values.get("live").?.loc);
+        try std.testing.expectEqualStrings("result", machine.owned_labels.items[1]);
+        try std.testing.expectEqual(selector_state.EflagsEffect.write, selector.eflags_semantics.items[selector.eflags_semantics.items.len - 1].effect);
+    }
+}
+
+test "value-use ignored boolean call publishes no result" {
+    var machine = MachineFunction.init("value-use-boolean-call-ignored", .void);
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        try runAttachedCall(&transaction, .{ .direct_call = try Transaction.DirectCallAction.init(
+            "callee_boolean",
+            null,
+            .{ .int = 1 },
+            &.{},
+            &.{},
+        ) });
+        try transaction.commit();
+    }
+    try std.testing.expectEqual(@as(usize, 0), selector.values.count());
+    try std.testing.expect(selector.accumulator_domain.occupant == null);
+    try std.testing.expectEqual(@as(usize, 1), machine.owned_labels.items.len);
+    for (machine.instructions.items) |instruction| try std.testing.expect(instruction != .and_eax_imm32);
+}
+
 test "value-use dormant direct call stages multiple aliases in source order under caller pressure" {
     var machine = MachineFunction.init("value-use-direct-call-aliases", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
@@ -906,60 +974,64 @@ test "value-use dormant call rollback restores every declared mutation boundary"
         .after_symbol_ownership,
         .after_call_append,
         .after_unalignment,
+        .after_mask,
         .after_result_identity_ownership,
         .after_result_definition,
         .after_finalization,
     };
-    inline for (boundaries) |boundary| {
-        var machine = MachineFunction.init("value-use-call-rollback", .{ .int = 64 });
-        defer machine.deinit(std.testing.allocator);
-        var plan = SelectorAllocationPlan.init(std.testing.allocator);
-        defer plan.deinit();
-        try addAtCurrent(&plan, "argument");
-        const after_preservation = boundary == .after_preservation;
-        if (after_preservation) inline for (&.{ "alias32", "alias64" }) |name| try addLive(&plan, name);
-        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
-        defer selector.deinit();
-        selector.allocation_plan = &plan;
-        if (after_preservation) selector.stack_frame_bytes = 128;
-        try selector_state.bindValueLoc(&selector, "argument", .{ .spill64 = .slot3 });
-        if (after_preservation) {
-            try selector_state.bindValueLoc(&selector, "alias32", .eax);
-            try selector_state.bindValueLoc(&selector, "alias64", .rax);
-        }
-        const argument_binding = selector.values.get("argument").?;
-        const alias32_binding = selector.values.get("alias32");
-        const alias64_binding = selector.values.get("alias64");
-        const next_vreg = selector.next_virtual_reg;
-        const next_spill = selector.next_spill_slot;
-        const saved_flags = selector.eflags.snapshot();
+    inline for (.{ @as(u16, 64), @as(u16, 1) }) |return_bits| {
+        inline for (boundaries) |boundary| {
+            if (return_bits != 1 and boundary == .after_mask) continue;
+            var machine = MachineFunction.init("value-use-call-rollback", .{ .int = 64 });
+            defer machine.deinit(std.testing.allocator);
+            var plan = SelectorAllocationPlan.init(std.testing.allocator);
+            defer plan.deinit();
+            try addAtCurrent(&plan, "argument");
+            const after_preservation = boundary == .after_preservation;
+            if (after_preservation) inline for (&.{ "alias32", "alias64" }) |name| try addLive(&plan, name);
+            var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+            defer selector.deinit();
+            selector.allocation_plan = &plan;
+            if (after_preservation) selector.stack_frame_bytes = 128;
+            try selector_state.bindValueLoc(&selector, "argument", .{ .spill64 = .slot3 });
+            if (after_preservation) {
+                try selector_state.bindValueLoc(&selector, "alias32", .eax);
+                try selector_state.bindValueLoc(&selector, "alias64", .rax);
+            }
+            const argument_binding = selector.values.get("argument").?;
+            const alias32_binding = selector.values.get("alias32");
+            const alias64_binding = selector.values.get("alias64");
+            const next_vreg = selector.next_virtual_reg;
+            const next_spill = selector.next_spill_slot;
+            const saved_flags = selector.eflags.snapshot();
 
-        var transaction = try Transaction.begin(&selector);
-        defer transaction.deinit();
-        const argument = try transaction.register(callRequest("argument", .{ .int = 64 }));
-        try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
-            "callee",
-            "result",
-            .{ .int = 64 },
-            &.{argument},
-            &.{.{ .int = 64 }},
-        ) });
-        try transaction.seal();
-        try call_actions.setCallTestFailureForTest(&transaction, boundary, 0);
-        try transaction.prepare();
-        try std.testing.expectError(error.ValueUseCallTestFailure, transaction.materializeAll());
-        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
-        try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
-        try std.testing.expectEqual(argument_binding, selector.values.get("argument").?);
-        try std.testing.expectEqual(alias32_binding, selector.values.get("alias32"));
-        try std.testing.expectEqual(alias64_binding, selector.values.get("alias64"));
-        try std.testing.expect(selector.values.get("result") == null);
-        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
-        try std.testing.expectEqual(next_vreg, selector.next_virtual_reg);
-        try std.testing.expectEqual(next_spill, selector.next_spill_slot);
-        try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
-        try selector.eflags.validateSnapshot(saved_flags);
-        try expectCallRollbackStorageCleared(&transaction);
+            var transaction = try Transaction.begin(&selector);
+            defer transaction.deinit();
+            const argument = try transaction.register(callRequest("argument", .{ .int = 64 }));
+            try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
+                "callee",
+                "result",
+                .{ .int = return_bits },
+                &.{argument},
+                &.{.{ .int = 64 }},
+            ) });
+            try transaction.seal();
+            try call_actions.setCallTestFailureForTest(&transaction, boundary, 0);
+            try transaction.prepare();
+            try std.testing.expectError(error.ValueUseCallTestFailure, transaction.materializeAll());
+            try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+            try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+            try std.testing.expectEqual(argument_binding, selector.values.get("argument").?);
+            try std.testing.expectEqual(alias32_binding, selector.values.get("alias32"));
+            try std.testing.expectEqual(alias64_binding, selector.values.get("alias64"));
+            try std.testing.expect(selector.values.get("result") == null);
+            try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+            try std.testing.expectEqual(next_vreg, selector.next_virtual_reg);
+            try std.testing.expectEqual(next_spill, selector.next_spill_slot);
+            try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+            try selector.eflags.validateSnapshot(saved_flags);
+            try expectCallRollbackStorageCleared(&transaction);
+        }
     }
 
     var mask_machine = MachineFunction.init("value-use-int-byte-size-mask-rollback", .{ .int = 16 });

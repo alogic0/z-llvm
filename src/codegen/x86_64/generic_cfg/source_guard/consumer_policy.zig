@@ -142,8 +142,8 @@ pub fn validateDormantCallActionProductionSites(
         return;
     }
     if (!std.mem.eql(u8, source_name, "composed_selector_calls.zig") or
-        attachment_count != 1 or
-        direct_action_count != 0 or
+        attachment_count != 2 or
+        direct_action_count != 1 or
         specialized_action_count != 2)
     {
         return error.ValueUseCallActionPrematureProductionUse;
@@ -167,7 +167,7 @@ pub fn validateDormantCallActionProductionSites(
         countPattern(helper_source, "transaction.commit()") != 1 or
         countPattern(helper_source, "AccumulatorDefinitionTransaction.begin(") != 0 or
         countPattern(helper_source, "else |err|") != 0 or
-        attachment_count != 1 or
+        attachment_count != 2 or
         countPattern(helper_source, "IntByteSizeCallAction.init(") != 1 or
         countPattern(helper_source, ".int_byte_size_call") != 1)
     {
@@ -226,11 +226,63 @@ pub fn validateDormantCallActionProductionSites(
     if (countPattern(lower_call_source, "lowerIntByteSizeCall(") != 1) {
         return error.ValueUseCallActionPrematureProductionUse;
     }
+    const boolean = functionBodyNamed(bodies, "lowerBooleanCall") orelse
+        return error.ValueUseCallActionPrematureProductionUse;
+    const boolean_source = source[boolean.start..boolean.end];
+    if (countPattern(source, "lowerBooleanCall(") != 2 or
+        countPattern(lower_call_source, "if (call.ret_ty.eql(.{ .int = 1 })) return lowerBooleanCall(selector, result, call);") != 1 or
+        countPattern(boolean_source, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(boolean_source, "transaction.register(") != 1 or
+        countPattern(boolean_source, "transaction.attachCallAction(") != 1 or
+        countPattern(boolean_source, "DirectCallAction.init(") != 1 or
+        countPattern(boolean_source, ".direct_call") != 1 or
+        countPattern(boolean_source, "transaction.seal()") != 1 or
+        countPattern(boolean_source, "transaction.prepare()") != 1 or
+        countPattern(boolean_source, "transaction.materializeAll()") != 1 or
+        countPattern(boolean_source, "transaction.commit()") != 1)
+    {
+        return error.ValueUseCallActionPrematureProductionUse;
+    }
+    const boolean_operations = [_][]const u8{
+        "transaction.register(",
+        "transaction.attachCallAction(",
+        "transaction.seal()",
+        "transaction.prepare()",
+        "transaction.materializeAll()",
+        "transaction.commit()",
+    };
+    var previous_boolean_operation: usize = 0;
+    for (boolean_operations, 0..) |operation, index| {
+        const position = std.mem.indexOf(u8, boolean_source, operation) orelse
+            return error.ValueUseCallActionPrematureProductionUse;
+        if (index != 0 and position <= previous_boolean_operation)
+            return error.ValueUseCallActionPrematureProductionUse;
+        previous_boolean_operation = position;
+    }
+    for ([_][]const u8{
+        "resolveValue(",
+        "valueIsLive",
+        "valueLoc",
+        ".loc",
+        "preparedView(",
+        "executePreparedAction(",
+        "AccumulatorDefinitionTransaction.begin(",
+        ".instructions",
+        "emitEflagsInstruction(",
+        "bindValueLoc(",
+        "spillValue(",
+        "else |err|",
+    }) |pattern| {
+        if (std.mem.indexOf(u8, boolean_source, pattern) != null)
+            return error.ValueUseCallActionPrematureProductionUse;
+    }
     for (bodies) |body| {
-        if (std.mem.eql(u8, body.name, "lowerIntByteSizeCall")) continue;
+        if (std.mem.eql(u8, body.name, "lowerIntByteSizeCall") or
+            std.mem.eql(u8, body.name, "lowerBooleanCall")) continue;
         const function_source = source[body.start..body.end];
         if (std.mem.indexOf(u8, function_source, "attachCallAction(") != null or
             std.mem.indexOf(u8, function_source, "IntByteSizeCallAction") != null or
+            std.mem.indexOf(u8, function_source, "DirectCallAction") != null or
             std.mem.indexOf(u8, function_source, ".int_byte_size_call") != null)
         {
             return error.ValueUseCallActionPrematureProductionUse;
@@ -2047,6 +2099,11 @@ pub fn validateFailureProvenanceProductionSites(source_name: []const u8, source:
         expected_count += 1;
     }
     if (functionBodyNamed(bodies, "lowerIntByteSizeCall")) |mapper| {
+        if (countPattern(source[mapper.start..mapper.end], ".failedRequestIs(") != 1)
+            return error.ValueUseFailureProvenanceAllowlistMismatch;
+        expected_count += 1;
+    }
+    if (functionBodyNamed(bodies, "lowerBooleanCall")) |mapper| {
         if (countPattern(source[mapper.start..mapper.end], ".failedRequestIs(") != 1)
             return error.ValueUseFailureProvenanceAllowlistMismatch;
         expected_count += 1;

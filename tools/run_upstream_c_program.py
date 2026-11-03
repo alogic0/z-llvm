@@ -46,6 +46,12 @@ def run_variadic_canary(runner, directory, zllvm, environment):
 
 
 MEMORY_CANARIES = {
+    "boolean_calls": {
+        "prefix": "boolean-call-returns", "fixture": "boolean_calls",
+        "functions": {"boolean_call_scalar", "boolean_call_branch", "boolean_call_stack_pointer", "boolean_call_live_return"},
+        "observations": 256,
+        "stdout": "boolean-call-returns observations=256 scalar=branch=stack=live=guards=preserved\n",
+    },
     "global_addresses": {
         "prefix": "global-addresses", "fixture": "global_addresses",
         "functions": {"global_object_address", "global_payload_address", "global_bits_address", "global_live_offset"},
@@ -161,7 +167,8 @@ def main():
               "signed_nonnegative_local_observations": 0, "signed_nonnegative_reference_observations": 0,
               "type_layout_padding_local_observations": 0, "type_layout_padding_reference_observations": 0,
               "global_addresses_local_observations": 0, "global_addresses_reference_observations": 0,
-              "global_memory_local_observations": 0, "global_memory_reference_observations": 0, "rows": []}
+              "global_memory_local_observations": 0, "global_memory_reference_observations": 0,
+              "boolean_calls_local_observations": 0, "boolean_calls_reference_observations": 0, "rows": []}
     try:
         if platform.system() != "Linux" or platform.machine() != "x86_64":
             raise RuntimeError("this bounded gate requires x86_64 Linux")
@@ -200,7 +207,8 @@ def main():
                            "signed_nonnegative.ll", "signed_nonnegative_driver.c",
                            "type_layout_padding.ll", "type_layout_padding_driver.c",
                            "global_addresses.ll", "global_addresses_driver.c",
-                           "global_memory.ll", "global_memory_driver.c")}})
+                           "global_memory.ll", "global_memory_driver.c",
+                           "boolean_calls.ll", "boolean_calls_driver.c")}})
         environment = {k: v for k, v in os.environ.items() if not k.startswith(("ZLLVM_", "ZIG_USE_ZLLVM"))}
         environment.update({"ZIG_LOCAL_CACHE_DIR": str(output / "frontend-cache"),
                             "ZIG_GLOBAL_CACHE_DIR": str(output / "global-cache")})
@@ -279,7 +287,7 @@ def main():
         print(f"summary integer-pointer-casts population=standalone-integer-pointer-casts routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['integer_pointer_local_observations']} reference_observations={report['integer_pointer_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary signed-nonnegative population=standalone-signed-nonnegative routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['signed_nonnegative_local_observations']} reference_observations={report['signed_nonnegative_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary type-layout-padding population=standalone-type-allocation-padding routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['type_layout_padding_local_observations']} reference_observations={report['type_layout_padding_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
-        for population in ("global_addresses", "global_memory"):
+        for population in ("global_addresses", "global_memory", "boolean_calls"):
             print(f"summary {population.replace('_', '-')} population=standalone-{population.replace('_', '-')} routes=direct,release modes={report.get('program_modes', 0)} local_observations={report[population + '_local_observations']} reference_observations={report[population + '_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"evidence: {output / 'report.json'}")
         if "error" in report:

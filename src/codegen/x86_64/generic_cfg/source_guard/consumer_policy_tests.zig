@@ -121,12 +121,21 @@ test "value-use call action wiring is function scoped and registration precedes 
     const accepted: [:0]const u8 = @embedFile("../composed_selector_calls.zig");
     try validateDormantCallActionProductionSites("composed_selector_calls.zig", accepted);
     const wired: [:0]const u8 =
-        "fn lowerCall() void { return lowerIntByteSizeCall(selector, call); } " ++
+        "fn lowerCall() void { " ++
+        "if (call.ret_ty.eql(.{ .int = 1 })) return lowerBooleanCall(selector, result, call); " ++
+        "return lowerIntByteSizeCall(selector, call); } " ++
         "fn lowerIntByteSizeCall() void { " ++
         "var transaction = ValueUseTransaction.begin(selector); " ++
         "_ = transaction.register(argument); " ++
         "_ = transaction.attachCallAction(.{ .int_byte_size_call = " ++
         "IntByteSizeCallAction.init(symbol, result, argument) }); " ++
+        "_ = transaction.seal(); _ = transaction.prepare(); " ++
+        "_ = transaction.materializeAll(); _ = transaction.commit(); } " ++
+        "fn lowerBooleanCall() void { " ++
+        "var transaction = ValueUseTransaction.begin(selector); " ++
+        "_ = transaction.register(boolean_argument); " ++
+        "_ = transaction.attachCallAction(.{ .direct_call = " ++
+        "DirectCallAction.init(symbol, result, arguments, types) }); " ++
         "_ = transaction.seal(); _ = transaction.prepare(); " ++
         "_ = transaction.materializeAll(); _ = transaction.commit(); }";
     try validateDormantCallActionProductionSites("composed_selector_calls.zig", wired);
@@ -134,50 +143,52 @@ test "value-use call action wiring is function scoped and registration precedes 
         "composed_selector_eflags.zig",
         "fn instructionEffect() void { _ = .direct_call; }",
     );
+    try std.testing.expectError(
+        error.ValueUseCallActionPrematureProductionUse,
+        validateDormantCallActionProductionSites("composed_selector_scalar.zig", wired),
+    );
     inline for (.{
-        "fn lowerCall() void { transaction.attachCallAction(action); }",
-        wired ++ " fn other() void { _ = transaction.attachCallAction(action); }",
-        "fn lowerCall() void { return lowerOrdinaryDirectCallValueUse(selector, call); } " ++
-            "fn lowerOrdinaryDirectCallValueUse() void { " ++
-            "var transaction = ValueUseTransaction.begin(selector); " ++
-            "_ = transaction.register(argument); " ++
-            "_ = transaction.attachCallAction(DirectCallAction); " ++
-            "_ = transaction.seal(); _ = transaction.prepare(); " ++
-            "_ = transaction.materializeAll(); _ = transaction.commit(); }",
-        "fn lowerIntByteSizeCall() void { _ = IntByteSizeCallAction; }",
-        "fn lowerIntByteSizeCall() void { _ = .int_byte_size_call; }",
-        "fn lowerCall() void { if (isAdmittedOrdinaryDirectCall(call)) " ++
-            "return lowerOrdinaryDirectCallValueUse(selector, call); } " ++
-            "fn isAdmittedOrdinaryDirectCall() bool { return selector.valueIsLive(); } " ++
-            "fn lowerOrdinaryDirectCallValueUse() void { " ++
-            "var transaction = ValueUseTransaction.begin(selector); " ++
-            "_ = transaction.register(argument); " ++
-            "_ = transaction.attachCallAction(DirectCallAction); " ++
-            "_ = transaction.seal(); _ = transaction.prepare(); " ++
-            "_ = transaction.materializeAll(); _ = transaction.commit(); }",
-        "fn lowerCall() void { if (isAdmittedOrdinaryDirectCall(call)) " ++
-            "return lowerOrdinaryDirectCallValueUse(selector, call); } " ++
-            "fn isAdmittedOrdinaryDirectCall() bool { return true; } " ++
-            "fn lowerOrdinaryDirectCallValueUse() void { " ++
-            "var transaction = ValueUseTransaction.begin(selector); " ++
-            "_ = transaction.attachCallAction(DirectCallAction); " ++
-            "_ = transaction.register(argument); _ = transaction.seal(); " ++
-            "_ = transaction.prepare(); _ = transaction.materializeAll(); " ++
-            "_ = transaction.commit(); }",
-        "fn lowerCall() void { if (isAdmittedOrdinaryDirectCall(call)) " ++
-            "return lowerOrdinaryDirectCallValueUse(selector, call); } " ++
-            "fn isAdmittedOrdinaryDirectCall() bool { return true; } " ++
-            "fn lowerOrdinaryDirectCallValueUse() void { " ++
-            "var transaction = ValueUseTransaction.begin(selector); " ++
-            "_ = transaction.register(argument); _ = transaction.seal(); " ++
-            "_ = transaction.attachCallAction(DirectCallAction); " ++
-            "_ = transaction.prepare(); _ = transaction.materializeAll(); " ++
-            "_ = transaction.commit(); }",
-        wired ++ " fn duplicate() void { _ = transaction.attachCallAction(action); }",
-    }) |fixture| {
+        .{ "call.ret_ty.eql(.{ .int = 1 })", "call.ret_ty.eql(.{ .int = 8 })" },
+        .{ "call.ret_ty.eql(.{ .int = 1 })", "true" },
+        .{ "transaction.register(boolean_argument)", "transaction.resolveValue(boolean_argument)" },
+        .{ "transaction.register(boolean_argument)", "transaction.register(boolean_argument); _ = selector.valueLoc(argument)" },
+        .{ "transaction.register(boolean_argument)", "transaction.register(boolean_argument); _ = selector_state.emitEflagsInstruction(selector, instruction)" },
+        .{ "transaction.register(boolean_argument)", "transaction.register(boolean_argument); _ = selector.valueIsLive(argument)" },
+        .{ "transaction.register(boolean_argument)", "transaction.register(boolean_argument); _ = transaction.preparedView(argument)" },
+        .{ "transaction.register(boolean_argument)", "transaction.register(boolean_argument); _ = selector.machine.instructions" },
+        .{ "transaction.register(boolean_argument)", "transaction.register(boolean_argument); _ = transaction.register(extra)" },
+        .{ "_ = transaction.register(boolean_argument); ", "" },
+        .{ "_ = transaction.register(argument); ", "" },
+        .{
+            "transaction.register(boolean_argument); _ = transaction.attachCallAction(.{ .direct_call = DirectCallAction.init(symbol, result, arguments, types) })",
+            "transaction.attachCallAction(.{ .direct_call = DirectCallAction.init(symbol, result, arguments, types) }); _ = transaction.register(boolean_argument)",
+        },
+        .{
+            "transaction.register(argument); _ = transaction.attachCallAction(.{ .int_byte_size_call = IntByteSizeCallAction.init(symbol, result, argument) })",
+            "transaction.attachCallAction(.{ .int_byte_size_call = IntByteSizeCallAction.init(symbol, result, argument) }); _ = transaction.register(argument)",
+        },
+        .{ "transaction.seal(); _ = transaction.prepare()", "transaction.prepare(); _ = transaction.seal()" },
+        .{ "transaction.materializeAll(); _ = transaction.commit()", "transaction.commit(); _ = transaction.materializeAll()" },
+        .{ "_ = transaction.materializeAll(); ", "" },
+    }) |mutation| {
+        const changed = try std.mem.replaceOwned(u8, std.testing.allocator, wired, mutation[0], mutation[1]);
+        defer std.testing.allocator.free(changed);
+        const fixture = try std.testing.allocator.dupeSentinel(u8, changed, 0);
+        defer std.testing.allocator.free(fixture);
         try std.testing.expectError(
             error.ValueUseCallActionPrematureProductionUse,
             validateDormantCallActionProductionSites("composed_selector_calls.zig", fixture),
+        );
+    }
+    inline for (.{
+        "fn other() void { _ = transaction.attachCallAction(action); }",
+        "fn other() void { _ = DirectCallAction; }",
+        "fn other() void { _ = lowerBooleanCall(selector, result, call); }",
+        "fn other() void { _ = IntByteSizeCallAction; }",
+    }) |extra| {
+        try std.testing.expectError(
+            error.ValueUseCallActionPrematureProductionUse,
+            validateDormantCallActionProductionSites("composed_selector_calls.zig", wired ++ extra),
         );
     }
 }
@@ -333,11 +344,30 @@ test "composed selector source guard conditionally confines call provenance mapp
     const int_byte_size: [:0]const u8 =
         "fn lowerIntByteSizeCall() void { " ++
         "_ = transaction.failedRequestIs(argument); }";
+    const boolean: [:0]const u8 =
+        "fn lowerBooleanCall() void { " ++
+        "for (arguments) |argument| _ = transaction.failedRequestIs(argument); }";
     try validateFailureProvenanceProductionSites("composed_selector_calls.zig", memcpy);
     try validateFailureProvenanceProductionSites("composed_selector_calls.zig", direct);
     try validateFailureProvenanceProductionSites("composed_selector_calls.zig", int_byte_size);
     try validateFailureProvenanceProductionSites("composed_selector_calls.zig", memcpy ++ direct);
     try validateFailureProvenanceProductionSites("composed_selector_calls.zig", memcpy ++ direct ++ int_byte_size);
+    try validateFailureProvenanceProductionSites("composed_selector_calls.zig", boolean);
+    try validateFailureProvenanceProductionSites("composed_selector_calls.zig", memcpy ++ direct ++ int_byte_size ++ boolean);
+    try std.testing.expectError(
+        error.ValueUseFailureProvenanceAllowlistMismatch,
+        validateFailureProvenanceProductionSites(
+            "composed_selector_calls.zig",
+            boolean ++ " fn successPath() void { _ = transaction.failedRequestIs(source); }",
+        ),
+    );
+    try std.testing.expectError(
+        error.ValueUseFailureProvenanceAllowlistMismatch,
+        validateFailureProvenanceProductionSites(
+            "composed_selector_calls.zig",
+            memcpy ++ " fn lowerBooleanCall() void {}",
+        ),
+    );
     try validateFailureProvenanceProductionSites("composed_selector_calls.zig", "fn lowerInlineMemcpy() void {}");
     try std.testing.expectError(
         error.ValueUseFailureProvenanceOutsideAllowlist,

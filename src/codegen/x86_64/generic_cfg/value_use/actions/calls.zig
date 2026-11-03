@@ -348,6 +348,12 @@ fn executeDirectCall(
         try transaction.accumulator_session.?.finishCallPreparationAfterArguments();
     try emitCallAndAlignment(Authority, transaction, &action.symbol, action.return_type);
     if (action.result) |*result| {
+        if (action.return_type.eql(.{ .int = 1 })) {
+            // The ABI returns i1 through AL; the remaining register bits do
+            // not belong to the declared value. Normalize before publication.
+            try selector_state.emitEflagsInstruction(transaction.selector, .{ .and_eax_imm32 = 1 }, .write);
+            try failCallForTest(transaction, .after_mask, null);
+        }
         const owned_result = try composition.ownActionIdentity(Authority, transaction, result);
         try failCallForTest(transaction, .after_result_identity_ownership, null);
         try transaction.accumulator_session.?.define(owned_result, result_definition.?);
@@ -561,6 +567,7 @@ fn callResultDefinition(return_type: ir.Type) !?AccumulatorDefinition {
     if (return_type == .ptr) return .fullRax();
     return switch (return_type) {
         .int => |bits| switch (bits) {
+            1 => .zeroExtending(1),
             32 => .zeroExtending(32),
             64 => .fullRax(),
             else => error.ValueUseCallReturnTypeUnsupported,

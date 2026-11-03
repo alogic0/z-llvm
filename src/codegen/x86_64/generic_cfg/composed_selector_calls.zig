@@ -144,6 +144,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (sysv_abi.callHasScalarSseType(call)) return lowerScalarSseCall(selector, result, call);
     try sysv_abi.rejectUnsupportedCallEnvelope(call);
     try sysv_abi.rejectUnsupportedCallSignature(call);
+    if (call.ret_ty.eql(.{ .int = 1 })) return lowerBooleanCall(selector, result, call);
     const ret_bits = if (call.ret_ty == .void) @as(u16, 0) else if (call.ret_ty == .ptr) @as(u16, 64) else intBits(call.ret_ty) orelse return .{ .no_emitter = "composed-block-call-ret" };
     if (ret_bits != 0 and ret_bits != 32 and ret_bits != 64 and ret_bits != 128) return .{ .no_emitter = "composed-block-call-ret-width" };
     var abi_index: usize = 0;
@@ -1298,6 +1299,52 @@ pub fn lowerTrap(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         if (!std.mem.eql(u8, tail_kind, "tail")) return .{ .no_emitter = "composed-block-trap-tail-kind" };
     }
     try selector.machine.instructions.append(selector.allocator, .ud2);
+    return null;
+}
+
+fn lowerBooleanCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    if (call.args.items.len > 6) return .{ .unsupported_value = "composed-block-boolean-call-arg-count" };
+    for (call.args.items) |arg| {
+        try sysv_abi.rejectUnsupportedCallArgAttrs(arg);
+        if (arg.ty != .ptr and !arg.ty.eql(.{ .int = 32 }) and !arg.ty.eql(.{ .int = 64 }))
+            return .{ .no_emitter = "composed-block-boolean-call-arg-type" };
+        if (arg.value != .named or std.mem.startsWith(u8, arg.value.named, "@"))
+            return .{ .unsupported_value = "composed-block-boolean-call-arg-value" };
+    }
+    var transaction = try ValueUseTransaction.begin(selector);
+    defer transaction.deinit();
+    var arguments: [6]ValueUseTransaction.RequestHandle = undefined;
+    var argument_types: [6]ir.Type = undefined;
+    for (call.args.items, 0..) |arg, index| {
+        arguments[index] = try transaction.register(.{
+            .source = arg.value,
+            .expected = .{
+                .ty = arg.ty,
+                .register_class = if (arg.ty == .ptr) .stack_object else if (arg.ty.int == 32) .gpr32 else .gpr64,
+                .pointer_address_space = if (arg.ty == .ptr) 0 else null,
+            },
+            .form = if (arg.ty == .ptr) .stack_object_address else if (arg.ty.int == 32) .gpr32 else .gpr64,
+            .destination = .prepared_source,
+        });
+        argument_types[index] = arg.ty;
+    }
+    try transaction.attachCallAction(.{ .direct_call = try ValueUseTransaction.DirectCallAction.init(
+        call.callee,
+        result,
+        call.ret_ty,
+        arguments[0..call.args.items.len],
+        argument_types[0..call.args.items.len],
+    ) });
+    try transaction.seal();
+    try transaction.prepare();
+    transaction.materializeAll() catch |err| {
+        if (err == error.ValueUseActionDiagnostic) return transaction.actionDiagnostic();
+        for (arguments[0..call.args.items.len]) |argument|
+            if (transaction.failedRequestIs(argument))
+                return .{ .unsupported_value = "composed-block-boolean-call-arg-value" };
+        return err;
+    };
+    try transaction.commit();
     return null;
 }
 
