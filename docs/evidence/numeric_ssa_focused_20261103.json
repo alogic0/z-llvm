@@ -228,7 +228,7 @@
     "target_exists_after": false
   },
   "additional_cleanup_proposal": {
-    "status": "read-only proposal; deletion not authorized",
+    "status": "superseded; deletion not authorized or needed under user-revised headroom",
     "target": "/home/oleg/.cache/pip",
     "category": "pip HTTP download and wheel build cache; no environments or installed packages",
     "allocated_bytes": 1498697728,
@@ -244,5 +244,7 @@
     "available_bytes": 42173145088,
     "required_start_bytes": 42949672960,
     "archives_created": 0
-  }
+  },
+  "headroom_update": "docs/evidence/headroom_reduction_focused_20261103.json",
+  "full_integration_plan": "One fresh/cache pair combines the IR fixes with the user-requested 10 GB reduction in admission and runtime reserve."
 }

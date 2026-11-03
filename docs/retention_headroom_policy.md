@@ -223,6 +223,6 @@ superseded interrupted-test roots released 2.17 GB; the previously authorized
 shared Zig cache cleanup released 0.84 GB after a fresh consumer check. These
 are allocation intervals, not cumulative net savings. Source probes, captured IR,
 current AIR, installed compilers and retained proofs remain verified. The
-artifact-store dry run found no unreferenced objects. Full integration is still
-pending admission; an additional pip-cache cleanup was proposed but has not been
-authorized or performed. No archives are created.
+artifact-store dry run found no unreferenced objects. The user-revised headroom
+admits the planned fresh/cache pair. The earlier pip-cache cleanup proposal is
+superseded; no pip cache was deleted. No archives are created.

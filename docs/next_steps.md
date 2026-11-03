@@ -214,8 +214,8 @@ LLVM references. The captured Fibonacci IR now verifies with layout and metadata
 preserved; this adds no local whole-program execution. Full integration remains
 pending, so the accepted checkpoint above stays unchanged.
 
-Next, complete the frozen full integration run for these IR changes before
-accepting the checkpoint. The naming repair and parser ownership fixes have
+Next, complete the frozen fresh/cache integration pair for the IR changes and
+revised headroom policy before accepting the checkpoint. The naming repair and parser ownership fixes have
 separate source commits; the fixed candidate and execution cohorts remain unchanged.
 
 Then narrow opaque dependency-reference coverage before changing the default
