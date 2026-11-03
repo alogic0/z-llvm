@@ -149,13 +149,19 @@ roots against the current keep-list before removing them.
 The [headroom calibration](evidence/headroom_calibration_20261102.json) established
 the 8 GiB forecast: a 25% margin over the retained 6.05 GB fresh-run free-space
 decrease, rounded upward to a whole GiB. At the user's direction on 2026-11-03,
-headroom policy schema 2 uses a fixed 32 GiB serial reserve plus that unchanged
-8 GiB working allowance. Serial admission therefore requires 40 GiB
-(42,949,672,960 bytes, approximately 42.95 GB) free. This replaces the earlier
-capacity-based reserve that required 57.70 GB on this filesystem. Nested workers
+headroom policy schema 3 lowers the former fixed 32 GiB reserve by exactly
+10,000,000,000 bytes (10 decimal GB). It reserves 24,359,738,368 bytes
+(approximately 24.36 GB) and keeps the 8 GiB working allowance. Serial admission
+therefore requires 32,949,672,960 bytes (approximately 32.95 GB) free, also
+10 GB below policy schema 2. This supersedes both the 42.95 GB fixed requirement
+and the earlier capacity-based 57.70 GB requirement on this filesystem. Nested workers
 continue to inherit and enforce the caller's reserve, including any stronger
 caller floor, and their transient minimum enters the serial report before cleanup.
-The separate sharding policy is unchanged.
+The separate sharding policy is unchanged. The
+[focused policy checks](evidence/headroom_reduction_focused_20261103.json) pass
+all 51 runner/policy and 41 comparison tests. Full fresh/cache validation of the
+revised limits is pending; historical measurements below retain their original
+policy values.
 
 The earlier
 [combined checkpoint](evidence/startup_headroom_acceptance_20261103.json)

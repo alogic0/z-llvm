@@ -1,9 +1,10 @@
 const std = @import("std");
 
-pub const schema_version: u32 = 2;
-// User-directed 2026-11-03: retain a fixed reserve independently of the
-// filesystem's capacity. The measured working allowance remains separate.
-pub const serial_reserve_floor_bytes: u64 = 32 * 1024 * 1024 * 1024;
+pub const schema_version: u32 = 3;
+// User-directed 2026-11-03: lower the previous 32 GiB reserve by exactly
+// 10 decimal GB. Admission falls by the same amount; the working allowance
+// remains separate and unchanged.
+pub const serial_reserve_floor_bytes: u64 = 24_359_738_368;
 // The 2026-11-02 full fresh run sampled a 6,048,505,856-byte global
 // decrease. Round its 25% margin upward to a whole GiB. The observation
 // includes worker caches and filesystem activity, not just published AIR.
@@ -99,13 +100,13 @@ pub fn shardingForFilesystem(filesystem_total_bytes: u64) ShardingPolicy {
 }
 
 test "serial policy keeps the approved fixed reserve across filesystem capacities" {
-    try std.testing.expectEqual(@as(u32, 2), schema_version);
-    for ([_]u64{ 42_949_672_960, 982_240_026_624, 4 * 1024 * 1024 * 1024 * 1024, std.math.maxInt(u64) }) |total| {
+    try std.testing.expectEqual(@as(u32, 3), schema_version);
+    for ([_]u64{ 32_949_672_960, 982_240_026_624, 4 * 1024 * 1024 * 1024 * 1024, std.math.maxInt(u64) }) |total| {
         const policy = forFilesystem(total);
         try std.testing.expectEqual(total, policy.filesystem_total_bytes);
-        try std.testing.expectEqual(@as(u64, 34_359_738_368), policy.reserve_bytes);
+        try std.testing.expectEqual(@as(u64, 24_359_738_368), policy.reserve_bytes);
         try std.testing.expectEqual(@as(u64, 8_589_934_592), policy.projected_peak_bytes);
-        try std.testing.expectEqual(@as(u64, 42_949_672_960), policy.required_start_bytes);
+        try std.testing.expectEqual(@as(u64, 32_949_672_960), policy.required_start_bytes);
     }
     try std.testing.expect(serial_projected_peak_bytes >= measured_serial_peak_bytes + (measured_serial_peak_bytes + 3) / 4);
     try std.testing.expect(serial_projected_peak_bytes - 1024 * 1024 * 1024 < measured_serial_peak_bytes + (measured_serial_peak_bytes + 3) / 4);
