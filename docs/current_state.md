@@ -25,6 +25,19 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
+The [module dependency selection work](evidence/module_selection_focused_20261103.json)
+is committed at `9c7985e2`, with shared analysis extracted at `68a56ca7`.
+The explicit `--codegen-reachable` mode follows function, global and alias
+references, retains required private helpers, and preserves local ELF bindings.
+Opaque references conservatively retain all definitions. Its seven-function
+native fixture passes 330 local observations against 165 LLVM references, with
+30 rejection controls and three CLI/environment equivalence checks. All 1,689
+unit tests and the focused gates pass. Full integration remains pending disk
+admission, so the accepted checkpoint above stays unchanged. The unchanged
+Fibonacci retry selects 35 definitions conservatively and rejects during code
+generation at `start.expandStackSize unsupported_type:alloca`; it has zero local
+executions. Legacy selection remains the default.
+
 The accepted [integer array-stride checkpoint](evidence/array_stride_acceptance_20261103.json)
 at `4f69c581`, with correctness repairs `d1fe039a` and `e2fb5841`, passes
 all 17 integration stages on a frozen 2,635-file snapshot. Named i64 indexes now
@@ -87,7 +100,7 @@ continue enforcing the reserve. Reported fresh/cached free-space decreases are
 Unchanged upstream `hello_libc.zig` and the C fixture execute in all three modes;
 the C fixture's six paired cases and 66 call/heap observations remain separate.
 The ABI gate passes 60 cases. The frozen FMA canary retains 29 exact-result
-checks and 8,192 LLVM-paired observations. Fibonacci now emits `start.main`
+checks and 8,192 LLVM-paired observations. In the accepted legacy route, Fibonacci emits `start.main`
 through composed selection, then fails to link because 13 required private
 symbols are omitted despite having definitions in the captured IR. The unchanged
 program retains one LLVM reference execution and zero local executions. Its

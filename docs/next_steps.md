@@ -183,24 +183,32 @@ immediate sources, cast flags, pointer targets and unproved compare forms retain
 explicit boundaries; frozen residual fingerprints and the bypass ratchet stay
 unchanged.
 
-Next, give unchanged programs a proved module dependency selection. Fibonacci
-now emits `start.main`, but the current alias-root filter omits 13 private
-definitions needed by calls and retained function pointers. Every missing symbol
-exists in the captured IR. Use parsed function/global/alias references and
-transitive reachability, including recursion and initializer references, with
-explicit external imports and deterministic rejection of unsupported reachable
-definitions. Audit compatibility with existing selection contracts before changing
-the default; avoid extending the current function-name allowlist.
+The [module dependency selection implementation](evidence/module_selection_focused_20261103.json)
+at `9c7985e2` now has focused proof. It reuses the shared GlobalDCE dependency
+analysis, follows parsed calls/global references/aliases, and resolves selected
+alias chains while preserving local bindings and visibility. The explicit mode
+passes 330 local/165 LLVM observations, 30 rejection controls, three matching
+CLI/environment checks, all 1,689 units and the focused gates. Legacy selection
+remains the default; opaque live references retain all definitions.
 
-The retained diagnostic copy removes only alias root filtering: 33 selected
-functions yield nine emitted and 24 rejected, beginning with
-`start.expandStackSize unsupported_type:alloca`. That probe is not an
-unchanged-program execution or a closure proof. The isolated recursive arithmetic
-body passes 31 inputs against LLVM, while the unchanged program still has zero
-local executions. Prove the new selection with native helper chains, recursion,
-global function pointers and unreachable unsupported bodies, then retry the
-unchanged source and record the next actual lowering boundary. Keep the fixed
-compiler-core population and bypass ratchet unchanged without a separate migration.
+Next, complete the full cached 17-stage run before accepting this checkpoint.
+Owned idle-cache cleanup removed 1.39 GB of allocation, leaving 41.71 GB at that
+measurement, below the fixed 42.95 GB admission requirement. The shared Zig cache
+is outside this cleanup scope and had active consumers during the read-only audit.
+Current AIR, accepted evidence, performance baselines and 13 source probes remain;
+no archives are created.
+
+The unchanged Fibonacci retry now reports its codegen boundary instead of omitting
+private helpers and reaching a link failure: `start.expandStackSize` rejects an
+aggregate alloca. Coverage is conservative: 35 functions are selected, ten emit
+and 25 reject; no object is published and there are zero local executions.
+Its first stack types are the 16-byte `{ i64, i64 }` rlimit and a 24-byte padded
+result wrapper. A 56-byte array stride and narrower call ABI forms are visible
+later in the same function. Narrow opaque reference coverage before adopting
+this selection by default, then extend bounded aggregate frame storage through
+the existing private legalization and typed address authorities. These are planned
+boundaries, not accepted capabilities. Keep the fixed compiler-core population
+and bypass ratchet unchanged without a separate migration.
 
 Keep broader optional ABIs and
 floating/indirect/aggregate/stack varargs as explicit boundaries. Use the frozen

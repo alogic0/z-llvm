@@ -204,6 +204,15 @@ wrapping addresses, live operands and guarded stores are checked. Six recorded
 controls reject a wrong scale or stale store-value ordering. Its standalone
 population does not change compiler-core execution counts.
 
+The new [module dependency canary](evidence/module_selection_focused_20261103.json)
+uses explicit reachable selection through direct/release routes in three modes.
+Seven selected functions pass 330 local observations against 165 LLVM references
+reused across routes. It checks helper chains, recursion, callback globals,
+function/data aliases, imports, local bindings and hidden visibility. Thirty
+controls require rejection before object publication, and three checks require
+identical CLI/environment-selected objects. These focused results are provisional
+until the next full integration run; the accepted status remains unchanged.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

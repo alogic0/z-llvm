@@ -116,6 +116,16 @@ its full run. Captured inputs, final outputs, diagnostics, current AIR and all
 13 original probes remain. Builds regenerate the main cache, so this deletion
 interval is not net task savings. No archives are created.
 
+The [module selection focused checkpoint](evidence/module_selection_focused_20261103.json)
+records removal of 314 complete idle cache roots, totaling 1.39 GB of allocated
+space. Most roots were empty retained directories; the main cache and completed
+ABI/Fibonacci caches supplied the allocation. Installed output, source captures,
+logs, current AIR, measurement inputs and all 13 probes remain hash-verified.
+The resulting 41.71 GB free-space measurement remains below full-run admission.
+The shared cache outside the project was audited read-only and left untouched;
+it had active consumers. No archives are created. Rebuilt caches are not net
+retention savings.
+
 ## Headroom
 
 The runner's numerical headroom checks remain owned by
