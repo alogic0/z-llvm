@@ -4,10 +4,13 @@
 import argparse
 import csv
 import hashlib
+import io
 import json
 import mmap
 from pathlib import Path
 import re
+
+import real_candidate_facts as facts
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -71,7 +74,8 @@ def scan(path, mode, pin):
         if reader.line() != b"zllvm-air-export-v1":
             raise ValueError("unknown descriptor contract")
         header = {key: reader.value(key).decode() for key in ("contract_version", "payload", "producer", "root_source", "wrapper", "mode", "target", "function_count", "global_count")}
-        if header["mode"] != mode or header["contract_version"] != "1" or header["root_source"] != "main.zig":
+        if (header["mode"] != mode or header["contract_version"] != "1" or
+                header["root_source"] != "main.zig" or header["target"] not in facts.DESCRIPTOR_TARGETS):
             raise ValueError("incorrect descriptor header")
         for _ in range(int(header["global_count"])):
             if reader.nonempty() != b"global_begin":
@@ -156,21 +160,59 @@ def derive(modes, inventory):
     return rows, sorted(rejected)
 
 
+def render_rows(rows):
+    output = io.StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=FIELDS, delimiter="\t", lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    return output.getvalue().encode()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for mode in MODES:
-        parser.add_argument(f"--{mode.lower()}-air", required=True, type=Path)
+        parser.add_argument(f"--{mode.lower()}-air", type=Path)
+    parser.add_argument("--facts-manifest", type=Path, help="checked semantic facts replacing the historical raw audit inputs")
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--audit", required=True, type=Path)
     parser.add_argument("--releasefast-inventory", required=True, type=Path, help="fresh typed-opcode/type inventory of the same ReleaseFast export")
     parser.add_argument("--previous", type=Path, default=ROOT / "docs/evidence/real_candidates_release_v2.tsv")
     args = parser.parse_args()
     pin = (ROOT / "docs/evidence/ziglang_pin.txt").read_text().strip()
+    paths = [getattr(args, f"{mode.lower()}_air") for mode in MODES]
+    if args.facts_manifest:
+        if any(paths):
+            parser.error("choose either the fact manifest or all three raw AIR inputs")
+        manifest = json.loads(args.facts_manifest.read_text(), object_pairs_hook=facts.unique_object)
+        if (manifest.get("schema") != facts.MANIFEST_SCHEMA or manifest.get("source_pin") != pin or
+                manifest.get("target") != facts.TARGET or set(manifest.get("inputs", {})) != set(MODES) or
+                manifest.get("releasefast_inventory_sha256") != hashlib.sha256(args.releasefast_inventory.read_bytes()).hexdigest()):
+            raise ValueError("candidate fact manifest identity mismatch")
+        authority_path = ROOT / "docs/evidence/real_candidates_release_v3_migration.json"
+        authority = json.loads(authority_path.read_text())
+        if (manifest.get("historical_audit_sha256") != hashlib.sha256(authority_path.read_bytes()).hexdigest() or
+                authority["source_pin"] != pin or manifest.get("candidate_sha256") != authority["candidate_sha256"] or
+                manifest.get("rows") != authority["rows"] or manifest.get("selected_rows") != authority["selected_rows"] or
+                manifest.get("rejected_count") != facts.rejection_count(authority)):
+            raise ValueError("candidate fact manifest differs from the frozen audit")
+    elif not all(paths):
+        parser.error("all three raw AIR inputs or a fact manifest are required")
     modes, inputs = {}, {}
     for mode in MODES:
-        path = getattr(args, f"{mode.lower()}_air")
-        modes[mode], digest, duplicates = scan(path, mode, pin)
-        inputs[mode] = {"path": str(path), "sha256": digest, "unambiguous_functions": len(modes[mode]), "ambiguous_symbols_excluded": duplicates}
+        if args.facts_manifest:
+            entry = manifest["inputs"][mode]
+            if entry["descriptor_sha256"] != authority["inputs"][mode]["sha256"]:
+                raise ValueError("candidate fact raw parent differs from the frozen audit")
+            path = ROOT / entry["path"]
+            modes[mode], duplicates = facts.load_facts(path, mode, pin, entry["sha256"], entry["descriptor_sha256"])
+            if len(modes[mode]) != entry["unambiguous_functions"] or duplicates != entry["ambiguous_symbols_excluded"]:
+                raise ValueError("candidate fact manifest population mismatch")
+            inputs[mode] = {"path": entry["path"], "sha256": entry["sha256"], "descriptor_sha256": entry["descriptor_sha256"], "format": facts.SCHEMA}
+        else:
+            path = getattr(args, f"{mode.lower()}_air")
+            modes[mode], digest, duplicates = scan(path, mode, pin)
+            inputs[mode] = {"path": str(path), "sha256": digest}
+        inputs[mode].update(unambiguous_functions=len(modes[mode]), ambiguous_symbols_excluded=duplicates)
     with args.releasefast_inventory.open() as source:
         inventory = {row["function"]: row for row in csv.DictReader(source, delimiter="\t")}
     if not set(modes["ReleaseFast"]).issubset(inventory):
@@ -179,11 +221,16 @@ def main():
     required = {"link.MachO.CodeSignature.Requirements.size", "link.MachO.CodeSignature.Requirements.slotType", "link.MachO.CodeSignature.Signature.size", "link.MachO.CodeSignature.Signature.slotType"}
     if len(rows) < 100 or not required.issubset({row["function"] for row in rows[:100]}):
         raise ValueError("the fixed 100-row population must contain all four execution cohort members")
+    if args.facts_manifest:
+        selected_facts = [{**row, "modes": {mode: modes[mode][row["function"]] for mode in MODES}} for row in rows[:100]]
+        if (selected_facts != authority["selected"] or len(rejected) != facts.rejection_count(authority) or
+                facts.rejection_digest(rejected) != manifest.get("rejected_names_sha256")):
+            raise ValueError("candidate fact replay changed a frozen audit decision")
+    rendered = render_rows(rows)
+    if args.facts_manifest and hashlib.sha256(rendered).hexdigest() != manifest.get("candidate_sha256"):
+        raise ValueError("candidate fact replay changed the frozen table")
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    with args.out.open("w") as output:
-        writer = csv.DictWriter(output, fieldnames=FIELDS, delimiter="\t", lineterminator="\n")
-        writer.writeheader()
-        writer.writerows(rows)
+    args.out.write_bytes(rendered)
     with args.previous.open() as previous:
         old = list(csv.DictReader(previous, delimiter="\t"))[:100]
     selected = rows[:100]

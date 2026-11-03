@@ -1,0 +1,61 @@
+{
+  "schema": "real-candidate-facts-manifest-v1",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-linux-gnu",
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "rows": 21117,
+  "selected_rows": 100,
+  "rejected_count": 1863,
+  "rejected_names_sha256": "3c5f5e115fc022dc31bda3d916ca51ab7beca5941651362db583ef235cf136bc",
+  "releasefast_inventory_sha256": "02467d46d90511ba3f88647aa62267a4ee69ea92a56811f59618c5b45a4cca51",
+  "historical_audit_sha256": "52a77f8d8e92063f5857af1a447e758e882a07fdcff3a86475e9891ec1495740",
+  "inputs": {
+    "ReleaseFast": {
+      "path": "local-state/inputs/real-candidates-v3/ReleaseFast.facts.json",
+      "sha256": "8c0fe94458c68580e68d83d58d3ada0821747603d2e8c5388223ea8a24b8fc14",
+      "bytes": 24886507,
+      "descriptor_sha256": "c174c6552a17794c0f82f936b0373f7a8d0cf943460007182d7c20c06beabd2a",
+      "descriptor_target": "x86_64-unknown-linux5.10.0-gnu2.31.0",
+      "unambiguous_functions": 66782,
+      "ambiguous_symbols_excluded": [
+        "debug.ElfFile.searchSymtab.SearchContext.predicate",
+        "zig.llvm.Builder.DataLayout.parseString.SortContext.lessThan",
+        "zig.llvm.Builder.arrayTypeAssumeCapacity.Adapter.eql",
+        "zig.llvm.Builder.arrayTypeAssumeCapacity.Adapter.hash"
+      ]
+    },
+    "ReleaseSafe": {
+      "path": "local-state/inputs/real-candidates-v3/ReleaseSafe.facts.json",
+      "sha256": "b54f8e99138e866f888fe67c47a05cdfc452b8667d92854fe9298390dfc068bf",
+      "bytes": 25164389,
+      "descriptor_sha256": "7b34676ca48eaeec0416bdb50a77b910c038dac88a40df3e7ed703c2e0d714c6",
+      "descriptor_target": "x86_64-unknown-linux5.10.0-gnu2.31.0",
+      "unambiguous_functions": 67451,
+      "ambiguous_symbols_excluded": [
+        "debug.ElfFile.searchSymtab.SearchContext.predicate",
+        "zig.llvm.Builder.DataLayout.parseString.SortContext.lessThan",
+        "zig.llvm.Builder.arrayTypeAssumeCapacity.Adapter.eql",
+        "zig.llvm.Builder.arrayTypeAssumeCapacity.Adapter.hash"
+      ]
+    },
+    "ReleaseSmall": {
+      "path": "local-state/inputs/real-candidates-v3/ReleaseSmall.facts.json",
+      "sha256": "0c1f5fa27f5619d8b53982d40ae2f83a776efdfbba85e417392bef30d4447ef1",
+      "bytes": 24041318,
+      "descriptor_sha256": "5ff91e8e1a86d214c7af8e6ab1c72b3b509564470b5d225b1433dc9b8cc25f5d",
+      "descriptor_target": "x86_64-unknown-linux5.10.0-gnu2.31.0",
+      "unambiguous_functions": 65275,
+      "ambiguous_symbols_excluded": [
+        "zig.llvm.Builder.DataLayout.parseString.SortContext.lessThan",
+        "zig.llvm.Builder.arrayTypeAssumeCapacity.Adapter.eql",
+        "zig.llvm.Builder.arrayTypeAssumeCapacity.Adapter.hash"
+      ]
+    }
+  },
+  "verification": {
+    "path": "local-state/validations/candidate-facts-20261103/extraction-proof.json",
+    "sha256": "db15d6752571d21c577d3c518b0dd30aa7478908d26c3b1044ebe2778b330eb6"
+  },
+  "scope": "Exact semantic inputs to offline v3 membership derivation, including typed-body hashes; no raw bodies or executable data. Current production AIR remains separate.",
+  "archives_created": 0
+}

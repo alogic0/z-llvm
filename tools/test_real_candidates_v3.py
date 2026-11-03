@@ -49,6 +49,17 @@ class Candidates(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "hash mismatch"):
                 scan(path, "ReleaseFast", "test")
 
+    def test_wrong_target_rejects_even_with_matching_content_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.fixture(directory, [function("probe")])
+            original = path.read_bytes()
+            changed = original.replace(b"target=x86_64-linux-gnu", b"target=aarch64-linux-gnu")
+            path.write_bytes(changed)
+            metadata = path.with_suffix(".meta")
+            metadata.write_text(metadata.read_text().replace(hashlib.sha256(original).hexdigest(), hashlib.sha256(changed).hexdigest()))
+            with self.assertRaisesRegex(ValueError, "incorrect descriptor header"):
+                scan(path, "ReleaseFast", "test")
+
     def test_mode_stability_and_defined_results_control_selection(self):
         base = {"signature": "fn () u32", "instructions": 2, "calls": 0, "global_refs": 0, "runtime_refs": 0, "undefined_result": False, "typed_sha256": "test"}
         modes = {mode: {"defined": dict(base), "undefined": {**base, "instructions": 1, "undefined_result": True}, "unstable": dict(base)} for mode in MODES}
