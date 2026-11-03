@@ -210,3 +210,13 @@ The module dependency cached run passes all 17 stages with
 43.33 GB, both above the 34.36 GB reserve. Three
 authenticated AIR exports are reused and execution checks run again. No headroom
 or AIR-cache implementation changes are part of this compiler checkpoint.
+
+The [IR serialization focused checkpoint](evidence/numeric_ssa_focused_20261103.json)
+records another idle-cache interval after readiness. Project cache roots and two
+superseded interrupted-test roots released 2.17 GB; the previously authorized
+shared Zig cache cleanup released 0.84 GB after a fresh consumer check. These
+are allocation intervals, not cumulative net savings. Source probes, captured IR,
+current AIR, installed compilers and retained proofs remain verified. The
+artifact-store dry run found no unreferenced objects. Full integration is still
+pending admission; an additional pip-cache cleanup was proposed but has not been
+authorized or performed. No archives are created.

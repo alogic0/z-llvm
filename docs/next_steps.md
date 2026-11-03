@@ -197,13 +197,22 @@ immediate sources, cast flags, pointer targets and unproved compare forms retain
 explicit boundaries; frozen residual fingerprints and the bypass ratchet stay
 unchanged.
 
-Next, repair numeric SSA names in printed IR after CFG reordering. A retained
-three-block reproducer is valid for LLVM before `simplifycfg`; the local pass
-merges blocks and prints `%2` before `%1`, which LLVM rejects. The existing
-comparison normalizer repairs that example and the captured Fibonacci module.
-Reuse its normalization authority, preserve non-comparison IR information and
-cover numeric block labels, forward references, PHIs and opaque operands before
-changing production serialization.
+The [numeric SSA serialization repair](evidence/numeric_ssa_focused_20261103.json)
+at `05467b60` now has focused proof. Printing repairs reordered numeric locals,
+including block labels and PHI predecessors, without mutating optimizer IR or
+stripping parsed module records. Valid production numbering remains unchanged;
+comparison output uses the same owner for dense numbering. Opaque references
+that need rewriting reject before output. Parser follow-up `12c57b9c` closes
+ownership leaks before append and propagates array-initializer allocation errors.
+All 1,705 units, readiness and structural checks pass. Six regression functions
+supply 288 observations of locally optimized IR executed by Clang-22 against 96
+LLVM references. The captured Fibonacci IR now verifies with layout and metadata
+preserved; this adds no local whole-program execution. Full integration remains
+pending, so the accepted checkpoint above stays unchanged.
+
+Next, complete the frozen full integration run for these IR changes before
+accepting the checkpoint. The naming repair and parser ownership fixes have
+separate source commits; the fixed candidate and execution cohorts remain unchanged.
 
 Then narrow opaque dependency-reference coverage before changing the default
 selection. LLVM GlobalDCE retains 34 functions and 16 globals/aliases from the

@@ -1,0 +1,248 @@
+{
+  "schema": 1,
+  "status": "focused proof; full integration pending",
+  "source_commits": [
+    {
+      "revision": "05467b605dbc846bf11b93fc8dd01ffb5c020356",
+      "tree": "9572ba0405b8c4cb5b3f5b46e47d023a443a4a55",
+      "subject": "fix(ir): serialize numeric locals in definition order"
+    },
+    {
+      "revision": "12c57b9c37dc59eb602e8c5427c85e4ff0c1448d",
+      "tree": "83a0567865eb8a3153979ec03b474a34c363d08f",
+      "subject": "fix(ir): release parsed values when publication fails"
+    }
+  ],
+  "source_sha256": {
+    "src/ir/local_names.zig": "3effaa4c2b22b2f1f738c1e2b684ac6adbd140c93ece36ac734d9ffbbde801ad",
+    "src/ir/printer.zig": "e6006c412ec2e431d5c735da0c34d7556ad1ed6ee8682d9d4714b32c772a8bc0",
+    "src/normalize.zig": "5537b45c1ecc8e849bd03eb1d6f6d67e8c5f2879c570bfa0c9efaff6da17e988",
+    "src/tests/ir_numeric_names.zig": "214646b350f562ee85e559715696fbef4ccd927be3ee313d1c008464c9b77e40",
+    "src/tests.zig": "0510ac845ed278f0ee2c6d0911b54b527e4f8d990dfe9ef947846687c4db25db",
+    "test/opt/inputs/numeric_local_names.ll": "1367cb7449e06c82e3064503c286f298eccf53e0fc11ff94a99a33f7747f3dca",
+    "test/opt/numeric_local_names_harness.c": "d30b8fa9328cb6e35b788ad73735ef285bfa887e39f4595ccf49ef2e1d5da4d6",
+    "tools/run_optimizer_correctness.zig": "06794c7475f0f5dfa17803348f651e2d7f5cff13198549ecef5b22a9901b9453",
+    "src/ir/parser.zig": "90ea45386d2e05aab37b86e83a28e24ff147b014dbf6ba511abad918bd6b37f4",
+    "src/ir/parser_common.zig": "04dc6ddcb863797e7c1824b3f832d579836743487d8e7cf935bdfe2aa70b75db",
+    "src/tests/ir_parser_ownership.zig": "fcd3b375d0b0e003f5369222a92bd77f70b745ca36cbbbd7e1913082480428a8"
+  },
+  "upstream_mapping": {
+    "path": "../llvm-project-22/llvm/lib/AsmParser/LLParser.cpp",
+    "owners": [
+      "PerFunctionState::setInstName",
+      "PerFunctionState::defineBB"
+    ]
+  },
+  "implementation": [
+    "One print-only numeric namespace for parameters, blocks and instruction results",
+    "Production preserves valid numbering; comparison output is dense",
+    "Typed operands, forward uses, PHIs and all branch targets follow one map without mutating IR",
+    "Opaque numeric references that would change reject before output; ambiguous numeric type references remain conservative",
+    "Parser retains ownership until publication succeeds, and array-global fallback propagates OutOfMemory"
+  ],
+  "validation": {
+    "unit_tests": 1705,
+    "unit_record": "local-state/validations/numeric-ssa-20261103/unit-all-r3.json",
+    "numeric_tests": 27,
+    "numeric_record": "local-state/validations/numeric-ssa-20261103/unit-numeric-r5.json",
+    "parser_ownership_tests": 11,
+    "parser_record": "local-state/validations/numeric-ssa-20261103/parser-ownership-r4.json",
+    "readiness": "local-state/validations/numeric-ssa-20261103/readiness-r4.json",
+    "readiness_sha256": "eb7503c6ea25e26f01bf5d57c7cb7d08c10cf81616fe629b5136ac0f1321ec9c",
+    "structural_smoke": "local-state/validations/numeric-ssa-20261103/structural-final.json",
+    "native_ir": {
+      "status": "passed",
+      "native": [
+        {
+          "pipeline": "simplifycfg",
+          "functions": 6,
+          "observations": 96,
+          "stdout_sha256": "e7792a6ff845966f406f85507ddcb547df97329309095d664d3749aa4d363f7f"
+        },
+        {
+          "pipeline": "instcombine,dce,simplifycfg",
+          "functions": 6,
+          "observations": 96,
+          "stdout_sha256": "e7792a6ff845966f406f85507ddcb547df97329309095d664d3749aa4d363f7f"
+        },
+        {
+          "pipeline": "release-o3",
+          "functions": 6,
+          "observations": 96,
+          "stdout_sha256": "e7792a6ff845966f406f85507ddcb547df97329309095d664d3749aa4d363f7f"
+        }
+      ],
+      "reference_observations": 96,
+      "references_reused": true,
+      "fibonacci": {
+        "input": "local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/object-input.ll",
+        "input_sha256": "2f72c59ebf876c48b671cbf39890f4a974b8b87545a3a3103d2cce2df85d180a",
+        "output": "local-state/validations/numeric-ssa-20261103/focused-native/fibonacci-preserved.ll",
+        "output_sha256": "40c482364c90db33cdfbccc6ccbc697899cc731f01a21da2fa27e43bc42d3d42",
+        "llvm_verify": 0,
+        "module_prefix_preserved": true,
+        "attributes_metadata_preserved": true,
+        "local_executions": 0
+      },
+      "archives_created": 0
+    },
+    "native_execution_backend": "Clang-22 -O0 executes locally optimized IR; reference compiled with Clang-22 -O2; this does not add local codegen execution credit",
+    "final_fibonacci_check": "local-state/validations/numeric-ssa-20261103/fibonacci-final-check.json",
+    "full_integration": "pending"
+  },
+  "boundaries": [
+    "Opaque numeric local references requiring rewriting reject before output",
+    "Ambiguous numeric named types inside opaque fields reject conservatively",
+    "Unnamed nonvoid calls retain existing InstructionNeedsResult verifier boundary"
+  ],
+  "validation_worktree": {
+    "worktree": "/home/oleg/prog/z_llvm/local-state/checkouts/ir-serialization-20261103/z_llvm",
+    "branch": "ir-serialization-validation-20261103",
+    "source_revision": "12c57b9c37dc59eb602e8c5427c85e4ff0c1448d",
+    "reason": "Concurrent build/vendor changes in the primary checkout; validate committed IR source independently",
+    "shared_immutable_cache": "local-state/caches/global-memory-headroom-20261103",
+    "separate_transient_roots": [
+      ".zig-cache",
+      "tmp",
+      "zig-out"
+    ],
+    "dependency_links": {
+      "../ziglang": "/home/oleg/prog/ziglang",
+      "../llvm-project-22": "/home/oleg/prog/llvm-project-22"
+    },
+    "original_scratch_root": "/home/oleg/prog/z_llvm/scratch",
+    "archives_created": 0,
+    "shared_local_state": [
+      "validations",
+      "caches",
+      "inputs",
+      "artifacts"
+    ]
+  },
+  "original_scratch_files": 13,
+  "archives_created": 0,
+  "owned_cache_cleanup": {
+    "status": "removed complete idle regenerable caches",
+    "recorded_utc": "2026-11-03T22:15:36.636647+00:00",
+    "targets": [
+      ".zig-cache",
+      "tmp/inbox66_abi_diff/run-1251247/global-cache",
+      "tmp/inbox66_abi_diff/run-1251247/ReleaseSmall/reference-cache",
+      "tmp/inbox66_abi_diff/run-1251247/ReleaseSmall/candidate-cache",
+      "tmp/inbox66_abi_diff/run-1251247/ReleaseSafe/reference-cache",
+      "tmp/inbox66_abi_diff/run-1251247/ReleaseSafe/candidate-cache",
+      "tmp/inbox66_abi_diff/run-1251247/ReleaseFast/reference-cache",
+      "tmp/inbox66_abi_diff/run-1251247/ReleaseFast/candidate-cache",
+      "tmp/inbox66_abi_diff/run-1281976/global-cache",
+      "tmp/inbox66_abi_diff/run-1281976/ReleaseSmall/reference-cache",
+      "tmp/inbox66_abi_diff/run-1281976/ReleaseSmall/candidate-cache",
+      "tmp/inbox66_abi_diff/run-1281976/ReleaseSafe/reference-cache",
+      "tmp/inbox66_abi_diff/run-1281976/ReleaseSafe/candidate-cache",
+      "tmp/inbox66_abi_diff/run-1281976/ReleaseFast/reference-cache",
+      "tmp/inbox66_abi_diff/run-1281976/ReleaseFast/candidate-cache",
+      "tmp/inbox66_abi_diff/run-1187450/global-cache",
+      "tmp/inbox66_abi_diff/run-1187450/ReleaseSmall/reference-cache",
+      "tmp/inbox66_abi_diff/run-1187450/ReleaseSmall/candidate-cache",
+      "tmp/inbox66_abi_diff/run-1187450/ReleaseSafe/reference-cache",
+      "tmp/inbox66_abi_diff/run-1187450/ReleaseSafe/candidate-cache",
+      "tmp/inbox66_abi_diff/run-1187450/ReleaseFast/reference-cache",
+      "tmp/inbox66_abi_diff/run-1187450/ReleaseFast/candidate-cache",
+      "tmp/inbox66_abi_diff/run-1198316/global-cache",
+      "tmp/inbox66_abi_diff/run-1198316/ReleaseSmall/reference-cache",
+      "tmp/inbox66_abi_diff/run-1198316/ReleaseSmall/candidate-cache",
+      "tmp/inbox66_abi_diff/run-1198316/ReleaseSafe/reference-cache",
+      "tmp/inbox66_abi_diff/run-1198316/ReleaseSafe/candidate-cache",
+      "tmp/inbox66_abi_diff/run-1198316/ReleaseFast/reference-cache",
+      "tmp/inbox66_abi_diff/run-1198316/ReleaseFast/candidate-cache",
+      "tmp/generated_scalar_diff_1261679",
+      "tmp/behavioral_diff_1261679"
+    ],
+    "allocated_bytes_before": 2174164992,
+    "free_bytes_before": 39539175424,
+    "inventory": "local-state/validations/numeric-ssa-20261103/pre-full-cache-inventory.json",
+    "inventory_sha256": "13f2d1d0a29d5acb08cfaed37fc08a184406d86076dae40253ff540cce9d8e45",
+    "inventory_entries": 3894,
+    "retained_sha256": {
+      "zig-out/bin/z_llvm": "b7973efcab169d2b10c0feadc688e6505797ce47fced327709ae58739c871cfc",
+      "local-state/validations/numeric-ssa-20261103/serialization-focused.json": "9473c77d108a52569c1df42c1735bceb2ba8e39c910b9ad626c9444c196019d1",
+      "local-state/validations/numeric-ssa-20261103/focused-native/report.json": "97fcec6cd101370bb9a4950b9d9ad9c5ae9a9b4edfc8b0841e3a0aa57231b5b8",
+      "local-state/validations/numeric-ssa-20261103/focused-native/fibonacci-preserved.ll": "40c482364c90db33cdfbccc6ccbc697899cc731f01a21da2fa27e43bc42d3d42",
+      "local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/preopt.ll": "6bf48fb984e32992886cd0ac4c4e70f8b300af1866ef5f30ab57efbc5b08a946",
+      "local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/object-input.ll": "2f72c59ebf876c48b671cbf39890f4a974b8b87545a3a3103d2cce2df85d180a",
+      "scratch/test_bitset.ll": "b34f6bfd3750284e36ff225111aed27e7961f570048b42628b375cfa99a6d8eb",
+      "scratch/test_llvm.ll": "17738822b102735f481bddb59f6bf63b4ddfdf48d9f9812008167e7c7cb35da6",
+      "scratch/test_query_debug.ll": "3a0798cb323fe6928565a8e5d450e85312df8437f2a79d5583d2a618a658d11c",
+      "scratch/test_size.zig": "a255ebc31f0eba577c2b616708dbb42a1727b9bc29b839abf2c30a1c35b57f10",
+      "scratch/test_opt.zig": "c2cfadc84692240bdfaca03406cae67692310b30fd11fcfb94a338fc80c95242",
+      "scratch/test_abi.zig": "e889e005850511755f57196e564a41e486686b9fd4f98c478482c969b7638d32",
+      "scratch/test_bitset.zig": "a0ae945f89311108811a07bdfaf65ddd2e9b453b59436df15c66dce739b6e137",
+      "scratch/test_init.zig": "38c327156a57e8a989db2d7ff35fafcb6fba9ae761bfafabf965ef92b71c343e",
+      "scratch/test_chunkstate_layout.zig": "8f12f11ced9863d48bb1e949ab5c414db8005d80569fb6bfb27b17a2a91473d6",
+      "scratch/test_query.ll": "99d0ca5c1b9472ef33bf9eb2dbf2cf8c05c69aab775588109826b763b233d476",
+      "scratch/test_offset.zig": "8b49ea64bf64a90fbd741d299eb1bacaccf24e5805073a08303dbfa26dec9534",
+      "scratch/test_query.zig": "5c7cbb510723d088f389cc932a67222e72ad736b651189c6b3e88bffd6fe3dbf",
+      "scratch/test_abi.s": "d439a7beb674e08b519923b308207f6c510f463ab229af7ca098fd1ce0ccdb15"
+    },
+    "active_consumers_found": [],
+    "archives_created": 0,
+    "free_bytes_after": 41713332224,
+    "remaining_targets": []
+  },
+  "shared_cache_cleanup": {
+    "status": "complete idle shared cache removed",
+    "authorization": "Existing user approval: yes, you can; same idle /home/oleg/.cache/zig cleanup within the continuing authorized work after owned cleanup remained below full-run admission",
+    "reason": "Readiness regenerated caches; owned cleanup leaves less than the fixed 42949672960-byte admission requirement",
+    "recorded_utc": "2026-11-03T22:16:14.085183+00:00",
+    "target": "/home/oleg/.cache/zig",
+    "inventory": "local-state/validations/numeric-ssa-20261103/shared-cache-cleanup-inventory.json",
+    "inventory_sha256": "f7e684cae5deb4bce23dcb51d8d2c8d3d4d01e9917b6554a58fd28a43912614d",
+    "inventory_entries": 3137,
+    "allocated_bytes_before": 836202496,
+    "free_bytes_before": 41674354688,
+    "active_consumers_found": [],
+    "retained_sha256": {
+      "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm": "b7973efcab169d2b10c0feadc688e6505797ce47fced327709ae58739c871cfc",
+      "/home/oleg/prog/z_llvm/local-state/validations/numeric-ssa-20261103/serialization-focused.json": "9473c77d108a52569c1df42c1735bceb2ba8e39c910b9ad626c9444c196019d1",
+      "/home/oleg/prog/z_llvm/local-state/validations/numeric-ssa-20261103/focused-native/report.json": "97fcec6cd101370bb9a4950b9d9ad9c5ae9a9b4edfc8b0841e3a0aa57231b5b8",
+      "/home/oleg/prog/z_llvm/local-state/validations/numeric-ssa-20261103/focused-native/fibonacci-preserved.ll": "40c482364c90db33cdfbccc6ccbc697899cc731f01a21da2fa27e43bc42d3d42",
+      "/home/oleg/prog/z_llvm/local-state/validations/numeric-ssa-20261103/fibonacci-final-check.json": "250aac079b9e16c568d2359e23ef5ffe4b7966cd30e334022d0b00df6e148207",
+      "/home/oleg/prog/z_llvm/local-state/validations/module-selection-20261103/verified-full-module-cached.json": "596f8322635181976e7fdee3b5dde46d915401bb374d9032b6b8d177e6ac38cf",
+      "/home/oleg/prog/z_llvm/local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/object-input.ll": "2f72c59ebf876c48b671cbf39890f4a974b8b87545a3a3103d2cce2df85d180a",
+      "/home/oleg/prog/ziglang/build/stage4/bin/zig": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+      "/home/oleg/prog/z_llvm/scratch/test_bitset.ll": "b34f6bfd3750284e36ff225111aed27e7961f570048b42628b375cfa99a6d8eb",
+      "/home/oleg/prog/z_llvm/scratch/test_llvm.ll": "17738822b102735f481bddb59f6bf63b4ddfdf48d9f9812008167e7c7cb35da6",
+      "/home/oleg/prog/z_llvm/scratch/test_query_debug.ll": "3a0798cb323fe6928565a8e5d450e85312df8437f2a79d5583d2a618a658d11c",
+      "/home/oleg/prog/z_llvm/scratch/test_size.zig": "a255ebc31f0eba577c2b616708dbb42a1727b9bc29b839abf2c30a1c35b57f10",
+      "/home/oleg/prog/z_llvm/scratch/test_opt.zig": "c2cfadc84692240bdfaca03406cae67692310b30fd11fcfb94a338fc80c95242",
+      "/home/oleg/prog/z_llvm/scratch/test_abi.zig": "e889e005850511755f57196e564a41e486686b9fd4f98c478482c969b7638d32",
+      "/home/oleg/prog/z_llvm/scratch/test_bitset.zig": "a0ae945f89311108811a07bdfaf65ddd2e9b453b59436df15c66dce739b6e137",
+      "/home/oleg/prog/z_llvm/scratch/test_init.zig": "38c327156a57e8a989db2d7ff35fafcb6fba9ae761bfafabf965ef92b71c343e",
+      "/home/oleg/prog/z_llvm/scratch/test_chunkstate_layout.zig": "8f12f11ced9863d48bb1e949ab5c414db8005d80569fb6bfb27b17a2a91473d6",
+      "/home/oleg/prog/z_llvm/scratch/test_query.ll": "99d0ca5c1b9472ef33bf9eb2dbf2cf8c05c69aab775588109826b763b233d476",
+      "/home/oleg/prog/z_llvm/scratch/test_offset.zig": "8b49ea64bf64a90fbd741d299eb1bacaccf24e5805073a08303dbfa26dec9534",
+      "/home/oleg/prog/z_llvm/scratch/test_query.zig": "5c7cbb510723d088f389cc932a67222e72ad736b651189c6b3e88bffd6fe3dbf",
+      "/home/oleg/prog/z_llvm/scratch/test_abi.s": "d439a7beb674e08b519923b308207f6c510f463ab229af7ca098fd1ce0ccdb15"
+    },
+    "archives_created": 0,
+    "free_bytes_after": 42510557184,
+    "target_exists_after": false
+  },
+  "additional_cleanup_proposal": {
+    "status": "read-only proposal; deletion not authorized",
+    "target": "/home/oleg/.cache/pip",
+    "category": "pip HTTP download and wheel build cache; no environments or installed packages",
+    "allocated_bytes": 1498697728,
+    "files": 4066,
+    "subdirectories_allocated_bytes": {
+      "wheels": 2822144,
+      "http-v2": 1021652992,
+      "selfcheck": 86016,
+      "http": 474132480
+    },
+    "active_consumers_found": [],
+    "observed_utc": "2026-11-03T22:18:34.244540+00:00",
+    "available_bytes": 42173145088,
+    "required_start_bytes": 42949672960,
+    "archives_created": 0
+  }
+}
