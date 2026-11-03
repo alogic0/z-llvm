@@ -7178,8 +7178,7 @@ pub const inherited_script_ranges = [_]Range{
     .{ .start = 0xE0100, .end = 0xE01EF },
 };
 
-pub const unknown_script_ranges = [_]Range{
-};
+pub const unknown_script_ranges = [_]Range{};
 
 pub const script_ranges_0 = [_]Range{
     .{ .start = 0x0, .end = 0x40 },
@@ -8670,8 +8669,7 @@ pub const script_ranges_169 = [_]Range{
     .{ .start = 0x113E1, .end = 0x113E2 },
 };
 
-pub const script_ranges_170 = [_]Range{
-};
+pub const script_ranges_170 = [_]Range{};
 
 pub const script_specs = [_]ScriptSpec{
     .{ .long_name = "Common", .short_name = "Zyyy", .property_id = script_property_base + 0, .ranges = script_ranges_0[0..] },
@@ -10712,8 +10710,7 @@ pub const script_extensions_ranges_169 = [_]Range{
     .{ .start = 0x113E1, .end = 0x113E2 },
 };
 
-pub const script_extensions_ranges_170 = [_]Range{
-};
+pub const script_extensions_ranges_170 = [_]Range{};
 
 pub const script_extensions_specs = [_]ScriptSpec{
     .{ .long_name = "Common", .short_name = "Zyyy", .property_id = script_extensions_property_base + 0, .ranges = script_extensions_ranges_0[0..] },

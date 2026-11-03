@@ -1,5 +1,5 @@
 const std = @import("std");
-const regex = @import("zigrep_regex/regex/root.zig");
+const regex = @import("vendor/regex/src/root.zig");
 
 pub const TempDir = struct {
     path: []const u8,

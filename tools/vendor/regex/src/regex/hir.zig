@@ -95,14 +95,7 @@ pub const Hir = struct {
     fast_path: FastPath,
 
     pub fn deinit(self: Hir, allocator: std.mem.Allocator) void {
-        for (self.nodes) |node| {
-            switch (node) {
-                .concat => |children| allocator.free(children),
-                .alternation => |branches| allocator.free(branches),
-                .char_class => |class| allocator.free(class.items),
-                else => {},
-            }
-        }
+        for (self.nodes) |node| deinitNode(allocator, node);
 
         allocator.free(self.nodes);
         for (self.capture_names) |name| {
@@ -113,6 +106,15 @@ pub const Hir = struct {
         allocator.free(self.prefix.bytes);
     }
 };
+
+fn deinitNode(allocator: std.mem.Allocator, node: Node) void {
+    switch (node) {
+        .concat => |children| allocator.free(children),
+        .alternation => |branches| allocator.free(branches),
+        .char_class => |class| allocator.free(class.items),
+        else => {},
+    }
+}
 
 pub const LowerError = error{
     OutOfMemory,
@@ -128,14 +130,7 @@ const max_case_folded_range_size: u32 = 2048;
 pub fn lower(allocator: std.mem.Allocator, ast: parser.Ast) LowerError!Hir {
     var nodes: std.ArrayList(Node) = .empty;
     errdefer {
-        for (nodes.items) |node| {
-            switch (node) {
-                .concat => |children| allocator.free(children),
-                .alternation => |branches| allocator.free(branches),
-                .char_class => |class| allocator.free(class.items),
-                else => {},
-            }
-        }
+        for (nodes.items) |node| deinitNode(allocator, node);
         nodes.deinit(allocator);
     }
 
@@ -186,7 +181,7 @@ fn applyScopedCaseFoldNode(
     node_id: NodeId,
     enabled: bool,
 ) CaseFoldError!void {
-    switch (hir.nodes[@intFromEnum(node_id)]) {
+    switch (hir.nodes[@backingInt(node_id)]) {
         .group => |group| try applyScopedCaseFoldNode(allocator, hir, group.child, enabled),
         .case_fold_group => |group| try applyScopedCaseFoldNode(allocator, hir, group.child, group.enabled),
         .concat => |children| for (children) |child| try applyScopedCaseFoldNode(allocator, hir, child, enabled),
@@ -197,10 +192,11 @@ fn applyScopedCaseFoldNode(
 
     if (!enabled) return;
 
-    const node = &hir.nodes[@intFromEnum(node_id)];
+    const node = &hir.nodes[@backingInt(node_id)];
     switch (node.*) {
         .literal => |cp| {
-            node.* = .{ .char_class = try foldedLiteralClass(allocator, cp) };
+            const folded = try foldedLiteralClass(allocator, cp);
+            node.* = .{ .char_class = folded };
         },
         .unicode_property => |property| {
             node.* = .{ .unicode_property = .{
@@ -232,7 +228,7 @@ fn lowerNode(
     node_id: parser.NodeId,
     out: *std.ArrayList(Node),
 ) LowerError!NodeId {
-    const node = ast.nodes[@intFromEnum(node_id)];
+    const node = ast.nodes[@backingInt(node_id)];
     const lowered: Node = switch (node) {
         .empty => .empty,
         .literal => |cp| .{ .literal = cp },
@@ -272,8 +268,9 @@ fn lowerNode(
         } },
     };
 
+    errdefer deinitNode(allocator, lowered);
     try out.append(allocator, lowered);
-    return @enumFromInt(out.items.len - 1);
+    return @fromBackingInt(@intCast(out.items.len - 1));
 }
 
 fn lowerChildren(
@@ -294,7 +291,8 @@ fn lowerChildren(
 
 fn dupCaptureNames(allocator: std.mem.Allocator, input: []const ?[]const u8) LowerError![]const ?[]const u8 {
     const duped = try allocator.alloc(?[]const u8, input.len);
-    errdefer allocator.free(duped);
+    @memset(duped, null);
+    errdefer freeCaptureNames(allocator, duped);
 
     for (input, 0..) |name, index| {
         duped[index] = if (name) |capture_name|
@@ -341,7 +339,7 @@ fn extractPrefix(allocator: std.mem.Allocator, nodes: []const Node, root: NodeId
 }
 
 fn prefixForNode(allocator: std.mem.Allocator, nodes: []const Node, node_id: NodeId) LowerError!Prefix {
-    switch (nodes[@intFromEnum(node_id)]) {
+    switch (nodes[@backingInt(node_id)]) {
         .empty => return .{
             .exact = true,
             .bytes = try allocator.alloc(u8, 0),
@@ -535,7 +533,7 @@ test "HIR lowering preserves shape and extracts prefix analysis" {
     defer hir.deinit(testing.allocator);
 
     try testing.expectEqual(@as(u32, 0), hir.capture_count);
-    try testing.expectEqual(.alternation, std.meta.activeTag(hir.nodes[@intFromEnum(hir.root)]));
+    try testing.expectEqual(.alternation, std.meta.activeTag(hir.nodes[@backingInt(hir.root)]));
     try testing.expectEqualStrings("ab", hir.prefix.bytes);
     try testing.expect(!hir.prefix.exact);
     try testing.expectEqual(@as(usize, 1), hir.literals.len);
@@ -572,11 +570,11 @@ test "HIR lowering preserves capture groups" {
     try testing.expectEqual(@as(usize, 2), hir.capture_names.len);
     try testing.expectEqual(@as(?[]const u8, null), hir.capture_names[0]);
     try testing.expectEqual(@as(?[]const u8, null), hir.capture_names[1]);
-    const root = hir.nodes[@intFromEnum(hir.root)].concat;
-    try testing.expectEqual(.group, std.meta.activeTag(hir.nodes[@intFromEnum(root[0])]));
-    try testing.expectEqual(@as(u32, 0), hir.nodes[@intFromEnum(root[0])].group.index);
-    try testing.expectEqual(.group, std.meta.activeTag(hir.nodes[@intFromEnum(root[1])]));
-    try testing.expectEqual(@as(u32, 1), hir.nodes[@intFromEnum(root[1])].group.index);
+    const root = hir.nodes[@backingInt(hir.root)].concat;
+    try testing.expectEqual(.group, std.meta.activeTag(hir.nodes[@backingInt(root[0])]));
+    try testing.expectEqual(@as(u32, 0), hir.nodes[@backingInt(root[0])].group.index);
+    try testing.expectEqual(.group, std.meta.activeTag(hir.nodes[@backingInt(root[1])]));
+    try testing.expectEqual(@as(u32, 1), hir.nodes[@backingInt(root[1])].group.index);
 }
 
 test "HIR lowering preserves named capture metadata" {

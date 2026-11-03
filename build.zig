@@ -16,6 +16,27 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const regex_probe = b.addExecutable(.{ .name = "tool-regex-probe", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/tool_regex_probe.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    const regex_options = b.addOptions();
+    regex_options.addOptionPath("probe", regex_probe.getEmittedBin());
+    const regex_tests = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/tool_regex_test.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    regex_tests.root_module.addOptions("test_options", regex_options);
+    const run_regex_tests = b.addRunArtifact(regex_tests);
+    run_regex_tests.has_side_effects = true;
+    const verify_regex = b.addSystemCommand(&.{ "sha256sum", "--check", "tools/vendor/regex.SHA256SUMS" });
+    verify_regex.setCwd(b.path("."));
+    run_regex_tests.step.dependOn(&verify_regex.step);
+    b.step("verify-regex-source", "Verify the pinned public regex source snapshot").dependOn(&verify_regex.step);
+    b.step("test-tool-regex", "Check production regex assertions through owned child processes").dependOn(&run_regex_tests.step);
+
     const exe = b.addExecutable(.{
         .name = "z_llvm",
         .root_module = b.createModule(.{

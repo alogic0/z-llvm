@@ -19,9 +19,16 @@ zig build
 zig build test-unit
 zig build test-unit -Dtest-filter=verifier
 zig build structural-smoke artifact-store-test
+zig build test-tool-regex
+zig build test-tool-regex -Doptimize=ReleaseSafe
 zig build check-docs
 zig build run -- --help
 ```
+
+Native tool regex assertions use the public `zig-regex` package source, pinned
+with per-file digests. See [tool dependency provenance](tools/vendor/README.md).
+Standalone and nested `zig run tools/FILE.zig` commands keep their existing
+interface; `zig build verify-regex-source` verifies the snapshot.
 
 Unit tests and storage tests do not require the patched sibling compiler,
 historical worktrees, or LLVM utilities. `zig build test` additionally runs the

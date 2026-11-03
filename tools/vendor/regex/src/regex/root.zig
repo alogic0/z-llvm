@@ -29,6 +29,8 @@ pub const Dfa = @import("dfa.zig");
 pub const CompileOptions = struct {
     multiline: bool = false,
     multiline_dotall: bool = false,
+    case_insensitive: bool = false,
+    max_instructions: ?usize = null,
 };
 
 pub const Compiled = struct {
@@ -37,13 +39,18 @@ pub const Compiled = struct {
     program: Nfa.Program,
     engine: Vm.MatchEngine,
 
-    pub fn init(allocator: std.mem.Allocator, pattern: []const u8, options: CompileOptions) (ParseError || Nfa.CompileError)!Compiled {
-        const compiled_hir = try compile(allocator, pattern, options);
+    pub fn init(allocator: std.mem.Allocator, pattern: []const u8, options: CompileOptions) (ParseError || Nfa.CompileError || hir.CaseFoldError)!Compiled {
+        var compiled_hir = try compile(allocator, pattern, options);
         errdefer compiled_hir.deinit(allocator);
+        const fold_case = options.case_insensitive or for (compiled_hir.nodes) |node| {
+            if (node == .case_fold_group and node.case_fold_group.enabled) break true;
+        } else false;
+        if (fold_case) try hir.applyScopedCaseFold(allocator, &compiled_hir, options.case_insensitive);
 
         const program = try Nfa.compile(allocator, compiled_hir, .{
             .multiline = options.multiline,
             .multiline_dotall = options.multiline_dotall,
+            .max_instructions = options.max_instructions,
         });
 
         return .{
@@ -79,7 +86,7 @@ pub fn compile(allocator: std.mem.Allocator, pattern: []const u8, _: CompileOpti
     return hir.lower(allocator, parsed);
 }
 
-pub fn compileRe(allocator: std.mem.Allocator, pattern: []const u8, options: CompileOptions) (ParseError || Nfa.CompileError)!Compiled {
+pub fn compileRe(allocator: std.mem.Allocator, pattern: []const u8, options: CompileOptions) (ParseError || Nfa.CompileError || hir.CaseFoldError)!Compiled {
     return Compiled.init(allocator, pattern, options);
 }
 
@@ -112,4 +119,13 @@ test "Compiled wrapper exposes captures" {
     try testing.expectEqual(@as(?usize, 3), m.groups[0].end);
     try testing.expectEqual(@as(?usize, 4), m.groups[1].start);
     try testing.expectEqual(@as(?usize, 7), m.groups[1].end);
+}
+
+test "Compiled wrapper supports global Unicode case folding" {
+    const testing = std.testing;
+
+    var compiled = try compileRe(testing.allocator, "needle σ", .{ .case_insensitive = true });
+    defer compiled.deinit();
+
+    try testing.expect(try compiled.isMatch("Needle Σ"));
 }

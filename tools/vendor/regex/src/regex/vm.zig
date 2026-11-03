@@ -74,6 +74,9 @@ pub const MatchEngine = struct {
         var next: std.ArrayList(Thread) = .empty;
         defer self.deinitThreadList(&next);
 
+        var pending_match: ?Match = null;
+        defer if (pending_match) |match| match.deinit(self.allocator);
+
         const visited = try self.allocator.alloc(bool, program.instructions.len);
         defer self.allocator.free(visited);
 
@@ -81,7 +84,10 @@ pub const MatchEngine = struct {
         defer self.allocator.free(start_slots);
 
         @memset(visited, false);
-        if (try self.addThread(program, haystack, &current, visited, program.start, start_slots, 0)) |match| return match;
+        if (try self.addThread(program, haystack, &current, visited, program.start, start_slots, 0)) |match| {
+            if (current.items.len == 0) return match;
+            self.rememberMatch(&pending_match, match);
+        }
 
         var input = reader.CodePointReader(u8).init(haystack);
         while (true) {
@@ -93,20 +99,123 @@ pub const MatchEngine = struct {
             @memset(visited, false);
 
             for (current.items) |thread| {
-                if (try self.step(program, haystack, &next, visited, thread, cp, end)) |match| return match;
+                if (try self.step(program, haystack, &next, visited, thread, cp, end)) |match| {
+                    self.rememberMatch(&pending_match, match);
+                    break;
+                }
             }
             self.clearThreadList(&current);
 
+            if (next.items.len == 0 and pending_match != null) {
+                return takeMatch(&pending_match);
+            }
+
             std.mem.swap(std.ArrayList(Thread), &current, &next);
 
-            @memset(visited, false);
-            if (start != end) {
+            if (pending_match == null and start != end) {
+                @memset(visited, false);
                 const restart_slots = try self.allocSlots(program.slot_count);
                 defer self.allocator.free(restart_slots);
-                if (try self.addThread(program, haystack, &current, visited, program.start, restart_slots, end)) |match| return match;
+                if (try self.addThread(program, haystack, &current, visited, program.start, restart_slots, end)) |match| {
+                    if (current.items.len == 0) return match;
+                    self.rememberMatch(&pending_match, match);
+                }
             }
         }
 
+        if (pending_match != null) return takeMatch(&pending_match);
+        return null;
+    }
+
+    /// Finds the first match whose start is at or after `start_offset` while
+    /// retaining the original haystack for document-relative anchors.
+    pub fn firstMatchFrom(
+        self: *const MatchEngine,
+        program: nfa.Program,
+        haystack: []const u8,
+        start_offset: usize,
+    ) MatchError!?Match {
+        if (program.instructions.len == 0 or start_offset > haystack.len) return null;
+        if (start_offset < haystack.len and haystack[start_offset] & 0xC0 == 0x80) {
+            return error.InvalidUtf8;
+        }
+        if (program.prefilter) |prefilter| {
+            if (!prefilter.mayMatch(haystack[start_offset..])) return null;
+        }
+
+        var current: std.ArrayList(Thread) = .empty;
+        defer self.deinitThreadList(&current);
+
+        var next: std.ArrayList(Thread) = .empty;
+        defer self.deinitThreadList(&next);
+
+        var pending_match: ?Match = null;
+        defer if (pending_match) |match| match.deinit(self.allocator);
+
+        const visited = try self.allocator.alloc(bool, program.instructions.len);
+        defer self.allocator.free(visited);
+
+        const start_slots = try self.allocSlots(program.slot_count);
+        defer self.allocator.free(start_slots);
+
+        @memset(visited, false);
+        if (try self.addThread(
+            program,
+            haystack,
+            &current,
+            visited,
+            program.start,
+            start_slots,
+            start_offset,
+        )) |match| {
+            if (current.items.len == 0) return match;
+            self.rememberMatch(&pending_match, match);
+        }
+
+        var input = reader.CodePointReader(u8).init(haystack);
+        input.pos = start_offset;
+        while (true) {
+            const start = input.pos;
+            const cp = (try input.next()) orelse break;
+            const end = input.pos;
+
+            self.clearThreadList(&next);
+            @memset(visited, false);
+
+            for (current.items) |thread| {
+                if (try self.step(program, haystack, &next, visited, thread, cp, end)) |match| {
+                    self.rememberMatch(&pending_match, match);
+                    break;
+                }
+            }
+            self.clearThreadList(&current);
+
+            if (next.items.len == 0 and pending_match != null) {
+                return takeMatch(&pending_match);
+            }
+
+            std.mem.swap(std.ArrayList(Thread), &current, &next);
+
+            if (pending_match == null and start != end) {
+                @memset(visited, false);
+                const restart_slots = try self.allocSlots(program.slot_count);
+                defer self.allocator.free(restart_slots);
+                if (try self.addThread(
+                    program,
+                    haystack,
+                    &current,
+                    visited,
+                    program.start,
+                    restart_slots,
+                    end,
+                )) |match| {
+                    if (current.items.len == 0) return match;
+                    self.rememberMatch(&pending_match, match);
+                }
+            }
+        }
+
+        if (pending_match != null) return takeMatch(&pending_match);
         return null;
     }
 
@@ -125,6 +234,9 @@ pub const MatchEngine = struct {
         var next: std.ArrayList(Thread) = .empty;
         defer self.deinitThreadList(&next);
 
+        var pending_match: ?Match = null;
+        defer if (pending_match) |match| match.deinit(self.allocator);
+
         const visited = try self.allocator.alloc(bool, program.instructions.len);
         defer self.allocator.free(visited);
 
@@ -132,7 +244,10 @@ pub const MatchEngine = struct {
         defer self.allocator.free(start_slots);
 
         @memset(visited, false);
-        if (try self.addThread(program, haystack, &current, visited, program.start, start_slots, 0)) |match| return match;
+        if (try self.addThread(program, haystack, &current, visited, program.start, start_slots, 0)) |match| {
+            if (current.items.len == 0) return match;
+            self.rememberMatch(&pending_match, match);
+        }
 
         var pos: usize = 0;
         while (nextTextUnit(haystack, &pos)) |unit| {
@@ -140,18 +255,31 @@ pub const MatchEngine = struct {
             @memset(visited, false);
 
             for (current.items) |thread| {
-                if (try self.stepByte(program, haystack, &next, visited, thread, unit)) |match| return match;
+                if (try self.stepByte(program, haystack, &next, visited, thread, unit)) |match| {
+                    self.rememberMatch(&pending_match, match);
+                    break;
+                }
             }
             self.clearThreadList(&current);
 
+            if (next.items.len == 0 and pending_match != null) {
+                return takeMatch(&pending_match);
+            }
+
             std.mem.swap(std.ArrayList(Thread), &current, &next);
 
-            @memset(visited, false);
-            const restart_slots = try self.allocSlots(program.slot_count);
-            defer self.allocator.free(restart_slots);
-            if (try self.addThread(program, haystack, &current, visited, program.start, restart_slots, unit.end)) |match| return match;
+            if (pending_match == null) {
+                @memset(visited, false);
+                const restart_slots = try self.allocSlots(program.slot_count);
+                defer self.allocator.free(restart_slots);
+                if (try self.addThread(program, haystack, &current, visited, program.start, restart_slots, unit.end)) |match| {
+                    if (current.items.len == 0) return match;
+                    self.rememberMatch(&pending_match, match);
+                }
+            }
         }
 
+        if (pending_match != null) return takeMatch(&pending_match);
         return null;
     }
 
@@ -162,6 +290,9 @@ pub const MatchEngine = struct {
         var next: std.ArrayList(Thread) = .empty;
         defer self.deinitThreadList(&next);
 
+        var pending_match: ?Match = null;
+        defer if (pending_match) |match| match.deinit(self.allocator);
+
         const visited = try self.allocator.alloc(bool, program.instructions.len);
         defer self.allocator.free(visited);
 
@@ -169,25 +300,41 @@ pub const MatchEngine = struct {
         defer self.allocator.free(start_slots);
 
         @memset(visited, false);
-        if (try self.addThread(program, haystack, &current, visited, program.start, start_slots, 0)) |match| return match;
+        if (try self.addThread(program, haystack, &current, visited, program.start, start_slots, 0)) |match| {
+            if (current.items.len == 0) return match;
+            self.rememberMatch(&pending_match, match);
+        }
 
         for (haystack, 0..) |byte, index| {
             self.clearThreadList(&next);
             @memset(visited, false);
 
             for (current.items) |thread| {
-                if (try self.step(program, haystack, &next, visited, thread, byte, index + 1)) |match| return match;
+                if (try self.step(program, haystack, &next, visited, thread, byte, index + 1)) |match| {
+                    self.rememberMatch(&pending_match, match);
+                    break;
+                }
             }
             self.clearThreadList(&current);
 
+            if (next.items.len == 0 and pending_match != null) {
+                return takeMatch(&pending_match);
+            }
+
             std.mem.swap(std.ArrayList(Thread), &current, &next);
 
-            @memset(visited, false);
-            const restart_slots = try self.allocSlots(program.slot_count);
-            defer self.allocator.free(restart_slots);
-            if (try self.addThread(program, haystack, &current, visited, program.start, restart_slots, index + 1)) |match| return match;
+            if (pending_match == null) {
+                @memset(visited, false);
+                const restart_slots = try self.allocSlots(program.slot_count);
+                defer self.allocator.free(restart_slots);
+                if (try self.addThread(program, haystack, &current, visited, program.start, restart_slots, index + 1)) |match| {
+                    if (current.items.len == 0) return match;
+                    self.rememberMatch(&pending_match, match);
+                }
+            }
         }
 
+        if (pending_match != null) return takeMatch(&pending_match);
         return null;
     }
 
@@ -317,14 +464,21 @@ pub const MatchEngine = struct {
             .match => return try self.buildMatch(program, slots),
             .literal, .char_class, .char_class_set, .unicode_property, .any => {
                 if (!hasThread(list.items, inst_ptr)) {
+                    const owned_slots = try self.cloneSlots(slots);
+                    errdefer self.allocator.free(owned_slots);
                     try list.append(self.allocator, .{
                         .inst_ptr = inst_ptr,
-                        .slots = try self.cloneSlots(slots),
+                        .slots = owned_slots,
                     });
                 }
                 return null;
             },
         }
+    }
+
+    fn rememberMatch(self: *const MatchEngine, pending: *?Match, match: Match) void {
+        if (pending.*) |previous| previous.deinit(self.allocator);
+        pending.* = match;
     }
 
     fn allocSlots(self: *const MatchEngine, slot_count: u32) MatchError![]?usize {
@@ -370,6 +524,12 @@ pub const MatchEngine = struct {
         list.deinit(self.allocator);
     }
 };
+
+fn takeMatch(pending: *?Match) Match {
+    const match = pending.*.?;
+    pending.* = null;
+    return match;
+}
 
 fn canUseLazyDfa(program: nfa.Program) bool {
     if (program.capture_count != 0) return false;
@@ -835,7 +995,39 @@ test "VM honors lazy quantifier priority" {
 
     const greedy_match = (try engine.firstMatch(greedy, "zzaxxbxxbyy")).?;
     defer greedy_match.deinit(testing.allocator);
-    try testing.expectEqual(Capture{ .start = 2, .end = 6 }, greedy_match.span);
+    try testing.expectEqual(Capture{ .start = 2, .end = 9 }, greedy_match.span);
+}
+
+test "VM keeps terminal quantifiers greedy across match paths" {
+    const testing = std.testing;
+
+    const ascii = try compileProgram(testing.allocator, "([0-9]+)", .{});
+    defer ascii.deinit(testing.allocator);
+
+    var engine = MatchEngine.init(testing.allocator);
+    const first = (try engine.firstMatch(ascii, "x123 y45")).?;
+    defer first.deinit(testing.allocator);
+    try testing.expectEqual(Capture{ .start = 1, .end = 4 }, first.span);
+    try testing.expectEqual(Capture{ .start = 1, .end = 4 }, first.groups[0]);
+
+    const from = (try engine.firstMatchFrom(ascii, "x123 y45", 4)).?;
+    defer from.deinit(testing.allocator);
+    try testing.expectEqual(Capture{ .start = 6, .end = 8 }, from.span);
+    try testing.expectEqual(Capture{ .start = 6, .end = 8 }, from.groups[0]);
+
+    const unicode_program = try compileProgram(testing.allocator, "(é+)", .{});
+    defer unicode_program.deinit(testing.allocator);
+    const unicode_match = (try engine.firstMatch(unicode_program, "xééy")).?;
+    defer unicode_match.deinit(testing.allocator);
+    try testing.expectEqual(Capture{ .start = 1, .end = 5 }, unicode_match.span);
+    try testing.expectEqual(Capture{ .start = 1, .end = 5 }, unicode_match.groups[0]);
+
+    const bytes = try compileProgram(testing.allocator, "(a.+b)", .{});
+    defer bytes.deinit(testing.allocator);
+    const byte_match = (try engine.firstMatchBytes(bytes, "xa\xffbxb")).?;
+    defer byte_match.deinit(testing.allocator);
+    try testing.expectEqual(Capture{ .start = 1, .end = 6 }, byte_match.span);
+    try testing.expectEqual(Capture{ .start = 1, .end = 6 }, byte_match.groups[0]);
 }
 
 test "VM handles negated classes and class edge literals" {
