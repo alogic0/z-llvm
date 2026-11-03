@@ -1115,8 +1115,12 @@ pub fn lowerBytePointerGep(selector: *ComposedBlockSelector, result_name: []cons
     const bounded_f32_pair = aggregatePointerView(selector, gep.ptr) != null;
     const base_use = pointerUseForm(selector, gep.ptr, bounded_f32_pair) orelse
         return .{ .unsupported_value = "composed-block-unknown-byte-gep-ptr" };
-    if (base_use.form == .stack_object_address)
-        return .{ .unsupported_value = "composed-block-unknown-byte-gep-ptr" };
+    if (base_use.form == .stack_object_address) {
+        // Bounded byte addresses within the existing 16-byte frame object.
+        // The value-use authority checks its storage class and owns clobbers.
+        if (index.value != .int or index.value.int < 0 or index.value.int > 16)
+            return .{ .unsupported_value = "composed-block-unknown-byte-gep-ptr" };
+    }
 
     var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();

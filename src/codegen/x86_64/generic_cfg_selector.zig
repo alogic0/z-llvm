@@ -7,6 +7,7 @@ const stage2_planning = @import("generic_cfg/stage2_planning.zig");
 const composed_selector = @import("generic_cfg/composed_selector.zig");
 const address_dependencies = @import("generic_cfg/composed_selector_address_dependencies.zig");
 const abi_legalization = @import("generic_cfg/abi_legalization.zig");
+const word_pair_memory = @import("generic_cfg/word_pair_memory.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 
@@ -48,6 +49,9 @@ pub fn tryLowerWithContext(
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try abi_legalization.paddedHalf(arena.allocator(), function)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
+    if (try word_pair_memory.legalize(arena.allocator(), function, module_context)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     switch (inspected) {

@@ -62,6 +62,13 @@ pub fn validateRequest(
             const current = try resolveRequestCurrent(Authority, transaction, index);
             try compatibility.validateBindingCompatibility(binding, request, current);
             try compatibility.validateSourceView(current, request.form);
+            if (request.form == .stack_object_address) {
+                if (request.prepared_action) |action| if (action == .form_byte_address) {
+                    if (current != .stack128 or action.form_byte_address.offset != .constant or
+                        action.form_byte_address.offset.constant < 0 or action.form_byte_address.offset.constant > 16)
+                        return error.ValueUseUnsupportedAddressForm;
+                };
+            }
             return current;
         },
     }
@@ -149,7 +156,7 @@ pub fn validateFormAndDestination(request: *const Types.StoredRequest) !void {
             .validate_shape => if (request.form == .stack_f32_pair_byte_address)
                 error.ValueUsePreparedActionFormMismatch,
             .emit_copy_to => |destination| compatibility.validateCopyActionForm(request.form, destination),
-            .form_byte_address => if (request.form != .pointer and request.form != .stack_f32_pair_byte_address)
+            .form_byte_address => if (request.form != .pointer and request.form != .stack_f32_pair_byte_address and request.form != .stack_object_address)
                 error.ValueUsePreparedActionFormMismatch,
             .form_scaled_address => if (request.form != .pointer and request.form != .stack_object_address)
                 error.ValueUsePreparedActionFormMismatch,

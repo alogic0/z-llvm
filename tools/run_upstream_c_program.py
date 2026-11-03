@@ -45,6 +45,46 @@ def run_variadic_canary(runner, directory, zllvm, environment):
     return 22
 
 
+def run_word_pair_canary(runner, directory, zllvm, environment, mode, report):
+    fixture = ROOT / "test/real_programs/word_pair_memory.ll"
+    driver = ROOT / "test/real_programs/word_pair_memory_driver.c"
+    expected = {"argv": [], "exit_status": 0,
+                "stdout": "word-pair-memory observations=64 copy=independent pointers=preserved guards=preserved\n"}
+    reference = directory / "word-pair-reference.o"
+    if runner.run(["clang-22", "-x", "ir", LLVM_OPT[mode], "-c", fixture, "-o", reference], directory / "word-pair-reference-object", environment):
+        raise RuntimeError("word-pair LLVM reference object failed")
+    executable = directory / "word-pair-reference"
+    if runner.run(["cc", "-O2", "-no-pie", "-Wl,-z,noexecstack", driver, reference, "-o", executable], directory / "word-pair-reference-link", environment):
+        raise RuntimeError("word-pair LLVM reference link failed")
+    require_observation(runner, executable, expected, directory / "word-pair-reference-run", environment)
+    report["word_pair_reference_observations"] += 64
+    for route in ("direct", "release"):
+        source = fixture
+        if route == "release":
+            stem = directory / "word-pair-optimize"
+            if runner.run([zllvm, "--pipeline=" + PIPELINES[mode], fixture], stem, environment):
+                raise RuntimeError("word-pair local optimizer failed")
+            source = directory / "word-pair-optimized.ll"
+            source.write_bytes(stem.with_suffix(".stdout").read_bytes())
+        stem = directory / ("word-pair-" + route + "-object")
+        arguments = ["--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", source]
+        if runner.run([zllvm, "--emit=obj", *arguments], stem, environment):
+            raise RuntimeError("word-pair local object failed")
+        obj = directory / ("word-pair-" + route + ".o")
+        obj.write_bytes(stem.with_suffix(".stdout").read_bytes())
+        stem = directory / ("word-pair-" + route + "-owners")
+        if runner.run([zllvm, "--emit=selection-owner-manifest", *arguments], stem, environment):
+            raise RuntimeError("word-pair ownership inspection failed")
+        owners = stem.with_suffix(".stdout").read_text().splitlines()
+        if len(owners) != 3 or {line.split("\t")[0] for line in owners[1:]} != {"word_pair_copy", "word_pair_extract"} or any(line.split("\t")[-1] not in {"composed_block", "composed_cfg"} for line in owners[1:]):
+            raise RuntimeError("word-pair canary escaped composed lowering")
+        executable = directory / ("word-pair-" + route)
+        if runner.run(["cc", "-O2", "-no-pie", "-Wl,-z,noexecstack", driver, obj, "-o", executable], directory / ("word-pair-" + route + "-link"), environment):
+            raise RuntimeError("word-pair local link failed")
+        require_observation(runner, executable, expected, directory / ("word-pair-" + route + "-run"), environment)
+        report["word_pair_local_observations"] += 64
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-root", required=True, type=Path)
@@ -61,7 +101,8 @@ def main():
     report = {"schema": "upstream-c-program-v1", "program": "zig-c-compiler-fixture", "language": "C",
               "status": "failed", "programs": 1, "matched_program_modes": 0,
               "reference_case_executions": 0, "local_case_executions": 0, "integer_variadic_observations": 0,
-              "heap_call_observations": 0, "native_call_observations": 0, "rows": []}
+              "heap_call_observations": 0, "native_call_observations": 0,
+              "word_pair_local_observations": 0, "word_pair_reference_observations": 0, "rows": []}
     try:
         if platform.system() != "Linux" or platform.machine() != "x86_64":
             raise RuntimeError("this bounded gate requires x86_64 Linux")
@@ -92,7 +133,8 @@ def main():
                        "source_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                        "runner_sha256": digest(Path(__file__)),
                        "fixture_sha256": {name: digest(ROOT / "test/real_programs" / name) for name in (
-                           "c_compiler.json", "variadic_integer.ll", "variadic_integer_driver.c", "variadic_integer_shim.S")}})
+                           "c_compiler.json", "variadic_integer.ll", "variadic_integer_driver.c", "variadic_integer_shim.S",
+                           "word_pair_memory.ll", "word_pair_memory_driver.c")}})
         environment = {k: v for k, v in os.environ.items() if not k.startswith(("ZLLVM_", "ZIG_USE_ZLLVM"))}
         environment.update({"ZIG_LOCAL_CACHE_DIR": str(output / "frontend-cache"),
                             "ZIG_GLOBAL_CACHE_DIR": str(output / "global-cache")})
@@ -153,6 +195,7 @@ def main():
             report["native_call_observations"] += run_variadic_canary(runner, directory, zllvm, environment)
             report["integer_variadic_observations"] += 16
             report["heap_call_observations"] += 6
+            run_word_pair_canary(runner, directory, zllvm, environment, mode, report)
             row["status"] = "matched"
             report["matched_program_modes"] += 1
         if digest(source) != report["source_sha256"]:
@@ -163,6 +206,7 @@ def main():
     finally:
         write_json(output / "report.json", report)
         print(f"summary upstream-c-program schema=upstream-c-program-v1 programs=1 program_modes={report.get('program_modes', 0)} matched_program_modes={report['matched_program_modes']} reference_case_executions={report['reference_case_executions']} local_case_executions={report['local_case_executions']} integer_variadic_observations={report['integer_variadic_observations']} heap_call_observations={report['heap_call_observations']} native_call_observations={report['native_call_observations']} local_fail={int(report['status'] != 'passed')}")
+        print(f"summary word-pair-memory population=standalone-two-word-stack-memory routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['word_pair_local_observations']} reference_observations={report['word_pair_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"evidence: {output / 'report.json'}")
         if "error" in report:
             print(report["error"], file=sys.stderr)

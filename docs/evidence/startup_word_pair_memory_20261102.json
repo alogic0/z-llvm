@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "date": "2026-11-02",
+  "status": "focused native and unit checks pass; combined Tier 3 pending",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "scope": "Private codegen view for an exact 16-byte pointer/length object and transparent named wrappers. Reuse existing 128-bit stack storage and value-use address/memcpy actions. No LLVM codegen fallback.",
+  "native_evidence": "local-state/validations/startup-headroom-20261102/c-program-final-r2/report.json",
+  "native_report_sha256": "4d66c2203cc12e26724116021ec2fb7d86142fa03dc7166bec9254a74cedfc21",
+  "local_observations": 384,
+  "reference_observations": 192,
+  "reference_reused_per_route": true,
+  "routes": [
+    "direct local codegen",
+    "accepted local release pipeline followed by local codegen"
+  ],
+  "modes": [
+    "ReleaseFast",
+    "ReleaseSafe",
+    "ReleaseSmall"
+  ],
+  "functions": [
+    "word_pair_copy",
+    "word_pair_extract"
+  ],
+  "inputs": "Four pointer values including null and unaligned values; eight full-width lengths; two functions. Each local route/mode executes 64 checked observations.",
+  "checks": [
+    "Copy remains independent after source pointer mutation.",
+    "Stored/loaded pointers and all length bits match expected values.",
+    "Adjacent output guards remain unchanged.",
+    "Both functions have composed lowering ownership.",
+    "Machine verification and native in-memory execution pass.",
+    "Original IR, including nested memcpy argument lists, remains unchanged."
+  ],
+  "declined_boundaries": [
+    "Other pair field orders/types, padding, unresolved trailing fields, arrays and packed objects",
+    "Volatile/atomic aggregate stores, unsupported address spaces, multiple objects and alignment above 16",
+    "Unresolved/escaping aggregate SSA consumers, aggregate loads/PHIs/returns",
+    "Negative, greater-than-16 or dynamic byte offsets from the frame object"
+  ],
+  "focused_tests": {
+    "compiler_unit_tests": 1637,
+    "structural_tests": 11,
+    "python_policy_tests": 7,
+    "abi_cases": 60,
+    "all_passed": true,
+    "log": "local-state/validations/startup-headroom-20261102/focused-final-r3.log",
+    "log_sha256": "833fce1c317325f253ffcabb88480add32baf092dc867e9b729da8d25cd4f544",
+    "compiler_rt_bypass_inventory_unchanged": true,
+    "compiler_rt_bypass_ratchet": 130
+  },
+  "upstream_mapping": {
+    "path": "../llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp",
+    "owners": [
+      "visitAlloca (static frame objects)",
+      "visitStore and ComputeValueVTs (scalar aggregate fields)",
+      "visitInsertValue and visitExtractValue (aggregate value decomposition)"
+    ],
+    "mapping_scope": "A bounded local lowering subset; it does not claim full LLVM aggregate support."
+  },
+  "unchanged_fibonacci_retry": {
+    "manifest": "local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+    "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+    "mode": "ReleaseFast",
+    "reference_executions": 1,
+    "local_executions": 0,
+    "previous_boundary": "unsupported_type:alloca in start.main",
+    "current_boundary": "no_emitter:composed-block-store-stack-pointer-value in start.main",
+    "evidence": "local-state/validations/startup-headroom-20261102/fibonacci-retry-r2/report.json",
+    "report_sha256": "cde32484422c729313987e80ade3fd771026c7fe2f3ec248b5ccb7a68ea9e42e",
+    "interpretation": "Allocation/copy shape advances to the next scalar-pointer-store boundary; the unchanged program is not accepted and earns no local execution credit."
+  },
+  "archives_created": 0
+}
