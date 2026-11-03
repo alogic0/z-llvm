@@ -1,0 +1,608 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "recorded_utc": "2026-11-03T09:58:50.994978+00:00",
+  "status": "scalar startup checkpoint accepted",
+  "accepted_revision": "1f92385ebeaf6d189d651afd71689f51a5ba0649",
+  "accepted_tree": "39b2c7e669608ea89085a2e54d886371e14c7d73",
+  "validated_working_head": "0bb5c7ef802bf7ee4ee787aabc2fc18bef3fea3c",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "selector_version": "real-candidate-selector-v3",
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "source_snapshot": "local-state/validations/integer-pointer-20261103/source-snapshot.json",
+  "source_snapshot_sha256": "04918f0f9e3616be933ca625bec94b1abf6556b10592fdbc3a766d80fc0cef12",
+  "source_snapshot_files": 2589,
+  "committed_sources_match_validated_snapshot": true,
+  "post_validation_changes": "Acceptance and retention documents only.",
+  "validation_plan": "local-state/validations/integer-pointer-20261103/validation-plan.json",
+  "validation_plan_sha256": "146c116facc8962f15efffb86f1ea733eb91a1830abad3cd60c77dcc0476e54e",
+  "scope": "Two dependent scalar startup steps: exact named i64-to-default-pointer casts through the existing accumulator cast action, and signed i32/i64 nonnegative comparisons through the existing sign-bit action. No new machine opcode or selector bypass; frozen lowerCast and residual fingerprints stay unchanged.",
+  "boundaries": [
+    "Non-64-bit pointer layouts, other inttoptr widths, flags, immediate sources and nondefault pointer targets",
+    "Sign-bit compare forms other than named i32/i64 slt/sge against zero; samesign remains outside this action",
+    "Global constant-expression memcpy destinations and aggregate global initialization remain the next unchanged-program boundaries",
+    "General aggregate ABIs and floating/indirect/aggregate/stack variadic arguments remain outside this slice"
+  ],
+  "population": {
+    "modes": [
+      "ReleaseFast",
+      "ReleaseSafe",
+      "ReleaseSmall"
+    ],
+    "selected_rows_per_mode": 100,
+    "lowered_per_mode": 100,
+    "objects_per_mode": 100,
+    "native_links_per_mode": 100,
+    "executed_functions_per_mode": 5,
+    "paired_harnesses_per_mode": 5,
+    "ascii_observations_per_mode": 256,
+    "paired_ascii_observations": 768,
+    "retained_constant_functions": 4
+  },
+  "selection_unchanged": true,
+  "compiler_rt_bypass_ratchet": 130,
+  "full_run": {
+    "argv": [
+      "zig",
+      "build",
+      "distribution-all",
+      "--",
+      "--serial",
+      "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+      "--real-rows-validation-root=local-state/validations/startup-headroom-20261102",
+      "--real-rows-cache-root=local-state/caches/startup-headroom-20261102"
+    ],
+    "returncode": 0,
+    "wall_ns": 2469758001324,
+    "raw_log": "local-state/validations/integer-pointer-20261103/full-cached.log",
+    "raw_log_sha256": "f10be435100d597c9404bed66c678b709e6e2f69ffd3c05d53a23a6c5a44fcd4",
+    "telemetry_sha256": "294523e180885225a6aa30d20161b9505cd9edfae8a706817845b925385d86be",
+    "gates": [
+      {
+        "id": "selected-object-suite",
+        "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+        "exit_status": "0",
+        "duration_ms": "62310",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "1842",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "3326",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "3234",
+        "cache_status": "none"
+      },
+      {
+        "id": "zig-source-native-link",
+        "tool": "tools/run_distribution_zig_source_native_link.zig",
+        "exit_status": "0",
+        "duration_ms": "18154",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-postopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "77826",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-preopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "--pipeline": "preopt",
+        "exit_status": "0",
+        "duration_ms": "653011",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-ir-writer",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "22422",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-release",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "73863",
+        "cache_status": "none"
+      },
+      {
+        "id": "real-rows-release-fast",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseFast",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "506301",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-safe",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSafe",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "534816",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-small",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSmall",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "354294",
+        "cache_status": "hit"
+      },
+      {
+        "id": "integrated-executable",
+        "tool": "tools/run_distribution_zig_integrated_exe.zig",
+        "exit_status": "0",
+        "duration_ms": "895861",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "502",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "1149",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "1077",
+        "cache_status": "none"
+      },
+      {
+        "id": "boundary-gates",
+        "tool": "tools/run_distribution_boundary_gates.zig",
+        "exit_status": "0",
+        "duration_ms": "764",
+        "cache_status": "none"
+      }
+    ],
+    "serial": {
+      "schema_version": "1",
+      "run_id": "1fcbae85bb91eb9a6464a1830e35ebcc",
+      "scratch_path": "tmp/distribution_all_serial_1fcbae85bb91eb9a6464a1830e35ebcc",
+      "bundle_path": "tmp/distribution_all_serial_1fcbae85bb91eb9a6464a1830e35ebcc/release_source_object_bundle",
+      "target": "x86_64-unknown-linux-gnu",
+      "mode": "serial",
+      "real_rows_concurrency": "3",
+      "subgates": "17",
+      "wall_ms": "2469079",
+      "starting_free_bytes": "57802100736",
+      "minimum_observed_free_bytes": "55484551168",
+      "final_free_bytes": "56548081664",
+      "observed_peak_bytes": "2317549568",
+      "reserve_bytes": "49112001332",
+      "required_start_bytes": "57701935924",
+      "local_fail": "0"
+    },
+    "real_rows": [
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseFast",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSafe",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSmall",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      }
+    ],
+    "cache_events": [
+      {
+        "mode": "ReleaseFast",
+        "status": "hit",
+        "duration_ms": "15137",
+        "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+        "descriptor_bytes": "1343891552"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "status": "hit",
+        "duration_ms": "16619",
+        "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+        "descriptor_bytes": "1473501148"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "status": "hit",
+        "duration_ms": "13374",
+        "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+        "descriptor_bytes": "1106432911"
+      }
+    ],
+    "real_rows_resources": {
+      "schema_version": "3",
+      "normalization_schema": "3",
+      "memory_policy": "os-managed-non-gating",
+      "concurrency": "3",
+      "workers": "3",
+      "modes": "ReleaseFast,ReleaseSafe,ReleaseSmall",
+      "run_id": "64ce41e2cbadf012ef122924b1b0e847",
+      "root": "local-state/validations/startup-headroom-20261102/real_rows_parallel_64ce41e2cbadf012ef122924b1b0e847",
+      "work_selection_root": "local-state/validations/startup-headroom-20261102",
+      "export_cache_selection_root": "local-state/caches/startup-headroom-20261102",
+      "fast_temp": "local-state/validations/startup-headroom-20261102/ReleaseFast/work_64ce41e2cbadf012ef122924b1b0e847",
+      "fast_local_cache": "local-state/validations/startup-headroom-20261102/real_rows_parallel_64ce41e2cbadf012ef122924b1b0e847/ReleaseFast/zig-local-cache",
+      "fast_global_cache": "local-state/validations/startup-headroom-20261102/real_rows_parallel_64ce41e2cbadf012ef122924b1b0e847/ReleaseFast/zig-global-cache",
+      "fast_air_cache": "local-state/caches/startup-headroom-20261102/ReleaseFast/export",
+      "safe_temp": "local-state/validations/startup-headroom-20261102/ReleaseSafe/work_64ce41e2cbadf012ef122924b1b0e847",
+      "safe_local_cache": "local-state/validations/startup-headroom-20261102/real_rows_parallel_64ce41e2cbadf012ef122924b1b0e847/ReleaseSafe/zig-local-cache",
+      "safe_global_cache": "local-state/validations/startup-headroom-20261102/real_rows_parallel_64ce41e2cbadf012ef122924b1b0e847/ReleaseSafe/zig-global-cache",
+      "safe_air_cache": "local-state/caches/startup-headroom-20261102/ReleaseSafe/export",
+      "small_temp": "local-state/validations/startup-headroom-20261102/ReleaseSmall/work_64ce41e2cbadf012ef122924b1b0e847",
+      "small_local_cache": "local-state/validations/startup-headroom-20261102/real_rows_parallel_64ce41e2cbadf012ef122924b1b0e847/ReleaseSmall/zig-local-cache",
+      "small_global_cache": "local-state/validations/startup-headroom-20261102/real_rows_parallel_64ce41e2cbadf012ef122924b1b0e847/ReleaseSmall/zig-global-cache",
+      "small_air_cache": "local-state/caches/startup-headroom-20261102/ReleaseSmall/export",
+      "pin_manifest_sha256": "cfe9c7c0dcacd020d4e7c7a701ffd6b036b9df0e035a24024d341d78623a4ad3",
+      "cache_status": "hit,hit,hit",
+      "air_cache": "read-only",
+      "pruning": "suspended",
+      "wall_ms": "653342",
+      "summed_child_ms": "1395411",
+      "filesystem_total_bytes": "982240026624",
+      "post_run_free_floor_bytes": "49112001332",
+      "projected_peak_bytes": "8589934592",
+      "required_start_bytes": "57701935924",
+      "admission_source": "serial_preflight",
+      "admission_starting_free_bytes": "57802100736",
+      "starting_free_bytes": "57138835456",
+      "minimum_free_bytes": "55484551168",
+      "final_free_bytes": "55484551168",
+      "peak_disk_bytes": "5374201856",
+      "peak_aggregate_rss_bytes": "5276147712",
+      "minimum_available_memory_bytes": "11093917696",
+      "load_start": "2.68",
+      "load_end": "4.06",
+      "execution_results_cached": "false",
+      "local_fail": "0"
+    },
+    "native_memory_populations": {
+      "word-pair-memory": {
+        "population": "standalone-two-word-stack-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "384",
+        "reference_observations": "192",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "pointer-stack-memory": {
+        "population": "standalone-runtime-pointer-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-stack-memory": {
+        "population": "standalone-scalar-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "486",
+        "reference_observations": "243",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "integer-pointer-casts": {
+        "population": "standalone-integer-pointer-casts",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "signed-nonnegative": {
+        "population": "standalone-signed-nonnegative",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    },
+    "c_program": {
+      "schema": "upstream-c-program-v1",
+      "programs": "1",
+      "program_modes": "3",
+      "matched_program_modes": "3",
+      "reference_case_executions": "6",
+      "local_case_executions": "6",
+      "integer_variadic_observations": "48",
+      "heap_call_observations": "18",
+      "native_call_observations": "66",
+      "local_fail": "0"
+    },
+    "sampled_minimum_free_bytes": 55446192128,
+    "retained_summary": "docs/evidence/scalar_startup_20261103_cached.summary",
+    "summary_sha256": "293d06ef298b3b31c55cb1ec79068c590215af1b1d8ebf97f957a7b70f7622bb"
+  },
+  "compiler_build_identities": {
+    "focused_native_sha256": "0cea7c05e52a903c67798e8231943ea275c722254c46e1048a7b40d9daaed19c",
+    "final_full_run_binary_sha256": "4190e3ab82b7dea613076b032c4d0706a9d19c0d6b00e7de9b2b2069ede31ab4",
+    "same_relevant_sources": true,
+    "interpretation": "The full run rebuilds the CLI after idle-cache retirement and reruns the mandatory canaries. These are separately identified builds; no byte-identical executable claim is made."
+  },
+  "run_reuse": {
+    "full_runs_for_this_source_state": 1,
+    "mode": "cached authenticated exports; execution results are not cached",
+    "reason": "Cumulative two-step selector/ABI-preservation checkpoint and mandatory executable canary additions require Tier 3. AIR publication, export keys, source pin, candidate selection, runner infrastructure and disk policies are unchanged; the prior accepted fresh/cached infrastructure calibration is reused.",
+    "infrastructure_evidence": "docs/evidence/startup_headroom_acceptance_20261103.json",
+    "fresh_cached_equivalence_claim_for_this_revision": false
+  },
+  "focused_validation": {
+    "compiler_unit_tests": 1649,
+    "unit_log": "local-state/validations/integer-pointer-20261103/unit-r6.log",
+    "unit_log_sha256": "dd938a5d630c8f9eac194da74a778d476a300fc6989efde01dcaaa097d0e887e",
+    "structural_tests": 11,
+    "structural_and_abi_log": "local-state/validations/integer-pointer-20261103/focused-r3.log",
+    "structural_and_abi_log_sha256": "f770a50ac3b3740276d28d1bd02a6e19b8a09e542aa6f4d77b17c80898f43ae2",
+    "abi_cases": 60,
+    "python_policy_tests": 7,
+    "native_report": "local-state/validations/integer-pointer-20261103/native-r3/report.json",
+    "native_report_sha256": "e509cdabbad08bbba27ff37f6c4ce9b2252c0def1b017a881fce67afd169d206",
+    "source_guard_and_bypass_inventory_passed": true,
+    "negative_boundaries": [
+      "Other pointer widths, immediate casts, cast flags, nondefault pointer targets",
+      "Other compare widths, samesign, nonzero or named RHS, immediate LHS"
+    ],
+    "transaction_coverage": [
+      "Bit-preserving casts preserve live EFLAGS and aliases, including failed-definition rollback",
+      "Inverted sign-bit action restores bindings, spills, address dependencies, EFLAGS and machine output at all seven failure boundaries in both widths"
+    ]
+  },
+  "new_native_populations": {
+    "integer_pointer": {
+      "functions": [
+        "integer_pointer_roundtrip",
+        "integer_pointer_spilled",
+        "integer_pointer_returned",
+        "integer_pointer_identity"
+      ],
+      "modes": 3,
+      "routes": [
+        "direct",
+        "release"
+      ],
+      "observations_per_execution": 256,
+      "local_observations": 1536,
+      "reference_observations": 768,
+      "reference_reused_per_route": true,
+      "checks": [
+        "All 64 bits including zero, bit31, bit32, sign bit and arbitrary high pointer bits",
+        "ABI/spill/returned-RAX sources and full-width pointer returns",
+        "Frame stores and original values remain independent of alias materialization",
+        "Live values and output guards survive caller-clobbering C calls; arbitrary pointer bits are never dereferenced"
+      ]
+    },
+    "signed_nonnegative": {
+      "functions": [
+        "nonnegative_i32",
+        "nonnegative_i64",
+        "nonnegative_returned",
+        "nonnegative_spilled"
+      ],
+      "modes": 3,
+      "routes": [
+        "direct",
+        "release"
+      ],
+      "observations_per_execution": 256,
+      "local_observations": 1536,
+      "reference_observations": 768,
+      "reference_reused_per_route": true,
+      "checks": [
+        "Signed extrema, negative, zero and positive i32/i64 inputs",
+        "Exact zero-extended i1 values and full-width live XOR results",
+        "Caller-clobbering C calls, returned EAX and five spilled inputs",
+        "Every output field and surrounding guards checked independently"
+      ]
+    }
+  },
+  "existing_populations": {
+    "word_pair_memory": {
+      "local_observations": 384,
+      "reference_observations": 192,
+      "reference_reused_per_route": true
+    },
+    "upstream_c_fixture": {
+      "reference_case_executions": 6,
+      "local_case_executions": 6,
+      "integer_variadic_observations": 48,
+      "heap_call_observations": 18,
+      "native_call_observations": 66
+    },
+    "original_integrated_cases": 7,
+    "upstream_hello_program_modes": 3,
+    "abi_functions": 10,
+    "abi_cases": 60,
+    "fma_llvm_paired_observations": 8192,
+    "fma_frozen_input_and_identities_unchanged": true,
+    "pointer_stack": {
+      "local_observations": 768,
+      "reference_observations": 384,
+      "reference_reused_per_route": true
+    },
+    "scalar_stack": {
+      "local_observations": 486,
+      "reference_observations": 243,
+      "reference_reused_per_route": true
+    }
+  },
+  "unchanged_fibonacci_retry": {
+    "evidence": "local-state/validations/integer-pointer-20261103/fibonacci-r3/report.json",
+    "sha256": "cfc6666f8d7f6b7340dc4e40b9a2eb45801e5adb174a70801acb08ba0b09d967",
+    "source": "/home/oleg/prog/ziglang/test/cases/recursive_fibonacci.zig",
+    "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+    "mode": "ReleaseFast",
+    "reference_executions": 1,
+    "local_executions": 0,
+    "previous_boundary": "composed-block-cast-to-not-int at inttoptr i64 to ptr in start.main",
+    "intermediate_boundary": "composed-block-icmp-form at icmp sge i32 %0, 0",
+    "current_boundary": "unsupported_value:composed-block-memcpy-dst at a constant-byte-offset global destination in start.main",
+    "next_boundary_investigation": "local-state/validations/integer-pointer-20261103/next-boundary-investigation.json",
+    "interpretation": "Both dependent scalar operations advance. The unchanged program remains blocked and earns no local execution credit."
+  },
+  "exploratory_failures": [
+    {
+      "log": "local-state/validations/integer-pointer-20261103/focused-r1.log",
+      "reason": "The first cast alias approach modified a frozen residual. It was replaced with the existing transaction-owned scalar-cast action; no guard or fingerprint was weakened."
+    },
+    {
+      "log": "local-state/validations/integer-pointer-20261103/unit-r5.log",
+      "reason": "A new rollback test deliberately started with live flags and met the existing live-clobber guard. The test now starts from consumed flags; all seven rollback boundaries pass and the guard remains unchanged."
+    }
+  ],
+  "upstream_mapping": [
+    {
+      "path": "../llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp",
+      "owner": "visitIntToPtr, lines 4075-4087",
+      "contract": "Zero-extend or truncate to pointer memory width, then convert to pointer value width; equal 64-bit integral widths require no representation change."
+    },
+    {
+      "path": "../llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp",
+      "owner": "visitICmp, line 3754",
+      "contract": "Signed greater-or-equal against zero is the complement of the fixed-width sign bit; preserve i1 zero-extension."
+    }
+  ],
+  "publication": {
+    "implementation_unchanged": true,
+    "write_schema": 4,
+    "read_schemas": [
+      3,
+      4
+    ],
+    "cache_status": "hit,hit,hit",
+    "execution_results_cached": false,
+    "manual_raw_air_cleanup": false,
+    "retained_caches": [
+      {
+        "mode": "ReleaseFast",
+        "path": "local-state/caches/startup-headroom-20261102/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32.air",
+        "bytes": 1343891552,
+        "allocated_bytes": 1343905792,
+        "sha256": "29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32",
+        "final_inode": 55212693,
+        "sampled_maximum_complete_payload_inodes": 1,
+        "same_inode_observed_as_raw_and_cache": true
+      },
+      {
+        "mode": "ReleaseSafe",
+        "path": "local-state/caches/startup-headroom-20261102/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e.air",
+        "bytes": 1473501148,
+        "allocated_bytes": 1473536000,
+        "sha256": "277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e",
+        "final_inode": 55212700,
+        "sampled_maximum_complete_payload_inodes": 1,
+        "same_inode_observed_as_raw_and_cache": true
+      },
+      {
+        "mode": "ReleaseSmall",
+        "path": "local-state/caches/startup-headroom-20261102/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6.air",
+        "bytes": 1106432911,
+        "allocated_bytes": 1106444288,
+        "sha256": "92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6",
+        "final_inode": 55212710,
+        "sampled_maximum_complete_payload_inodes": 1,
+        "same_inode_observed_as_raw_and_cache": true
+      }
+    ]
+  },
+  "storage": {
+    "forecast_bytes": 8589934592,
+    "reserve_unchanged": true,
+    "reserve_bytes": 49112001332,
+    "serial_observed_decrease_bytes": 2317549568,
+    "two_second_sampled_minimum_free_bytes": 55446192128,
+    "owned_row_peak_allocated_bytes": 5374201856,
+    "scope": "Owned peak includes retained AIR; global free-space movement also includes unrelated processes. Sampling is not atomic; no performance speedup is claimed."
+  },
+  "final_source_sha256": {
+    "src/codegen/x86_64/generic_cfg/composed_selector_icmp.zig": "8973c844bcce1e468e7f155ecc2ea021a68868897abdfbcadba5cb50164b505b",
+    "src/codegen/x86_64/generic_cfg/composed_selector_impl.zig": "75077e1cfbe2900825e3a0ceb2dfa5575e659b85e7cebf7720c1ac3cb912fce3",
+    "src/codegen/x86_64/generic_cfg/composed_selector_scalar.zig": "a78b12d13d4b09d0d5ba17fc0f11e8b413faa7603e09ea65623bae085ef74582",
+    "src/codegen/x86_64/generic_cfg/integer_pointer_tests.zig": "2ef4d630e8a1b1c029adf3f392f3ad431798857b4bd61006afc1f009adeb06a0",
+    "src/codegen/x86_64/generic_cfg/signed_nonnegative_tests.zig": "f7210ab0d59b3915eca9725119456d5cd7a59448f9b5857a761b55c96a58e38f",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/control_compare.zig": "30e319492e039834eaeba2fc7f60ffbd984a93d596c73c91b186549dba851a0a",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/control_compare_sign_bit_tests.zig": "e7d2b8c4d51bb077d708357d7352759cff3f2697d2ff7bc0f1725282aa09eb17",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_cast.zig": "ed08f8958631eec202bd727cc2a1aa553a13dfb20a4822b2c9395136f5f5d905",
+    "src/codegen/x86_64/generic_cfg/value_use/model.zig": "987db90f971f54833509ba5aecde225adc6aa1e486b3be1da61e44913b38335d",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/physical_mapping.zig": "af86e564eea496bd557e35ca67136a22bd8036ac0656a8cd2d45c448aa97172e",
+    "src/tests.zig": "9a07ed271e4e8970b552555865696f06dcdf239beb312e7dac61d7233049d2bd",
+    "test/real_programs/integer_pointer.ll": "51bc8b8982439cea6d7ae7fd624e46b62390bcfc49a0fd5407900049c0a61116",
+    "test/real_programs/integer_pointer_driver.c": "e783b8ecb3a310e19e9eba49aa3b45f6a06b5b1258de13d30bef17b24b3bae52",
+    "test/real_programs/signed_nonnegative.ll": "529191dcba354614fa6fefe32569835ee6efb1929f978ae0807db0db4aa73a81",
+    "test/real_programs/signed_nonnegative_driver.c": "2cc92cb9b08d7601972a51e68d714b4bfae25fa85d0d409e8170699e73046ad5",
+    "tools/run_upstream_c_program.py": "de2e4e05a447541da5a70cad8247ad95685669858ab3ef404892cda73ba0d979"
+  },
+  "cleanup_evidence": "docs/evidence/scalar_startup_cleanup_20261103.json",
+  "archives_created": 0
+}

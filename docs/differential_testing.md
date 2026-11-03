@@ -12,7 +12,7 @@ matching observations and six rejected constant-result implementations.
 Schema-3 cohort records distinguish five executed functions from their input
 observations: 256 for ASCII and one for each retained constant method. Accepted
 counters retain five in the
-[current acceptance](evidence/scalar_frame_acceptance_20261103.json): the serial
+[current acceptance](evidence/scalar_startup_acceptance_20261103.json): the serial
 run passes all 17 subgates on the unchanged 100-row selection. The earlier
 fresh/cached infrastructure pair remains separate evidence.
 
@@ -123,7 +123,18 @@ the required `00000000ffffffff` bits. Unit rejection checks cover non-default
 address spaces, 32-bit default pointer layouts, invalid frame kinds/widths,
 misalignment and frame bounds.
 
-The unchanged Fibonacci retry passes pointer and integer frame stores but remains
-blocked in `start.main` at `no_emitter:composed-block-cast-to-not-int`, on
-`inttoptr i64 to ptr`. Its reference executes once and local execution remains
+The [scalar startup canaries](evidence/scalar_startup_acceptance_20261103.json)
+add four integer-to-pointer functions and four signed nonnegative-compare
+functions. Each population checks 1,536 local observations against 768 LLVM
+references through direct/release routes in three modes. Casts cover full-width
+patterns, register/spill/returned-RAX inputs and pointer returns; comparisons
+cover i32/i64 signed extrema and exact zero-extended booleans. Native C callees
+clobber caller-saved registers, independent expected fields check every result,
+and output guards detect overwrites. Unit tests cover live EFLAGS, aliases,
+rollback and the deliberately unsupported forms.
+
+The unchanged Fibonacci retry passes frame stores, pointer casts and the signed
+comparison but remains blocked in `start.main` at
+`unsupported_value:composed-block-memcpy-dst`, on a constant-offset global
+copy destination. Its reference executes once and local execution remains
 zero; this program is not accepted.

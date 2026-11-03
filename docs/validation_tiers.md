@@ -166,6 +166,14 @@ and returned pointers, caller-clobbering calls, full-width constants through fra
 and ordinary-pointer destinations, literal null, live values and guards. These
 populations are separate from all existing counters and canaries above.
 
+The mandatory [scalar startup canaries](evidence/scalar_startup_acceptance_20261103.json)
+add four integer-to-pointer functions and four signed nonnegative-compare
+functions. Each population has 1,536 local observations against 768 LLVM
+references reused across direct/release routes in three modes. They check exact
+bits/booleans, signed extrema, register/spill/returned inputs, caller clobbers,
+live values and output guards. These standalone observations leave all earlier
+population counters unchanged.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

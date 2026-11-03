@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `90b91eb702fb65b50efdc55cecfb730bbb816ad3`; tree: `111adda7e055a4be64a329ecfd2ff466ce2f68c8`.
+Accepted revision: `1f92385ebeaf6d189d651afd71689f51a5ba0649`; tree: `39b2c7e669608ea89085a2e54d886371e14c7d73`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,29 +25,39 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The [2026-11-02 checkpoint](evidence/current_pin_acceptance_20261102.json)
-is an explicit migration to the current Zig pin and frozen selector-v3
-population. Full fresh and cached integration results and their canonical
-comparison back the values above. The membership audit retains 30 prefix
+The [scalar startup checkpoint](evidence/scalar_startup_acceptance_20261103.json)
+passes all 17 integration subgates on its frozen source snapshot. Exact named
+i64-to-pointer casts preserve every bit and signed i32/i64 nonnegative comparisons
+reuse the existing sign-bit authority. Earlier scalar frame stores and their
+full-width immediate repair remain accepted. The new standalone native canaries
+each pass 1,536 local observations against 768 LLVM references in three modes.
+
+The [current-pin migration](evidence/real_candidates_release_v3_migration.json)
+fixes the 100-row selector-v3 population. Its audit retains 30 previous prefix
 entries and replaces 70; 63 former names have no runtime AIR at this pin.
-Four audited source-bound functions execute in each mode.
+Five source-bound functions execute per mode: four constant methods and
+`ascii.isAscii`, which checks all 256 byte inputs. These observations do not
+turn 100 native links into 100 executions.
 
-The same checkpoint repairs aggregate and optional snapshots across aliasing
-writes, typed address scaling, displacement boundaries and current SysV carriers.
-The ABI differential passes 60 native cases. Zig's unchanged upstream
-`hello_libc.zig` executes through the local preopt optimizer and object emitter
-in all three release modes. These program, compiler-rt and behavioral populations
-remain separate from the compiler-core prefix.
+AIR publication atomically writes schema-4 metadata and transfers the verified
+payload into the cache. The earlier accepted fresh/cached infrastructure pair
+proves ownership transfer and equivalent records; the current scalar-source
+checkpoint reuses authenticated exports and reruns executions. It does not claim
+a new fresh/cached comparison. Nested workers inherit the original serial
+admission and enforce the unchanged reserve and 8 GiB forecast. Raw AIR does not
+require a manual cleanup wrapper.
 
-The [FMA audit](evidence/current_pin_fma_canary_20261102.json) preserves 29
-exact-result checks and requires 8,192 bitwise comparisons with LLVM compiling
-the identical frozen IR. Tagged optional ABI signatures, wider variadic calls
-and other unimplemented representations remain explicit boundaries.
-IR construction, the system linker/CRT and libc remain dependencies of the
-unchanged-program route.
+Unchanged upstream `hello_libc.zig` and the C fixture execute in all three modes;
+the C fixture's six paired cases and 66 call/heap observations remain separate.
+The ABI gate passes 60 cases. The frozen FMA canary retains 29 exact-result
+checks and 8,192 LLVM-paired observations. Fibonacci advances through the scalar
+operations but remains blocked at a global-copy destination with zero local
+executions. LLVM IR construction, the system linker/CRT and libc remain
+external dependencies of that route.
 
-Fresh export publication still retains duplicate working and cached descriptors.
-The accepted run used a verified cleanup wrapper; capacity forecast acceptance
-remains separate. See [next steps](next_steps.md) for that follow-up and for
-expanding execution coverage within the fixed prefix. Earlier checkpoints and
-measurements remain documented under the roadmap and evidence directories.
+The [current cleanup](evidence/scalar_startup_cleanup_20261103.json) retains the
+13 original source probes, current/frozen inputs, performance baselines and
+required evidence. Obsolete generated copies and a source copy exactly present
+in Git history are retired without archives. See [next steps](next_steps.md) for
+the symbolic global-address/initializer/relocation slice. Historical checkpoints
+remain under the roadmap and evidence directories.

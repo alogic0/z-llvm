@@ -58,6 +58,17 @@ original scratch probes, performance baseline compilers, captured inputs and log
 remain. Cache deletion intervals include rebuilt caches; do not sum them as net
 task savings. No archives are created.
 
+The [scalar startup cleanup](evidence/scalar_startup_cleanup_20261103.json)
+retires superseded non-performance executable copies and resolved exploratory
+hello captures while retaining final captures, diagnostics and commands. It also
+removes an unregistered 2,465-file source copy after verifying that every file
+exactly matches Git revision `56e66794`. The local reconstruction manifest records
+paths, modes and blob hashes. Original probes, current performance baselines,
+current/frozen AIR, accepted evidence and sibling dependencies stay outside this
+retirement. Complete idle build caches are removed in separately recorded
+intervals; regenerated caches are not counted as net savings. No archives are
+created.
+
 Use unique run-owned directories for new work. Successful temporary tests clean
 up their own fixtures. A failed test may retain a bounded diagnostic fixture,
 but it must report that location and must not turn it into a test prerequisite.

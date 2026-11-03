@@ -1,7 +1,8 @@
 # Current architecture
 
-Source baseline: `90b91eb7` (2026-11-03), including the current-pin
-correctness, ABI, export publication, execution and scalar frame stores.
+Source baseline: `1f92385e` (2026-11-03), including the current-pin
+correctness, ABI, export publication, execution, scalar frame stores and startup
+scalar conversions/comparisons.
 This page describes the
 implementation; the
 [refactor plan](roadmap/architecture_refactor_plan.md) records its completed scope.
@@ -14,7 +15,9 @@ The bounded refactors, memset capability,
 The accepted checkpoint uses tracked Zig 0.17.0, executes all byte inputs for
 the selected ASCII function, and runs unchanged upstream Zig and C programs.
 Production export publication transfers the original payload into the cache;
-fresh and cached full integration runs pass against the same source snapshot.
+an earlier infrastructure checkpoint passed fresh and cached full integration
+runs against one source snapshot. The current scalar checkpoint reuses verified
+exports and reruns executions.
 The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
 backend for selected Zig inputs. It does not yet provide a complete LLVM
 replacement or a self-hosting Zig backend.
@@ -141,10 +144,27 @@ New direct/release canaries pass 768 local pointer observations against 384
 reference observations and 486 local scalar observations against 243 references;
 each reference population is reused across the two routes.
 
-The unchanged Fibonacci retry advances past pointer and integer frame stores
-and stops in `start.main` at `no_emitter:composed-block-cast-to-not-int`, on
-`inttoptr i64 to ptr`. Its LLVM reference executes; local execution remains zero.
-Exact 64-bit integer-to-pointer conversion is the next boundary.
+The [scalar startup slice](evidence/scalar_startup_acceptance_20261103.json)
+lowers named `inttoptr i64 to ptr` through the existing sealed accumulator cast
+action. It preserves all bits, live flags and aliases without a width mask;
+other widths, immediates, flags and non-64-bit pointer layouts reject. Nondefault
+pointer targets remain a parser boundary. LLVM's owner is
+`SelectionDAGBuilder.cpp::visitIntToPtr`, whose equal-width integral conversion
+preserves the representation. The frozen legacy cast body is unchanged.
+
+Signed `icmp sge i32/i64 <named>, 0` complements the existing sign-bit action's
+logical shift result with XOR 1 and defines a zero-extended i1. It reuses the
+current-home, preservation, EFLAGS and rollback authority; `samesign`, other
+widths and unproved operand forms remain outside that action. LLVM's owner is
+`SelectionDAGBuilder.cpp::visitICmp`. Each new standalone canary passes 1,536
+local observations against 768 LLVM references reused across direct/release
+routes in three modes.
+
+The unchanged Fibonacci retry passes these operations and stops in `start.main`
+at `unsupported_value:composed-block-memcpy-dst`, on a constant-offset global
+destination. Its LLVM reference executes; local execution remains zero. Symbolic
+global address formation, initializer layout/bytes and relocations form the next
+memory boundary.
 
 The current-pin SysV legalization keeps `{ i64, i64 }` returns in RAX/RDX across
 composed control flow and preserves both live operands of i128 subtraction.

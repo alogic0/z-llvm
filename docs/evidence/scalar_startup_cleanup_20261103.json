@@ -1,0 +1,260 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "status": "deleted and verified; accepted inputs, source probes, baselines and required evidence retained",
+  "accepted_revision": "1f92385ebeaf6d189d651afd71689f51a5ba0649",
+  "acceptance_evidence": "docs/evidence/scalar_startup_acceptance_20261103.json",
+  "archives_created": 0,
+  "evidence": [
+    {
+      "path": "local-state/validations/integer-pointer-20261103/preflight-cache-result.json",
+      "sha256": "14e7edbe50c11cbe49e3bf76bdc28742f9aa9973ddf7a89d779286215ac0998c"
+    },
+    {
+      "path": "local-state/validations/integer-pointer-20261103/superseded-native-result.json",
+      "sha256": "99ceba25ada04d362845b8ccd161fd06509e5f2dace47191ce128b1713c4051e"
+    },
+    {
+      "path": "local-state/validations/integer-pointer-20261103/obsolete-source-copy-result.json",
+      "sha256": "e68d8fc5753d0cb9da7d0184b43b678fc1790027bc926b2a019ee47bb06348b2"
+    },
+    {
+      "path": "local-state/validations/integer-pointer-20261103/superseded-hello-captures-result.json",
+      "sha256": "88ebf28b785db68f60ef03eff35d85aadb1ddb434eb30777b0a3d8d4438a4ebc"
+    }
+  ],
+  "preflight_idle_caches": {
+    "roots": 14,
+    "reclaimable_allocated_bytes": 2003214336,
+    "scope": "Remove complete idle owned compiler caches before cumulative scalar-startup integration; retain captured IR, native outputs, all logs, current and frozen AIR, baseline compilers, sibling dependencies and 13 original probes.",
+    "paths": [
+      ".zig-cache",
+      "tools/__pycache__",
+      "tmp/inbox66_abi_diff/run-1151803/global-cache",
+      "tmp/inbox66_abi_diff/run-1610790/global-cache",
+      "tmp/inbox66_abi_diff/run-1677407/global-cache",
+      "tmp/inbox66_abi_diff/run-1767406/global-cache",
+      "tmp/inbox66_abi_diff/run-3091147/global-cache",
+      "tmp/inbox66_abi_diff/run-3345567/global-cache",
+      "tmp/inbox66_abi_diff/run-496634/global-cache",
+      "tmp/inbox66_abi_diff/run-509685/global-cache",
+      "tmp/inbox66_abi_diff/run-536264/global-cache",
+      "local-state/validations/integer-pointer-20261103/fibonacci-r1/global-cache",
+      "local-state/validations/integer-pointer-20261103/fibonacci-r2/global-cache",
+      "local-state/validations/integer-pointer-20261103/fibonacci-r3/global-cache"
+    ]
+  },
+  "superseded_native_executables": {
+    "files": 195,
+    "reclaimable_allocated_bytes": 119095296,
+    "scope": "Completed and superseded non-performance native smoke/discovery diagnostics; keep exact captured inputs, source/driver files, command/results and compiler baselines. Latest accepted scalar checkpoint and current task evidence are excluded.",
+    "retained": "Captured source/IR, drivers, exact commands, results and failure diagnostics. Latest accepted scalar evidence and performance measurements are excluded."
+  },
+  "obsolete_source_copy": {
+    "path": "local-state/validations/operand-refactor-20260926/baseline",
+    "files": 2465,
+    "file_allocated_bytes": 53161984,
+    "all_files_exactly_reconstructible_at_git_revision": "56e66794ec37448d16822701a48198543d4543b2",
+    "unique_files": 0,
+    "scope": "Redundant unregistered source copy from the completed September operand refactor; only files whose exact content is already reachable in local Git history may be retired. Manifest retains path/mode/blob/SHA256 for reconstruction. Unique files, original scratch and current performance worktrees remain."
+  },
+  "superseded_hello_captures": {
+    "files": 45,
+    "reclaimable_allocated_bytes": 151588864,
+    "reason": "Regenerable LLVM captures from superseded hello-libc exploratory failures. All five reports match the unchanged source/pin/pipeline/target/cpu of the retained three-mode hello-final success. Reports, exact commands, failure diagnostics, stream outputs and final captures remain; permanent regression fixtures and later accepted full validations retain repaired behavior. No unresolved input, current AIR, performance baseline or scratch probe is removed.",
+    "replacement": "local-state/validations/current-pin-20261102/hello-final/report.json",
+    "replacement_sha256": "a478eba2ee1592e2fc1f3dabcd28767ac09773cbf46ea7394f7aac715fd6c23a",
+    "retained_reports": [
+      "local-state/validations/current-pin-20261102/hello-global/report.json",
+      "local-state/validations/current-pin-20261102/hello-folded/report.json",
+      "local-state/validations/current-pin-20261102/hello-provenance/report.json",
+      "local-state/validations/current-pin-20261102/hello-varargs/report.json",
+      "local-state/validations/current-pin-20261102/hello-all-modes/report.json"
+    ]
+  },
+  "retained_current_caches": [
+    {
+      "mode": "ReleaseFast",
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32.air",
+      "bytes": 1343891552,
+      "allocated_bytes": 1343905792,
+      "sha256": "29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32",
+      "final_inode": 55212693,
+      "sampled_maximum_complete_payload_inodes": 1,
+      "same_inode_observed_as_raw_and_cache": true,
+      "verified_after_checkpoint": true
+    },
+    {
+      "mode": "ReleaseSafe",
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e.air",
+      "bytes": 1473501148,
+      "allocated_bytes": 1473536000,
+      "sha256": "277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e",
+      "final_inode": 55212700,
+      "sampled_maximum_complete_payload_inodes": 1,
+      "same_inode_observed_as_raw_and_cache": true,
+      "verified_after_checkpoint": true
+    },
+    {
+      "mode": "ReleaseSmall",
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6.air",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106444288,
+      "sha256": "92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6",
+      "final_inode": 55212710,
+      "sampled_maximum_complete_payload_inodes": 1,
+      "same_inode_observed_as_raw_and_cache": true,
+      "verified_after_checkpoint": true
+    }
+  ],
+  "retained_frozen_inputs": [
+    {
+      "path": "local-state/caches/test-real-rows/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.air",
+      "sha256": "c174c6552a17794c0f82f936b0373f7a8d0cf943460007182d7c20c06beabd2a",
+      "bytes": 1343891552,
+      "device": 66306,
+      "inode": 54832908,
+      "links": 2,
+      "verified_after_checkpoint": true
+    },
+    {
+      "path": "local-state/caches/test-real-rows/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.air",
+      "sha256": "7b34676ca48eaeec0416bdb50a77b910c038dac88a40df3e7ed703c2e0d714c6",
+      "bytes": 1473501276,
+      "device": 66306,
+      "inode": 54826136,
+      "links": 2,
+      "verified_after_checkpoint": true
+    },
+    {
+      "path": "local-state/caches/test-real-rows/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.air",
+      "sha256": "5ff91e8e1a86d214c7af8e6ab1c72b3b509564470b5d225b1433dc9b8cc25f5d",
+      "bytes": 1106432911,
+      "device": 66306,
+      "inode": 54827145,
+      "links": 2,
+      "verified_after_checkpoint": true
+    }
+  ],
+  "original_scratch_probes_retained": [
+    "scratch/test_abi.s",
+    "scratch/test_abi.zig",
+    "scratch/test_bitset.ll",
+    "scratch/test_bitset.zig",
+    "scratch/test_chunkstate_layout.zig",
+    "scratch/test_init.zig",
+    "scratch/test_llvm.ll",
+    "scratch/test_offset.zig",
+    "scratch/test_opt.zig",
+    "scratch/test_query.ll",
+    "scratch/test_query.zig",
+    "scratch/test_query_debug.ll",
+    "scratch/test_size.zig"
+  ],
+  "original_scratch_probes_sha256": {
+    "scratch/test_abi.s": "d439a7beb674e08b519923b308207f6c510f463ab229af7ca098fd1ce0ccdb15",
+    "scratch/test_abi.zig": "e889e005850511755f57196e564a41e486686b9fd4f98c478482c969b7638d32",
+    "scratch/test_bitset.ll": "b34f6bfd3750284e36ff225111aed27e7961f570048b42628b375cfa99a6d8eb",
+    "scratch/test_bitset.zig": "a0ae945f89311108811a07bdfaf65ddd2e9b453b59436df15c66dce739b6e137",
+    "scratch/test_chunkstate_layout.zig": "8f12f11ced9863d48bb1e949ab5c414db8005d80569fb6bfb27b17a2a91473d6",
+    "scratch/test_init.zig": "38c327156a57e8a989db2d7ff35fafcb6fba9ae761bfafabf965ef92b71c343e",
+    "scratch/test_llvm.ll": "17738822b102735f481bddb59f6bf63b4ddfdf48d9f9812008167e7c7cb35da6",
+    "scratch/test_offset.zig": "8b49ea64bf64a90fbd741d299eb1bacaccf24e5805073a08303dbfa26dec9534",
+    "scratch/test_opt.zig": "c2cfadc84692240bdfaca03406cae67692310b30fd11fcfb94a338fc80c95242",
+    "scratch/test_query.ll": "99d0ca5c1b9472ef33bf9eb2dbf2cf8c05c69aab775588109826b763b233d476",
+    "scratch/test_query.zig": "5c7cbb510723d088f389cc932a67222e72ad736b651189c6b3e88bffd6fe3dbf",
+    "scratch/test_query_debug.ll": "3a0798cb323fe6928565a8e5d450e85312df8437f2a79d5583d2a618a658d11c",
+    "scratch/test_size.zig": "a255ebc31f0eba577c2b616708dbb42a1727b9bc29b839abf2c30a1c35b57f10"
+  },
+  "performance_baseline_compilers_preserved": true,
+  "sibling_dependencies_and_shared_caches_excluded_from_cleanup": true,
+  "measurement_scope": "Allocated retired-file and cache bytes are scoped to each recorded interval; global free-space changes include unrelated processes. The build cache is regenerated during integration; later cleanup is a separate interval, not an additive net task-saving claim.",
+  "filesystem_available_after_preflight": 57825398784,
+  "filesystem_available_before_final_cleanup": 56451657728,
+  "final_idle_cache_cleanup": [
+    {
+      "path": ".zig-cache",
+      "device": 66306,
+      "inode": 54044792,
+      "allocated_unique_bytes": 159526912,
+      "reclaimable_allocated_bytes": 159526912,
+      "deleted": true
+    },
+    {
+      "path": "tools/__pycache__",
+      "device": 66306,
+      "inode": 54306402,
+      "allocated_unique_bytes": 28672,
+      "reclaimable_allocated_bytes": 28672,
+      "deleted": true
+    }
+  ],
+  "final_idle_cleanup_filesystem_available_before": 56439238656,
+  "final_idle_cache_reclaimable_allocated_bytes": 159555584,
+  "final_idle_cleanup_filesystem_available_after": 56598794240,
+  "verification": {
+    "documentation": {
+      "argv": [
+        "zig",
+        "build",
+        "check-docs"
+      ],
+      "status": "finished",
+      "started_ns": 1793699952338145157,
+      "samples": [
+        {
+          "time_ns": 1793699952338288066,
+          "available_bytes": 56451100672
+        }
+      ],
+      "pid": 2049985,
+      "returncode": 0,
+      "wall_ns": 43443182,
+      "finished_ns": 1793699952381702421,
+      "log": "local-state/validations/integer-pointer-20261103/docs-final.log",
+      "log_sha256": "d51fa1a8ef30aea47e37e1ca95626ed4435b60597559d74154f8298defdcf05d",
+      "documents": 19,
+      "internal_links": 150,
+      "status_blocks": 2
+    },
+    "artifact_store": {
+      "argv": [
+        "zig",
+        "build",
+        "artifact-store",
+        "--",
+        "verify"
+      ],
+      "status": "finished",
+      "started_ns": 1793699952337942611,
+      "samples": [
+        {
+          "time_ns": 1793699952338123324,
+          "available_bytes": 56451100672
+        },
+        {
+          "time_ns": 1793699954338249473,
+          "available_bytes": 56451031040
+        },
+        {
+          "time_ns": 1793699956338362339,
+          "available_bytes": 56450985984
+        },
+        {
+          "time_ns": 1793699958338500155,
+          "available_bytes": 56450985984
+        }
+      ],
+      "pid": 2049984,
+      "returncode": 0,
+      "wall_ns": 6273254954,
+      "finished_ns": 1793699958611338199,
+      "log": "local-state/validations/integer-pointer-20261103/artifacts-final.log",
+      "log_sha256": "e8586851043012f7df59a7f8e7d39e576be7213ce6cab2f6cce68ba287f90501",
+      "manifests": 5
+    },
+    "non_document_snapshot_files": 1435,
+    "all_non_document_sources_still_match_snapshot": true
+  },
+  "completed_utc": "2026-11-03T10:00:31.256301+00:00"
+}
