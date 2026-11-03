@@ -1,8 +1,19 @@
 const std = @import("std");
 
 const core = @import("core.zig");
+const local_names = @import("local_names.zig");
+
+pub const Options = struct {
+    numeric_names: local_names.Mode = .repair,
+};
 
 pub fn print(module: core.Module, writer: anytype) !void {
+    return printWithOptions(module, writer, .{});
+}
+
+pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) !void {
+    var name_plan = try local_names.Plan.init(module, options.numeric_names);
+    defer name_plan.deinit();
     var printed_module_record = false;
     if (module.source_filename) |source_filename| {
         try writer.print("source_filename = \"{s}\"\n", .{source_filename});
@@ -76,6 +87,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
     if (module.declarations.items.len != 0 and module.functions.items.len != 0) try writer.writeByte('\n');
 
     for (module.functions.items, 0..) |function, function_index| {
+        const names = name_plan.forFunction(function_index);
         if (function_index != 0) try writer.writeByte('\n');
         try writer.writeAll("define ");
         try function.linkage.format(writer);
@@ -87,18 +99,18 @@ pub fn print(module: core.Module, writer: anytype) !void {
             if (index != 0) try writer.writeAll(", ");
             try param.ty.format(writer);
             if (param.attrs) |attrs| try writer.print(" {s}", .{attrs});
-            try writer.print(" %{s}", .{param.name});
+            try writer.print(" %{s}", .{names.name(param.name)});
         }
         try writer.writeByte(')');
         if (function.attrs) |attrs| try writer.print(" {s}", .{attrs});
         try writer.writeAll(" {\n");
 
         for (function.blocks.items) |block| {
-            try writer.print("{s}:\n", .{block.name});
+            try writer.print("{s}:\n", .{names.name(block.name)});
             for (block.instructions.items) |instruction| {
                 if (instruction.removed) continue;
                 if (instruction.result) |result| {
-                    try writer.print("  %{s} = ", .{result});
+                    try writer.print("  %{s} = ", .{names.name(result)});
                 } else {
                     try writer.writeAll("  ");
                 }
@@ -109,9 +121,9 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try printFastMathFlags(binary.fp_flags, writer);
                         try binary.ty.format(writer);
                         try writer.writeByte(' ');
-                        try binary.lhs.format(writer);
+                        try names.value(binary.lhs).format(writer);
                         try writer.writeAll(", ");
-                        try binary.rhs.format(writer);
+                        try names.value(binary.rhs).format(writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .cast => |cast| {
@@ -119,7 +131,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try printCastFlags(cast.flags, writer);
                         try cast.from_ty.format(writer);
                         try writer.writeByte(' ');
-                        try cast.value.format(writer);
+                        try names.value(cast.value).format(writer);
                         try writer.writeAll(" to ");
                         try cast.to_ty.format(writer);
                         try printInstructionMetadata(instruction.metadata, writer);
@@ -128,7 +140,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.writeAll("freeze ");
                         try freeze.ty.format(writer);
                         try writer.writeByte(' ');
-                        try freeze.value.format(writer);
+                        try names.value(freeze.value).format(writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .icmp => |icmp| {
@@ -137,9 +149,9 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.print("{s} ", .{icmp.predicate.name()});
                         try icmp.operand_ty.format(writer);
                         try writer.writeByte(' ');
-                        try icmp.lhs.format(writer);
+                        try names.value(icmp.lhs).format(writer);
                         try writer.writeAll(", ");
-                        try icmp.rhs.format(writer);
+                        try names.value(icmp.rhs).format(writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .fcmp => |fcmp| {
@@ -148,24 +160,24 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.print("{s} ", .{fcmp.predicate.name()});
                         try fcmp.operand_ty.format(writer);
                         try writer.writeByte(' ');
-                        try fcmp.lhs.format(writer);
+                        try names.value(fcmp.lhs).format(writer);
                         try writer.writeAll(", ");
-                        try fcmp.rhs.format(writer);
+                        try names.value(fcmp.rhs).format(writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .select => |select| {
                         try writer.writeAll("select ");
                         try select.cond_ty.format(writer);
                         try writer.writeByte(' ');
-                        try select.cond.format(writer);
+                        try names.value(select.cond).format(writer);
                         try writer.writeAll(", ");
                         try select.ty.format(writer);
                         try writer.writeByte(' ');
-                        try select.true_value.format(writer);
+                        try names.value(select.true_value).format(writer);
                         try writer.writeAll(", ");
                         try select.ty.format(writer);
                         try writer.writeByte(' ');
-                        try select.false_value.format(writer);
+                        try names.value(select.false_value).format(writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .phi => |phi| {
@@ -175,8 +187,8 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         for (phi.incoming.items, 0..) |incoming, index| {
                             if (index != 0) try writer.writeAll(", ");
                             try writer.writeAll("[ ");
-                            try incoming.value.format(writer);
-                            try writer.print(", %{s} ]", .{incoming.block});
+                            try names.value(incoming.value).format(writer);
+                            try writer.print(", %{s} ]", .{names.name(incoming.block)});
                         }
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
@@ -187,7 +199,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                             try writer.writeAll(", ");
                             try count.ty.format(writer);
                             try writer.writeByte(' ');
-                            try count.value.format(writer);
+                            try names.value(count.value).format(writer);
                         }
                         if (alloca.attrs) |attrs| try writer.print(", {s}", .{attrs});
                         try printInstructionMetadata(instruction.metadata, writer);
@@ -198,7 +210,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try printTypeWithAddressSpace(load.ty, load.ty_addrspace, writer);
                         try writer.writeAll(", ptr ");
                         if (load.ptr_addrspace) |addrspace_name| try writer.print("{s} ", .{addrspace_name});
-                        try load.ptr.format(writer);
+                        try names.value(load.ptr).format(writer);
                         try printMemorySuffix(load.attrs, writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
@@ -207,10 +219,10 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try printMemoryPrefix(store.attrs, writer);
                         try printTypeWithAddressSpace(store.ty, store.ty_addrspace, writer);
                         try writer.writeByte(' ');
-                        try store.value.format(writer);
+                        try names.value(store.value).format(writer);
                         try writer.writeAll(", ptr ");
                         if (store.ptr_addrspace) |addrspace_name| try writer.print("{s} ", .{addrspace_name});
-                        try store.ptr.format(writer);
+                        try names.value(store.ptr).format(writer);
                         try printMemorySuffix(store.attrs, writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
@@ -218,11 +230,11 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.writeAll("atomicrmw ");
                         if (atomicrmw.is_volatile) try writer.writeAll("volatile ");
                         try writer.print("{s} ptr ", .{atomicrmw.op});
-                        try atomicrmw.ptr.format(writer);
+                        try names.value(atomicrmw.ptr).format(writer);
                         try writer.writeAll(", ");
                         try atomicrmw.ty.format(writer);
                         try writer.writeByte(' ');
-                        try atomicrmw.value.format(writer);
+                        try names.value(atomicrmw.value).format(writer);
                         if (atomicrmw.syncscope) |syncscope| try writer.print(" {s}", .{syncscope});
                         try writer.print(" {s}", .{atomicrmw.ordering});
                         if (atomicrmw.@"align") |alignment| try writer.print(", align {}", .{alignment});
@@ -233,15 +245,15 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         if (cmpxchg.is_weak) try writer.writeAll("weak ");
                         if (cmpxchg.is_volatile) try writer.writeAll("volatile ");
                         try writer.writeAll("ptr ");
-                        try cmpxchg.ptr.format(writer);
+                        try names.value(cmpxchg.ptr).format(writer);
                         try writer.writeAll(", ");
                         try cmpxchg.ty.format(writer);
                         try writer.writeByte(' ');
-                        try cmpxchg.expected.format(writer);
+                        try names.value(cmpxchg.expected).format(writer);
                         try writer.writeAll(", ");
                         try cmpxchg.ty.format(writer);
                         try writer.writeByte(' ');
-                        try cmpxchg.replacement.format(writer);
+                        try names.value(cmpxchg.replacement).format(writer);
                         if (cmpxchg.syncscope) |syncscope| try writer.print(" {s}", .{syncscope});
                         try writer.print(" {s} {s}", .{ cmpxchg.success_ordering, cmpxchg.failure_ordering });
                         if (cmpxchg.@"align") |alignment| try writer.print(", align {}", .{alignment});
@@ -257,48 +269,48 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.writeAll("extractelement ");
                         try extract.vector_ty.format(writer);
                         try writer.writeByte(' ');
-                        try extract.vector.format(writer);
+                        try names.value(extract.vector).format(writer);
                         try writer.writeAll(", ");
                         try extract.index_ty.format(writer);
                         try writer.writeByte(' ');
-                        try extract.index.format(writer);
+                        try names.value(extract.index).format(writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .insertelement => |insert| {
                         try writer.writeAll("insertelement ");
                         try insert.vector_ty.format(writer);
                         try writer.writeByte(' ');
-                        try insert.vector.format(writer);
+                        try names.value(insert.vector).format(writer);
                         try writer.writeAll(", ");
                         try insert.value_ty.format(writer);
                         try writer.writeByte(' ');
-                        try insert.value.format(writer);
+                        try names.value(insert.value).format(writer);
                         try writer.writeAll(", ");
                         try insert.index_ty.format(writer);
                         try writer.writeByte(' ');
-                        try insert.index.format(writer);
+                        try names.value(insert.index).format(writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .shufflevector => |shuffle| {
                         try writer.writeAll("shufflevector ");
                         try shuffle.lhs_ty.format(writer);
                         try writer.writeByte(' ');
-                        try shuffle.lhs.format(writer);
+                        try names.value(shuffle.lhs).format(writer);
                         try writer.writeAll(", ");
                         try shuffle.rhs_ty.format(writer);
                         try writer.writeByte(' ');
-                        try shuffle.rhs.format(writer);
+                        try names.value(shuffle.rhs).format(writer);
                         try writer.writeAll(", ");
                         try shuffle.mask_ty.format(writer);
                         try writer.writeByte(' ');
-                        try printShuffleMask(shuffle.mask, writer);
+                        try printShuffleMask(names.value(shuffle.mask), writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .extractvalue => |extract| {
                         try writer.writeAll("extractvalue ");
                         try extract.aggregate_ty.format(writer);
                         try writer.writeByte(' ');
-                        try extract.aggregate.format(writer);
+                        try names.value(extract.aggregate).format(writer);
                         try writer.print(", {s}", .{extract.indices});
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
@@ -306,11 +318,11 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.writeAll("insertvalue ");
                         try insert.aggregate_ty.format(writer);
                         try writer.writeByte(' ');
-                        try insert.aggregate.format(writer);
+                        try names.value(insert.aggregate).format(writer);
                         try writer.writeAll(", ");
                         try insert.value_ty.format(writer);
                         try writer.writeByte(' ');
-                        try insert.value.format(writer);
+                        try names.value(insert.value).format(writer);
                         try writer.print(", {s}", .{insert.indices});
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
@@ -319,12 +331,12 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try gep.source_ty.format(writer);
                         try writer.writeAll(", ptr ");
                         if (gep.ptr_addrspace) |addrspace_text| try writer.print("{s} ", .{addrspace_text});
-                        try gep.ptr.format(writer);
+                        try names.value(gep.ptr).format(writer);
                         for (gep.indices.items) |index| {
                             try writer.writeAll(", ");
                             try index.ty.format(writer);
                             try writer.writeByte(' ');
-                            try index.value.format(writer);
+                            try names.value(index.value).format(writer);
                         }
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
@@ -340,7 +352,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                             try writer.print("\"{s}\", \"{s}\"(", .{ inline_asm.template, inline_asm.constraints });
                         } else if (call.callee_value) |callee_value| {
                             try writer.writeByte(' ');
-                            try callee_value.format(writer);
+                            try names.value(callee_value).format(writer);
                             try writer.writeByte('(');
                         } else {
                             try writer.print(" @{s}(", .{call.callee});
@@ -353,7 +365,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                                 try arg.ty.format(writer);
                                 if (arg.attrs) |attrs| try writer.print(" {s}", .{attrs});
                                 try writer.writeByte(' ');
-                                try arg.value.format(writer);
+                                try names.value(arg.value).format(writer);
                             }
                         }
                         try writer.writeByte(')');
@@ -370,12 +382,12 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     if (ret.ptr_addrspace) |addrspace_text| try writer.print(" {s}", .{addrspace_text});
                     if (ret.value) |value| {
                         try writer.writeByte(' ');
-                        try value.format(writer);
+                        try names.value(value).format(writer);
                     }
                     try writer.writeByte('\n');
                 },
                 .br => |br| {
-                    try writer.print("  br label %{s}", .{br.target});
+                    try writer.print("  br label %{s}", .{names.name(br.target)});
                     if (br.metadata) |metadata| try writer.print(", {s}", .{metadata});
                     try writer.writeByte('\n');
                 },
@@ -383,8 +395,8 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     try writer.writeAll("  br ");
                     try condbr.cond_ty.format(writer);
                     try writer.writeByte(' ');
-                    try condbr.cond.format(writer);
-                    try writer.print(", label %{s}, label %{s}", .{ condbr.then_target, condbr.else_target });
+                    try names.value(condbr.cond).format(writer);
+                    try writer.print(", label %{s}, label %{s}", .{ names.name(condbr.then_target), names.name(condbr.else_target) });
                     if (condbr.metadata) |metadata| try writer.print(", {s}", .{metadata});
                     try writer.writeByte('\n');
                 },
@@ -392,14 +404,14 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     try writer.writeAll("  switch ");
                     try switch_term.cond_ty.format(writer);
                     try writer.writeByte(' ');
-                    try switch_term.cond.format(writer);
-                    try writer.print(", label %{s} [\n", .{switch_term.default_target});
+                    try names.value(switch_term.cond).format(writer);
+                    try writer.print(", label %{s} [\n", .{names.name(switch_term.default_target)});
                     for (switch_term.cases.items) |case| {
                         try writer.writeAll("    ");
                         try case.value_ty.format(writer);
                         try writer.writeByte(' ');
-                        try case.value.format(writer);
-                        try writer.print(", label %{s}\n", .{case.target});
+                        try names.value(case.value).format(writer);
+                        try writer.print(", label %{s}\n", .{names.name(case.target)});
                     }
                     try writer.writeAll("  ]");
                     if (switch_term.metadata) |metadata| try writer.print(", {s}", .{metadata});
@@ -409,11 +421,11 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     try writer.writeAll("  indirectbr ");
                     try indirectbr.addr_ty.format(writer);
                     try writer.writeByte(' ');
-                    try indirectbr.addr.format(writer);
+                    try names.value(indirectbr.addr).format(writer);
                     try writer.writeAll(", [");
                     for (indirectbr.targets.items, 0..) |target, index| {
                         if (index != 0) try writer.writeAll(", ");
-                        try writer.print("label %{s}", .{target});
+                        try writer.print("label %{s}", .{names.name(target)});
                     }
                     try writer.writeByte(']');
                     if (indirectbr.metadata) |metadata| try writer.print(", {s}", .{metadata});

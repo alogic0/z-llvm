@@ -4,6 +4,7 @@ const common = @import("tool_common.zig");
 pub fn main(init: std.process.Init) !void {
     var buffer: [4096]u8 = undefined;
     var out = std.Io.File.stdout().writer(init.io, &buffer);
+    try runCase(init, &out.interface, "test/opt/inputs/numeric_local_names.ll", "test/opt/numeric_local_names_harness.c", &.{ "simplifycfg", "instcombine,dce,simplifycfg", "release-o3" }, "numeric local serialization", "functions=6 observations=96");
     try runCase(init, &out.interface, "test/opt/inputs/optimizer_checkpoint.ll", "test/opt/optimizer_checkpoint_harness.c", &.{ "instcombine", "constmerge", "vector-combine", "release-o3" }, "correctness checkpoint", "functions=11 observations=1640 seed=5eed1234");
     try runCase(init, &out.interface, "test/opt/inputs/optimizer_review_boundaries.ll", "test/opt/optimizer_review_boundaries_harness.c", &.{ "instcombine,dce", "release-o3" }, "optimizer review boundaries", "functions=7 observations=134");
     try runCase(init, &out.interface, "test/opt/inputs/optimizer_correctness.ll", "test/opt/optimizer_correctness_harness.c", &.{ "early-cse,instcombine,licm,sccp,globalopt", "release-o3" }, "optimizer correctness", "functions=17");
