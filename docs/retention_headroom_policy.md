@@ -121,10 +121,19 @@ records removal of 314 complete idle cache roots, totaling 1.39 GB of allocated
 space. Most roots were empty retained directories; the main cache and completed
 ABI/Fibonacci caches supplied the allocation. Installed output, source captures,
 logs, current AIR, measurement inputs and all 13 probes remain hash-verified.
-The resulting 41.71 GB free-space measurement remains below full-run admission.
-The shared cache outside the project was audited read-only and left untouched;
-it had active consumers. No archives are created. Rebuilt caches are not net
+The resulting 41.71 GB free-space measurement was below full-run admission.
+At that point, the shared cache outside the project was audited read-only and
+left untouched because it had active consumers. No archives are created. Rebuilt caches are not net
 retention savings.
+
+The [module dependency acceptance](evidence/module_selection_acceptance_20261103.json)
+also records the user's explicit approval to clear `/home/oleg/.cache/zig` once
+idle. A fresh file-descriptor/executable/mapping check found no consumers before
+removing the complete shared cache. That interval removed 6.74 GB of cache
+allocation and measured 48.04 GB free afterward. Installed compilers, source captures,
+current AIR and all probes remain hash-verified. No archive was created. Later
+builds regenerate shared cache entries; this is an interval measurement, not a
+permanent net reduction or a standing instruction to clear other projects' caches.
 
 ## Headroom
 
@@ -194,3 +203,10 @@ retires ten complete idle cache roots after the 17-stage acceptance run. About
 the installed compiler, full logs, source snapshots, current AIR, audit facts,
 performance baselines and all 13 original probes remain. Open-file and mapping
 checks found no active cache consumers. No archives are created.
+
+The module dependency cached run passes all 17 stages with
+47.94 GB free at admission. Its reported minimum is
+43.72 GB and its sampled minimum is
+43.33 GB, both above the 34.36 GB reserve. Three
+authenticated AIR exports are reused and execution checks run again. No headroom
+or AIR-cache implementation changes are part of this compiler checkpoint.

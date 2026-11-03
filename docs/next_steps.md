@@ -41,7 +41,21 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [integer array-stride checkpoint](evidence/array_stride_acceptance_20261103.json)
+The accepted [module dependency checkpoint](evidence/module_selection_acceptance_20261103.json)
+at `9c7985e2`, with shared analysis extracted at `68a56ca7`, passes all 17
+integration stages on a frozen 2,642-file snapshot. Explicit
+`--codegen-reachable` selection follows parsed function, global and alias references;
+private helpers keep local ELF bindings and selected alias chains resolve in any
+definition order. Opaque references conservatively retain all definitions.
+Seven functions pass 330 local observations against 165 LLVM references across
+direct/release routes in three modes. Thirty rejection controls and three
+CLI/environment equivalence checks pass, along with all 1,689 unit tests, focused
+checks and 60 ABI cases. Earlier populations and the bypass ratchet stay fixed.
+Legacy selection remains the default. Unchanged Fibonacci now rejects during
+code generation at `start.expandStackSize unsupported_type:alloca` in the explicit
+mode; it still has zero local executions.
+
+The earlier accepted [integer array-stride checkpoint](evidence/array_stride_acceptance_20261103.json)
 at `4f69c581`, with correctness repairs `d1fe039a` and `e2fb5841`, passes
 all 17 integration stages on a frozen 2,635-file snapshot. Named i64 indexes now
 form runtime addresses for bounded literal integer arrays using allocation
@@ -183,32 +197,29 @@ immediate sources, cast flags, pointer targets and unproved compare forms retain
 explicit boundaries; frozen residual fingerprints and the bypass ratchet stay
 unchanged.
 
-The [module dependency selection implementation](evidence/module_selection_focused_20261103.json)
-at `9c7985e2` now has focused proof. It reuses the shared GlobalDCE dependency
-analysis, follows parsed calls/global references/aliases, and resolves selected
-alias chains while preserving local bindings and visibility. The explicit mode
-passes 330 local/165 LLVM observations, 30 rejection controls, three matching
-CLI/environment checks, all 1,689 units and the focused gates. Legacy selection
-remains the default; opaque live references retain all definitions.
+Next, repair numeric SSA names in printed IR after CFG reordering. A retained
+three-block reproducer is valid for LLVM before `simplifycfg`; the local pass
+merges blocks and prints `%2` before `%1`, which LLVM rejects. The existing
+comparison normalizer repairs that example and the captured Fibonacci module.
+Reuse its normalization authority, preserve non-comparison IR information and
+cover numeric block labels, forward references, PHIs and opaque operands before
+changing production serialization.
 
-Next, complete the full cached 17-stage run before accepting this checkpoint.
-Owned idle-cache cleanup removed 1.39 GB of allocation, leaving 41.71 GB at that
-measurement, below the fixed 42.95 GB admission requirement. The shared Zig cache
-is outside this cleanup scope and had active consumers during the read-only audit.
-Current AIR, accepted evidence, performance baselines and 13 source probes remain;
-no archives are created.
+Then narrow opaque dependency-reference coverage before changing the default
+selection. LLVM GlobalDCE retains 34 functions and 16 globals/aliases from the
+original Fibonacci capture; the comparison-normalized local output yields the
+same counts. Current conservative selection retains 35 functions and 86
+globals/aliases. These are diagnostic comparisons, not whole-program executions.
 
-The unchanged Fibonacci retry now reports its codegen boundary instead of omitting
-private helpers and reaching a link failure: `start.expandStackSize` rejects an
-aggregate alloca. Coverage is conservative: 35 functions are selected, ten emit
-and 25 reject; no object is published and there are zero local executions.
-Its first stack types are the 16-byte `{ i64, i64 }` rlimit and a 24-byte padded
-result wrapper. A 56-byte array stride and narrower call ABI forms are visible
-later in the same function. Narrow opaque reference coverage before adopting
-this selection by default, then extend bounded aggregate frame storage through
-the existing private legalization and typed address authorities. These are planned
-boundaries, not accepted capabilities. Keep the fixed compiler-core population
-and bypass ratchet unchanged without a separate migration.
+The explicit unchanged Fibonacci retry selects 35 functions: ten emit and 25
+reject, beginning at `start.expandStackSize` with an aggregate alloca. Its first
+stack types are the 16-byte `{ i64, i64 }` rlimit and a 24-byte padded result
+wrapper. A 56-byte array stride and narrower call ABI forms are visible later.
+Extend bounded aggregate frame storage through existing private legalization and
+typed address authorities after the serialization and selection work. Keep the
+fixed compiler-core population and bypass ratchet unchanged without a separate
+migration. The [checkpoint evidence](evidence/module_selection_acceptance_20261103.json)
+records all diagnostics, cleanup and the full integration proof.
 
 Keep broader optional ABIs and
 floating/indirect/aggregate/stack varargs as explicit boundaries. Use the frozen

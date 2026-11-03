@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `4f69c5814e6e6d78bfb78368242344f3e0ad6e21`; tree: `6a1148b47a2b42c13b6bd681e8095668f355516c`.
+Accepted revision: `9c7985e27078d18e4958eb63fb0c0011881c3cda`; tree: `0bbde5100847ce57f27eae68db8797afa91a83aa`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,20 +25,21 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The [module dependency selection work](evidence/module_selection_focused_20261103.json)
-is committed at `9c7985e2`, with shared analysis extracted at `68a56ca7`.
-The explicit `--codegen-reachable` mode follows function, global and alias
-references, retains required private helpers, and preserves local ELF bindings.
-Opaque references conservatively retain all definitions. Its seven-function
-native fixture passes 330 local observations against 165 LLVM references, with
-30 rejection controls and three CLI/environment equivalence checks. All 1,689
-unit tests and the focused gates pass. Full integration remains pending disk
-admission, so the accepted checkpoint above stays unchanged. The unchanged
-Fibonacci retry selects 35 definitions conservatively and rejects during code
-generation at `start.expandStackSize unsupported_type:alloca`; it has zero local
-executions. Legacy selection remains the default.
+The accepted [module dependency checkpoint](evidence/module_selection_acceptance_20261103.json)
+at `9c7985e2`, with shared analysis extracted at `68a56ca7`, passes all 17
+integration stages on a frozen 2,642-file snapshot. Explicit
+`--codegen-reachable` selection follows parsed function, global and alias references;
+private helpers keep local ELF bindings and selected alias chains resolve in any
+definition order. Opaque references conservatively retain all definitions.
+Seven functions pass 330 local observations against 165 LLVM references across
+direct/release routes in three modes. Thirty rejection controls and three
+CLI/environment equivalence checks pass, along with all 1,689 unit tests, focused
+checks and 60 ABI cases. Earlier populations and the bypass ratchet stay fixed.
+Legacy selection remains the default. Unchanged Fibonacci now rejects during
+code generation at `start.expandStackSize unsupported_type:alloca` in the explicit
+mode; it still has zero local executions.
 
-The accepted [integer array-stride checkpoint](evidence/array_stride_acceptance_20261103.json)
+The earlier [integer array-stride checkpoint](evidence/array_stride_acceptance_20261103.json)
 at `4f69c581`, with correctness repairs `d1fe039a` and `e2fb5841`, passes
 all 17 integration stages on a frozen 2,635-file snapshot. Named i64 indexes now
 form runtime addresses for bounded literal integer arrays using allocation
@@ -119,5 +120,5 @@ history are retired without archives. The latest
 [generation cleanup](evidence/global_memory_cleanup_20261103.json) retires 3.92 GB
 of superseded AIR after verifying the accepted replacement and all payload hashes;
 metadata and historical proofs remain. See [next steps](next_steps.md) for
-module dependency selection. Historical checkpoints
+numeric SSA serialization and dependency-reference coverage. Historical checkpoints
 remain under the roadmap and evidence directories.

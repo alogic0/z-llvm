@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "4f69c5814e6e6d78bfb78368242344f3e0ad6e21",
-  "accepted_tree": "6a1148b47a2b42c13b6bd681e8095668f355516c",
+  "accepted_revision": "9c7985e27078d18e4958eb63fb0c0011881c3cda",
+  "accepted_tree": "0bbde5100847ce57f27eae68db8797afa91a83aa",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 5,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "4f69c581",
+  "declaration_revision": "9c7985e2",
   "evidence": [
+    "docs/evidence/module_selection_acceptance_20261103.json",
+    "docs/evidence/module_selection_20261103_cached.summary",
     "docs/evidence/array_stride_acceptance_20261103.json",
     "docs/evidence/array_stride_20261103_cached.summary",
     "docs/evidence/boolean_call_acceptance_20261103.json",
