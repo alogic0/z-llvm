@@ -69,7 +69,8 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
                 error.NotGlobalAlias => {},
                 else => return err,
             }
-            const global = try parser_helpers.parseGlobal(&module, line);
+            var global = try parser_helpers.parseGlobal(&module, line);
+            errdefer global.deinit(allocator);
             try module.globals.append(allocator, global);
             continue;
         }
@@ -79,7 +80,8 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             continue;
         }
         if (current_function == null and std.mem.startsWith(u8, line, "declare ")) {
-            const decl = try parser_helpers.parseFunctionDecl(allocator, line);
+            var decl = try parser_helpers.parseFunctionDecl(allocator, line);
+            errdefer decl.deinit(allocator);
             try module.declarations.append(allocator, decl);
             continue;
         }
@@ -95,7 +97,8 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
 
         if (std.mem.startsWith(u8, line, "define ")) {
             if (current_function != null) return error.NestedFunction;
-            const function = try parser_helpers.parseFunctionHeader(allocator, line);
+            var function = try parser_helpers.parseFunctionHeader(allocator, line);
+            errdefer function.deinit(allocator);
             try module.functions.append(allocator, function);
             current_function = module.functions.items.len - 1;
             current_block = null;
@@ -177,7 +180,9 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             continue;
         }
 
-        try block.instructions.append(allocator, try parser_helpers.parseInstruction(allocator, line));
+        var instruction = try parser_helpers.parseInstruction(allocator, line);
+        errdefer instruction.deinit(allocator);
+        try block.instructions.append(allocator, instruction);
     }
 
     if (current_function != null) return error.UnclosedFunction;

@@ -178,7 +178,10 @@ pub fn parseGlobal(module: *core.Module, line: []const u8) !core.Global {
     else
         "";
 
-    var initializer = parseGlobalInitializer(module.allocator, ty, initializer_text) catch return error.UnsupportedGlobalVariable;
+    var initializer = parseGlobalInitializer(module.allocator, ty, initializer_text) catch |err| switch (err) {
+        error.OutOfMemory => return err,
+        else => return error.UnsupportedGlobalVariable,
+    };
     errdefer initializer.deinit(module.allocator);
     return .{
         .name = name_text[1..],
@@ -252,7 +255,10 @@ pub fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text:
         return .{ .c_string = text };
     }
     if (ty == .aggregate and std.mem.startsWith(u8, text, "[") and std.mem.endsWith(u8, text, "]")) {
-        const array = parseGlobalArrayInitializer(allocator, ty, text) catch return core.GlobalInitializer{ .@"opaque" = text };
+        const array = parseGlobalArrayInitializer(allocator, ty, text) catch |err| switch (err) {
+            error.OutOfMemory => return err,
+            else => return core.GlobalInitializer{ .@"opaque" = text },
+        };
         return .{ .array = array };
     }
 
