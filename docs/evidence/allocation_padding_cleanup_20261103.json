@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "created_utc": "2026-11-03T12:09:04.314853+00:00",
+  "status": "retired",
+  "roots": [
+    {
+      "path": ".zig-cache",
+      "files": 1057,
+      "unique_inodes": 1057,
+      "allocated_bytes": 3377876992,
+      "fully_owned_file_allocation": 3377876992,
+      "purpose": "Disposable compiler build cache; source and proof outputs are elsewhere."
+    },
+    {
+      "path": "local-state/worktrees/global-memory-20261103/.zig-cache",
+      "files": 369,
+      "unique_inodes": 369,
+      "allocated_bytes": 156323840,
+      "fully_owned_file_allocation": 156323840,
+      "purpose": "Disposable compiler build cache; source and proof outputs are elsewhere."
+    }
+  ],
+  "available_before": 51924127744,
+  "preserved": [
+    "All source files and 13 original scratch probes",
+    "Current production AIR and semantic audit facts",
+    "All accepted/provisional evidence and performance baselines",
+    "Active worktree source and compiled CLI",
+    "Shared global Zig caches and sibling toolchains"
+  ],
+  "archives_created": 0,
+  "available_after": 55459565568,
+  "all_roots_absent": true,
+  "note": "Allocated cache-file inventory is recorded separately from global free-space movement; concurrent filesystem activity may change that movement."
+}

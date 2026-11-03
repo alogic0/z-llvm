@@ -95,6 +95,12 @@ Use unique run-owned directories for new work. Successful temporary tests clean
 up their own fixtures. A failed test may retain a bounded diagnostic fixture,
 but it must report that location and must not turn it into a test prerequisite.
 
+The [allocation-padding cleanup](evidence/allocation_padding_cleanup_20261103.json)
+retires 3.53 GB of fully owned cache-file allocation after compiler processes
+finish. Sources, accepted and provisional proofs, performance baselines, current
+AIR, audit facts and all 13 source probes remain. Cache allocation and global
+free-space movement are recorded separately; no archives are created.
+
 ## Headroom
 
 The runner's numerical headroom checks remain owned by
