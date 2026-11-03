@@ -46,6 +46,12 @@ def run_variadic_canary(runner, directory, zllvm, environment):
 
 
 MEMORY_CANARIES = {
+    "type_layout_padding": {
+        "prefix": "type-layout-padding", "fixture": "type_layout_padding",
+        "functions": {"layout_i24_field", "layout_fp80_field", "layout_nested_field", "layout_array_field"},
+        "observations": 128,
+        "stdout": "type-layout-padding observations=128 scalar=nested=array=preserved\n",
+    },
     "word_pair": {
         "prefix": "word-pair", "fixture": "word_pair_memory",
         "functions": {"word_pair_copy", "word_pair_extract"}, "observations": 64,
@@ -140,7 +146,8 @@ def main():
               "pointer_stack_local_observations": 0, "pointer_stack_reference_observations": 0,
               "scalar_stack_local_observations": 0, "scalar_stack_reference_observations": 0,
               "integer_pointer_local_observations": 0, "integer_pointer_reference_observations": 0,
-              "signed_nonnegative_local_observations": 0, "signed_nonnegative_reference_observations": 0, "rows": []}
+              "signed_nonnegative_local_observations": 0, "signed_nonnegative_reference_observations": 0,
+              "type_layout_padding_local_observations": 0, "type_layout_padding_reference_observations": 0, "rows": []}
     try:
         if platform.system() != "Linux" or platform.machine() != "x86_64":
             raise RuntimeError("this bounded gate requires x86_64 Linux")
@@ -176,7 +183,8 @@ def main():
                            "runtime_pointer_stack.ll", "runtime_pointer_stack_driver.c",
                            "scalar_stack_memory.ll", "scalar_stack_memory_driver.c",
                            "integer_pointer.ll", "integer_pointer_driver.c",
-                           "signed_nonnegative.ll", "signed_nonnegative_driver.c")}})
+                           "signed_nonnegative.ll", "signed_nonnegative_driver.c",
+                           "type_layout_padding.ll", "type_layout_padding_driver.c")}})
         environment = {k: v for k, v in os.environ.items() if not k.startswith(("ZLLVM_", "ZIG_USE_ZLLVM"))}
         environment.update({"ZIG_LOCAL_CACHE_DIR": str(output / "frontend-cache"),
                             "ZIG_GLOBAL_CACHE_DIR": str(output / "global-cache")})
@@ -254,6 +262,7 @@ def main():
         print(f"summary scalar-stack-memory population=standalone-scalar-stack routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['scalar_stack_local_observations']} reference_observations={report['scalar_stack_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary integer-pointer-casts population=standalone-integer-pointer-casts routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['integer_pointer_local_observations']} reference_observations={report['integer_pointer_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary signed-nonnegative population=standalone-signed-nonnegative routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['signed_nonnegative_local_observations']} reference_observations={report['signed_nonnegative_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
+        print(f"summary type-layout-padding population=standalone-type-allocation-padding routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['type_layout_padding_local_observations']} reference_observations={report['type_layout_padding_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"evidence: {output / 'report.json'}")
         if "error" in report:
             print(report["error"], file=sys.stderr)

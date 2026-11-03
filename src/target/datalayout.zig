@@ -56,6 +56,11 @@ pub const DataLayout = struct {
         };
     }
 
+    /// Allocation stride includes trailing padding required by the ABI.
+    pub fn typeAllocSizeBytes(layout: DataLayout, ty: ir.Type) anyerror!u64 {
+        return alignForward(try layout.typeStoreSizeBytes(ty), bitsToBytes(try layout.typeAbiAlignmentBits(ty)));
+    }
+
     pub fn typeAbiAlignmentBits(layout: DataLayout, ty: ir.Type) anyerror!u16 {
         return switch (ty) {
             .void => 8,
@@ -93,7 +98,7 @@ pub const DataLayout = struct {
         };
         if (arrayInfo(text)) |array| {
             const stride = try layout.arrayElementStrideBytes(array.element_ty);
-            return @as(i128, @intCast(field_index * stride));
+            return @intCast(std.math.mul(u64, @intCast(field_index), stride) catch return error.UnsupportedDataLayoutQuery);
         }
 
         var fields = aggregateFields(text) orelse return error.UnsupportedDataLayoutQuery;
@@ -101,9 +106,9 @@ pub const DataLayout = struct {
         var offset: u64 = 0;
         while (nextAggregateField(&fields)) |field_text| : (index += 1) {
             const field_ty = parseTypeLiteral(field_text) orelse return error.UnsupportedDataLayoutQuery;
-            offset = alignForward(offset, bitsToBytes(try layout.typeAbiAlignmentBits(field_ty)));
+            offset = try alignForward(offset, bitsToBytes(try layout.typeAbiAlignmentBits(field_ty)));
             if (index == field_index) return @intCast(offset);
-            offset += try layout.typeStoreSizeBytes(field_ty);
+            offset = std.math.add(u64, offset, try layout.typeAllocSizeBytes(field_ty)) catch return error.UnsupportedDataLayoutQuery;
         }
         return error.UnsupportedDataLayoutQuery;
     }
@@ -113,7 +118,7 @@ pub const DataLayout = struct {
             .aggregate => |text| text,
             .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return error.UnsupportedDataLayoutQuery,
         };
-        if (arrayInfo(text)) |array| return array.count * try layout.arrayElementStrideBytes(array.element_ty);
+        if (arrayInfo(text)) |array| return std.math.mul(u64, array.count, try layout.arrayElementStrideBytes(array.element_ty)) catch error.UnsupportedDataLayoutQuery;
 
         var fields = aggregateFields(text) orelse return error.UnsupportedDataLayoutQuery;
         var size: u64 = 0;
@@ -122,8 +127,8 @@ pub const DataLayout = struct {
             const field_ty = parseTypeLiteral(field_text) orelse return error.UnsupportedDataLayoutQuery;
             const field_align = bitsToBytes(try layout.typeAbiAlignmentBits(field_ty));
             max_align = @max(max_align, field_align);
-            size = alignForward(size, field_align);
-            size += try layout.typeStoreSizeBytes(field_ty);
+            size = try alignForward(size, field_align);
+            size = std.math.add(u64, size, try layout.typeAllocSizeBytes(field_ty)) catch return error.UnsupportedDataLayoutQuery;
         }
         return alignForward(size, max_align);
     }
@@ -152,9 +157,7 @@ pub const DataLayout = struct {
     }
 
     fn arrayElementStrideBytes(layout: DataLayout, element_ty: ir.Type) anyerror!u64 {
-        const size = try layout.typeStoreSizeBytes(element_ty);
-        const align_bytes = bitsToBytes(try layout.typeAbiAlignmentBits(element_ty));
-        return alignForward(size, align_bytes);
+        return layout.typeAllocSizeBytes(element_ty);
     }
 
     fn integerAlignmentSpec(layout: DataLayout, bits: u16) !AlignmentSpec {
@@ -225,11 +228,11 @@ fn bitsToBytes(bits: u16) u64 {
     return @max(@as(u64, 1), (@as(u64, bits) + 7) / 8);
 }
 
-fn alignForward(value: u64, alignment: u64) u64 {
+fn alignForward(value: u64, alignment: u64) !u64 {
     if (alignment <= 1) return value;
     const remainder = value % alignment;
     if (remainder == 0) return value;
-    return value + alignment - remainder;
+    return std.math.add(u64, value, alignment - remainder) catch error.UnsupportedDataLayoutQuery;
 }
 
 const AggregateFields = struct {
@@ -308,4 +311,34 @@ fn findTopLevelComma(text: []const u8) ?usize {
         }
     }
     return null;
+}
+
+test "aggregate fields advance by allocation size including scalar tail padding" {
+    const layout = try DataLayout.parse("e-p:64:64-i24:32-i64:64");
+    try std.testing.expectEqual(@as(u64, 3), try layout.typeStoreSizeBytes(.{ .int = 24 }));
+    try std.testing.expectEqual(@as(u64, 4), try layout.typeAllocSizeBytes(.{ .int = 24 }));
+    try std.testing.expectEqual(@as(u64, 10), try layout.typeStoreSizeBytes(.x86_fp80));
+    try std.testing.expectEqual(@as(u64, 16), try layout.typeAllocSizeBytes(.x86_fp80));
+    const cases = [_]struct { text: []const u8, offset: i128, size: u64 }{
+        .{ .text = "{ i24, i8 }", .offset = 4, .size = 8 },
+        .{ .text = "{ x86_fp80, i8 }", .offset = 16, .size = 32 },
+        .{ .text = "{ { i24, i8 }, i16 }", .offset = 8, .size = 12 },
+        .{ .text = "{ [2 x { i24, i8 }], i8 }", .offset = 16, .size = 20 },
+    };
+    for (cases) |case| {
+        const ty: ir.Type = .{ .aggregate = case.text };
+        try std.testing.expectEqual(case.offset, try layout.aggregateFieldOffsetBytes(ty, 1));
+        try std.testing.expectEqual(case.size, try layout.typeStoreSizeBytes(ty));
+        try std.testing.expectEqual(case.size, try layout.typeAllocSizeBytes(ty));
+    }
+}
+
+test "allocation and aggregate layout queries reject arithmetic overflow" {
+    const layout = try DataLayout.parse("e-p:64:64-i64:64");
+    try std.testing.expectError(error.UnsupportedDataLayoutQuery, layout.typeStoreSizeBytes(.{ .aggregate = "[18446744073709551615 x i16]" }));
+    try std.testing.expectError(error.UnsupportedDataLayoutQuery, layout.aggregateFieldOffsetBytes(.{ .aggregate = "[2 x i64]" }, std.math.maxInt(usize)));
+    const overflow: ir.Type = .{ .aggregate = "{ [18446744073709551615 x i8], i64 }" };
+    try std.testing.expectError(error.UnsupportedDataLayoutQuery, layout.aggregateFieldOffsetBytes(overflow, 1));
+    try std.testing.expectError(error.UnsupportedDataLayoutQuery, layout.typeStoreSizeBytes(overflow));
+    try std.testing.expectError(error.UnsupportedDataLayoutQuery, alignForward(std.math.maxInt(u64), 8));
 }

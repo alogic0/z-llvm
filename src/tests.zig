@@ -8,6 +8,7 @@ comptime {
     _ = @import("codegen/x86_64/generic_cfg/runtime_pointer_stack_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/integer_pointer_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/signed_nonnegative_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/type_layout_padding_tests.zig");
     _ = @import("tests/correctness_checkpoint_native.zig");
     _ = @import("tests/composed_byte_loops.zig");
     _ = @import("tests/composed_memcpy.zig");
