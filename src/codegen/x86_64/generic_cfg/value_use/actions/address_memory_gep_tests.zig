@@ -236,6 +236,52 @@ test "value-use scaled-address action internally resolves both current homes" {
     try std.testing.expect(selector.values.get("scaled-result") == null);
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
+test "value-use scaled-address action preserves sources already in its scratch destinations" {
+    for ([_]u8{ 1, 8, 128 }) |scale| {
+        var machine = MachineFunction.init("scaled-in-place", .ptr);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        inline for (&.{ "base", "index", "result" }) |name| try addLive(&plan, name);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "base", .{ .arg64 = .rcx });
+        try selector_state.bindValueLoc(&selector, "index", .{ .arg64 = .r8 });
+        const base_before = selector.values.get("base").?;
+        const index_before = selector.values.get("index").?;
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const index = try transaction.register(preparedSourceRequest("index", .{ .int = 64 }, .gpr64, .gpr64));
+        const action = try transaction.register(preparedRequest(
+            "base",
+            .ptr,
+            .gpr64,
+            .pointer,
+            .{ .form_scaled_address = .{
+                .result = try actionIdentity("result"),
+                .index = .{ .request = index },
+                .scale = scale,
+            } },
+        ));
+        try transaction.seal();
+        try transaction.prepare();
+        try std.testing.expect(selector.values.get("base").?.loc == .spill64);
+        try std.testing.expect(selector.values.get("index").?.loc == .spill64);
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(action));
+        try std.testing.expectEqual(base_before.vreg, selector.values.get("base").?.vreg);
+        try std.testing.expectEqual(index_before.vreg, selector.values.get("index").?.vreg);
+        try std.testing.expectEqual(ValueLoc{ .scratch64 = .rcx }, selector.values.get("result").?.loc);
+        try transaction.rollback();
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(base_before, selector.values.get("base").?);
+        try std.testing.expectEqual(index_before, selector.values.get("index").?);
+        try std.testing.expect(selector.values.get("result") == null);
+    }
+}
+
 test "value-use address actions include every physical destination in conflict and cycle planning" {
     var machine = MachineFunction.init("value-use-address-action-plan", .ptr);
     defer machine.deinit(std.testing.allocator);

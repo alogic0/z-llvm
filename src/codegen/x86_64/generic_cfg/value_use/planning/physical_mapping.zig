@@ -96,11 +96,18 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
             }
             const source = mapping.source.?;
             if (source == mapping.destination) {
-                // Byte GEP changes destination register even when staging its base/index is a
-                // no-op. Preserve that canonical source before exposing views.
+                // Address arithmetic changes destination registers even when
+                // staging the base/index is a no-op. Preserve canonical sources
+                // before exposing their views.
                 if (request.prepared_action) |action| {
                     if (action == .form_byte_address) switch (action.form_byte_address.offset) {
                         .constant => |offset| if (offset != 0) {
+                            writes[@backingInt(mapping.destination)] = true;
+                        },
+                        .request => writes[@backingInt(mapping.destination)] = true,
+                    };
+                    if (action == .form_scaled_address) switch (action.form_scaled_address.index) {
+                        .constant => |index| if (index != 0) {
                             writes[@backingInt(mapping.destination)] = true;
                         },
                         .request => writes[@backingInt(mapping.destination)] = true,
