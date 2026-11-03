@@ -41,10 +41,11 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The [startup-memory/headroom acceptance](evidence/startup_headroom_acceptance_20261103.json)
-at `ea1e1e1a` completes the two follow-ups from the prior checkpoint. Both
-full distribution runs pass all 17 subgates against one frozen source snapshot,
-and all 1,396 canonical records match. The source pin remains
+The [scalar frame-store acceptance](evidence/scalar_frame_acceptance_20261103.json)
+at `90b91eb7` completes runtime pointer and i64 frame stores, including a
+full-width immediate wrong-code repair. A serial distribution run passes all 17
+subgates against a frozen 2,580-file source snapshot. Three authenticated AIR
+exports are reused; execution checks run again. The source pin remains
 `1c08b09d1c847f4f02c8216e3b62df323861a437`.
 
 The compiler-core selection remains the same 100-row selector-v3 prefix. Every
@@ -59,8 +60,8 @@ Production AIR publication writes schema-4 metadata atomically and transfers
 ownership of the verified payload. Same-filesystem publication renames the
 original file; cross-filesystem publication removes raw only after commit.
 Readers support schemas 3 and 4, including the parent's cache-pin verifier.
-Two-second observations identify the same inode as raw and cached in all three
-modes, with one complete payload per mode and no manual cleanup wrapper.
+The earlier fresh/cache proof identifies the same inode as raw and cached in all
+three modes, with one complete payload per mode and no manual cleanup wrapper.
 Rollback, legacy migration, reuse and actual cross-filesystem tests pass.
 
 The unchanged upstream `hello_libc.zig` still executes in all three release
@@ -76,24 +77,27 @@ Zig/Clang IR construction, libc, the system linker and CRT remain dependencies.
 The ABI cohort retains ten functions and passes 60 cases plus its negative
 controls. The frozen FMA canary still passes its 29 exact-result cases and
 8,192 LLVM-paired observations with unchanged identities. The combined focused
-checks pass 1,637 compiler unit tests, 11 structural tests and seven Python
+checks pass 1,642 compiler unit tests, 11 structural tests and seven Python
 policy tests. Standalone, compiler-core and compiler-rt populations remain
 separate; the compiler-rt bypass ratchet remains 130.
 
 The earlier [space cleanup](evidence/space_cleanup_20261102.json) retained frozen
 selector inputs and source probes. The
-[checkpoint cleanup](evidence/startup_headroom_cleanup_20261103.json) replaces
-superseded AIR payloads with the current schema-4 generation and removes idle
-build caches while retaining metadata, logs and native evidence. No backup
-archives are created. Follow the [current keep-list](evidence/tmp_retention_pins.tsv).
+[checkpoint cleanup](evidence/scalar_frame_cleanup_20261103.json) shares
+byte-identical immutable evidence through hardlinks, preserving all 228 paths and
+hashes. Six obsolete debug compiler copies and complete idle caches are removed;
+current exports, frozen inputs, performance baselines, sources and logs remain.
+No archives are created. Follow the [current keep-list](evidence/tmp_retention_pins.tsv).
 
-The [disk calibration](evidence/headroom_calibration_20261102.json) is accepted:
+The earlier [disk calibration](evidence/headroom_calibration_20261102.json) is accepted:
 an 8 GiB forecast covers the sampled 6.10 GB fresh and 1.60 GB cached decreases.
 The original serial admission is inherited by nested row workers, whose reserve
 stays enforced and whose transient minimum enters the serial report. Allocated
 disk telemetry covers all seven owned roots, including retained exports. The
 49 runner/policy and 39 comparison tests pass. Filesystem noise and sampled,
 non-atomic observations remain measurement limits.
+The current cached run reports a 1.63 GB decrease with the same reserve and
+forecast; AIR publication and runner infrastructure are unchanged.
 
 The [bounded memory slice](evidence/startup_word_pair_memory_20261102.json)
 reuses existing 128-bit frame storage for an exact 16-byte pointer/length object
@@ -102,15 +106,22 @@ pass 384 local observations through direct/release routes in three modes, agains
 192 LLVM-reference observations reused across routes. This does not establish
 general aggregate memory or ABI support.
 
-Next, extend value-use-owned stores of runtime pointer values from ABI registers
-or spills into typed 64-bit frame slots. Keep stored pointer values distinct from
-addresses of frame objects, and prove preservation of live caller values with
-native comparisons. Then retry the unchanged
-`test/cases/recursive_fibonacci.zig` probe. It now advances past allocation/copy
-but stops in `start.main` at
-`no_emitter:composed-block-store-stack-pointer-value`; its reference executes once
-and local execution remains zero. Further startup boundaries may follow.
-Keep broader optional
+Runtime pointer values from registers, spills and returned RAX now store through
+the existing authority into typed 64-bit frame slots, with 768 local observations
+against 384 references. Scalar frame stores, eight full-width constants through
+frame and ordinary-pointer destinations, and literal null add 486 local
+observations against 243 references. References are reused across direct/release
+routes in all three modes. The C fixture's six paired cases/66 call observations,
+the existing word-pair canary and accepted compiler counters stay separate.
+
+Next, extend the existing cast authority for exact 64-bit integer-to-default-pointer
+conversion. Preserve all bits and prove register, spill, returned RAX and live-value
+behavior against LLVM; reject unproved widths, flags and address spaces. Then
+retry unchanged `test/cases/recursive_fibonacci.zig`. It advances past pointer
+and integer frame stores but stops in `start.main` at
+`no_emitter:composed-block-cast-to-not-int`, on `inttoptr i64 to ptr`. Its
+reference executes once and local execution remains zero. Further startup
+boundaries may follow. Keep broader optional
 ABIs and floating/indirect/aggregate/stack varargs as explicit boundaries.
 Use the frozen performance baseline for measured comparisons and the
 [validation policy](validation_tiers.md) for matching evidence reuse.

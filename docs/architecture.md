@@ -1,7 +1,7 @@
 # Current architecture
 
-Source baseline: `ea1e1e1a` (2026-11-03), including the current-pin
-correctness, ABI, export publication, execution and bounded startup-memory work.
+Source baseline: `90b91eb7` (2026-11-03), including the current-pin
+correctness, ABI, export publication, execution and scalar frame stores.
 This page describes the
 implementation; the
 [refactor plan](roadmap/architecture_refactor_plan.md) records its completed scope.
@@ -129,10 +129,22 @@ SSA values retain explicit boundaries. Direct and release routes pass 384 local
 observations against 192 LLVM-reference observations reused across the two routes,
 plus independent expected fields and output guards.
 
-The unchanged Fibonacci retry advances past aggregate allocation and stops in
-`start.main` at `no_emitter:composed-block-store-stack-pointer-value`. Its LLVM
-reference executes; it still earns zero local executions. Runtime pointer values
-stored into typed 64-bit frame slots are the next memory boundary.
+The [scalar frame-store slice](evidence/scalar_frame_acceptance_20261103.json)
+extends the existing value-use store action to runtime pointer and i64 values in
+typed 64-bit integer frame slots. Register, spill and returned RAX values remain
+distinct from frame-object addresses. Planning and execution retain width, kind,
+alignment and frame-bound checks; the new frame forms reject non-default address
+spaces and pointer stores require a 64-bit default pointer layout.
+Immediate intent retains all 64 bits: `store i64 4294967295` now writes
+`00000000ffffffff`, correcting the prior sign extension to all ones.
+New direct/release canaries pass 768 local pointer observations against 384
+reference observations and 486 local scalar observations against 243 references;
+each reference population is reused across the two routes.
+
+The unchanged Fibonacci retry advances past pointer and integer frame stores
+and stops in `start.main` at `no_emitter:composed-block-cast-to-not-int`, on
+`inttoptr i64 to ptr`. Its LLVM reference executes; local execution remains zero.
+Exact 64-bit integer-to-pointer conversion is the next boundary.
 
 The current-pin SysV legalization keeps `{ i64, i64 }` returns in RAX/RDX across
 composed control flow and preserves both live operands of i128 subtraction.
@@ -201,13 +213,17 @@ these folds so newly constant safety branches disappear before codegen.
 | Integrated preopt/postopt/writer gates | The selected route and wrappers declared by each runner. | Different routes exercise different optimization owners and selector paths. |
 | `distribution-all` | The tracked 17-subgate inventory and its declared populations. | Success does not cover every development pass, input shape, or separate frontier gate. |
 
-The [current acceptance](evidence/startup_headroom_acceptance_20261103.json)
+The [current acceptance](evidence/scalar_frame_acceptance_20261103.json)
 records 100 compiler-core functions lowered, emitted and linked, with five cohort
 executions in every release mode. ASCII contributes 256 input observations per
-mode; the retained constant methods contribute one each. Both 17-subgate runs
-pass and all 1,396 canonical records match. Standalone programs, behavioral
-observations and compiler-rt counts retain their own populations. The calibrated
-8 GiB disk forecast covers sampled fresh/cached decreases of 6.10 GB and 1.60 GB.
+mode; the retained constant methods contribute one each. The current serial run
+passes all 17 subgates against a frozen 2,580-file source snapshot, reusing three
+authenticated AIR exports while rerunning execution. Standalone programs,
+behavioral observations and compiler-rt counts retain their own populations.
+The earlier [infrastructure pair](evidence/startup_headroom_acceptance_20261103.json)
+passed both 17-subgate runs with 1,396 matching canonical records. Its calibrated
+8 GiB forecast and unchanged reserve are reused; the current serial report
+observes a 1.63 GB free-space decrease.
 Nested row workers inherit the original serial admission and enforce its reserve;
 their transient minimum enters the serial report. Schema-3 row telemetry measures
 allocated bytes across all seven owned roots, including retained exports.

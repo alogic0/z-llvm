@@ -158,6 +158,14 @@ preservation, and composed ownership. This standalone population does not change
 the original seven integrated cases, the C fixture's six paired cases/66 call
 observations, or compiler-core and compiler-rt counters.
 
+The mandatory [scalar frame-store canaries](evidence/scalar_frame_acceptance_20261103.json)
+add four pointer functions (768 local/384 reference observations) and three scalar
+functions (486 local/243 reference observations). Each uses direct and release
+routes in all three modes; references are reused across routes. They check runtime
+and returned pointers, caller-clobbering calls, full-width constants through frame
+and ordinary-pointer destinations, literal null, live values and guards. These
+populations are separate from all existing counters and canaries above.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

@@ -1,0 +1,572 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "recorded_utc": "2026-11-03T08:15:02.009956+00:00",
+  "status": "scalar frame-store checkpoint accepted",
+  "accepted_revision": "90b91eb702fb65b50efdc55cecfb730bbb816ad3",
+  "accepted_tree": "111adda7e055a4be64a329ecfd2ff466ce2f68c8",
+  "validated_working_head": "2d7a2e9bd578a2d2bb807371f0a696198e18f995",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "selector_version": "real-candidate-selector-v3",
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "source_snapshot": "local-state/validations/pointer-stack-20261103/source-snapshot.json",
+  "source_snapshot_sha256": "c7e143a768d2b1dba46199dbfd50716b97527c05d399bcf7e64e143760aabaca",
+  "source_snapshot_files": 2580,
+  "committed_sources_match_validated_snapshot": true,
+  "post_validation_changes": "Acceptance documents only.",
+  "validation_plan": "local-state/validations/pointer-stack-20261103/validation-plan.json",
+  "validation_plan_sha256": "fb1bac3b3fe44582ca81278e1899995ce303a94e8be5784ec5a215f74545fce4",
+  "scope": "Existing value-use stores accept runtime pointer values and i64 values in typed 64-bit integer frame slots. Frame-object addresses remain a separate source form. No new storage kind, machine opcode or selector bypass.",
+  "boundaries": [
+    "Non-default store address spaces and non-64-bit default pointer layouts",
+    "Wrong destination kind/width, misalignment and stores outside the frame",
+    "General aggregate ABIs and floating/indirect/aggregate/stack variadic arguments remain outside this slice"
+  ],
+  "population": {
+    "modes": [
+      "ReleaseFast",
+      "ReleaseSafe",
+      "ReleaseSmall"
+    ],
+    "selected_rows_per_mode": 100,
+    "lowered_per_mode": 100,
+    "objects_per_mode": 100,
+    "native_links_per_mode": 100,
+    "executed_functions_per_mode": 5,
+    "paired_harnesses_per_mode": 5,
+    "ascii_observations_per_mode": 256,
+    "paired_ascii_observations": 768,
+    "retained_constant_functions": 4
+  },
+  "selection_unchanged": true,
+  "compiler_rt_bypass_ratchet": 130,
+  "full_run": {
+    "argv": [
+      "zig",
+      "build",
+      "distribution-all",
+      "--",
+      "--serial",
+      "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+      "--real-rows-validation-root=local-state/validations/startup-headroom-20261102",
+      "--real-rows-cache-root=local-state/caches/startup-headroom-20261102"
+    ],
+    "returncode": 0,
+    "wall_ns": 2445520190537,
+    "raw_log": "local-state/validations/pointer-stack-20261103/full-cached.log",
+    "raw_log_sha256": "ebd87a73c13d5f3f3472fd59caef9fda270ef79b11c77ad6617a49c27a0afa05",
+    "telemetry_sha256": "377b25ab57ffa6320f27dcb19e6ec84796f5edf85cacbbfd1bb75cd208fda1c4",
+    "gates": [
+      {
+        "id": "selected-object-suite",
+        "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+        "exit_status": "0",
+        "duration_ms": "61680",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "1889",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "3358",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "3293",
+        "cache_status": "none"
+      },
+      {
+        "id": "zig-source-native-link",
+        "tool": "tools/run_distribution_zig_source_native_link.zig",
+        "exit_status": "0",
+        "duration_ms": "18630",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-postopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "77467",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-preopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "--pipeline": "preopt",
+        "exit_status": "0",
+        "duration_ms": "648061",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-ir-writer",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "21757",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-release",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "73941",
+        "cache_status": "none"
+      },
+      {
+        "id": "real-rows-release-fast",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseFast",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "512359",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-safe",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSafe",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "539385",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-small",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSmall",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "356684",
+        "cache_status": "hit"
+      },
+      {
+        "id": "integrated-executable",
+        "tool": "tools/run_distribution_zig_integrated_exe.zig",
+        "exit_status": "0",
+        "duration_ms": "870405",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "524",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "1151",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "1067",
+        "cache_status": "none"
+      },
+      {
+        "id": "boundary-gates",
+        "tool": "tools/run_distribution_boundary_gates.zig",
+        "exit_status": "0",
+        "duration_ms": "805",
+        "cache_status": "none"
+      }
+    ],
+    "serial": {
+      "schema_version": "1",
+      "run_id": "35db7db2b0ae47002fc5061ab1df7d12",
+      "scratch_path": "tmp/distribution_all_serial_35db7db2b0ae47002fc5061ab1df7d12",
+      "bundle_path": "tmp/distribution_all_serial_35db7db2b0ae47002fc5061ab1df7d12/release_source_object_bundle",
+      "target": "x86_64-unknown-linux-gnu",
+      "mode": "serial",
+      "real_rows_concurrency": "3",
+      "subgates": "17",
+      "wall_ms": "2444797",
+      "starting_free_bytes": "58136100864",
+      "minimum_observed_free_bytes": "56508633088",
+      "final_free_bytes": "57343332352",
+      "observed_peak_bytes": "1627467776",
+      "reserve_bytes": "49112001332",
+      "required_start_bytes": "57701935924",
+      "local_fail": "0"
+    },
+    "real_rows": [
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseFast",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSafe",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSmall",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      }
+    ],
+    "cache_events": [
+      {
+        "mode": "ReleaseFast",
+        "status": "hit",
+        "duration_ms": "15061",
+        "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+        "descriptor_bytes": "1343891552"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "status": "hit",
+        "duration_ms": "16383",
+        "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+        "descriptor_bytes": "1473501148"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "status": "hit",
+        "duration_ms": "12463",
+        "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+        "descriptor_bytes": "1106432911"
+      }
+    ],
+    "real_rows_resources": {
+      "schema_version": "3",
+      "normalization_schema": "3",
+      "memory_policy": "os-managed-non-gating",
+      "concurrency": "3",
+      "workers": "3",
+      "modes": "ReleaseFast,ReleaseSafe,ReleaseSmall",
+      "run_id": "a12e6ec6ebb8dfc4ea539e3597ce01ed",
+      "root": "local-state/validations/startup-headroom-20261102/real_rows_parallel_a12e6ec6ebb8dfc4ea539e3597ce01ed",
+      "work_selection_root": "local-state/validations/startup-headroom-20261102",
+      "export_cache_selection_root": "local-state/caches/startup-headroom-20261102",
+      "fast_temp": "local-state/validations/startup-headroom-20261102/ReleaseFast/work_a12e6ec6ebb8dfc4ea539e3597ce01ed",
+      "fast_local_cache": "local-state/validations/startup-headroom-20261102/real_rows_parallel_a12e6ec6ebb8dfc4ea539e3597ce01ed/ReleaseFast/zig-local-cache",
+      "fast_global_cache": "local-state/validations/startup-headroom-20261102/real_rows_parallel_a12e6ec6ebb8dfc4ea539e3597ce01ed/ReleaseFast/zig-global-cache",
+      "fast_air_cache": "local-state/caches/startup-headroom-20261102/ReleaseFast/export",
+      "safe_temp": "local-state/validations/startup-headroom-20261102/ReleaseSafe/work_a12e6ec6ebb8dfc4ea539e3597ce01ed",
+      "safe_local_cache": "local-state/validations/startup-headroom-20261102/real_rows_parallel_a12e6ec6ebb8dfc4ea539e3597ce01ed/ReleaseSafe/zig-local-cache",
+      "safe_global_cache": "local-state/validations/startup-headroom-20261102/real_rows_parallel_a12e6ec6ebb8dfc4ea539e3597ce01ed/ReleaseSafe/zig-global-cache",
+      "safe_air_cache": "local-state/caches/startup-headroom-20261102/ReleaseSafe/export",
+      "small_temp": "local-state/validations/startup-headroom-20261102/ReleaseSmall/work_a12e6ec6ebb8dfc4ea539e3597ce01ed",
+      "small_local_cache": "local-state/validations/startup-headroom-20261102/real_rows_parallel_a12e6ec6ebb8dfc4ea539e3597ce01ed/ReleaseSmall/zig-local-cache",
+      "small_global_cache": "local-state/validations/startup-headroom-20261102/real_rows_parallel_a12e6ec6ebb8dfc4ea539e3597ce01ed/ReleaseSmall/zig-global-cache",
+      "small_air_cache": "local-state/caches/startup-headroom-20261102/ReleaseSmall/export",
+      "pin_manifest_sha256": "cfe9c7c0dcacd020d4e7c7a701ffd6b036b9df0e035a24024d341d78623a4ad3",
+      "cache_status": "hit,hit,hit",
+      "air_cache": "read-only",
+      "pruning": "suspended",
+      "wall_ms": "660307",
+      "summed_child_ms": "1408428",
+      "filesystem_total_bytes": "982240026624",
+      "post_run_free_floor_bytes": "49112001332",
+      "projected_peak_bytes": "8589934592",
+      "required_start_bytes": "57701935924",
+      "admission_source": "serial_preflight",
+      "admission_starting_free_bytes": "58136100864",
+      "starting_free_bytes": "57982050304",
+      "minimum_free_bytes": "56508633088",
+      "final_free_bytes": "56508633088",
+      "peak_disk_bytes": "5374140416",
+      "peak_aggregate_rss_bytes": "5279117312",
+      "minimum_available_memory_bytes": "11450757120",
+      "load_start": "2.56",
+      "load_end": "2.20",
+      "execution_results_cached": "false",
+      "local_fail": "0"
+    },
+    "native_memory_populations": {
+      "word-pair-memory": {
+        "population": "standalone-two-word-stack-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "384",
+        "reference_observations": "192",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "pointer-stack-memory": {
+        "population": "standalone-runtime-pointer-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-stack-memory": {
+        "population": "standalone-scalar-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "486",
+        "reference_observations": "243",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    },
+    "c_program": {
+      "schema": "upstream-c-program-v1",
+      "programs": "1",
+      "program_modes": "3",
+      "matched_program_modes": "3",
+      "reference_case_executions": "6",
+      "local_case_executions": "6",
+      "integer_variadic_observations": "48",
+      "heap_call_observations": "18",
+      "native_call_observations": "66",
+      "local_fail": "0"
+    },
+    "sampled_minimum_free_bytes": 56508219392,
+    "retained_summary": "docs/evidence/scalar_frame_20261103_cached.summary",
+    "summary_sha256": "0a31cee9b789a454c7fcbfffb280977120db3266329cf89faee2fc30cf8a9ca4"
+  },
+  "run_reuse": {
+    "full_runs_for_this_source_state": 1,
+    "mode": "cached authenticated exports; execution results are not cached",
+    "reason": "Codegen/frame and mandatory executable canary changes require Tier 3. AIR publication, export keys, source pin, candidate selection, runner infrastructure and disk policies are unchanged; the previous accepted fresh/cached infrastructure calibration is reused.",
+    "infrastructure_evidence": "docs/evidence/startup_headroom_acceptance_20261103.json",
+    "fresh_cached_equivalence_claim_for_this_revision": false
+  },
+  "focused_validation": {
+    "compiler_unit_tests": 1642,
+    "unit_log": "local-state/validations/pointer-stack-20261103/unit-final-r5.log",
+    "unit_log_sha256": "d2c34e75f19eb1a735cbbf3f368e3e3272d3a44dcab60c25db1dee9721b38fdc",
+    "structural_tests": 11,
+    "structural_and_abi_log": "local-state/validations/pointer-stack-20261103/focused-r1.log",
+    "structural_and_abi_scope": "Structural and ABI checks passed; the initial full unit run in this combined log exposed the import/surface guard failure, subsequently repaired and fully repeated in unit-final-r5.log.",
+    "abi_cases": 60,
+    "python_policy_tests": 7,
+    "python_log": "local-state/validations/pointer-stack-20261103/python-policy-final.log",
+    "python_log_sha256": "bee1deaeee8a500be7b285bf332ca87c31cd4a45337eff4bd8ff3032b84d90a2",
+    "native_report": "local-state/validations/pointer-stack-20261103/native-final/report.json",
+    "native_report_sha256": "b51b781193699c1fb38b74ab3492e62e1f671bf3e5720e2560397824180f263d",
+    "source_guard_and_bypass_inventory_passed": true
+  },
+  "new_native_populations": {
+    "pointer_stack": {
+      "functions": [
+        "pointer_stack_roundtrip",
+        "pointer_stack_pressure",
+        "pointer_stack_returned",
+        "pointer_stack_object_address"
+      ],
+      "modes": 3,
+      "routes": [
+        "direct",
+        "release"
+      ],
+      "local_observations": 768,
+      "reference_observations": 384,
+      "reference_reused_per_route": true,
+      "checks": [
+        "Null/aligned/unaligned/end pointer identities",
+        "Runtime pointer values remain distinct from frame-object addresses",
+        "All six incoming pointer/output arguments survive caller-clobbering C calls",
+        "Returned RAX pointers, live values and output guards are preserved"
+      ]
+    },
+    "scalar_stack": {
+      "functions": [
+        "scalar_stack_roundtrip",
+        "scalar_stack_constants",
+        "scalar_stack_null"
+      ],
+      "modes": 3,
+      "routes": [
+        "direct",
+        "release"
+      ],
+      "local_observations": 486,
+      "reference_observations": 243,
+      "reference_reused_per_route": true,
+      "observations_per_execution": 81,
+      "checks": [
+        "64 value/live-value combinations",
+        "Eight constants checked through both frame and ordinary-pointer destinations",
+        "Literal null survives store/load",
+        "Full bits and adjacent output guards remain unchanged"
+      ]
+    }
+  },
+  "existing_populations": {
+    "word_pair_memory": {
+      "local_observations": 384,
+      "reference_observations": 192,
+      "reference_reused_per_route": true
+    },
+    "upstream_c_fixture": {
+      "reference_case_executions": 6,
+      "local_case_executions": 6,
+      "integer_variadic_observations": 48,
+      "heap_call_observations": 18,
+      "native_call_observations": 66
+    },
+    "original_integrated_cases": 7,
+    "upstream_hello_program_modes": 3,
+    "abi_functions": 10,
+    "abi_cases": 60,
+    "fma_llvm_paired_observations": 8192,
+    "fma_frozen_input_and_identities_unchanged": true
+  },
+  "constant_store_wrong_code": {
+    "evidence": "local-state/validations/pointer-stack-20261103/constant-store-repro/report.json",
+    "sha256": "7fe43ffe8b51c37f45be098272299044644c135cc5113a233d39db4010e5a662",
+    "input": "store i64 4294967295 through an ordinary pointer",
+    "before": "ffffffffffffffff; native exit 1",
+    "after": "00000000ffffffff; native exit 0",
+    "repair": "Carry i64 immediate intent. Zero-extend positive u32 bit patterns; preserve full-width and negative i64 values."
+  },
+  "default_address_space_regression": {
+    "llvm_validated_probe": "local-state/validations/pointer-stack-20261103/nondefault-frame-probe.ll",
+    "before_evidence": "local-state/validations/pointer-stack-20261103/nondefault-frame-probe.json",
+    "after_evidence": "local-state/validations/pointer-stack-20261103/nondefault-frame-after.json",
+    "before": "LLVM verifier and local codegen both accepted a non-default 32-bit address space.",
+    "after": "New frame-store admission rejects it, with a separate regression for a 32-bit default pointer layout."
+  },
+  "unchanged_fibonacci_retry": {
+    "evidence": "local-state/validations/pointer-stack-20261103/fibonacci-final/report.json",
+    "sha256": "76e111ecbebc88ad6ede2b1b60945208808c0fec4f121b70558ad31f1033980a",
+    "source": "/home/oleg/prog/ziglang/test/cases/recursive_fibonacci.zig",
+    "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+    "mode": "ReleaseFast",
+    "reference_executions": 1,
+    "local_executions": 0,
+    "previous_boundary": "composed-block-store-stack-pointer-value in start.main",
+    "current_boundary": "composed-block-cast-to-not-int at inttoptr i64 to ptr in start.main",
+    "interpretation": "Pointer and integer frame stores advance. The unchanged program remains blocked and earns no local execution credit."
+  },
+  "stopped_attempts": [
+    {
+      "evidence": "local-state/validations/pointer-stack-20261103/root-selection-r1.json",
+      "reason": "Root owners did not match; stopped before any gates. Reused the existing matching validation/cache root selections without weakening ownership."
+    },
+    {
+      "evidence": "local-state/validations/pointer-stack-20261103/address-space-stop-reason.json",
+      "log": "local-state/validations/pointer-stack-20261103/full-cached-before-as.log",
+      "returncode": -15,
+      "completed_subgates": 6,
+      "reason": "Intentional stop before acceptance to repair the newly observed address-space boundary. Full integration was repeated after the source change."
+    }
+  ],
+  "upstream_mapping": {
+    "path": "../llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp",
+    "owner": "visitStore, lines 4839-4911",
+    "contract": "SrcV is lowered separately from PtrV. ComputeValueVTs uses the stored type; DAG.getStore writes that value to the computed destination, including a frame address."
+  },
+  "publication": {
+    "implementation_unchanged": true,
+    "write_schema": 4,
+    "read_schemas": [
+      3,
+      4
+    ],
+    "cache_status": "hit,hit,hit",
+    "execution_results_cached": false,
+    "manual_raw_air_cleanup": false,
+    "retained_caches": [
+      {
+        "mode": "ReleaseFast",
+        "path": "local-state/caches/startup-headroom-20261102/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32.air",
+        "bytes": 1343891552,
+        "allocated_bytes": 1343905792,
+        "sha256": "29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32",
+        "final_inode": 55212693,
+        "sampled_maximum_complete_payload_inodes": 1,
+        "same_inode_observed_as_raw_and_cache": true
+      },
+      {
+        "mode": "ReleaseSafe",
+        "path": "local-state/caches/startup-headroom-20261102/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e.air",
+        "bytes": 1473501148,
+        "allocated_bytes": 1473536000,
+        "sha256": "277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e",
+        "final_inode": 55212700,
+        "sampled_maximum_complete_payload_inodes": 1,
+        "same_inode_observed_as_raw_and_cache": true
+      },
+      {
+        "mode": "ReleaseSmall",
+        "path": "local-state/caches/startup-headroom-20261102/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6.air",
+        "bytes": 1106432911,
+        "allocated_bytes": 1106444288,
+        "sha256": "92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6",
+        "final_inode": 55212710,
+        "sampled_maximum_complete_payload_inodes": 1,
+        "same_inode_observed_as_raw_and_cache": true
+      }
+    ]
+  },
+  "storage": {
+    "forecast_bytes": 8589934592,
+    "reserve_unchanged": true,
+    "reserve_bytes": 49112001332,
+    "serial_observed_decrease_bytes": 1627467776,
+    "two_second_sampled_minimum_free_bytes": 56508219392,
+    "owned_row_peak_allocated_bytes": 5374140416,
+    "scope": "Owned peak includes retained AIR; global free-space movement also includes unrelated processes. Sampling is not atomic; no performance speedup is claimed."
+  },
+  "final_source_sha256": {
+    "src/codegen/x86_64/generic_cfg/composed_selector_memory.zig": "bd791937ac0900b3cec8fac33a922f5dabbc4c8e567f5d0195298b4b392f77a0",
+    "src/codegen/x86_64/generic_cfg/runtime_pointer_stack_tests.zig": "a68f80008edd3a89d18acd0bc6d3089010bdfdc1bce328a2a35902c78889de95",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory.zig": "46b37cb4e76db78de6c54ded7735fcc85bdf026a88c16e5bd1cb7f9c4c4f30a2",
+    "src/codegen/x86_64/generic_cfg/value_use/core.zig": "ca0a0f727d77bdf70221cec66d76c4a95bd549288382ec93727059617c0e19fc",
+    "src/codegen/x86_64/generic_cfg/value_use/model.zig": "a3821d90b678406d409774a52cd0a7cf8d6a7aee3b58f0e8700dae3bd70fcf51",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/compatibility.zig": "13540521ba20acc526fbe09cb5f324b5e1a8c874ce1587a321f418ba7b046608",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/lifetime_admission.zig": "5628ab3a6478ed4d76bf4cf6a58ba63bc27979adace46a4ef57054aefdffb603",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/physical_mapping.zig": "fe9ce6b6f2461f0660573817fa7d6b406916a60dc75cef5af55dbc6ad56c9043",
+    "src/tests.zig": "b9d75afd19a5dd6438503a31918931fa9deb750d2ed77b8c42afb6e2dee509fd",
+    "test/real_programs/runtime_pointer_stack.ll": "98b6e16dc995c93faf8fb39f095694f6b0964e00baace8f1c1093b61847c25b8",
+    "test/real_programs/runtime_pointer_stack_driver.c": "e0250ce12a739dc30e9f599dafeb73d5c1b55bd1bb5054226f61bdbb3242b1ab",
+    "test/real_programs/scalar_stack_memory.ll": "1dffde31fe77b6e52f90af19efb0a9c5c19ace4ffe35fa46fd9ef647dd9de4c2",
+    "test/real_programs/scalar_stack_memory_driver.c": "8d19fff9e78e57d64b59a53bb31fa5649641b0adae8bdee68d78b147a8fca827",
+    "tools/run_upstream_c_program.py": "bcdb6125a6569fcc4794d09a8b6618962251980529ffdd97b416f02b2bcaa755"
+  },
+  "cleanup_evidence": "docs/evidence/scalar_frame_cleanup_20261103.json",
+  "archives_created": 0
+}

@@ -1,0 +1,228 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "status": "deleted and verified; sources, current exports, frozen inputs, baseline compilers and evidence retained",
+  "accepted_revision": "90b91eb702fb65b50efdc55cecfb730bbb816ad3",
+  "acceptance_evidence": "docs/evidence/scalar_frame_acceptance_20261103.json",
+  "immutable_deduplication": {
+    "evidence": "local-state/validations/pointer-stack-20261103/immutable-dedup-result.json",
+    "sha256": "5b2736231afe33456df1fb304874cfddf246aa7e2a55c9a0e8fd48d1a5d81462",
+    "byte_identical_paths_preserved": 228,
+    "reclaimed_allocated_bytes": 1006227456,
+    "mode_and_owner_preserved": true,
+    "scope": "Byte-identical immutable generated IR captures and native ELF evidence; retain every file path and SHA. No AIR, tracked source, original scratch probe, current cache or active run is changed.",
+    "verified_unique_inodes_after_checkpoint": 53
+  },
+  "retired_debug_compilers": [
+    {
+      "path": "local-state/validations/adce-operands-20260926/z-llvm-before",
+      "reason": "Superseded debug compiler binary from a completed September refactor/regression comparison; comparison logs, IR, source snapshots and Git history remain. Current performance baseline compiler binaries are excluded.",
+      "bytes": 93911662,
+      "allocated_bytes": 93917184,
+      "device": 66306,
+      "inode": 59133377,
+      "sha256": "eff033b1917668e88186d2dcf610361581a0ffce5890f7c9cff0358bd7a5a07d",
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/globaldce-references-20260926/z-llvm-before",
+      "reason": "Superseded debug compiler binary from a completed September refactor/regression comparison; comparison logs, IR, source snapshots and Git history remain. Current performance baseline compiler binaries are excluded.",
+      "bytes": 93887404,
+      "allocated_bytes": 93892608,
+      "device": 66306,
+      "inode": 59023434,
+      "sha256": "8678f80aa840f916d539e556cafb2dde52f81dc1afd802d94ec99359cf3228a0",
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/module-references-20260926/z-llvm-before",
+      "reason": "Superseded debug compiler binary from a completed September refactor/regression comparison; comparison logs, IR, source snapshots and Git history remain. Current performance baseline compiler binaries are excluded.",
+      "bytes": 93789916,
+      "allocated_bytes": 93794304,
+      "device": 66306,
+      "inode": 59023357,
+      "sha256": "76ed999573f618b5ebcfd93806b38c704a664a03b9ee4ed7b12bd0305ac030ca",
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/integer-semantics-20260926/z-llvm-before",
+      "reason": "Superseded debug compiler binary from a completed September refactor/regression comparison; comparison logs, IR, source snapshots and Git history remain. Current performance baseline compiler binaries are excluded.",
+      "bytes": 93785201,
+      "allocated_bytes": 93790208,
+      "device": 66306,
+      "inode": 59022238,
+      "sha256": "13f9de8a28130e5f1512f32faa37c0027c8f7b680093cb153eb433f298317575",
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/instruction-ownership-20260926/z-llvm-before",
+      "reason": "Superseded debug compiler binary from a completed September refactor/regression comparison; comparison logs, IR, source snapshots and Git history remain. Current performance baseline compiler binaries are excluded.",
+      "bytes": 93784027,
+      "allocated_bytes": 93790208,
+      "device": 66306,
+      "inode": 55485842,
+      "sha256": "e8ee8fee3bfcf74337cfd5bfd115222bc0adddc6ca5c016eb98379853274510d",
+      "deleted": true
+    },
+    {
+      "path": "local-state/validations/operand-refactor-20260926/z-llvm-before",
+      "reason": "Superseded debug compiler binary from a completed September refactor/regression comparison; comparison logs, IR, source snapshots and Git history remain. Current performance baseline compiler binaries are excluded.",
+      "bytes": 93754048,
+      "allocated_bytes": 93761536,
+      "device": 66306,
+      "inode": 54960936,
+      "sha256": "b47591910555c60c2b55607e494891da3390340b2373eec682f9c00877e87a40",
+      "deleted": true
+    }
+  ],
+  "retired_debug_compiler_allocated_bytes": 562946048,
+  "idle_cache_intervals": [
+    {
+      "evidence": "local-state/validations/pointer-stack-20261103/preflight-cleanup.json",
+      "sha256": "942a0c64baf4e5ff8cdf438decf4bd37e9167d629b3d87e6024d004786258cac",
+      "reclaimable_allocated_bytes": 1428836352
+    },
+    {
+      "evidence": "local-state/validations/pointer-stack-20261103/preflight-retry-cleanup.json",
+      "sha256": "28a757a7d83f1846330b71f227ea41b6ceb0cab8a92a07791a8b1b230c72bb03",
+      "reclaimable_allocated_bytes": 504958976
+    }
+  ],
+  "retained_current_caches": [
+    {
+      "mode": "ReleaseFast",
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32.air",
+      "bytes": 1343891552,
+      "allocated_bytes": 1343905792,
+      "sha256": "29a0e725ce04f745b8509ca81e623db5d8fd02d8764015cd94fc5517be8a2a32",
+      "final_inode": 55212693,
+      "sampled_maximum_complete_payload_inodes": 1,
+      "same_inode_observed_as_raw_and_cache": true,
+      "verified_after_checkpoint": true
+    },
+    {
+      "mode": "ReleaseSafe",
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e.air",
+      "bytes": 1473501148,
+      "allocated_bytes": 1473536000,
+      "sha256": "277169f799b0d049fba7dc995a9360665826b33fb15acb1cec55adc123f56a4e",
+      "final_inode": 55212700,
+      "sampled_maximum_complete_payload_inodes": 1,
+      "same_inode_observed_as_raw_and_cache": true,
+      "verified_after_checkpoint": true
+    },
+    {
+      "mode": "ReleaseSmall",
+      "path": "local-state/caches/startup-headroom-20261102/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6.air",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106444288,
+      "sha256": "92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6",
+      "final_inode": 55212710,
+      "sampled_maximum_complete_payload_inodes": 1,
+      "same_inode_observed_as_raw_and_cache": true,
+      "verified_after_checkpoint": true
+    }
+  ],
+  "retained_frozen_inputs": [
+    {
+      "path": "local-state/caches/test-real-rows/98c971781ab042e2f280eea7e67f687fb38e8d11b0c6a887d89d2b1ce484bf67.air",
+      "sha256": "c174c6552a17794c0f82f936b0373f7a8d0cf943460007182d7c20c06beabd2a",
+      "bytes": 1343891552,
+      "device": 66306,
+      "inode": 54832908,
+      "links": 2,
+      "verified_after_checkpoint": true
+    },
+    {
+      "path": "local-state/caches/test-real-rows/d194da97960cb0b5d46ace810a32a30696932110c0417ef376eefdc8f5e84099.air",
+      "sha256": "7b34676ca48eaeec0416bdb50a77b910c038dac88a40df3e7ed703c2e0d714c6",
+      "bytes": 1473501276,
+      "device": 66306,
+      "inode": 54826136,
+      "links": 2,
+      "verified_after_checkpoint": true
+    },
+    {
+      "path": "local-state/caches/test-real-rows/239ef505f70bdac741f42a8404011fafbf9c5b9b8d88beb54e408ae767838e9e.air",
+      "sha256": "5ff91e8e1a86d214c7af8e6ab1c72b3b509564470b5d225b1433dc9b8cc25f5d",
+      "bytes": 1106432911,
+      "device": 66306,
+      "inode": 54827145,
+      "links": 2,
+      "verified_after_checkpoint": true
+    }
+  ],
+  "original_scratch_probes_retained": [
+    "scratch/test_abi.s",
+    "scratch/test_abi.zig",
+    "scratch/test_bitset.ll",
+    "scratch/test_bitset.zig",
+    "scratch/test_chunkstate_layout.zig",
+    "scratch/test_init.zig",
+    "scratch/test_llvm.ll",
+    "scratch/test_offset.zig",
+    "scratch/test_opt.zig",
+    "scratch/test_query.ll",
+    "scratch/test_query.zig",
+    "scratch/test_query_debug.ll",
+    "scratch/test_size.zig"
+  ],
+  "performance_baseline_compilers_preserved": true,
+  "failure_inputs_and_logs_preserved": true,
+  "archives_created": 0,
+  "measurement_scope": "Duplicate-evidence and obsolete-compiler bytes are distinct reclaimed allocations. Compiler caches were rebuilt between cleanup intervals, so interval totals are not net task savings. Global free-space movement can include unrelated work.",
+  "final_idle_cache_cleanup": [
+    {
+      "path": ".zig-cache",
+      "device": 66306,
+      "inode": 54044784,
+      "allocated_unique_bytes": 159522816,
+      "reclaimable_allocated_bytes": 159522816,
+      "deleted": true
+    },
+    {
+      "path": "tools/__pycache__",
+      "device": 66306,
+      "inode": 54306375,
+      "allocated_unique_bytes": 28672,
+      "reclaimable_allocated_bytes": 28672,
+      "deleted": true
+    }
+  ],
+  "final_idle_cleanup_filesystem_available_before": 57241640960,
+  "final_idle_cache_reclaimable_allocated_bytes": 159551488,
+  "final_idle_cleanup_filesystem_available_after": 57401192448,
+  "verification": {
+    "documentation": {
+      "argv": [
+        "zig",
+        "build",
+        "check-docs"
+      ],
+      "returncode": 0,
+      "wall_ns": 44553627,
+      "log": "local-state/validations/pointer-stack-20261103/docs-final.log",
+      "log_sha256": "96524bf9bb9f14a3a80466153cc8d05769dbea00b4d1adb995c1b7ebd4c0cf29",
+      "documents": 19,
+      "internal_links": 145,
+      "status_blocks": 2
+    },
+    "artifact_store": {
+      "argv": [
+        "zig",
+        "build",
+        "artifact-store",
+        "--",
+        "verify"
+      ],
+      "returncode": 0,
+      "wall_ns": 6364794016,
+      "log": "local-state/validations/pointer-stack-20261103/artifacts-final.log",
+      "log_sha256": "e8586851043012f7df59a7f8e7d39e576be7213ce6cab2f6cce68ba287f90501",
+      "manifests": 5
+    },
+    "non_document_snapshot_files": 1429,
+    "all_non_document_sources_still_match_snapshot": true
+  },
+  "completed_utc": "2026-11-03T08:22:53.237719+00:00"
+}

@@ -44,11 +44,19 @@ retirement of the superseded selector-v2 failed-run exports and idle compiler
 caches. The authenticated accepted exports and the separately frozen selector
 inputs remain pinned. Equal file sizes do not establish duplicate content.
 
-The [current cleanup](evidence/startup_headroom_cleanup_20261103.json) retires
+The [export-generation cleanup](evidence/startup_headroom_cleanup_20261103.json) retires
 the superseded export/execution generation after its replacement fresh run
 passed and all replacement hashes were verified. The accepted generation now
 lives under `local-state/caches/startup-headroom-20261102`; the frozen
 `test-real-rows` inputs, historical metadata, logs and source probes remain.
+
+The [scalar frame-store cleanup](evidence/scalar_frame_cleanup_20261103.json)
+preserves all paths and hashes while hardlinking 228 byte-identical immutable
+IR/native evidence files. It retires six superseded debug compiler copies from
+completed refactor comparisons and removes complete idle caches. Current AIR,
+original scratch probes, performance baseline compilers, captured inputs and logs
+remain. Cache deletion intervals include rebuilt caches; do not sum them as net
+task savings. No archives are created.
 
 Use unique run-owned directories for new work. Successful temporary tests clean
 up their own fixtures. A failed test may retain a bounded diagnostic fixture,

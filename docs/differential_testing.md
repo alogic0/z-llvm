@@ -12,8 +12,9 @@ matching observations and six rejected constant-result implementations.
 Schema-3 cohort records distinguish five executed functions from their input
 observations: 256 for ASCII and one for each retained constant method. Accepted
 counters retain five in the
-[current acceptance](evidence/startup_headroom_acceptance_20261103.json): both
-full 17-subgate runs pass and all 1,396 canonical records match.
+[current acceptance](evidence/scalar_frame_acceptance_20261103.json): the serial
+run passes all 17 subgates on the unchanged 100-row selection. The earlier
+fresh/cached infrastructure pair remains separate evidence.
 
 | Runner | Local path | Independent reference and boundary |
 | --- | --- | --- |
@@ -107,7 +108,22 @@ expected fields. It checks copy independence after source mutation, exact pointe
 and length bits, output guards and composed lowering ownership. These are separate
 from the C fixture cases and its 66 call/heap observations.
 
-The unchanged Fibonacci retry now passes the allocation/copy shape but remains
-blocked in `start.main` at
-`no_emitter:composed-block-store-stack-pointer-value`. Its reference executes
-once and local execution remains zero; this program is not accepted.
+The mandatory [scalar frame-store canaries](evidence/scalar_frame_acceptance_20261103.json)
+add two standalone populations. Four pointer functions contribute 768 local
+observations against 384 references, checking argument spills across a C callee
+that clobbers caller-saved registers, returned RAX pointers, frame-object addresses,
+live values and output guards. Three scalar functions contribute 486 local
+observations against 243 references: 64 value/live combinations, 16 constant-field
+checks and one literal-null check per executable. Both populations use direct and
+release routes in three modes, reusing references across routes.
+
+A native before/after reproducer confirms the existing i64 immediate-store bug:
+positive `4294967295` was sign-extended to all ones. Full-width intent now preserves
+the required `00000000ffffffff` bits. Unit rejection checks cover non-default
+address spaces, 32-bit default pointer layouts, invalid frame kinds/widths,
+misalignment and frame bounds.
+
+The unchanged Fibonacci retry passes pointer and integer frame stores but remains
+blocked in `start.main` at `no_emitter:composed-block-cast-to-not-int`, on
+`inttoptr i64 to ptr`. Its reference executes once and local execution remains
+zero; this program is not accepted.

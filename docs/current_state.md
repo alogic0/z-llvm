@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `ea1e1e1abb047f47374528f4fc6f6db706f87645`; tree: `8f778b9392fcff16cdee216e14b142ddc255e9d2`.
+Accepted revision: `90b91eb702fb65b50efdc55cecfb730bbb816ad3`; tree: `111adda7e055a4be64a329ecfd2ff466ce2f68c8`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
