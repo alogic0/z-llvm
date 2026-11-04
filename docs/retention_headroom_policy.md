@@ -29,6 +29,14 @@ name in the manifests and retrieved with `artifact-store get`.
 
 ## Generated run cleanup
 
+The [symbol identity checkpoint](evidence/symbol_identity_acceptance_20261103.json)
+retires 0.81 GB of complete idle project build-cache file allocation before its
+full run. Sources, all 13 probes, installed output, current exports and diagnostic
+evidence are reverified; shared caches are not deleted. The full cached run
+passes all 17 stages with a 31.92 GB reported minimum, above the 24.36 GB floor.
+Builds regenerate cache files, so the deletion interval is not net task savings.
+No archives are created.
+
 Before removing an old run, preserve unique source edits/commits and the minimum
 source/log/input evidence necessary for accepted results or unresolved failures.
 Discard reproducible build binaries, cache generations, and verified duplicate

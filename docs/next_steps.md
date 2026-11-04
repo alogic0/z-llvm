@@ -41,7 +41,14 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [IR and headroom checkpoint](evidence/ir_headroom_acceptance_20261103.json)
+The accepted [symbol identity checkpoint](evidence/symbol_identity_acceptance_20261103.json)
+at `b3be3512` passes all 17 integration stages on a frozen 2,691-file snapshot.
+The unchanged 100-row and five-function counts pass in all modes, with three
+authenticated export-cache hits and fresh execution checks. Its minimum is
+31.92 GB free, above the 24.36 GB reserve. The bounded repair and remaining
+reference-analysis work are described below.
+
+The earlier accepted [IR and headroom checkpoint](evidence/ir_headroom_acceptance_20261103.json)
 at `abd0bae6` passes both full 17-stage fresh/cached runs. All 1,406 canonical
 records match on an unchanged 2,681-file primary-checkout snapshot. The numeric
 serialization, blockaddress, quoted-name and allocation-ownership repairs are
@@ -232,20 +239,20 @@ after merging the focused commits. Failed logs and frozen snapshots remain.
 The follow-up fixes have separate printing, parser and optimizer source commits;
 the fixed candidate and execution cohorts remain unchanged.
 
-The [symbol identity prerequisite](evidence/symbol_identity_focused_20261103.json)
-at `b3be3512` passes 1,727 units, 13 structural tests and readiness. It fixes
-GlobalOpt ignoring escaped stores and GlobalDCE deleting differently spelled
-live globals; constant merging uses the same identity. Five entries pass
+The accepted [symbol identity prerequisite](evidence/symbol_identity_acceptance_20261103.json)
+at `b3be3512` passes 1,727 units, 13 structural tests, readiness and full
+integration. It fixes GlobalOpt ignoring escaped stores and GlobalDCE deleting
+differently spelled live globals; constant merging uses the same identity. Five entries pass
 240 observations of locally optimized IR via Clang against 80 reused references.
 The local verifier still rejects differently spelled direct callees, alias
 targets and global-initializer targets; graph-only tests do not establish their
 CLI admission. Unsupported symbol spellings and opaque regions stay conservative.
-Complete the frozen 17-stage cached integration run before accepting this repair;
-the exact command and reuse rationale are recorded in its focused evidence.
-Only the idle project build cache was retired for admission, preserving sources,
-current exports and all 13 original probes. Other caches remain untouched.
+The frozen cached run passes all 17 stages; its exact command and reuse rationale
+are recorded in the evidence. Only the idle project build cache was retired for
+admission, preserving sources, current exports and all 13 original probes.
+No shared caches were deleted, and no archives were created.
 
-Then narrow opaque dependency-reference coverage before changing the default
+Next, narrow opaque dependency-reference coverage before changing the default
 selection. LLVM GlobalDCE retains 34 functions and 16 globals/aliases from the
 original Fibonacci capture; the comparison-normalized local output yields the
 same counts. Current conservative selection retains 35 functions and 86

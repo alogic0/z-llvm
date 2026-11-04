@@ -225,6 +225,15 @@ and 13 structural checks pass. The accompanying policy schema 3 passes its
 candidate, execution and bypass counts. The 32.95 GB admission and 24.36 GB
 runtime floor are enforced with the existing 8 GiB forecast.
 
+The accepted [symbol identity checkpoint](evidence/symbol_identity_acceptance_20261103.json)
+adds permanent optimizer-correctness checks for escaped stores, pointer and alias
+escapes, reverse quoted definitions, and distinct numbered/quoted numeric globals.
+Five entry points over 16 inputs and three pipelines produce 240 observations
+of locally optimized IR executed by Clang against 80 reused references. All
+1,727 units, 13 structural tests, readiness and the 17-stage cached integration
+run pass. Current exports are authenticated again and execution is rerun;
+this repair adds no local machine-code or whole-program execution credit.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `abd0bae6d4c995ee4875296754da0231900a64ad`; tree: `86a221ce353089625223f859a1ad7e873608982e`.
+Accepted revision: `b3be3512a9f4623315bbc3ae657ba620686346c6`; tree: `2b8dea5ff5ccd365ea8e243d65890008177cf032`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,17 +25,21 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The [symbol identity repair](evidence/symbol_identity_focused_20261103.json) at
-`b3be3512` has focused validation; full integration is pending. Shared reference
-analysis recognizes supported quoted and hexadecimal global spellings, preserving
-stores and live definitions that GlobalOpt and GlobalDCE previously missed.
-Numeric slots remain distinct from quoted numeric names. All 1,727 units,
-13 structural tests and readiness pass. Five entries pass 240 observations of
-locally optimized IR executed by Clang against 80 reused LLVM references.
-This adds no local machine-code or whole-program execution credit. Opaque
-coverage and the legacy selection default remain unchanged.
+The accepted [symbol identity repair](evidence/symbol_identity_acceptance_20261103.json)
+at `b3be3512` passes all 17 integration stages on a frozen 2,691-file snapshot.
+Shared reference analysis recognizes supported quoted and hexadecimal global
+spellings, preserving stores and live definitions that GlobalOpt and GlobalDCE
+previously missed. Constant merging uses the same identity; numeric slots remain
+distinct from quoted numeric names. All 1,727 units, 13 structural tests and
+readiness pass. Five entries pass 240 observations of locally optimized IR
+executed by Clang against 80 reused LLVM references. This adds no local
+machine-code or whole-program execution credit. The three current AIR exports
+are authenticated and reused while execution checks run again. The recorded
+minimum is 31.92 GB free, above the 24.36 GB runtime floor; the reported decrease
+is 1.71 GB. Opaque coverage, the legacy selection default, all fixed populations
+and the bypass ratchet remain unchanged.
 
-The accepted [IR and headroom checkpoint](evidence/ir_headroom_acceptance_20261103.json)
+The earlier accepted [IR and headroom checkpoint](evidence/ir_headroom_acceptance_20261103.json)
 at `abd0bae6` passes both full 17-stage fresh/cached runs. All 1,406 canonical
 records match on one unchanged 2,681-file snapshot in the primary checkout.
 Numeric local names follow definition order, and printing binds each
