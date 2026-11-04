@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `b3be3512a9f4623315bbc3ae657ba620686346c6`; tree: `2b8dea5ff5ccd365ea8e243d65890008177cf032`.
+Accepted revision: `811aa4baec30e3fc9b6ea5c825957f99eb46a943`; tree: `c397460daf00c8a026239270698dec01114f3e80`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,21 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [symbol identity repair](evidence/symbol_identity_acceptance_20261103.json)
+The accepted [dependency-coverage checkpoint](evidence/dependency_coverage_acceptance_20261104.json)
+at `811aa4ba` passes all 17 integration stages on a frozen 2,708-file snapshot.
+Bounded attributes, metadata and typed constants now establish complete reference
+coverage; unsupported forms remain conservative. Retained raw metadata roots
+survive constant merging, and inferred function attributes precede trailing
+metadata. All 1,756 units, 13 structural checks and readiness pass. Five optimizer
+pipelines add 400 LLVM-backed observations of locally optimized IR. The unchanged
+Fibonacci capture selects 34 functions and 16 globals/aliases, matching LLVM after
+serialization-only SSA normalization, but still rejects aggregate stack storage.
+Three authenticated exports are reused with fresh execution checks. The fixed
+100-row/five-function populations, eleven native populations, legacy selection
+and bypass ratchet remain unchanged. Minimum reported free space is 47.84 GB,
+above the 24.36 GB reserve. All 13 original probes remain; no archives were made.
+
+The earlier accepted [symbol identity repair](evidence/symbol_identity_acceptance_20261103.json)
 at `b3be3512` passes all 17 integration stages on a frozen 2,691-file snapshot.
 Shared reference analysis recognizes supported quoted and hexadecimal global
 spellings, preserving stores and live definitions that GlobalOpt and GlobalDCE
@@ -158,15 +172,7 @@ history are retired without archives. The latest
 of superseded AIR after the complete fresh replacement proof, making room for
 the cached run. Both runs now pass; old metadata and hashes remain. The retired
 checkout's dependency links are removed while their target repositories remain.
-The subsequent [dependency-coverage slice](evidence/dependency_coverage_focused_20261104.json)
-at `dad027d9`, including the earlier attribute-group work, is provisional.
-Bounded metadata, typed constants and parameter attributes now establish complete
-reference coverage while unsupported forms remain conservative. Raw metadata roots
-remain live even when constant merging cannot rewrite them. The separate
-`85e892f3` repair keeps inferred function attributes before trailing metadata,
-fixing invalid LLVM IR. All 1,756 units, 13 structural checks, readiness and
-400 LLVM-backed observations of locally optimized IR pass. Fibonacci now selects
-34 functions and 16 globals/aliases, matching LLVM after serialization-only SSA
-normalization, and still rejects its aggregate alloca with zero local executions.
-Cumulative full integration is next, followed by bounded 16-byte and 24-byte
-frame storage. Accepted counters remain unchanged; see [next steps](next_steps.md).
+The dependency-reference family is accepted. Next, extend bounded 16-byte and
+24-byte aggregate frame storage through existing private legalization and typed
+address authorities, with all-mode native checks and full integration. See
+[next steps](next_steps.md) for the remaining Fibonacci boundaries.

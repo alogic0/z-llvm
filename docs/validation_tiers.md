@@ -234,6 +234,16 @@ of locally optimized IR executed by Clang against 80 reused references. All
 run pass. Current exports are authenticated again and execution is rerun;
 this repair adds no local machine-code or whole-program execution credit.
 
+The accepted [dependency-coverage checkpoint](evidence/dependency_coverage_acceptance_20261104.json)
+adds a permanent metadata/constant-reference regression with five entries over
+16 inputs and five pipelines: 400 locally optimized IR observations against
+80 reused LLVM references through Clang. Raw metadata roots, recursive debug
+records, GEP stores, callback tables and attribute ordering are covered. All
+1,756 units, readiness, 13 structural checks and the frozen 17-stage run pass.
+The module negative control now uses unknown named metadata; its 330 local
+observations, 30 rejection controls and three environment checks stay unchanged.
+This checkpoint adds no local machine-code or whole-program execution credit.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

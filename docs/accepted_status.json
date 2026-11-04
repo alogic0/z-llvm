@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "b3be3512a9f4623315bbc3ae657ba620686346c6",
-  "accepted_tree": "2b8dea5ff5ccd365ea8e243d65890008177cf032",
+  "accepted_revision": "811aa4baec30e3fc9b6ea5c825957f99eb46a943",
+  "accepted_tree": "c397460daf00c8a026239270698dec01114f3e80",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 5,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "b3be3512",
+  "declaration_revision": "811aa4ba",
   "evidence": [
+    "docs/evidence/dependency_coverage_acceptance_20261104.json",
+    "docs/evidence/dependency_coverage_20261104_cached.summary",
     "docs/evidence/symbol_identity_acceptance_20261103.json",
     "docs/evidence/symbol_identity_20261103_cached.summary",
     "docs/evidence/ir_headroom_acceptance_20261103.json",

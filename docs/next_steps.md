@@ -41,7 +41,21 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [symbol identity checkpoint](evidence/symbol_identity_acceptance_20261103.json)
+The accepted [dependency-coverage checkpoint](evidence/dependency_coverage_acceptance_20261104.json)
+at `811aa4ba` passes all 17 integration stages on a frozen 2,708-file snapshot.
+Bounded attributes, metadata and typed constants now establish complete reference
+coverage; unsupported forms remain conservative. Retained raw metadata roots
+survive constant merging, and inferred function attributes precede trailing
+metadata. All 1,756 units, 13 structural checks and readiness pass. Five optimizer
+pipelines add 400 LLVM-backed observations of locally optimized IR. The unchanged
+Fibonacci capture selects 34 functions and 16 globals/aliases, matching LLVM after
+serialization-only SSA normalization, but still rejects aggregate stack storage.
+Three authenticated exports are reused with fresh execution checks. The fixed
+100-row/five-function populations, eleven native populations, legacy selection
+and bypass ratchet remain unchanged. Minimum reported free space is 47.84 GB,
+above the 24.36 GB reserve. All 13 original probes remain; no archives were made.
+
+The earlier accepted [symbol identity checkpoint](evidence/symbol_identity_acceptance_20261103.json)
 at `b3be3512` passes all 17 integration stages on a frozen 2,691-file snapshot.
 The unchanged 100-row and five-function counts pass in all modes, with three
 authenticated export-cache hits and fresh execution checks. Its minimum is
@@ -252,46 +266,35 @@ are recorded in the evidence. Only the idle project build cache was retired for
 admission, preserving sources, current exports and all 13 original probes.
 No shared caches were deleted, and no archives were created.
 
-The provisional [attribute-group slice](evidence/reference_attributes_focused_20261103.json)
+The earlier [attribute-group slice](evidence/reference_attributes_focused_20261103.json)
 at `fa85a805` recognizes bounded enum, alignment, memory-effect and string
 attributes through one module context. Missing/duplicate groups and unfamiliar
 strings such as `probe-stack` remain conservative. It passes 1,739 units,
 13 structural tests, 19 focused tests in each of ReleaseFast and ReleaseSafe,
 readiness and 400 observations of optimized IR executed by Clang against
-80 reused LLVM references. Full family integration remains pending.
+80 reused LLVM references. The subsequent checkpoint accepts the family.
 
-The subsequent [dependency-coverage slice](evidence/dependency_coverage_focused_20261104.json)
-at `dad027d9` is provisionally validated. Metadata IDs are indexed before their
-bounded field grammars are parsed, preserving forward references and recursive
-debug types. Typed constants, aggregate initializers and parameter attributes now
-share complete reference discovery; unsupported forms remain conservative.
-Raw metadata stays unchanged, and constant merging retains globals it cannot
-rewrite. The separate `85e892f3` repair places inferred function attributes before
-metadata and trailing header clauses, fixing confirmed invalid LLVM output.
+The [dependency-coverage checkpoint](evidence/dependency_coverage_acceptance_20261104.json)
+accepts `dad027d9`, the attribute-ordering repair `85e892f3` and the corrected
+negative fixture `811aa4ba`. The first full attempt was stopped after a narrow
+check confirmed that its opaque-coverage control used now-supported metadata.
+The control now uses unknown named metadata. All 330 local module observations,
+30 rejection controls and three environment checks pass, and the frozen retry
+passes all 17 stages. The original and retry logs remain retained.
 
-All 1,756 units, 13 structural checks, readiness, 36 reference tests and eight
-attribute tests in each of ReleaseFast and ReleaseSafe pass. Five optimizer
-pipelines pass 400 observations of locally optimized IR executed by Clang against
-80 reused LLVM references. The explicit unchanged Fibonacci input now has complete
-coverage: 34 functions and 15 globals plus one alias. The selected names match
-LLVM GlobalDCE after serialization-only numeric SSA normalization. Nine functions
-emit and 25 reject, first at `start.expandStackSize unsupported_type:alloca`.
-No local whole-program execution is claimed.
+The unchanged Fibonacci input now has complete coverage: 34 functions and
+15 globals plus one alias. Its selected names match LLVM GlobalDCE after
+serialization-only numeric SSA normalization. Nine functions emit and 25 reject,
+first at `start.expandStackSize unsupported_type:alloca`; local whole-program
+execution remains zero.
 
-The first full attempt was deliberately stopped after a narrow check confirmed
-an outdated opaque-metadata control. The updated control uses unknown named
-metadata; all 330 local module observations and 30 rejection controls pass in
-three modes. Compiler sources and prior focused results remain unchanged.
-
-Run cumulative 17-stage integration now for the dependency family and the
-confirmed invalid-output repair, using a frozen primary-checkout snapshot and
-current authenticated AIR exports. The existing accepted full result predates
-these compiler changes. Record acceptance before starting the next capability.
-Then extend bounded 16-byte `{ i64, i64 }` rlimit and 24-byte padded-wrapper
-stack storage through existing private legalization and typed address authorities.
-Shared frame changes require all-mode native checks and full integration.
-The later 56-byte array stride and narrower call ABI forms remain separate
-boundaries. Keep fixed populations and the bypass ratchet unchanged.
+Implement bounded 16-byte `{ i64, i64 }` and 24-byte padded-wrapper stack storage
+next through existing private legalization and typed address authorities. Include
+the 16-byte padded-word wrapper from the same capture. Preserve original IR and
+use exact layout, alignment and bounds checks. All-mode native proof and full
+integration are required for the frame change. The later 56-byte array stride and
+narrower call ABI forms remain separate boundaries. Keep fixed populations,
+default legacy selection and the bypass ratchet unchanged.
 
 Keep broader optional ABIs and
 floating/indirect/aggregate/stack varargs as explicit boundaries. Use the frozen
