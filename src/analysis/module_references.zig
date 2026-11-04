@@ -10,6 +10,7 @@
 //! valid only while the source module and its storage remain unchanged.
 const std = @import("std");
 const ir = @import("../ir.zig");
+const opaque_names = @import("../ir/opaque_names.zig");
 
 pub const Site = union(enum) {
     module,
@@ -21,10 +22,12 @@ pub const Site = union(enum) {
     terminator: *const ir.Terminator,
 };
 
-pub const OpaqueKind = enum { value, initializer, assembly, metadata, attributes, raw_arguments, operand_bundle };
+pub const OpaqueKind = enum { value, initializer, assembly, metadata, attributes, raw_arguments, operand_bundle, block_address };
 pub const Event = union(enum) {
     /// Module symbol spelling without @, as stored in definition names.
     symbol: []const u8,
+    /// Positive evidence only; its containing opaque region remains unknown.
+    block_address: opaque_names.BlockAddress,
     unknown: OpaqueKind,
 };
 
@@ -38,10 +41,11 @@ fn valueReference(value: ir.Value, site: Site, visitor: anytype) @TypeOf(visitor
             if (name.len > 1 and name[0] == '@') {
                 try visitor.visit(site, .{ .symbol = name[1..] });
             } else if (name.len != 0 and name[0] == '!') {
-                try visitor.visit(site, .{ .unknown = .metadata });
+                try opaqueText(name, .metadata, site, visitor);
             }
         },
-        .vector, .constant_expr => try visitor.visit(site, .{ .unknown = .value }),
+        .vector => |raw| try opaqueText(raw, .value, site, visitor),
+        .constant_expr => |raw| try opaqueText(raw, .value, site, visitor),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer => {},
     }
 }
@@ -59,7 +63,17 @@ fn ValueVisitor(comptime Visitor: type) type {
 
 fn opaqueText(text: ?[]const u8, kind: OpaqueKind, site: Site, visitor: anytype) @TypeOf(visitor).Error!void {
     if (text) |s| {
-        if (s.len != 0) try visitor.visit(site, .{ .unknown = kind });
+        if (s.len != 0) {
+            try visitor.visit(site, .{ .unknown = kind });
+            var tokens: opaque_names.Iterator = .{ .raw = s };
+            while (tokens.next() catch {
+                try visitor.visit(site, .{ .unknown = .block_address });
+                return;
+            }) |token| switch (token) {
+                .local => {},
+                .block_address => |address| try visitor.visit(site, .{ .block_address = address }),
+            };
+        }
     }
 }
 
@@ -96,7 +110,7 @@ fn referenceFreeAttributes(text: []const u8) bool {
 
 fn attributes(text: ?[]const u8, site: Site, visitor: anytype) @TypeOf(visitor).Error!void {
     if (text) |s| {
-        if (!referenceFreeAttributes(s)) try visitor.visit(site, .{ .unknown = .attributes });
+        if (!referenceFreeAttributes(s)) try opaqueText(s, .attributes, site, visitor);
     }
 }
 
@@ -160,7 +174,7 @@ pub fn walkGlobal(global: *const ir.Global, visitor: anytype) @TypeOf(visitor).E
         .none, .c_string => {}, // A parsed byte string is data, not IR syntax.
         .scalar => |value| try valueReference(value, site, visitor),
         .array => |array| for (array.values.items) |value| try valueReference(value, site, visitor),
-        .@"opaque" => try visitor.visit(site, .{ .unknown = .initializer }),
+        .@"opaque" => |raw| try opaqueText(raw, .initializer, site, visitor),
     }
     try attributes(global.attrs, site, visitor);
     try attributes(global.address_attrs, site, visitor);
@@ -203,6 +217,9 @@ const Query = struct {
                 search.summary.direct_uses += 1;
             },
             .unknown => search.summary.has_unknown = true,
+            .block_address => |address| if (std.mem.eql(u8, search.name, address.function)) {
+                search.summary.direct_uses += 1;
+            },
         }
     }
 };

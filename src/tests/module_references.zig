@@ -109,6 +109,7 @@ const Recorder = struct {
     pub fn visit(visitor: Recorder, _: refs.Site, event: refs.Event) Error!void {
         switch (event) {
             .symbol => visitor.symbols.* += 1,
+            .block_address => visitor.symbols.* += 1,
             .unknown => |kind| visitor.unknown.insert(kind),
         }
     }
