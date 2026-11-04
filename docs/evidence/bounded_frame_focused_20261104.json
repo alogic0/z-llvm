@@ -1,0 +1,294 @@
+{
+  "schema": 1,
+  "status": "focused proof accepted by the accompanying full integration checkpoint",
+  "recorded_utc": "2026-11-04T10:24:41.593059+00:00",
+  "source_revision": "d389d13566d873554632221eceff117e176cfc74",
+  "source_tree": "9b66edf48a8ec305f770b4087a7cbdcb2beb97c1",
+  "source_sha256": {
+    "src/codegen/x86_64/generic_cfg/composed_selector_memory.zig": "14c09add3387debc648fa9c92f683c873e8968a6bf585f8ee6fe1321dcd7a759",
+    "src/codegen/x86_64/generic_cfg/padded_frame.zig": "2404a26d3d4b631756da93a4828e83039a7866803611d7d23c30a3ad5f7c972c",
+    "src/codegen/x86_64/generic_cfg/padded_frame_tests.zig": "5a07d38393a76f57c0a5ec3719d522bedd541bf5394f463f2ad807a3606708ea",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/lifetime_admission.zig": "5bda41264534fcd46b6860bc81ed56c55807cc32c6d7add134943411f78afe60",
+    "src/codegen/x86_64/generic_cfg/word_pair_memory.zig": "e1e9d4dbbb575ba3efa875d3034644edcef716aebcdd3c085e8c62a20f55e4e2",
+    "src/codegen/x86_64/generic_cfg_selector.zig": "866e6d2630f43a063370f07ee9f5e088e94f733729802fa4d4b81b0701c4a984",
+    "src/tests.zig": "47cb22b56d8f2028b3d7cd74d9562e94db967254896fbd33c901c6ae274a4d37",
+    "test/real_programs/bounded_frame.ll": "b65cd194814de64ab1e364e330c348eefdfb22ea566faaa012dc3307b1ad837e",
+    "test/real_programs/bounded_frame_driver.c": "1d66311ae2c52726a0d680dc3b40c19bd79812b9429224c05f35914ca6dd87e7",
+    "tools/run_upstream_c_program.py": "e157dd74477488c1b09021fea40d073c5223c497689120f1997b8a3040229117"
+  },
+  "behavior": [
+    "Exact named/transparent {i64,i64} objects reuse the existing 16-byte integer frame storage.",
+    "Exact {i64,i16,[6xi8]} and {{i64,i64},i16,[6xi8]} wrappers use existing 16/24-byte array frame storage in a private codegen view.",
+    "Native layout, complete type shape, unique named definitions, alignment and single-object counts are checked before conversion. Source records and nested call arguments remain unchanged.",
+    "Typed byte-address admission checks the current 16/24-byte storage extent before emitting; invalid offsets publish no instructions or binding.",
+    "Mixed pair/wrapper copies recognize the bounded literal integer extension produced by the earlier private conversion.",
+    "Four permanent native functions check copies, all defined padding bytes, narrow tags, helper calls, live values, alignment and guards across direct/release routes in three modes."
+  ],
+  "known_boundaries": [
+    "Packed, floating/vector, unresolved, cyclic and duplicate named shapes; dynamic/multiple objects and excessive alignment; incompatible target layouts.",
+    "Aggregate value/call/return ABI forms beyond existing support, nondefault address spaces, unsupported barriers and dynamic/oversized wrapper copies.",
+    "Fibonacci 56-byte array stride, narrower call ABI forms and remaining whole-program boundaries."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 11580535607,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-units-r2.json",
+          "sha256": "6592d8dc10ae8f0cdbfeea0f424c1c323d4faee397604351e26506cdad09f0a1"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-units-r2.log",
+          "sha256": "b2271b355f1dd2e0268ab01fc7c434fd3d8551929ba2b2d8c6ffd035eccc0bce"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 395128186,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-structural-r2.json",
+          "sha256": "253e35b4fae9006747f57c07a65993dd1ffd3c3a6ce48ade9c990eca42ead703"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-structural-r2.log",
+          "sha256": "809b116277e26ecd21be5af6734a4a53be0b37996c588d6079f1be9f32286572"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=bounded frame",
+          "-Doptimize=ReleaseFast",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 39805041952,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-release-fast-r2.json",
+          "sha256": "d09fade5e6d676858877e318fbeee58a158e3dc557e7a463fef9ac08d6f2a73b"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-release-fast-r2.log",
+          "sha256": "5d08de3e017d144b5286fa5965440a9fbb4901a5c1665c14c08269dd14f2ca03"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=bounded frame",
+          "-Doptimize=ReleaseSafe",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 33942222613,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-release-safe-r2.json",
+          "sha256": "97b4bbd8a67081101521293274bee28a1437a1c63133981181243d2519b35ef7"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-release-safe-r2.log",
+          "sha256": "a3f8c15e2e0222793f0ac9481567bc34d2ccd12b40ce8b1f93a2ecf1248d3fdf"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 450214047418,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-readiness-r2.json",
+          "sha256": "e5afab6dbcd609cb88d4a8788efc1fff7dbc798b700d3bebcc401535e8befd39"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-readiness-r2.log",
+          "sha256": "bb9054a88d069d356b7b367423d12e2dfb2b57d2895dd9675b968977580f9854"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 5597174217,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-captured-object.json",
+          "sha256": "0f80948d56955cd273680e35cca1287e661e61c994b617e7c49764a7f81212bf"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-captured-object.log",
+          "sha256": "99bf1dcd433a7ae9b1b1e5ece6c77f4c371b97ebd5aac2640cbe11c147de6d5c"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/bounded-frame-20261104/check_native.py",
+          "local-state/validations/bounded-frame-20261104/native-r2"
+        ],
+        "returncode": 0,
+        "wall_ns": 1735056722,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-native-r2.json",
+          "sha256": "6c5708cc2df7218b6bfd63a2687eeb3b5138675875048950c0e536a844b8bf59"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-native-r2.log",
+          "sha256": "d0e17afafb1d8c67ba4510e0376a0ef9818f0ee06abd585e14b8893adcd13105"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/bounded-frame-20261104/check_existing_native.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 27667538252,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-existing-native.json",
+          "sha256": "d4d8060a78bff6175b144717ae66f85142955b69eb38dc02993e903b505e3507"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-existing-native.log",
+          "sha256": "9e70b4709a1b34e589bfb50c64c94ecd3bf9b2a1e5dddd67a8d8b1e528eb1f84"
+        }
+      }
+    ],
+    "unit_tests": 1763,
+    "structural_tests": 13,
+    "focused_tests_per_release_mode": 16,
+    "native": {
+      "status": "passed",
+      "bounded_frame_local_observations": 768,
+      "bounded_frame_reference_observations": 384,
+      "compiler_sha256": "33154f494e98e2db7721e358bb8c963fc700227e34bbedd2f308caf85da67865",
+      "inputs": {
+        "test/real_programs/bounded_frame.ll": "b65cd194814de64ab1e364e330c348eefdfb22ea566faaa012dc3307b1ad837e",
+        "test/real_programs/bounded_frame_driver.c": "1d66311ae2c52726a0d680dc3b40c19bd79812b9429224c05f35914ca6dd87e7",
+        "tools/run_upstream_c_program.py": "e157dd74477488c1b09021fea40d073c5223c497689120f1997b8a3040229117"
+      }
+    },
+    "native_proof": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/native-r2/proof.json",
+      "sha256": "d0e17afafb1d8c67ba4510e0376a0ef9818f0ee06abd585e14b8893adcd13105"
+    },
+    "existing_native": {
+      "module_dependencies_local_observations": 330,
+      "module_dependencies_reference_observations": 165,
+      "array_stride_local_observations": 1536,
+      "array_stride_reference_observations": 768,
+      "boolean_calls_local_observations": 1536,
+      "boolean_calls_reference_observations": 768,
+      "global_addresses_local_observations": 192,
+      "global_addresses_reference_observations": 96,
+      "global_memory_local_observations": 240,
+      "global_memory_reference_observations": 120,
+      "type_layout_padding_local_observations": 768,
+      "type_layout_padding_reference_observations": 384,
+      "word_pair_local_observations": 384,
+      "word_pair_reference_observations": 192,
+      "signed_nonnegative_local_observations": 1536,
+      "signed_nonnegative_reference_observations": 768,
+      "integer_pointer_local_observations": 1536,
+      "integer_pointer_reference_observations": 768,
+      "scalar_stack_local_observations": 486,
+      "scalar_stack_reference_observations": 243,
+      "pointer_stack_local_observations": 768,
+      "pointer_stack_reference_observations": 384,
+      "compiler_sha256": "33154f494e98e2db7721e358bb8c963fc700227e34bbedd2f308caf85da67865",
+      "status": "passed",
+      "module_dependencies_environment_checks": 3,
+      "module_dependencies_negative_controls": 30
+    },
+    "existing_native_proof": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/existing-native/proof.json",
+      "sha256": "9e70b4709a1b34e589bfb50c64c94ecd3bf9b2a1e5dddd67a8d8b1e528eb1f84"
+    }
+  },
+  "fibonacci": {
+    "input_sha256": "2f72c59ebf876c48b671cbf39890f4a974b8b87545a3a3103d2cce2df85d180a",
+    "compiler_sha256": "33154f494e98e2db7721e358bb8c963fc700227e34bbedd2f308caf85da67865",
+    "argv": [
+      "zig-out/bin/z_llvm",
+      "--codegen-reachable",
+      "--generic-cfg-selector",
+      "--report-all-codegen-failures",
+      "--target=x86_64-unknown-linux-gnu",
+      "--input-limit=67108864",
+      "--emit=obj",
+      "local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/object-input.ll"
+    ],
+    "returncode": 1,
+    "object_bytes": 0,
+    "summary_lines": [
+      "summary zllvm-codegen-selection mode=reachable coverage=complete selected_globals=15 selected_aliases=1",
+      "summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=34 emitted_functions=10 failed_functions=24 first_failing_function=start.expandStackSize first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=no_emitter first_failing_selector_detail=composed-block-array-gep-stride local_fail=1"
+    ],
+    "input_unchanged": true,
+    "record": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/fibonacci-frame.json",
+      "sha256": "7401515ef4fe0737d6cc3612d3282471ee20df17a770d60998294e5262da5953"
+    },
+    "stderr": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/fibonacci-frame.stderr",
+      "sha256": "c8294fb9e2b36a73affacb396d6dd22297bf4caefc9694a49def424f5bd3bc2e"
+    },
+    "local_whole_program_executions": 0
+  },
+  "superseded_readiness": {
+    "record": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-readiness.json",
+      "sha256": "7c4b504bc5643bb2bf2805ff5f1b2051b281121bd59b0001fe67142c8a9725cf"
+    },
+    "log": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-readiness.log",
+      "sha256": "1213549cf826cf7e5f4dd17df2626315ef719d6fc7f7165c357c5cdbd40200ab"
+    },
+    "reason": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-readiness-superseded.json",
+      "sha256": "5480101250773ab92f9deb329b6ee151ea1ec034243fa7b3b04dd8b6c16d495b"
+    }
+  },
+  "validation_policy": "Tier 2 source commit d389d135 remained provisional until the mandatory shared-frame Tier 3 acceptance.",
+  "disk_policy": {
+    "schema_version": 3,
+    "reserve_bytes": 24359738368,
+    "projected_peak_bytes": 8589934592,
+    "required_start_bytes": 32949672960
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0,
+  "cleanup": {
+    "deleted_paths": [],
+    "archives_created": 0
+  }
+}

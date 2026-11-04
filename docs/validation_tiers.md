@@ -244,6 +244,15 @@ The module negative control now uses unknown named metadata; its 330 local
 observations, 30 rejection controls and three environment checks stay unchanged.
 This checkpoint adds no local machine-code or whole-program execution credit.
 
+The accepted [bounded frame canary](evidence/bounded_frame_acceptance_20261104.json)
+adds four functions for integer pairs and padded 16-byte and 24-byte stack objects.
+Direct/release routes in three modes check 768 local observations against 384
+LLVM references reused across routes. Complete copied bytes, padding, mixed-size
+copies, narrow tags, helper calls, live values, alignment and guards are checked.
+All 1,763 units, 13 structural checks, readiness and the frozen 17-stage integration
+run pass. The eleven earlier native populations and all fixed compiler-core and
+compiler-rt counters remain unchanged.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

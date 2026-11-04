@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `811aa4baec30e3fc9b6ea5c825957f99eb46a943`; tree: `c397460daf00c8a026239270698dec01114f3e80`.
+Accepted revision: `d389d13566d873554632221eceff117e176cfc74`; tree: `9b66edf48a8ec305f770b4087a7cbdcb2beb97c1`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,23 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [dependency-coverage checkpoint](evidence/dependency_coverage_acceptance_20261104.json)
+The accepted [bounded frame checkpoint](evidence/bounded_frame_acceptance_20261104.json)
+at `d389d135` passes all 17 integration stages on a frozen 2,714-file snapshot.
+Exact integer pairs and padded 16-byte and 24-byte wrappers now reuse existing
+frame storage through private codegen views and typed address operations.
+Complete layout, alignment and extent checks preserve the source IR and reject
+unsupported forms. Four permanent functions pass 768 local observations against
+384 LLVM references across direct/release routes in three modes, including mixed
+pair/wrapper copies, defined padding, helper calls, live values and guards.
+All 1,763 units, 13 structural checks, focused release tests and readiness pass.
+The unchanged Fibonacci capture now emits 10 of 34 selected functions and reaches
+`start.expandStackSize composed-block-array-gep-stride` for a 56-byte stride;
+whole-program execution remains blocked. The 100-row/five-function populations,
+eleven earlier native populations, legacy selection and bypass ratchet remain
+unchanged. Minimum reported free space is 45.91 GB, above the 24.36 GB reserve.
+All 13 original probes remain unchanged; no archives were made.
+
+The earlier accepted [dependency-coverage checkpoint](evidence/dependency_coverage_acceptance_20261104.json)
 at `811aa4ba` passes all 17 integration stages on a frozen 2,708-file snapshot.
 Bounded attributes, metadata and typed constants now establish complete reference
 coverage; unsupported forms remain conservative. Retained raw metadata roots

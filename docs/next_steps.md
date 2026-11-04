@@ -41,7 +41,23 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [dependency-coverage checkpoint](evidence/dependency_coverage_acceptance_20261104.json)
+The accepted [bounded frame checkpoint](evidence/bounded_frame_acceptance_20261104.json)
+at `d389d135` passes all 17 integration stages on a frozen 2,714-file snapshot.
+Exact integer pairs and padded 16-byte and 24-byte wrappers now reuse existing
+frame storage through private codegen views and typed address operations.
+Complete layout, alignment and extent checks preserve the source IR and reject
+unsupported forms. Four permanent functions pass 768 local observations against
+384 LLVM references across direct/release routes in three modes, including mixed
+pair/wrapper copies, defined padding, helper calls, live values and guards.
+All 1,763 units, 13 structural checks, focused release tests and readiness pass.
+The unchanged Fibonacci capture now emits 10 of 34 selected functions and reaches
+`start.expandStackSize composed-block-array-gep-stride` for a 56-byte stride;
+whole-program execution remains blocked. The 100-row/five-function populations,
+eleven earlier native populations, legacy selection and bypass ratchet remain
+unchanged. Minimum reported free space is 45.91 GB, above the 24.36 GB reserve.
+All 13 original probes remain unchanged; no archives were made.
+
+The earlier accepted [dependency-coverage checkpoint](evidence/dependency_coverage_acceptance_20261104.json)
 at `811aa4ba` passes all 17 integration stages on a frozen 2,708-file snapshot.
 Bounded attributes, metadata and typed constants now establish complete reference
 coverage; unsupported forms remain conservative. Retained raw metadata roots
@@ -282,19 +298,27 @@ The control now uses unknown named metadata. All 330 local module observations,
 30 rejection controls and three environment checks pass, and the frozen retry
 passes all 17 stages. The original and retry logs remain retained.
 
-The unchanged Fibonacci input now has complete coverage: 34 functions and
-15 globals plus one alias. Its selected names match LLVM GlobalDCE after
-serialization-only numeric SSA normalization. Nine functions emit and 25 reject,
-first at `start.expandStackSize unsupported_type:alloca`; local whole-program
-execution remains zero.
+The dependency checkpoint established complete coverage for the unchanged
+Fibonacci input: 34 functions and 15 globals plus one alias. Its selected names
+match LLVM GlobalDCE after serialization-only numeric SSA normalization. At that
+checkpoint, nine functions emitted and 25 rejected, first at aggregate allocation.
 
-Implement bounded 16-byte `{ i64, i64 }` and 24-byte padded-wrapper stack storage
-next through existing private legalization and typed address authorities. Include
-the 16-byte padded-word wrapper from the same capture. Preserve original IR and
-use exact layout, alignment and bounds checks. All-mode native proof and full
-integration are required for the frame change. The later 56-byte array stride and
-narrower call ABI forms remain separate boundaries. Keep fixed populations,
-default legacy selection and the bypass ratchet unchanged.
+The [bounded frame checkpoint](evidence/bounded_frame_acceptance_20261104.json)
+now accepts exact 16-byte integer pairs and the capture's padded 16-byte and
+24-byte wrappers. The existing allocator and typed address authority own storage
+and access; private views preserve source records and borrowed call arguments.
+Mixed pair/wrapper copies retain their proven literal length through both views.
+All-mode native proof and all 17 integration stages pass. Fibonacci now emits ten
+functions and rejects 24, first at the 56-byte array stride in
+`start.expandStackSize`; local whole-program execution remains zero.
+
+Next, support bounded non-power-of-two integer array strides through the existing
+typed address action. Include the exact `[56 x i8]` GEP, negative and wrapping
+indexes, spilled/live operands, stores and rollback, with all-mode native
+comparisons and matching integration checks. Preserve the current descriptor
+and layout boundaries. Narrower call ABI forms remain the following separate
+slice. Keep fixed populations, default legacy selection and the bypass ratchet
+unchanged.
 
 Keep broader optional ABIs and
 floating/indirect/aggregate/stack varargs as explicit boundaries. Use the frozen

@@ -1,0 +1,875 @@
+{
+  "schema": 1,
+  "status": "accepted",
+  "recorded_utc": "2026-11-04T10:24:41.595470+00:00",
+  "accepted_revision": "d389d13566d873554632221eceff117e176cfc74",
+  "accepted_tree": "9b66edf48a8ec305f770b4087a7cbdcb2beb97c1",
+  "validated_working_head": "d389d13566d873554632221eceff117e176cfc74",
+  "source_snapshot": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-source-snapshot.json",
+    "sha256": "cfc1490ef09c937627e3b41d4edbf5aa0d8ccb20f3a28d0a0b2daa95ac1edd29"
+  },
+  "source_snapshot_files": 2714,
+  "source_worktree": "/home/oleg/prog/z_llvm",
+  "source_sha256": {
+    "src/codegen/x86_64/generic_cfg/composed_selector_memory.zig": "14c09add3387debc648fa9c92f683c873e8968a6bf585f8ee6fe1321dcd7a759",
+    "src/codegen/x86_64/generic_cfg/padded_frame.zig": "2404a26d3d4b631756da93a4828e83039a7866803611d7d23c30a3ad5f7c972c",
+    "src/codegen/x86_64/generic_cfg/padded_frame_tests.zig": "5a07d38393a76f57c0a5ec3719d522bedd541bf5394f463f2ad807a3606708ea",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/lifetime_admission.zig": "5bda41264534fcd46b6860bc81ed56c55807cc32c6d7add134943411f78afe60",
+    "src/codegen/x86_64/generic_cfg/word_pair_memory.zig": "e1e9d4dbbb575ba3efa875d3034644edcef716aebcdd3c085e8c62a20f55e4e2",
+    "src/codegen/x86_64/generic_cfg_selector.zig": "866e6d2630f43a063370f07ee9f5e088e94f733729802fa4d4b81b0701c4a984",
+    "src/tests.zig": "47cb22b56d8f2028b3d7cd74d9562e94db967254896fbd33c901c6ae274a4d37",
+    "test/real_programs/bounded_frame.ll": "b65cd194814de64ab1e364e330c348eefdfb22ea566faaa012dc3307b1ad837e",
+    "test/real_programs/bounded_frame_driver.c": "1d66311ae2c52726a0d680dc3b40c19bd79812b9429224c05f35914ca6dd87e7",
+    "tools/run_upstream_c_program.py": "e157dd74477488c1b09021fea40d073c5223c497689120f1997b8a3040229117"
+  },
+  "behavior": [
+    "Exact named/transparent {i64,i64} objects reuse the existing 16-byte integer frame storage.",
+    "Exact {i64,i16,[6xi8]} and {{i64,i64},i16,[6xi8]} wrappers use existing 16/24-byte array frame storage in a private codegen view.",
+    "Native layout, complete type shape, unique named definitions, alignment and single-object counts are checked before conversion. Source records and nested call arguments remain unchanged.",
+    "Typed byte-address admission checks the current 16/24-byte storage extent before emitting; invalid offsets publish no instructions or binding.",
+    "Mixed pair/wrapper copies recognize the bounded literal integer extension produced by the earlier private conversion.",
+    "Four permanent native functions check copies, all defined padding bytes, narrow tags, helper calls, live values, alignment and guards across direct/release routes in three modes."
+  ],
+  "known_boundaries": [
+    "Packed, floating/vector, unresolved, cyclic and duplicate named shapes; dynamic/multiple objects and excessive alignment; incompatible target layouts.",
+    "Aggregate value/call/return ABI forms beyond existing support, nondefault address spaces, unsupported barriers and dynamic/oversized wrapper copies.",
+    "Fibonacci 56-byte array stride, narrower call ABI forms and remaining whole-program boundaries."
+  ],
+  "fibonacci": {
+    "input_sha256": "2f72c59ebf876c48b671cbf39890f4a974b8b87545a3a3103d2cce2df85d180a",
+    "compiler_sha256": "33154f494e98e2db7721e358bb8c963fc700227e34bbedd2f308caf85da67865",
+    "argv": [
+      "zig-out/bin/z_llvm",
+      "--codegen-reachable",
+      "--generic-cfg-selector",
+      "--report-all-codegen-failures",
+      "--target=x86_64-unknown-linux-gnu",
+      "--input-limit=67108864",
+      "--emit=obj",
+      "local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/object-input.ll"
+    ],
+    "returncode": 1,
+    "object_bytes": 0,
+    "summary_lines": [
+      "summary zllvm-codegen-selection mode=reachable coverage=complete selected_globals=15 selected_aliases=1",
+      "summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=34 emitted_functions=10 failed_functions=24 first_failing_function=start.expandStackSize first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=no_emitter first_failing_selector_detail=composed-block-array-gep-stride local_fail=1"
+    ],
+    "input_unchanged": true,
+    "record": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/fibonacci-frame.json",
+      "sha256": "7401515ef4fe0737d6cc3612d3282471ee20df17a770d60998294e5262da5953"
+    },
+    "stderr": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/fibonacci-frame.stderr",
+      "sha256": "c8294fb9e2b36a73affacb396d6dd22297bf4caefc9694a49def424f5bd3bc2e"
+    },
+    "local_whole_program_executions": 0
+  },
+  "focused_evidence": {
+    "path": "docs/evidence/bounded_frame_focused_20261104.json",
+    "sha256": "f386b2e96ff567ee586b652a06544bdbcfd301cc7c04677e74d982745ac13d2d"
+  },
+  "focused_validation": {
+    "checks": [
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 11580535607,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-units-r2.json",
+          "sha256": "6592d8dc10ae8f0cdbfeea0f424c1c323d4faee397604351e26506cdad09f0a1"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-units-r2.log",
+          "sha256": "b2271b355f1dd2e0268ab01fc7c434fd3d8551929ba2b2d8c6ffd035eccc0bce"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 395128186,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-structural-r2.json",
+          "sha256": "253e35b4fae9006747f57c07a65993dd1ffd3c3a6ce48ade9c990eca42ead703"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-structural-r2.log",
+          "sha256": "809b116277e26ecd21be5af6734a4a53be0b37996c588d6079f1be9f32286572"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=bounded frame",
+          "-Doptimize=ReleaseFast",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 39805041952,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-release-fast-r2.json",
+          "sha256": "d09fade5e6d676858877e318fbeee58a158e3dc557e7a463fef9ac08d6f2a73b"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-release-fast-r2.log",
+          "sha256": "5d08de3e017d144b5286fa5965440a9fbb4901a5c1665c14c08269dd14f2ca03"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=bounded frame",
+          "-Doptimize=ReleaseSafe",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 33942222613,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-release-safe-r2.json",
+          "sha256": "97b4bbd8a67081101521293274bee28a1437a1c63133981181243d2519b35ef7"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-release-safe-r2.log",
+          "sha256": "a3f8c15e2e0222793f0ac9481567bc34d2ccd12b40ce8b1f93a2ecf1248d3fdf"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 450214047418,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-readiness-r2.json",
+          "sha256": "e5afab6dbcd609cb88d4a8788efc1fff7dbc798b700d3bebcc401535e8befd39"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-readiness-r2.log",
+          "sha256": "bb9054a88d069d356b7b367423d12e2dfb2b57d2895dd9675b968977580f9854"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 5597174217,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-captured-object.json",
+          "sha256": "0f80948d56955cd273680e35cca1287e661e61c994b617e7c49764a7f81212bf"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-captured-object.log",
+          "sha256": "99bf1dcd433a7ae9b1b1e5ece6c77f4c371b97ebd5aac2640cbe11c147de6d5c"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/bounded-frame-20261104/check_native.py",
+          "local-state/validations/bounded-frame-20261104/native-r2"
+        ],
+        "returncode": 0,
+        "wall_ns": 1735056722,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-native-r2.json",
+          "sha256": "6c5708cc2df7218b6bfd63a2687eeb3b5138675875048950c0e536a844b8bf59"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-native-r2.log",
+          "sha256": "d0e17afafb1d8c67ba4510e0376a0ef9818f0ee06abd585e14b8893adcd13105"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/bounded-frame-20261104/check_existing_native.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 27667538252,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-existing-native.json",
+          "sha256": "d4d8060a78bff6175b144717ae66f85142955b69eb38dc02993e903b505e3507"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/frame-existing-native.log",
+          "sha256": "9e70b4709a1b34e589bfb50c64c94ecd3bf9b2a1e5dddd67a8d8b1e528eb1f84"
+        }
+      }
+    ],
+    "unit_tests": 1763,
+    "structural_tests": 13,
+    "focused_tests_per_release_mode": 16,
+    "native": {
+      "status": "passed",
+      "bounded_frame_local_observations": 768,
+      "bounded_frame_reference_observations": 384,
+      "compiler_sha256": "33154f494e98e2db7721e358bb8c963fc700227e34bbedd2f308caf85da67865",
+      "inputs": {
+        "test/real_programs/bounded_frame.ll": "b65cd194814de64ab1e364e330c348eefdfb22ea566faaa012dc3307b1ad837e",
+        "test/real_programs/bounded_frame_driver.c": "1d66311ae2c52726a0d680dc3b40c19bd79812b9429224c05f35914ca6dd87e7",
+        "tools/run_upstream_c_program.py": "e157dd74477488c1b09021fea40d073c5223c497689120f1997b8a3040229117"
+      }
+    },
+    "native_proof": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/native-r2/proof.json",
+      "sha256": "d0e17afafb1d8c67ba4510e0376a0ef9818f0ee06abd585e14b8893adcd13105"
+    },
+    "existing_native": {
+      "module_dependencies_local_observations": 330,
+      "module_dependencies_reference_observations": 165,
+      "array_stride_local_observations": 1536,
+      "array_stride_reference_observations": 768,
+      "boolean_calls_local_observations": 1536,
+      "boolean_calls_reference_observations": 768,
+      "global_addresses_local_observations": 192,
+      "global_addresses_reference_observations": 96,
+      "global_memory_local_observations": 240,
+      "global_memory_reference_observations": 120,
+      "type_layout_padding_local_observations": 768,
+      "type_layout_padding_reference_observations": 384,
+      "word_pair_local_observations": 384,
+      "word_pair_reference_observations": 192,
+      "signed_nonnegative_local_observations": 1536,
+      "signed_nonnegative_reference_observations": 768,
+      "integer_pointer_local_observations": 1536,
+      "integer_pointer_reference_observations": 768,
+      "scalar_stack_local_observations": 486,
+      "scalar_stack_reference_observations": 243,
+      "pointer_stack_local_observations": 768,
+      "pointer_stack_reference_observations": 384,
+      "compiler_sha256": "33154f494e98e2db7721e358bb8c963fc700227e34bbedd2f308caf85da67865",
+      "status": "passed",
+      "module_dependencies_environment_checks": 3,
+      "module_dependencies_negative_controls": 30
+    },
+    "existing_native_proof": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/existing-native/proof.json",
+      "sha256": "9e70b4709a1b34e589bfb50c64c94ecd3bf9b2a1e5dddd67a8d8b1e528eb1f84"
+    }
+  },
+  "validation_trigger": "Immediate tier 3 after changes to shared frame layout and call-visible stack storage (docs/validation_tiers.md).",
+  "prior_result_reuse": "The accepted dependency checkpoint predates these frame and byte-address changes. Reuse authenticated current AIR exports, but execute all 17 stages and the new native frame population on the frozen compiler source.",
+  "frozen_plan": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/validation-plan.json",
+    "sha256": "7e6f5c3c63b1741482d2d92c17a8731ed2420312e277fd5f7f762e243df41675"
+  },
+  "verification_script": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/verify_full_run.py",
+    "sha256": "dd64408edcf688836439c1e93970624a6c9f1c0b1e396ecb824ef45e7847a95a"
+  },
+  "verified_record": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/bounded-frame-20261104/verified-full-frame-cached.json",
+    "sha256": "b3f7660c57eea1623652e2d4c13e515d1330a267928b0b6436e34cb927efc09f"
+  },
+  "integration": {
+    "argv": [
+      "/home/oleg/.zig/0.17.0/files/zig",
+      "build",
+      "distribution-all",
+      "--",
+      "--serial",
+      "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+      "--real-rows-validation-root=local-state/validations/ir-headroom-20261103",
+      "--real-rows-cache-root=local-state/caches/ir-headroom-20261103"
+    ],
+    "returncode": 0,
+    "wall_ns": 2491725409116,
+    "raw_log": "local-state/validations/bounded-frame-20261104/full-frame-cached.log",
+    "raw_log_sha256": "6c5737966e5856f7ee0609eb6b185123569a3a1c1719a34a11edfefd913e01bd",
+    "telemetry_sha256": "5796f300aa123c90bf1f726a1e14935129be7fb6a73ba8f2cf362a9d85d68e7e",
+    "gates": [
+      {
+        "id": "selected-object-suite",
+        "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+        "exit_status": "0",
+        "duration_ms": "61524",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "1838",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "3389",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "3328",
+        "cache_status": "none"
+      },
+      {
+        "id": "zig-source-native-link",
+        "tool": "tools/run_distribution_zig_source_native_link.zig",
+        "exit_status": "0",
+        "duration_ms": "19077",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-postopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "81010",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-preopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "--pipeline": "preopt",
+        "exit_status": "0",
+        "duration_ms": "662547",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-ir-writer",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "22206",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-release",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "77384",
+        "cache_status": "none"
+      },
+      {
+        "id": "real-rows-release-fast",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseFast",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "503173",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-safe",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSafe",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "529712",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-small",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSmall",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "352471",
+        "cache_status": "hit"
+      },
+      {
+        "id": "integrated-executable",
+        "tool": "tools/run_distribution_zig_integrated_exe.zig",
+        "exit_status": "0",
+        "duration_ms": "902850",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "498",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "1216",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "1053",
+        "cache_status": "none"
+      },
+      {
+        "id": "boundary-gates",
+        "tool": "tools/run_distribution_boundary_gates.zig",
+        "exit_status": "0",
+        "duration_ms": "777",
+        "cache_status": "none"
+      }
+    ],
+    "serial": {
+      "schema_version": "1",
+      "run_id": "a72efb901cf92365843476ab52b8570a",
+      "scratch_path": "tmp/distribution_all_serial_a72efb901cf92365843476ab52b8570a",
+      "bundle_path": "tmp/distribution_all_serial_a72efb901cf92365843476ab52b8570a/release_source_object_bundle",
+      "target": "x86_64-unknown-linux-gnu",
+      "mode": "serial",
+      "real_rows_concurrency": "3",
+      "subgates": "17",
+      "wall_ms": "2491696",
+      "starting_free_bytes": "47577391104",
+      "minimum_observed_free_bytes": "45914202112",
+      "final_free_bytes": "47208374272",
+      "observed_peak_bytes": "1663188992",
+      "reserve_bytes": "24359738368",
+      "required_start_bytes": "32949672960",
+      "local_fail": "0"
+    },
+    "real_rows": [
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseFast",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSafe",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSmall",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      }
+    ],
+    "cache_events": [
+      {
+        "mode": "ReleaseFast",
+        "status": "hit",
+        "duration_ms": "15103",
+        "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+        "descriptor_bytes": "1343891697"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "status": "hit",
+        "duration_ms": "16474",
+        "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+        "descriptor_bytes": "1473501276"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "status": "hit",
+        "duration_ms": "12380",
+        "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+        "descriptor_bytes": "1106432911"
+      }
+    ],
+    "real_rows_resources": {
+      "schema_version": "3",
+      "normalization_schema": "3",
+      "memory_policy": "os-managed-non-gating",
+      "concurrency": "3",
+      "workers": "3",
+      "modes": "ReleaseFast,ReleaseSafe,ReleaseSmall",
+      "run_id": "8307b5c789fce8d5f95a0ae9deb33c8a",
+      "root": "local-state/validations/ir-headroom-20261103/real_rows_parallel_8307b5c789fce8d5f95a0ae9deb33c8a",
+      "work_selection_root": "local-state/validations/ir-headroom-20261103",
+      "export_cache_selection_root": "local-state/caches/ir-headroom-20261103",
+      "fast_temp": "local-state/validations/ir-headroom-20261103/ReleaseFast/work_8307b5c789fce8d5f95a0ae9deb33c8a",
+      "fast_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_8307b5c789fce8d5f95a0ae9deb33c8a/ReleaseFast/zig-local-cache",
+      "fast_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_8307b5c789fce8d5f95a0ae9deb33c8a/ReleaseFast/zig-global-cache",
+      "fast_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseFast/export",
+      "safe_temp": "local-state/validations/ir-headroom-20261103/ReleaseSafe/work_8307b5c789fce8d5f95a0ae9deb33c8a",
+      "safe_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_8307b5c789fce8d5f95a0ae9deb33c8a/ReleaseSafe/zig-local-cache",
+      "safe_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_8307b5c789fce8d5f95a0ae9deb33c8a/ReleaseSafe/zig-global-cache",
+      "safe_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export",
+      "small_temp": "local-state/validations/ir-headroom-20261103/ReleaseSmall/work_8307b5c789fce8d5f95a0ae9deb33c8a",
+      "small_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_8307b5c789fce8d5f95a0ae9deb33c8a/ReleaseSmall/zig-local-cache",
+      "small_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_8307b5c789fce8d5f95a0ae9deb33c8a/ReleaseSmall/zig-global-cache",
+      "small_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export",
+      "pin_manifest_sha256": "0d7370b61aa9f9871196371de428475b01a05554fd449a97a74f63ba4f948a29",
+      "cache_status": "hit,hit,hit",
+      "air_cache": "read-only",
+      "pruning": "suspended",
+      "wall_ms": "652605",
+      "summed_child_ms": "1385356",
+      "filesystem_total_bytes": "982240026624",
+      "post_run_free_floor_bytes": "24359738368",
+      "projected_peak_bytes": "8589934592",
+      "required_start_bytes": "32949672960",
+      "admission_source": "serial_preflight",
+      "admission_starting_free_bytes": "47577391104",
+      "starting_free_bytes": "47422431232",
+      "minimum_free_bytes": "45914202112",
+      "final_free_bytes": "45945696256",
+      "peak_disk_bytes": "5377662976",
+      "peak_aggregate_rss_bytes": "5265125376",
+      "minimum_available_memory_bytes": "9858498560",
+      "load_start": "3.38",
+      "load_end": "5.00",
+      "execution_results_cached": "false",
+      "local_fail": "0"
+    },
+    "native_memory_populations": {
+      "word-pair-memory": {
+        "population": "standalone-two-word-stack-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "384",
+        "reference_observations": "192",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "pointer-stack-memory": {
+        "population": "standalone-runtime-pointer-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-stack-memory": {
+        "population": "standalone-scalar-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "486",
+        "reference_observations": "243",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "integer-pointer-casts": {
+        "population": "standalone-integer-pointer-casts",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "signed-nonnegative": {
+        "population": "standalone-signed-nonnegative",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "type-layout-padding": {
+        "population": "standalone-type-allocation-padding",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-addresses": {
+        "population": "standalone-global-addresses",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "192",
+        "reference_observations": "96",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-memory": {
+        "population": "standalone-global-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "240",
+        "reference_observations": "120",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "boolean-calls": {
+        "population": "standalone-boolean-calls",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "array-stride": {
+        "population": "standalone-array-stride",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "module-dependencies": {
+        "population": "standalone-module-dependencies",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "330",
+        "reference_observations": "165",
+        "reference_reused_per_route": "true",
+        "local_fail": "0",
+        "negative_controls": "30",
+        "environment_checks": "3"
+      },
+      "bounded-frame": {
+        "population": "standalone-bounded-frame",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    },
+    "c_program": {
+      "schema": "upstream-c-program-v1",
+      "programs": "1",
+      "program_modes": "3",
+      "matched_program_modes": "3",
+      "reference_case_executions": "6",
+      "local_case_executions": "6",
+      "integer_variadic_observations": "48",
+      "heap_call_observations": "18",
+      "native_call_observations": "66",
+      "local_fail": "0"
+    },
+    "ascii_rows": [
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseFast",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+        "object_bytes": "712",
+        "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+        "reference_bytes": "4154072",
+        "reference_sha256": "b90ffc3d0a5ce656b13a1d9d14d14ca3e50658e420baa3ca9f40923a6e96caee",
+        "linked_bytes": "6292382",
+        "linked_sha256": "89946095614cf0e2ee199c6a7bfec4496c0a6150177c3f9d5f3f1d702ac7d59f",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      },
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseSafe",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+        "object_bytes": "712",
+        "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+        "reference_bytes": "4040088",
+        "reference_sha256": "f8fd19d865e7bad30a955b95fd3f450239c4a24be1f9ec6fedb67297e5701201",
+        "linked_bytes": "6147574",
+        "linked_sha256": "3fc42ef6ee1a8e9f61d53def1389ae085488731ce589695c3bf070b79c6d689a",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      },
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseSmall",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+        "object_bytes": "712",
+        "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+        "reference_bytes": "149824",
+        "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+        "linked_bytes": "356150",
+        "linked_sha256": "131f4f49893e6feafd5bc981a785a6b7271326aff3fce585b02436afdf605753",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      }
+    ],
+    "fma": {
+      "cases": "8192",
+      "matched": "8192",
+      "reference": "llvm22-frozen-ir",
+      "local_fail": "0"
+    },
+    "source_snapshot": "local-state/validations/bounded-frame-20261104/frame-source-snapshot.json",
+    "source_snapshot_sha256": "cfc1490ef09c937627e3b41d4edbf5aa0d8ccb20f3a28d0a0b2daa95ac1edd29",
+    "source_snapshot_files": 2714,
+    "source_worktree": "/home/oleg/prog/z_llvm",
+    "original_scratch_files_verified": 13,
+    "sources_unchanged": true,
+    "headroom_policy": {
+      "schema_version": "3",
+      "filesystem_total_bytes": "982240026624",
+      "reserve_bytes": "24359738368",
+      "projected_peak_bytes": "8589934592",
+      "required_start_bytes": "32949672960",
+      "authority": "tools/distribution_headroom_policy.zig",
+      "local_fail": "0"
+    },
+    "expected_cache_status": "hit",
+    "sampled_minimum_free_bytes": 45914247168,
+    "archives_created": 0
+  },
+  "headroom_policy": {
+    "schema_version": 3,
+    "reserve_bytes": 24359738368,
+    "projected_peak_bytes": 8589934592,
+    "required_start_bytes": 32949672960
+  },
+  "authenticated_exports_reused": [
+    {
+      "mode": "ReleaseFast",
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5.air",
+      "bytes": 1343891697,
+      "allocated_bytes": 1343922176,
+      "sha256": "bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5",
+      "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+      "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.meta",
+      "metadata_sha256": "037abbc2bc1e323c0174b6a43373654ee44ef22a91fcf9a8c092d5693f45f00a"
+    },
+    {
+      "mode": "ReleaseSafe",
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c.air",
+      "bytes": 1473501276,
+      "allocated_bytes": 1473531904,
+      "sha256": "53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c",
+      "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+      "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.meta",
+      "metadata_sha256": "24849930ee312cc3cb2d35cf0da327898ca4a16ad25c90b1a858ac5530300618"
+    },
+    {
+      "mode": "ReleaseSmall",
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809.air",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106452480,
+      "sha256": "e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809",
+      "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+      "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.meta",
+      "metadata_sha256": "b3f9cb704b31b4257b0e2c3b9f3415672c282a7bd10142d8dbf246de354c62f3"
+    }
+  ],
+  "summary_log": {
+    "path": "docs/evidence/bounded_frame_20261104_cached.summary",
+    "sha256": "ad43612b2031e66bdd7d517212a4e66b3a41982fcaa61929c9451ff6fdbb2283",
+    "lines": 140
+  },
+  "cleanup": {
+    "deleted_paths": [],
+    "archives_created": 0
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0,
+  "unchanged_scope": {
+    "candidate_rows_per_mode": 100,
+    "executed_functions_per_mode": 5,
+    "compiler_rt_bypass_ratchet": 130,
+    "previous_native_populations": 11,
+    "selection_default": "legacy",
+    "fibonacci_whole_program_local_executions": 0
+  },
+  "new_native_population": {
+    "name": "bounded-frame",
+    "functions": 4,
+    "inputs_per_function": 32,
+    "routes": [
+      "direct",
+      "release"
+    ],
+    "modes": 3,
+    "local_observations": 768,
+    "reference_observations": 384,
+    "reference_reused_per_route": true
+  },
+  "toolchain": {
+    "project_zig_version": "0.17.0",
+    "project_zig": "/home/oleg/.zig/0.17.0/files/zig",
+    "emitter": "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+    "emitter_version": "0.17.0-dev.11+1c08b09d1",
+    "emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+    "emitter_bytes": 149918648,
+    "source_authority_sha256": "d4846f9d9032727d3903b31bdefc763447a92024483aa3c83b2ac0683167f492"
+  },
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-unknown-linux-gnu",
+  "modes": [
+    "ReleaseFast",
+    "ReleaseSafe",
+    "ReleaseSmall"
+  ],
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "selector_version": "real-candidate-selector-v3"
+}
