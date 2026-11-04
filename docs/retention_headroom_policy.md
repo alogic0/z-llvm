@@ -37,6 +37,13 @@ passes all 17 stages with a 31.92 GB reported minimum, above the 24.36 GB floor.
 Builds regenerate cache files, so the deletion interval is not net task savings.
 No archives are created.
 
+The provisional [attribute-group evidence](evidence/reference_attributes_focused_20261103.json)
+is retained under `local-state/validations/opaque-references-20261103` for the
+ongoing dependency-reference work. It contains source hashes, the earlier binary's
+observed outputs, native IR comparisons, focused validation and the next metadata
+plan. The 13 original probes remain unchanged; this slice creates no archives
+and retires no caches.
+
 Before removing an old run, preserve unique source edits/commits and the minimum
 source/log/input evidence necessary for accepted results or unresolved failures.
 Discard reproducible build binaries, cache generations, and verified duplicate

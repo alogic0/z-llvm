@@ -1,0 +1,239 @@
+{
+  "schema": 1,
+  "status": "provisional focused proof; cumulative dependency-reference integration pending",
+  "recorded_utc": "2026-11-04T03:54:13.226835+00:00",
+  "source_revision": "fa85a8052c6340e51accc6c71584558d78eda679",
+  "source_tree": "0ff6d28800732c28de9b198abc86bdad40b4e31f",
+  "source_sha256": {
+    "src/analysis/global_dependencies.zig": "3f64169f1935ceb8a91f5dbe8506f38f0f6b5301c208d6a6a18fd7fc3c41554d",
+    "src/analysis/module_references.zig": "f7b415c10b6f58bdb2877449e8a34ddde6321bd5c2c753561e2c722ff05428e6",
+    "src/analysis/reference_attributes.zig": "1b15d76ca3ffa4f88ef3f3c88cdd32b7e6886d73ae758f87bcb27f385760cd13",
+    "src/passes/constmerge.zig": "48ebf024fcc88b8ccf2ced42bf15f99aaff3f0bfc71a3276079ca784675d35f1",
+    "src/passes/globalopt.zig": "a93f397b4d41d468e69bb6cdd40b8392f67d745da797f7b34d8d9558b7f7264f",
+    "src/tests.zig": "3a4066cbff2360b2c68258bcdca6eb42ff376996feca9e9a2d9b16a4045bcf1b",
+    "src/tests/global_dependencies.zig": "c4a7535f2b48ce1847acd05bcffec7000cb5afe4ae6f62c140785e4a5ff4dd31",
+    "src/tests/globaldce_references.zig": "3a1ac09267f13fa3217f1cd25537845fd2ab9ea7a061e94ff79b2e6b034da58e",
+    "src/tests/reference_attributes.zig": "a7530a058bf69b350df86a696890006599832abc1e6133e22e4ee1ab98422c69",
+    "test/opt/inputs/reference_attributes.ll": "0d9fade1097ad401129717d1c706b31776aac7a30606a09b02ec845672a7af58",
+    "test/opt/reference_attributes_harness.c": "954dddd7dc46d536627e6df0cdc2fb6168e145a2031d68ed3ef7b47b048aeb37",
+    "tools/run_optimizer_correctness.zig": "b965d4df9a8e33737d1a394083d529c9ac2786f1e76c3b1e84d1f59c4a51659e"
+  },
+  "replacement_goal": "Recognize a bounded reference-free attribute grammar and group IDs without weakening unknown reference coverage.",
+  "behavior": [
+    "Build one borrowed-module context with an owned group-ID index per GlobalDCE/dependency graph, GlobalOpt or ConstMerge invocation.",
+    "Recognize the explicit enum set, bounded alignment and memory effects, plus frame-pointer, target-cpu and target-features strings. Keep all raw records unchanged.",
+    "Missing IDs, duplicate IDs, nested groups, unknown strings including probe-stack, and unsupported or malformed forms remain unknown.",
+    "Standalone walks remain allocation-free and cannot resolve group IDs without module context.",
+    "Recognized groups allow dead-definition deletion, immutable direct-load folding and scalar constant merging; ordinary stores, alias edges and escaped symbol identity remain effective."
+  ],
+  "upstream_mapping": [
+    {
+      "path": "../llvm-project-22/llvm/lib/AsmParser/LLParser.cpp",
+      "owners": [
+        "parseUnnamedAttrGrp",
+        "parseFnAttributeValuePairs",
+        "parseStringAttribute",
+        "parseMemoryAttr",
+        "parseOptionalAlignment"
+      ]
+    },
+    {
+      "path": "../llvm-project-22/llvm/include/llvm/IR/Value.h",
+      "owners": [
+        "MaximumAlignment"
+      ]
+    },
+    {
+      "path": "../llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp",
+      "owners": [
+        "X86TargetLowering::getStackProbeSymbolName"
+      ],
+      "constraint": "The probe-stack string can name a helper without @, so arbitrary quoted attributes must not be assumed reference-free."
+    }
+  ],
+  "known_boundaries": [
+    "This grammar establishes reference coverage, not full LLVM attribute validity or placement rules. Unsupported forms remain conservative.",
+    "Metadata, assembly, raw call fields, opaque expressions and aggregate initializers keep their existing conservative coverage.",
+    "No change to legacy default selection, native ABI support, whole-program execution, fixed populations or accepted counters.",
+    "The unchanged Fibonacci input still selects 35 functions and 85 globals plus one alias; 10 functions emit and 25 reject, first at start.expandStackSize unsupported_type:alloca."
+  ],
+  "validation": {
+    "unit_tests": 1739,
+    "structural_tests": 13,
+    "focused_releasefast_tests": 19,
+    "focused_releasesafe_tests": 19,
+    "abi_cases": 60,
+    "behavioral_observations": 6528,
+    "checks": [
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/opaque-references-20261103/attribute-unit-final.json",
+        "record_sha256": "7e293722a697362d47f943dcc37b7b7657d2f455accc755a836c9b84ea73de7b",
+        "log": "local-state/validations/opaque-references-20261103/attribute-unit-final.log",
+        "log_sha256": "2031143946897403345fe043345481ef966f70763ce68ae6aa5e7c48d82d04ba",
+        "wall_ns": 10891618692
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/opaque-references-20261103/attribute-structural.json",
+        "record_sha256": "9388b9fc597282df0355ac3ea5aff005dcc332b09268a4a9d749068d841a12a7",
+        "log": "local-state/validations/opaque-references-20261103/attribute-structural.log",
+        "log_sha256": "878afc9b141e76656384a78729d5b9067dfa76b14060d4ed1b77c18e67c2cc7b",
+        "wall_ns": 518480972
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/opaque-references-20261103/attribute-readiness-r2.json",
+        "record_sha256": "af126fd435139ca069034dee64c33ba93369d6af474f687855c91291aef86168",
+        "log": "local-state/validations/opaque-references-20261103/attribute-readiness-r2.log",
+        "log_sha256": "7ba1473419eec81edc85194e835aa81e1c30679b276ab0bfeb0f434ee4243dc8",
+        "wall_ns": 432242499491
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=reference attributes",
+          "-Doptimize=ReleaseFast",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/opaque-references-20261103/attribute-releasefast-tests.json",
+        "record_sha256": "be5f28683ad0bd6a428adf9e01e9b0c8ffbdce5442b77ad8e4c9f1257ebb3d0e",
+        "log": "local-state/validations/opaque-references-20261103/attribute-releasefast-tests.log",
+        "log_sha256": "a73f87253e280526ce6463dfa777d23db40c6099de2fcbf9c3fb5280218778a5",
+        "wall_ns": 22698447098
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=reference attributes",
+          "-Doptimize=ReleaseSafe",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/opaque-references-20261103/attribute-releasesafe-tests.json",
+        "record_sha256": "e7754e05527ac2114a589c34ab871fbd03454f9356d346fb934f6506a4f0a9bb",
+        "log": "local-state/validations/opaque-references-20261103/attribute-releasesafe-tests.log",
+        "log_sha256": "417a28eea9c7f5abda5cfa0ab384861cfeb797cfb2387be826eadf140d07fec1",
+        "wall_ns": 19435376222
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/opaque-references-20261103/attribute-build.json",
+        "record_sha256": "bd5846c37bec42c22313c13d47c9f8b2f00cd1d20398eaa747989b7b871ba05d",
+        "log": "local-state/validations/opaque-references-20261103/attribute-build.log",
+        "log_sha256": "ade290bf6199387b2c8618729494911c36ecdf83d4e87692e788d4fc405859fd",
+        "wall_ns": 2114510136
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/opaque-references-20261103/check_attribute_native.py"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/opaque-references-20261103/attribute-native.json",
+        "record_sha256": "47c5d81245e6632cbc62cab1231063a2999d27a158befc39e325c732726f012d",
+        "log": "local-state/validations/opaque-references-20261103/attribute-native.log",
+        "log_sha256": "474f52954d9e7f0f43d46586080daf3015d15b0406f6d6f46e825b5a0b5a4031",
+        "wall_ns": 790246136
+      }
+    ],
+    "new_ir_regression": {
+      "status": "passed",
+      "compiler_sha256": "d0c01143f8c712903932d4dc1fb9d00c77e075de0f006de78cb5c2e862014edb",
+      "fixture_sha256": "0d9fade1097ad401129717d1c706b31776aac7a30606a09b02ec845672a7af58",
+      "harness_sha256": "954dddd7dc46d536627e6df0cdc2fb6168e145a2031d68ed3ef7b47b048aeb37",
+      "entry_points": 5,
+      "input_cases": 16,
+      "pipelines": 5,
+      "locally_optimized_ir_observations": 400,
+      "llvm_reference_observations": 80,
+      "reference_reused": true,
+      "execution_backend": "Clang-22; no local machine-code or whole-program credit"
+    },
+    "native_proof": {
+      "path": "local-state/validations/opaque-references-20261103/attribute-native-proof.json",
+      "sha256": "e7091cd0007f0b55619c2a6674d9430383194f72aca35ac2fff3211d1c6def5d"
+    },
+    "fibonacci_boundary": {
+      "path": "local-state/validations/opaque-references-20261103/attribute-fibonacci-boundary.json",
+      "sha256": "bd95f37cf812cb02d05ae37514ab65fe5638c380840691c118efb7dadd166642"
+    },
+    "source_snapshot": {
+      "path": "local-state/validations/opaque-references-20261103/attribute-validation-snapshot.json",
+      "sha256": "b0656b41d0a65a1c6bddf2c58bf12ddf5589f0ce9fc8b04094421f18eee05b75",
+      "files": 2684,
+      "scope": "Captured during readiness, then verified unchanged before the source commit; this is focused proof, not a frozen full integration run."
+    },
+    "source_and_probe_check": {
+      "path": "local-state/validations/opaque-references-20261103/attribute-source-and-probe-check.json",
+      "sha256": "a61dd7a3543d72fb5edb4aaeb1421d5845b4b1a8df8d4b9408720cd728361968"
+    }
+  },
+  "baseline": {
+    "path": "local-state/validations/opaque-references-20261103/attribute-baseline.json",
+    "sha256": "93dae8fd6986f3a6ace3323a8695a490ba6b087d1ff0a7e4b886d0a18613cf2a",
+    "scope": "Installed binary before this slice retained the dead definitions, foldable global and duplicate constants across the five checked pipelines; all outputs passed LLVM verification. Exact source-to-binary provenance is not authenticated, and baseline execution is not claimed."
+  },
+  "diagnostic_corrections": [
+    "The first module filter exposed an old test that treated recognized nounwind groups as unknown; it now tests an unrecognized attribute.",
+    "The first readiness attempt passed all 60 ABI cases but failed the new test setup because the text parser rejects empty modules. The test now constructs the malformed record in a valid declaration-only module, and all 1739 units and readiness pass.",
+    "The first Fibonacci assertion confused the combined 86 globals/aliases with a global-only count; the measured split is the unchanged 85 globals plus one alias."
+  ],
+  "validation_policy": "Tier 2 provisional compiler slice under docs/validation_tiers.md. Cumulative Tier 3 remains required before accepting the dependency-reference family, moving to aggregate frames or claiming a milestone.",
+  "next_plan": {
+    "path": "local-state/validations/opaque-references-20261103/metadata-next-plan.json",
+    "sha256": "1f7b97837936454ec43ec57c5f9af3e14d64eb77dd6e0a0ecacbe28cd1a2c343"
+  },
+  "disk_policy": "The separately accepted 32,949,672,960-byte admission and 24,359,738,368-byte runtime reserve are unchanged.",
+  "readiness_sampled_min_free_bytes": 31897899008,
+  "free_bytes_after_readiness": 32009674752,
+  "original_scratch_files_verified": 13,
+  "archives_created": 0,
+  "documentation_validation": {
+    "argv": [
+      "/home/oleg/.zig/0.17.0/files/zig",
+      "build",
+      "check-docs"
+    ],
+    "returncode": 0,
+    "log": "local-state/validations/opaque-references-20261103/attribute-docs.log",
+    "log_sha256": "60f79727b41a5e6b0f2262dfc1f6fecb76d3694b5e625871bbd96dad6a172bb1",
+    "documents": 19,
+    "internal_file_links": 209,
+    "generated_status_blocks": 2
+  }
+}

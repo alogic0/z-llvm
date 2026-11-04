@@ -252,8 +252,21 @@ are recorded in the evidence. Only the idle project build cache was retired for
 admission, preserving sources, current exports and all 13 original probes.
 No shared caches were deleted, and no archives were created.
 
-Next, narrow opaque dependency-reference coverage before changing the default
-selection. LLVM GlobalDCE retains 34 functions and 16 globals/aliases from the
+The provisional [attribute-group slice](evidence/reference_attributes_focused_20261103.json)
+at `fa85a805` recognizes bounded enum, alignment, memory-effect and string
+attributes through one module context. Missing/duplicate groups and unfamiliar
+strings such as `probe-stack` remain conservative. It passes 1,739 units,
+13 structural tests, 19 focused tests in each of ReleaseFast and ReleaseSafe,
+readiness and 400 observations of optimized IR executed by Clang against
+80 reused LLVM references. Full family integration remains pending.
+
+Next, parse metadata definitions and attachments with explicit field grammars,
+indexing IDs before validation so valid recursive debug types remain supported.
+Preserve raw records and unknown fallbacks. Complete reference discovery does
+not establish rewrite coverage: constant merging must retain globals still
+referenced in raw metadata and must not report a change when nothing changes.
+Then inspect remaining typed constant/aggregate boundaries before changing the
+default selection. LLVM GlobalDCE retains 34 functions and 16 globals/aliases from the
 original Fibonacci capture; the comparison-normalized local output yields the
 same counts. Current conservative selection retains 35 functions and 86
 globals/aliases. These are diagnostic comparisons, not whole-program executions.

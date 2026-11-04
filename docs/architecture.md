@@ -297,6 +297,12 @@ do not establish a runtime speedup.
   explicitly; absence requires both zero direct uses and complete coverage.
   Assembly, raw call fields, metadata, and unrecognized attributes conservatively
   remain unknown. GlobalOpt uses this API for eligibility and deletion checks.
+  Allocation-capable consumers build one module context to resolve the bounded
+  [reference-free attribute grammar](../src/analysis/reference_attributes.zig).
+  Missing/duplicate group IDs and arbitrary string attributes, including helper
+  names in `probe-stack`, remain unknown. Standalone walks cannot resolve group
+  IDs without that context. The [attribute slice](evidence/reference_attributes_focused_20261103.json)
+  has focused proof; cumulative dependency-reference integration is pending.
   GlobalDCE uses definition-scoped walks to build function/global/alias edges:
   an unknown in a live definition or module scope blocks deletion, while an
   unreachable definition containing unknown text can still be removed. Other

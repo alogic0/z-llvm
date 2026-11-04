@@ -158,6 +158,11 @@ history are retired without archives. The latest
 of superseded AIR after the complete fresh replacement proof, making room for
 the cached run. Both runs now pass; old metadata and hashes remain. The retired
 checkout's dependency links are removed while their target repositories remain.
+The subsequent [attribute-group slice](evidence/reference_attributes_focused_20261103.json)
+at `fa85a805` is provisional: 1,739 unit tests, 13 structural tests, readiness and
+400 observations of locally optimized IR pass. Recognized groups permit more
+precise dependency analysis; metadata and other opaque forms remain conservative.
+Cumulative family integration is pending, and accepted counters stay unchanged.
 See [next steps](next_steps.md) for dependency-reference coverage and bounded
 aggregate frames. Historical checkpoints remain under the roadmap and evidence
 directories.
