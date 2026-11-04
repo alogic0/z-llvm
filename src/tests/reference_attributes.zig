@@ -33,6 +33,23 @@ test "reference attributes: unsupported and malformed fields keep unknown covera
     }) |text| try std.testing.expect(!attributes.referenceFree(text, null));
 }
 
+test "reference attributes: bounded typed parameter fields resolve without value references" {
+    for ([_][]const u8{
+        "dead_on_unwind noalias writeonly sret({ %os.linux.rlimit, i16, [6 x i8] }) align 8 captures(none)",
+        "byval([2 x i64]) byref(<{ i32, ptr }>) inalloca({})",
+        "preallocated(%\"a@b\") elementtype(<4 x i32>)",
+        "dereferenceable(0) dereferenceable_or_null(18446744073709551615)",
+        "elementtype(i8388608)",
+    }) |text| try std.testing.expect(attributes.referenceFree(text, null));
+    for ([_][]const u8{
+        "sret",                           "sret()",                      "sret({ ptr @hidden })", "sret(i32 1)",
+        "byval(%unterminated\")",         "byref([2 x i64)",             "inalloca(opaque)",      "elementtype(i0)",
+        "elementtype(i8388609)",          "elementtype(<0 x i32>)",      "captures()",            "captures(address)",
+        "captures(none, none)",           "captures(none) @hidden",      "dereferenceable(-1)",   "dereferenceable(18446744073709551616)",
+        "dereferenceable_or_null(8junk)", "dereferenceable(8) trailing",
+    }) |text| try std.testing.expect(!attributes.referenceFree(text, null));
+}
+
 fn checkGroups(allocator: std.mem.Allocator) !void {
     var groups = try attributes.Groups.init(allocator, &.{
         "attributes #0 = { nounwind \"frame-pointer\"=\"all\" }",
@@ -193,10 +210,10 @@ test "reference attributes: unknown groups and helper strings block optimizer de
     }
 }
 
-test "reference attributes: declaration groups resolve while metadata remains unknown" {
+test "reference attributes: declaration groups resolve while unsupported metadata remains unknown" {
     for ([_][]const u8{
         "declare noundef i32 @sink(i32 noundef) #0\nattributes #0 = { nounwind memory(none) }",
-        "declare noundef i32 @sink(i32 noundef) #0\nattributes #0 = { nounwind memory(none) }\n!0 = !{i32 1}",
+        "declare noundef i32 @sink(i32 noundef) #0\nattributes #0 = { nounwind memory(none) }\n!0 = !UnknownMetadata(value: 1)",
     }, 0..) |input, index| {
         var module = try ir.Module.parse(std.testing.allocator, input);
         defer module.deinit();

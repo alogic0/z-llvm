@@ -70,9 +70,9 @@ test "module dependencies: allocation failures leave borrowed definitions intact
 
 test "module dependencies: live opaque references conservatively retain all definitions" {
     for ([_][]const u8{
-        "@callback = global [1 x ptr] [ptr @hidden]",
+        "@callback = global [1 x ptr] [ptr dso_local_equivalent @hidden]",
         "module asm \".quad hidden\"",
-        "!0 = !{ptr @hidden}",
+        "!0 = !UnknownMetadata(value: ptr @hidden)",
         "define void @entry() #0 {\nentry:\n  ret void\n}\nattributes #0 = { unknown_attribute }",
     }) |opaque_root| {
         const source = try std.fmt.allocPrint(std.testing.allocator, "{s}\ndefine internal i32 @hidden() {{\nentry:\n  ret i32 9\n}}\n", .{opaque_root});

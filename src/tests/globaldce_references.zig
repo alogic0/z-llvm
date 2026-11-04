@@ -84,15 +84,15 @@ test "globaldce references: local names and dead cycles do not root definitions"
     try std.testing.expectEqual(@as(usize, 0), module.aliases.items.len);
 }
 
-test "globaldce references: opaque initializers block deletion only when live" {
-    for ([_][]const u8{ "[1 x ptr] [ptr @g]", "{ ptr } { ptr @g }", "ptr getelementptr (i32, ptr @g, i64 0)", "{ i32 } { i32 0 }" }) |initializer| {
+test "globaldce references: live parsed initializers retain their actual dependencies" {
+    for ([_][]const u8{ "[1 x ptr] [ptr @g]", "{ ptr } { ptr @g }", "ptr getelementptr (i32, ptr @g, i64 0)", "{ i32 } { i32 0 }" }, 0..) |initializer, case_index| {
         for ([_]bool{ false, true }) |live| {
             const input = try std.fmt.allocPrint(std.testing.allocator, "@g = internal global i32 1\n@p = {s}global {s}\n", .{ if (live) "" else "internal ", initializer });
             defer std.testing.allocator.free(input);
             var module = try ir.Module.parse(std.testing.allocator, input);
             defer module.deinit();
             try optimize(&module, std.testing.allocator);
-            try std.testing.expectEqual(@as(usize, if (live) 2 else 0), module.globals.items.len);
+            try std.testing.expectEqual(@as(usize, if (live) (if (case_index == 3) 1 else 2) else 0), module.globals.items.len);
         }
     }
 }

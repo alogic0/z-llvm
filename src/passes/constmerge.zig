@@ -49,11 +49,12 @@ fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassRes
 
     if (replacements.items.len == 0) return .unchanged;
 
+    var changed = false;
     for (replacements.items) |replacement| {
-        replaceGlobalUses(module, replacement);
+        replaceGlobalUses(module, replacement, &changed);
     }
-    removeMergedGlobals(module, replacements.items, &reference_context);
-    return .changed;
+    removeMergedGlobals(module, replacements.items, &reference_context, &changed);
+    return if (changed) .changed else .unchanged;
 }
 
 fn isMergeableConstant(global: ir.Global) bool {
@@ -80,36 +81,39 @@ fn sameMergeKey(a: ir.Global, b: ir.Global) bool {
     };
 }
 
-fn replaceGlobalUses(module: *ir.Module, replacement: Replacement) void {
+fn replaceGlobalUses(module: *ir.Module, replacement: Replacement, changed: *bool) void {
     for (module.globals.items) |*global| {
-        replaceInitializer(&global.initializer, replacement);
+        replaceInitializer(&global.initializer, replacement, changed);
     }
     for (module.aliases.items) |*alias| {
-        if (ir.identifiers.eql(alias.target, replacement.old_name)) alias.target = replacement.new_name;
+        if (ir.identifiers.eql(alias.target, replacement.old_name)) {
+            alias.target = replacement.new_name;
+            changed.* = true;
+        }
     }
     for (module.functions.items) |*function| {
         for (function.blocks.items) |*block| {
             for (block.instructions.items) |*instruction| {
                 if (instruction.removed) continue;
-                _ = ir.operands.instruction(instruction, OperandReplacer{ .replacement = replacement }) catch unreachable;
+                _ = ir.operands.instruction(instruction, OperandReplacer{ .replacement = replacement, .changed = changed }) catch unreachable;
             }
             if (block.terminator) |*terminator|
-                _ = ir.operands.terminator(terminator, OperandReplacer{ .replacement = replacement }) catch unreachable;
+                _ = ir.operands.terminator(terminator, OperandReplacer{ .replacement = replacement, .changed = changed }) catch unreachable;
         }
     }
 }
 
-fn replaceInitializer(initializer: *ir.GlobalInitializer, replacement: Replacement) void {
+fn replaceInitializer(initializer: *ir.GlobalInitializer, replacement: Replacement, changed: *bool) void {
     switch (initializer.*) {
-        .scalar => |*value| value.* = replaceValue(value.*, replacement),
+        .scalar => |*value| value.* = replaceValue(value.*, replacement, changed),
         .array => |*array| for (array.values.items) |*value| {
-            value.* = replaceValue(value.*, replacement);
+            value.* = replaceValue(value.*, replacement, changed);
         },
         .none, .c_string, .@"opaque" => {},
     }
 }
 
-fn removeMergedGlobals(module: *ir.Module, replacements: []const Replacement, context: *const references.Context) void {
+fn removeMergedGlobals(module: *ir.Module, replacements: []const Replacement, context: *const references.Context, changed: *bool) void {
     var index: usize = 0;
     while (index < module.globals.items.len) {
         const global = module.globals.items[index];
@@ -119,6 +123,7 @@ fn removeMergedGlobals(module: *ir.Module, replacements: []const Replacement, co
         }
         var removed = module.globals.orderedRemove(index);
         removed.deinit(module.allocator);
+        changed.* = true;
     }
 }
 
@@ -132,13 +137,15 @@ fn isRemovedGlobal(name: []const u8, replacements: []const Replacement) bool {
 const OperandReplacer = struct {
     pub const Error = error{};
     replacement: Replacement,
+    changed: *bool,
     pub fn visit(replacer: OperandReplacer, value: *ir.Value, _: ir.Type) Error!void {
-        value.* = replaceValue(value.*, replacer.replacement);
+        value.* = replaceValue(value.*, replacer.replacement, replacer.changed);
     }
 };
 
-fn replaceValue(value: ir.Value, replacement: Replacement) ir.Value {
+fn replaceValue(value: ir.Value, replacement: Replacement, changed: *bool) ir.Value {
     if (!references.isDirectValue(value, replacement.old_name)) return value;
+    if (!value.eql(replacement.new_value)) changed.* = true;
     return replacement.new_value;
 }
 

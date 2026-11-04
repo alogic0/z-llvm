@@ -136,16 +136,16 @@ test "module references: malformed symbol spellings remain unknown" {
     try std.testing.expect(refs.hasUnknown(&module));
 }
 
-test "module references: nested expressions and vectors stay unknown without text matching" {
+test "module references: standalone constants stay unknown while context decodes bounded grammar" {
     for ([_][]const u8{
         "@p = global { ptr } { ptr @g }",
         "@p = global [1 x ptr] [ptr getelementptr (i32, ptr @g, i64 0)]",
         "@p = global ptr inttoptr (i64 ptrtoint (ptr @g to i64) to ptr)",
         "@p = global <2 x ptr> <ptr @g, ptr null>",
-        // No partial text search may claim these opaque regions are complete.
+        // Complete parsing can prove these two initializers reference no global.
         "@p = global { i32 } { i32 0 }",
         "@p = global ptr inttoptr (i64 0 to ptr)",
-    }) |initializer| {
+    }, 0..) |initializer, case_index| {
         const input = try std.fmt.allocPrint(std.testing.allocator,
             \\@g = internal global i32 1
             \\{s}
@@ -161,9 +161,13 @@ test "module references: nested expressions and vectors stay unknown without tex
         const query = refs.query(&module, "g");
         try std.testing.expect(query.direct_uses != 0 and query.has_unknown);
         try std.testing.expect(refs.query(&module, "unrelated").has_unknown);
+        var context = try refs.Context.init(std.testing.allocator, &module);
+        defer context.deinit();
+        try std.testing.expect(!context.hasUnknown());
         try optimize(&module);
-        try std.testing.expectEqualStrings("g", module.globals.items[0].name);
-        try std.testing.expect(!module.functions.items[0].blocks.items[0].instructions.items[0].removed);
+        const retained = case_index < 4;
+        try std.testing.expectEqualStrings(if (retained) "g" else "p", module.globals.items[0].name);
+        try std.testing.expectEqual(!retained, module.functions.items[0].blocks.items[0].instructions.items[0].removed);
     }
 }
 

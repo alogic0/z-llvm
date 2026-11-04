@@ -11,6 +11,7 @@ pub fn main(init: std.process.Init) !void {
     try runCase(init, &out.interface, "test/opt/inputs/globaldce_references.ll", "test/opt/globaldce_references_harness.c", &.{ "globaldce", "adce", "release-o3" }, "GlobalDCE references", "entry_points=5");
     try runCase(init, &out.interface, "test/opt/inputs/symbol_spelling.ll", "test/opt/symbol_spelling_harness.c", &.{ "globaldce", "globalopt", "release-o3" }, "symbol spelling", "entry_points=5 input_cases=16");
     try runCase(init, &out.interface, "test/opt/inputs/reference_attributes.ll", "test/opt/reference_attributes_harness.c", &.{ "globaldce", "globalopt", "constmerge", "globalopt,constmerge,globaldce", "release-o3" }, "reference attributes", "entry_points=5 input_cases=16");
+    try runCase(init, &out.interface, "test/opt/inputs/reference_metadata.ll", "test/opt/reference_metadata_harness.c", &.{ "globaldce", "globalopt", "constmerge", "globalopt,constmerge,globaldce", "release-o3" }, "reference metadata", "entry_points=5 input_cases=16");
     try runCase(init, &out.interface, "test/opt/inputs/adce_operands.ll", "test/opt/adce_operands_harness.c", &.{ "adce", "release-o3" }, "ADCE vector operands", "observations=156");
 }
 

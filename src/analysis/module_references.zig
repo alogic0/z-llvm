@@ -3,29 +3,37 @@
 //! are symbols by their field's contract. Definition names and CFG labels are
 //! not uses. Removed instructions and replacement bookkeeping are skipped.
 //!
-//! Opaque expressions/aggregates, assembly, metadata, bundles and raw arguments
-//! report unknown references, never absence inferred from a substring search.
-//! Only an explicit grammar of reference-free attributes is accepted as absent.
+//! Bounded attribute, metadata and constant grammars establish coverage only
+//! with a module context. Unsupported regions report unknown references, never
+//! absence inferred from a substring search. Standalone walks stay conservative.
 //! Visitors declare Error and visit(site, event); borrowed pointers/text remain
 //! valid only while the source module and its storage remain unchanged.
 const std = @import("std");
 const ir = @import("../ir.zig");
 const opaque_names = @import("../ir/opaque_names.zig");
 const reference_attributes = @import("reference_attributes.zig");
+const reference_metadata = @import("reference_metadata.zig");
+const reference_constants = @import("reference_constants.zig");
+const Cursor = @import("reference_syntax.zig").Cursor;
 
-/// Borrow one module while owning only lookup storage. Attribute records must
-/// remain unchanged for this context's lifetime; definitions and uses may be
-/// rewritten by its consumer. Standalone walks do not resolve group IDs.
+/// Borrow one module while owning lookup/reference storage. Attribute and
+/// metadata records must remain unchanged during this context's lifetime.
+/// Scoped walks validate metadata IDs; their retained definition references
+/// are emitted by walkModuleScope. Consumers must include that scope too.
 pub const Context = struct {
     module: *const ir.Module,
     groups: reference_attributes.Groups,
+    metadata: reference_metadata.Index,
 
     pub fn init(allocator: std.mem.Allocator, module: *const ir.Module) !Context {
-        return .{ .module = module, .groups = try reference_attributes.Groups.init(allocator, module.attribute_groups.items) };
+        var groups = try reference_attributes.Groups.init(allocator, module.attribute_groups.items);
+        errdefer groups.deinit();
+        return .{ .module = module, .groups = groups, .metadata = try reference_metadata.Index.init(allocator, module.metadata.items) };
     }
 
     pub fn deinit(context: *Context) void {
         context.groups.deinit();
+        context.metadata.deinit();
     }
 
     pub fn walkModule(context: *const Context, visitor: anytype) @TypeOf(visitor).Error!void {
@@ -88,17 +96,20 @@ fn symbolReference(name: []const u8, site: Site, visitor: anytype) @TypeOf(visit
     }
 }
 
-fn valueReference(value: ir.Value, site: Site, visitor: anytype) @TypeOf(visitor).Error!void {
+fn valueReference(value: ir.Value, ty: ir.Type, site: Site, context: ?*const Context, visitor: anytype) @TypeOf(visitor).Error!void {
     switch (value) {
         .named => |name| {
             if (name.len != 0 and name[0] == '@') {
                 try symbolReference(name[1..], site, visitor);
             } else if (name.len != 0 and name[0] == '!') {
+                if (context) |ctx| {
+                    if (try ctx.metadata.value(name, TextVisitor(@TypeOf(visitor)){ .site = .module, .visitor = visitor })) return;
+                }
                 try opaqueText(name, .metadata, site, visitor);
             }
         },
-        .vector => |raw| try opaqueText(raw, .value, site, visitor),
-        .constant_expr => |raw| try opaqueText(raw, .value, site, visitor),
+        .vector => |raw| try constantText(raw, ty, .value, site, context, visitor),
+        .constant_expr => |raw| try constantText(raw, ty, .value, site, context, visitor),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer => {},
     }
 }
@@ -108,10 +119,27 @@ fn ValueVisitor(comptime Visitor: type) type {
         pub const Error = Visitor.Error;
         visitor: Visitor,
         site: Site,
-        pub fn visit(walker: @This(), value: *const ir.Value, _: ir.Type) Error!void {
-            try valueReference(value.*, walker.site, walker.visitor);
+        context: ?*const Context,
+        pub fn visit(walker: @This(), value: *const ir.Value, ty: ir.Type) Error!void {
+            try valueReference(value.*, ty, walker.site, walker.context, walker.visitor);
         }
     };
+}
+
+fn TextVisitor(comptime Visitor: type) type {
+    return struct {
+        pub const Error = Visitor.Error;
+        visitor: Visitor,
+        site: Site,
+        pub fn symbol(walker: @This(), name: []const u8) Error!void {
+            try symbolReference(name, walker.site, walker.visitor);
+        }
+    };
+}
+
+fn constantText(text: []const u8, ty: ir.Type, kind: OpaqueKind, site: Site, context: ?*const Context, visitor: anytype) @TypeOf(visitor).Error!void {
+    if (context != null and try reference_constants.value(text, ty, TextVisitor(@TypeOf(visitor)){ .site = site, .visitor = visitor })) return;
+    try opaqueText(text, kind, site, visitor);
 }
 
 fn opaqueText(text: ?[]const u8, kind: OpaqueKind, site: Site, visitor: anytype) @TypeOf(visitor).Error!void {
@@ -133,7 +161,40 @@ fn opaqueText(text: ?[]const u8, kind: OpaqueKind, site: Site, visitor: anytype)
 fn attributes(text: ?[]const u8, site: Site, context: ?*const Context, visitor: anytype) @TypeOf(visitor).Error!void {
     if (text) |s| {
         const groups = if (context) |ctx| &ctx.groups else null;
-        if (!reference_attributes.referenceFree(s, groups)) try opaqueText(s, .attributes, site, visitor);
+        var cursor: Cursor = .{ .text = s };
+        while (!cursor.done()) {
+            const complete = if (cursor.peek() == '!') blk: {
+                const ctx = context orelse break :blk false;
+                // A metadata use on a load is not another direct load use.
+                break :blk try ctx.metadata.attachment(&cursor, TextVisitor(@TypeOf(visitor)){ .site = .module, .visitor = visitor });
+            } else reference_attributes.takeOne(&cursor, groups);
+            if (!complete or (cursor.take(',') and cursor.done())) {
+                try opaqueText(s, .attributes, site, visitor);
+                return;
+            }
+        }
+    }
+}
+
+fn metadataText(text: ?[]const u8, site: Site, context: ?*const Context, visitor: anytype) @TypeOf(visitor).Error!void {
+    if (text) |s| {
+        if (context) |ctx| {
+            var cursor: Cursor = .{ .text = s };
+            var complete = true;
+            while (!cursor.done()) {
+                if (!try ctx.metadata.attachment(&cursor, TextVisitor(@TypeOf(visitor)){ .site = .module, .visitor = visitor })) {
+                    complete = false;
+                    break;
+                }
+                if (cursor.done()) break;
+                if (!cursor.take(',') or cursor.done()) {
+                    complete = false;
+                    break;
+                }
+            }
+            if (complete) return;
+        }
+        try opaqueText(s, .metadata, site, visitor);
     }
 }
 
@@ -146,8 +207,8 @@ fn walkInstructionWithContext(inst: *const ir.Instruction, context: ?*const Cont
     const site: Site = .{ .instruction = inst };
     // The operand API's generic coverage also flags reference-free attributes;
     // inspect those fields below under the explicit module-reference policy.
-    _ = try ir.operands.instruction(inst, ValueVisitor(@TypeOf(visitor)){ .site = site, .visitor = visitor });
-    try opaqueText(inst.metadata, .metadata, site, visitor);
+    _ = try ir.operands.instruction(inst, ValueVisitor(@TypeOf(visitor)){ .site = site, .visitor = visitor, .context = context });
+    try metadataText(inst.metadata, site, context, visitor);
     switch (inst.kind) {
         .call => |call| {
             if (call.inline_asm != null) {
@@ -167,13 +228,17 @@ fn walkInstructionWithContext(inst: *const ir.Instruction, context: ?*const Cont
 }
 
 pub fn walkTerminator(term: *const ir.Terminator, visitor: anytype) @TypeOf(visitor).Error!void {
+    try walkTerminatorWithContext(term, null, visitor);
+}
+
+fn walkTerminatorWithContext(term: *const ir.Terminator, context: ?*const Context, visitor: anytype) @TypeOf(visitor).Error!void {
     const site: Site = .{ .terminator = term };
-    _ = try ir.operands.terminator(term, ValueVisitor(@TypeOf(visitor)){ .site = site, .visitor = visitor });
+    _ = try ir.operands.terminator(term, ValueVisitor(@TypeOf(visitor)){ .site = site, .visitor = visitor, .context = context });
     switch (term.*) {
-        .br => |x| try opaqueText(x.metadata, .metadata, site, visitor),
-        .condbr => |x| try opaqueText(x.metadata, .metadata, site, visitor),
-        .@"switch" => |x| try opaqueText(x.metadata, .metadata, site, visitor),
-        .indirectbr => |x| try opaqueText(x.metadata, .metadata, site, visitor),
+        .br => |x| try metadataText(x.metadata, site, context, visitor),
+        .condbr => |x| try metadataText(x.metadata, site, context, visitor),
+        .@"switch" => |x| try metadataText(x.metadata, site, context, visitor),
+        .indirectbr => |x| try metadataText(x.metadata, site, context, visitor),
         .ret, .@"unreachable" => {},
     }
 }
@@ -191,7 +256,16 @@ fn walkModuleScopeWithContext(module: *const ir.Module, context: ?*const Context
         if (module.attribute_groups.items.len != 0) try visitor.visit(.module, .{ .unknown = .attributes });
         for (module.attribute_groups.items) |text| try opaqueText(text, .attributes, .module, visitor);
     }
-    for (module.metadata.items) |text| try opaqueText(text, .metadata, .module, visitor);
+    if (context) |ctx| {
+        if (ctx.metadata.has_unknown) {
+            try visitor.visit(.module, .{ .unknown = .metadata });
+            for (module.metadata.items) |text| try opaqueText(text, .metadata, .module, visitor);
+        }
+        for (ctx.metadata.symbols.items) |name| try symbolReference(name, .module, visitor);
+    } else {
+        if (module.metadata.items.len != 0) try visitor.visit(.module, .{ .unknown = .metadata });
+        for (module.metadata.items) |text| try opaqueText(text, .metadata, .module, visitor);
+    }
     for (module.declarations.items) |*decl| {
         const site: Site = .{ .declaration = decl };
         if (!ir.identifiers.isValid(decl.name)) try visitor.visit(site, .{ .unknown = .symbol_name });
@@ -216,9 +290,9 @@ fn walkGlobalWithContext(global: *const ir.Global, context: ?*const Context, vis
     if (!ir.identifiers.isValid(global.name)) try visitor.visit(site, .{ .unknown = .symbol_name });
     switch (global.initializer) {
         .none, .c_string => {}, // A parsed byte string is data, not IR syntax.
-        .scalar => |value| try valueReference(value, site, visitor),
-        .array => |array| for (array.values.items) |value| try valueReference(value, site, visitor),
-        .@"opaque" => |raw| try opaqueText(raw, .initializer, site, visitor),
+        .scalar => |value| try valueReference(value, global.ty, site, context, visitor),
+        .array => |array| for (array.values.items) |value| try valueReference(value, array.elem_ty, site, context, visitor),
+        .@"opaque" => |raw| try constantText(raw, global.ty, .initializer, site, context, visitor),
     }
     try attributes(global.attrs, site, context, visitor);
     try attributes(global.address_attrs, site, context, visitor);
@@ -236,7 +310,7 @@ fn walkFunctionWithContext(function: *const ir.Function, context: ?*const Contex
     for (function.params.items) |param| try attributes(param.attrs, site, context, visitor);
     for (function.blocks.items) |*block| {
         for (block.instructions.items) |*inst| try walkInstructionWithContext(inst, context, visitor);
-        if (block.terminator) |*term| try walkTerminator(term, visitor);
+        if (block.terminator) |*term| try walkTerminatorWithContext(term, context, visitor);
     }
 }
 
