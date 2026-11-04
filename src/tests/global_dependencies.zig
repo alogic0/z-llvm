@@ -106,3 +106,56 @@ test "module dependencies: alias cycles terminate without inventing a function" 
     try std.testing.expectEqual(@as(usize, 2), selection.live.items.len);
     try std.testing.expect(!selection.contains(.function, "dead"));
 }
+
+test "module dependencies: quoted references resolve to the stored definition identity" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\@export = global ptr @"ali\61s"
+        \\@alias = internal alias i32 (), ptr @"hel\70er"
+        \\define internal i32 @helper() {
+        \\entry:
+        \\  ret i32 7
+        \\}
+        \\define internal i32 @dead() {
+        \\entry:
+        \\  ret i32 0
+        \\}
+    );
+    defer module.deinit();
+    var graph = try dependencies.Graph.build(std.testing.allocator, module);
+    defer graph.deinit();
+    var selection = try graph.reachable();
+    defer selection.deinit();
+    try std.testing.expect(!selection.has_unknown);
+    try std.testing.expect(selection.contains(.global, "export"));
+    try std.testing.expect(selection.contains(.alias, "alias"));
+    try std.testing.expect(selection.contains(.alias, "\"alias\""));
+    try std.testing.expect(selection.contains(.function, "helper"));
+    try std.testing.expect(!selection.contains(.function, "dead"));
+    for (selection.live.items) |ref| {
+        try std.testing.expect(std.mem.indexOfScalar(u8, ref.name, '"') == null);
+    }
+}
+
+test "module dependencies: unrecognized definition spellings keep the closure conservative" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\define internal i32 @"bad\+1"() {
+        \\entry:
+        \\  ret i32 7
+        \\}
+        \\define internal i32 @dead() {
+        \\entry:
+        \\  ret i32 0
+        \\}
+        \\define i32 @entry() {
+        \\entry:
+        \\  ret i32 1
+        \\}
+    );
+    defer module.deinit();
+    var graph = try dependencies.Graph.build(std.testing.allocator, module);
+    defer graph.deinit();
+    var selection = try graph.reachable();
+    defer selection.deinit();
+    try std.testing.expect(selection.has_unknown);
+    try std.testing.expect(selection.contains(.function, "dead"));
+}

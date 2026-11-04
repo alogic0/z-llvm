@@ -65,7 +65,7 @@ const DirectLoadUses = struct {
         switch (event) {
             .unknown, .block_address => uses.blocked.* = true,
             .symbol => |name| {
-                if (!std.mem.eql(u8, name, uses.global.name)) return;
+                if (!ir.identifiers.eql(name, uses.global.name)) return;
                 if (site == .instruction and site.instruction.kind == .load) {
                     const load = site.instruction.kind.load;
                     if (!load.attrs.isBarrier() and load.ty.eql(uses.global.ty) and references.isDirectValue(load.ptr, name)) {

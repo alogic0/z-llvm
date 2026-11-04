@@ -22,7 +22,7 @@ pub const Site = union(enum) {
     terminator: *const ir.Terminator,
 };
 
-pub const OpaqueKind = enum { value, initializer, assembly, metadata, attributes, raw_arguments, operand_bundle, block_address };
+pub const OpaqueKind = enum { value, initializer, assembly, metadata, attributes, raw_arguments, operand_bundle, block_address, symbol_name };
 pub const Event = union(enum) {
     /// Module symbol spelling without @, as stored in definition names.
     symbol: []const u8,
@@ -32,14 +32,22 @@ pub const Event = union(enum) {
 };
 
 pub fn isDirectValue(value: ir.Value, name: []const u8) bool {
-    return value == .named and value.named.len > 1 and value.named[0] == '@' and std.mem.eql(u8, value.named[1..], name);
+    return value == .named and value.named.len > 1 and value.named[0] == '@' and ir.identifiers.eql(value.named[1..], name);
+}
+
+fn symbolReference(name: []const u8, site: Site, visitor: anytype) @TypeOf(visitor).Error!void {
+    if (ir.identifiers.isValid(name)) {
+        try visitor.visit(site, .{ .symbol = name });
+    } else {
+        try visitor.visit(site, .{ .unknown = .symbol_name });
+    }
 }
 
 fn valueReference(value: ir.Value, site: Site, visitor: anytype) @TypeOf(visitor).Error!void {
     switch (value) {
         .named => |name| {
-            if (name.len > 1 and name[0] == '@') {
-                try visitor.visit(site, .{ .symbol = name[1..] });
+            if (name.len != 0 and name[0] == '@') {
+                try symbolReference(name[1..], site, visitor);
             } else if (name.len != 0 and name[0] == '!') {
                 try opaqueText(name, .metadata, site, visitor);
             }
@@ -126,7 +134,7 @@ pub fn walkInstruction(inst: *const ir.Instruction, visitor: anytype) @TypeOf(vi
             if (call.inline_asm != null) {
                 try visitor.visit(site, .{ .unknown = .assembly });
             } else if (call.callee_value == null) {
-                try visitor.visit(site, .{ .symbol = call.callee });
+                try symbolReference(call.callee, site, visitor);
             }
             for (call.args.items) |arg| try attributes(arg.attrs, site, visitor);
             try attributes(call.attrs, site, visitor);
@@ -158,6 +166,7 @@ pub fn walkModuleScope(module: *const ir.Module, visitor: anytype) @TypeOf(visit
     for (module.metadata.items) |text| try opaqueText(text, .metadata, .module, visitor);
     for (module.declarations.items) |*decl| {
         const site: Site = .{ .declaration = decl };
+        if (!ir.identifiers.isValid(decl.name)) try visitor.visit(site, .{ .unknown = .symbol_name });
         try attributes(decl.attrs, site, visitor);
         try attributes(decl.ret_attrs, site, visitor);
         for (decl.params.items) |param| try attributes(param.attrs, site, visitor);
@@ -165,11 +174,14 @@ pub fn walkModuleScope(module: *const ir.Module, visitor: anytype) @TypeOf(visit
 }
 
 pub fn walkAlias(alias: *const ir.GlobalAlias, visitor: anytype) @TypeOf(visitor).Error!void {
-    try visitor.visit(.{ .alias = alias }, .{ .symbol = alias.target });
+    const site: Site = .{ .alias = alias };
+    if (!ir.identifiers.isValid(alias.name)) try visitor.visit(site, .{ .unknown = .symbol_name });
+    try symbolReference(alias.target, site, visitor);
 }
 
 pub fn walkGlobal(global: *const ir.Global, visitor: anytype) @TypeOf(visitor).Error!void {
     const site: Site = .{ .global = global };
+    if (!ir.identifiers.isValid(global.name)) try visitor.visit(site, .{ .unknown = .symbol_name });
     switch (global.initializer) {
         .none, .c_string => {}, // A parsed byte string is data, not IR syntax.
         .scalar => |value| try valueReference(value, site, visitor),
@@ -182,6 +194,7 @@ pub fn walkGlobal(global: *const ir.Global, visitor: anytype) @TypeOf(visitor).E
 
 pub fn walkFunction(function: *const ir.Function, visitor: anytype) @TypeOf(visitor).Error!void {
     const site: Site = .{ .function = function };
+    if (!ir.identifiers.isValid(function.name)) try visitor.visit(site, .{ .unknown = .symbol_name });
     try attributes(function.attrs, site, visitor);
     try attributes(function.ret_attrs, site, visitor);
     for (function.params.items) |param| try attributes(param.attrs, site, visitor);
@@ -213,11 +226,11 @@ const Query = struct {
     summary: *Summary,
     pub fn visit(search: Query, _: Site, event: Event) Error!void {
         switch (event) {
-            .symbol => |name| if (std.mem.eql(u8, search.name, name)) {
+            .symbol => |name| if (ir.identifiers.eql(search.name, name)) {
                 search.summary.direct_uses += 1;
             },
             .unknown => search.summary.has_unknown = true,
-            .block_address => |address| if (std.mem.eql(u8, search.name, address.function)) {
+            .block_address => |address| if (ir.identifiers.eql(search.name, address.function)) {
                 search.summary.direct_uses += 1;
             },
         }
@@ -227,7 +240,14 @@ const Query = struct {
 /// Known absence means zero direct uses AND no unknown regions. A known use
 /// and incomplete coverage can coexist. This is not a transitive alias graph.
 pub fn query(module: *const ir.Module, name: []const u8) Summary {
-    var summary: Summary = .{};
+    var summary: Summary = .{ .has_unknown = !ir.identifiers.isValid(name) };
     walkModule(module, Query{ .name = name, .summary = &summary }) catch unreachable;
     return summary;
+}
+
+/// Whether any reference region is incomplete, without querying a symbol.
+pub fn hasUnknown(module: *const ir.Module) bool {
+    var summary: Summary = .{};
+    walkModule(module, Query{ .name = "", .summary = &summary }) catch unreachable;
+    return summary.has_unknown;
 }

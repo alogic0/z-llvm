@@ -20,7 +20,7 @@ const Replacement = struct {
 fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassResult {
     // The replacement walk cannot rewrite opaque expressions, metadata or
     // assembly. Incomplete reference coverage forbids deleting any candidate.
-    if (references.query(module, "").has_unknown) return .unchanged;
+    if (references.hasUnknown(module)) return .unchanged;
     var replacements: std.ArrayList(Replacement) = .empty;
     defer replacements.deinit(context.allocator);
 
@@ -83,7 +83,7 @@ fn replaceGlobalUses(module: *ir.Module, replacement: Replacement) void {
         replaceInitializer(&global.initializer, replacement);
     }
     for (module.aliases.items) |*alias| {
-        if (std.mem.eql(u8, alias.target, replacement.old_name)) alias.target = replacement.new_name;
+        if (ir.identifiers.eql(alias.target, replacement.old_name)) alias.target = replacement.new_name;
     }
     for (module.functions.items) |*function| {
         for (function.blocks.items) |*block| {
@@ -136,12 +136,7 @@ const OperandReplacer = struct {
 };
 
 fn replaceValue(value: ir.Value, replacement: Replacement) ir.Value {
-    const name = switch (value) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return value,
-    };
-    if (name.len != replacement.old_name.len + 1 or name[0] != '@') return value;
-    if (!std.mem.eql(u8, name[1..], replacement.old_name)) return value;
+    if (!references.isDirectValue(value, replacement.old_name)) return value;
     return replacement.new_value;
 }
 

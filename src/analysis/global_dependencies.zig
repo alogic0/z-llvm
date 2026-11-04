@@ -38,6 +38,7 @@ pub const Graph = struct {
         errdefer graph.deinit();
 
         for (module.functions.items) |*function| {
+            if (!ir.identifiers.isValid(function.name)) graph.has_unknown_roots = true;
             const ref: NodeRef = .{ .kind = .function, .name = function.name };
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
@@ -46,6 +47,7 @@ pub const Graph = struct {
             try graph.nodes.append(allocator, node);
         }
         for (module.globals.items) |*global| {
+            if (!ir.identifiers.isValid(global.name)) graph.has_unknown_roots = true;
             const ref: NodeRef = .{ .kind = .global, .name = global.name };
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
@@ -54,6 +56,7 @@ pub const Graph = struct {
             try graph.nodes.append(allocator, node);
         }
         for (module.aliases.items) |*alias| {
+            if (!ir.identifiers.isValid(alias.name)) graph.has_unknown_roots = true;
             const ref: NodeRef = .{ .kind = .alias, .name = alias.name };
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
@@ -122,13 +125,13 @@ const EdgeVisitor = struct {
 
 fn definition(module: *const ir.Module, name: []const u8) ?NodeRef {
     for (module.functions.items) |function| {
-        if (std.mem.eql(u8, function.name, name)) return .{ .kind = .function, .name = name };
+        if (ir.identifiers.eql(function.name, name)) return .{ .kind = .function, .name = function.name };
     }
     for (module.globals.items) |global| {
-        if (std.mem.eql(u8, global.name, name)) return .{ .kind = .global, .name = name };
+        if (ir.identifiers.eql(global.name, name)) return .{ .kind = .global, .name = global.name };
     }
     for (module.aliases.items) |alias| {
-        if (std.mem.eql(u8, alias.name, name)) return .{ .kind = .alias, .name = name };
+        if (ir.identifiers.eql(alias.name, name)) return .{ .kind = .alias, .name = alias.name };
     }
     return null;
 }
@@ -171,7 +174,7 @@ pub fn containsRef(refs: []const NodeRef, ref: NodeRef) bool {
 }
 
 fn sameRef(a: NodeRef, b: NodeRef) bool {
-    return a.kind == b.kind and std.mem.eql(u8, a.name, b.name);
+    return a.kind == b.kind and ir.identifiers.eql(a.name, b.name);
 }
 
 pub fn isLocal(linkage: ir.FunctionLinkage) bool {

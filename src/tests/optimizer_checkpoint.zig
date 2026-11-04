@@ -85,6 +85,23 @@ test "correctness checkpoint: constmerge still rewrites structured uses and alia
     try std.testing.expectEqualStrings("@b", module.functions.items[0].blocks.items[0].instructions.items[0].kind.load.ptr.named);
 }
 
+test "correctness checkpoint: constmerge rewrites equivalent quoted global uses" {
+    var module = try optimize(
+        \\@a = private unnamed_addr constant i32 7
+        \\@b = private unnamed_addr constant i32 7
+        \\@p = global ptr @a
+        \\define i32 @f() {
+        \\entry:
+        \\ %v = load i32, ptr @"a"
+        \\ ret i32 %v
+        \\}
+    , "constmerge");
+    defer module.deinit();
+    try std.testing.expectEqual(@as(usize, 2), module.globals.items.len);
+    try std.testing.expectEqualStrings("@b", module.globals.items[1].initializer.scalar.named);
+    try std.testing.expectEqualStrings("@b", module.functions.items[0].blocks.items[0].instructions.items[0].kind.load.ptr.named);
+}
+
 test "correctness checkpoint: vector index spellings use their own widths" {
     for ([_][]const u8{ "instcombine", "vector-combine", "release-o3" }) |passes| {
         for ([_][]const u8{ "i1 3", "i1 -1", "i8 257", "i128 1" }) |index| {

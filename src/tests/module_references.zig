@@ -31,6 +31,8 @@ test "module references: distinguish direct symbols local names and known absenc
     const query = refs.query(&module, "g");
     try std.testing.expectEqual(@as(usize, 1), query.direct_uses);
     try std.testing.expect(!query.has_unknown);
+    try std.testing.expect(!refs.hasUnknown(&module));
+    try std.testing.expect(refs.query(&module, "").has_unknown);
     try std.testing.expect(!refs.query(&module, "missing").mayReference());
     try std.testing.expect(!refs.isDirectValue(.{ .named = "g" }, "g"));
     try std.testing.expect(!refs.isDirectValue(.{ .named = "@global" }, "g"));
@@ -69,6 +71,69 @@ test "module references: alias chains arrays callees and terminators enumerate s
     try std.testing.expectEqual(@as(usize, 1), refs.query(&module, "second").direct_uses);
     try std.testing.expectEqual(@as(usize, 1), refs.query(&module, "sink").direct_uses);
     try std.testing.expect(!refs.query(&module, "g").has_unknown);
+}
+
+test "module references: alternate global spellings retain stores and pointer escapes" {
+    for ([_][]const u8{
+        "@value = internal global i32 7\ndefine i32 @f(i32 %x) {\nentry:\n  store i32 %x, ptr @\"val\\75e\"\n  %v = load i32, ptr @value\n  ret i32 %v\n}\n",
+        "@\"value\" = internal global i32 7\ndefine i32 @f(i32 %x) {\nentry:\n  store i32 %x, ptr @value\n  %v = load i32, ptr @\"val\\75e\"\n  ret i32 %v\n}\n",
+        "@value = internal global i32 7\ndefine i32 @f() {\nentry:\n  %v = load i32, ptr @value\n  ret i32 %v\n}\ndefine ptr @address() {\nentry:\n  ret ptr @\"val\\75e\"\n}\n",
+    }) |source| {
+        var module = try parse(source);
+        defer module.deinit();
+        const query = refs.query(&module, "value");
+        try std.testing.expectEqual(@as(usize, 2), query.direct_uses);
+        try std.testing.expect(!query.has_unknown);
+        try optimize(&module);
+        try std.testing.expectEqual(@as(usize, 1), module.globals.items.len);
+        for (module.functions.items[0].blocks.items[0].instructions.items) |instruction| {
+            try std.testing.expect(!instruction.removed);
+        }
+    }
+}
+
+test "module references: equivalent direct loads fold and numeric global identities stay separate" {
+    var module = try parse(
+        \\@0 = internal global i32 11
+        \\@"0" = internal global i32 19
+        \\@value = internal global i32 7
+        \\define i32 @f() {
+        \\entry:
+        \\  %a = load i32, ptr @0
+        \\  %b = load i32, ptr @"\30"
+        \\  %c = load i32, ptr @"val\75e"
+        \\  %ab = add i32 %a, %b
+        \\  %v = add i32 %ab, %c
+        \\  ret i32 %v
+        \\}
+    );
+    defer module.deinit();
+    try std.testing.expectEqual(@as(usize, 1), refs.query(&module, "0").direct_uses);
+    try std.testing.expectEqual(@as(usize, 1), refs.query(&module, "\"0\"").direct_uses);
+    try std.testing.expect(refs.isDirectValue(.{ .named = "@\"val\\75e\"" }, "value"));
+    try std.testing.expect(!refs.isDirectValue(.{ .named = "@\"0\"" }, "0"));
+    try optimize(&module);
+    try std.testing.expectEqual(@as(usize, 0), module.globals.items.len);
+    const instructions = module.functions.items[0].blocks.items[0].instructions.items;
+    try std.testing.expect(instructions[3].kind.binary.lhs.eql(.{ .int = 11 }));
+    try std.testing.expect(instructions[3].kind.binary.rhs.eql(.{ .int = 19 }));
+    try std.testing.expect(instructions[4].kind.binary.rhs.eql(.{ .int = 7 }));
+}
+
+test "module references: malformed symbol spellings remain unknown" {
+    var module = try parse(
+        \\@value = internal global i32 7
+        \\define ptr @f() {
+        \\entry:
+        \\  ret ptr @"bad\+1"
+        \\}
+    );
+    defer module.deinit();
+    try std.testing.expect(refs.query(&module, "value").has_unknown);
+    try std.testing.expect(refs.query(&module, "\"bad\\+1\"").has_unknown);
+    try std.testing.expect(refs.hasUnknown(&module));
+    module.functions.items[0].blocks.items[0].terminator.?.ret.value = .{ .named = "@" };
+    try std.testing.expect(refs.hasUnknown(&module));
 }
 
 test "module references: nested expressions and vectors stay unknown without text matching" {
