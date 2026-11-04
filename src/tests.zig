@@ -21,6 +21,7 @@ comptime {
     _ = @import("tests/ir_operands.zig");
     _ = @import("tests/ir_numeric_names.zig");
     _ = @import("tests/ir_parser_ownership.zig");
+    _ = @import("tests/ir_parser_parameters.zig");
     _ = @import("tests/ir_instruction_ownership.zig");
     _ = @import("tests/optimizer_correctness.zig");
     _ = @import("tests/optimizer_review_boundaries.zig");

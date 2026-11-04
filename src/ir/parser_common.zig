@@ -516,24 +516,21 @@ pub fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Functio
             const raw_param = if (comma) |index| rest[0..index] else rest;
             const param_text = std.mem.trim(u8, raw_param, " \t");
             const parsed_ty = try parseLeadingType(param_text);
-            var parts = std.mem.tokenizeAny(u8, parsed_ty.after, " \t");
-            var param_attrs_start: ?usize = null;
+            const after_type = std.mem.trim(u8, parsed_ty.after, " \t");
+            var parts = after_type;
             var param_name_token: ?[]const u8 = null;
-            while (parts.next()) |part| {
+            while (parts.len != 0) {
+                const end = syntax.findTopLevelTokenEnd(parts) orelse return error.InvalidParameter;
+                const part = parts[0..end];
+                parts = std.mem.trimStart(u8, parts[end..], " \t");
                 if (std.mem.startsWith(u8, part, "%")) {
+                    if (part.len == 1 or parts.len != 0) return error.InvalidParameter;
                     param_name_token = part;
-                    continue;
-                }
-                if (param_attrs_start == null) {
-                    param_attrs_start = @intFromPtr(part.ptr) - @intFromPtr(param_text.ptr);
+                    break;
                 }
             }
             const param_name = param_name_token orelse return error.InvalidParameter;
-            if (!std.mem.startsWith(u8, param_name, "%")) return error.InvalidValueName;
-            const param_attrs = if (param_attrs_start) |start|
-                std.mem.trim(u8, param_text[start..(@intFromPtr(param_name.ptr) - @intFromPtr(param_text.ptr))], " \t")
-            else
-                "";
+            const param_attrs = std.mem.trim(u8, after_type[0..(@intFromPtr(param_name.ptr) - @intFromPtr(after_type.ptr))], " \t");
             try function.params.append(allocator, .{
                 .ty = parsed_ty.ty,
                 .attrs = if (param_attrs.len == 0) null else param_attrs,
