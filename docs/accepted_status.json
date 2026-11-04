@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "9c7985e27078d18e4958eb63fb0c0011881c3cda",
-  "accepted_tree": "0bbde5100847ce57f27eae68db8797afa91a83aa",
+  "accepted_revision": "abd0bae6d4c995ee4875296754da0231900a64ad",
+  "accepted_tree": "86a221ce353089625223f859a1ad7e873608982e",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,12 @@
   "paired_harnesses_ok": 5,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "9c7985e2",
+  "declaration_revision": "abd0bae6",
   "evidence": [
+    "docs/evidence/ir_headroom_acceptance_20261103.json",
+    "docs/evidence/ir_headroom_20261103_fresh.summary",
+    "docs/evidence/ir_headroom_20261103_cached.summary",
+    "docs/evidence/ir_headroom_20261103_comparison.summary",
     "docs/evidence/module_selection_acceptance_20261103.json",
     "docs/evidence/module_selection_20261103_cached.summary",
     "docs/evidence/array_stride_acceptance_20261103.json",

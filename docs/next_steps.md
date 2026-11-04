@@ -41,7 +41,14 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [module dependency checkpoint](evidence/module_selection_acceptance_20261103.json)
+The accepted [IR and headroom checkpoint](evidence/ir_headroom_acceptance_20261103.json)
+at `abd0bae6` passes both full 17-stage fresh/cached runs. All 1,406 canonical
+records match on an unchanged 2,681-file primary-checkout snapshot. The numeric
+serialization, blockaddress, quoted-name and allocation-ownership repairs are
+accepted with headroom policy schema 3. All candidate, execution and bypass
+counts stay fixed; the detailed scope appears below.
+
+The earlier accepted [module dependency checkpoint](evidence/module_selection_acceptance_20261103.json)
 at `9c7985e2`, with shared analysis extracted at `68a56ca7`, passes all 17
 integration stages on a frozen 2,642-file snapshot. Explicit
 `--codegen-reachable` selection follows parsed function, global and alias references;
@@ -170,13 +177,17 @@ are 44.09 GB and 43.31 GB, above the 34.36 GB reserve. The 51 runner/policy and
 41 comparison tests pass. These filesystem observations do not establish a speedup.
 The user subsequently lowered both admission and reserve by 10 decimal GB.
 Policy schema 3 now requires 32.95 GB at admission and maintains a 24.36 GB
-runtime reserve, with the same 8 GiB working budget. Validate the revised limits
-with a fresh/cache integration pair alongside the pending IR serialization repair.
+runtime reserve, with the same 8 GiB working budget. Its accepted fresh/cached
+pair reports 7.09 GB and 1.97 GB decreases. Independent sampled minima are
+30.71 GB and 33.65 GB, above the reduced reserve; all 1,406 canonical records match.
 The [generation cleanup](evidence/global_memory_cleanup_20261103.json) retires
 3.92 GB of superseded AIR after both full runs and replacement hash verification.
-Current exports and their paired work selection now use
-`global-memory-headroom-20261103`; historical metadata, proofs and source probes
-remain, with no archives.
+That checkpoint used `global-memory-headroom-20261103`. The later
+[IR generation cleanup](evidence/ir_headroom_cleanup_20261103.json) retires those
+payloads after the complete fresh replacement proof and before cached validation
+to meet its admission threshold. Both replacement runs now pass. Current exports
+and their paired work selection use `ir-headroom-20261103`; historical metadata,
+hashes, proofs and source probes remain, with no archives.
 
 The [bounded memory slice](evidence/startup_word_pair_memory_20261102.json)
 reuses existing 128-bit frame storage for an exact 16-byte pointer/length object
@@ -213,17 +224,15 @@ All 1,718 units, readiness and 13 structural checks pass, including the previous
 failing mixed C/Zig native case. Ten regression functions supply 480 observations
 of locally optimized IR executed by Clang-22 against 160 reused LLVM references.
 Complete optimized panic-module IR and the unchanged repaired Fibonacci IR verify.
-These IR checks add no local whole-program execution. Full fresh/cache integration
-remains pending, so the accepted checkpoint above stays unchanged. The isolated
-retry passed nine stages, then exposed the export worker's fixed checkout path.
-The fresh/cache pair now runs from the primary checkout after merging the focused
-commits; the failed logs and both frozen snapshots remain retained.
-
-Next, complete the frozen fresh/cache integration pair for the IR changes and
-revised headroom policy before accepting the checkpoint. The follow-up fixes have separate printing, parser and optimizer source commits;
+These IR checks add no local whole-program execution. The accepted fresh/cached
+pair passes all 17 stages with matching canonical records and an unchanged source
+snapshot. The isolated retry had passed nine stages before exposing the export
+worker's fixed checkout path; the accepted pair ran from the primary checkout
+after merging the focused commits. Failed logs and frozen snapshots remain.
+The follow-up fixes have separate printing, parser and optimizer source commits;
 the fixed candidate and execution cohorts remain unchanged.
 
-Then narrow opaque dependency-reference coverage before changing the default
+Next, narrow opaque dependency-reference coverage before changing the default
 selection. LLVM GlobalDCE retains 34 functions and 16 globals/aliases from the
 original Fibonacci capture; the comparison-normalized local output yields the
 same counts. Current conservative selection retains 35 functions and 86
@@ -234,7 +243,7 @@ reject, beginning at `start.expandStackSize` with an aggregate alloca. Its first
 stack types are the 16-byte `{ i64, i64 }` rlimit and a 24-byte padded result
 wrapper. A 56-byte array stride and narrower call ABI forms are visible later.
 Extend bounded aggregate frame storage through existing private legalization and
-typed address authorities after the serialization and selection work. Keep the
+typed address authorities after the dependency-reference work. Keep the
 fixed compiler-core population and bypass ratchet unchanged without a separate
 migration. The [checkpoint evidence](evidence/module_selection_acceptance_20261103.json)
 records all diagnostics, cleanup and the full integration proof.

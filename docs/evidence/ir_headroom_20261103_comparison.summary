@@ -1,0 +1,1 @@
+summary distribution-all-equivalence schema_version=4 expected=local-state/validations/numeric-ssa-20261103/full-ir-fresh-r3.log actual=local-state/validations/numeric-ssa-20261103/full-ir-cached-r3.log gates=17 canonical_records=1406 semantic_match=true local_fail=0

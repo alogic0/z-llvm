@@ -214,6 +214,17 @@ identical CLI/environment-selected objects. All 17 integration stages pass on th
 frozen source snapshot; the default selection, compiler-core counts and bypass
 ratchet remain unchanged.
 
+The accepted [IR serialization and headroom checkpoint](evidence/ir_headroom_acceptance_20261103.json)
+adds optimizer-correctness regressions for numeric locals, quoted parameter names,
+generated-name collisions and function-bound block addresses. Ten functions over
+16 inputs and three optimizer pipelines produce 480 observations of locally
+optimized IR executed by Clang-22 against 160 reused LLVM references. These
+checks add no local machine-code execution credit. All 1,718 units, readiness
+and 13 structural checks pass. The accompanying policy schema 3 passes its
+17-stage fresh/cached pair with 1,406 matching canonical records and unchanged
+candidate, execution and bypass counts. The 32.95 GB admission and 24.36 GB
+runtime floor are enforced with the existing 8 GiB forecast.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

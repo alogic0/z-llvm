@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `9c7985e27078d18e4958eb63fb0c0011881c3cda`; tree: `0bbde5100847ce57f27eae68db8797afa91a83aa`.
+Accepted revision: `abd0bae6d4c995ee4875296754da0231900a64ad`; tree: `86a221ce353089625223f859a1ad7e873608982e`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,25 +25,24 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The [numeric SSA serialization repair](evidence/numeric_ssa_focused_20261103.json)
-now has a [focused integration follow-up](evidence/ir_blockaddress_focused_20261103.json).
-The first full run failed after six stages on a retained jump-table initializer;
-its sampled minimum stayed above the reduced reserve. Printing now binds each
+The accepted [IR and headroom checkpoint](evidence/ir_headroom_acceptance_20261103.json)
+at `abd0bae6` passes both full 17-stage fresh/cached runs. All 1,406 canonical
+records match on one unchanged 2,681-file snapshot in the primary checkout.
+Numeric local names follow definition order, and printing binds each
 `blockaddress` to its function before renumbering. CFG passes preserve functions
 whose block addresses escape, while opaque reference coverage stays conservative.
-SimplifyCFG generates valid names without collisions, and the parser preserves
-quoted parameter names with spaces. The earlier allocation-ownership fixes remain.
+SimplifyCFG generates valid names without collisions; the parser preserves
+quoted parameter names with spaces and releases owned values on failed publication.
 All 1,718 units, readiness and 13 structural checks pass, including the previously
 failing mixed C/Zig native case. Ten regression functions supply 480 observations
 of locally optimized IR executed by Clang-22 against 160 reused LLVM references.
 Complete optimized panic-module IR and the unchanged repaired Fibonacci IR verify.
-These IR checks add no local whole-program execution. Full fresh/cache integration
-remains pending, so the accepted checkpoint above stays unchanged. The isolated
-retry passed nine stages, then exposed the export worker's fixed checkout path.
-The fresh/cache pair now runs from the primary checkout after merging the focused
-commits; the failed logs and both frozen snapshots remain retained.
+These IR checks add no local whole-program execution. Candidate counts, all eleven
+native populations and the bypass ratchet remain unchanged. The two failed
+attempts, their inputs and frozen snapshots remain retained; full validation uses
+the canonical checkout required by the export/execution cohort.
 
-The accepted [module dependency checkpoint](evidence/module_selection_acceptance_20261103.json)
+The earlier accepted [module dependency checkpoint](evidence/module_selection_acceptance_20261103.json)
 at `9c7985e2`, with shared analysis extracted at `68a56ca7`, passes all 17
 integration stages on a frozen 2,642-file snapshot. Explicit
 `--codegen-reachable` selection follows parsed function, global and alias references;
@@ -108,16 +107,19 @@ Five source-bound functions execute per mode: four constant methods and
 turn 100 native links into 100 executions.
 
 AIR publication atomically writes schema-4 metadata and transfers the verified
-payload into the cache. The global-memory pair authenticates three exports; the
-boolean and array-stride checkpoints reuse them and rerun execution checks on
-cache hits. The user has reduced serial admission and its runtime reserve by
-10 decimal GB: policy schema 3 requires 32,949,672,960 bytes (about 32.95 GB)
+payload into the cache. The IR/headroom pair authenticates three fresh exports,
+then verifies three cache hits while rerunning execution checks. Current exports
+use `local-state/caches/ir-headroom-20261103`. The user reduced serial admission
+and its runtime reserve by 10 decimal GB: policy schema 3 requires
+32,949,672,960 bytes (about 32.95 GB)
 at the start and reserves 24,359,738,368 bytes (about 24.36 GB) during execution.
 The working budget remains 8 GiB. Nested workers inherit that admission and
-continue enforcing the reserve, including stronger caller floors. Full fresh/cache
-validation of the revised limits is pending. The earlier accepted pair reported
-5.86 GB and 2.16 GB decreases under policy schema 2. Raw AIR needs no manual
-cleanup wrapper.
+continue enforcing the reserve, including stronger caller floors. The accepted
+pair reports 7.09 GB fresh and 1.97 GB cached decreases, within the 8 GiB forecast.
+Reported minima are 30.85 GB and 33.65 GB; independent two-second samples reach
+30.71 GB and 33.65 GB. Both stay above the 24.36 GB reserve. Filesystem activity
+outside the runner and non-atomic samples limit these measurements. Raw AIR
+needs no manual cleanup wrapper.
 
 Unchanged upstream `hello_libc.zig` and the C fixture execute in all three modes;
 the C fixture's six paired cases and 66 call/heap observations remain separate.
@@ -138,8 +140,10 @@ retained input allocation by 3.85 GB. Audit replay preserves the entire candidat
 table and selected mode facts. Current authenticated production AIR remains
 pinned. Obsolete generated copies and a source copy exactly present in Git
 history are retired without archives. The latest
-[generation cleanup](evidence/global_memory_cleanup_20261103.json) retires 3.92 GB
-of superseded AIR after verifying the accepted replacement and all payload hashes;
-metadata and historical proofs remain. See [next steps](next_steps.md) for
-numeric SSA serialization and dependency-reference coverage. Historical checkpoints
-remain under the roadmap and evidence directories.
+[generation cleanup](evidence/ir_headroom_cleanup_20261103.json) retires 3.92 GB
+of superseded AIR after the complete fresh replacement proof, making room for
+the cached run. Both runs now pass; old metadata and hashes remain. The retired
+checkout's dependency links are removed while their target repositories remain.
+See [next steps](next_steps.md) for dependency-reference coverage and bounded
+aggregate frames. Historical checkpoints remain under the roadmap and evidence
+directories.

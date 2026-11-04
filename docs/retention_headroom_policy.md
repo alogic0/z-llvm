@@ -105,8 +105,8 @@ The [global-memory generation cleanup](evidence/global_memory_cleanup_20261103.j
 retires 3.92 GB of superseded AIR payload allocation only after the replacement
 passes both full 17-stage runs, all 1,403 canonical records match, and old/new
 payload hashes are reverified with no active consumers. Historical metadata,
-logs, sources and performance baselines remain. Current production exports and
-their paired work selection use `global-memory-headroom-20261103`; the old
+logs, sources and performance baselines remain. At that checkpoint, production
+exports and their paired work selection used `global-memory-headroom-20261103`; the old
 `startup-headroom-20261102` cache retains metadata and its retirement record.
 No archives are created.
 
@@ -159,9 +159,14 @@ continue to inherit and enforce the caller's reserve, including any stronger
 caller floor, and their transient minimum enters the serial report before cleanup.
 The separate sharding policy is unchanged. The
 [focused policy checks](evidence/headroom_reduction_focused_20261103.json) pass
-all 51 runner/policy and 41 comparison tests. Full fresh/cache validation of the
-revised limits is pending; historical measurements below retain their original
-policy values.
+all 51 runner/policy and 41 comparison tests. The accepted
+[IR/headroom pair](evidence/ir_headroom_acceptance_20261103.json) passes all 17
+stages in both runs, with all 1,406 canonical records matching on one frozen
+2,681-file snapshot. Reported fresh/cached decreases are 7.09 GB and 1.97 GB,
+within the unchanged 8 GiB forecast. Reported minima are 30.85 GB and 33.65 GB;
+independent two-second sampled minima are 30.71 GB and 33.65 GB, above the
+24.36 GB reserve. Historical measurements below retain their original policy
+values; filesystem noise and non-atomic samples remain measurement limits.
 
 The earlier
 [combined checkpoint](evidence/startup_headroom_acceptance_20261103.json)
@@ -243,7 +248,20 @@ stopped at `FileNotFound`, with a sampled 35.51 GB minimum, above the reserve.
 After merging the focused commits, validation moves to `/home/oleg/prog/z_llvm`,
 the location required by the current export/execution cohort. The idle checkout
 and unpublished failed-run outputs were retired after preserving failure records,
-source commits and snapshots, releasing 2.19 GB. Current accepted AIR and all
-13 original probes remain. See
+source commits and snapshots, releasing 2.19 GB. The prior accepted AIR and all
+13 original probes were preserved during this recovery. See
 `local-state/validations/numeric-ssa-20261103/canonical-root-recovery.json`.
 No archives are created.
+
+The [IR/headroom cleanup](evidence/ir_headroom_cleanup_20261103.json) retires
+3.92 GB of superseded AIR payload allocation after all 17 fresh stages pass,
+the source snapshot is verified, and both generations' metadata and hashes are
+checked. The initial plan retained both generations through the pair; the fresh
+run ended below the cached run's admission threshold, so the old generation was
+retired first under the user's obsolete-file cleanup authorization. Historical
+metadata and hashes remain, and the new payloads remain unchanged through the
+successful cached run and comparison. This cleanup did not clear the shared
+tool cache or pip cache. Current exports and paired work selection use
+`ir-headroom-20261103`. Two obsolete checkout dependency links are also removed;
+the actual dependency repositories, original probes and performance baselines
+remain. No archives are created.

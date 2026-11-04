@@ -1,0 +1,1361 @@
+{
+  "schema": 1,
+  "status": "accepted",
+  "recorded_utc": "2026-11-04T02:11:26.907861+00:00",
+  "compiler_revision": "abd0bae6d4c995ee4875296754da0231900a64ad",
+  "validated_working_head": "8aad013a7e2e374b275fc8cb5ace35d1e50922d7",
+  "source_snapshot": "local-state/validations/numeric-ssa-20261103/ir-headroom-full-source-snapshot-r3.json",
+  "source_snapshot_sha256": "ae696440453938b1f343aa81be0fb506452091348145f111c3ca645460dd3598",
+  "source_snapshot_files": 2681,
+  "source_worktree": "/home/oleg/prog/z_llvm",
+  "source_sha256": {
+    "src/ir/local_names.zig": "2fc957e9769335987f6c9940a4941f939bbbe56367d9a9826ae3528d43c22133",
+    "src/ir/printer.zig": "223a4b786a2c4b55dfac6c8fada09a72108aa3778a160c54be6670eef660ac6d",
+    "src/normalize.zig": "5537b45c1ecc8e849bd03eb1d6f6d67e8c5f2879c570bfa0c9efaff6da17e988",
+    "src/tests/ir_numeric_names.zig": "8e3750c934647f7303c58867c36f2f5cce414d95e7fc1a5f28fe2fa576ffb3d2",
+    "src/tests.zig": "54574ad3576d1e3a9b8d724865da7b76f241a5e3c9125fa70d098d0318615f8b",
+    "test/opt/inputs/numeric_local_names.ll": "fd41e44e485f4023c872ea1fefc804756bfcbdbfebf57ba33070893a5c7cb081",
+    "test/opt/numeric_local_names_harness.c": "15a05f48e7e4a61f70a4d3da25a969cee2b9184ee44fa180ce2a657a9fae113e",
+    "tools/run_optimizer_correctness.zig": "32f8c48659869f38d92f9f1eab294889f7f9e2d12d373aefeacfce5a0bb656a5",
+    "src/ir/parser.zig": "90ea45386d2e05aab37b86e83a28e24ff147b014dbf6ba511abad918bd6b37f4",
+    "src/ir/parser_common.zig": "047a6ba9d933dbf4004b2cd6d6c98a384da04c69eeaf763611a99f0e28ab69db",
+    "src/tests/ir_parser_ownership.zig": "fcd3b375d0b0e003f5369222a92bd77f70b745ca36cbbbd7e1913082480428a8",
+    "src/analysis/block_addresses.zig": "2395df5f32e3052da0f9891c29f4ad5259663083697497edebf1dc044a7e2324",
+    "src/analysis/global_dependencies.zig": "d666966cf445bb2a16b0c7be2372d60c617bb48498e50ad351cebb2bd6e5c462",
+    "src/analysis/module_references.zig": "82ac776d31f810c746657fe35cd53b4e3c9013303fe49bd11bf58288ecdaac3d",
+    "src/ir/opaque_names.zig": "95a7224154fd3bc53ffe3059b61502e2708cbc50d82059c7ad1797d4c8f02fed",
+    "src/passes/globalopt.zig": "c711e6c17c9bc8a470646a7e1ad03b39a9126eb768ad32d515f3c0f0ca3d33ae",
+    "src/passes/jump_threading.zig": "2309a3b516fef0c509aed1acfcd7d6bc6676f08d54a9249f79fc274854cc572b",
+    "src/passes/loop_deletion.zig": "fe40919f7e98bfe3d2dbc8f15c949bb4dcab09a125314d5a0094bd15e0b21658",
+    "src/passes/loop_simplifycfg.zig": "0bbb3c86c79c40149c447cac2cc49324bfdf227143fb1af98d4f6e7d22eb293f",
+    "src/passes/sccp.zig": "e7b5123a28bc2f28ed17f51e5fcc11ad7177c2233ebf8dd4aa12af4ab498aaf6",
+    "src/passes/simplifycfg.zig": "4d0de78777d9032cd5802b36bfff6b141e423f34510cd37124b203bd5acdca9d",
+    "src/tests/block_addresses.zig": "71bce5fb7df1d45cb5965489b140b36ca111ae5b315b4e56a5712f5ec4846317",
+    "src/tests/ir_parser_parameters.zig": "224e9fd462c864d8852bb43e6f3c5cdd25da2d93b76a121e17b2bfed65ddf537",
+    "src/tests/module_references.zig": "9e69f5c0961b67391ddb38b7882dbf39d0f515834f12bfa8e89048e4c2684179",
+    "src/tests/simplifycfg_names.zig": "21629daa6e5b1b6125edb9585f6bc0f179093bf4777d62195ff7493f7edda027",
+    "tools/distribution_headroom_policy.zig": "e205cadaaf1023ac211d2b867af68a08a4737b1d53b56ee083a472f7d1f9b9fe",
+    "tools/distribution_real_rows_parallel_policy.zig": "1178ca1a7ce4df6667c0048563ac811827cbfde9dba9713fe29e965774910964",
+    "tools/run_distribution_real_rows_parallel.zig": "a43e68ef5b1bc40fca3ffc5c121a6e4f7626e9c470b9c89de690ed7513212381"
+  },
+  "headroom_policy": {
+    "schema_version": 3,
+    "reserve_bytes": 24359738368,
+    "projected_peak_bytes": 8589934592,
+    "required_start_bytes": 32949672960,
+    "previous_reserve_bytes": 34359738368,
+    "previous_required_start_bytes": 42949672960,
+    "runtime_reserve_enforced": true,
+    "stronger_caller_floors_preserved": true,
+    "sharding_policy_unchanged": true
+  },
+  "user_direction": "Can we reduce on 10 GB before starting and reserve during execution?",
+  "focused_ir_evidence": "docs/evidence/ir_blockaddress_focused_20261103.json",
+  "focused_ir_evidence_sha256": "d55918f9aa29acf2d9dc4c87c76dd800992dc924be49ec7bd66ab20bbdefadeb",
+  "focused_policy_evidence": "docs/evidence/headroom_reduction_focused_20261103.json",
+  "focused_policy_evidence_sha256": "7756e05aeb7b81aab2edf9c205699df49c4290bfdecc215f12615fd1823078c1",
+  "runs": {
+    "fresh": {
+      "argv": [
+        "/home/oleg/.zig/0.17.0/files/zig",
+        "build",
+        "distribution-all",
+        "--",
+        "--serial",
+        "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+        "--real-rows-validation-root=local-state/validations/ir-headroom-20261103",
+        "--real-rows-cache-root=local-state/caches/ir-headroom-20261103",
+        "--fresh-real-rows"
+      ],
+      "returncode": 0,
+      "wall_ns": 2657382221258,
+      "raw_log": "local-state/validations/numeric-ssa-20261103/full-ir-fresh-r3.log",
+      "raw_log_sha256": "57e211b3d10c913f9fb0ed97ce0a3b6cd03459c4b72241ba17e97846a57047df",
+      "telemetry_sha256": "21b36c2c9a1ca8800141bc6ab504b154fd24c84a515e8400bf7bd67311ce4ae2",
+      "gates": [
+        {
+          "id": "selected-object-suite",
+          "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+          "exit_status": "0",
+          "duration_ms": "62633",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "1942",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "3676",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "3454",
+          "cache_status": "none"
+        },
+        {
+          "id": "zig-source-native-link",
+          "tool": "tools/run_distribution_zig_source_native_link.zig",
+          "exit_status": "0",
+          "duration_ms": "20182",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-postopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "82020",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-preopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "--pipeline": "preopt",
+          "exit_status": "0",
+          "duration_ms": "662022",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-ir-writer",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "22521",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-release",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "75062",
+          "cache_status": "none"
+        },
+        {
+          "id": "real-rows-release-fast",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseFast",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "666361",
+          "cache_status": "miss"
+        },
+        {
+          "id": "real-rows-release-safe",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSafe",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "697705",
+          "cache_status": "miss"
+        },
+        {
+          "id": "real-rows-release-small",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSmall",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "496173",
+          "cache_status": "miss"
+        },
+        {
+          "id": "integrated-executable",
+          "tool": "tools/run_distribution_zig_integrated_exe.zig",
+          "exit_status": "0",
+          "duration_ms": "907384",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "503",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "1200",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "1080",
+          "cache_status": "none"
+        },
+        {
+          "id": "boundary-gates",
+          "tool": "tools/run_distribution_boundary_gates.zig",
+          "exit_status": "0",
+          "duration_ms": "2127",
+          "cache_status": "none"
+        }
+      ],
+      "serial": {
+        "schema_version": "1",
+        "run_id": "4993fbe0405f57b4c5532b4ffadcf851",
+        "scratch_path": "tmp/distribution_all_serial_4993fbe0405f57b4c5532b4ffadcf851",
+        "bundle_path": "tmp/distribution_all_serial_4993fbe0405f57b4c5532b4ffadcf851/release_source_object_bundle",
+        "target": "x86_64-unknown-linux-gnu",
+        "mode": "serial",
+        "real_rows_concurrency": "3",
+        "subgates": "17",
+        "wall_ms": "2657342",
+        "starting_free_bytes": "37941256192",
+        "minimum_observed_free_bytes": "30847254528",
+        "final_free_bytes": "31704870912",
+        "observed_peak_bytes": "7094001664",
+        "reserve_bytes": "24359738368",
+        "required_start_bytes": "32949672960",
+        "local_fail": "0"
+      },
+      "real_rows": [
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseFast",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "5",
+          "real_programs_ok": "5",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseSafe",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "5",
+          "real_programs_ok": "5",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseSmall",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "5",
+          "real_programs_ok": "5",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        }
+      ],
+      "cache_events": [
+        {
+          "mode": "ReleaseFast",
+          "status": "fresh-export",
+          "duration_ms": "109598",
+          "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+          "descriptor_bytes": "1343891697"
+        },
+        {
+          "mode": "ReleaseSafe",
+          "status": "fresh-export",
+          "duration_ms": "111936",
+          "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+          "descriptor_bytes": "1473501276"
+        },
+        {
+          "mode": "ReleaseSmall",
+          "status": "fresh-export",
+          "duration_ms": "102665",
+          "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+          "descriptor_bytes": "1106432911"
+        }
+      ],
+      "real_rows_resources": {
+        "schema_version": "3",
+        "normalization_schema": "3",
+        "memory_policy": "os-managed-non-gating",
+        "concurrency": "3",
+        "workers": "3",
+        "modes": "ReleaseFast,ReleaseSafe,ReleaseSmall",
+        "run_id": "7b92a5f8c59f01ab28f0a25730ebc225",
+        "root": "local-state/validations/ir-headroom-20261103/real_rows_parallel_7b92a5f8c59f01ab28f0a25730ebc225",
+        "work_selection_root": "local-state/validations/ir-headroom-20261103",
+        "export_cache_selection_root": "local-state/caches/ir-headroom-20261103",
+        "fast_temp": "local-state/validations/ir-headroom-20261103/ReleaseFast/work_7b92a5f8c59f01ab28f0a25730ebc225",
+        "fast_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_7b92a5f8c59f01ab28f0a25730ebc225/ReleaseFast/zig-local-cache",
+        "fast_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_7b92a5f8c59f01ab28f0a25730ebc225/ReleaseFast/zig-global-cache",
+        "fast_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseFast/export",
+        "safe_temp": "local-state/validations/ir-headroom-20261103/ReleaseSafe/work_7b92a5f8c59f01ab28f0a25730ebc225",
+        "safe_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_7b92a5f8c59f01ab28f0a25730ebc225/ReleaseSafe/zig-local-cache",
+        "safe_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_7b92a5f8c59f01ab28f0a25730ebc225/ReleaseSafe/zig-global-cache",
+        "safe_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export",
+        "small_temp": "local-state/validations/ir-headroom-20261103/ReleaseSmall/work_7b92a5f8c59f01ab28f0a25730ebc225",
+        "small_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_7b92a5f8c59f01ab28f0a25730ebc225/ReleaseSmall/zig-local-cache",
+        "small_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_7b92a5f8c59f01ab28f0a25730ebc225/ReleaseSmall/zig-global-cache",
+        "small_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export",
+        "pin_manifest_sha256": "0d7370b61aa9f9871196371de428475b01a05554fd449a97a74f63ba4f948a29",
+        "cache_status": "fresh-export,fresh-export,fresh-export",
+        "air_cache": "populated-authenticated",
+        "pruning": "suspended",
+        "wall_ms": "810944",
+        "summed_child_ms": "1860239",
+        "filesystem_total_bytes": "982240026624",
+        "post_run_free_floor_bytes": "24359738368",
+        "projected_peak_bytes": "8589934592",
+        "required_start_bytes": "32949672960",
+        "admission_source": "serial_preflight",
+        "admission_starting_free_bytes": "37941256192",
+        "starting_free_bytes": "37093249024",
+        "minimum_free_bytes": "30847254528",
+        "final_free_bytes": "30847254528",
+        "peak_disk_bytes": "5913296896",
+        "peak_aggregate_rss_bytes": "6059696128",
+        "minimum_available_memory_bytes": "10228895744",
+        "load_start": "2.65",
+        "load_end": "4.62",
+        "execution_results_cached": "false",
+        "local_fail": "0"
+      },
+      "native_memory_populations": {
+        "word-pair-memory": {
+          "population": "standalone-two-word-stack-memory",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "384",
+          "reference_observations": "192",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "pointer-stack-memory": {
+          "population": "standalone-runtime-pointer-stack",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "768",
+          "reference_observations": "384",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "scalar-stack-memory": {
+          "population": "standalone-scalar-stack",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "486",
+          "reference_observations": "243",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "integer-pointer-casts": {
+          "population": "standalone-integer-pointer-casts",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "1536",
+          "reference_observations": "768",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "signed-nonnegative": {
+          "population": "standalone-signed-nonnegative",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "1536",
+          "reference_observations": "768",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "type-layout-padding": {
+          "population": "standalone-type-allocation-padding",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "768",
+          "reference_observations": "384",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "global-addresses": {
+          "population": "standalone-global-addresses",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "192",
+          "reference_observations": "96",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "global-memory": {
+          "population": "standalone-global-memory",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "240",
+          "reference_observations": "120",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "boolean-calls": {
+          "population": "standalone-boolean-calls",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "1536",
+          "reference_observations": "768",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "array-stride": {
+          "population": "standalone-array-stride",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "1536",
+          "reference_observations": "768",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "module-dependencies": {
+          "population": "standalone-module-dependencies",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "330",
+          "reference_observations": "165",
+          "reference_reused_per_route": "true",
+          "local_fail": "0",
+          "negative_controls": "30",
+          "environment_checks": "3"
+        }
+      },
+      "c_program": {
+        "schema": "upstream-c-program-v1",
+        "programs": "1",
+        "program_modes": "3",
+        "matched_program_modes": "3",
+        "reference_case_executions": "6",
+        "local_case_executions": "6",
+        "integer_variadic_observations": "48",
+        "heap_call_observations": "18",
+        "native_call_observations": "66",
+        "local_fail": "0"
+      },
+      "ascii_rows": [
+        {
+          "schema": "distribution-execution-cohort-v3",
+          "mode": "ReleaseFast",
+          "source": "../ziglang/src/main.zig",
+          "function": "ascii.isAscii",
+          "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+          "object_bytes": "712",
+          "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+          "reference_bytes": "4154072",
+          "reference_sha256": "71f7687dbe757d5fb8356962111327a05bfef3719abfba970d80506fb53aed66",
+          "linked_bytes": "6292382",
+          "linked_sha256": "f2498acd9e70ee280fbd55696fbb79803b4744284ff1ef3ccb6454f09f63246b",
+          "result": "128",
+          "witness": "8256",
+          "observations": "256",
+          "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+          "reference_status": "0",
+          "linked_status": "0",
+          "real_executed": "1",
+          "real_programs_ok": "1"
+        },
+        {
+          "schema": "distribution-execution-cohort-v3",
+          "mode": "ReleaseSafe",
+          "source": "../ziglang/src/main.zig",
+          "function": "ascii.isAscii",
+          "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+          "object_bytes": "712",
+          "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+          "reference_bytes": "4040088",
+          "reference_sha256": "fea256dd9a1f0039e9c4e88f926cfd5c05bd558dbc74d968e8c197758daf35e7",
+          "linked_bytes": "6147574",
+          "linked_sha256": "96e6a502a28dcefad082bc6e01fe8a7bed6b5a9b5f18fbad985747e67b049a67",
+          "result": "128",
+          "witness": "8256",
+          "observations": "256",
+          "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+          "reference_status": "0",
+          "linked_status": "0",
+          "real_executed": "1",
+          "real_programs_ok": "1"
+        },
+        {
+          "schema": "distribution-execution-cohort-v3",
+          "mode": "ReleaseSmall",
+          "source": "../ziglang/src/main.zig",
+          "function": "ascii.isAscii",
+          "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+          "object_bytes": "712",
+          "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+          "reference_bytes": "149824",
+          "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+          "linked_bytes": "356150",
+          "linked_sha256": "5e74214bc01fec558d342dbc7da41da4d5d3dfcc88f992b544862f145adde237",
+          "result": "128",
+          "witness": "8256",
+          "observations": "256",
+          "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+          "reference_status": "0",
+          "linked_status": "0",
+          "real_executed": "1",
+          "real_programs_ok": "1"
+        }
+      ],
+      "fma": {
+        "cases": "8192",
+        "matched": "8192",
+        "reference": "llvm22-frozen-ir",
+        "local_fail": "0"
+      },
+      "source_snapshot": "local-state/validations/numeric-ssa-20261103/ir-headroom-full-source-snapshot-r3.json",
+      "source_snapshot_sha256": "ae696440453938b1f343aa81be0fb506452091348145f111c3ca645460dd3598",
+      "source_snapshot_files": 2681,
+      "source_worktree": "/home/oleg/prog/z_llvm",
+      "original_scratch_files_verified": 13,
+      "sources_unchanged": true,
+      "headroom_policy": {
+        "schema_version": "3",
+        "filesystem_total_bytes": "982240026624",
+        "reserve_bytes": "24359738368",
+        "projected_peak_bytes": "8589934592",
+        "required_start_bytes": "32949672960",
+        "authority": "tools/distribution_headroom_policy.zig",
+        "local_fail": "0"
+      },
+      "expected_cache_status": "fresh-export",
+      "sampled_minimum_free_bytes": 30714195968,
+      "archives_created": 0
+    },
+    "cached": {
+      "argv": [
+        "/home/oleg/.zig/0.17.0/files/zig",
+        "build",
+        "distribution-all",
+        "--",
+        "--serial",
+        "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+        "--real-rows-validation-root=local-state/validations/ir-headroom-20261103",
+        "--real-rows-cache-root=local-state/caches/ir-headroom-20261103"
+      ],
+      "returncode": 0,
+      "wall_ns": 2484199000732,
+      "raw_log": "local-state/validations/numeric-ssa-20261103/full-ir-cached-r3.log",
+      "raw_log_sha256": "cb9123a42e22e00d1b76f56de1135cd7f007e84fe069acfeb29da36be1da0c77",
+      "telemetry_sha256": "8bfdb5aa1ff2da0b42608180b513b3d57470cb6737f45f6125c48c7ccc956f5d",
+      "gates": [
+        {
+          "id": "selected-object-suite",
+          "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+          "exit_status": "0",
+          "duration_ms": "63282",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "1955",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "3512",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "3481",
+          "cache_status": "none"
+        },
+        {
+          "id": "zig-source-native-link",
+          "tool": "tools/run_distribution_zig_source_native_link.zig",
+          "exit_status": "0",
+          "duration_ms": "18466",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-postopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "78873",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-preopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "--pipeline": "preopt",
+          "exit_status": "0",
+          "duration_ms": "664466",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-ir-writer",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "22445",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-release",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "75224",
+          "cache_status": "none"
+        },
+        {
+          "id": "real-rows-release-fast",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseFast",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "502238",
+          "cache_status": "hit"
+        },
+        {
+          "id": "real-rows-release-safe",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSafe",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "529696",
+          "cache_status": "hit"
+        },
+        {
+          "id": "real-rows-release-small",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSmall",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "350712",
+          "cache_status": "hit"
+        },
+        {
+          "id": "integrated-executable",
+          "tool": "tools/run_distribution_zig_integrated_exe.zig",
+          "exit_status": "0",
+          "duration_ms": "898608",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "513",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "1146",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "1057",
+          "cache_status": "none"
+        },
+        {
+          "id": "boundary-gates",
+          "tool": "tools/run_distribution_boundary_gates.zig",
+          "exit_status": "0",
+          "duration_ms": "780",
+          "cache_status": "none"
+        }
+      ],
+      "serial": {
+        "schema_version": "1",
+        "run_id": "7c30a1d83aa58dfa9a366cabc6f39138",
+        "scratch_path": "tmp/distribution_all_serial_7c30a1d83aa58dfa9a366cabc6f39138",
+        "bundle_path": "tmp/distribution_all_serial_7c30a1d83aa58dfa9a366cabc6f39138/release_source_object_bundle",
+        "target": "x86_64-unknown-linux-gnu",
+        "mode": "serial",
+        "real_rows_concurrency": "3",
+        "subgates": "17",
+        "wall_ms": "2484168",
+        "starting_free_bytes": "35627044864",
+        "minimum_observed_free_bytes": "33654198272",
+        "final_free_bytes": "34945806336",
+        "observed_peak_bytes": "1972846592",
+        "reserve_bytes": "24359738368",
+        "required_start_bytes": "32949672960",
+        "local_fail": "0"
+      },
+      "real_rows": [
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseFast",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "5",
+          "real_programs_ok": "5",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseSafe",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "5",
+          "real_programs_ok": "5",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v2",
+          "mode": "ReleaseSmall",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "5",
+          "real_programs_ok": "5",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        }
+      ],
+      "cache_events": [
+        {
+          "mode": "ReleaseFast",
+          "status": "hit",
+          "duration_ms": "15297",
+          "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+          "descriptor_bytes": "1343891697"
+        },
+        {
+          "mode": "ReleaseSafe",
+          "status": "hit",
+          "duration_ms": "16726",
+          "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+          "descriptor_bytes": "1473501276"
+        },
+        {
+          "mode": "ReleaseSmall",
+          "status": "hit",
+          "duration_ms": "12624",
+          "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+          "descriptor_bytes": "1106432911"
+        }
+      ],
+      "real_rows_resources": {
+        "schema_version": "3",
+        "normalization_schema": "3",
+        "memory_policy": "os-managed-non-gating",
+        "concurrency": "3",
+        "workers": "3",
+        "modes": "ReleaseFast,ReleaseSafe,ReleaseSmall",
+        "run_id": "ea13481ea51cf3e8f1812c106e43f796",
+        "root": "local-state/validations/ir-headroom-20261103/real_rows_parallel_ea13481ea51cf3e8f1812c106e43f796",
+        "work_selection_root": "local-state/validations/ir-headroom-20261103",
+        "export_cache_selection_root": "local-state/caches/ir-headroom-20261103",
+        "fast_temp": "local-state/validations/ir-headroom-20261103/ReleaseFast/work_ea13481ea51cf3e8f1812c106e43f796",
+        "fast_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_ea13481ea51cf3e8f1812c106e43f796/ReleaseFast/zig-local-cache",
+        "fast_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_ea13481ea51cf3e8f1812c106e43f796/ReleaseFast/zig-global-cache",
+        "fast_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseFast/export",
+        "safe_temp": "local-state/validations/ir-headroom-20261103/ReleaseSafe/work_ea13481ea51cf3e8f1812c106e43f796",
+        "safe_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_ea13481ea51cf3e8f1812c106e43f796/ReleaseSafe/zig-local-cache",
+        "safe_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_ea13481ea51cf3e8f1812c106e43f796/ReleaseSafe/zig-global-cache",
+        "safe_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export",
+        "small_temp": "local-state/validations/ir-headroom-20261103/ReleaseSmall/work_ea13481ea51cf3e8f1812c106e43f796",
+        "small_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_ea13481ea51cf3e8f1812c106e43f796/ReleaseSmall/zig-local-cache",
+        "small_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_ea13481ea51cf3e8f1812c106e43f796/ReleaseSmall/zig-global-cache",
+        "small_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export",
+        "pin_manifest_sha256": "0d7370b61aa9f9871196371de428475b01a05554fd449a97a74f63ba4f948a29",
+        "cache_status": "hit,hit,hit",
+        "air_cache": "read-only",
+        "pruning": "suspended",
+        "wall_ms": "649957",
+        "summed_child_ms": "1382646",
+        "filesystem_total_bytes": "982240026624",
+        "post_run_free_floor_bytes": "24359738368",
+        "projected_peak_bytes": "8589934592",
+        "required_start_bytes": "32949672960",
+        "admission_source": "serial_preflight",
+        "admission_starting_free_bytes": "35627044864",
+        "starting_free_bytes": "35135311872",
+        "minimum_free_bytes": "33654198272",
+        "final_free_bytes": "33654198272",
+        "peak_disk_bytes": "5377122304",
+        "peak_aggregate_rss_bytes": "5265268736",
+        "minimum_available_memory_bytes": "12491218944",
+        "load_start": "2.43",
+        "load_end": "2.72",
+        "execution_results_cached": "false",
+        "local_fail": "0"
+      },
+      "native_memory_populations": {
+        "word-pair-memory": {
+          "population": "standalone-two-word-stack-memory",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "384",
+          "reference_observations": "192",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "pointer-stack-memory": {
+          "population": "standalone-runtime-pointer-stack",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "768",
+          "reference_observations": "384",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "scalar-stack-memory": {
+          "population": "standalone-scalar-stack",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "486",
+          "reference_observations": "243",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "integer-pointer-casts": {
+          "population": "standalone-integer-pointer-casts",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "1536",
+          "reference_observations": "768",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "signed-nonnegative": {
+          "population": "standalone-signed-nonnegative",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "1536",
+          "reference_observations": "768",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "type-layout-padding": {
+          "population": "standalone-type-allocation-padding",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "768",
+          "reference_observations": "384",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "global-addresses": {
+          "population": "standalone-global-addresses",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "192",
+          "reference_observations": "96",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "global-memory": {
+          "population": "standalone-global-memory",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "240",
+          "reference_observations": "120",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "boolean-calls": {
+          "population": "standalone-boolean-calls",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "1536",
+          "reference_observations": "768",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "array-stride": {
+          "population": "standalone-array-stride",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "1536",
+          "reference_observations": "768",
+          "reference_reused_per_route": "true",
+          "local_fail": "0"
+        },
+        "module-dependencies": {
+          "population": "standalone-module-dependencies",
+          "routes": "direct,release",
+          "modes": "3",
+          "local_observations": "330",
+          "reference_observations": "165",
+          "reference_reused_per_route": "true",
+          "local_fail": "0",
+          "negative_controls": "30",
+          "environment_checks": "3"
+        }
+      },
+      "c_program": {
+        "schema": "upstream-c-program-v1",
+        "programs": "1",
+        "program_modes": "3",
+        "matched_program_modes": "3",
+        "reference_case_executions": "6",
+        "local_case_executions": "6",
+        "integer_variadic_observations": "48",
+        "heap_call_observations": "18",
+        "native_call_observations": "66",
+        "local_fail": "0"
+      },
+      "ascii_rows": [
+        {
+          "schema": "distribution-execution-cohort-v3",
+          "mode": "ReleaseFast",
+          "source": "../ziglang/src/main.zig",
+          "function": "ascii.isAscii",
+          "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+          "object_bytes": "712",
+          "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+          "reference_bytes": "4154072",
+          "reference_sha256": "3c67d92ea6f840775667f26356dbb9f6c58b26871575d04e44976f7920e8408b",
+          "linked_bytes": "6292382",
+          "linked_sha256": "a61116903d3d58fddcff5fa389a71cf5a2747a5c041a04165898da449ae6948a",
+          "result": "128",
+          "witness": "8256",
+          "observations": "256",
+          "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+          "reference_status": "0",
+          "linked_status": "0",
+          "real_executed": "1",
+          "real_programs_ok": "1"
+        },
+        {
+          "schema": "distribution-execution-cohort-v3",
+          "mode": "ReleaseSafe",
+          "source": "../ziglang/src/main.zig",
+          "function": "ascii.isAscii",
+          "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+          "object_bytes": "712",
+          "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+          "reference_bytes": "4040088",
+          "reference_sha256": "7150a869f092f190f8a49e146e626aa7b461209db2e4b98eda36fd7cf3cdfcef",
+          "linked_bytes": "6147574",
+          "linked_sha256": "d68505053d873051786219907f402612a725db696b9790920cce9b384ec66ce4",
+          "result": "128",
+          "witness": "8256",
+          "observations": "256",
+          "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+          "reference_status": "0",
+          "linked_status": "0",
+          "real_executed": "1",
+          "real_programs_ok": "1"
+        },
+        {
+          "schema": "distribution-execution-cohort-v3",
+          "mode": "ReleaseSmall",
+          "source": "../ziglang/src/main.zig",
+          "function": "ascii.isAscii",
+          "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+          "object_bytes": "712",
+          "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+          "reference_bytes": "149824",
+          "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+          "linked_bytes": "356150",
+          "linked_sha256": "131f4f49893e6feafd5bc981a785a6b7271326aff3fce585b02436afdf605753",
+          "result": "128",
+          "witness": "8256",
+          "observations": "256",
+          "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+          "reference_status": "0",
+          "linked_status": "0",
+          "real_executed": "1",
+          "real_programs_ok": "1"
+        }
+      ],
+      "fma": {
+        "cases": "8192",
+        "matched": "8192",
+        "reference": "llvm22-frozen-ir",
+        "local_fail": "0"
+      },
+      "source_snapshot": "local-state/validations/numeric-ssa-20261103/ir-headroom-full-source-snapshot-r3.json",
+      "source_snapshot_sha256": "ae696440453938b1f343aa81be0fb506452091348145f111c3ca645460dd3598",
+      "source_snapshot_files": 2681,
+      "source_worktree": "/home/oleg/prog/z_llvm",
+      "original_scratch_files_verified": 13,
+      "sources_unchanged": true,
+      "headroom_policy": {
+        "schema_version": "3",
+        "filesystem_total_bytes": "982240026624",
+        "reserve_bytes": "24359738368",
+        "projected_peak_bytes": "8589934592",
+        "required_start_bytes": "32949672960",
+        "authority": "tools/distribution_headroom_policy.zig",
+        "local_fail": "0"
+      },
+      "expected_cache_status": "hit",
+      "sampled_minimum_free_bytes": 33653620736,
+      "archives_created": 0
+    }
+  },
+  "comparison": {
+    "argv": [
+      "/home/oleg/.zig/0.17.0/files/zig",
+      "run",
+      "tools/compare_distribution_all_logs.zig",
+      "--",
+      "local-state/validations/numeric-ssa-20261103/full-ir-fresh-r3.log",
+      "local-state/validations/numeric-ssa-20261103/full-ir-cached-r3.log"
+    ],
+    "returncode": 0,
+    "log": "local-state/validations/numeric-ssa-20261103/ir-headroom-pair-comparison-r3.log",
+    "log_sha256": "fca09ad660b9b13bf765979a2d31fe39978e5ea4578827b45988f56cce283afe",
+    "summary": {
+      "schema_version": "4",
+      "expected": "local-state/validations/numeric-ssa-20261103/full-ir-fresh-r3.log",
+      "actual": "local-state/validations/numeric-ssa-20261103/full-ir-cached-r3.log",
+      "gates": "17",
+      "canonical_records": "1406",
+      "semantic_match": "true",
+      "local_fail": "0"
+    }
+  },
+  "cache_generations": [
+    {
+      "mode": "ReleaseFast",
+      "old": {
+        "path": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.4b757112cdbe3d4d95000dd8aaedbe4918d3a3e187447225cc05649a0a12d821.air",
+        "bytes": 1343891552,
+        "allocated_bytes": 1343918080,
+        "device": 66306,
+        "inode": 54439883,
+        "nlink": 1,
+        "mtime_ns": 1793725221454186009,
+        "sha256": "4b757112cdbe3d4d95000dd8aaedbe4918d3a3e187447225cc05649a0a12d821",
+        "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+        "metadata_path": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.meta",
+        "metadata_sha256": "891ac2dfe59a62c38d43f3c59026413a327850f3c8203f7e3d2329fe2edc8cfe",
+        "payload_status": "retired after full fresh replacement proof; hash and metadata retained"
+      },
+      "new": {
+        "path": "local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5.air",
+        "bytes": 1343891697,
+        "allocated_bytes": 1343922176,
+        "sha256": "bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5",
+        "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+        "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.meta",
+        "metadata_sha256": "037abbc2bc1e323c0174b6a43373654ee44ef22a91fcf9a8c092d5693f45f00a"
+      },
+      "same_content": false
+    },
+    {
+      "mode": "ReleaseSafe",
+      "old": {
+        "path": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429.air",
+        "bytes": 1473501276,
+        "allocated_bytes": 1473527808,
+        "device": 66306,
+        "inode": 54439881,
+        "nlink": 1,
+        "mtime_ns": 1793725223741351463,
+        "sha256": "6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429",
+        "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+        "metadata_path": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.meta",
+        "metadata_sha256": "80d6a17a837ca621dd332a30381d2b6ed0174791f5325b9642f5a81acc1058bc",
+        "payload_status": "retired after full fresh replacement proof; hash and metadata retained"
+      },
+      "new": {
+        "path": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c.air",
+        "bytes": 1473501276,
+        "allocated_bytes": 1473531904,
+        "sha256": "53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c",
+        "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+        "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.meta",
+        "metadata_sha256": "24849930ee312cc3cb2d35cf0da327898ca4a16ad25c90b1a858ac5530300618"
+      },
+      "same_content": false
+    },
+    {
+      "mode": "ReleaseSmall",
+      "old": {
+        "path": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6.air",
+        "bytes": 1106432911,
+        "allocated_bytes": 1106448384,
+        "device": 66306,
+        "inode": 54439882,
+        "nlink": 1,
+        "mtime_ns": 1793725216495827600,
+        "sha256": "92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6",
+        "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+        "metadata_path": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.meta",
+        "metadata_sha256": "d29639eb569be72cca3063f413509ac00d4d11aa36562d523679eef458980eaf",
+        "payload_status": "retired after full fresh replacement proof; hash and metadata retained"
+      },
+      "new": {
+        "path": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809.air",
+        "bytes": 1106432911,
+        "allocated_bytes": 1106452480,
+        "sha256": "e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809",
+        "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+        "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.meta",
+        "metadata_sha256": "b3f9cb704b31b4257b0e2c3b9f3415672c282a7bd10142d8dbf246de354c62f3"
+      },
+      "same_content": false
+    }
+  ],
+  "original_scratch_files_verified": 13,
+  "archives_created": 0,
+  "pre_cached_generation_retirement": {
+    "record": "local-state/validations/numeric-ssa-20261103/pre-cached-air-retirement.json",
+    "sha256": "7b18e8ef1936a1bfed3260683bb586a713b266ae0a5e54c45e16dcf7cba9333a",
+    "timing": "after all 17 fresh stages and source verification; before the cached run",
+    "plan_adjustment": "The initial plan kept both generations through the pair. Actual free space after the fresh run was below cached admission. The user authorized obsolete-file cleanup. Retire the superseded cache after the full fresh replacement proof; retain metadata, hashes and failure history. This does not accept the pending compiler/policy checkpoint.",
+    "allocated_bytes_retired": 3923894272,
+    "free_bytes_after": 35627139072
+  },
+  "accepted_revision": "abd0bae6d4c995ee4875296754da0231900a64ad",
+  "accepted_tree": "86a221ce353089625223f859a1ad7e873608982e",
+  "source_commits": [
+    {
+      "revision": "05467b605dbc846bf11b93fc8dd01ffb5c020356",
+      "tree": "9572ba0405b8c4cb5b3f5b46e47d023a443a4a55",
+      "subject": "fix(ir): serialize numeric locals in definition order"
+    },
+    {
+      "revision": "12c57b9c37dc59eb602e8c5427c85e4ff0c1448d",
+      "tree": "83a0567865eb8a3153979ec03b474a34c363d08f",
+      "subject": "fix(ir): release parsed values when publication fails"
+    },
+    {
+      "revision": "b4f1ea95a353b62916a6da057d61408410094c19",
+      "tree": "b0b21ee9bee8a31c3dcb6c65cc1a8c6347703b38",
+      "subject": "fix(ir): bind blockaddress rewrites to their function namespace"
+    },
+    {
+      "revision": "396bfabddd42d44e41f56b45bfef04b4215d9b84",
+      "tree": "52ff5600160ab26e7a3030ff227b30d5b8b9e094",
+      "subject": "fix(parser): retain complete quoted parameter names"
+    },
+    {
+      "revision": "8b6452ebc56509a16970510756eb938d984f86e5",
+      "tree": "993d3de239ff3a18816c16301896d38e459152b6",
+      "subject": "fix(optimizer): preserve addressed blocks and valid local names"
+    },
+    {
+      "revision": "abd0bae6d4c995ee4875296754da0231900a64ad",
+      "tree": "86a221ce353089625223f859a1ad7e873608982e",
+      "subject": "Merge focused IR fixes for canonical-checkout integration"
+    }
+  ],
+  "policy_commit": "007297d1",
+  "validation_trigger": "Shared IR correctness repair and gate-infrastructure change; full distribution plus fresh/cache comparison required by docs/validation_tiers.md",
+  "prior_result_reuse": "The isolated retry passed nine stages but failed at the export worker canonical-cwd boundary. The primary checkout now contains the tested source plus the existing shared tool changes. The full pair must bind one unchanged primary source snapshot and correct export/execution paths; isolated failed logs cannot establish that pair.",
+  "frozen_plan": "local-state/validations/numeric-ssa-20261103/validation-plan-r3.json",
+  "frozen_plan_sha256": "3c3cc704491c5f660700ec0592d50950f23a928b2d5afe4ecbaa825b5c94a69a",
+  "evidence_collection_script_sha256": "b0b97e7096f3cb3f9d873c327498a1014e1d870686e76a90ba70c4b9f6b0a3d9",
+  "verification_script_sha256": "97e37ad37a64f4dc962cb2b69ddc4b56ef11ec27c6780ee2cd825bf0427dd9ea",
+  "validated_post_source_paths": [
+    "docs/current_state.md",
+    "docs/evidence/tmp_retention_pins.tsv",
+    "docs/next_steps.md",
+    "docs/retention_headroom_policy.md"
+  ],
+  "summary_logs": {
+    "fresh": {
+      "path": "docs/evidence/ir_headroom_20261103_fresh.summary",
+      "sha256": "440412104198f34c0f47144eab38c2af96747723cd7ab62f03ebbc26ec165a52",
+      "lines": 139
+    },
+    "cached": {
+      "path": "docs/evidence/ir_headroom_20261103_cached.summary",
+      "sha256": "17c60cba7060da2831552f0a168ddef3f81a7d506578ef2d6634348fc2660adb",
+      "lines": 139
+    }
+  },
+  "comparison_summary": {
+    "path": "docs/evidence/ir_headroom_20261103_comparison.summary",
+    "sha256": "fca09ad660b9b13bf765979a2d31fe39978e5ea4578827b45988f56cce283afe"
+  },
+  "focused_validation": {
+    "unit_tests": 1718,
+    "structural_tests": 13,
+    "readiness": "passed",
+    "ir_regression_functions": 10,
+    "ir_observations_via_clang": 480,
+    "llvm_reference_observations_reused": 160,
+    "ir_execution_scope": "Locally optimized IR executed by Clang-22; no new local machine-code or whole-program execution credit.",
+    "policy_runner_tests": 51,
+    "policy_comparison_tests": 41,
+    "policy_test_scope": "Overlapping suites, not 92 unique tests.",
+    "reuse": "Compiler src/ and test/ trees exactly match the final focused revision before merging. Primary-checkout build and the full pair cover the additional source-audit build/tool changes.",
+    "focused_revision": "8b6452ebc56509a16970510756eb938d984f86e5",
+    "records": [
+      {
+        "record": "local-state/validations/numeric-ssa-20261103/blockaddress-unit-final.json",
+        "sha256": "09ba286582da7665e65463b412c2611c9e3d5eb53df0f1c94bd6dbe000d42093",
+        "returncode": 0,
+        "log": "local-state/validations/numeric-ssa-20261103/blockaddress-unit-final.log",
+        "log_sha256": "e2384d980a3c6ff82e48e4fb5eaaa325a6caf44d8890060a0a298e365445fc5f"
+      },
+      {
+        "record": "local-state/validations/numeric-ssa-20261103/blockaddress-readiness-r2.json",
+        "sha256": "10a7dafa3084a8ab207689ca996e0b81bd3693b16202a888aae0041641273741",
+        "returncode": 0,
+        "log": "local-state/validations/numeric-ssa-20261103/blockaddress-readiness-r2.log",
+        "log_sha256": "b3511ca5ca2e2d6a449fc0a23d7b43c5ff1670e0e9414c49d7cb91e2e1392329"
+      },
+      {
+        "record": "local-state/validations/numeric-ssa-20261103/blockaddress-structural.json",
+        "sha256": "22464b7a41376c4476f2162433aba15601ef92fb417d1f2b4b8097258800b0a9",
+        "returncode": 0,
+        "log": "local-state/validations/numeric-ssa-20261103/blockaddress-structural.log",
+        "log_sha256": "6155f923180e58a6f731d6d4015315d5cdfb7343a443df61eae1aa7d8c2cde47"
+      },
+      {
+        "record": "local-state/validations/numeric-ssa-20261103/generated-names-native.json",
+        "sha256": "46f7c31d879dfca4b426bdc9d3732c1b51f2a435070588d6eb9c62b1e9747471",
+        "returncode": 0,
+        "log": "local-state/validations/numeric-ssa-20261103/generated-names-native.log",
+        "log_sha256": "4312b38b79faebf9bf79205b1070d93dcb8ff9cf5f4de0834fbf932a67ccd3fc"
+      },
+      {
+        "record": "local-state/validations/numeric-ssa-20261103/mixed-panic-final.json",
+        "sha256": "d685b68af23b1e7694e07ba76374d12db3d343ce2095664dbbab90c9655b3355",
+        "returncode": 0,
+        "log": "local-state/validations/numeric-ssa-20261103/mixed-panic-final.log",
+        "log_sha256": "8b26bc88deda2f75b5e37f352ef12b618a958d2e2cfd9bddb24ac65bcc538ccb"
+      },
+      {
+        "record": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2.json",
+        "sha256": "b331a20065bfc1c4c23a728f6cda29bdca8d0181c381334cb90328f2e0748e11",
+        "returncode": 0,
+        "log": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2.log",
+        "log_sha256": "7ccb57b40c35e3901faaaeb52a109e365b2b78f0c4f9c95b32fb4e2e9f308250"
+      },
+      {
+        "record": "local-state/validations/numeric-ssa-20261103/canonical-build.json",
+        "sha256": "68266b858b5ed1ccd92f8aa258b2d708b2f6bf3d2313399eff133466b72ea293",
+        "returncode": 0,
+        "log": "local-state/validations/numeric-ssa-20261103/canonical-build.log",
+        "log_sha256": "c435a78f1883984c9a6d3c20f8655651e55e729b0e44eed371799198e5589f69"
+      },
+      {
+        "record": "local-state/validations/numeric-ssa-20261103/canonical-docs.json",
+        "sha256": "bae799749505ca533e53e948431d2c4be76fa75534314894015d374c233baede",
+        "returncode": 0,
+        "log": "local-state/validations/numeric-ssa-20261103/canonical-docs.log",
+        "log_sha256": "980cd1e766cd8bdd8e697c8c1d711e02d03a6c0a3e4f3f86ffc27a31ee094ed1"
+      }
+    ]
+  },
+  "failed_attempts": [
+    {
+      "status": "failed; not acceptance evidence",
+      "failure": "UnsupportedNumericLocalReference while printing a global initializer in releasesmall_runtime_mix_c_add_may_panic",
+      "stage": "integrated-object-preopt",
+      "completed_stages": 6,
+      "source_snapshot": "local-state/validations/numeric-ssa-20261103/ir-full-source-snapshot.json",
+      "source_snapshot_sha256": "ad103a49064e2a172cade17920c586323c3d27242a8db8f9e8708050ce13d111",
+      "head": "6560d61b9b7201974a230f9fba318bd5df270882",
+      "sources_unchanged": true,
+      "original_probes_verified": 13,
+      "minimum_available_bytes": 38268682240,
+      "reserve_bytes": 24359738368,
+      "air_export_started": false,
+      "recorded_utc": "2026-11-03T23:38:45.909602+00:00"
+    },
+    {
+      "status": "failed; not acceptance evidence",
+      "recorded_utc": "2026-11-04T00:35:36.195640+00:00",
+      "failure": "ReleaseSmall export completed in the canonical repository root but the isolated worker tried to read the relative descriptor path from its own cwd",
+      "error": "FileNotFound in loadOrExportDescriptor; RealRowsParallelChildFailed",
+      "completed_stages": 9,
+      "compiler_ir_regression_stage": "passed all 146 preopt executable cases",
+      "source_snapshot": "local-state/validations/numeric-ssa-20261103/ir-headroom-full-source-snapshot-r2.json",
+      "source_snapshot_sha256": "43d5469195bd9a95ecededeccb96e74943c690824741c5b0ba61cd9279174f21",
+      "sources_unchanged": true,
+      "source_files": 2653,
+      "original_probes_verified": 13,
+      "sampled_minimum_free_bytes": 35509690368,
+      "reserve_bytes": 24359738368,
+      "root_authority": "src/distribution_execution_cohort_v1.zig:repository_root and runBounded; src/distribution_real_rows_gate.zig:loadOrExportDescriptor and absolutePath",
+      "next_action": "Merge focused source commits and run the frozen pair from the canonical primary checkout; preserve the failed evidence",
+      "archives_created": 0
+    }
+  ],
+  "cleanup_evidence": "docs/evidence/ir_headroom_cleanup_20261103.json",
+  "cleanup_evidence_sha256": "4045f4a4e5382cbcfd80928dcf9f79df4f067bef99ef4e3acc20430724caad47",
+  "unchanged_scope": {
+    "candidate_rows_per_mode": 100,
+    "executed_functions_per_mode": 5,
+    "compiler_rt_bypass_ratchet": 130,
+    "native_populations": 11,
+    "selection_default": "legacy",
+    "fibonacci_whole_program_local_executions": 0,
+    "opaque_dependency_coverage": "conservative"
+  },
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "selector_version": "real-candidate-selector-v3",
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "modes": [
+    "ReleaseFast",
+    "ReleaseSafe",
+    "ReleaseSmall"
+  ],
+  "target": "x86_64-unknown-linux-gnu",
+  "toolchain": {
+    "project_zig_version": "0.17.0",
+    "project_zig": "/home/oleg/.zig/0.17.0/files/zig",
+    "emitter": "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+    "emitter_version": "0.17.0-dev.11+1c08b09d1",
+    "emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+    "emitter_bytes": 149918648,
+    "source_authority_sha256": "d4846f9d9032727d3903b31bdefc763447a92024483aa3c83b2ac0683167f492"
+  },
+  "documentation_validation": {
+    "argv": [
+      "/home/oleg/.zig/0.17.0/files/zig",
+      "build",
+      "check-docs"
+    ],
+    "returncode": 0,
+    "record": "local-state/validations/numeric-ssa-20261103/ir-headroom-final-docs.json",
+    "record_sha256": "759a738c0b3cabd163e5779c05fa1342533188b7124d4f0503f49ccf391f9b2e",
+    "log": "local-state/validations/numeric-ssa-20261103/ir-headroom-final-docs.log",
+    "log_sha256": "a3d11b0176edc4554409b31e03c7c9396d264f2a1eed0f350d37edcf5bcd90ac",
+    "documents": 19,
+    "internal_links": 199,
+    "status_blocks": 2
+  }
+}

@@ -1,0 +1,157 @@
+{
+  "schema": 1,
+  "status": "completed",
+  "recorded_utc": "2026-11-04T02:11:26.906520+00:00",
+  "generation_retirement": {
+    "schema": 1,
+    "status": "superseded payloads retired; metadata and verified replacement retained",
+    "recorded_utc": "2026-11-04T01:28:00.453351+00:00",
+    "timing": "after all 17 fresh stages and source verification; before the cached run",
+    "plan_adjustment": "The initial plan kept both generations through the pair. Actual free space after the fresh run was below cached admission. The user authorized obsolete-file cleanup. Retire the superseded cache after the full fresh replacement proof; retain metadata, hashes and failure history. This does not accept the pending compiler/policy checkpoint.",
+    "fresh_verification": "/home/oleg/prog/z_llvm/local-state/validations/numeric-ssa-20261103/verified-full-ir-fresh-r3.json",
+    "fresh_verification_sha256": "cbf08068a38829b9a8be8639757e8ba7acacc92868263f22e4f3cfecec992f4a",
+    "fresh_log_sha256": "57e211b3d10c913f9fb0ed97ce0a3b6cd03459c4b72241ba17e97846a57047df",
+    "old_root": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103",
+    "new_root": "/home/oleg/prog/z_llvm/local-state/caches/ir-headroom-20261103",
+    "exports": [
+      {
+        "mode": "ReleaseFast",
+        "old": {
+          "path": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.4b757112cdbe3d4d95000dd8aaedbe4918d3a3e187447225cc05649a0a12d821.air",
+          "bytes": 1343891552,
+          "allocated_bytes": 1343918080,
+          "device": 66306,
+          "inode": 54439883,
+          "nlink": 1,
+          "mtime_ns": 1793725221454186009,
+          "sha256": "4b757112cdbe3d4d95000dd8aaedbe4918d3a3e187447225cc05649a0a12d821",
+          "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+          "metadata_path": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.meta",
+          "metadata_sha256": "891ac2dfe59a62c38d43f3c59026413a327850f3c8203f7e3d2329fe2edc8cfe"
+        },
+        "new": {
+          "path": "/home/oleg/prog/z_llvm/local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5.air",
+          "bytes": 1343891697,
+          "allocated_bytes": 1343922176,
+          "device": 66306,
+          "inode": 55460109,
+          "nlink": 1,
+          "mtime_ns": 1793753874819222360,
+          "sha256": "bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5",
+          "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+          "metadata_path": "/home/oleg/prog/z_llvm/local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.meta",
+          "metadata_sha256": "037abbc2bc1e323c0174b6a43373654ee44ef22a91fcf9a8c092d5693f45f00a"
+        },
+        "same_content": false
+      },
+      {
+        "mode": "ReleaseSafe",
+        "old": {
+          "path": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429.air",
+          "bytes": 1473501276,
+          "allocated_bytes": 1473527808,
+          "device": 66306,
+          "inode": 54439881,
+          "nlink": 1,
+          "mtime_ns": 1793725223741351463,
+          "sha256": "6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429",
+          "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+          "metadata_path": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.meta",
+          "metadata_sha256": "80d6a17a837ca621dd332a30381d2b6ed0174791f5325b9642f5a81acc1058bc"
+        },
+        "new": {
+          "path": "/home/oleg/prog/z_llvm/local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c.air",
+          "bytes": 1473501276,
+          "allocated_bytes": 1473531904,
+          "device": 66306,
+          "inode": 55460104,
+          "nlink": 1,
+          "mtime_ns": 1793753875013237466,
+          "sha256": "53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c",
+          "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+          "metadata_path": "/home/oleg/prog/z_llvm/local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.meta",
+          "metadata_sha256": "24849930ee312cc3cb2d35cf0da327898ca4a16ad25c90b1a858ac5530300618"
+        },
+        "same_content": false
+      },
+      {
+        "mode": "ReleaseSmall",
+        "old": {
+          "path": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6.air",
+          "bytes": 1106432911,
+          "allocated_bytes": 1106448384,
+          "device": 66306,
+          "inode": 54439882,
+          "nlink": 1,
+          "mtime_ns": 1793725216495827600,
+          "sha256": "92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6",
+          "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+          "metadata_path": "/home/oleg/prog/z_llvm/local-state/caches/global-memory-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.meta",
+          "metadata_sha256": "d29639eb569be72cca3063f413509ac00d4d11aa36562d523679eef458980eaf"
+        },
+        "new": {
+          "path": "/home/oleg/prog/z_llvm/local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809.air",
+          "bytes": 1106432911,
+          "allocated_bytes": 1106452480,
+          "device": 66306,
+          "inode": 55460083,
+          "nlink": 1,
+          "mtime_ns": 1793753867954687942,
+          "sha256": "e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809",
+          "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+          "metadata_path": "/home/oleg/prog/z_llvm/local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.meta",
+          "metadata_sha256": "b3f9cb704b31b4257b0e2c3b9f3415672c282a7bd10142d8dbf246de354c62f3"
+        },
+        "same_content": false
+      }
+    ],
+    "allocated_bytes_retired": 3923894272,
+    "free_bytes_before": 31703269376,
+    "active_consumers_found": [],
+    "source_snapshot_sha256": "ae696440453938b1f343aa81be0fb506452091348145f111c3ca645460dd3598",
+    "source_files_verified": 2681,
+    "original_probes_verified": 13,
+    "shared_tool_caches_touched": false,
+    "pip_cache_touched": false,
+    "archives_created": 0,
+    "free_bytes_after": 35627139072
+  },
+  "generation_retirement_record": "local-state/validations/numeric-ssa-20261103/pre-cached-air-retirement.json",
+  "generation_retirement_record_sha256": "7b18e8ef1936a1bfed3260683bb586a713b266ae0a5e54c45e16dcf7cba9333a",
+  "previous_intervals": [
+    {
+      "record": "local-state/validations/numeric-ssa-20261103/pre-full-cache-cleanup.json",
+      "sha256": "03b3a20c25e988f93002fd2497ce0a72584867d6e3e5d3776797d2a4e90748a9",
+      "status": "removed complete idle regenerable caches",
+      "note": "Retain the exact inventory and interval measurements in the linked local record."
+    },
+    {
+      "record": "local-state/validations/numeric-ssa-20261103/shared-cache-cleanup.json",
+      "sha256": "c84cb3b2a0bfe74bf5f1a0c6eff5efbea860ac73dfd95887ec78bdcc0f5205b8",
+      "status": "complete idle shared cache removed",
+      "note": "Retain the exact inventory and interval measurements in the linked local record."
+    },
+    {
+      "record": "local-state/validations/numeric-ssa-20261103/retry-idle-cache-cleanup.json",
+      "sha256": "e73af1a7dff0b63119fbea1d9f8bd1361a706b94c33d592486768dd653a4ac07",
+      "status": "removed complete idle regenerable cache",
+      "note": "Retain the exact inventory and interval measurements in the linked local record."
+    },
+    {
+      "record": "local-state/validations/numeric-ssa-20261103/canonical-root-recovery.json",
+      "sha256": "b571d8738d4397b19c7adb9196f8083114a67f7f7c64c49c94680b2db04ac48b",
+      "status": "retired failed outputs and merged idle checkout; evidence and source branch preserved",
+      "note": "Retain the exact inventory and interval measurements in the linked local record."
+    },
+    {
+      "record": "local-state/validations/numeric-ssa-20261103/retired-checkout-links-cleanup.json",
+      "sha256": "81898ddbb84ba4662368a178c1dd91e05ac301340388cd5333974f9d11ca7c60",
+      "status": "removed two obsolete dependency links and empty checkout parent",
+      "note": "Retain the exact inventory and interval measurements in the linked local record."
+    }
+  ],
+  "cache_interval_caution": "Builds regenerate caches. Separate deletion intervals and filesystem free-space changes are not cumulative net task savings.",
+  "replacement_pair": "docs/evidence/ir_headroom_acceptance_20261103.json",
+  "original_probes_verified": 13,
+  "archives_created": 0
+}
