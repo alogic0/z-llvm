@@ -222,7 +222,7 @@ pub fn requestDestinationNodes(
                 const source = current orelse return error.ValueUseUnresolvedSource;
                 switch (load.kind) {
                     .ordinary => switch (source) {
-                        .spill64 => try result.append(.rcx),
+                        .rax, .spill64 => try result.append(.rcx),
                         .stack_i32_ptr => |ptr| if (ptr.index != null) {
                             try result.append(.rcx);
                             if (ptr.index.?.addend_name != null) try result.append(.r8);
@@ -704,7 +704,7 @@ pub fn requestMappings(
                 mappings.append(.{ .source = null, .destination = .accumulator, .source_request_index = null });
                 switch (load.kind) {
                     .ordinary => switch (source) {
-                        .spill64 => mappings.append(.{
+                        .rax, .spill64 => mappings.append(.{
                             .source = scalarSourceNode(source),
                             .destination = .rcx,
                             .source_request_index = request_index,

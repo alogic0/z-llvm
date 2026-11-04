@@ -123,12 +123,21 @@ pub fn executeScalarLoad(
 
     switch (action.kind) {
         .ordinary => {
+            // A dying RAX pointer loses its canonical binding when the load
+            // prepares its accumulator result. Keep the address in the owned
+            // RCX staging register before that transition, as stores do.
+            var staged = view.*;
+            const staged_address = view.* == .register and view.register.register == .rax;
+            if (staged_address) {
+                try stageAccumulatorPointer(Authority, transaction, &staged);
+                try failLoadForTest(Authority, transaction, .after_pointer_staging);
+            }
             try prepareScalarLoadAccumulator(Authority, transaction, session);
-            try refreshLoadPreparedOperand(Authority, transaction, request_index);
+            if (!staged_address) try refreshLoadPreparedOperand(Authority, transaction, request_index);
             try executeOrdinaryScalarLoad(
                 Authority,
                 transaction,
-                &transaction.prepared_views[request_index].view,
+                if (staged_address) &staged else &transaction.prepared_views[request_index].view,
                 action.bits,
                 action.is_ptr,
             );
@@ -495,7 +504,7 @@ pub fn executeStoreScalar(
     const staged_address = (try materialization.preparedViewLoc(before)) == .rax;
     if (staged_address) {
         staged = before.*;
-        try stageAccumulatorStorePointer(Authority, transaction, &staged);
+        try stageAccumulatorPointer(Authority, transaction, &staged);
     }
     try materializeActionScalar32(Authority, transaction, value_view, .accumulator);
     const pointer_view = if (staged_address) &staged else try Authority.registeredOperandView(Authority, transaction, action.pointer);
@@ -513,7 +522,7 @@ pub fn executeStoreImmediate(
     var staged_pointer: Types.PreparedView = undefined;
     const actual_pointer = if ((try materialization.preparedViewLoc(pointer_view)) == .rax) blk: {
         staged_pointer = pointer_view.*;
-        try stageAccumulatorStorePointer(Authority, transaction, &staged_pointer);
+        try stageAccumulatorPointer(Authority, transaction, &staged_pointer);
         break :blk &staged_pointer;
     } else pointer_view;
     try materialization.clobberPhysicalNode(transaction.selector, .accumulator);
@@ -529,11 +538,11 @@ pub fn executeStoreImmediate(
     try executeStoreEaxToPointer(Authority, transaction, actual_pointer, action.bits);
 }
 
-fn stageAccumulatorStorePointer(comptime Authority: type, transaction: anytype, view: *Types.PreparedView) !void {
+fn stageAccumulatorPointer(comptime Authority: type, transaction: anytype, view: *Types.PreparedView) !void {
     const pointer = try materialization.preparedViewLoc(view);
     if (pointer != .rax) return;
-    // The plan owns this RAX -> RCX transfer. Stage the address before scalar
-    // materialization overwrites EAX; retain the original canonical ownership.
+    // The plan owns this RAX -> RCX transfer. Stage the address before the
+    // accumulator is reused; retain the original canonical ownership.
     try materializeActionPointer(Authority, transaction, pointer, .rcx);
     view.* = .{ .register = .{ .register = .{ .gpr64 = .rcx }, .bits = 64 } };
 }
