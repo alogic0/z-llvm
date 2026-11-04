@@ -236,3 +236,14 @@ compilers, captured IR, original probes and the prior accepted AIR remain intact
 The receipt is `local-state/validations/numeric-ssa-20261103/retry-idle-cache-cleanup.json`.
 The retry uses a new frozen snapshot and distinct fresh/cache logs; no archives
 are created.
+
+The isolated retry passed nine stages before the export worker's canonical
+repository working directory disagreed with the caller's relative paths. It
+stopped at `FileNotFound`, with a sampled 35.51 GB minimum, above the reserve.
+After merging the focused commits, validation moves to `/home/oleg/prog/z_llvm`,
+the location required by the current export/execution cohort. The idle checkout
+and unpublished failed-run outputs were retired after preserving failure records,
+source commits and snapshots, releasing 2.19 GB. Current accepted AIR and all
+13 original probes remain. See
+`local-state/validations/numeric-ssa-20261103/canonical-root-recovery.json`.
+No archives are created.

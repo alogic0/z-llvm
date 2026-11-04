@@ -214,7 +214,10 @@ failing mixed C/Zig native case. Ten regression functions supply 480 observation
 of locally optimized IR executed by Clang-22 against 160 reused LLVM references.
 Complete optimized panic-module IR and the unchanged repaired Fibonacci IR verify.
 These IR checks add no local whole-program execution. Full fresh/cache integration
-remains pending, so the accepted checkpoint above stays unchanged.
+remains pending, so the accepted checkpoint above stays unchanged. The isolated
+retry passed nine stages, then exposed the export worker's fixed checkout path.
+The fresh/cache pair now runs from the primary checkout after merging the focused
+commits; the failed logs and both frozen snapshots remain retained.
 
 Next, complete the frozen fresh/cache integration pair for the IR changes and
 revised headroom policy before accepting the checkpoint. The follow-up fixes have separate printing, parser and optimizer source commits;
