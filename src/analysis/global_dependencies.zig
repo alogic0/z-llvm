@@ -36,6 +36,8 @@ pub const Graph = struct {
             .roots = .empty,
         };
         errdefer graph.deinit();
+        var reference_context = try references.Context.init(allocator, &module);
+        defer reference_context.deinit();
 
         for (module.functions.items) |*function| {
             if (!ir.identifiers.isValid(function.name)) graph.has_unknown_roots = true;
@@ -43,7 +45,7 @@ pub const Graph = struct {
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
             if (!isLocal(function.linkage)) try graph.roots.append(allocator, ref);
-            try references.walkFunction(function, EdgeVisitor{ .allocator = allocator, .module = &module, .edges = &node.edges, .has_unknown = &node.has_unknown });
+            try reference_context.walkFunction(function, EdgeVisitor{ .allocator = allocator, .module = &module, .edges = &node.edges, .has_unknown = &node.has_unknown });
             try graph.nodes.append(allocator, node);
         }
         for (module.globals.items) |*global| {
@@ -52,7 +54,7 @@ pub const Graph = struct {
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
             if (!isLocal(global.linkage)) try graph.roots.append(allocator, ref);
-            try references.walkGlobal(global, EdgeVisitor{ .allocator = allocator, .module = &module, .edges = &node.edges, .has_unknown = &node.has_unknown });
+            try reference_context.walkGlobal(global, EdgeVisitor{ .allocator = allocator, .module = &module, .edges = &node.edges, .has_unknown = &node.has_unknown });
             try graph.nodes.append(allocator, node);
         }
         for (module.aliases.items) |*alias| {
@@ -64,7 +66,7 @@ pub const Graph = struct {
             try references.walkAlias(alias, EdgeVisitor{ .allocator = allocator, .module = &module, .edges = &node.edges, .has_unknown = &node.has_unknown });
             try graph.nodes.append(allocator, node);
         }
-        try references.walkModuleScope(&module, EdgeVisitor{ .allocator = allocator, .module = &module, .edges = &graph.roots, .has_unknown = &graph.has_unknown_roots });
+        try reference_context.walkModuleScope(EdgeVisitor{ .allocator = allocator, .module = &module, .edges = &graph.roots, .has_unknown = &graph.has_unknown_roots });
 
         return graph;
     }

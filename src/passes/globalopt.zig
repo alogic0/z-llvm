@@ -11,7 +11,9 @@ pub const pass: pass_manager.ModulePass = .{
     .run = run,
 };
 
-fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
+fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassResult {
+    var reference_context = try references.Context.init(context.allocator, module);
+    defer reference_context.deinit();
     var changed = false;
     var index: usize = 0;
     while (index < module.globals.items.len) {
@@ -20,7 +22,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
             index += 1;
             continue;
         };
-        if (!allUsesAreDirectLoads(module.*, global)) {
+        if (!allUsesAreDirectLoads(&reference_context, global)) {
             index += 1;
             continue;
         }
@@ -31,7 +33,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
             continue;
         }
 
-        if (!globalHasRemainingUses(module.*, global)) {
+        if (!reference_context.query(global.name).mayReference()) {
             var removed = module.globals.orderedRemove(index);
             removed.deinit(module.allocator);
         } else {
@@ -79,10 +81,10 @@ const DirectLoadUses = struct {
     }
 };
 
-fn allUsesAreDirectLoads(module: ir.Module, global: ir.Global) bool {
+fn allUsesAreDirectLoads(context: *const references.Context, global: ir.Global) bool {
     var loads: usize = 0;
     var blocked = false;
-    references.walkModule(&module, DirectLoadUses{ .global = global, .loads = &loads, .blocked = &blocked }) catch unreachable;
+    context.walkModule(DirectLoadUses{ .global = global, .loads = &loads, .blocked = &blocked }) catch unreachable;
     return !blocked and loads != 0;
 }
 
@@ -107,10 +109,6 @@ fn replaceDirectLoads(module: *ir.Module, global: ir.Global, initializer: ir.Val
         }
     }
     return removed_loads;
-}
-
-fn globalHasRemainingUses(module: ir.Module, global: ir.Global) bool {
-    return references.query(&module, global.name).mayReference();
 }
 
 fn isLoadFoldableScalar(value: ir.Value) bool {

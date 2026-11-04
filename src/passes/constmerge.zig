@@ -20,7 +20,9 @@ const Replacement = struct {
 fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassResult {
     // The replacement walk cannot rewrite opaque expressions, metadata or
     // assembly. Incomplete reference coverage forbids deleting any candidate.
-    if (references.hasUnknown(module)) return .unchanged;
+    var reference_context = try references.Context.init(context.allocator, module);
+    defer reference_context.deinit();
+    if (reference_context.hasUnknown()) return .unchanged;
     var replacements: std.ArrayList(Replacement) = .empty;
     defer replacements.deinit(context.allocator);
 
@@ -50,7 +52,7 @@ fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassRes
     for (replacements.items) |replacement| {
         replaceGlobalUses(module, replacement);
     }
-    removeMergedGlobals(module, replacements.items);
+    removeMergedGlobals(module, replacements.items, &reference_context);
     return .changed;
 }
 
@@ -107,11 +109,11 @@ fn replaceInitializer(initializer: *ir.GlobalInitializer, replacement: Replaceme
     }
 }
 
-fn removeMergedGlobals(module: *ir.Module, replacements: []const Replacement) void {
+fn removeMergedGlobals(module: *ir.Module, replacements: []const Replacement, context: *const references.Context) void {
     var index: usize = 0;
     while (index < module.globals.items.len) {
         const global = module.globals.items[index];
-        if (!isRemovedGlobal(global.name, replacements) or references.query(module, global.name).mayReference()) {
+        if (!isRemovedGlobal(global.name, replacements) or context.query(global.name).mayReference()) {
             index += 1;
             continue;
         }

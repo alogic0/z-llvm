@@ -120,7 +120,7 @@ test "globaldce references: live function unknowns retain definitions but dead f
 }
 
 test "globaldce references: module scope unknowns retain globals functions aliases and comdats" {
-    for ([_][]const u8{ "module asm \".quad g\"", "attributes #0 = { nounwind }", "!0 = !{ptr @g}", "declare void @sink() #0\nattributes #0 = { nounwind }" }) |text| {
+    for ([_][]const u8{ "module asm \".quad g\"", "attributes #0 = { unknown_attribute }", "!0 = !{ptr @g}", "declare void @sink() #0\nattributes #0 = { \"probe-stack\"=\"f\" }" }) |text| {
         const input = try std.fmt.allocPrint(
             std.testing.allocator,
             "{s}\n$grp = comdat any\n@g = internal global i32 1, comdat($grp)\n@a = internal alias i32, ptr @g\ndefine internal void @f() {{\nentry:\n  ret void\n}}\n",

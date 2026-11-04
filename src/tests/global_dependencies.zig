@@ -73,7 +73,7 @@ test "module dependencies: live opaque references conservatively retain all defi
         "@callback = global [1 x ptr] [ptr @hidden]",
         "module asm \".quad hidden\"",
         "!0 = !{ptr @hidden}",
-        "define void @entry() #0 {\nentry:\n  ret void\n}\nattributes #0 = { nounwind }",
+        "define void @entry() #0 {\nentry:\n  ret void\n}\nattributes #0 = { unknown_attribute }",
     }) |opaque_root| {
         const source = try std.fmt.allocPrint(std.testing.allocator, "{s}\ndefine internal i32 @hidden() {{\nentry:\n  ret i32 9\n}}\n", .{opaque_root});
         defer std.testing.allocator.free(source);

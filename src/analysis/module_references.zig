@@ -11,6 +11,51 @@
 const std = @import("std");
 const ir = @import("../ir.zig");
 const opaque_names = @import("../ir/opaque_names.zig");
+const reference_attributes = @import("reference_attributes.zig");
+
+/// Borrow one module while owning only lookup storage. Attribute records must
+/// remain unchanged for this context's lifetime; definitions and uses may be
+/// rewritten by its consumer. Standalone walks do not resolve group IDs.
+pub const Context = struct {
+    module: *const ir.Module,
+    groups: reference_attributes.Groups,
+
+    pub fn init(allocator: std.mem.Allocator, module: *const ir.Module) !Context {
+        return .{ .module = module, .groups = try reference_attributes.Groups.init(allocator, module.attribute_groups.items) };
+    }
+
+    pub fn deinit(context: *Context) void {
+        context.groups.deinit();
+    }
+
+    pub fn walkModule(context: *const Context, visitor: anytype) @TypeOf(visitor).Error!void {
+        try walkModuleWithContext(context.module, context, visitor);
+    }
+
+    pub fn walkModuleScope(context: *const Context, visitor: anytype) @TypeOf(visitor).Error!void {
+        try walkModuleScopeWithContext(context.module, context, visitor);
+    }
+
+    pub fn walkFunction(context: *const Context, function: *const ir.Function, visitor: anytype) @TypeOf(visitor).Error!void {
+        try walkFunctionWithContext(function, context, visitor);
+    }
+
+    pub fn walkGlobal(context: *const Context, global: *const ir.Global, visitor: anytype) @TypeOf(visitor).Error!void {
+        try walkGlobalWithContext(global, context, visitor);
+    }
+
+    pub fn query(context: *const Context, name: []const u8) Summary {
+        var summary: Summary = .{ .has_unknown = !ir.identifiers.isValid(name) };
+        context.walkModule(Query{ .name = name, .summary = &summary }) catch unreachable;
+        return summary;
+    }
+
+    pub fn hasUnknown(context: *const Context) bool {
+        var summary: Summary = .{};
+        context.walkModule(Query{ .name = "", .summary = &summary }) catch unreachable;
+        return summary.has_unknown;
+    }
+};
 
 pub const Site = union(enum) {
     module,
@@ -85,44 +130,18 @@ fn opaqueText(text: ?[]const u8, kind: OpaqueKind, site: Site, visitor: anytype)
     }
 }
 
-// This is a complete whitelist for this small grammar, not a search for @.
-// Unknown tokens (including attribute-group references) retain unknown status.
-fn referenceFreeAttributes(text: []const u8) bool {
-    var tokens = std.mem.tokenizeAny(u8, text, " \t\r\n,");
-    while (tokens.next()) |token| {
-        if (std.mem.eql(u8, token, "align")) {
-            _ = std.fmt.parseInt(u64, tokens.next() orelse return false, 10) catch return false;
-            continue;
-        }
-        const known = [_][]const u8{
-            "local_unnamed_addr", "unnamed_addr", "nounwind",   "noundef",
-            "noinline",           "alwaysinline", "inlinehint", "readnone",
-            "readonly",           "writeonly",    "nocapture",  "nonnull",
-            "noalias",            "willreturn",   "noreturn",   "nofree",
-            "nosync",             "cold",         "hot",        "optsize",
-            "minsize",            "optnone",      "uwtable",    "dso_local",
-            "dso_preemptable",    "signext",      "zeroext",    "inreg",
-            "immarg",
-        };
-        var recognized = false;
-        for (known) |word| {
-            if (std.mem.eql(u8, token, word)) {
-                recognized = true;
-                break;
-            }
-        }
-        if (!recognized) return false;
-    }
-    return true;
-}
-
-fn attributes(text: ?[]const u8, site: Site, visitor: anytype) @TypeOf(visitor).Error!void {
+fn attributes(text: ?[]const u8, site: Site, context: ?*const Context, visitor: anytype) @TypeOf(visitor).Error!void {
     if (text) |s| {
-        if (!referenceFreeAttributes(s)) try opaqueText(s, .attributes, site, visitor);
+        const groups = if (context) |ctx| &ctx.groups else null;
+        if (!reference_attributes.referenceFree(s, groups)) try opaqueText(s, .attributes, site, visitor);
     }
 }
 
 pub fn walkInstruction(inst: *const ir.Instruction, visitor: anytype) @TypeOf(visitor).Error!void {
+    try walkInstructionWithContext(inst, null, visitor);
+}
+
+fn walkInstructionWithContext(inst: *const ir.Instruction, context: ?*const Context, visitor: anytype) @TypeOf(visitor).Error!void {
     if (inst.removed) return;
     const site: Site = .{ .instruction = inst };
     // The operand API's generic coverage also flags reference-free attributes;
@@ -136,13 +155,13 @@ pub fn walkInstruction(inst: *const ir.Instruction, visitor: anytype) @TypeOf(vi
             } else if (call.callee_value == null) {
                 try symbolReference(call.callee, site, visitor);
             }
-            for (call.args.items) |arg| try attributes(arg.attrs, site, visitor);
-            try attributes(call.attrs, site, visitor);
-            try attributes(call.ret_attrs, site, visitor);
+            for (call.args.items) |arg| try attributes(arg.attrs, site, context, visitor);
+            try attributes(call.attrs, site, context, visitor);
+            try attributes(call.ret_attrs, site, context, visitor);
             try opaqueText(call.raw_args, .raw_arguments, site, visitor);
             try opaqueText(call.operand_bundle, .operand_bundle, site, visitor);
         },
-        .alloca => |alloca| try attributes(alloca.attrs, site, visitor),
+        .alloca => |alloca| try attributes(alloca.attrs, site, context, visitor),
         else => {},
     }
 }
@@ -161,15 +180,24 @@ pub fn walkTerminator(term: *const ir.Terminator, visitor: anytype) @TypeOf(visi
 
 /// References that remain even after dead definitions are removed.
 pub fn walkModuleScope(module: *const ir.Module, visitor: anytype) @TypeOf(visitor).Error!void {
+    try walkModuleScopeWithContext(module, null, visitor);
+}
+
+fn walkModuleScopeWithContext(module: *const ir.Module, context: ?*const Context, visitor: anytype) @TypeOf(visitor).Error!void {
     for (module.module_asm.items) |_| try visitor.visit(.module, .{ .unknown = .assembly });
-    for (module.attribute_groups.items) |text| try opaqueText(text, .attributes, .module, visitor);
+    if (context == null or context.?.groups.has_unknown) {
+        // A malformed record can be empty in constructed IR. Coverage must
+        // remain unknown even when there is no text for the positive walker.
+        if (module.attribute_groups.items.len != 0) try visitor.visit(.module, .{ .unknown = .attributes });
+        for (module.attribute_groups.items) |text| try opaqueText(text, .attributes, .module, visitor);
+    }
     for (module.metadata.items) |text| try opaqueText(text, .metadata, .module, visitor);
     for (module.declarations.items) |*decl| {
         const site: Site = .{ .declaration = decl };
         if (!ir.identifiers.isValid(decl.name)) try visitor.visit(site, .{ .unknown = .symbol_name });
-        try attributes(decl.attrs, site, visitor);
-        try attributes(decl.ret_attrs, site, visitor);
-        for (decl.params.items) |param| try attributes(param.attrs, site, visitor);
+        try attributes(decl.attrs, site, context, visitor);
+        try attributes(decl.ret_attrs, site, context, visitor);
+        for (decl.params.items) |param| try attributes(param.attrs, site, context, visitor);
     }
 }
 
@@ -180,6 +208,10 @@ pub fn walkAlias(alias: *const ir.GlobalAlias, visitor: anytype) @TypeOf(visitor
 }
 
 pub fn walkGlobal(global: *const ir.Global, visitor: anytype) @TypeOf(visitor).Error!void {
+    try walkGlobalWithContext(global, null, visitor);
+}
+
+fn walkGlobalWithContext(global: *const ir.Global, context: ?*const Context, visitor: anytype) @TypeOf(visitor).Error!void {
     const site: Site = .{ .global = global };
     if (!ir.identifiers.isValid(global.name)) try visitor.visit(site, .{ .unknown = .symbol_name });
     switch (global.initializer) {
@@ -188,27 +220,35 @@ pub fn walkGlobal(global: *const ir.Global, visitor: anytype) @TypeOf(visitor).E
         .array => |array| for (array.values.items) |value| try valueReference(value, site, visitor),
         .@"opaque" => |raw| try opaqueText(raw, .initializer, site, visitor),
     }
-    try attributes(global.attrs, site, visitor);
-    try attributes(global.address_attrs, site, visitor);
+    try attributes(global.attrs, site, context, visitor);
+    try attributes(global.address_attrs, site, context, visitor);
 }
 
 pub fn walkFunction(function: *const ir.Function, visitor: anytype) @TypeOf(visitor).Error!void {
+    try walkFunctionWithContext(function, null, visitor);
+}
+
+fn walkFunctionWithContext(function: *const ir.Function, context: ?*const Context, visitor: anytype) @TypeOf(visitor).Error!void {
     const site: Site = .{ .function = function };
     if (!ir.identifiers.isValid(function.name)) try visitor.visit(site, .{ .unknown = .symbol_name });
-    try attributes(function.attrs, site, visitor);
-    try attributes(function.ret_attrs, site, visitor);
-    for (function.params.items) |param| try attributes(param.attrs, site, visitor);
+    try attributes(function.attrs, site, context, visitor);
+    try attributes(function.ret_attrs, site, context, visitor);
+    for (function.params.items) |param| try attributes(param.attrs, site, context, visitor);
     for (function.blocks.items) |*block| {
-        for (block.instructions.items) |*inst| try walkInstruction(inst, visitor);
+        for (block.instructions.items) |*inst| try walkInstructionWithContext(inst, context, visitor);
         if (block.terminator) |*term| try walkTerminator(term, visitor);
     }
 }
 
 pub fn walkModule(module: *const ir.Module, visitor: anytype) @TypeOf(visitor).Error!void {
-    try walkModuleScope(module, visitor);
+    try walkModuleWithContext(module, null, visitor);
+}
+
+fn walkModuleWithContext(module: *const ir.Module, context: ?*const Context, visitor: anytype) @TypeOf(visitor).Error!void {
+    try walkModuleScopeWithContext(module, context, visitor);
     for (module.aliases.items) |*alias| try walkAlias(alias, visitor);
-    for (module.globals.items) |*global| try walkGlobal(global, visitor);
-    for (module.functions.items) |*function| try walkFunction(function, visitor);
+    for (module.globals.items) |*global| try walkGlobalWithContext(global, context, visitor);
+    for (module.functions.items) |*function| try walkFunctionWithContext(function, context, visitor);
 }
 
 pub const Summary = struct {

@@ -29,6 +29,7 @@ comptime {
     _ = @import("tests/optimizer_checkpoint.zig");
     _ = @import("tests/integer_semantics.zig");
     _ = @import("tests/module_references.zig");
+    _ = @import("tests/reference_attributes.zig");
     _ = @import("tests/block_addresses.zig");
     _ = @import("tests/simplifycfg_names.zig");
     _ = @import("tests/globaldce_references.zig");
