@@ -140,7 +140,9 @@ def run_module_dependency_controls(runner, directory, zllvm, environment, report
     fixture = (ROOT / "test/real_programs/module_dependencies.ll").read_text()
     cases = {
         "reachable-unsupported": (fixture.replace("@module_dead_alias = internal alias", "@module_dead_alias = alias"), "function=module_dead"),
-        "opaque-coverage": (fixture + "\n!0 = !{ptr @module_dead}\n", "coverage=conservative"),
+        # Arbitrary named metadata can have unknown string semantics. Ordinary
+        # typed tuples are now covered by the bounded reference grammar.
+        "opaque-coverage": (fixture + '\n!vendor.helpers = !{!0}\n!0 = !{!"module_dead"}\n', "coverage=conservative"),
         "alias-cycle": ("@a = alias i64 (), ptr @b\n@b = internal alias i64 (), ptr @a\n", "UnresolvedAliasTarget"),
         "alias-external": ("@a = alias i64 (), ptr @external\ndeclare i64 @external()\n", "UnresolvedAliasTarget"),
         "unsupported-global": ("@value = global double 1.0\n", "UnsupportedGlobalData"),
