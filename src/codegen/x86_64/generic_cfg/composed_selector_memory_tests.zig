@@ -62,9 +62,14 @@ test "array strides execute allocation padding nested arrays and wrapping indexe
         .{ .source = "[1 x i1]", .stride = 1 },
         .{ .source = "[2 x i8]", .stride = 2 },
         .{ .source = "[128 x i8]", .stride = 128 },
+        .{ .source = "[3 x i8]", .stride = 3 },
+        .{ .source = "[56 x i8]", .stride = 56 },
+        .{ .source = "[255 x i8]", .stride = 255 },
         .{ .source = "[2 x i8]", .layout = "e-p:64:64-i8:32", .stride = 8 },
         .{ .source = "[1 x i24]", .layout = "e-p:64:64-i24:32", .stride = 4 },
+        .{ .source = "[3 x i24]", .layout = "e-p:64:64-i24:32", .stride = 12 },
         .{ .source = "[2 x [2 x i64]]", .stride = 32 },
+        .{ .source = "[3 x [5 x i8]]", .stride = 15 },
     };
     for (cases) |case| {
         const source = try std.fmt.allocPrint(std.testing.allocator,
@@ -125,7 +130,7 @@ test "array stride admission rejects unsupported layouts strides and operands wi
         .{ .source = "[1 x { i8, i64 }]" },
         .{ .source = "[1 x double]", .layout = "e-p:64:64-f64:128" },
         .{ .source = "[0 x i8]", .diagnostic = "composed-block-array-gep-stride" },
-        .{ .source = "[3 x i8]", .diagnostic = "composed-block-array-gep-stride" },
+        .{ .source = "[18446744073709551615 x i16]" },
         .{ .source = "[256 x i8]", .diagnostic = "composed-block-array-gep-stride" },
         .{ .index_ty = .{ .int = 32 }, .diagnostic = "composed-block-gep-elem-index-ty" },
         .{ .index = .{ .int = 1 }, .diagnostic = "composed-block-gep-index-form" },

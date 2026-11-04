@@ -698,7 +698,7 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
         },
         .form_scaled_address => |address| {
             try address.result.validate();
-            _ = try scaleShift(address.scale);
+            if (address.scale == 0) return error.ValueUseAddressScaleInvalid;
             switch (address.index) {
                 .constant => {},
                 .request => |handle| _ = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle),

@@ -1117,7 +1117,7 @@ fn lowerArrayStrideGep(selector: *ComposedBlockSelector, result_name: []const u8
     const allocation_size = layout.typeAllocSizeBytes(gep.source_ty) catch
         return .{ .no_emitter = "composed-block-array-gep-layout" };
     const scale = std.math.cast(u8, allocation_size) orelse return .{ .no_emitter = "composed-block-array-gep-stride" };
-    if (scale == 0 or !std.math.isPowerOfTwo(scale)) return .{ .no_emitter = "composed-block-array-gep-stride" };
+    if (scale == 0) return .{ .no_emitter = "composed-block-array-gep-stride" };
     const index = gep.indices.items[0];
     if (!index.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-gep-elem-index-ty" };
     if (index.value != .named) return .{ .no_emitter = "composed-block-gep-index-form" };

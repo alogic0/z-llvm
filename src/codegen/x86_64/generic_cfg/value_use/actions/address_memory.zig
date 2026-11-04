@@ -1010,13 +1010,7 @@ pub fn executeScaledAddress(
                         Authority.noteRegisteredOperandBoundaryError(Authority, transaction, index_handle, err);
                         return err;
                     };
-                    const shift = try scaleShift(action.scale);
-                    if (shift != 0) try selector_state.emitEflagsInstruction(
-                        transaction.selector,
-                        .{ .shl_r8_imm6 = shift },
-                        .write,
-                    );
-                    try selector_state.emitEflagsInstruction(transaction.selector, .add_r8_rcx, .write);
+                    try addScaledIndex(transaction.selector, action.scale);
                 },
             }
             try selector_state.bindScratch(transaction.selector, result_name, .rcx, 64);
@@ -1058,6 +1052,23 @@ fn scaleShift(scale: u8) !u6 {
     return shift;
 }
 fn scaledOffset(index: i32, scale: u8) !i32 {
-    _ = try scaleShift(scale);
+    if (scale == 0) return error.ValueUseAddressScaleInvalid;
     return std.math.mul(i32, index, scale) catch error.ValueUseAddressOffsetOutOfRange;
+}
+
+fn addScaledIndex(selector: *ComposedBlockSelector, scale: u8) !void {
+    if (scale == 0) return error.ValueUseAddressScaleInvalid;
+    // The transaction owns RCX (base/result) and R8 (index). Accumulate each
+    // set bit without another temporary; shifts and additions wrap at 64 bits.
+    // Power-of-two scales retain their existing single shift/add sequence.
+    var remaining = scale;
+    var shift: u6 = 0;
+    while (remaining != 0) : (remaining >>= 1) {
+        if (remaining & 1 != 0) {
+            if (shift != 0) try selector_state.emitEflagsInstruction(selector, .{ .shl_r8_imm6 = shift }, .write);
+            try selector_state.emitEflagsInstruction(selector, .add_r8_rcx, .write);
+            shift = 0;
+        }
+        shift += 1;
+    }
 }

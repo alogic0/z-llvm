@@ -237,7 +237,7 @@ test "value-use scaled-address action internally resolves both current homes" {
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 test "value-use scaled-address action preserves sources already in its scratch destinations" {
-    for ([_]u8{ 1, 8, 128 }) |scale| {
+    for ([_]u8{ 1, 3, 8, 12, 15, 56, 128, 255 }) |scale| {
         var machine = MachineFunction.init("scaled-in-place", .ptr);
         defer machine.deinit(std.testing.allocator);
         var plan = SelectorAllocationPlan.init(std.testing.allocator);

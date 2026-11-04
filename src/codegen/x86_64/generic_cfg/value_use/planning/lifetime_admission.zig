@@ -62,6 +62,10 @@ pub fn validateRequest(
             const current = try resolveRequestCurrent(Authority, transaction, index);
             try compatibility.validateBindingCompatibility(binding, request, current);
             try compatibility.validateSourceView(current, request.form);
+            if (request.prepared_action) |action| if (action == .form_scaled_address) {
+                if ((current == .stack_i32_array or current == .stack_i32_ptr) and action.form_scaled_address.scale != 4)
+                    return error.ValueUseAddressDescriptorScaleMismatch;
+            };
             if (request.form == .stack_object_address) {
                 if (request.prepared_action) |action| if (action == .form_byte_address) {
                     const extent: u32 = switch (current) {
