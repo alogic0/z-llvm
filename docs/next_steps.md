@@ -202,21 +202,23 @@ explicit boundaries; frozen residual fingerprints and the bypass ratchet stay
 unchanged.
 
 The [numeric SSA serialization repair](evidence/numeric_ssa_focused_20261103.json)
-at `05467b60` now has focused proof. Printing repairs reordered numeric locals,
-including block labels and PHI predecessors, without mutating optimizer IR or
-stripping parsed module records. Valid production numbering remains unchanged;
-comparison output uses the same owner for dense numbering. Opaque references
-that need rewriting reject before output. Parser follow-up `12c57b9c` closes
-ownership leaks before append and propagates array-initializer allocation errors.
-All 1,705 units, readiness and structural checks pass. Six regression functions
-supply 288 observations of locally optimized IR executed by Clang-22 against 96
-LLVM references. The captured Fibonacci IR now verifies with layout and metadata
-preserved; this adds no local whole-program execution. Full integration remains
-pending, so the accepted checkpoint above stays unchanged.
+now has a [focused integration follow-up](evidence/ir_blockaddress_focused_20261103.json).
+The first full run failed after six stages on a retained jump-table initializer;
+its sampled minimum stayed above the reduced reserve. Printing now binds each
+`blockaddress` to its function before renumbering. CFG passes preserve functions
+whose block addresses escape, while opaque reference coverage stays conservative.
+SimplifyCFG generates valid names without collisions, and the parser preserves
+quoted parameter names with spaces. The earlier allocation-ownership fixes remain.
+All 1,718 units, readiness and 13 structural checks pass, including the previously
+failing mixed C/Zig native case. Ten regression functions supply 480 observations
+of locally optimized IR executed by Clang-22 against 160 reused LLVM references.
+Complete optimized panic-module IR and the unchanged repaired Fibonacci IR verify.
+These IR checks add no local whole-program execution. Full fresh/cache integration
+remains pending, so the accepted checkpoint above stays unchanged.
 
 Next, complete the frozen fresh/cache integration pair for the IR changes and
-revised headroom policy before accepting the checkpoint. The naming repair and parser ownership fixes have
-separate source commits; the fixed candidate and execution cohorts remain unchanged.
+revised headroom policy before accepting the checkpoint. The follow-up fixes have separate printing, parser and optimizer source commits;
+the fixed candidate and execution cohorts remain unchanged.
 
 Then narrow opaque dependency-reference coverage before changing the default
 selection. LLVM GlobalDCE retains 34 functions and 16 globals/aliases from the

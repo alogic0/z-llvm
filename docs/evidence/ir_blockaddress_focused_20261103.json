@@ -1,0 +1,263 @@
+{
+  "schema": 1,
+  "status": "focused proof; full fresh/cache integration pending",
+  "recorded_utc": "2026-11-04T00:14:15.274093+00:00",
+  "source_commits": [
+    {
+      "revision": "b4f1ea95a353b62916a6da057d61408410094c19",
+      "tree": "b0b21ee9bee8a31c3dcb6c65cc1a8c6347703b38",
+      "subject": "fix(ir): bind blockaddress rewrites to their function namespace"
+    },
+    {
+      "revision": "396bfabddd42d44e41f56b45bfef04b4215d9b84",
+      "tree": "52ff5600160ab26e7a3030ff227b30d5b8b9e094",
+      "subject": "fix(parser): retain complete quoted parameter names"
+    },
+    {
+      "revision": "8b6452ebc56509a16970510756eb938d984f86e5",
+      "tree": "993d3de239ff3a18816c16301896d38e459152b6",
+      "subject": "fix(optimizer): preserve addressed blocks and valid local names"
+    }
+  ],
+  "source_sha256": {
+    "src/analysis/block_addresses.zig": "2395df5f32e3052da0f9891c29f4ad5259663083697497edebf1dc044a7e2324",
+    "src/analysis/global_dependencies.zig": "d666966cf445bb2a16b0c7be2372d60c617bb48498e50ad351cebb2bd6e5c462",
+    "src/analysis/module_references.zig": "82ac776d31f810c746657fe35cd53b4e3c9013303fe49bd11bf58288ecdaac3d",
+    "src/ir/local_names.zig": "2fc957e9769335987f6c9940a4941f939bbbe56367d9a9826ae3528d43c22133",
+    "src/ir/opaque_names.zig": "95a7224154fd3bc53ffe3059b61502e2708cbc50d82059c7ad1797d4c8f02fed",
+    "src/ir/parser_common.zig": "047a6ba9d933dbf4004b2cd6d6c98a384da04c69eeaf763611a99f0e28ab69db",
+    "src/ir/printer.zig": "223a4b786a2c4b55dfac6c8fada09a72108aa3778a160c54be6670eef660ac6d",
+    "src/passes/globalopt.zig": "c711e6c17c9bc8a470646a7e1ad03b39a9126eb768ad32d515f3c0f0ca3d33ae",
+    "src/passes/jump_threading.zig": "2309a3b516fef0c509aed1acfcd7d6bc6676f08d54a9249f79fc274854cc572b",
+    "src/passes/loop_deletion.zig": "fe40919f7e98bfe3d2dbc8f15c949bb4dcab09a125314d5a0094bd15e0b21658",
+    "src/passes/loop_simplifycfg.zig": "0bbb3c86c79c40149c447cac2cc49324bfdf227143fb1af98d4f6e7d22eb293f",
+    "src/passes/sccp.zig": "e7b5123a28bc2f28ed17f51e5fcc11ad7177c2233ebf8dd4aa12af4ab498aaf6",
+    "src/passes/simplifycfg.zig": "4d0de78777d9032cd5802b36bfff6b141e423f34510cd37124b203bd5acdca9d",
+    "src/tests.zig": "54574ad3576d1e3a9b8d724865da7b76f241a5e3c9125fa70d098d0318615f8b",
+    "src/tests/block_addresses.zig": "71bce5fb7df1d45cb5965489b140b36ca111ae5b315b4e56a5712f5ec4846317",
+    "src/tests/ir_numeric_names.zig": "8e3750c934647f7303c58867c36f2f5cce414d95e7fc1a5f28fe2fa576ffb3d2",
+    "src/tests/ir_parser_parameters.zig": "224e9fd462c864d8852bb43e6f3c5cdd25da2d93b76a121e17b2bfed65ddf537",
+    "src/tests/module_references.zig": "9e69f5c0961b67391ddb38b7882dbf39d0f515834f12bfa8e89048e4c2684179",
+    "src/tests/simplifycfg_names.zig": "21629daa6e5b1b6125edb9585f6bc0f179093bf4777d62195ff7493f7edda027",
+    "test/opt/inputs/numeric_local_names.ll": "fd41e44e485f4023c872ea1fefc804756bfcbdbfebf57ba33070893a5c7cb081",
+    "test/opt/numeric_local_names_harness.c": "15a05f48e7e4a61f70a4d3da25a969cee2b9184ee44fa180ce2a657a9fae113e",
+    "tools/run_optimizer_correctness.zig": "32f8c48659869f38d92f9f1eab294889f7f9e2d12d373aefeacfce5a0bb656a5"
+  },
+  "first_full_failure": {
+    "status": "failed; not acceptance evidence",
+    "failure": "UnsupportedNumericLocalReference while printing a global initializer in releasesmall_runtime_mix_c_add_may_panic",
+    "stage": "integrated-object-preopt",
+    "completed_stages": 6,
+    "source_snapshot": "local-state/validations/numeric-ssa-20261103/ir-full-source-snapshot.json",
+    "source_snapshot_sha256": "ad103a49064e2a172cade17920c586323c3d27242a8db8f9e8708050ce13d111",
+    "head": "6560d61b9b7201974a230f9fba318bd5df270882",
+    "sources_unchanged": true,
+    "original_probes_verified": 13,
+    "minimum_available_bytes": 38268682240,
+    "reserve_bytes": 24359738368,
+    "air_export_started": false,
+    "recorded_utc": "2026-11-03T23:38:45.909602+00:00"
+  },
+  "implementation": [
+    "Decode only complete function/block blockaddress pairs in opaque IR; preserve strings and metadata identifiers",
+    "Print-only blockaddress repair uses the referenced function namespace and finishes before any output",
+    "Shared reference walker emits positive blockaddress events without claiming complete opaque reference coverage",
+    "Five CFG passes retain address-taken functions; malformed or unresolved address references conservatively protect all functions",
+    "SimplifyCFG generates valid unique names across values, labels, quoted spellings and escaped spellings",
+    "Parameter parsing uses complete top-level tokens, preserving quoted names and nested attributes; trailing text rejects safely"
+  ],
+  "validation": {
+    "unit_tests": 1718,
+    "structural_tests": 13,
+    "checks": {
+      "blockaddress-unit-final": {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 10962863343,
+        "record": "local-state/validations/numeric-ssa-20261103/blockaddress-unit-final.json",
+        "record_sha256": "09ba286582da7665e65463b412c2611c9e3d5eb53df0f1c94bd6dbe000d42093",
+        "log": "local-state/validations/numeric-ssa-20261103/blockaddress-unit-final.log",
+        "log_sha256": "e2384d980a3c6ff82e48e4fb5eaaa325a6caf44d8890060a0a298e365445fc5f"
+      },
+      "blockaddress-readiness-r2": {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 441418278140,
+        "record": "local-state/validations/numeric-ssa-20261103/blockaddress-readiness-r2.json",
+        "record_sha256": "10a7dafa3084a8ab207689ca996e0b81bd3693b16202a888aae0041641273741",
+        "log": "local-state/validations/numeric-ssa-20261103/blockaddress-readiness-r2.log",
+        "log_sha256": "b3511ca5ca2e2d6a449fc0a23d7b43c5ff1670e0e9414c49d7cb91e2e1392329"
+      },
+      "blockaddress-structural": {
+        "argv": [
+          "zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 388714185,
+        "record": "local-state/validations/numeric-ssa-20261103/blockaddress-structural.json",
+        "record_sha256": "22464b7a41376c4476f2162433aba15601ef92fb417d1f2b4b8097258800b0a9",
+        "log": "local-state/validations/numeric-ssa-20261103/blockaddress-structural.log",
+        "log_sha256": "6155f923180e58a6f731d6d4015315d5cdfb7343a443df61eae1aa7d8c2cde47"
+      },
+      "blockaddress-llvm-r2": {
+        "argv": [
+          "python3",
+          "local-state/validations/numeric-ssa-20261103/verify_blockaddress_llvm_r2.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 8973011035,
+        "record": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2.json",
+        "record_sha256": "b331a20065bfc1c4c23a728f6cda29bdca8d0181c381334cb90328f2e0748e11",
+        "log": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2.log",
+        "log_sha256": "7ccb57b40c35e3901faaaeb52a109e365b2b78f0c4f9c95b32fb4e2e9f308250"
+      },
+      "mixed-panic-final": {
+        "argv": [
+          "zig",
+          "run",
+          "tools/run_distribution_zig_integrated_object.zig",
+          "--",
+          "--pipeline=preopt",
+          "--case=releasesmall_runtime_mix_c_add_may_panic"
+        ],
+        "returncode": 0,
+        "wall_ns": 10427963081,
+        "record": "local-state/validations/numeric-ssa-20261103/mixed-panic-final.json",
+        "record_sha256": "d685b68af23b1e7694e07ba76374d12db3d343ce2095664dbbab90c9655b3355",
+        "log": "local-state/validations/numeric-ssa-20261103/mixed-panic-final.log",
+        "log_sha256": "8b26bc88deda2f75b5e37f352ef12b618a958d2e2cfd9bddb24ac65bcc538ccb"
+      }
+    },
+    "native_ir": {
+      "functions": 10,
+      "inputs": 16,
+      "pipelines": [
+        "simplifycfg",
+        "instcombine,dce,simplifycfg",
+        "release-o3"
+      ],
+      "observations_per_pipeline": 160,
+      "locally_optimized_ir_observations": 480,
+      "llvm_reference_observations": 160,
+      "reference_reused": true,
+      "execution_backend": "Clang-22; no local machine-code execution credit"
+    },
+    "llvm_module_verification": {
+      "commands": [
+        {
+          "label": "build",
+          "argv": [
+            "zig",
+            "build"
+          ],
+          "returncode": 0,
+          "wall_ns": 23857085,
+          "stdout": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/build.stdout",
+          "stderr": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/build.stderr"
+        },
+        {
+          "label": "original-verify",
+          "argv": [
+            "opt-22",
+            "-passes=verify",
+            "-disable-output",
+            "local-state/validations/numeric-ssa-20261103/repro-mixed-panic/input.ll"
+          ],
+          "returncode": 0,
+          "wall_ns": 71754642,
+          "stdout": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/original-verify.stdout",
+          "stderr": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/original-verify.stderr"
+        },
+        {
+          "label": "optimize",
+          "argv": [
+            "zig-out/bin/z_llvm",
+            "--passes=zig-release-small-accepted",
+            "--input-limit=67108864",
+            "local-state/validations/numeric-ssa-20261103/repro-mixed-panic/input.ll"
+          ],
+          "returncode": 0,
+          "wall_ns": 8692662421,
+          "stdout": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/mixed-panic-optimized.ll",
+          "stderr": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/optimize.stderr"
+        },
+        {
+          "label": "optimized-verify",
+          "argv": [
+            "opt-22",
+            "-passes=verify",
+            "-disable-output",
+            "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/mixed-panic-optimized.ll"
+          ],
+          "returncode": 0,
+          "wall_ns": 68793625,
+          "stdout": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/optimized-verify.stdout",
+          "stderr": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/optimized-verify.stderr"
+        },
+        {
+          "label": "fibonacci-preserve",
+          "argv": [
+            "zig-out/bin/z_llvm",
+            "--passes=",
+            "--input-limit=67108864",
+            "local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/object-input.ll"
+          ],
+          "returncode": 0,
+          "wall_ns": 66178874,
+          "stdout": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/fibonacci-preserved.ll",
+          "stderr": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/fibonacci-preserve.stderr"
+        },
+        {
+          "label": "fibonacci-verify",
+          "argv": [
+            "opt-22",
+            "-passes=verify",
+            "-disable-output",
+            "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/fibonacci-preserved.ll"
+          ],
+          "returncode": 0,
+          "wall_ns": 20602313,
+          "stdout": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/fibonacci-verify.stdout",
+          "stderr": "local-state/validations/numeric-ssa-20261103/blockaddress-llvm-r2/fibonacci-verify.stderr"
+        }
+      ],
+      "fibonacci_sha256": "40c482364c90db33cdfbccc6ccbc697899cc731f01a21da2fa27e43bc42d3d42",
+      "fibonacci_unchanged": true,
+      "original_sha256": "db32f2902fb706afcc8ce4f2f17e7078c0398f4122674dd47b6e77adff7ddcc3",
+      "optimized_sha256": "f9644bb5f1536fbbcf8d9f000343471262a822e721a0ce05fec3850af346df51"
+    },
+    "llvm_verification_scope": "Complete captured mixed C/Zig panic module and unchanged repaired Fibonacci IR; the later conservative guard extension is covered by units, readiness and the final exact-case replay",
+    "readiness_interrupted_attempt": "local-state/validations/numeric-ssa-20261103/blockaddress-readiness.json"
+  },
+  "upstream_mapping": [
+    {
+      "path": "../llvm-project-22/llvm/lib/Transforms/Utils/BasicBlockUtils.cpp",
+      "owner": "llvm::MergeBlockIntoPredecessor",
+      "constraint": "Address-taken blocks require preservation or explicit blockaddress use updates"
+    },
+    {
+      "path": "../llvm-project-22/llvm/lib/AsmParser/LLParser.cpp",
+      "owner": "PerFunctionState",
+      "constraint": "LLVM local identifier syntax and shared value/block namespace"
+    }
+  ],
+  "acceptance": "accepted_status.json remains at the module-dependency checkpoint until a frozen fresh/cache pair passes",
+  "archives_created": 0,
+  "scratch_policy": "Retain all 13 original scratch probes"
+}

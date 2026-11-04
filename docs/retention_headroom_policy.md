@@ -226,3 +226,13 @@ current AIR, installed compilers and retained proofs remain verified. The
 artifact-store dry run found no unreferenced objects. The user-revised headroom
 admits the planned fresh/cache pair. The earlier pip-cache cleanup proposal is
 superseded; no pip cache was deleted. No archives are created.
+
+After the first full IR run failed, its input, log and frozen source snapshot were
+retained. The follow-up passes 1,718 units, readiness, structural checks and the
+exact failing native case. Before the retry, another complete idle checkout build
+cache released 2.35 GB after an open-file and mapping audit. Free space measured
+38.06 GB afterward, above the revised 32.95 GB admission requirement. Installed
+compilers, captured IR, original probes and the prior accepted AIR remain intact.
+The receipt is `local-state/validations/numeric-ssa-20261103/retry-idle-cache-cleanup.json`.
+The retry uses a new frozen snapshot and distinct fresh/cache logs; no archives
+are created.
