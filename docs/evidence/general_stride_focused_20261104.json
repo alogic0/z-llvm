@@ -1,0 +1,526 @@
+{
+  "schema": 1,
+  "status": "focused proof accepted by the accompanying full integration checkpoint",
+  "recorded_utc": "2026-11-04T11:36:55.554735+00:00",
+  "source_revision": "a81a36fe2dadfbc9e3a292a844b3bc2df068bab3",
+  "source_tree": "087277f16b107084f635092e1f81e2dfdfcbff2d",
+  "source_sha256": {
+    "src/codegen/x86_64/generic_cfg/composed_selector_memory.zig": "0416f56fcdf420a7a8561cd832837c6d4d9270cdf15cfdb6ee44e06db08c29f1",
+    "src/codegen/x86_64/generic_cfg/composed_selector_memory_tests.zig": "6b7ff7aef1c49dc771f5eff8bc8dd3cef2de3bd4c87fcfd188e6bc7c642da4bc",
+    "src/codegen/x86_64/generic_cfg/general_stride_tests.zig": "87543153b0608363aa77aa4c6346fa2e9575749c4dc1c885dd066d40e6bb7387",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory.zig": "e3a5e3180eaef6da8eab8fb41bb9a7bec0de2435560b41292bb5dfae45befc4d",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory_gep_tests.zig": "aecacbe5c89643cf046e6d0a30cf7acc1d3f43bc949ffc518dd9b575ccf3f41c",
+    "src/codegen/x86_64/generic_cfg/value_use/core.zig": "350762fa4c3b3152b6278983ace8339722b1a85d23e168d291bba6a9ea7d7794",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/lifetime_admission.zig": "073f93e767ae72a2aa8d3af5999a553e41f0ee6e48fc9e31049c1e5905b28c21",
+    "src/tests.zig": "eb4157ad1d3f439e049523cc2315caa126f1f34ef86f23403dcbb42ffe18adca",
+    "test/real_programs/general_array_stride.ll": "d15d7a682c88261c0e17dd9067d0662882ebfa90ea14e11c0a743c3c1cdef29a",
+    "test/real_programs/general_array_stride_driver.c": "bbf2afbf9df3fc53f85da6b085feff729fdf2058b2d322da4ed1ed30e15a515b",
+    "tools/run_upstream_c_program.py": "1a1292594ba19001cea01af1e88e53bb4774238939553eeb99f335be98749693"
+  },
+  "behavior": [
+    "Literal integer-array allocation strides 1..255, including 56-byte arrays, use the existing typed scaled-address action.",
+    "Bounded shift/add decomposition accumulates the modulo-64-bit address in already-owned RCX/R8. Power-of-two instruction streams and physical clobber ownership are retained.",
+    "Stack i32 descriptors still require scale four, rejected before mutation; read-only table actions retain their power-of-two and shape rules.",
+    "All 255 scales execute against independent wrapping integer multiplication across 11475 cases per unit run. Native fixtures cover 56-byte, padded 12-byte, nested 15-byte, returned/reloaded 255-byte addresses and guarded 56-byte stores.",
+    "Five permanent native functions pass direct/release routes in three modes with live values, clobbering helper calls, negative indexes, wrapping addresses and guards."
+  ],
+  "known_boundaries": [
+    "Zero or greater-than-255 allocation strides; unknown/named/struct/floating array layouts; nondefault pointer address spaces/index widths; unsupported operand forms.",
+    "Descriptor and read-only-table scale rules are unchanged. No new machine instruction or register-allocation policy.",
+    "Fibonacci now reaches composed-block-load-ptr: an ordinary i32 load rejects its RAX pointer home during transaction seal. A retained loop reproduces it and Clang accepts the loop. Typed pointer staging, narrower call ABIs and whole-program execution remain later work."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 11254758708,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-units.json",
+          "sha256": "1144f8a2b4463a088fe25cc6d396ad90842a28cce55230e0f6f85debfeb3c125"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-units.log",
+          "sha256": "377374e9278fc33769e5ee4a9a6cce3ace34656d4936179b7fe743380a45a43f"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 473224065,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-structural.json",
+          "sha256": "6b51c37274cc18fdde98f586c6d8029c93d405f6eb4922e31ed3e1fd3a71d8b6"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-structural.log",
+          "sha256": "cc9c50ff82ebc58cd8e7217525368661459a7490f3e3c5706972ed85e1969d54"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=array stride",
+          "-Dtest-filter=scaled-address",
+          "-Doptimize=ReleaseFast",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 41405151866,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-release-fast.json",
+          "sha256": "c4acb32fd61a3f40a42af3c412cb3e26fad21cae1b61f97676cdf112b0ff04a2"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-release-fast.log",
+          "sha256": "b6ce326eb2b68571574171d3fdc97cbd10bfe3734ae726242181f33c797b340f"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=array stride",
+          "-Dtest-filter=scaled-address",
+          "-Doptimize=ReleaseSafe",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 32083889260,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-release-safe.json",
+          "sha256": "d67d226ce6150208ba9a72819bae72dfea15f0e891e7042529fee65ab64b400b"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-release-safe.log",
+          "sha256": "92b1909baac51bb79d7f08043ac2e312af81033f5882882a623d6ff3cf3a030a"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 397445464859,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-readiness.json",
+          "sha256": "77a731f76c466864ca3cb14ecc7aa9cc3e722c0228a7bd1e735f2da5cc6364e2"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-readiness.log",
+          "sha256": "1ad5c4ef150fde337edaee545d4e84de8d8fb84af29cc3209d479515bf0e2194"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 5190983593,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-captured-object.json",
+          "sha256": "0ce23c673437baefbd10b8724ea3a2b3a014829e4229e61831a6ebf0ddfd2328"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-captured-object.log",
+          "sha256": "99bf1dcd433a7ae9b1b1e5ece6c77f4c371b97ebd5aac2640cbe11c147de6d5c"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/general-stride-20261104/check_native.py",
+          "local-state/validations/general-stride-20261104/native"
+        ],
+        "returncode": 0,
+        "wall_ns": 1765863844,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-native.json",
+          "sha256": "0f50ffc56d509e0fe2052d0c4575c6a211aee5ba0f8bbe592720c768a6e3baeb"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-native.log",
+          "sha256": "3fe61e48656c3d8a98d1682a198e761f91ca3b34d53580d7c8adb2abeeab639c"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/general-stride-20261104/check_existing_native.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 26127275946,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-existing-native.json",
+          "sha256": "707c3d73b4dea8ee9728a18b456ee3faeb5d28f6c97387645974e56eefa0d373"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-existing-native.log",
+          "sha256": "8dd1f610140acefc973b8731fa339e5817c234e5c500eb7a78056beaf219496a"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/general-stride-20261104/check_controls.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 1227320416,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-controls-r2.json",
+          "sha256": "0dbb58a5596376080b7f63bbf37678f6b15a98ac89a58fc1d8f6069f26601183"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-controls-r2.log",
+          "sha256": "749632645eaea770844c4805de00ee3e6bd1101f7bc2df11e469609bb782a9e2"
+        }
+      }
+    ],
+    "unit_tests": 1766,
+    "structural_tests": 13,
+    "focused_tests_per_release_mode": 18,
+    "all_scale_native_cases_per_unit_run": 11475,
+    "native": {
+      "status": "passed",
+      "general_array_stride_local_observations": 1920,
+      "general_array_stride_reference_observations": 960,
+      "compiler_sha256": "0820adedc5ce6c2d64294e750c87025740d1f3f82878104fadf6adfc6567b775",
+      "inputs": {
+        "test/real_programs/general_array_stride.ll": "d15d7a682c88261c0e17dd9067d0662882ebfa90ea14e11c0a743c3c1cdef29a",
+        "test/real_programs/general_array_stride_driver.c": "bbf2afbf9df3fc53f85da6b085feff729fdf2058b2d322da4ed1ed30e15a515b",
+        "tools/run_upstream_c_program.py": "1a1292594ba19001cea01af1e88e53bb4774238939553eeb99f335be98749693"
+      }
+    },
+    "native_proof": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/native/proof.json",
+      "sha256": "3fe61e48656c3d8a98d1682a198e761f91ca3b34d53580d7c8adb2abeeab639c"
+    },
+    "existing_native": {
+      "bounded_frame_local_observations": 768,
+      "bounded_frame_reference_observations": 384,
+      "module_dependencies_local_observations": 330,
+      "module_dependencies_reference_observations": 165,
+      "array_stride_local_observations": 1536,
+      "array_stride_reference_observations": 768,
+      "boolean_calls_local_observations": 1536,
+      "boolean_calls_reference_observations": 768,
+      "global_addresses_local_observations": 192,
+      "global_addresses_reference_observations": 96,
+      "global_memory_local_observations": 240,
+      "global_memory_reference_observations": 120,
+      "type_layout_padding_local_observations": 768,
+      "type_layout_padding_reference_observations": 384,
+      "word_pair_local_observations": 384,
+      "word_pair_reference_observations": 192,
+      "signed_nonnegative_local_observations": 1536,
+      "signed_nonnegative_reference_observations": 768,
+      "integer_pointer_local_observations": 1536,
+      "integer_pointer_reference_observations": 768,
+      "scalar_stack_local_observations": 486,
+      "scalar_stack_reference_observations": 243,
+      "pointer_stack_local_observations": 768,
+      "pointer_stack_reference_observations": 384,
+      "compiler_sha256": "0820adedc5ce6c2d64294e750c87025740d1f3f82878104fadf6adfc6567b775",
+      "status": "passed",
+      "module_dependencies_environment_checks": 3,
+      "module_dependencies_negative_controls": 30
+    },
+    "existing_native_proof": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/existing-native/proof.json",
+      "sha256": "8dd1f610140acefc973b8731fa339e5817c234e5c500eb7a78056beaf219496a"
+    },
+    "negative_controls": {
+      "status": "passed",
+      "compiler_sha256": "0820adedc5ce6c2d64294e750c87025740d1f3f82878104fadf6adfc6567b775",
+      "negative_controls": 12,
+      "cases": [
+        {
+          "control": "wrong-stride",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-stride",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-stride",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-stride",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-stride",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-stride",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-store-value",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 3,
+          "rejected": true
+        },
+        {
+          "control": "wrong-store-value",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 3,
+          "rejected": true
+        },
+        {
+          "control": "wrong-store-value",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 3,
+          "rejected": true
+        },
+        {
+          "control": "wrong-store-value",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 3,
+          "rejected": true
+        },
+        {
+          "control": "wrong-store-value",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 3,
+          "rejected": true
+        },
+        {
+          "control": "wrong-store-value",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 3,
+          "rejected": true
+        }
+      ],
+      "fixture_unchanged": true
+    },
+    "negative_controls_proof": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/native-controls-r2/proof.json",
+      "sha256": "749632645eaea770844c4805de00ee3e6bd1101f7bc2df11e469609bb782a9e2"
+    }
+  },
+  "fibonacci": {
+    "input_sha256": "2f72c59ebf876c48b671cbf39890f4a974b8b87545a3a3103d2cce2df85d180a",
+    "compiler_sha256": "0820adedc5ce6c2d64294e750c87025740d1f3f82878104fadf6adfc6567b775",
+    "argv": [
+      "zig-out/bin/z_llvm",
+      "--codegen-reachable",
+      "--generic-cfg-selector",
+      "--report-all-codegen-failures",
+      "--target=x86_64-unknown-linux-gnu",
+      "--input-limit=67108864",
+      "--emit=obj",
+      "local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/object-input.ll"
+    ],
+    "returncode": 1,
+    "object_bytes": 0,
+    "summary_lines": [
+      "summary zllvm-codegen-selection mode=reachable coverage=complete selected_globals=15 selected_aliases=1",
+      "summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=34 emitted_functions=10 failed_functions=24 first_failing_function=start.expandStackSize first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=no_emitter first_failing_selector_detail=composed-block-load-ptr local_fail=1"
+    ],
+    "input_unchanged": true,
+    "record": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/fibonacci-stride.json",
+      "sha256": "e7b996d54f2fb74e3cc252ad2d2b3c452ae7f88c4bd597c9ed9d442d8a7a973d"
+    },
+    "stderr": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/fibonacci-stride.stderr",
+      "sha256": "8926601f4e0bd3ea33875b0a0d6905717f2ea5c8a2c1e7f2042d4b149daff809"
+    },
+    "local_whole_program_executions": 0
+  },
+  "baseline": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/baseline.json",
+    "sha256": "c5cb84629c232628e55682416659236fe5718f7091dd63c29a15be952c921c87"
+  },
+  "next_boundary_plan": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/next-load-readonly-plan.json",
+    "sha256": "e4882c5450c9028014db889653a771a9faf67f7613f4006007696fb14f8483c5"
+  },
+  "next_boundary": {
+    "status": "read-only follow-up for the RAX ordinary-load boundary",
+    "observed_boundary": "Unchanged Fibonacci first rejects start.expandStackSize at composed-block-load-ptr after accepting the 56-byte array stride. Still 10/34 emitted and zero local whole-program execution.",
+    "provenance": "local-state/validations/general-stride-20261104/fibonacci-stride.json",
+    "source_locations": [
+      "src/codegen/x86_64/generic_cfg/composed_selector_memory.zig: ordinaryLoadValueUseDiagnostic",
+      "src/codegen/x86_64/generic_cfg/value_use/planning/compatibility.zig: validateOrdinaryLoadHome",
+      "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory.zig: ordinary scalar load staging and accumulator ownership"
+    ],
+    "next_work": "Admit proven ordinary load addresses currently in RAX through typed pointer staging and accumulator ownership. Keep seal/prepare/materialization/execution admission consistent, preserve live pointers and other scratch values, and prove rollback before permanent native integration.",
+    "reduction_note": "The straight-line probe emits, but a 13-line loop reproduces composed-block-load-ptr. Clang-22 accepts that loop. The first failure in the unchanged Fibonacci input was inspected in the debugger without changing compiler sources.",
+    "later_boundaries": [
+      "narrow call ABI forms",
+      "remaining aggregate/indirect-call forms",
+      "whole-program native execution"
+    ],
+    "constraints": [
+      "Do not alter compiler source during frozen integration.",
+      "No archives; preserve scratch probes.",
+      "Keep legacy selection, fixed counts and bypass ratchet unchanged."
+    ],
+    "rejected_home": {
+      "value_location": "rax",
+      "raw_value_location_tag": 4,
+      "class": "gpr64",
+      "pointer_bits": 64,
+      "load_bits": 32,
+      "alias_i128": false,
+      "is_ptr_result": false,
+      "phase": "transaction.seal",
+      "captured_load": "%17 = load i32, ptr %16, align 8",
+      "inspection_note": "Read raw union tag from the current-home stack argument at the compatibility rejection branch because GDB cannot render this Zig union. Tag 4 maps to rax in selector_types.ValueLoc; other argument values and stack frames are readable. Breakpoint addresses apply only to the recorded binary.",
+      "compiler_sha256": "0820adedc5ce6c2d64294e750c87025740d1f3f82878104fadf6adfc6567b775",
+      "debugger_commands": {
+        "path": "local-state/validations/general-stride-20261104/next-load-fibonacci-gdb-commands.txt",
+        "sha256": "c65a91eebe9d14419e72146ac6adb005b2b0c1b6e73af8e149adb47ab2b281fd"
+      },
+      "debugger_log": {
+        "path": "local-state/validations/general-stride-20261104/next-load-fibonacci-gdb.log",
+        "sha256": "ee695b7dd958146067dd3c3b2d83924a8a37ce79b06818afaa99e1214d67748e"
+      },
+      "type_definition": {
+        "path": "src/codegen/x86_64/generic_cfg/selector_types.zig",
+        "sha256": "f0aaa08c37631418cca4410df40bc1c06360fcd864b8b94076584a76eb468df2"
+      }
+    },
+    "minimal_reproducer": {
+      "ir": "define i32 @pointer_chain_loop(ptr %base) {\nentry:\n  %slot = alloca ptr, align 8\n  store ptr %base, ptr %slot, align 8\n  br label %loop\nloop:\n  %pointer = load ptr, ptr %slot, align 8\n  %value = load i32, ptr %pointer, align 4\n  %repeat = icmp ne i32 %value, 0\n  br i1 %repeat, label %loop, label %exit\nexit:\n  ret i32 %value\n}\n",
+      "source": {
+        "path": "local-state/validations/general-stride-20261104/next-load-loop-minimal.ll",
+        "sha256": "97d14671e223f1d58535a9f52288a2253ef2a7dcb8f00c82040cfa6ab1ae21d8"
+      },
+      "baseline": {
+        "argv": [
+          "zig-out/bin/z_llvm",
+          "--generic-cfg-selector",
+          "--report-all-codegen-failures",
+          "--emit=obj",
+          "--target=x86_64-unknown-linux-gnu",
+          "local-state/validations/general-stride-20261104/next-load-loop-minimal.ll"
+        ],
+        "input_sha256": "97d14671e223f1d58535a9f52288a2253ef2a7dcb8f00c82040cfa6ab1ae21d8",
+        "compiler_sha256": "0820adedc5ce6c2d64294e750c87025740d1f3f82878104fadf6adfc6567b775",
+        "returncode": 1,
+        "object_bytes": 0,
+        "stderr": "zllvm-codegen-failure function=pointer_chain_loop diagnostic=UnsupportedCodegenControlFlow selector_tag=no_emitter selector_detail=composed-block-load-ptr\nsummary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=1 emitted_functions=0 failed_functions=1 first_failing_function=pointer_chain_loop first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=no_emitter first_failing_selector_detail=composed-block-load-ptr local_fail=1\n"
+      },
+      "baseline_record": {
+        "path": "local-state/validations/general-stride-20261104/next-load-loop-minimal.json",
+        "sha256": "3457af32614c18f37d5432a1804c861e8f59cd6151eb8b088aade94601878306"
+      },
+      "llvm_compile_control": {
+        "argv": [
+          "clang-22",
+          "-x",
+          "ir",
+          "-O0",
+          "-c",
+          "local-state/validations/general-stride-20261104/next-load-loop-minimal.ll",
+          "-o",
+          "local-state/validations/general-stride-20261104/next-load-loop-minimal.reference.o"
+        ],
+        "returncode": 0,
+        "stderr": "warning: overriding the module target triple with x86_64-pc-linux-gnu [-Woverride-module]\n1 warning generated.\n",
+        "input_sha256": "97d14671e223f1d58535a9f52288a2253ef2a7dcb8f00c82040cfa6ab1ae21d8",
+        "reference_object_bytes": 896
+      },
+      "local_executions": 0
+    },
+    "captured_function_reproducer": {
+      "source": {
+        "path": "local-state/validations/general-stride-20261104/next-load-captured-function.ll",
+        "sha256": "fcd460c6f3b99f12abf8a3ac57f5c319670d5a52c3416568a04ad649768c570a"
+      },
+      "record": {
+        "path": "local-state/validations/general-stride-20261104/next-load-captured-function.json",
+        "sha256": "bdb9b74e2982d85e2321f5b5054a65eae13d14308f0e6e4f4f29543fa60c1082"
+      }
+    },
+    "implementation_checks": [
+      "Before widening admission, account for ordinary-load accumulator preservation running before its prepared address view is refreshed. A dying RAX address must remain available for the load.",
+      "Physical planning currently declares RCX staging for spill64 ordinary loads, not RAX. Any added staging must declare the same physical writes and ownership used by execution.",
+      "Keep the duplicated compatibility checks in planning and materialization consistent; distinguish supported 64-bit pointer homes from narrow or aggregate homes.",
+      "Retain the passing straight-line control, failing loop and branch cases, and unchanged capture. Add native load-width, live-pointer, clobber, and rollback cases before integration."
+    ]
+  },
+  "passing_reduction_control": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/next-load-boundary.json",
+    "sha256": "8e0b7012803154a107918d071413bf02bb29dc7ba63792654e7fcd3311600899"
+  },
+  "control_retry": {
+    "record": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/stride-controls.json",
+      "sha256": "d02baae78df733eb0d154ea7b75df0cef68525c5c625ebf6b74d756484d9cf61"
+    },
+    "reason": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/general-stride-20261104/native-controls/first-attempt.json",
+      "sha256": "23491378115e612c629e074da4a207680f6e1e04ef91f5362a716a03043cc5d9"
+    },
+    "scope": "The first control correctly rejected a mutation at an earlier guard check. Retry isolates the wrong-stride mutation to one address-only function; compiler and permanent fixture sources were unchanged."
+  },
+  "validation_policy": "Tier 2 source commit remained provisional until full Tier 3 capability acceptance.",
+  "disk_policy": {
+    "schema_version": 3,
+    "reserve_bytes": 24359738368,
+    "projected_peak_bytes": 8589934592,
+    "required_start_bytes": 32949672960
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0,
+  "cleanup": {
+    "deleted_paths": [],
+    "archives_created": 0
+  }
+}

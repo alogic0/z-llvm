@@ -41,7 +41,25 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [bounded frame checkpoint](evidence/bounded_frame_acceptance_20261104.json)
+The accepted [general array stride checkpoint](evidence/general_stride_acceptance_20261104.json)
+at `a81a36fe` passes all 17 integration stages on a frozen 2,720-file snapshot.
+Literal integer arrays now use allocation strides from 1 to 255 bytes through
+the existing typed address action, including the capture's 56-byte stride.
+Stack descriptor and read-only table restrictions remain unchanged. Five native
+functions pass 1,920 local observations against 960 LLVM references across
+direct/release routes in three modes, checking padding, nesting, negative and
+wrapping indexes, helper calls, live values and guarded stores. Twelve mutation
+controls reject wrong strides and stores. All 1,766 units, 13 structural checks,
+18 focused tests each in ReleaseFast and ReleaseSafe, and readiness pass. The
+twelve earlier native populations, fixed 100-row/five-function counts, legacy selection and
+bypass ratchet stay unchanged. Minimum reported free space is 45.54 GB,
+above the 24.36 GB reserve. Fibonacci still emits ten of 34 selected functions;
+its next boundary is an ordinary i32 load through an RAX pointer in
+`start.expandStackSize`, reported as `composed-block-load-ptr`. A retained small
+loop reproduces it and compiles with Clang; local whole-program execution is
+still zero. All 13 original probes remain unchanged; no archives were made.
+
+The earlier accepted [bounded frame checkpoint](evidence/bounded_frame_acceptance_20261104.json)
 at `d389d135` passes all 17 integration stages on a frozen 2,714-file snapshot.
 Exact integer pairs and padded 16-byte and 24-byte wrappers now reuse existing
 frame storage through private codegen views and typed address operations.
@@ -304,21 +322,30 @@ match LLVM GlobalDCE after serialization-only numeric SSA normalization. At that
 checkpoint, nine functions emitted and 25 rejected, first at aggregate allocation.
 
 The [bounded frame checkpoint](evidence/bounded_frame_acceptance_20261104.json)
-now accepts exact 16-byte integer pairs and the capture's padded 16-byte and
+accepted exact 16-byte integer pairs and the capture's padded 16-byte and
 24-byte wrappers. The existing allocator and typed address authority own storage
 and access; private views preserve source records and borrowed call arguments.
 Mixed pair/wrapper copies retain their proven literal length through both views.
-All-mode native proof and all 17 integration stages pass. Fibonacci now emits ten
-functions and rejects 24, first at the 56-byte array stride in
-`start.expandStackSize`; local whole-program execution remains zero.
+All-mode native proof and all 17 integration stages passed. At that checkpoint,
+Fibonacci emitted ten functions and rejected 24, first at the 56-byte array stride
+in `start.expandStackSize`; local whole-program execution remained zero.
 
-Next, support bounded non-power-of-two integer array strides through the existing
-typed address action. Include the exact `[56 x i8]` GEP, negative and wrapping
-indexes, spilled/live operands, stores and rollback, with all-mode native
-comparisons and matching integration checks. Preserve the current descriptor
-and layout boundaries. Narrower call ABI forms remain the following separate
-slice. Keep fixed populations, default legacy selection and the bypass ratchet
-unchanged.
+The [general array stride checkpoint](evidence/general_stride_acceptance_20261104.json)
+now accepts bounded allocation strides from 1 to 255 bytes, including `[56 x i8]`,
+with all-mode native proof and all 17 integration stages. The unchanged capture
+still emits ten functions and rejects 24; its first boundary has moved to
+`start.expandStackSize composed-block-load-ptr`. Read-only debugger inspection
+identifies a 64-bit pointer in RAX rejected during transaction seal for an i32
+load. The [focused evidence](evidence/general_stride_focused_20261104.json) retains
+a small loop reproducer and its successful Clang compile. This is a codegen
+boundary, with zero local whole-program executions.
+
+Next, admit this ordinary-load address through typed pointer staging and
+accumulator ownership. Keep seal, preparation and materialization consistent;
+prove live pointer/scratch preservation, exact load widths, control-flow cases
+and rollback, then extend all-mode native comparisons and integration. Narrower
+call ABI forms remain later work. Keep fixed populations, default legacy
+selection and the bypass ratchet unchanged.
 
 Keep broader optional ABIs and
 floating/indirect/aggregate/stack varargs as explicit boundaries. Use the frozen

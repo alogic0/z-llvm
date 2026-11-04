@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `d389d13566d873554632221eceff117e176cfc74`; tree: `9b66edf48a8ec305f770b4087a7cbdcb2beb97c1`.
+Accepted revision: `a81a36fe2dadfbc9e3a292a844b3bc2df068bab3`; tree: `087277f16b107084f635092e1f81e2dfdfcbff2d`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,25 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [bounded frame checkpoint](evidence/bounded_frame_acceptance_20261104.json)
+The accepted [general array stride checkpoint](evidence/general_stride_acceptance_20261104.json)
+at `a81a36fe` passes all 17 integration stages on a frozen 2,720-file snapshot.
+Literal integer arrays now use allocation strides from 1 to 255 bytes through
+the existing typed address action, including the capture's 56-byte stride.
+Stack descriptor and read-only table restrictions remain unchanged. Five native
+functions pass 1,920 local observations against 960 LLVM references across
+direct/release routes in three modes, checking padding, nesting, negative and
+wrapping indexes, helper calls, live values and guarded stores. Twelve mutation
+controls reject wrong strides and stores. All 1,766 units, 13 structural checks,
+18 focused tests each in ReleaseFast and ReleaseSafe, and readiness pass. The
+twelve earlier native populations, fixed 100-row/five-function counts, legacy selection and
+bypass ratchet stay unchanged. Minimum reported free space is 45.54 GB,
+above the 24.36 GB reserve. Fibonacci still emits ten of 34 selected functions;
+its next boundary is an ordinary i32 load through an RAX pointer in
+`start.expandStackSize`, reported as `composed-block-load-ptr`. A retained small
+loop reproduces it and compiles with Clang; local whole-program execution is
+still zero. All 13 original probes remain unchanged; no archives were made.
+
+The earlier accepted [bounded frame checkpoint](evidence/bounded_frame_acceptance_20261104.json)
 at `d389d135` passes all 17 integration stages on a frozen 2,714-file snapshot.
 Exact integer pairs and padded 16-byte and 24-byte wrappers now reuse existing
 frame storage through private codegen views and typed address operations.
@@ -188,7 +206,7 @@ history are retired without archives. The latest
 of superseded AIR after the complete fresh replacement proof, making room for
 the cached run. Both runs now pass; old metadata and hashes remain. The retired
 checkout's dependency links are removed while their target repositories remain.
-The dependency-reference family is accepted. Next, extend bounded 16-byte and
-24-byte aggregate frame storage through existing private legalization and typed
-address authorities, with all-mode native checks and full integration. See
-[next steps](next_steps.md) for the remaining Fibonacci boundaries.
+The general array stride family is accepted. Next, extend ordinary loads whose
+pointer is held in RAX through typed pointer staging and accumulator ownership,
+with all-mode native checks and full integration. See [next steps](next_steps.md)
+for the retained reproducer and later Fibonacci boundaries.

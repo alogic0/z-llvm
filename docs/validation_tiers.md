@@ -253,6 +253,17 @@ All 1,763 units, 13 structural checks, readiness and the frozen 17-stage integra
 run pass. The eleven earlier native populations and all fixed compiler-core and
 compiler-rt counters remain unchanged.
 
+The accepted [general array stride canary](evidence/general_stride_acceptance_20261104.json)
+adds five functions for 56-byte, padded 12-byte, nested 15-byte and 255-byte
+addresses, including returned/reloaded pointers and guarded stores. Direct/release
+routes in three modes check 1,920 local observations against 960 LLVM references
+reused across routes. Negative indexes, wrapping arithmetic, clobbering helper
+calls and live values are covered; twelve mutation controls reject wrong strides
+and stores. Unit execution independently checks all 255 admitted scales over
+11,475 address cases. All 1,766 units, 13 structural checks, focused release tests,
+readiness and the frozen 17-stage integration run pass. The twelve earlier native
+populations and all fixed compiler-core and compiler-rt counters remain unchanged.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

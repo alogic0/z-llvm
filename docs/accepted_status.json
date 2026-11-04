@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "d389d13566d873554632221eceff117e176cfc74",
-  "accepted_tree": "9b66edf48a8ec305f770b4087a7cbdcb2beb97c1",
+  "accepted_revision": "a81a36fe2dadfbc9e3a292a844b3bc2df068bab3",
+  "accepted_tree": "087277f16b107084f635092e1f81e2dfdfcbff2d",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 5,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "d389d135",
+  "declaration_revision": "a81a36fe",
   "evidence": [
+    "docs/evidence/general_stride_acceptance_20261104.json",
+    "docs/evidence/general_stride_20261104_cached.summary",
     "docs/evidence/bounded_frame_acceptance_20261104.json",
     "docs/evidence/bounded_frame_20261104_cached.summary",
     "docs/evidence/dependency_coverage_acceptance_20261104.json",
