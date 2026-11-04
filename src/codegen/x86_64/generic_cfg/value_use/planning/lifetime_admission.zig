@@ -64,8 +64,13 @@ pub fn validateRequest(
             try compatibility.validateSourceView(current, request.form);
             if (request.form == .stack_object_address) {
                 if (request.prepared_action) |action| if (action == .form_byte_address) {
-                    if (current != .stack128 or action.form_byte_address.offset != .constant or
-                        action.form_byte_address.offset.constant < 0 or action.form_byte_address.offset.constant > 16)
+                    const extent: u32 = switch (current) {
+                        .stack128 => 16,
+                        .stack_i32_array => |array| if (array.len == 4 or array.len == 6) array.len * 4 else return error.ValueUseUnsupportedAddressForm,
+                        else => return error.ValueUseUnsupportedAddressForm,
+                    };
+                    if (action.form_byte_address.offset != .constant or
+                        action.form_byte_address.offset.constant < 0 or action.form_byte_address.offset.constant > extent)
                         return error.ValueUseUnsupportedAddressForm;
                 };
             }

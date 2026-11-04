@@ -6,6 +6,7 @@ const ir = @import("../../../ir.zig");
 const target = @import("../../../target.zig");
 const machine = @import("../machine.zig");
 const uses = @import("stage2_planning.zig");
+const addresses = @import("../symbol_address.zig");
 
 const word: ir.Type = .{ .int = 64 };
 
@@ -14,45 +15,77 @@ fn pairTypes(context: ?*const machine.ReadOnlyModuleContext, ty: ir.Type, depth:
     const body = std.mem.trim(u8, ty.aggregate, " \t");
     if (std.mem.startsWith(u8, body, "%")) {
         const ctx = context orelse return null;
+        var definition_body: ?[]const u8 = null;
         for (ctx.named_types) |named| {
-            if (std.mem.eql(u8, named.name, body[1..]))
-                return pairTypes(context, .{ .aggregate = named.body }, depth + 1);
+            if (ir.identifiers.eql(named.name, body[1..])) {
+                if (definition_body != null) return null;
+                definition_body = named.body;
+            }
         }
-        return null;
+        return pairTypes(context, .{ .aggregate = definition_body orelse return null }, depth + 1);
     }
     // Match the complete field list. A field-count helper can stop at an
     // unresolved trailing named field, which must never shrink an allocation.
-    const expected = "{ptr,i64}";
-    var index: usize = 0;
-    var matches = true;
-    for (body) |c| {
-        if (std.ascii.isWhitespace(c)) continue;
-        if (index >= expected.len or expected[index] != c) {
-            matches = false;
-            break;
-        }
-        index += 1;
-    }
-    if (matches and index == expected.len) return .{ .ptr, word };
+    if (spelling(body, "{ptr,i64}")) return .{ .ptr, word };
+    if (spelling(body, "{i64,i64}")) return .{ word, word };
     if (body.len < 2 or body[0] != '{' or body[body.len - 1] != '}') return null;
     const inner = std.mem.trim(u8, body[1 .. body.len - 1], " \t");
     if (!std.mem.startsWith(u8, inner, "{") and !std.mem.startsWith(u8, inner, "%")) return null;
     return pairTypes(context, .{ .aggregate = inner }, depth + 1);
 }
 
+pub fn spelling(body: []const u8, expected: []const u8) bool {
+    var index: usize = 0;
+    for (body) |c| {
+        if (std.ascii.isWhitespace(c)) continue;
+        if (index >= expected.len or expected[index] != c) return false;
+        index += 1;
+    }
+    return index == expected.len;
+}
+
+pub fn isIntegerPair(context: ?*const machine.ReadOnlyModuleContext, ty: ir.Type) bool {
+    const fields = pairTypes(context, ty, 0) orelse return false;
+    return fields[0].eql(word) and fields[1].eql(word);
+}
+
+pub fn supportsLayout(context: ?*const machine.ReadOnlyModuleContext) bool {
+    const text = if (context) |ctx| ctx.target_datalayout else null;
+    if (text) |explicit| if (explicit.len == 0 or explicit[0] != 'e') return false;
+    if (!addresses.supportsLayout(text)) return false;
+    const dl = target.DataLayout.parse(text orelse "") catch return false;
+    if ((dl.integerAbiAlignmentBits(64) catch return false) != 64) return false;
+    // Stronger aggregate ABI alignment can change the allocation size, including
+    // transparent wrappers. It is outside this fixed native storage envelope.
+    var parts = std.mem.splitScalar(u8, text orelse "", '-');
+    while (parts.next()) |part| {
+        if (!std.mem.startsWith(u8, part, "a:")) continue;
+        var fields = std.mem.splitScalar(u8, part[2..], ':');
+        const alignment = std.fmt.parseUnsigned(u16, fields.next() orelse return false, 10) catch return false;
+        if (alignment > 64 or (alignment != 0 and !std.math.isPowerOfTwo(alignment))) return false;
+        if (fields.next()) |preferred_text| {
+            const preferred = std.fmt.parseUnsigned(u16, preferred_text, 10) catch return false;
+            if (preferred < alignment or (preferred != 0 and !std.math.isPowerOfTwo(preferred))) return false;
+        }
+        if (fields.next() != null) return false;
+    }
+    return true;
+}
+
 test "pair storage rejects padding unresolved tails arrays packing and other address spaces" {
     try std.testing.expect(pairTypes(null, .{ .aggregate = "{ { ptr, i64 } }" }, 0) != null);
+    try std.testing.expect(isIntegerPair(null, .{ .aggregate = "{ { i64, i64 } }" }));
     for ([_][]const u8{
         "{ ptr, i64, %Unknown }", "{ ptr, i64, i8 }",     "{ ptr, i32 }",
         "<{ ptr, i64 }>",         "[2 x i64]",            "{ ptr addrspace(1), i64 }",
         "{ float, float }",       "{ { ptr, i64 }, i8 }", "%Unresolved",
-        "{ ptr, ptr }",           "{ i64, ptr }",         "{ i64, i64 }",
+        "{ ptr, ptr }",           "{ i64, ptr }",         "{ i64, i64, %Unknown }",
     }) |text| try std.testing.expect(pairTypes(null, .{ .aggregate = text }, 0) == null);
 }
 
 fn definition(function: ir.Function, name: []const u8) ?ir.Instruction {
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
-        if (!inst.removed and inst.result != null and std.mem.eql(u8, inst.result.?, name)) return inst;
+        if (!inst.removed and inst.result != null and ir.identifiers.eql(inst.result.?, name)) return inst;
     };
     return null;
 }
@@ -79,7 +112,7 @@ fn temporary(allocator: std.mem.Allocator, function: ir.Function, serial: *usize
         serial.* += 1;
         if (definition(function, name) != null) continue;
         var collision = false;
-        for (function.params.items) |param| if (std.mem.eql(u8, param.name, name)) {
+        for (function.params.items) |param| if (ir.identifiers.eql(param.name, name)) {
             collision = true;
         };
         if (!collision) return name;
@@ -95,12 +128,7 @@ fn address(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Basic
 }
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
-    const text = if (context) |ctx| ctx.target_datalayout else null;
-    if (text) |explicit| if (explicit.len == 0 or explicit[0] != 'e') return null;
-    const dl = target.DataLayout.parse(text orelse "e-p:64:64-i64:64-i128:128-n8:16:32:64-S128") catch return null;
-    if ((dl.pointerSizeBits() catch return null) != 64 or
-        (dl.pointerAbiAlignmentBits() catch return null) != 64 or
-        (dl.integerAbiAlignmentBits(64) catch return null) != 64) return null;
+    if (!supportsLayout(context)) return null;
     var slots = std.StringHashMap(void).init(allocator);
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed or inst.kind != .alloca or inst.result == null) continue;

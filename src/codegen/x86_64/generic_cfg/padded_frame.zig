@@ -1,0 +1,165 @@
+//! Private storage view for bounded integer result wrappers. The existing i32
+//! array frame allocator owns the bytes; typed byte-address actions own access.
+//! This does not legalize aggregate values or alter the source module/ABI.
+const std = @import("std");
+const ir = @import("../../../ir.zig");
+const syntax = @import("../../../ir/parser_syntax.zig");
+const target = @import("../../../target.zig");
+const machine = @import("../machine.zig");
+const pairs = @import("word_pair_memory.zig");
+
+fn trim(text: []const u8) []const u8 {
+    return std.mem.trim(u8, text, " \t\r\n");
+}
+
+pub fn size(context: ?*const machine.ReadOnlyModuleContext, ty: ir.Type, depth: u8) ?u32 {
+    if (depth >= 8 or ty != .aggregate) return null;
+    const body = trim(ty.aggregate);
+    if (std.mem.startsWith(u8, body, "%")) {
+        const ctx = context orelse return null;
+        var found: ?[]const u8 = null;
+        for (ctx.named_types) |named| if (ir.identifiers.eql(named.name, body[1..])) {
+            if (found != null) return null;
+            found = named.body;
+        };
+        return size(context, .{ .aggregate = found orelse return null }, depth + 1);
+    }
+    if (body.len < 2 or body[0] != '{' or body[body.len - 1] != '}' or
+        (syntax.findTopLevelTokenEnd(body) orelse return null) != body.len) return null;
+    var fields: [3][]const u8 = undefined;
+    var count: usize = 0;
+    var rest = trim(body[1 .. body.len - 1]);
+    while (rest.len != 0) {
+        if (count == fields.len) return null;
+        const comma = syntax.findTopLevelComma(rest);
+        fields[count] = trim(if (comma) |index| rest[0..index] else rest);
+        if (fields[count].len == 0) return null;
+        count += 1;
+        rest = if (comma) |index| trim(rest[index + 1 ..]) else "";
+        if (comma != null and rest.len == 0) return null;
+    }
+    if (count == 1) return size(context, .{ .aggregate = fields[0] }, depth + 1);
+    if (count != 3 or !std.mem.eql(u8, fields[1], "i16") or !pairs.spelling(fields[2], "[6xi8]")) return null;
+    if (std.mem.eql(u8, fields[0], "i64")) return 16;
+    return if (pairs.isIntegerPair(context, .{ .aggregate = fields[0] })) 24 else null;
+}
+
+fn alignment(alloca: ir.AllocaInst) ?u32 {
+    if (!alloca.isSingleObject() or alloca.allocated_ty_addrspace != null) return null;
+    const text = trim(alloca.attrs orelse return 8);
+    if (!std.mem.startsWith(u8, text, "align ")) return null;
+    const value = std.fmt.parseUnsigned(u32, trim(text[6..]), 10) catch return null;
+    if (value == 0 or value > 16 or !std.math.isPowerOfTwo(value)) return null;
+    return @max(value, 8);
+}
+
+fn temporary(allocator: std.mem.Allocator, function: ir.Function, serial: *usize) ![]const u8 {
+    while (true) {
+        const name = try std.fmt.allocPrint(allocator, "__zllvm_padded_frame_{d}", .{serial.*});
+        serial.* += 1;
+        var collision = false;
+        for (function.params.items) |param| if (ir.identifiers.eql(param.name, name)) {
+            collision = true;
+        };
+        for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+            if (inst.result) |result| if (ir.identifiers.eql(result, name)) {
+                collision = true;
+            };
+        };
+        if (!collision) return name;
+    }
+}
+
+fn address(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, value: ir.Value) !ir.Value {
+    const name = try temporary(allocator, function, serial);
+    var indices: std.ArrayList(ir.GepIndex) = .empty;
+    try indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 0 } });
+    try block.instructions.append(allocator, .{ .result = name, .kind = .{ .gep = .{
+        .source_ty = .{ .int = 8 },
+        .ptr = value,
+        .indices = indices,
+    } } });
+    return .{ .named = name };
+}
+
+fn slotSize(slots: std.StringHashMap(u32), value: ir.Value) ?u32 {
+    return if (value == .named) slots.get(value.named) else null;
+}
+
+fn copyLength(function: ir.Function, value: ir.Value) ?i128 {
+    if (value == .int) return value.int;
+    if (value != .named) return null;
+    // Word-pair lowering presents a literal length through this scalar cast.
+    // Resolve only that exact constant form, retaining the original range check.
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (inst.removed or inst.result == null or !ir.identifiers.eql(inst.result.?, value.named)) continue;
+        if (inst.kind != .cast) return null;
+        const cast = inst.kind.cast;
+        if (cast.op != .zext or !cast.from_ty.eql(.{ .int = 32 }) or !cast.to_ty.eql(.{ .int = 64 }) or
+            cast.value != .int or cast.value.int < 0 or cast.value.int > std.math.maxInt(u32)) return null;
+        return cast.value.int;
+    };
+    return null;
+}
+
+pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
+    if (!pairs.supportsLayout(context)) return null;
+    const dl = target.DataLayout.parse(if (context) |ctx| ctx.target_datalayout orelse "" else "") catch return null;
+    inline for (.{ 8, 16, 32 }) |bits| if ((dl.integerAbiAlignmentBits(bits) catch return null) != bits) return null;
+    var slots = std.StringHashMap(u32).init(allocator);
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (inst.removed or inst.kind != .alloca or inst.result == null) continue;
+        const bytes = size(context, inst.kind.alloca.allocated_ty, 0) orelse continue;
+        _ = alignment(inst.kind.alloca) orelse return null;
+        try slots.put(inst.result.?, bytes);
+    };
+    if (slots.count() == 0) return null;
+
+    var result = function;
+    result.blocks = .empty;
+    var serial: usize = 0;
+    for (function.blocks.items) |original| {
+        var block = original;
+        block.instructions = .empty;
+        for (original.instructions.items) |inst| {
+            var copy = inst;
+            if (!inst.removed) switch (inst.kind) {
+                .alloca => |alloca| if (inst.result) |name| {
+                    if (slots.get(name)) |bytes| {
+                        copy.kind.alloca.allocated_ty = .{ .aggregate = if (bytes == 16) "[4 x i32]" else "[6 x i32]" };
+                        copy.kind.alloca.attrs = try std.fmt.allocPrint(allocator, "align {d}", .{alignment(alloca).?});
+                    }
+                },
+                .load => |load| if (slotSize(slots, load.ptr) != null) {
+                    if (load.attrs.isBarrier() or load.attrs.syncscope != null or load.ty_addrspace != null or load.ptr_addrspace != null) return null;
+                    copy.kind.load.ptr = try address(allocator, function, &block, &serial, load.ptr);
+                },
+                .store => |store| if (slotSize(slots, store.ptr) != null) {
+                    if (store.attrs.isBarrier() or store.attrs.syncscope != null or store.ty_addrspace != null or store.ptr_addrspace != null) return null;
+                    copy.kind.store.ptr = try address(allocator, function, &block, &serial, store.ptr);
+                },
+                .call => |call| {
+                    const memcpy = std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64") or std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64");
+                    var copied = false;
+                    for (call.args.items, 0..) |arg, index| if (slotSize(slots, arg.value)) |bytes| {
+                        if (arg.ty != .ptr) return null;
+                        if (memcpy and index < 2) {
+                            if (call.args.items.len != 4) return null;
+                            const length = copyLength(function, call.args.items[2].value) orelse return null;
+                            if (length < 0 or length > bytes) return null;
+                        }
+                        if (!copied) {
+                            copy.kind.call.args = try call.args.clone(allocator);
+                            copied = true;
+                        }
+                        copy.kind.call.args.items[index].value = try address(allocator, function, &block, &serial, arg.value);
+                    };
+                },
+                else => {},
+            };
+            try block.instructions.append(allocator, copy);
+        }
+        try result.blocks.append(allocator, block);
+    }
+    return result;
+}

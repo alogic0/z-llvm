@@ -46,6 +46,12 @@ def run_variadic_canary(runner, directory, zllvm, environment):
 
 
 MEMORY_CANARIES = {
+    "bounded_frame": {
+        "prefix": "bounded-frame", "fixture": "bounded_frame",
+        "functions": {"bounded_frame_pair", "bounded_frame_padded_pair", "bounded_frame_padded_word", "bounded_frame_call"},
+        "observations": 128,
+        "stdout": "bounded-frame observations=128 pairs=padding=copies=calls=alignment=live=guards=preserved\n",
+    },
     "module_dependencies": {
         "prefix": "module-dependencies", "fixture": "module_dependencies",
         "functions": {"module_entry_impl", "module_middle", "module_leaf", "debug.module_callback_impl", "module_slot_impl", "module_get_slot", "module_fib_impl"},
@@ -246,6 +252,7 @@ def main():
               "reference_case_executions": 0, "local_case_executions": 0, "integer_variadic_observations": 0,
               "heap_call_observations": 0, "native_call_observations": 0,
               "word_pair_local_observations": 0, "word_pair_reference_observations": 0,
+              "bounded_frame_local_observations": 0, "bounded_frame_reference_observations": 0,
               "pointer_stack_local_observations": 0, "pointer_stack_reference_observations": 0,
               "scalar_stack_local_observations": 0, "scalar_stack_reference_observations": 0,
               "integer_pointer_local_observations": 0, "integer_pointer_reference_observations": 0,
@@ -288,6 +295,7 @@ def main():
                        "fixture_sha256": {name: digest(ROOT / "test/real_programs" / name) for name in (
                            "c_compiler.json", "variadic_integer.ll", "variadic_integer_driver.c", "variadic_integer_shim.S",
                            "word_pair_memory.ll", "word_pair_memory_driver.c",
+                           "bounded_frame.ll", "bounded_frame_driver.c",
                            "runtime_pointer_stack.ll", "runtime_pointer_stack_driver.c",
                            "scalar_stack_memory.ll", "scalar_stack_memory_driver.c",
                            "integer_pointer.ll", "integer_pointer_driver.c",
@@ -375,7 +383,7 @@ def main():
         print(f"summary integer-pointer-casts population=standalone-integer-pointer-casts routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['integer_pointer_local_observations']} reference_observations={report['integer_pointer_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary signed-nonnegative population=standalone-signed-nonnegative routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['signed_nonnegative_local_observations']} reference_observations={report['signed_nonnegative_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary type-layout-padding population=standalone-type-allocation-padding routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['type_layout_padding_local_observations']} reference_observations={report['type_layout_padding_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
-        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies"):
+        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies", "bounded_frame"):
             extra = f" negative_controls={report.get('module_dependencies_negative_controls', 0)} environment_checks={report.get('module_dependencies_environment_checks', 0)}" if population == "module_dependencies" else ""
             print(f"summary {population.replace('_', '-')} population=standalone-{population.replace('_', '-')} routes=direct,release modes={report.get('program_modes', 0)} local_observations={report[population + '_local_observations']} reference_observations={report[population + '_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}{extra}")
         print(f"evidence: {output / 'report.json'}")
