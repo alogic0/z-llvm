@@ -1,0 +1,224 @@
+{
+  "schema": 1,
+  "status": "focused proof; full integration pending",
+  "recorded_utc": "2026-11-04T02:46:28.454387+00:00",
+  "source_revision": "b3be3512a9f4623315bbc3ae657ba620686346c6",
+  "source_tree": "2b8dea5ff5ccd365ea8e243d65890008177cf032",
+  "source_sha256": {
+    "src/ir/identifiers.zig": "f54db93eaae674f8ecdb93112b4d2271b92afece5d6daa921515c2aef4d79c82",
+    "src/ir.zig": "b07390a3f8c044bf14037c639a34ee962b6e91db928d0fec3aaaa103abcd94ea",
+    "src/analysis/module_references.zig": "546e9c76bb30c53daec943a05c46aeb318753c01d04480858b2041adfe186974",
+    "src/analysis/global_dependencies.zig": "87b7ff90b4e6faf152f5f69098dca8ee62aafa574adb8053ac6510203ac87f0e",
+    "src/passes/globalopt.zig": "931fc7262930f03cf5029387bd936f231bfe6e82df814b9ff76541de4f069517",
+    "src/passes/constmerge.zig": "02e6c6e877c611c6a8585f7bccc403e0dd8534b17868ff7171ce1220dab6fd7e",
+    "src/tests/ir_identifiers.zig": "3bc5215a9f660bd85478ee3174857e42e3cbef71bbf26b30615f3d5f182da2c3",
+    "src/tests/module_references.zig": "9dd1233169a92ae7eeede88b98b123c1c6159aa679692f09dd6ce75a0fd4d368",
+    "src/tests/global_dependencies.zig": "f55f7fdd60fc8436cf242a1997de74af8a1b0a9a97ad9dccc35d143583b570e2",
+    "src/tests/optimizer_checkpoint.zig": "4f385f44ee5e97a098cc6575d393a21a4e1fbf5c48361c196b4d64385c2ed368",
+    "src/tests.zig": "e173c5cb8c1005048f5e8b6457a0060c50b50418b2203d867b7cd8ab2c122e69",
+    "test/opt/inputs/symbol_spelling.ll": "dab8d924ce8228160615ea7baa2292c95193ce95076df8d5111af30bf103896c",
+    "test/opt/symbol_spelling_harness.c": "8de1f6070dda5c095a863c582bf6541a0630c90a5dec692c23b66fa84cf4a483",
+    "tools/run_optimizer_correctness.zig": "4aeefa8e56484cc75dbd0009a1a922e869359011b1dba443877d684918973b1b"
+  },
+  "replacement_goal": "Preserve global symbol identity across quoted and hexadecimal spellings before narrowing dependency analysis.",
+  "observed_bug": "globalopt folds a mutable load and removes a global after ignoring its escaped store reference; globaldce deletes referenced differently spelled globals. Both emitted modules fail LLVM verification.",
+  "upstream_mapping": [
+    {
+      "path": "../llvm-project-22/llvm/lib/AsmParser/LLLexer.cpp",
+      "owners": [
+        "LexVar",
+        "ReadVarName",
+        "LexUIntID",
+        "UnEscapeLexed"
+      ],
+      "constraint": "Named spellings decode to symbol identity; numbered globals have a distinct token kind."
+    },
+    {
+      "path": "../llvm-project-22/llvm/lib/Transforms/IPO/GlobalOpt.cpp",
+      "constraint": "Every use participates in the proof that a global has no stores or escapes.",
+      "owners": [
+        "processGlobal",
+        "GlobalStatus::analyzeGlobal"
+      ]
+    },
+    {
+      "path": "../llvm-project-22/llvm/lib/Transforms/IPO/GlobalDCE.cpp",
+      "constraint": "Reference edges retain the referenced definition independent of textual spelling.",
+      "owners": [
+        "ComputeDependencies",
+        "UpdateGVDependencies"
+      ]
+    },
+    {
+      "path": "../llvm-project-22/llvm/lib/Transforms/IPO/ConstantMerge.cpp",
+      "constraint": "Replacements operate on the referenced global value identity, independent of source spelling."
+    }
+  ],
+  "reference": "https://llvm.org/docs/LangRef.html#identifiers",
+  "known_boundaries": [
+    "Quoted-name identity helper recognizes a bounded grammar; unsupported spellings conservatively mark reference coverage unknown.",
+    "Local verifier still rejects differently spelled direct callees, alias targets and global-initializer targets; graph-only tests do not establish CLI admission.",
+    "Opaque expressions, metadata, attributes and assembly retain their existing conservative coverage.",
+    "No change to default codegen selection, ABI support, whole-program execution or fixed counters."
+  ],
+  "validation": {
+    "unit_tests": 1727,
+    "structural_tests": 13,
+    "abi_cases": 60,
+    "behavioral_observations": 6528,
+    "checks": [
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/reference-precision-20261103/unit-reference-all-r2.json",
+        "record_sha256": "c3a9941b39a11f6aa00f1efc48fbc046337cbb430c22eb96756be3ca05f1a32d",
+        "log": "local-state/validations/reference-precision-20261103/unit-reference-all-r2.log",
+        "log_sha256": "5ca2f4e9cf220d2809c961d0c90c7fcbc0337223756bf64b2cb8675ac852ac7c"
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=identifier",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/reference-precision-20261103/unit-identifiers-formatted.json",
+        "record_sha256": "dffe6bbf77a4a541252c5024846970177aaafefc7bd112f1d2965c82fde5f5af",
+        "log": "local-state/validations/reference-precision-20261103/unit-identifiers-formatted.log",
+        "log_sha256": "dea131d4916d060b19631cdebbfe398e354cecf7d042fe136770d701331ed5a1"
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/reference-precision-20261103/structural.json",
+        "record_sha256": "bd813a21e78cb84316e0701b437f3debb62dee9ec9108e530bc1f88e1899625f",
+        "log": "local-state/validations/reference-precision-20261103/structural.log",
+        "log_sha256": "611d4ea459614e6d9091f88c020ec6ad2fd9910438dd90ed3cb0c6121fca3870"
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/reference-precision-20261103/readiness.json",
+        "record_sha256": "fd092f9bb54df4d2003554ff4cadd4c86def46526394ca8158a27bbfb985c789",
+        "log": "local-state/validations/reference-precision-20261103/readiness.log",
+        "log_sha256": "a78b0f72bd2f0969151649e42e3c39a8160355613e06eaaac6864b53e7338d1b"
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/reference-precision-20261103/build.json",
+        "record_sha256": "97dd6f116cd19991e50a1b186276bbd796c22fc0692090c0c4219ef6bf33b69a",
+        "log": "local-state/validations/reference-precision-20261103/build.log",
+        "log_sha256": "688b965430d948c29e3769585da5224a998f3885b22a48bf64c4cad6f0c49ba8"
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/reference-precision-20261103/check_symbol_native.py"
+        ],
+        "returncode": 0,
+        "record": "local-state/validations/reference-precision-20261103/symbol-native-after.json",
+        "record_sha256": "253eac3ce4b364b553444e7b544a119912b4b855474f9fd867c5e74e81c1752f",
+        "log": "local-state/validations/reference-precision-20261103/symbol-native-after.log",
+        "log_sha256": "cd13bb0b924f8eae0d5bb4ee39b19fd1afdc1c6520dd424fbd60ee45c241d252"
+      }
+    ],
+    "format_only_reuse": "Only src/tests/ir_identifiers.zig whitespace was formatted after readiness; all ten identifier-filter tests passed again. Production source and assertions were unchanged.",
+    "new_ir_regression": {
+      "status": "passed",
+      "compiler_sha256": "9dbf29ffb067214cfa5d65b33ef1670ea36eacfec91fb32eb0cb38a74e8e103b",
+      "fixture_sha256": "dab8d924ce8228160615ea7baa2292c95193ce95076df8d5111af30bf103896c",
+      "harness_sha256": "8de1f6070dda5c095a863c582bf6541a0630c90a5dec692c23b66fa84cf4a483",
+      "entry_points": 5,
+      "input_cases": 16,
+      "pipelines": 3,
+      "locally_optimized_ir_observations": 240,
+      "llvm_reference_observations": 80,
+      "reference_reused": true,
+      "execution_backend": "Clang-22; no local machine-code or whole-program execution credit",
+      "archives_created": 0
+    },
+    "native_proof": {
+      "path": "local-state/validations/reference-precision-20261103/symbol-native-after-proof.json",
+      "sha256": "dee8bb5b20a5445d65cdf2e0003aad29ed35a7466678777ca92847366f116f1b"
+    }
+  },
+  "baseline": {
+    "path": "local-state/validations/reference-precision-20261103/symbol-native-before.json",
+    "sha256": "f84f044ccc41abd03cd1c9393888d2409b6031d95bfcb2968fe0681254b120dc",
+    "source_revision": "23d45449",
+    "compiler_sha256": "07173710971852bedef1aeeb9c7a72b879ec2c84d517b13fd8d8ecb3f4c0354a",
+    "globaldce": "LLVM verification fails after local optimization",
+    "globalopt": "LLVM verification fails after local optimization",
+    "release-o3": "LLVM verification and native execution already pass",
+    "release_o3_native_record": "local-state/validations/reference-precision-20261103/symbol-before-release-o3-native.json",
+    "release_o3_native_record_sha256": "0f12c18ad2a27b66eab164bc5739d4b4d123b0566215b90471b82729f91005b7"
+  },
+  "diagnostic_corrections": [
+    {
+      "record": "local-state/validations/reference-precision-20261103/quoted-symbol-before-review.json",
+      "sha256": "7da41b0941c89c999ba86d6f1a916724885dc489b7dd6fac8410a53c183e3ad3",
+      "scope": "Quoted callees reject before optimization; empty stdout verification is not an admitted local result."
+    },
+    "Initial strict query validation disabled constmerge through its old empty-name coverage query; explicit hasUnknown replaces the sentinel and permanent constmerge regressions pass."
+  ],
+  "validation_trigger": "Immediate tier 3 for a confirmed wrong-code repair under docs/validation_tiers.md.",
+  "prior_result_reuse": "Existing full runs predate the shared analysis and optimizer changes. AIR source/export inputs and policy are unchanged; reuse the authenticated current exports but execute all 17 stages again.",
+  "full_argv": [
+    "/home/oleg/.zig/0.17.0/files/zig",
+    "build",
+    "distribution-all",
+    "--",
+    "--serial",
+    "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+    "--real-rows-validation-root=local-state/validations/ir-headroom-20261103",
+    "--real-rows-cache-root=local-state/caches/ir-headroom-20261103"
+  ],
+  "intended_evidence": "local-state/validations/reference-precision-20261103/full-symbol-cached.log",
+  "cleanup": {
+    "record": "local-state/validations/reference-precision-20261103/project-cache-retirement.json",
+    "record_sha256": "b1d979ae9be28a717e8c15c66fab03f98c7385706faf5e851eb13bbabf2fc20d",
+    "allocated_file_bytes_retired": 813682688,
+    "free_bytes_before": 32834007040,
+    "free_bytes_after": 33649438720,
+    "scope": "Only the complete idle project .zig-cache; other caches untouched. Rebuilds and filesystem activity mean this is not net task savings."
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0,
+  "documentation_validation": {
+    "argv": [
+      "/home/oleg/.zig/0.17.0/files/zig",
+      "build",
+      "check-docs"
+    ],
+    "returncode": 0,
+    "log": "local-state/validations/reference-precision-20261103/focused-docs.log",
+    "log_sha256": "4bc561fcc5bec8850475854de1ff3457572178b71585be3e1e8a5016a09eb9b6"
+  }
+}

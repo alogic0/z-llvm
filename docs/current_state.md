@@ -25,6 +25,16 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
+The [symbol identity repair](evidence/symbol_identity_focused_20261103.json) at
+`b3be3512` has focused validation; full integration is pending. Shared reference
+analysis recognizes supported quoted and hexadecimal global spellings, preserving
+stores and live definitions that GlobalOpt and GlobalDCE previously missed.
+Numeric slots remain distinct from quoted numeric names. All 1,727 units,
+13 structural tests and readiness pass. Five entries pass 240 observations of
+locally optimized IR executed by Clang against 80 reused LLVM references.
+This adds no local machine-code or whole-program execution credit. Opaque
+coverage and the legacy selection default remain unchanged.
+
 The accepted [IR and headroom checkpoint](evidence/ir_headroom_acceptance_20261103.json)
 at `abd0bae6` passes both full 17-stage fresh/cached runs. All 1,406 canonical
 records match on one unchanged 2,681-file snapshot in the primary checkout.
