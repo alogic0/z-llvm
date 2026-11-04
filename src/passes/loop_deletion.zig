@@ -1,4 +1,5 @@
 const std = @import("std");
+const block_addresses = @import("../analysis/block_addresses.zig");
 const cfg = @import("../analysis/cfg.zig");
 const cfg_update = @import("../analysis/cfg_update.zig");
 const def_use = @import("../analysis/def_use.zig");
@@ -15,8 +16,11 @@ pub const pass: pass_manager.ModulePass = .{
 };
 
 fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
+    var address_guard = try block_addresses.Guard.build(module.allocator, module.*);
+    defer address_guard.deinit();
     var changed = false;
     for (module.functions.items) |*function| {
+        if (address_guard.contains(function.name)) continue;
         changed = try deleteFunctionLoops(module.*, function) or changed;
     }
     return if (changed) .changed else .unchanged;

@@ -216,3 +216,23 @@ The module dependency cached run passes all 17 stages with
 43.33 GB, both above the 34.36 GB reserve. Three
 authenticated AIR exports are reused and execution checks run again. No headroom
 or AIR-cache implementation changes are part of this compiler checkpoint.
+
+The [IR serialization focused checkpoint](evidence/numeric_ssa_focused_20261103.json)
+records another idle-cache interval after readiness. Project cache roots and two
+superseded interrupted-test roots released 2.17 GB; the previously authorized
+shared Zig cache cleanup released 0.84 GB after a fresh consumer check. These
+are allocation intervals, not cumulative net savings. Source probes, captured IR,
+current AIR, installed compilers and retained proofs remain verified. The
+artifact-store dry run found no unreferenced objects. The user-revised headroom
+admits the planned fresh/cache pair. The earlier pip-cache cleanup proposal is
+superseded; no pip cache was deleted. No archives are created.
+
+After the first full IR run failed, its input, log and frozen source snapshot were
+retained. The follow-up passes 1,718 units, readiness, structural checks and the
+exact failing native case. Before the retry, another complete idle checkout build
+cache released 2.35 GB after an open-file and mapping audit. Free space measured
+38.06 GB afterward, above the revised 32.95 GB admission requirement. Installed
+compilers, captured IR, original probes and the prior accepted AIR remain intact.
+The receipt is `local-state/validations/numeric-ssa-20261103/retry-idle-cache-cleanup.json`.
+The retry uses a new frozen snapshot and distinct fresh/cache logs; no archives
+are created.

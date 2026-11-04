@@ -113,6 +113,9 @@ const EdgeVisitor = struct {
             .symbol => |name| if (definition(visitor.module, name)) |ref| {
                 try appendUniqueEdge(visitor.allocator, visitor.edges, ref);
             },
+            .block_address => |address| if (definition(visitor.module, address.function)) |ref| {
+                try appendUniqueEdge(visitor.allocator, visitor.edges, ref);
+            },
         }
     }
 };

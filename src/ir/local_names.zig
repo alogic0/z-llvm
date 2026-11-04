@@ -4,18 +4,33 @@
 const std = @import("std");
 const ir = @import("core.zig");
 const operands = @import("operands.zig");
+const opaque_names = @import("opaque_names.zig");
 
 pub const Mode = enum { repair, canonical };
 
 pub const Names = struct {
     aliases: std.StringHashMapUnmanaged([]const u8) = .empty,
+    texts: std.StringHashMapUnmanaged([]const u8) = .empty,
 
     pub fn name(names: Names, original: []const u8) []const u8 {
         return names.aliases.get(original) orelse original;
     }
 
     pub fn value(names: Names, original: ir.Value) ir.Value {
-        return if (original == .named) .{ .named = names.name(original.named) } else original;
+        return switch (original) {
+            .named => |raw| .{ .named = names.text(names.name(raw)) },
+            .vector => |raw| .{ .vector = names.text(raw) },
+            .constant_expr => |raw| .{ .constant_expr = names.text(raw) },
+            else => original,
+        };
+    }
+
+    pub fn text(names: Names, original: []const u8) []const u8 {
+        return names.texts.get(original) orelse original;
+    }
+
+    pub fn optionalText(names: Names, original: ?[]const u8) ?[]const u8 {
+        return if (original) |raw| names.text(raw) else null;
     }
 
     fn changes(names: Names, original: []const u8) bool {
@@ -26,6 +41,9 @@ pub const Names = struct {
 pub const Plan = struct {
     arena: std.heap.ArenaAllocator,
     functions: []Names = &.{},
+    ir_functions: []const ir.Function = &.{},
+    function_indexes: std.StringHashMapUnmanaged(usize) = .empty,
+    texts: std.StringHashMapUnmanaged([]const u8) = .empty,
 
     pub fn init(module: ir.Module, mode: Mode) !Plan {
         var plan: Plan = .{ .arena = .init(module.allocator) };
@@ -40,6 +58,8 @@ pub const Plan = struct {
         if (!needed) return plan;
 
         const allocator = plan.arena.allocator();
+        plan.ir_functions = module.functions.items;
+        for (module.functions.items, 0..) |function, index| try plan.function_indexes.put(allocator, function.name, index);
         plan.functions = try allocator.alloc(Names, module.functions.items.len);
         @memset(plan.functions, .{});
         var changed_blocks: std.StringHashMapUnmanaged(void) = .empty;
@@ -68,10 +88,10 @@ pub const Plan = struct {
             }
         }
 
-        // Opaque module records can contain blockaddress references to any
-        // function. Ambiguous numeric type references reject conservatively;
-        // type spelling is never rewritten as though it were an SSA operand.
-        const module_check: OpaqueCheck = .{ .other_names = changed_locals };
+        // Parse blockaddress's complete function/block pair before renaming.
+        // Other opaque numeric references remain conservative; numeric types
+        // are never blindly substituted as though they were SSA operands.
+        const module_check: OpaqueCheck = .{ .plan = &plan, .other_names = changed_locals };
         for (module.globals.items) |global| {
             switch (global.initializer) {
                 .none, .c_string => {},
@@ -90,7 +110,7 @@ pub const Plan = struct {
             for (decl.params.items) |param| try module_check.text(param.attrs);
         }
         for (module.functions.items, plan.functions) |function, names| {
-            const check: OpaqueCheck = .{ .names = names, .other_names = changed_blocks };
+            const check: OpaqueCheck = .{ .plan = &plan, .names = names, .other_names = changed_blocks };
             try check.text(function.attrs);
             try check.text(function.ret_attrs);
             for (function.params.items) |param| try check.text(param.attrs);
@@ -151,7 +171,21 @@ pub const Plan = struct {
     }
 
     pub fn forFunction(plan: Plan, index: usize) Names {
-        return if (plan.functions.len == 0) .{} else plan.functions[index];
+        var names: Names = if (plan.functions.len == 0) .{} else plan.functions[index];
+        names.texts = plan.texts;
+        return names;
+    }
+
+    pub fn moduleNames(plan: Plan) Names {
+        return .{ .texts = plan.texts };
+    }
+
+    fn blockName(plan: *const Plan, function_name: []const u8, block_name: []const u8) ![]const u8 {
+        const index = plan.function_indexes.get(function_name) orelse return error.UnsupportedNumericLocalReference;
+        for (plan.ir_functions[index].blocks.items) |block| {
+            if (std.mem.eql(u8, block.name, block_name)) return plan.functions[index].name(block_name);
+        }
+        return error.UnsupportedNumericLocalReference;
     }
 };
 
@@ -195,7 +229,8 @@ fn addName(allocator: std.mem.Allocator, names: *Names, original: []const u8, ne
 }
 
 const OpaqueCheck = struct {
-    pub const Error = error{UnsupportedNumericLocalReference};
+    pub const Error = std.mem.Allocator.Error || error{UnsupportedNumericLocalReference};
+    plan: *Plan,
     names: Names = .{},
     other_names: std.StringHashMapUnmanaged(void) = .empty,
 
@@ -210,38 +245,33 @@ const OpaqueCheck = struct {
 
     // Recognize complete identifier tokens outside LLVM quoted strings. This
     // proves only absence of names that this plan changes, not general reference
-    // coverage. A matching token rejects; opaque text is never substituted.
+    // coverage. Only a parsed blockaddress pair can be rewritten. Other
+    // matching tokens reject before output, and quoted bytes remain intact.
     fn text(check: OpaqueCheck, optional: ?[]const u8) Error!void {
         if (check.names.aliases.count() == 0 and check.other_names.count() == 0) return;
         const raw = optional orelse return;
-        var index: usize = 0;
-        while (index < raw.len) {
-            const byte = raw[index];
-            index += 1;
-            if (byte == '"') {
-                var closed = false;
-                while (index < raw.len) {
-                    const quoted = raw[index];
-                    index += 1;
-                    if (quoted == '\\') {
-                        if (index == raw.len) return error.UnsupportedNumericLocalReference;
-                        index += 1;
-                    } else if (quoted == '"') {
-                        closed = true;
-                        break;
+        var tokens: opaque_names.Iterator = .{ .raw = raw };
+        var copied: usize = 0;
+        var rewritten: std.ArrayList(u8) = .empty;
+        const allocator = check.plan.arena.allocator();
+        while (tokens.next() catch return error.UnsupportedNumericLocalReference) |token| {
+            switch (token) {
+                .local => |name| if (check.names.changes(name) or check.other_names.contains(name)) {
+                    return error.UnsupportedNumericLocalReference;
+                },
+                .block_address => |address| {
+                    const replacement = try check.plan.blockName(address.function, address.block);
+                    if (!std.mem.eql(u8, replacement, address.block)) {
+                        try rewritten.appendSlice(allocator, raw[copied..address.block_start]);
+                        try rewritten.appendSlice(allocator, replacement);
+                        copied = address.block_end;
                     }
-                }
-                if (!closed) return error.UnsupportedNumericLocalReference;
-            } else if (byte == '%') {
-                const start = index;
-                while (index < raw.len and identifierByte(raw[index])) : (index += 1) {}
-                const token = raw[start..index];
-                if (check.names.changes(token) or check.other_names.contains(token)) return error.UnsupportedNumericLocalReference;
+                },
             }
+        }
+        if (copied != 0 and !check.plan.texts.contains(raw)) {
+            try rewritten.appendSlice(allocator, raw[copied..]);
+            try check.plan.texts.put(allocator, raw, try rewritten.toOwnedSlice(allocator));
         }
     }
 };
-
-fn identifierByte(byte: u8) bool {
-    return std.ascii.isAlphanumeric(byte) or byte == '_' or byte == '-' or byte == '$' or byte == '.';
-}

@@ -21,12 +21,15 @@ comptime {
     _ = @import("tests/ir_operands.zig");
     _ = @import("tests/ir_numeric_names.zig");
     _ = @import("tests/ir_parser_ownership.zig");
+    _ = @import("tests/ir_parser_parameters.zig");
     _ = @import("tests/ir_instruction_ownership.zig");
     _ = @import("tests/optimizer_correctness.zig");
     _ = @import("tests/optimizer_review_boundaries.zig");
     _ = @import("tests/optimizer_checkpoint.zig");
     _ = @import("tests/integer_semantics.zig");
     _ = @import("tests/module_references.zig");
+    _ = @import("tests/block_addresses.zig");
+    _ = @import("tests/simplifycfg_names.zig");
     _ = @import("tests/globaldce_references.zig");
     _ = @import("tests/global_dependencies.zig");
     _ = @import("tests/adce_operands.zig");

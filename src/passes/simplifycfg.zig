@@ -1,4 +1,5 @@
 const std = @import("std");
+const block_addresses = @import("../analysis/block_addresses.zig");
 const cfg = @import("../analysis/cfg.zig");
 const cfg_update = @import("../analysis/cfg_update.zig");
 const def_use = @import("../analysis/def_use.zig");
@@ -15,8 +16,11 @@ pub const pass: pass_manager.ModulePass = .{
 };
 
 fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
+    var address_guard = try block_addresses.Guard.build(module.allocator, module.*);
+    defer address_guard.deinit();
     var changed = false;
     for (module.functions.items) |*function| {
+        if (address_guard.contains(function.name)) continue;
         changed = simplifyTerminators(function) or changed;
         changed = try hoistTwoInstructionReturnArms(module, function) or changed;
         changed = try hoistIdenticalTwoArmReturn(module, function) or changed;
@@ -748,8 +752,7 @@ fn foldSimpleDiamondSelectReturns(module: *ir.Module, function: *ir.Function) !b
             };
             const shape = simpleDiamondSelectReturn(function.*, graph, block_index, condbr) orelse continue;
 
-            const select_name_text = try diamondSelectName(allocator, shape);
-            const select_name = try module.ownString(select_name_text);
+            const select_name = try diamondSelectName(module, function.*, shape);
             try block.instructions.append(allocator, .{
                 .result = select_name,
                 .kind = .{ .select = .{
@@ -849,8 +852,7 @@ fn uniqueCommonReturnBlockName(module: *ir.Module, function: ir.Function) ![]con
     var suffix: usize = 1;
     while (true) : (suffix += 1) {
         const candidate = try std.fmt.allocPrint(module.allocator, "common.ret{}", .{suffix});
-        errdefer module.allocator.free(candidate);
-        if (function.blockIndex(candidate) == null) return try module.ownString(candidate);
+        if (!hasLocalName(function, candidate)) return try module.ownString(candidate);
         module.allocator.free(candidate);
     }
 }
@@ -862,24 +864,52 @@ fn uniqueCommonReturnValueName(module: *ir.Module, function: ir.Function, block_
             try std.fmt.allocPrint(module.allocator, "{s}.op", .{block_name})
         else
             try std.fmt.allocPrint(module.allocator, "{s}.op{}", .{ block_name, suffix });
-        errdefer module.allocator.free(candidate);
-        if (!hasResultName(function, candidate)) return try module.ownString(candidate);
+        if (!hasLocalName(function, candidate)) return try module.ownString(candidate);
         module.allocator.free(candidate);
     }
 }
 
-fn hasResultName(function: ir.Function, name: []const u8) bool {
+fn hasLocalName(function: ir.Function, name: []const u8) bool {
     for (function.params.items) |param| {
-        if (std.mem.eql(u8, param.name, name)) return true;
+        if (localNameMatches(param.name, name)) return true;
     }
     for (function.blocks.items) |block| {
+        if (localNameMatches(block.name, name)) return true;
         for (block.instructions.items) |instruction| {
             if (instruction.result) |result| {
-                if (std.mem.eql(u8, result, name)) return true;
+                if (localNameMatches(result, name)) return true;
             }
         }
     }
     return false;
+}
+
+// Generated names are bare identifiers, but existing quoted and escaped
+// spellings can denote the same local in LLVM's shared value/block namespace.
+fn localNameMatches(existing: []const u8, name: []const u8) bool {
+    if (std.mem.eql(u8, existing, name)) return true;
+    if (existing.len < 2 or existing[0] != '"' or existing[existing.len - 1] != '"') return false;
+    var index: usize = 1;
+    for (name) |byte| {
+        if (index >= existing.len - 1) return false;
+        var decoded = existing[index];
+        index += 1;
+        if (decoded == '\\') {
+            if (index + 2 > existing.len - 1) return false;
+            decoded = std.fmt.parseInt(u8, existing[index..][0..2], 16) catch return false;
+            index += 2;
+        }
+        if (decoded != byte) return false;
+    }
+    return index == existing.len - 1;
+}
+
+fn isBareLocalName(name: []const u8) bool {
+    if (name.len == 0 or std.ascii.isDigit(name[0])) return false;
+    for (name) |byte| {
+        if (!std.ascii.isAlphanumeric(byte) and std.mem.indexOfScalar(u8, "-.$_", byte) == null) return false;
+    }
+    return true;
 }
 
 fn profileMetadata(metadata: ?[]const u8) ?[]const u8 {
@@ -893,11 +923,23 @@ fn profileMetadata(metadata: ?[]const u8) ?[]const u8 {
     return null;
 }
 
-fn diamondSelectName(allocator: std.mem.Allocator, shape: DiamondSelectReturn) ![]u8 {
-    if (shape.true_value == .named and shape.false_value == .named) {
-        return std.fmt.allocPrint(allocator, "{s}.{s}", .{ shape.true_value.named, shape.false_value.named });
+fn diamondSelectName(module: *ir.Module, function: ir.Function, shape: DiamondSelectReturn) ![]const u8 {
+    const allocator = module.allocator;
+    const preferred = if (shape.true_value == .named and shape.false_value == .named)
+        try std.fmt.allocPrint(allocator, "{s}.{s}", .{ shape.true_value.named, shape.false_value.named })
+    else
+        try std.fmt.allocPrint(allocator, "{s}.select", .{shape.phi_name});
+    defer allocator.free(preferred);
+    const base = if (isBareLocalName(preferred)) preferred else "select";
+    var suffix: usize = 0;
+    while (true) : (suffix += 1) {
+        const candidate = if (suffix == 0)
+            try allocator.dupe(u8, base)
+        else
+            try std.fmt.allocPrint(allocator, "{s}.{}", .{ base, suffix });
+        if (!hasLocalName(function, candidate)) return try module.ownString(candidate);
+        allocator.free(candidate);
     }
-    return std.fmt.allocPrint(allocator, "{s}.select", .{shape.phi_name});
 }
 
 const DiamondSelectReturn = struct {

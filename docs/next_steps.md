@@ -201,13 +201,24 @@ immediate sources, cast flags, pointer targets and unproved compare forms retain
 explicit boundaries; frozen residual fingerprints and the bypass ratchet stay
 unchanged.
 
-Next, repair numeric SSA names in printed IR after CFG reordering. A retained
-three-block reproducer is valid for LLVM before `simplifycfg`; the local pass
-merges blocks and prints `%2` before `%1`, which LLVM rejects. The existing
-comparison normalizer repairs that example and the captured Fibonacci module.
-Reuse its normalization authority, preserve non-comparison IR information and
-cover numeric block labels, forward references, PHIs and opaque operands before
-changing production serialization.
+The [numeric SSA serialization repair](evidence/numeric_ssa_focused_20261103.json)
+now has a [focused integration follow-up](evidence/ir_blockaddress_focused_20261103.json).
+The first full run failed after six stages on a retained jump-table initializer;
+its sampled minimum stayed above the reduced reserve. Printing now binds each
+`blockaddress` to its function before renumbering. CFG passes preserve functions
+whose block addresses escape, while opaque reference coverage stays conservative.
+SimplifyCFG generates valid names without collisions, and the parser preserves
+quoted parameter names with spaces. The earlier allocation-ownership fixes remain.
+All 1,718 units, readiness and 13 structural checks pass, including the previously
+failing mixed C/Zig native case. Ten regression functions supply 480 observations
+of locally optimized IR executed by Clang-22 against 160 reused LLVM references.
+Complete optimized panic-module IR and the unchanged repaired Fibonacci IR verify.
+These IR checks add no local whole-program execution. Full fresh/cache integration
+remains pending, so the accepted checkpoint above stays unchanged.
+
+Next, complete the frozen fresh/cache integration pair for the IR changes and
+revised headroom policy before accepting the checkpoint. The follow-up fixes have separate printing, parser and optimizer source commits;
+the fixed candidate and execution cohorts remain unchanged.
 
 Then narrow opaque dependency-reference coverage before changing the default
 selection. LLVM GlobalDCE retains 34 functions and 16 globals/aliases from the

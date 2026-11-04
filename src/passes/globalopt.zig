@@ -63,7 +63,7 @@ const DirectLoadUses = struct {
 
     pub fn visit(uses: DirectLoadUses, site: references.Site, event: references.Event) Error!void {
         switch (event) {
-            .unknown => uses.blocked.* = true,
+            .unknown, .block_address => uses.blocked.* = true,
             .symbol => |name| {
                 if (!std.mem.eql(u8, name, uses.global.name)) return;
                 if (site == .instruction and site.instruction.kind == .load) {
