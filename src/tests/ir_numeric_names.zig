@@ -232,8 +232,8 @@ test "numeric serialization rejects opaque references before writing any module 
             // on structured IR carrying an opaque bundle from another producer.
             module.functions.items[0].blocks.items[0].instructions.items[1].kind.call.operand_bundle = "[ \"deopt\"(i32 %2) ]";
         } else {
-            // Global blockaddress syntax also retains a parser boundary.
-            module.globals.items[0].initializer = .{ .@"opaque" = "blockaddress(@opaque, %4)" };
+            // A blockaddress must resolve its function as well as its block.
+            module.globals.items[0].initializer = .{ .@"opaque" = "blockaddress(@missing, %4)" };
         }
         var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
         defer output.deinit();
@@ -299,7 +299,100 @@ test "numeric serialization rejects raw debug uses and permits unchanged opaque 
     try contains(output.written(), "!dbg !{!\"%2\", i32 %20}");
 }
 
-fn allocationCheck(allocator: std.mem.Allocator, module: ir.Module) !void {
+const block_addresses =
+    \\@table = constant [3 x ptr] [ptr blockaddress(@"first fn", %4), ptr blockaddress(@other, %4), ptr blockaddress(@"first fn", %2)]
+    \\define void @"first fn"() {
+    \\0:
+    \\  br label %4
+    \\4:
+    \\  br label %2
+    \\2:
+    \\  ret void
+    \\}
+    \\define i32 @other() {
+    \\0:
+    \\  br label %4
+    \\4:
+    \\  ret i32 7
+    \\}
+    \\!0 = !{!"blockaddress(@other, %4)"}
+    \\!blockaddress = !{!0}
+;
+
+test "numeric serialization binds jump-table block addresses to their owning functions" {
+    var module = try ir.Module.parse(std.testing.allocator, block_addresses);
+    defer module.deinit();
+    try module.verify();
+    const original = module.globals.items[0].initializer.@"opaque";
+    const output = try printed(std.testing.allocator, module, false);
+    defer std.testing.allocator.free(output);
+    try contains(output, "[ptr blockaddress(@\"first fn\", %1), ptr blockaddress(@other, %4), ptr blockaddress(@\"first fn\", %2)]");
+    try contains(output, "!0 = !{!\"blockaddress(@other, %4)\"}");
+    try contains(output, "!blockaddress = !{!0}");
+    try std.testing.expectEqualStrings(original, module.globals.items[0].initializer.@"opaque");
+    try std.testing.expectEqualStrings("4", module.functions.items[0].blocks.items[1].name);
+    try verifyPrinted(output);
+    var reparsed = try ir.Module.parse(std.testing.allocator, output);
+    defer reparsed.deinit();
+    const again = try printed(std.testing.allocator, reparsed, false);
+    defer std.testing.allocator.free(again);
+    try std.testing.expectEqualStrings(output, again);
+    const canonical = try printed(std.testing.allocator, module, true);
+    defer std.testing.allocator.free(canonical);
+    try contains(canonical, "ptr blockaddress(@other, %1)");
+    try verifyPrinted(canonical);
+}
+
+test "numeric serialization rewrites block addresses inside structured values and raw records" {
+    var module = try ir.Module.parse(std.testing.allocator, block_addresses ++ "\n" ++
+        \\declare void @consume(ptr)
+        \\define ptr @use() {
+        \\entry:
+        \\  call void @consume(ptr null)
+        \\  ret ptr null
+        \\}
+    );
+    defer module.deinit();
+    const raw = "blockaddress( @\"first fn\", %4 )";
+    module.globals.items[0].initializer = .{ .array = .{ .elem_ty = .ptr, .values = .empty } };
+    try module.globals.items[0].initializer.array.values.appendSlice(std.testing.allocator, &.{ .{ .constant_expr = raw }, .null_value, .{ .constant_expr = raw } });
+    var function = &module.functions.items[2];
+    function.attrs = "prefix ptr blockaddress(@\"first fn\", %4)";
+    function.blocks.items[0].instructions.items[0].kind.call.raw_args = "ptr blockaddress(@\"first fn\", %4)";
+    function.blocks.items[0].instructions.items[0].metadata = "!annotation !{ptr blockaddress(@\"first fn\", %4)}";
+    function.blocks.items[0].terminator.?.ret.value = .{ .constant_expr = raw };
+    try module.metadata.append(std.testing.allocator, "!1 = !{ptr blockaddress(@\"first fn\", %4)}");
+    const output = try printed(std.testing.allocator, module, false);
+    defer std.testing.allocator.free(output);
+    try contains(output, "[ptr blockaddress( @\"first fn\", %1 ), ptr null, ptr blockaddress( @\"first fn\", %1 )]");
+    try contains(output, "prefix ptr blockaddress(@\"first fn\", %1)");
+    try contains(output, "call void @consume(ptr blockaddress(@\"first fn\", %1)), !annotation !{ptr blockaddress(@\"first fn\", %1)}");
+    try contains(output, "ret ptr blockaddress( @\"first fn\", %1 )");
+    try contains(output, "!1 = !{ptr blockaddress(@\"first fn\", %1)}");
+    try std.testing.expectEqualStrings(raw, function.blocks.items[0].terminator.?.ret.value.?.constant_expr);
+}
+
+test "numeric serialization rejects malformed and unresolved block addresses before output" {
+    var module = try ir.Module.parse(std.testing.allocator, block_addresses);
+    defer module.deinit();
+    for ([_][]const u8{
+        "blockaddress(@missing, %4)",
+        "blockaddress(@other, %999)",
+        "blockaddress(@other %4)",
+        "blockaddress(@other, %4",
+        "blockaddress(@other, %4 extra)",
+        "blockaddress(@\"unterminated, %4)",
+        "ptrtoint (ptr %4 to i64)",
+    }) |raw| {
+        module.globals.items[0].initializer = .{ .@"opaque" = raw };
+        var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+        defer output.deinit();
+        try std.testing.expectError(error.UnsupportedNumericLocalReference, module.print(&output.writer));
+        try std.testing.expectEqual(@as(usize, 0), output.written().len);
+    }
+}
+
+fn allocationCheck(allocator: std.mem.Allocator, module: ir.Module, first_result: ?[]const u8) !void {
     var borrowed = module;
     borrowed.allocator = allocator;
     // Allocating writer maps allocation failure to WriteFailed; restore the
@@ -309,11 +402,14 @@ fn allocationCheck(allocator: std.mem.Allocator, module: ir.Module) !void {
         else => return err,
     };
     defer allocator.free(output);
-    try std.testing.expectEqualStrings("2", module.functions.items[0].blocks.items[0].instructions.items[0].result.?);
+    if (first_result) |expected| try std.testing.expectEqualStrings(expected, module.functions.items[0].blocks.items[0].instructions.items[0].result.?);
 }
 
 test "numeric serialization cleans up every print allocation failure" {
     var module = try ir.Module.parse(std.testing.allocator, reordered);
     defer module.deinit();
-    try std.testing.checkAllAllocationFailures(std.testing.allocator, allocationCheck, .{module});
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, allocationCheck, .{ module, @as(?[]const u8, "2") });
+    var blocks = try ir.Module.parse(std.testing.allocator, block_addresses);
+    defer blocks.deinit();
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, allocationCheck, .{ blocks, @as(?[]const u8, null) });
 }

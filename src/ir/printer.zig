@@ -14,6 +14,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
 pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) !void {
     var name_plan = try local_names.Plan.init(module, options.numeric_names);
     defer name_plan.deinit();
+    const module_names = name_plan.moduleNames();
     var printed_module_record = false;
     if (module.source_filename) |source_filename| {
         try writer.print("source_filename = \"{s}\"\n", .{source_filename});
@@ -41,14 +42,14 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
     for (module.globals.items) |global| {
         try writer.print("@{s} = ", .{global.name});
         try global.linkage.format(writer);
-        if (global.address_attrs) |address_attrs| try writer.print("{s} ", .{address_attrs});
+        if (global.address_attrs) |address_attrs| try writer.print("{s} ", .{module_names.text(address_attrs)});
         try writer.print("{s} ", .{global.kind.name()});
         try global.ty.format(writer);
         if (global.initializer != .none) {
             try writer.writeByte(' ');
-            try global.initializer.format(writer);
+            try printGlobalInitializer(global.initializer, module_names, writer);
         }
-        if (global.attrs) |attrs| try writer.print(", {s}", .{attrs});
+        if (global.attrs) |attrs| try writer.print(", {s}", .{module_names.text(attrs)});
         try writer.writeByte('\n');
     }
     if (module.globals.items.len != 0 and (module.aliases.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0)) try writer.writeByte('\n');
@@ -69,19 +70,19 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
         try decl.linkage.format(writer);
         try decl.visibility.format(writer);
         if (decl.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
-        try printReturnType(decl.ret_ty, decl.ret_attrs, writer);
+        try printReturnType(decl.ret_ty, module_names.optionalText(decl.ret_attrs), writer);
         try writer.print(" @{s}(", .{decl.name});
         for (decl.params.items, 0..) |param, index| {
             if (index != 0) try writer.writeAll(", ");
             try param.ty.format(writer);
-            if (param.attrs) |attrs| try writer.print(" {s}", .{attrs});
+            if (param.attrs) |attrs| try writer.print(" {s}", .{module_names.text(attrs)});
         }
         if (decl.is_varargs) {
             if (decl.params.items.len != 0) try writer.writeAll(", ");
             try writer.writeAll("...");
         }
         try writer.writeByte(')');
-        if (decl.attrs) |attrs| try writer.print(" {s}", .{attrs});
+        if (decl.attrs) |attrs| try writer.print(" {s}", .{module_names.text(attrs)});
         try writer.writeByte('\n');
     }
     if (module.declarations.items.len != 0 and module.functions.items.len != 0) try writer.writeByte('\n');
@@ -93,16 +94,16 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
         try function.linkage.format(writer);
         try function.visibility.format(writer);
         if (function.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
-        try printReturnType(function.ret_ty, function.ret_attrs, writer);
+        try printReturnType(function.ret_ty, names.optionalText(function.ret_attrs), writer);
         try writer.print(" @{s}(", .{function.name});
         for (function.params.items, 0..) |param, index| {
             if (index != 0) try writer.writeAll(", ");
             try param.ty.format(writer);
-            if (param.attrs) |attrs| try writer.print(" {s}", .{attrs});
+            if (param.attrs) |attrs| try writer.print(" {s}", .{names.text(attrs)});
             try writer.print(" %{s}", .{names.name(param.name)});
         }
         try writer.writeByte(')');
-        if (function.attrs) |attrs| try writer.print(" {s}", .{attrs});
+        if (function.attrs) |attrs| try writer.print(" {s}", .{names.text(attrs)});
         try writer.writeAll(" {\n");
 
         for (function.blocks.items) |block| {
@@ -124,7 +125,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try names.value(binary.lhs).format(writer);
                         try writer.writeAll(", ");
                         try names.value(binary.rhs).format(writer);
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .cast => |cast| {
                         try writer.print("{s} ", .{cast.op.name()});
@@ -134,14 +135,14 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try names.value(cast.value).format(writer);
                         try writer.writeAll(" to ");
                         try cast.to_ty.format(writer);
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .freeze => |freeze| {
                         try writer.writeAll("freeze ");
                         try freeze.ty.format(writer);
                         try writer.writeByte(' ');
                         try names.value(freeze.value).format(writer);
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .icmp => |icmp| {
                         try writer.writeAll("icmp ");
@@ -152,7 +153,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try names.value(icmp.lhs).format(writer);
                         try writer.writeAll(", ");
                         try names.value(icmp.rhs).format(writer);
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .fcmp => |fcmp| {
                         try writer.writeAll("fcmp ");
@@ -163,7 +164,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try names.value(fcmp.lhs).format(writer);
                         try writer.writeAll(", ");
                         try names.value(fcmp.rhs).format(writer);
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .select => |select| {
                         try writer.writeAll("select ");
@@ -178,7 +179,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try select.ty.format(writer);
                         try writer.writeByte(' ');
                         try names.value(select.false_value).format(writer);
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .phi => |phi| {
                         try writer.writeAll("phi ");
@@ -190,7 +191,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                             try names.value(incoming.value).format(writer);
                             try writer.print(", %{s} ]", .{names.name(incoming.block)});
                         }
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .alloca => |alloca| {
                         try writer.writeAll("alloca ");
@@ -201,8 +202,8 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                             try writer.writeByte(' ');
                             try names.value(count.value).format(writer);
                         }
-                        if (alloca.attrs) |attrs| try writer.print(", {s}", .{attrs});
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        if (alloca.attrs) |attrs| try writer.print(", {s}", .{names.text(attrs)});
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .load => |load| {
                         try writer.writeAll("load ");
@@ -212,7 +213,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         if (load.ptr_addrspace) |addrspace_name| try writer.print("{s} ", .{addrspace_name});
                         try names.value(load.ptr).format(writer);
                         try printMemorySuffix(load.attrs, writer);
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .store => |store| {
                         try writer.writeAll("store ");
@@ -224,7 +225,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         if (store.ptr_addrspace) |addrspace_name| try writer.print("{s} ", .{addrspace_name});
                         try names.value(store.ptr).format(writer);
                         try printMemorySuffix(store.attrs, writer);
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .atomicrmw => |atomicrmw| {
                         try writer.writeAll("atomicrmw ");
@@ -238,7 +239,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         if (atomicrmw.syncscope) |syncscope| try writer.print(" {s}", .{syncscope});
                         try writer.print(" {s}", .{atomicrmw.ordering});
                         if (atomicrmw.@"align") |alignment| try writer.print(", align {}", .{alignment});
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .cmpxchg => |cmpxchg| {
                         try writer.writeAll("cmpxchg ");
@@ -257,13 +258,13 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         if (cmpxchg.syncscope) |syncscope| try writer.print(" {s}", .{syncscope});
                         try writer.print(" {s} {s}", .{ cmpxchg.success_ordering, cmpxchg.failure_ordering });
                         if (cmpxchg.@"align") |alignment| try writer.print(", align {}", .{alignment});
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .fence => |fence| {
                         try writer.writeAll("fence ");
                         if (fence.syncscope) |syncscope| try writer.print("{s} ", .{syncscope});
                         try writer.print("{s}", .{fence.ordering});
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .extractelement => |extract| {
                         try writer.writeAll("extractelement ");
@@ -274,7 +275,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try extract.index_ty.format(writer);
                         try writer.writeByte(' ');
                         try names.value(extract.index).format(writer);
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .insertelement => |insert| {
                         try writer.writeAll("insertelement ");
@@ -289,7 +290,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try insert.index_ty.format(writer);
                         try writer.writeByte(' ');
                         try names.value(insert.index).format(writer);
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .shufflevector => |shuffle| {
                         try writer.writeAll("shufflevector ");
@@ -304,7 +305,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try shuffle.mask_ty.format(writer);
                         try writer.writeByte(' ');
                         try printShuffleMask(names.value(shuffle.mask), writer);
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .extractvalue => |extract| {
                         try writer.writeAll("extractvalue ");
@@ -312,7 +313,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try writer.writeByte(' ');
                         try names.value(extract.aggregate).format(writer);
                         try writer.print(", {s}", .{extract.indices});
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .insertvalue => |insert| {
                         try writer.writeAll("insertvalue ");
@@ -324,7 +325,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try writer.writeByte(' ');
                         try names.value(insert.value).format(writer);
                         try writer.print(", {s}", .{insert.indices});
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .gep => |gep| {
                         try writer.writeAll("getelementptr ");
@@ -338,13 +339,13 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                             try writer.writeByte(' ');
                             try names.value(index.value).format(writer);
                         }
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .call => |call| {
                         if (call.tail_kind) |tail_kind| try writer.print("{s} ", .{tail_kind});
                         try writer.writeAll("call ");
                         if (call.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
-                        try printReturnType(call.ret_ty, call.ret_attrs, writer);
+                        try printReturnType(call.ret_ty, names.optionalText(call.ret_attrs), writer);
                         if (call.callee_function_ty) |function_ty| try writer.print(" {s}", .{function_ty});
                         if (call.inline_asm) |inline_asm| {
                             try writer.writeAll(" asm ");
@@ -358,20 +359,20 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                             try writer.print(" @{s}(", .{call.callee});
                         }
                         if (call.raw_args) |raw_args| {
-                            try writer.writeAll(raw_args);
+                            try writer.writeAll(names.text(raw_args));
                         } else {
                             for (call.args.items, 0..) |arg, index| {
                                 if (index != 0) try writer.writeAll(", ");
                                 try arg.ty.format(writer);
-                                if (arg.attrs) |attrs| try writer.print(" {s}", .{attrs});
+                                if (arg.attrs) |attrs| try writer.print(" {s}", .{names.text(attrs)});
                                 try writer.writeByte(' ');
                                 try names.value(arg.value).format(writer);
                             }
                         }
                         try writer.writeByte(')');
-                        if (call.attrs) |attrs| try writer.print(" {s}", .{attrs});
-                        if (call.operand_bundle) |operand_bundle| try writer.print(" {s}", .{operand_bundle});
-                        try printInstructionMetadata(instruction.metadata, writer);
+                        if (call.attrs) |attrs| try writer.print(" {s}", .{names.text(attrs)});
+                        if (call.operand_bundle) |operand_bundle| try writer.print(" {s}", .{names.text(operand_bundle)});
+                        try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                 }
             }
@@ -388,7 +389,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                 },
                 .br => |br| {
                     try writer.print("  br label %{s}", .{names.name(br.target)});
-                    if (br.metadata) |metadata| try writer.print(", {s}", .{metadata});
+                    if (br.metadata) |metadata| try writer.print(", {s}", .{names.text(metadata)});
                     try writer.writeByte('\n');
                 },
                 .condbr => |condbr| {
@@ -397,7 +398,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                     try writer.writeByte(' ');
                     try names.value(condbr.cond).format(writer);
                     try writer.print(", label %{s}, label %{s}", .{ names.name(condbr.then_target), names.name(condbr.else_target) });
-                    if (condbr.metadata) |metadata| try writer.print(", {s}", .{metadata});
+                    if (condbr.metadata) |metadata| try writer.print(", {s}", .{names.text(metadata)});
                     try writer.writeByte('\n');
                 },
                 .@"switch" => |switch_term| {
@@ -414,7 +415,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try writer.print(", label %{s}\n", .{names.name(case.target)});
                     }
                     try writer.writeAll("  ]");
-                    if (switch_term.metadata) |metadata| try writer.print(", {s}", .{metadata});
+                    if (switch_term.metadata) |metadata| try writer.print(", {s}", .{names.text(metadata)});
                     try writer.writeByte('\n');
                 },
                 .indirectbr => |indirectbr| {
@@ -428,7 +429,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try writer.print("label %{s}", .{names.name(target)});
                     }
                     try writer.writeByte(']');
-                    if (indirectbr.metadata) |metadata| try writer.print(", {s}", .{metadata});
+                    if (indirectbr.metadata) |metadata| try writer.print(", {s}", .{names.text(metadata)});
                     try writer.writeByte('\n');
                 },
                 .@"unreachable" => try writer.writeAll("  unreachable\n"),
@@ -440,12 +441,30 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
 
     if (module.attribute_groups.items.len != 0) {
         if (module.comdats.items.len != 0 or module.globals.items.len != 0 or module.aliases.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0) try writer.writeByte('\n');
-        for (module.attribute_groups.items) |attribute_group| try writer.print("{s}\n", .{attribute_group});
+        for (module.attribute_groups.items) |attribute_group| try writer.print("{s}\n", .{module_names.text(attribute_group)});
     }
 
     if (module.metadata.items.len != 0) {
         if (module.comdats.items.len != 0 or module.globals.items.len != 0 or module.aliases.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0 or module.attribute_groups.items.len != 0) try writer.writeByte('\n');
-        for (module.metadata.items) |metadata| try writer.print("{s}\n", .{metadata});
+        for (module.metadata.items) |metadata| try writer.print("{s}\n", .{module_names.text(metadata)});
+    }
+}
+
+fn printGlobalInitializer(initializer: core.GlobalInitializer, names: local_names.Names, writer: anytype) !void {
+    switch (initializer) {
+        .none, .c_string => try initializer.format(writer),
+        .scalar => |value| try names.value(value).format(writer),
+        .@"opaque" => |raw| try writer.writeAll(names.text(raw)),
+        .array => |array| {
+            try writer.writeByte('[');
+            for (array.values.items, 0..) |value, index| {
+                if (index != 0) try writer.writeAll(", ");
+                try array.elem_ty.format(writer);
+                try writer.writeByte(' ');
+                try names.value(value).format(writer);
+            }
+            try writer.writeByte(']');
+        },
     }
 }
 
