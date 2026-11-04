@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "a81a36fe2dadfbc9e3a292a844b3bc2df068bab3",
-  "accepted_tree": "087277f16b107084f635092e1f81e2dfdfcbff2d",
+  "accepted_revision": "c6b46f0c38f56c6bdb159c2c4eb784da7699bb9d",
+  "accepted_tree": "714168c2a384da14c7d0cd1463307c4a9f961c56",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 5,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "a81a36fe",
+  "declaration_revision": "c6b46f0c",
   "evidence": [
+    "docs/evidence/rax_load_acceptance_20261104.json",
+    "docs/evidence/rax_load_20261104_cached.summary",
     "docs/evidence/general_stride_acceptance_20261104.json",
     "docs/evidence/general_stride_20261104_cached.summary",
     "docs/evidence/bounded_frame_acceptance_20261104.json",

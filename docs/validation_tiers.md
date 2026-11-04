@@ -264,6 +264,19 @@ and stores. Unit execution independently checks all 255 admitted scales over
 readiness and the frozen 17-stage integration run pass. The twelve earlier native
 populations and all fixed compiler-core and compiler-rt counters remain unchanged.
 
+The accepted [RAX pointer-load canary](evidence/rax_load_acceptance_20261104.json)
+adds seven functions for 8/16/32/64-bit and pointer-valued loads, helper-returned
+addresses and 56-byte stride loops. Direct/release routes in three modes check
+2,688 local observations against 1,344 LLVM references reused across routes.
+Protected page ends prove exact-width reads; skipped branches, live pointers,
+live RCX addresses, clobbering calls and storage guards are checked. Twelve
+mutation controls reject oversized reads and corrupted live values. Unit native
+execution checks 240 additional branch/load cases per run; staged-write conflicts
+and rollback reject or restore state before publication. All 1,770 units,
+13 structural checks, focused release tests, readiness and the frozen 17-stage
+integration pass. The thirteen earlier native populations and all fixed
+compiler-core and compiler-rt counters remain unchanged.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

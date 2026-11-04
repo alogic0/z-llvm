@@ -1,0 +1,1455 @@
+{
+  "schema": 1,
+  "status": "accepted",
+  "recorded_utc": "2026-11-04T22:48:16.881584+00:00",
+  "accepted_revision": "c6b46f0c38f56c6bdb159c2c4eb784da7699bb9d",
+  "accepted_tree": "714168c2a384da14c7d0cd1463307c4a9f961c56",
+  "validated_working_head": "c6b46f0c38f56c6bdb159c2c4eb784da7699bb9d",
+  "source_snapshot": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-source-snapshot.json",
+    "sha256": "daca13a28eac041c161946d8f6497e8131261e11c283ddae31feb470b888db25"
+  },
+  "source_snapshot_files": 2726,
+  "source_worktree": "/home/oleg/prog/z_llvm",
+  "source_sha256": {
+    "src/codegen/x86_64/generic_cfg/rax_load_tests.zig": "10ba0321403298cb85314a0973737f84c9c686aa8acad52512165799dc9a229f",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory.zig": "d3edd264b5d8abb40875e724df58c8be5bb55c68a73ca2c48e58a98a9ce13074",
+    "src/codegen/x86_64/generic_cfg/value_use/materialization.zig": "61f917bd6674f0cd908acfcb542f311298817c9b4f8d159fe245b2ce18b29362",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/compatibility.zig": "24d2344cfa40109d5e262651c555fe146a2f531cdf391b25676faec6ccde6ba5",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/physical_mapping.zig": "5099e93aa754e01982982c08d644d0f00277f791f9a64cf49146884a6a6f2c57",
+    "src/tests.zig": "ca0eea9867ab33d7c93ee6459d12175f0a2fc506f650da4114410f9ebc253192",
+    "test/real_programs/rax_pointer_load.ll": "80c9f8fc6c47417c7d054ffb99f89cdfa11a6928c78c432f86db0069bd9f5729",
+    "test/real_programs/rax_pointer_load_driver.c": "073e524f3baf6897cde10532f8f942893df7cc7433b67c52787d02669bca245a",
+    "tools/run_upstream_c_program.py": "a55a0c6dffcbac06d5229522314e7bf25d7009a7aa523ec6dde486edf3a8975e"
+  },
+  "behavior": [
+    "Ordinary integer and pointer loads accept a proven 64-bit RAX address through the existing typed load action.",
+    "RAX-to-RCX address staging precedes accumulator preparation; the same staging helper serves stores. Both compatibility paths and physical write planning agree, with no new machine instruction or register-allocation policy.",
+    "Live and dying pointers, a live RCX stride address, caller-clobbering helper calls, exact 8/16/32/64-bit loads and pointer-valued loads preserve values and transaction rollback.",
+    "Seven permanent functions pass direct/release routes in three modes with protected page ends, skipped null-slot branches, 56-byte stride loops, input/output guards and independent C checks.",
+    "The retained loop and branch reproducers now emit objects. Width/class and read-only-load restrictions remain closed; staging conflicts reject before mutation."
+  ],
+  "known_boundaries": [
+    "Read-only specialized loads, i128 aliases and unsupported pointer widths/classes keep their existing admission rules. No floating, aggregate or broader ABI capability is added.",
+    "Live scratch values still require a valid preservation home. An unframed fixed-scratch comparison can reject before the new load path; its fixture-development attempts are retained.",
+    "Fibonacci now reaches composed-block-binary-imm-rhs at urem i64 by 4096. A small control-flow reproducer has the same rejection and compiles with Clang. Narrower call ABIs and whole-program execution remain later work."
+  ],
+  "fibonacci": {
+    "argv": [
+      "zig-out/bin/z_llvm",
+      "--generic-cfg-selector",
+      "--report-all-codegen-failures",
+      "--target=x86_64-unknown-linux-gnu",
+      "--input-limit=67108864",
+      "--emit=obj",
+      "--codegen-reachable",
+      "local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/object-input.ll"
+    ],
+    "input_sha256": "2f72c59ebf876c48b671cbf39890f4a974b8b87545a3a3103d2cce2df85d180a",
+    "compiler_sha256": "ec5f8f7fa6e930822ae335257a2955414b5bf53a9cbdcabb2ec344cbfcacc0ae",
+    "returncode": 1,
+    "object_bytes": 0,
+    "summary_lines": [
+      "summary zllvm-codegen-selection mode=reachable coverage=complete selected_globals=15 selected_aliases=1",
+      "summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=34 emitted_functions=10 failed_functions=24 first_failing_function=start.expandStackSize first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=no_emitter first_failing_selector_detail=composed-block-binary-imm-rhs local_fail=1"
+    ],
+    "record": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/fibonacci-r1.json",
+      "sha256": "e42439614bc6c37ee01f9e71ea349696578ff78b85ab85d2de3740bf835c1d2c"
+    },
+    "stderr": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/fibonacci-r1.stderr",
+      "sha256": "73d99bf6cad6cec2c9f377a77101bf40418249c3a40f217a1823c6a5ab9e2040"
+    },
+    "local_whole_program_executions": 0,
+    "input_unchanged": true
+  },
+  "focused_evidence": {
+    "path": "docs/evidence/rax_load_focused_20261104.json",
+    "sha256": "828a74a16ca6ab62d429818a06380e31f4005f58f3d32a7a2206a5debb461b1b"
+  },
+  "focused_validation": {
+    "checks": [
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 11555286153,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-units.json",
+          "sha256": "97f24a6371f59e034a47a6d20f541fb8d557245a7d1ae7b5c3920fbe7cdd2ecd"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-units.log",
+          "sha256": "b75562990bf406f453da3b36e0cae681b3251013f2d496079aeecce1d9d4b693"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 442997907,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-structural.json",
+          "sha256": "70a85ab6aec83737bcdd73b51b0e2daaf0fe0d4864c650deedf5162047e076f5"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-structural.log",
+          "sha256": "4b750261bc57fd707236ba16eb18efc6eecc32822db180aa5013f12a19320cf2"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=RAX ordinary",
+          "-Dtest-filter=ordinary load",
+          "-Dtest-filter=load rollback",
+          "-Doptimize=ReleaseFast",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 51746977845,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-release-fast.json",
+          "sha256": "da2e7b0b4a97bb491b67b32718d267b6c0a02dbc95c6323688418741b9fd6466"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-release-fast.log",
+          "sha256": "0439a86ed207fee9994fa6052274ad526757b4791645b6873b2f0e801840d235"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=RAX ordinary",
+          "-Dtest-filter=ordinary load",
+          "-Dtest-filter=load rollback",
+          "-Doptimize=ReleaseSafe",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 38314373480,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-release-safe.json",
+          "sha256": "0db4644bf09b3339ddd156ae91d1ad6c8ff10300730d4903c32c9940874e54b7"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-release-safe.log",
+          "sha256": "e8eb30bbbeb51ed2bcddf13a760499cc1001bf62f60401b9a9ff64da2599cada"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 417300549385,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-readiness.json",
+          "sha256": "beb2735a4103367465b8816956383cc136ef1f7c97f73a5be8074496f614716e"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-readiness.log",
+          "sha256": "7f278c6045e7e4654be6812ee3870d01051b1e565a6c18ebfac09ba2bb6bb768"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 5090899720,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-captured-object.json",
+          "sha256": "8e543d8223d89745bd745d29b69705e589b6240ad2eb91be052a7d995905b327"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-captured-object.log",
+          "sha256": "99bf1dcd433a7ae9b1b1e5ece6c77f4c371b97ebd5aac2640cbe11c147de6d5c"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/rax-load-20261104/check_native.py",
+          "local-state/validations/rax-load-20261104/native"
+        ],
+        "returncode": 0,
+        "wall_ns": 1808793315,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-native.json",
+          "sha256": "4f826e15b2c1b742c7b0376dc3500b2f0971742f408186a35fee5f1922dcab92"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-native.log",
+          "sha256": "6f1ad07937ebdc2943943b35e7e61c7d45d6b0262cde235f755f54658d4dffab"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/rax-load-20261104/check_existing_native.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 28095524810,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-existing-native.json",
+          "sha256": "b28606858c1a6f019f63bb4c26d70df7dc2e03c534cc1ff6b75a54f4b677e9c0"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-existing-native.log",
+          "sha256": "42275c1240ee34f8727efe118c1f1cd9fe91ac3ccf7cf805082305e9a76b305b"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/rax-load-20261104/check_controls.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 9133630610,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-controls.json",
+          "sha256": "6f604c036e6e8b08eea6f9fee6101b08de9868d1e7cdb1e93d0380c0e2821a0f"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/rax-controls.log",
+          "sha256": "3276d3668d3412b37b3169337d0dc432778447b575d4ad83454c6a2de7ca9202"
+        }
+      }
+    ],
+    "unit_tests": 1770,
+    "structural_tests": 13,
+    "focused_tests_per_release_mode": 17,
+    "rax_load_native_cases_per_unit_run": 240,
+    "native": {
+      "status": "passed",
+      "rax_pointer_load_local_observations": 2688,
+      "rax_pointer_load_reference_observations": 1344,
+      "compiler_sha256": "ec5f8f7fa6e930822ae335257a2955414b5bf53a9cbdcabb2ec344cbfcacc0ae",
+      "inputs": {
+        "test/real_programs/rax_pointer_load.ll": "80c9f8fc6c47417c7d054ffb99f89cdfa11a6928c78c432f86db0069bd9f5729",
+        "test/real_programs/rax_pointer_load_driver.c": "073e524f3baf6897cde10532f8f942893df7cc7433b67c52787d02669bca245a",
+        "tools/run_upstream_c_program.py": "a55a0c6dffcbac06d5229522314e7bf25d7009a7aa523ec6dde486edf3a8975e"
+      }
+    },
+    "native_proof": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native/proof.json",
+      "sha256": "6f1ad07937ebdc2943943b35e7e61c7d45d6b0262cde235f755f54658d4dffab"
+    },
+    "existing_native": {
+      "general_array_stride_local_observations": 1920,
+      "general_array_stride_reference_observations": 960,
+      "bounded_frame_local_observations": 768,
+      "bounded_frame_reference_observations": 384,
+      "module_dependencies_local_observations": 330,
+      "module_dependencies_reference_observations": 165,
+      "array_stride_local_observations": 1536,
+      "array_stride_reference_observations": 768,
+      "boolean_calls_local_observations": 1536,
+      "boolean_calls_reference_observations": 768,
+      "global_addresses_local_observations": 192,
+      "global_addresses_reference_observations": 96,
+      "global_memory_local_observations": 240,
+      "global_memory_reference_observations": 120,
+      "type_layout_padding_local_observations": 768,
+      "type_layout_padding_reference_observations": 384,
+      "word_pair_local_observations": 384,
+      "word_pair_reference_observations": 192,
+      "signed_nonnegative_local_observations": 1536,
+      "signed_nonnegative_reference_observations": 768,
+      "integer_pointer_local_observations": 1536,
+      "integer_pointer_reference_observations": 768,
+      "scalar_stack_local_observations": 486,
+      "scalar_stack_reference_observations": 243,
+      "pointer_stack_local_observations": 768,
+      "pointer_stack_reference_observations": 384,
+      "compiler_sha256": "ec5f8f7fa6e930822ae335257a2955414b5bf53a9cbdcabb2ec344cbfcacc0ae",
+      "status": "passed",
+      "module_dependencies_environment_checks": 3,
+      "module_dependencies_negative_controls": 30
+    },
+    "existing_native_proof": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/existing-native/proof.json",
+      "sha256": "42275c1240ee34f8727efe118c1f1cd9fe91ac3ccf7cf805082305e9a76b305b"
+    },
+    "negative_controls": {
+      "status": "passed",
+      "compiler_sha256": "ec5f8f7fa6e930822ae335257a2955414b5bf53a9cbdcabb2ec344cbfcacc0ae",
+      "negative_controls": 12,
+      "cases": [
+        {
+          "control": "overwide-load",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": -11,
+          "rejected": true
+        },
+        {
+          "control": "overwide-load",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": -11,
+          "rejected": true
+        },
+        {
+          "control": "overwide-load",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": -11,
+          "rejected": true
+        },
+        {
+          "control": "overwide-load",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": -11,
+          "rejected": true
+        },
+        {
+          "control": "overwide-load",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": -11,
+          "rejected": true
+        },
+        {
+          "control": "overwide-load",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": -11,
+          "rejected": true
+        },
+        {
+          "control": "wrong-live-value",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-live-value",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-live-value",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-live-value",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-live-value",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-live-value",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        }
+      ],
+      "commands": [
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/rax_pointer_load_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/direct"
+          ],
+          "returncode": -11,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/rax_pointer_load_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/release"
+          ],
+          "returncode": -11,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/rax_pointer_load_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/direct"
+          ],
+          "returncode": -11,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/rax_pointer_load_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/release"
+          ],
+          "returncode": -11,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/rax_pointer_load_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/direct"
+          ],
+          "returncode": -11,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/rax_pointer_load_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/release"
+          ],
+          "returncode": -11,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/overwide-load-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/rax_pointer_load_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/rax_pointer_load_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/rax_pointer_load_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/rax_pointer_load_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/rax_pointer_load_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/rax_pointer_load_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/wrong-live-value-ReleaseSmall/release-run"
+        }
+      ],
+      "fixture_sha256": "80c9f8fc6c47417c7d054ffb99f89cdfa11a6928c78c432f86db0069bd9f5729",
+      "driver_sha256": "073e524f3baf6897cde10532f8f942893df7cc7433b67c52787d02669bca245a",
+      "fixture_unchanged": true,
+      "core_dumps_disabled": true
+    },
+    "negative_controls_proof": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/native-controls/proof.json",
+      "sha256": "2fbe2f5edb71e5d7dc60c55f77b5ce1b488382b816941d3dd1fe7a78c0e397cb"
+    }
+  },
+  "validation_trigger": "Tier 3 before accepting the RAX ordinary-load capability and proceeding to the next arithmetic boundary (docs/validation_tiers.md).",
+  "prior_result_reuse": "The accepted stride checkpoint predates the load admission and staging changes. Reuse authenticated AIR inputs but rerun all 17 stages, fourteen native populations and fresh execution checks on frozen compiler sources.",
+  "frozen_plan": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/validation-plan.json",
+    "sha256": "4f5ae987283ed05d7b983bc0a527af1c25415f8ce2c2bdedb82f0e57e625ecfb"
+  },
+  "verification_script": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/verify_full_run.py",
+    "sha256": "3c6b628d82c869e16e2259ed50d268e85d999fdcf553c288152d8a6c19dff8df"
+  },
+  "verified_record": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/rax-load-20261104/verified-full-rax-cached.json",
+    "sha256": "796556b9da9ad2e9281fef30c5c0ece67ee24a1a20a1368b7306d5dc37eda348"
+  },
+  "integration": {
+    "argv": [
+      "/home/oleg/.zig/0.17.0/files/zig",
+      "build",
+      "distribution-all",
+      "--",
+      "--serial",
+      "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+      "--real-rows-validation-root=local-state/validations/ir-headroom-20261103",
+      "--real-rows-cache-root=local-state/caches/ir-headroom-20261103"
+    ],
+    "returncode": 0,
+    "wall_ns": 2442778527951,
+    "raw_log": "local-state/validations/rax-load-20261104/full-rax-cached.log",
+    "raw_log_sha256": "8da10b4435f593eef6c785e34f0e3f6e4526d7714d8aff3aee0ab4b81fd7003b",
+    "telemetry_sha256": "eff40983575d59b23ef74f336d4f5423d8655caa46122c380cdc00ac40c8bbf9",
+    "gates": [
+      {
+        "id": "selected-object-suite",
+        "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+        "exit_status": "0",
+        "duration_ms": "62624",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "2021",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "3572",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "3390",
+        "cache_status": "none"
+      },
+      {
+        "id": "zig-source-native-link",
+        "tool": "tools/run_distribution_zig_source_native_link.zig",
+        "exit_status": "0",
+        "duration_ms": "18809",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-postopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "81426",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-preopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "--pipeline": "preopt",
+        "exit_status": "0",
+        "duration_ms": "645509",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-ir-writer",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "21779",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-release",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "73123",
+        "cache_status": "none"
+      },
+      {
+        "id": "real-rows-release-fast",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseFast",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "496120",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-safe",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSafe",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "521629",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-small",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSmall",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "347277",
+        "cache_status": "hit"
+      },
+      {
+        "id": "integrated-executable",
+        "tool": "tools/run_distribution_zig_integrated_exe.zig",
+        "exit_status": "0",
+        "duration_ms": "883414",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "480",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "1125",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "1032",
+        "cache_status": "none"
+      },
+      {
+        "id": "boundary-gates",
+        "tool": "tools/run_distribution_boundary_gates.zig",
+        "exit_status": "0",
+        "duration_ms": "803",
+        "cache_status": "none"
+      }
+    ],
+    "serial": {
+      "schema_version": "1",
+      "run_id": "ac15e8707656fe4572eda294a8684ec1",
+      "scratch_path": "tmp/distribution_all_serial_ac15e8707656fe4572eda294a8684ec1",
+      "bundle_path": "tmp/distribution_all_serial_ac15e8707656fe4572eda294a8684ec1/release_source_object_bundle",
+      "target": "x86_64-unknown-linux-gnu",
+      "mode": "serial",
+      "real_rows_concurrency": "3",
+      "subgates": "17",
+      "wall_ms": "2442747",
+      "starting_free_bytes": "45510848512",
+      "minimum_observed_free_bytes": "44136148992",
+      "final_free_bytes": "45508739072",
+      "observed_peak_bytes": "1374699520",
+      "reserve_bytes": "24359738368",
+      "required_start_bytes": "32949672960",
+      "local_fail": "0"
+    },
+    "real_rows": [
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseFast",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSafe",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSmall",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      }
+    ],
+    "cache_events": [
+      {
+        "mode": "ReleaseFast",
+        "status": "hit",
+        "duration_ms": "14946",
+        "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+        "descriptor_bytes": "1343891697"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "status": "hit",
+        "duration_ms": "16173",
+        "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+        "descriptor_bytes": "1473501276"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "status": "hit",
+        "duration_ms": "12209",
+        "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+        "descriptor_bytes": "1106432911"
+      }
+    ],
+    "real_rows_resources": {
+      "schema_version": "3",
+      "normalization_schema": "3",
+      "memory_policy": "os-managed-non-gating",
+      "concurrency": "3",
+      "workers": "3",
+      "modes": "ReleaseFast,ReleaseSafe,ReleaseSmall",
+      "run_id": "2a67be36250a6a85b8233812ce33c372",
+      "root": "local-state/validations/ir-headroom-20261103/real_rows_parallel_2a67be36250a6a85b8233812ce33c372",
+      "work_selection_root": "local-state/validations/ir-headroom-20261103",
+      "export_cache_selection_root": "local-state/caches/ir-headroom-20261103",
+      "fast_temp": "local-state/validations/ir-headroom-20261103/ReleaseFast/work_2a67be36250a6a85b8233812ce33c372",
+      "fast_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_2a67be36250a6a85b8233812ce33c372/ReleaseFast/zig-local-cache",
+      "fast_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_2a67be36250a6a85b8233812ce33c372/ReleaseFast/zig-global-cache",
+      "fast_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseFast/export",
+      "safe_temp": "local-state/validations/ir-headroom-20261103/ReleaseSafe/work_2a67be36250a6a85b8233812ce33c372",
+      "safe_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_2a67be36250a6a85b8233812ce33c372/ReleaseSafe/zig-local-cache",
+      "safe_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_2a67be36250a6a85b8233812ce33c372/ReleaseSafe/zig-global-cache",
+      "safe_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export",
+      "small_temp": "local-state/validations/ir-headroom-20261103/ReleaseSmall/work_2a67be36250a6a85b8233812ce33c372",
+      "small_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_2a67be36250a6a85b8233812ce33c372/ReleaseSmall/zig-local-cache",
+      "small_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_2a67be36250a6a85b8233812ce33c372/ReleaseSmall/zig-global-cache",
+      "small_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export",
+      "pin_manifest_sha256": "0d7370b61aa9f9871196371de428475b01a05554fd449a97a74f63ba4f948a29",
+      "cache_status": "hit,hit,hit",
+      "air_cache": "read-only",
+      "pruning": "suspended",
+      "wall_ms": "643263",
+      "summed_child_ms": "1365026",
+      "filesystem_total_bytes": "982240026624",
+      "post_run_free_floor_bytes": "24359738368",
+      "projected_peak_bytes": "8589934592",
+      "required_start_bytes": "32949672960",
+      "admission_source": "serial_preflight",
+      "admission_starting_free_bytes": "45510848512",
+      "starting_free_bytes": "45576863744",
+      "minimum_free_bytes": "44136148992",
+      "final_free_bytes": "44136148992",
+      "peak_disk_bytes": "5377929216",
+      "peak_aggregate_rss_bytes": "5249134592",
+      "minimum_available_memory_bytes": "10367016960",
+      "load_start": "2.45",
+      "load_end": "2.10",
+      "execution_results_cached": "false",
+      "local_fail": "0"
+    },
+    "native_memory_populations": {
+      "word-pair-memory": {
+        "population": "standalone-two-word-stack-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "384",
+        "reference_observations": "192",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "pointer-stack-memory": {
+        "population": "standalone-runtime-pointer-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-stack-memory": {
+        "population": "standalone-scalar-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "486",
+        "reference_observations": "243",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "integer-pointer-casts": {
+        "population": "standalone-integer-pointer-casts",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "signed-nonnegative": {
+        "population": "standalone-signed-nonnegative",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "type-layout-padding": {
+        "population": "standalone-type-allocation-padding",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-addresses": {
+        "population": "standalone-global-addresses",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "192",
+        "reference_observations": "96",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-memory": {
+        "population": "standalone-global-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "240",
+        "reference_observations": "120",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "boolean-calls": {
+        "population": "standalone-boolean-calls",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "array-stride": {
+        "population": "standalone-array-stride",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "module-dependencies": {
+        "population": "standalone-module-dependencies",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "330",
+        "reference_observations": "165",
+        "reference_reused_per_route": "true",
+        "local_fail": "0",
+        "negative_controls": "30",
+        "environment_checks": "3"
+      },
+      "bounded-frame": {
+        "population": "standalone-bounded-frame",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "general-array-stride": {
+        "population": "standalone-general-array-stride",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1920",
+        "reference_observations": "960",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "rax-pointer-load": {
+        "population": "standalone-rax-pointer-load",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "2688",
+        "reference_observations": "1344",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    },
+    "c_program": {
+      "schema": "upstream-c-program-v1",
+      "programs": "1",
+      "program_modes": "3",
+      "matched_program_modes": "3",
+      "reference_case_executions": "6",
+      "local_case_executions": "6",
+      "integer_variadic_observations": "48",
+      "heap_call_observations": "18",
+      "native_call_observations": "66",
+      "local_fail": "0"
+    },
+    "ascii_rows": [
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseFast",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+        "object_bytes": "712",
+        "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+        "reference_bytes": "4154072",
+        "reference_sha256": "b6b5886422faa36d6b98e75b6f86df66ae25c3a9b68df7ae176cf2fcf99e4827",
+        "linked_bytes": "6292382",
+        "linked_sha256": "6554256ff61534f785c22a20dc28d4d12707e3b12274ef6ced2e755e27a0e7d8",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      },
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseSafe",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+        "object_bytes": "712",
+        "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+        "reference_bytes": "4040088",
+        "reference_sha256": "2ff503b0f92725bd9f88e82c28d0f68c93d7ed20e79c3d1f2821f0b3d1a16eea",
+        "linked_bytes": "6147574",
+        "linked_sha256": "2c63a8d31a08860e30fd59f2173c791f90b77e253bad34d35a1a2ceab098cf62",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      },
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseSmall",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+        "object_bytes": "712",
+        "object_sha256": "40e9bb98f7323034dd598ad8c87656971e8701525f77bb3afe926d6f1a0c05be",
+        "reference_bytes": "149824",
+        "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+        "linked_bytes": "356150",
+        "linked_sha256": "225422404216d1c816b4483c748096b95b95038d5756df0f4f925934516be5f0",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      }
+    ],
+    "fma": {
+      "cases": "8192",
+      "matched": "8192",
+      "reference": "llvm22-frozen-ir",
+      "local_fail": "0"
+    },
+    "source_snapshot": "local-state/validations/rax-load-20261104/rax-source-snapshot.json",
+    "source_snapshot_sha256": "daca13a28eac041c161946d8f6497e8131261e11c283ddae31feb470b888db25",
+    "source_snapshot_files": 2726,
+    "source_worktree": "/home/oleg/prog/z_llvm",
+    "original_scratch_files_verified": 13,
+    "sources_unchanged": true,
+    "headroom_policy": {
+      "schema_version": "3",
+      "filesystem_total_bytes": "982240026624",
+      "reserve_bytes": "24359738368",
+      "projected_peak_bytes": "8589934592",
+      "required_start_bytes": "32949672960",
+      "authority": "tools/distribution_headroom_policy.zig",
+      "local_fail": "0"
+    },
+    "expected_cache_status": "hit",
+    "sampled_minimum_free_bytes": 44135677952,
+    "archives_created": 0
+  },
+  "headroom_policy": {
+    "schema_version": 3,
+    "reserve_bytes": 24359738368,
+    "projected_peak_bytes": 8589934592,
+    "required_start_bytes": 32949672960
+  },
+  "authenticated_exports_reused": [
+    {
+      "mode": "ReleaseFast",
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5.air",
+      "bytes": 1343891697,
+      "allocated_bytes": 1343922176,
+      "sha256": "bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5",
+      "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+      "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.meta",
+      "metadata_sha256": "037abbc2bc1e323c0174b6a43373654ee44ef22a91fcf9a8c092d5693f45f00a"
+    },
+    {
+      "mode": "ReleaseSafe",
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c.air",
+      "bytes": 1473501276,
+      "allocated_bytes": 1473531904,
+      "sha256": "53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c",
+      "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+      "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.meta",
+      "metadata_sha256": "24849930ee312cc3cb2d35cf0da327898ca4a16ad25c90b1a858ac5530300618"
+    },
+    {
+      "mode": "ReleaseSmall",
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809.air",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106452480,
+      "sha256": "e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809",
+      "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+      "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.meta",
+      "metadata_sha256": "b3f9cb704b31b4257b0e2c3b9f3415672c282a7bd10142d8dbf246de354c62f3"
+    }
+  ],
+  "summary_log": {
+    "path": "docs/evidence/rax_load_20261104_cached.summary",
+    "sha256": "6e3915df0f8aa304b91913e977296f6859e5c1ce41925781974fd3b08a21c10b",
+    "lines": 142
+  },
+  "cleanup": {
+    "deleted_paths": [],
+    "archives_created": 0
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0,
+  "unchanged_scope": {
+    "candidate_rows_per_mode": 100,
+    "executed_functions_per_mode": 5,
+    "compiler_rt_bypass_ratchet": 130,
+    "previous_native_populations": 13,
+    "selection_default": "legacy",
+    "fibonacci_whole_program_local_executions": 0
+  },
+  "new_native_population": {
+    "name": "rax-pointer-load",
+    "functions": 7,
+    "inputs_per_function": 64,
+    "routes": [
+      "direct",
+      "release"
+    ],
+    "modes": 3,
+    "local_observations": 2688,
+    "reference_observations": 1344,
+    "reference_reused_per_route": true
+  },
+  "toolchain": {
+    "project_zig_version": "0.17.0",
+    "project_zig": "/home/oleg/.zig/0.17.0/files/zig",
+    "emitter": "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+    "emitter_version": "0.17.0-dev.11+1c08b09d1",
+    "emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+    "emitter_bytes": 149918648,
+    "source_authority_sha256": "d4846f9d9032727d3903b31bdefc763447a92024483aa3c83b2ac0683167f492"
+  },
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-unknown-linux-gnu",
+  "modes": [
+    "ReleaseFast",
+    "ReleaseSafe",
+    "ReleaseSmall"
+  ],
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "selector_version": "real-candidate-selector-v3"
+}

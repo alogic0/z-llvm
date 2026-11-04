@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `a81a36fe2dadfbc9e3a292a844b3bc2df068bab3`; tree: `087277f16b107084f635092e1f81e2dfdfcbff2d`.
+Accepted revision: `c6b46f0c38f56c6bdb159c2c4eb784da7699bb9d`; tree: `714168c2a384da14c7d0cd1463307c4a9f961c56`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,27 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [general array stride checkpoint](evidence/general_stride_acceptance_20261104.json)
+The accepted [RAX pointer-load checkpoint](evidence/rax_load_acceptance_20261104.json)
+at `c6b46f0c` passes all 17 integration stages on a frozen 2,726-file snapshot.
+Ordinary integer and pointer loads now stage RAX addresses before preparing the
+accumulator result, using the same typed address helper as stores. Physical write
+planning and both admission paths agree. Live pointers and scratch values survive;
+width/class restrictions, EFLAGS and transaction rollback remain checked.
+Seven native functions pass 2,688 local observations against 1,344 LLVM references
+across direct/release routes in three modes, including exact-width protected-page
+loads, skipped null-slot branches, 56-byte stride loops, helper calls and guards.
+Twelve mutation controls reject oversized reads and corrupted live values.
+All 1,770 units, 13 structural checks, 17 focused tests each in ReleaseFast and
+ReleaseSafe, captured-object smoke and readiness pass. The thirteen earlier
+native populations, fixed 100-row/five-function counts, legacy selection and
+bypass ratchet stay unchanged. Minimum reported free space is 44.14 GB,
+above the 24.36 GB reserve. The retained loop and branch now emit objects.
+Fibonacci still emits ten of 34 selected functions; it next rejects unsigned
+remainder by 4096 at `start.expandStackSize composed-block-binary-imm-rhs`.
+Local whole-program execution remains zero. All 13 original probes remain
+unchanged; no archives were made.
+
+The earlier accepted [general array stride checkpoint](evidence/general_stride_acceptance_20261104.json)
 at `a81a36fe` passes all 17 integration stages on a frozen 2,720-file snapshot.
 Literal integer arrays now use allocation strides from 1 to 255 bytes through
 the existing typed address action, including the capture's 56-byte stride.
@@ -206,7 +226,7 @@ history are retired without archives. The latest
 of superseded AIR after the complete fresh replacement proof, making room for
 the cached run. Both runs now pass; old metadata and hashes remain. The retired
 checkout's dependency links are removed while their target repositories remain.
-The general array stride family is accepted. Next, extend ordinary loads whose
-pointer is held in RAX through typed pointer staging and accumulator ownership,
-with all-mode native checks and full integration. See [next steps](next_steps.md)
-for the retained reproducer and later Fibonacci boundaries.
+The RAX ordinary-load slice is accepted. Next, support unsigned remainder by a
+constant power of two through existing typed scalar operations, with exact-width
+native checks and full integration. See [next steps](next_steps.md) for the
+retained reproducer and later Fibonacci boundaries.

@@ -41,7 +41,27 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [general array stride checkpoint](evidence/general_stride_acceptance_20261104.json)
+The accepted [RAX pointer-load checkpoint](evidence/rax_load_acceptance_20261104.json)
+at `c6b46f0c` passes all 17 integration stages on a frozen 2,726-file snapshot.
+Ordinary integer and pointer loads now stage RAX addresses before preparing the
+accumulator result, using the same typed address helper as stores. Physical write
+planning and both admission paths agree. Live pointers and scratch values survive;
+width/class restrictions, EFLAGS and transaction rollback remain checked.
+Seven native functions pass 2,688 local observations against 1,344 LLVM references
+across direct/release routes in three modes, including exact-width protected-page
+loads, skipped null-slot branches, 56-byte stride loops, helper calls and guards.
+Twelve mutation controls reject oversized reads and corrupted live values.
+All 1,770 units, 13 structural checks, 17 focused tests each in ReleaseFast and
+ReleaseSafe, captured-object smoke and readiness pass. The thirteen earlier
+native populations, fixed 100-row/five-function counts, legacy selection and
+bypass ratchet stay unchanged. Minimum reported free space is 44.14 GB,
+above the 24.36 GB reserve. The retained loop and branch now emit objects.
+Fibonacci still emits ten of 34 selected functions; it next rejects unsigned
+remainder by 4096 at `start.expandStackSize composed-block-binary-imm-rhs`.
+Local whole-program execution remains zero. All 13 original probes remain
+unchanged; no archives were made.
+
+The earlier accepted [general array stride checkpoint](evidence/general_stride_acceptance_20261104.json)
 at `a81a36fe` passes all 17 integration stages on a frozen 2,720-file snapshot.
 Literal integer arrays now use allocation strides from 1 to 255 bytes through
 the existing typed address action, including the capture's 56-byte stride.
@@ -331,20 +351,29 @@ Fibonacci emitted ten functions and rejected 24, first at the 56-byte array stri
 in `start.expandStackSize`; local whole-program execution remained zero.
 
 The [general array stride checkpoint](evidence/general_stride_acceptance_20261104.json)
-now accepts bounded allocation strides from 1 to 255 bytes, including `[56 x i8]`,
-with all-mode native proof and all 17 integration stages. The unchanged capture
-still emits ten functions and rejects 24; its first boundary has moved to
+accepted bounded allocation strides from 1 to 255 bytes, including `[56 x i8]`,
+with all-mode native proof and all 17 integration stages. At that checkpoint, the
+unchanged capture emitted ten functions and rejected 24; its first boundary moved to
 `start.expandStackSize composed-block-load-ptr`. Read-only debugger inspection
 identifies a 64-bit pointer in RAX rejected during transaction seal for an i32
 load. The [focused evidence](evidence/general_stride_focused_20261104.json) retains
 a small loop reproducer and its successful Clang compile. This is a codegen
 boundary, with zero local whole-program executions.
 
-Next, admit this ordinary-load address through typed pointer staging and
-accumulator ownership. Keep seal, preparation and materialization consistent;
-prove live pointer/scratch preservation, exact load widths, control-flow cases
-and rollback, then extend all-mode native comparisons and integration. Narrower
-call ABI forms remain later work. Keep fixed populations, default legacy
+The [RAX pointer-load checkpoint](evidence/rax_load_acceptance_20261104.json)
+accepts that ordinary-load address through shared RAX-to-RCX staging and
+accumulator ownership. Both retained load reproducers now emit objects, and
+all-mode native checks and all 17 integration stages pass. The unchanged capture
+still emits ten functions and rejects 24; it now reaches `urem i64` by 4096,
+reported as `start.expandStackSize composed-block-binary-imm-rhs`.
+The [focused evidence](evidence/rax_load_focused_20261104.json) retains a small
+control-flow reproducer with that exact rejection and a successful Clang compile.
+
+Next, lower bounded unsigned remainder by constant powers of two through existing
+typed immediate scalar operations. Check exact integer widths, zero/high-bit
+inputs, live operands, EFLAGS and rollback, with native comparisons and matching
+integration. Arbitrary or zero divisors, signed remainder and narrower call ABI
+forms remain separate later work. Keep fixed populations, default legacy
 selection and the bypass ratchet unchanged.
 
 Keep broader optional ABIs and
