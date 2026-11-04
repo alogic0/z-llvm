@@ -1,0 +1,341 @@
+{
+  "schema": 1,
+  "status": "provisional focused proof; cumulative dependency integration pending",
+  "recorded_utc": "2026-11-04T08:32:07.439551+00:00",
+  "source_revision": "dad027d9247cb2caa3ead7935a0041c6c96e93b0",
+  "source_tree": "1d3885799ea724fb15af55860ed88e7966c2d9c6",
+  "source_sha256": {
+    "src/analysis/module_references.zig": "62168da737fa5a2fb93cabffd5c0f19c051672a5e8b03a6acb7269d42d2f173f",
+    "src/analysis/reference_attributes.zig": "7bf71852f411df7cf39ac2cd0df9b2d2a5bb8badaf0d67f0dd71be29c97e68a8",
+    "src/analysis/reference_constants.zig": "7d99d5b39f282bb4772ede7cdbb0b8494bafcf6d31030905d7bd6e25b4c53aa8",
+    "src/analysis/reference_metadata.zig": "0d0e4dd82d317221b9958dd66ddfc85c3b80e612a8553b3330e1badbae85685d",
+    "src/analysis/reference_metadata_fields.zig": "1987afd88a1c7efc742fa02ff44e7fce601f84618ac6fe6861fda7672724c74a",
+    "src/analysis/reference_syntax.zig": "f3e3dab9ab7ce4dfc8ed862c725c1d36ee1b7df4e259d1a90824e1f7f7d459bd",
+    "src/passes/constmerge.zig": "808677dbdabb6c3efb6ac015d990fc2c16abf352dcce4f9f60aa538e4238198a",
+    "src/passes/function_attrs.zig": "5821ae37a5bee95a03aab7da447f6a6d5321388d31bdb7bfadb5c9701693f7a4",
+    "src/tests.zig": "c0df1e34c94b57110feb86ed2d4a9cbed729cddca6819b13f57ccb8671047554",
+    "src/tests/function_attrs_metadata.zig": "c4056302291782f3ee92f300db2a3f6fb311c4e31ba7f6bbef877bad4a7a2ae8",
+    "src/tests/global_dependencies.zig": "a6f3ea2b1e811e9b451f4dfe1c66b8b8480aae5c1f0fe0acb1e236734dc85c83",
+    "src/tests/globaldce_references.zig": "b02348efb7b5db93e54701c519792bcd166fe7a590fa5681c0d31b05b0a3d5d2",
+    "src/tests/module_references.zig": "c1e81b094a32b960f114e90f3d80c4efc19cb49f0684b6c8be2f291e9edd2fec",
+    "src/tests/reference_attributes.zig": "92f348d3643f850050c7b0e302285a45a7db34b4e7d402365329ed55b9664805",
+    "src/tests/reference_constants.zig": "19abfef04c4a062966ceabb462be04179403edf69eb78b4ce7231a07cf43127d",
+    "src/tests/reference_metadata.zig": "6638eb21a5e7e728a93e19cac5b962d833a431c0120c4c5010a228ae49171703",
+    "test/opt/inputs/reference_metadata.ll": "7e786c1c67a0dd9dcbe5363115da3e1f3e44f43ed13c8ee7cf581f265f0f65a7",
+    "test/opt/reference_metadata_harness.c": "edc61fe7755e1090b29947d9b0707c82f72d7e68b1f06091f357ab0f9c86b408",
+    "tools/run_optimizer_correctness.zig": "4bfce659c03b1691dfc97ac7d1d71eac89bee83337ae829948af363b2dd43c7b"
+  },
+  "replacement_goal": "Complete bounded metadata and typed constant reference discovery while retaining conservative unknown coverage.",
+  "behavior": [
+    "Index metadata IDs before validating complete records, allowing forward references and cycles without recursive expansion.",
+    "Parse explicit debug-node field schemas, tuples, empty DIExpression, attachments, typed constants, GEPs, casts, aggregates and parameter attributes.",
+    "Retain raw metadata unchanged and keep its typed global references as module roots; strings remain data only in recognized fields.",
+    "ConstMerge retains definitions still named by raw regions and reports unchanged when no structured use or definition changes.",
+    "Standalone reference walks remain conservative; unsupported forms, unknown strings, missing or duplicate IDs and excessive nesting stay unknown."
+  ],
+  "observed_bug": "Existing FunctionAttrs appended inferred attributes after !dbg, producing invalid LLVM IR on the new release-o3 regression. Insertion now respects trailing header clauses and quoted/nested tokens.",
+  "upstream_mapping": [
+    {
+      "path": "../llvm-project-22/llvm/lib/AsmParser/LLParser.cpp",
+      "owners": [
+        "parseMetadata",
+        "VISIT_MD_FIELDS tables",
+        "parseMDField",
+        "function attribute and parameter attribute parsing",
+        "typed constant parsing"
+      ]
+    },
+    {
+      "path": "../llvm-project-22/llvm/include/llvm/IR/DerivedTypes.h",
+      "owners": [
+        "IntegerType::MAX_INT_BITS"
+      ]
+    },
+    {
+      "path": "../llvm-project-22/llvm/include/llvm/IR/DebugInfoFlags.def",
+      "owners": [
+        "recognized debug flags"
+      ]
+    }
+  ],
+  "known_boundaries": [
+    "Reference grammar is not a full LLVM semantic verifier and does not widen text parser or native ABI admission.",
+    "Arbitrary named metadata, unsupported nodes/fields, nonempty DIExpression, assembly, operand bundles and unsupported constant operators remain conservative.",
+    "Raw constant/metadata text is not rewritten by ConstMerge.",
+    "Legacy codegen selection remains default; fixed populations and bypass ratchet stay unchanged.",
+    "Fibonacci has zero local whole-program executions; stack allocations still reject."
+  ],
+  "validation": {
+    "unit_tests": 1756,
+    "structural_tests": 13,
+    "focused_reference_tests_per_mode": 36,
+    "focused_attribute_tests_per_mode": 8,
+    "focused_modes": [
+      "ReleaseFast",
+      "ReleaseSafe"
+    ],
+    "checks": [
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 12124442238,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-unit-final.json",
+          "sha256": "bfb3de138c1a7ada02018e0c7f3ca132f1e4bc39afe61597aecbf44c7625e667"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-unit-final.log",
+          "sha256": "7fc6c1f0370a7db5cc80d750f9bae8772aa230c44c89ee1bd7d4fccb73360383"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 474854187,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-structural.json",
+          "sha256": "2e928f7fb0df429c22667581d095c8a11b5371303046e502635664414081b407"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-structural.log",
+          "sha256": "da35bf2fa9015c2a165e496ef0dd3c8d77ede49ceb4e9adcfb9b5668cdd4226f"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 458735973747,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-readiness.json",
+          "sha256": "be04a2525703ec348dfd7dd81f3b343be54df95ca564422345cd3f48f3ea9400"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-readiness.log",
+          "sha256": "e3b3341fde583c5476e5d7a5d94697466f8d0f57b617ec9ee7a39725546919ae"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=reference ",
+          "-Doptimize=ReleaseFast",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 39111110121,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-releasefast.json",
+          "sha256": "e9f2e110467613da2f238312f3650a2958c15846116734f0447e7e8ad06ecdad"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-releasefast.log",
+          "sha256": "1d0095cd36e3650997d4536bb783cc3be17577392094d0eb96f52e90bbed1d31"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=reference ",
+          "-Doptimize=ReleaseSafe",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 27195096649,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-releasesafe.json",
+          "sha256": "2a14608b509d87d04766a9d1846e5f2e82c2dd267e283c5be091ad64ae5f183d"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-releasesafe.log",
+          "sha256": "debf5c21a86f6bcc7c1527b6324f032fd4454da252bceb577973c133a7c666f6"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=function attributes: inferred",
+          "-Doptimize=ReleaseFast",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 23992811388,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/attr-order-releasefast.json",
+          "sha256": "81d184b31bd08a0464e0428172d086dcbf80816a5c9cdedf1e3f9cb9be0cd5a1"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/attr-order-releasefast.log",
+          "sha256": "7614d562d9af7a04b2bc38c2bdd25b267d0a4396eeef09c533480d84d9e524cf"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=function attributes: inferred",
+          "-Doptimize=ReleaseSafe",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 18821608246,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/attr-order-releasesafe.json",
+          "sha256": "6a3e6b160f2878f207f30c85aa2709291f1a4d6d8885c1ea7c0543122b4dc642"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/attr-order-releasesafe.log",
+          "sha256": "935541bf08344a7b9e97b2f845091119c2d6edee24973c7e6ea3b2f1559ebc69"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 2026955566,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-build-r3.json",
+          "sha256": "efceb6e128ed06fb6539c489604d24305397be65c64cdc6c1f4430e92422c4f0"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-build-r3.log",
+          "sha256": "01c655eafcf1d73e89060a689b4ba8d51a74c7728d0b0121b46fffe74ec6300d"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/dependency-coverage-20261104/check_metadata_native.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 844937555,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/metadata-native-final.json",
+          "sha256": "984eaaf258ed690ca778816b7f2953c7b354e4c63dc74d0aa9d99229c01ae6d8"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/metadata-native-final.log",
+          "sha256": "fcbf35f961262dd3e150df83b19c4de46303e143a4e5670475e25721c02d48f8"
+        }
+      }
+    ],
+    "new_ir_regression": {
+      "status": "passed",
+      "compiler_sha256": "c33c64bd426fbdd3d34601da77c16588d95b3d756cb7562e60e815725fd1d279",
+      "fixture_sha256": "7e786c1c67a0dd9dcbe5363115da3e1f3e44f43ed13c8ee7cf581f265f0f65a7",
+      "harness_sha256": "edc61fe7755e1090b29947d9b0707c82f72d7e68b1f06091f357ab0f9c86b408",
+      "pipelines": 5,
+      "entry_points": 5,
+      "input_cases": 16,
+      "locally_optimized_ir_observations": 400,
+      "llvm_reference_observations": 80,
+      "reference_reused": true,
+      "execution_backend": "Clang-22; no local machine-code or whole-program credit"
+    },
+    "native_proof": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/metadata-native-proof.json",
+      "sha256": "7bccecd29b108a0e79d0e576471ddd4d121ebfe629513e637971bc4ae191f2d3"
+    },
+    "focused_snapshot": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-focused-snapshot.json",
+      "sha256": "9fa8bb2b3130fc4bc526f614bbeae256619edd69748cc335cb0e65abe226e1ae"
+    }
+  },
+  "fibonacci": {
+    "selection": {
+      "input_sha256": "2f72c59ebf876c48b671cbf39890f4a974b8b87545a3a3103d2cce2df85d180a",
+      "compiler_sha256": "c33c64bd426fbdd3d34601da77c16588d95b3d756cb7562e60e815725fd1d279",
+      "argv": [
+        "zig-out/bin/z_llvm",
+        "--codegen-reachable",
+        "--generic-cfg-selector",
+        "--report-all-codegen-failures",
+        "--target=x86_64-unknown-linux-gnu",
+        "--input-limit=67108864",
+        "--emit=obj",
+        "local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/object-input.ll"
+      ],
+      "returncode": 1,
+      "object_bytes": 0,
+      "summary_lines": [
+        "summary zllvm-codegen-selection mode=reachable coverage=complete selected_globals=15 selected_aliases=1",
+        "summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=34 emitted_functions=9 failed_functions=25 first_failing_function=start.expandStackSize first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=unsupported_type first_failing_selector_detail=alloca local_fail=1"
+      ],
+      "input_unchanged": true
+    },
+    "llvm_comparison": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/fibonacci-globaldce-normalized-comparison.json",
+      "sha256": "7d4830af82ccc471f107868dcc104c78bcebd8986ea4797a95db31bd3476e986"
+    },
+    "comparison_scope": "Fibonacci GlobalDCE definition comparison after serialization-only numeric SSA normalization; no local execution",
+    "identical_selected_names": true,
+    "functions": 34,
+    "globals": 15,
+    "aliases": 1,
+    "local_whole_program_executions": 0
+  },
+  "baseline": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/metadata-baseline.json",
+    "sha256": "9848a82209fd21fca7e1e44f0938fdf62a1d0737920ce1e77ca5f9008f64f0da"
+  },
+  "diagnostic_corrections": [
+    "Old conservative tests now use genuinely unsupported forms where the new grammar can establish complete coverage.",
+    "Instruction !annotation is outside existing parser admission; the permanent executable fixture uses admitted !dbg without broadening the parser.",
+    "Metadata schema tables explicitly use comptime storage after a test exposed dangling temporary field arrays.",
+    "The original capture has out-of-order numeric SSA names rejected by LLVM. Comparison uses the existing serialization repair through the verify-only route; the original input remains unchanged."
+  ],
+  "validation_policy": "Tier 2 provisional. Immediate full integration for the confirmed invalid-output repair and cumulative dependency acceptance before frame work.",
+  "disk_policy": {
+    "required_start_bytes": 32949672960,
+    "reserve_bytes": 24359738368,
+    "projected_peak_bytes": 8589934592
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0,
+  "cleanup": {
+    "deleted_paths": [],
+    "archives_created": 0
+  },
+  "documentation_validation": {
+    "argv": [
+      "zig",
+      "build",
+      "check-docs"
+    ],
+    "returncode": 0,
+    "log": "local-state/validations/dependency-coverage-20261104/dependency-docs-provisional.log",
+    "log_sha256": "60f79727b41a5e6b0f2262dfc1f6fecb76d3694b5e625871bbd96dad6a172bb1"
+  }
+}

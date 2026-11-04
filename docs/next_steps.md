@@ -260,26 +260,33 @@ strings such as `probe-stack` remain conservative. It passes 1,739 units,
 readiness and 400 observations of optimized IR executed by Clang against
 80 reused LLVM references. Full family integration remains pending.
 
-Next, parse metadata definitions and attachments with explicit field grammars,
-indexing IDs before validation so valid recursive debug types remain supported.
-Preserve raw records and unknown fallbacks. Complete reference discovery does
-not establish rewrite coverage: constant merging must retain globals still
-referenced in raw metadata and must not report a change when nothing changes.
-Then inspect remaining typed constant/aggregate boundaries before changing the
-default selection. LLVM GlobalDCE retains 34 functions and 16 globals/aliases from the
-original Fibonacci capture; the comparison-normalized local output yields the
-same counts. Current conservative selection retains 35 functions and 86
-globals/aliases. These are diagnostic comparisons, not whole-program executions.
+The subsequent [dependency-coverage slice](evidence/dependency_coverage_focused_20261104.json)
+at `dad027d9` is provisionally validated. Metadata IDs are indexed before their
+bounded field grammars are parsed, preserving forward references and recursive
+debug types. Typed constants, aggregate initializers and parameter attributes now
+share complete reference discovery; unsupported forms remain conservative.
+Raw metadata stays unchanged, and constant merging retains globals it cannot
+rewrite. The separate `85e892f3` repair places inferred function attributes before
+metadata and trailing header clauses, fixing confirmed invalid LLVM output.
 
-The explicit unchanged Fibonacci retry selects 35 functions: ten emit and 25
-reject, beginning at `start.expandStackSize` with an aggregate alloca. Its first
-stack types are the 16-byte `{ i64, i64 }` rlimit and a 24-byte padded result
-wrapper. A 56-byte array stride and narrower call ABI forms are visible later.
-Extend bounded aggregate frame storage through existing private legalization and
-typed address authorities after the dependency-reference work. Keep the
-fixed compiler-core population and bypass ratchet unchanged without a separate
-migration. The [checkpoint evidence](evidence/module_selection_acceptance_20261103.json)
-records all diagnostics, cleanup and the full integration proof.
+All 1,756 units, 13 structural checks, readiness, 36 reference tests and eight
+attribute tests in each of ReleaseFast and ReleaseSafe pass. Five optimizer
+pipelines pass 400 observations of locally optimized IR executed by Clang against
+80 reused LLVM references. The explicit unchanged Fibonacci input now has complete
+coverage: 34 functions and 15 globals plus one alias. The selected names match
+LLVM GlobalDCE after serialization-only numeric SSA normalization. Nine functions
+emit and 25 reject, first at `start.expandStackSize unsupported_type:alloca`.
+No local whole-program execution is claimed.
+
+Run cumulative 17-stage integration now for the dependency family and the
+confirmed invalid-output repair, using a frozen primary-checkout snapshot and
+current authenticated AIR exports. The existing accepted full result predates
+these compiler changes. Record acceptance before starting the next capability.
+Then extend bounded 16-byte `{ i64, i64 }` rlimit and 24-byte padded-wrapper
+stack storage through existing private legalization and typed address authorities.
+Shared frame changes require all-mode native checks and full integration.
+The later 56-byte array stride and narrower call ABI forms remain separate
+boundaries. Keep fixed populations and the bypass ratchet unchanged.
 
 Keep broader optional ABIs and
 floating/indirect/aggregate/stack varargs as explicit boundaries. Use the frozen

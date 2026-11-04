@@ -158,11 +158,15 @@ history are retired without archives. The latest
 of superseded AIR after the complete fresh replacement proof, making room for
 the cached run. Both runs now pass; old metadata and hashes remain. The retired
 checkout's dependency links are removed while their target repositories remain.
-The subsequent [attribute-group slice](evidence/reference_attributes_focused_20261103.json)
-at `fa85a805` is provisional: 1,739 unit tests, 13 structural tests, readiness and
-400 observations of locally optimized IR pass. Recognized groups permit more
-precise dependency analysis; metadata and other opaque forms remain conservative.
-Cumulative family integration is pending, and accepted counters stay unchanged.
-See [next steps](next_steps.md) for dependency-reference coverage and bounded
-aggregate frames. Historical checkpoints remain under the roadmap and evidence
-directories.
+The subsequent [dependency-coverage slice](evidence/dependency_coverage_focused_20261104.json)
+at `dad027d9`, including the earlier attribute-group work, is provisional.
+Bounded metadata, typed constants and parameter attributes now establish complete
+reference coverage while unsupported forms remain conservative. Raw metadata roots
+remain live even when constant merging cannot rewrite them. The separate
+`85e892f3` repair keeps inferred function attributes before trailing metadata,
+fixing invalid LLVM IR. All 1,756 units, 13 structural checks, readiness and
+400 LLVM-backed observations of locally optimized IR pass. Fibonacci now selects
+34 functions and 16 globals/aliases, matching LLVM after serialization-only SSA
+normalization, and still rejects its aggregate alloca with zero local executions.
+Cumulative full integration is next, followed by bounded 16-byte and 24-byte
+frame storage. Accepted counters remain unchanged; see [next steps](next_steps.md).
