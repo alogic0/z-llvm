@@ -3,6 +3,7 @@ const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 const function_attrs = @import("../analysis/function_attrs.zig");
 const memory_effect = @import("../analysis/memory_effect.zig");
+const syntax = @import("../ir/parser_syntax.zig");
 
 const AttributeSet = function_attrs.AttributeSet;
 
@@ -726,12 +727,38 @@ fn isKnownFunctionAttr(attr: []const u8) bool {
 
 fn appendFunctionAttr(module: *ir.Module, function: *ir.Function, attr: []const u8) !bool {
     if (hasRawAttr(function.attrs, attr)) return false;
-    const new_attrs = if (function.attrs) |existing|
-        try std.fmt.allocPrint(module.allocator, "{s} {s}", .{ existing, attr })
+    const new_attrs = if (function.attrs) |existing| blk: {
+        const point = functionAttrInsertionPoint(existing) orelse return false;
+        const prefix = std.mem.trimEnd(u8, existing[0..point], " \t\r\n");
+        const suffix = std.mem.trimStart(u8, existing[point..], " \t\r\n");
+        break :blk try std.fmt.allocPrint(module.allocator, "{s}{s}{s}{s}{s}", .{
+            prefix, if (prefix.len != 0) " " else "", attr, if (suffix.len != 0) " " else "", suffix,
+        });
+    }
     else
         try std.fmt.allocPrint(module.allocator, "{s}", .{attr});
     function.attrs = try module.ownString(new_attrs);
     return true;
+}
+
+// LLVM parses function attributes before section/alignment/debug clauses.
+// Quoted strings and nested constant text cannot introduce a clause boundary.
+fn functionAttrInsertionPoint(text: []const u8) ?usize {
+    var index: usize = 0;
+    while (index < text.len) {
+        while (index < text.len and std.ascii.isWhitespace(text[index])) : (index += 1) {}
+        if (index == text.len) break;
+        const length = syntax.findTopLevelTokenEnd(text[index..]) orelse return null;
+        if (length == 0) return null;
+        const token = text[index..][0..length];
+        if (token[0] == '!') return index;
+        for ([_][]const u8{ "section", "partition", "comdat", "align", "gc", "prefix", "prologue", "personality" }) |clause| {
+            if (std.mem.eql(u8, token, clause) or
+                (token.len > clause.len and std.mem.startsWith(u8, token, clause) and token[clause.len] == '(')) return index;
+        }
+        index += length;
+    }
+    return text.len;
 }
 
 fn appendMemoryNoneAttr(module: *ir.Module, function: *ir.Function) !bool {
