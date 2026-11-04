@@ -278,6 +278,11 @@ LLVM GlobalDCE after serialization-only numeric SSA normalization. Nine function
 emit and 25 reject, first at `start.expandStackSize unsupported_type:alloca`.
 No local whole-program execution is claimed.
 
+The first full attempt was deliberately stopped after a narrow check confirmed
+an outdated opaque-metadata control. The updated control uses unknown named
+metadata; all 330 local module observations and 30 rejection controls pass in
+three modes. Compiler sources and prior focused results remain unchanged.
+
 Run cumulative 17-stage integration now for the dependency family and the
 confirmed invalid-output repair, using a frozen primary-checkout snapshot and
 current authenticated AIR exports. The existing accepted full result predates

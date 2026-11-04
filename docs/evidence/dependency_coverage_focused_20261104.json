@@ -2,8 +2,8 @@
   "schema": 1,
   "status": "provisional focused proof; cumulative dependency integration pending",
   "recorded_utc": "2026-11-04T08:32:07.439551+00:00",
-  "source_revision": "dad027d9247cb2caa3ead7935a0041c6c96e93b0",
-  "source_tree": "1d3885799ea724fb15af55860ed88e7966c2d9c6",
+  "source_revision": "811aa4baec30e3fc9b6ea5c825957f99eb46a943",
+  "source_tree": "c397460daf00c8a026239270698dec01114f3e80",
   "source_sha256": {
     "src/analysis/module_references.zig": "62168da737fa5a2fb93cabffd5c0f19c051672a5e8b03a6acb7269d42d2f173f",
     "src/analysis/reference_attributes.zig": "7bf71852f411df7cf39ac2cd0df9b2d2a5bb8badaf0d67f0dd71be29c97e68a8",
@@ -23,7 +23,8 @@
     "src/tests/reference_metadata.zig": "6638eb21a5e7e728a93e19cac5b962d833a431c0120c4c5010a228ae49171703",
     "test/opt/inputs/reference_metadata.ll": "7e786c1c67a0dd9dcbe5363115da3e1f3e44f43ed13c8ee7cf581f265f0f65a7",
     "test/opt/reference_metadata_harness.c": "edc61fe7755e1090b29947d9b0707c82f72d7e68b1f06091f357ab0f9c86b408",
-    "tools/run_optimizer_correctness.zig": "4bfce659c03b1691dfc97ac7d1d71eac89bee83337ae829948af363b2dd43c7b"
+    "tools/run_optimizer_correctness.zig": "4bfce659c03b1691dfc97ac7d1d71eac89bee83337ae829948af363b2dd43c7b",
+    "tools/run_upstream_c_program.py": "c68eafa8b55395704cea1192c1dd733dfc245ba86cfb4982b62d7144c048f6b3"
   },
   "replacement_goal": "Complete bounded metadata and typed constant reference discovery while retaining conservative unknown coverage.",
   "behavior": [
@@ -271,6 +272,21 @@
     "focused_snapshot": {
       "path": "/home/oleg/prog/z_llvm/local-state/validations/dependency-coverage-20261104/dependency-focused-snapshot.json",
       "sha256": "9fa8bb2b3130fc4bc526f614bbeae256619edd69748cc335cb0e65abe226e1ae"
+    },
+    "module_canary_followup": {
+      "proof": {
+        "path": "local-state/validations/dependency-coverage-20261104/module-controls/proof.json",
+        "sha256": "1ccbe6df5be6ac763a81658bcc447f8ab1ca0714044a3b0e94920e6d98d502d1"
+      },
+      "record": {
+        "path": "local-state/validations/dependency-coverage-20261104/updated-module-controls.json",
+        "sha256": "bb8133417830628c8c76b2dd44fbe1cee2518f292bcafd09a433b974a961534e"
+      },
+      "log": {
+        "path": "local-state/validations/dependency-coverage-20261104/updated-module-controls.log",
+        "sha256": "1ccbe6df5be6ac763a81658bcc447f8ab1ca0714044a3b0e94920e6d98d502d1"
+      },
+      "compiler_source_unchanged": true
     }
   },
   "fibonacci": {
@@ -314,7 +330,8 @@
     "Old conservative tests now use genuinely unsupported forms where the new grammar can establish complete coverage.",
     "Instruction !annotation is outside existing parser admission; the permanent executable fixture uses admitted !dbg without broadening the parser.",
     "Metadata schema tables explicitly use comptime storage after a test exposed dangling temporary field arrays.",
-    "The original capture has out-of-order numeric SSA names rejected by LLVM. Comparison uses the existing serialization repair through the verify-only route; the original input remains unchanged."
+    "The original capture has out-of-order numeric SSA names rejected by LLVM. Comparison uses the existing serialization repair through the verify-only route; the original input remains unchanged.",
+    "The mandatory opaque-coverage control used a now-supported typed metadata tuple. It now uses arbitrary named metadata; all 30 controls pass without changing population counts. Compiler code and previously passing focused evidence are unchanged."
   ],
   "validation_policy": "Tier 2 provisional. Immediate full integration for the confirmed invalid-output repair and cumulative dependency acceptance before frame work.",
   "disk_policy": {
@@ -337,5 +354,29 @@
     "returncode": 0,
     "log": "local-state/validations/dependency-coverage-20261104/dependency-docs-provisional.log",
     "log_sha256": "60f79727b41a5e6b0f2262dfc1f6fecb76d3694b5e625871bbd96dad6a172bb1"
+  },
+  "dependency_revision": "dad027d9247cb2caa3ead7935a0041c6c96e93b0",
+  "early_integration_stop": {
+    "record": {
+      "path": "local-state/validations/dependency-coverage-20261104/full-dependency-cached.json",
+      "sha256": "e676eae08c9526e8257a03b12799adfb88afa20428a7314b84a7eff99d5982d2"
+    },
+    "log": {
+      "path": "local-state/validations/dependency-coverage-20261104/full-dependency-cached.log",
+      "sha256": "c923d94cbc2ad7fc1d1d5eca19e6fb01d6417c8607e6f259af740e4a6a133dba"
+    },
+    "source_snapshot": {
+      "path": "local-state/validations/dependency-coverage-20261104/dependency-source-snapshot.json",
+      "sha256": "a6dcb983eadb586177ae25c6303fcd664e124ad2d94cb22f8377908cd7b9ba66"
+    },
+    "reason": {
+      "path": "local-state/validations/dependency-coverage-20261104/aborted-integration.json",
+      "sha256": "e202cb65e4774b6f7d0f537095a9337421c8b491ddd8e4a817365d29c985a185"
+    },
+    "narrow_reproducer": {
+      "path": "local-state/validations/dependency-coverage-20261104/old-opaque-control.json",
+      "sha256": "c40b7902d59533a403e9afee7f85678300a65396b4ca543aeac5cc2f9671f220"
+    },
+    "status": "stopped deliberately after confirming a stale control expectation; not an acceptance result"
   }
 }
