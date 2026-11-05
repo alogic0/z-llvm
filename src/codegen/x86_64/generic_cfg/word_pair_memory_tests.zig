@@ -97,7 +97,7 @@ test "word-pair legalization declines barriers address spaces counts and excessi
     }
 }
 
-test "word-pair byte addresses reject negative out-of-range and dynamic offsets" {
+test "word-pair byte addresses reject invalid constants and execute dynamic offsets" {
     const bytes = try fixture();
     defer std.testing.allocator.free(bytes);
     for (0..3) |boundary| {
@@ -115,9 +115,28 @@ test "word-pair byte addresses reject negative out-of-range and dynamic offsets"
         };
         var lowered = machine.MachineFunction.init(function.name, function.ret_ty);
         defer lowered.deinit(std.testing.allocator);
-        switch (try selector.tryLowerWithContext(std.testing.allocator, &lowered, function.*, &ctx)) {
-            .selected => return error.TestUnexpectedResult,
-            .unsupported => |diagnostic| try std.testing.expectEqualStrings("composed-block-unknown-byte-gep-ptr", diagnostic.detail()),
+        const selected = try selector.tryLowerWithContext(std.testing.allocator, &lowered, function.*, &ctx);
+        if (boundary < 2) {
+            switch (selected) {
+                .selected => return error.TestUnexpectedResult,
+                .unsupported => |diagnostic| try std.testing.expectEqualStrings("composed-block-unknown-byte-gep-ptr", diagnostic.detail()),
+            }
+        } else {
+            try std.testing.expectEqual(selector.SelectionResult.selected, selected);
+            try verify.verifyFunction(lowered);
+            const code = try encoding.encodeFunction(std.testing.allocator, lowered);
+            defer std.testing.allocator.free(code);
+            const executable = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+            defer std.posix.munmap(executable);
+            @memcpy(executable[0..code.len], code);
+            const run: *const fn (?*anyopaque, u64, *[2]u64) callconv(.c) u64 = @ptrCast(executable.ptr);
+            var buffer: [16]u8 = @splat(0);
+            for ([_]?*anyopaque{ null, &buffer, &buffer[15] }) |pointer| for ([_]u64{ 0, 8 }) |offset| {
+                var out = [4]u64{ 0xa5a5, 0, 0, 0xbeef };
+                const expected: u64 = if (offset == 0) @intFromPtr(pointer) else 8;
+                try std.testing.expectEqual(expected, run(pointer, offset, out[1..3]));
+                try std.testing.expectEqualSlices(u64, &.{ 0xa5a5, @intFromPtr(pointer), expected, 0xbeef }, &out);
+            };
         }
     }
 }

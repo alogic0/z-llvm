@@ -281,3 +281,131 @@ test "aggregate storage pair legalization rejects barriers unsupported ABI and u
         try std.testing.expect(try values.legalize(arena.allocator(), module.functions.items[0], null) == null);
     }
 }
+
+test "stack address values execute pointer PHIs and selected stack data" {
+    const text =
+        \\define i64 @choose(i64 %a, i64 %b) {
+        \\entry:
+        \\  %left = alloca [3 x i64], align 8
+        \\  %right = alloca [3 x i64], align 8
+        \\  store i64 %a, ptr %left
+        \\  store i64 %b, ptr %right
+        \\  %choose = icmp ne i64 %b, 0
+        \\  br i1 %choose, label %yes, label %no
+        \\yes:
+        \\  br label %merge
+        \\no:
+        \\  br label %merge
+        \\merge:
+        \\  %selected = phi ptr [ %left, %yes ], [ %right, %no ]
+        \\  %value = load i64, ptr %selected
+        \\  %live = xor i64 %a, %b
+        \\  %result = add i64 %value, %live
+        \\  ret i64 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const code = try executable(module);
+    defer std.posix.munmap(code);
+    const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+    const inputs = [_]u64{ 0, 1, 0x8000000000000000, std.math.maxInt(u64) };
+    for (inputs) |a| for (inputs) |b| try std.testing.expectEqual((if (b != 0) a else b) +% (a ^ b), run(a, b));
+}
+
+test "stack address values execute loop carried frame addresses and index arithmetic" {
+    const text =
+        \\define i64 @loop(i64 %a) {
+        \\entry:
+        \\  %slot = alloca [4 x i64], align 8
+        \\  br label %loop
+        \\loop:
+        \\  %cursor = phi ptr [ %slot, %entry ], [ %next, %loop ]
+        \\  %index = phi i64 [ 0, %entry ], [ %increment, %loop ]
+        \\  %value = add i64 %a, %index
+        \\  store i64 %value, ptr %cursor
+        \\  %next = getelementptr i8, ptr %cursor, i64 8
+        \\  %increment = add i64 %index, 1
+        \\  %again = icmp ult i64 %increment, 4
+        \\  br i1 %again, label %loop, label %done
+        \\done:
+        \\  %tail = getelementptr i8, ptr %slot, i64 24
+        \\  %result = load i64, ptr %tail
+        \\  ret i64 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const code = try executable(module);
+    defer std.posix.munmap(code);
+    const run: *const fn (u64) callconv(.c) u64 = @ptrCast(code.ptr);
+    for ([_]u64{ 0, 1, 0x8000000000000000, std.math.maxInt(u64) }) |a| try std.testing.expectEqual(a +% 3, run(a));
+}
+
+test "stack address values preserve dynamic addresses casts and stored frame pointers" {
+    const text =
+        \\define i64 @address(i64 %a, i64 %b) {
+        \\entry:
+        \\  %slot = alloca [16 x i32], align 16
+        \\  %holder = alloca ptr, align 8
+        \\  %index = and i64 %b, 7
+        \\  %offset = shl i64 %index, 3
+        \\  %element = getelementptr i8, ptr %slot, i64 %offset
+        \\  store i64 %a, ptr %element
+        \\  store ptr %slot, ptr %holder
+        \\  %pointer = load ptr, ptr %holder
+        \\  %bits = ptrtoint ptr %slot to i64
+        \\  %roundtrip = inttoptr i64 %bits to ptr
+        \\  %same = icmp eq ptr %pointer, %roundtrip
+        \\  %wide = zext i1 %same to i64
+        \\  %loaded = load i64, ptr %element
+        \\  %result = xor i64 %loaded, %wide
+        \\  ret i64 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const code = try executable(module);
+    defer std.posix.munmap(code);
+    const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+    const inputs = [_]u64{ 0, 1, 7, 8, 0x8000000000000000, std.math.maxInt(u64) };
+    for (inputs) |a| for (inputs) |b| try std.testing.expectEqual(a ^ 1, run(a, b));
+    const addresses = @import("stack_addresses.zig");
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const view = (try addresses.legalize(arena.allocator(), module.functions.items[0], null)).?;
+    try std.testing.expect(try addresses.legalize(arena.allocator(), view, null) == null);
+    var private_module = module;
+    private_module.functions = try module.functions.clone(arena.allocator());
+    private_module.functions.items[0] = view;
+    try private_module.verify();
+    try std.testing.expectEqualStrings("slot", module.functions.items[0].blocks.items[0].instructions.items[0].result.?);
+    try module.verify();
+}
+
+test "stack address values retain allocation admission and reject unsupported layouts" {
+    const addresses = @import("stack_addresses.zig");
+    const text = "define i64 @address() {\nentry:\n  %slot = alloca [4 x i32], align 8\n  %address = ptrtoint ptr %slot to i64\n  ret i64 %address\n}\n";
+    for (0..6) |boundary| {
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        const alloca = &module.functions.items[0].blocks.items[0].instructions.items[0].kind.alloca;
+        var context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = null };
+        switch (boundary) {
+            0 => alloca.attrs = "align 32",
+            1 => alloca.attrs = "align 8, inalloca",
+            2 => alloca.count = .{ .ty = .{ .int = 64 }, .value = .{ .int = 2 } },
+            3 => alloca.allocated_ty_addrspace = "1",
+            4 => alloca.allocated_ty = .{ .aggregate = "[16385 x i32]" },
+            5 => context.target_datalayout = "E-p:64:64",
+            else => unreachable,
+        }
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect(try addresses.legalize(arena.allocator(), module.functions.items[0], &context) == null);
+        try std.testing.expectEqualStrings("slot", module.functions.items[0].blocks.items[0].instructions.items[0].result.?);
+    }
+}

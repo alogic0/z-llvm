@@ -311,3 +311,27 @@ test "generic cfg selector preserves current-position accumulator on phi edges" 
         .{ .spill_eax_rsp = .slot0 },
     }, machine.instructions.items);
 }
+
+test "generic cfg selector preserves every live GPR alias across a call" {
+    var machine = MachineFunction.init("call-gpr-aliases", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    const names = [_][]const u8{ "pointer", "bits", "narrow", "pair", "pair_alias" };
+    for (names) |name| try plan.interval_ends.put(name, 10);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    selector.stack_frame_bytes = 256;
+    try selector_state.bindValueLoc(&selector, "pointer", .{ .scratch64 = .rcx });
+    try selector_state.bindValueLoc(&selector, "bits", .{ .scratch64 = .rcx });
+    try selector_state.bindValueLoc(&selector, "narrow", .{ .scratch32 = .rcx });
+    try selector_state.bindValueLoc(&selector, "pair", .{ .scratch128 = .{ .lo = .rdi, .hi = .rsi } });
+    try selector_state.bindValueLoc(&selector, "pair_alias", .{ .scratch128 = .{ .lo = .rdi, .hi = .rsi } });
+    try std.testing.expect((try selector_state.spillLiveCallerClobbersForCall(&selector)) == null);
+    for (names[0..3]) |name| try std.testing.expect(selector_state.valueLoc(&selector, name).? == .spill64);
+    for (names[3..]) |name| try std.testing.expect(selector_state.valueLoc(&selector, name).? == .spill128);
+    try std.testing.expect(try selector_state.liveScalarNameInReg(&selector, .rcx) == null);
+    try std.testing.expect(try selector_state.livePairNameContainingReg(&selector, .rdi) == null);
+}

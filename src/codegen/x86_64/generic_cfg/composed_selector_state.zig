@@ -2483,10 +2483,10 @@ pub fn spillLiveCallerClobbersForCall(selector: *ComposedBlockSelector) !?Diagno
         }
     }
     for (selector_allocatable_regs) |reg| {
-        if (try livePairNameContainingReg(selector, reg)) |name| {
+        while (try livePairNameContainingReg(selector, reg)) |name| {
             if (try spillPairValue(selector, name)) |diagnostic| return diagnostic;
         }
-        if (try liveScalarNameInReg(selector, reg)) |name| {
+        while (try liveScalarNameInReg(selector, reg)) |name| {
             if (try spillValue(selector, name)) |diagnostic| return diagnostic;
         }
     }

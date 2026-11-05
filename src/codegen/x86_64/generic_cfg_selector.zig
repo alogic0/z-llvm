@@ -15,6 +15,7 @@ const switch_phi_edges = @import("generic_cfg/switch_phi_edges.zig");
 const word_pair_values = @import("generic_cfg/word_pair_values.zig");
 const word_pair_memory = @import("generic_cfg/word_pair_memory.zig");
 const padded_frame = @import("generic_cfg/padded_frame.zig");
+const stack_addresses = @import("generic_cfg/stack_addresses.zig");
 const global_memory = @import("generic_cfg/global_memory.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
@@ -89,6 +90,10 @@ pub fn tryLowerWithContext(
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try padded_frame.legalizeStorage(arena.allocator(), function, module_context)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
+    if (try stack_addresses.legalize(arena.allocator(), function, module_context)) |legalized| {
+        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try global_memory.legalize(arena.allocator(), function, module_context)) |legalized| {
