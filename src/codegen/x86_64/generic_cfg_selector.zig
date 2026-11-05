@@ -69,6 +69,11 @@ pub fn tryLowerWithContext(
         if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
+    if (try @import("generic_cfg/integer_forms.zig").legalize(arena.allocator(), function)) |legalized| {
+        if (!@import("generic_cfg/integer_forms.zig").requiresNormalization(function) and
+            try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
     if (try integer_intrinsics.legalize(arena.allocator(), function)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
@@ -280,6 +285,9 @@ fn tryOriginalComposedForm(
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
     inspected: SelectionResult,
 ) !bool {
+    // Earlier legalizers must not reuse a form that still has a known narrow
+    // shift error merely because another instruction can already be selected.
+    if (@import("generic_cfg/integer_forms.zig").requiresNormalization(function)) return false;
     switch (inspected) {
         .selected => return false,
         .unsupported => |diagnostic| switch (diagnostic) {

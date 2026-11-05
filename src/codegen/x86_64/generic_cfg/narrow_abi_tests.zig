@@ -142,7 +142,7 @@ test "narrow ABI retains unsupported extension call convention and intrinsic bou
         "%result = call i8 (i32, ...) @callee(i32 1)",
         "%result = call i8 @callee(i8 signext 1)",
         "%result = call i8 @callee(i8 zeroext 1)",
-        "%result = call i17 @callee()",
+        "%result = call i32 @callee()",
         "%result = call i8 @llvm.unknown.i8()",
     };
     for (calls) |call| {

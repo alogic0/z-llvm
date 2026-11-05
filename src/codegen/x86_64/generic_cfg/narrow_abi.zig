@@ -8,7 +8,7 @@ const helpers = @import("composed_helpers.zig");
 const carrier: ir.Type = .{ .int = 32 };
 
 fn narrow(ty: ir.Type) bool {
-    return ty == .int and ty.int > 0 and ty.int <= 16;
+    return ty == .int and ty.int > 0 and ty.int < 32;
 }
 
 fn advisory(attrs: ?[]const u8) bool {

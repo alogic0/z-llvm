@@ -59,7 +59,7 @@ fn wordValue(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Bas
     if (value == .null_value) return literal(allocator, function, block, serial, 64, 0);
     if (value == .int) {
         const mask = (@as(i128, 1) << @as(u7, @intCast(bits))) - 1;
-        const bias: i128 = if (signed and bits < 32) @as(i128, 1) << @as(u7, @intCast(bits - 1)) else 0;
+        const bias: i128 = if (signed and bits < wide) @as(i128, 1) << @as(u7, @intCast(bits - 1)) else 0;
         return literal(allocator, function, block, serial, wide, (value.int & mask) ^ bias);
     }
     var result = value;
@@ -76,7 +76,7 @@ fn wordValue(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Bas
         } } });
         result = .{ .named = name };
     }
-    if (ty == .ptr or bits < 32) {
+    if (ty == .ptr or bits < wide) {
         const name = try forms.temporary(allocator, function, serial);
         try block.instructions.append(allocator, .{ .result = name, .kind = .{ .cast = .{
             .op = if (ty == .ptr) .ptrtoint else .zext,
@@ -86,11 +86,11 @@ fn wordValue(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Bas
         } } });
         result = .{ .named = name };
     }
-    if (signed and bits < 32) {
+    if (signed and bits < wide) {
         const name = try forms.temporary(allocator, function, serial);
         try block.instructions.append(allocator, .{ .result = name, .kind = .{ .binary = .{
             .op = .xor,
-            .ty = .{ .int = 32 },
+            .ty = .{ .int = wide },
             .lhs = result,
             .rhs = .{ .int = @as(i128, 1) << @as(u7, @intCast(bits - 1)) },
         } } });
@@ -102,13 +102,23 @@ fn wordValue(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Bas
 // Preserve existing compares that explicitly inspect only the declared bits:
 // byte/halfword instructions, halfword normalization, and masked sign tests.
 // Other narrow paths may observe dirty upper bits left by a truncation alias.
-fn needsNarrowNormalization(cmp: ir.IcmpInst) bool {
-    if (cmp.samesign or cmp.operand_ty != .int or cmp.operand_ty.int == 0 or cmp.operand_ty.int >= 32)
+fn needsNarrowNormalization(function: ir.Function, cmp: ir.IcmpInst) bool {
+    if (cmp.samesign or cmp.operand_ty != .int or cmp.operand_ty.int == 0 or cmp.operand_ty.int > 64 or
+        cmp.operand_ty.int == 32 or cmp.operand_ty.int == 64)
         return false;
     const bits = cmp.operand_ty.int;
     if (cmp.lhs == .named) {
         if (cmp.rhs == .int) {
             const value = cmp.rhs.int;
+            // The dedicated i64-to-i52 cast masks the carrier before binding
+            // its result, so the existing zero test already sees only i52 bits.
+            if (bits == 52 and cmp.predicate == .eq and value == 0) {
+                for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+                    if (inst.removed or inst.result == null or !ir.identifiers.eql(inst.result.?, cmp.lhs.named) or inst.kind != .cast) continue;
+                    const cast = inst.kind.cast;
+                    if (cast.op == .trunc and cast.from_ty.eql(.{ .int = 64 }) and cast.to_ty.eql(.{ .int = 52 })) return false;
+                };
+            }
             if (cmp.predicate == .ne and value == 0 and (bits == 8 or bits == 16)) return false;
             if (cmp.predicate == .sgt and value == -1 and (bits == 6 or bits == 16)) return false;
             if (cmp.predicate == .slt and value == 0 and bits == 16) return false;
@@ -124,7 +134,7 @@ fn needsNarrowNormalization(cmp: ir.IcmpInst) bool {
 
 pub fn requiresNarrowNormalization(function: ir.Function) bool {
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
-        if (!inst.removed and inst.kind == .icmp and needsNarrowNormalization(inst.kind.icmp)) return true;
+        if (!inst.removed and inst.kind == .icmp and needsNarrowNormalization(function, inst.kind.icmp)) return true;
     };
     return false;
 }
@@ -143,7 +153,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 const pointer = cmp.operand_ty == .ptr;
                 const bits: u16 = if (pointer) 64 else if (cmp.operand_ty == .int) cmp.operand_ty.int else 0;
                 const signed = unsignedPredicate(cmp.predicate) != cmp.predicate;
-                const integer_form = !pointer and bits > 0 and (bits <= 32 or bits == 64) and
+                const integer_form = !pointer and bits > 0 and bits <= 64 and
                     validInteger(cmp.lhs, bits) and validInteger(cmp.rhs, bits);
                 const pointer_form = pointer and !signed and pointerValue(cmp.lhs) and pointerValue(cmp.rhs) and
                     addresses.supportsLayout(if (context) |ctx| ctx.target_datalayout else null);
@@ -151,13 +161,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                     (cmp.predicate != .ne or cmp.rhs != .null_value));
                 // Existing full-width named comparisons are already canonical.
                 // Preserve established null and nonnegative compare fast paths.
-                const needs_rewrite = pointer_needs_rewrite or (!pointer and (needsNarrowNormalization(cmp) or
+                const needs_rewrite = pointer_needs_rewrite or (!pointer and (needsNarrowNormalization(function, cmp) or
                     cmp.lhs == .int or
                     (cmp.rhs == .int and (cmp.rhs.int != 0 or cmp.predicate == .uge or (bits == 32 and cmp.predicate == .ule))) or
                     (cmp.predicate == .sge and !(bits == 32 and cmp.rhs.eql(.{ .int = 0 }))) or
                     cmp.predicate == .sle));
                 if (!cmp.samesign and (integer_form or pointer_form) and needs_rewrite and
-                    (pointer or bits >= 32 or needsNarrowNormalization(cmp)) and
+                    (pointer or bits >= 32 or needsNarrowNormalization(function, cmp)) and
                     (cmp.lhs == .named or cmp.rhs == .named))
                 {
                     if (cmp.lhs != .named and cmp.rhs == .named) {
@@ -171,7 +181,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                     cmp.lhs = lhs;
                     cmp.rhs = rhs;
                     cmp.operand_ty = .{ .int = if (bits <= 32) 32 else 64 };
-                    if (signed and bits < 32) cmp.predicate = unsignedPredicate(cmp.predicate);
+                    if (signed and bits != 32 and bits != 64) cmp.predicate = unsignedPredicate(cmp.predicate);
                     const invert = cmp.predicate == .sge or cmp.predicate == .sle;
                     if (invert) cmp.predicate = if (cmp.predicate == .sge) .slt else .sgt;
                     var comparison = inst;

@@ -6,6 +6,7 @@ comptime {
     _ = @import("codegen/x86_64/generic_cfg/address_flow_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/call_contracts_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/accumulator_store_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/integer_forms_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/narrow_abi_tests.zig");
     _ = @import("air_export_cache.zig");
     _ = @import("codegen/x86_64/symbol_address.zig");
