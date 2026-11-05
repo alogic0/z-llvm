@@ -545,7 +545,8 @@ pub fn tryLowerComposedBlockWithContextAndAddressDependencies(
         .ret => |ret| {
             if (try selector_cfg.lowerReturn(&composed, ret)) |diagnostic| return unsupported(diagnostic);
         },
-        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return unsupported(.{ .no_emitter = "composed-block-terminator-not-owned" }),
+        .@"unreachable" => try selector_state.emitEflagsInstruction(&composed, .ud2, .preserve),
+        .br, .condbr, .@"switch", .indirectbr => return unsupported(.{ .no_emitter = "composed-block-terminator-not-owned" }),
     }
     try selector_state.validateEflagsInstructions(&composed, machine.instructions.items[start_len..], start_len);
     return .selected;

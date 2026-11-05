@@ -9,6 +9,7 @@ const address_dependencies = @import("generic_cfg/composed_selector_address_depe
 const abi_legalization = @import("generic_cfg/abi_legalization.zig");
 const narrow_abi = @import("generic_cfg/narrow_abi.zig");
 const scalar_forms = @import("generic_cfg/scalar_forms.zig");
+const overflow_values = @import("generic_cfg/overflow_values.zig");
 const switch_phi_edges = @import("generic_cfg/switch_phi_edges.zig");
 const word_pair_values = @import("generic_cfg/word_pair_values.zig");
 const word_pair_memory = @import("generic_cfg/word_pair_memory.zig");
@@ -51,6 +52,9 @@ pub fn tryLowerWithContext(
     }
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
+    if (try overflow_values.legalize(arena.allocator(), function)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
     if (try scalar_forms.legalize(arena.allocator(), function)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }

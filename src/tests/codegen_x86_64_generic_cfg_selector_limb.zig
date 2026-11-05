@@ -16,6 +16,47 @@ fn expectComposedNearMissLoad(machine: codegen.x86_64.MachineFunction) !void {
     };
 }
 
+fn expectComposedNearMissArithmetic(output: codegen.x86_64.MachineFunction, multiply: bool) !void {
+    try std.testing.expectEqual(.composed_block, output.selection_owner);
+    for (output.instructions.items) |instruction| {
+        try std.testing.expect(instruction != .mulo_limb64_rdi_rsi_rdx_cl_r8w_al);
+    }
+    try codegen.x86_64.verifyFunction(output);
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, output);
+    defer std.testing.allocator.free(bytes);
+    const helper = [_]u8{ 0x89, 0xf8, 0x83, 0xc0, 0x07, 0xc1, 0xe8, 0x03, 0xc3 };
+    const memory = try std.posix.mmap(null, bytes.len + helper.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(memory);
+    @memcpy(memory[0..bytes.len], bytes);
+    @memcpy(memory[bytes.len..], &helper);
+    var offset: usize = 0;
+    var calls: usize = 0;
+    for (output.instructions.items) |instruction| {
+        if (instruction == .direct_call) {
+            try std.testing.expectEqualStrings("zig.target.intByteSize", instruction.direct_call.symbol);
+            std.mem.writeInt(i32, memory[offset + 1 ..][0..4], @intCast(bytes.len - offset - 5), .little);
+            calls += 1;
+        }
+        offset += mc.encoding.instructionSize(instruction);
+    }
+    try std.testing.expectEqual(@as(usize, 1), calls);
+    const run: *const fn (*u64, *const u64, *const u64, u64, u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+    const inputs = [_]u64{ 0, 1, 2, 65535, 0x80000000, 0xffffffff, 0x8000000000000000, std.math.maxInt(u64) };
+    for (inputs) |a| for (inputs) |b| {
+        if (multiply and (a > 0xffffffff or b > 0xffffffff)) continue;
+        // All products obey the source nuw promise. Their sum can overflow.
+        const x = if (multiply) a * b else a;
+        const y = if (multiply) x else b;
+        const expected = @addWithOverflow(x, y);
+        var guarded = [_]u64{ 0xa5a5a5a5a5a5a5a5, 0, 0xa5a5a5a5a5a5a5a5 };
+        const result = run(&guarded[1], &a, &b, 0, 64) & 1;
+        try std.testing.expectEqual(@as(u64, if (multiply) expected[1] else 0), result);
+        try std.testing.expectEqual(expected[0], guarded[1]);
+        try std.testing.expectEqual(@as(u64, 0xa5a5a5a5a5a5a5a5), guarded[0]);
+        try std.testing.expectEqual(guarded[0], guarded[2]);
+    };
+}
+
 fn expectInstruction(instructions: []const codegen.x86_64.Instruction, expected: codegen.x86_64.Instruction) !void {
     for (instructions) |instruction| {
         if (std.meta.eql(instruction, expected)) return;
@@ -120,7 +161,7 @@ test "generic cfg selector emits limb64 multiply envelope through opt-in selecto
     try std.testing.expectEqual(.mulo_limb64_rdi_rsi_rdx_cl_r8w_al, machine.instructions.items[0]);
 }
 
-test "generic cfg selector keeps limb64 multiply near miss fail-closed" {
+test "generic cfg selector lowers limb64 multiply near miss with composed scalar operations" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -150,11 +191,8 @@ test "generic cfg selector keeps limb64 multiply near miss fail-closed" {
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectComposedNearMissArithmetic(machine, true);
 }
 
 test "generic cfg selector emits limb64 byteswap envelope through opt-in selector" {
@@ -1303,7 +1341,7 @@ test "generic cfg selector emits limb64 overflow envelopes through opt-in select
     }
 }
 
-test "generic cfg selector keeps limb64 overflow near miss fail-closed" {
+test "generic cfg selector lowers limb64 overflow near miss with composed scalar operations" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -1331,11 +1369,8 @@ test "generic cfg selector keeps limb64 overflow near miss fail-closed" {
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectComposedNearMissArithmetic(machine, false);
 }
 
 test "generic cfg selector composes stack out-param direct call and i64 return" {

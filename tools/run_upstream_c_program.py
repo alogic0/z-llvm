@@ -46,6 +46,12 @@ def run_variadic_canary(runner, directory, zllvm, environment):
 
 
 MEMORY_CANARIES = {
+    "safe_scalar_forms": {
+        "prefix": "safe-scalar-forms", "fixture": "safe_scalar_forms",
+        "functions": {"safe_mask_32", "safe_mask_64", "safe_uadd_named", "safe_uadd_max", "safe_uadd_high", "safe_usub_named", "safe_usub_max", "safe_usub_high", "safe_null_eq", "safe_null_ne", "safe_ra_plain", "safe_ra_frame", "safe_unreachable_branch"},
+        "observations": 832,
+        "stdout": "safe-scalar-forms observations=832 masks=overflow=null=return-address=live=guards=preserved\n",
+    },
     "indirect_stack_calls": {
         "prefix": "indirect-stack-calls", "fixture": "indirect_stack_calls",
         "functions": {"calls_plain", "calls_loaded", "calls_returned", "calls_alias", "calls_pair", "calls_pointer", "calls_noargs", "calls_narrow_1", "calls_narrow_8", "calls_narrow_16", "calls_entry_7", "calls_out_7", "calls_entry_8", "calls_out_8", "calls_entry_9", "calls_out_9", "calls_entry_16", "calls_out_16", "calls_frame", "calls_sat32", "calls_sat64", "calls_sat_loaded", "calls_constant", "calls_entry_mixed", "calls_entry_branch", "calls_repeated"},
@@ -311,6 +317,7 @@ def main():
               "aggregate_storage_local_observations": 0, "aggregate_storage_reference_observations": 0,
               "scalar_forms_local_observations": 0, "scalar_forms_reference_observations": 0,
               "indirect_stack_calls_local_observations": 0, "indirect_stack_calls_reference_observations": 0,
+              "safe_scalar_forms_local_observations": 0, "safe_scalar_forms_reference_observations": 0,
               "module_dependencies_local_observations": 0, "module_dependencies_reference_observations": 0, "rows": []}
     try:
         if platform.system() != "Linux" or platform.machine() != "x86_64":
@@ -356,7 +363,7 @@ def main():
                            "array_stride.ll", "array_stride_driver.c", "module_dependencies.ll", "module_dependencies_driver.c",
                            "general_array_stride.ll", "general_array_stride_driver.c",
                            "rax_pointer_load.ll", "rax_pointer_load_driver.c",
-                           "constant_remainder.ll", "constant_remainder_driver.c", "narrow_abi.ll", "narrow_abi_driver.c", "aggregate_storage.ll", "aggregate_storage_driver.c", "scalar_forms.ll", "scalar_forms_driver.c", "indirect_stack_calls.ll", "indirect_stack_calls_driver.c")}})
+                           "constant_remainder.ll", "constant_remainder_driver.c", "narrow_abi.ll", "narrow_abi_driver.c", "aggregate_storage.ll", "aggregate_storage_driver.c", "scalar_forms.ll", "scalar_forms_driver.c", "indirect_stack_calls.ll", "indirect_stack_calls_driver.c", "safe_scalar_forms.ll", "safe_scalar_forms_driver.c")}})
         environment = {k: v for k, v in os.environ.items() if not k.startswith(("ZLLVM_", "ZIG_USE_ZLLVM"))}
         environment.update({"ZIG_LOCAL_CACHE_DIR": str(output / "frontend-cache"),
                             "ZIG_GLOBAL_CACHE_DIR": str(output / "global-cache")})
@@ -435,7 +442,7 @@ def main():
         print(f"summary integer-pointer-casts population=standalone-integer-pointer-casts routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['integer_pointer_local_observations']} reference_observations={report['integer_pointer_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary signed-nonnegative population=standalone-signed-nonnegative routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['signed_nonnegative_local_observations']} reference_observations={report['signed_nonnegative_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary type-layout-padding population=standalone-type-allocation-padding routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['type_layout_padding_local_observations']} reference_observations={report['type_layout_padding_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
-        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies", "bounded_frame", "general_array_stride", "rax_pointer_load", "constant_remainder", "narrow_abi", "aggregate_storage", "scalar_forms", "indirect_stack_calls"):
+        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies", "bounded_frame", "general_array_stride", "rax_pointer_load", "constant_remainder", "narrow_abi", "aggregate_storage", "scalar_forms", "indirect_stack_calls", "safe_scalar_forms"):
             extra = f" negative_controls={report.get('module_dependencies_negative_controls', 0)} environment_checks={report.get('module_dependencies_environment_checks', 0)}" if population == "module_dependencies" else ""
             print(f"summary {population.replace('_', '-')} population=standalone-{population.replace('_', '-')} routes=direct,release modes={report.get('program_modes', 0)} local_observations={report[population + '_local_observations']} reference_observations={report[population + '_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}{extra}")
         print(f"evidence: {output / 'report.json'}")

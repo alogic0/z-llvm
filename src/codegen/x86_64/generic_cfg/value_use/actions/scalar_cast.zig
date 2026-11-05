@@ -234,7 +234,9 @@ pub fn executeAccumulatorScalarCast(
         try failScalarCastForTest(Authority, transaction, .after_mask);
     } else if (action.from_bits < 32 or (action.from_bits == 52 and action.to_bits == 6)) {
         const shift: u5 = @intCast(if (action.from_bits == 52) action.to_bits else action.from_bits);
-        const mask = (@as(i32, 1) << shift) - 1;
+        // Build the bit pattern unsigned: shifting a signed 1 by 31 makes
+        // the following subtraction overflow in a safety-checked compiler.
+        const mask: i32 = @bitCast((@as(u32, 1) << shift) - 1);
         try selector_state.emitEflagsInstruction(
             transaction.selector,
             .{ .and_eax_imm32 = mask },

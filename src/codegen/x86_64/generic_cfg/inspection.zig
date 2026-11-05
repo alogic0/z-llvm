@@ -436,7 +436,7 @@ fn inspectExtractValue(extract: ir.ExtractValueInst) ?Diagnostic {
     return .{ .unsupported_value = "extractvalue-index" };
 }
 
-fn inspectTerminator(block: ir.BasicBlock, terminator: ir.Terminator) ?Diagnostic {
+fn inspectTerminator(_: ir.BasicBlock, terminator: ir.Terminator) ?Diagnostic {
     return switch (terminator) {
         .ret => |ret| if (isScalarReturnType(ret.ty)) null else .{ .unsupported_type = "ret" },
         .br => null,
@@ -446,7 +446,7 @@ fn inspectTerminator(block: ir.BasicBlock, terminator: ir.Terminator) ?Diagnosti
         },
         .@"switch" => .{ .unsupported_control_flow = "switch" },
         .indirectbr => .{ .unsupported_control_flow = "indirectbr" },
-        .@"unreachable" => if (blockEndsInTrap(block)) null else .{ .unsupported_control_flow = "unreachable" },
+        .@"unreachable" => null,
     };
 }
 

@@ -110,8 +110,8 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                 },
                 .icmp => |icmp| if (!icmp.samesign and
                     (icmp.predicate == .eq or icmp.predicate == .ne) and
-                    (icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })) and
-                    icmp.lhs == .int and icmp.rhs == .named)
+                    (((icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })) and icmp.lhs == .int) or
+                        (icmp.operand_ty == .ptr and icmp.lhs == .null_value)) and icmp.rhs == .named)
                 {
                     var comparison = inst;
                     comparison.kind.icmp.lhs = icmp.rhs;

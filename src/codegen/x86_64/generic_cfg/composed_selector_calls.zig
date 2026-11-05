@@ -93,6 +93,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.lifetime.start.p0") or std.mem.eql(u8, call.callee, "llvm.lifetime.end.p0")) return lowerLifetimeMarker(result, call);
     if (std.mem.eql(u8, call.callee, "llvm.assume")) return lowerAssume(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.trap")) return try lowerTrap(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.returnaddress")) return lowerReturnAddress(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f16")) return try lowerFpAbs(selector, result, call, 16);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f32")) return try lowerFpAbs(selector, result, call, 32);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f64")) return try lowerFpAbs(selector, result, call, 64);
@@ -245,6 +246,25 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         128 => try selector_state.bindFixedProductResult(selector, result_name),
         else => unreachable,
     };
+    return null;
+}
+
+fn lowerReturnAddress(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    const name = result orelse return .{ .unsupported_value = "composed-block-return-address-result" };
+    if (call.ret_ty != .ptr or call.args.items.len != 1 or call.args.items[0].attrs != null or
+        !call.args.items[0].ty.eql(.{ .int = 32 }) or !call.args.items[0].value.eql(.{ .int = 0 }) or
+        call.callee_value != null or call.callee_function_ty != null or call.inline_asm != null or call.raw_args != null or
+        call.operand_bundle != null or call.calling_conv != null or call.ret_attrs != null)
+        return .{ .no_emitter = "composed-block-return-address-form" };
+    try sysv_abi.rejectUnsupportedCallEnvelope(call);
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+    // The frame has a fixed size. Calls restore RSP before the next IR
+    // instruction, so its entry return address is at exactly this offset.
+    try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_rax = selector.stack_frame_bytes });
+    try transaction.define(name, .fullRax());
+    try transaction.commit();
     return null;
 }
 

@@ -538,6 +538,9 @@ pub fn emitCodegenModule(
                         selector_diagnostic_detail orelse "-",
                     },
                 );
+                // Selector diagnostics also write stderr directly. Finish this
+                // row before the next function can emit those diagnostics.
+                try stderr_writer.interface.flush();
                 continue;
             }
             try fatal(io, "codegen failed for function {s}: {any}\n", .{ function.name, err });
