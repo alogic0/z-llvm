@@ -13,6 +13,32 @@ const expect = std.testing.expect;
 const equal = std.testing.expectEqualStrings;
 const io = std.testing.io;
 const zero_hash = &@as([64]u8, @splat('0'));
+test "command logs preserve independent positional writers and final error trace" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const config = @import("test_options");
+    var runner = Runner.init(&f.c, f.directory);
+    const log_fixture = try f.c.join(&.{config.log_fixture});
+    const direct = try runner.run(&.{log_fixture}, try f.path("direct"), &f.c.env, .{});
+    try std.testing.expectEqual(@as(i64, 1), direct.code);
+    try equal("before\x00out\nafter\n", try f.c.read(try f.path("direct.stdout")));
+    const direct_err = try f.c.read(try f.path("direct.stderr"));
+    try expect(std.mem.startsWith(u8, direct_err, "diagnostic\nerror: IntentionalLogFailure\n"));
+    const merged = try runner.run(&.{ try f.c.join(&.{config.checked_runner}), "--output-root", f.directory, "merged", "--", log_fixture }, try f.path("checked"), &f.c.env, .{});
+    try std.testing.expectEqual(@as(i64, 1), merged.code);
+    const log = try f.c.read(try f.path("merged.log"));
+    try expect(std.mem.startsWith(u8, log, "before\x00out\ndiagnostic\nafter\nerror: IntentionalLogFailure\n"));
+}
+test "real program JSON summary preserves the prior success and failure log contract" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const success = try u.toValue(f.c.a, .{ .local_executions = 3, .matched_program_modes = 3, .reference_executions = 3, .status = "passed" });
+    try equal("{\"local_executions\": 3, \"matched_program_modes\": 3, \"reference_executions\": 3, \"status\": \"passed\"}", try @import("validation/program.zig").summaryJson(&f.c, success));
+    const blocked = try u.toValue(f.c.a, .{ .local_executions = 0, .matched_program_modes = 0, .reference_executions = 1, .status = "blocked" });
+    try equal("{\"local_executions\": 0, \"matched_program_modes\": 0, \"reference_executions\": 1, \"status\": \"blocked\"}", try @import("validation/program.zig").summaryJson(&f.c, blocked));
+}
 test "command wrapper preserves binary log, durable failure, cancellation and owned child cleanup" {
     var f: Fixture = undefined;
     try f.init();

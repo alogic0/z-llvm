@@ -73,6 +73,19 @@ pub const Context = struct {
         try std.Io.Dir.cwd().writeFile(c.io, .{ .sub_path = path, .data = bytes });
     }
 
+    /// Linux log descriptors append even when a child uses positional stdout/stderr
+    /// writers. Independent writers must not overwrite earlier diagnostics.
+    pub fn createLog(c: Context, path: []const u8, exclusive: bool) !std.Io.File {
+        const file = try std.Io.Dir.cwd().createFile(c.io, path, .{ .exclusive = exclusive });
+        errdefer file.close(c.io);
+        const linux = std.os.linux;
+        const flags = linux.fcntl(file.handle, linux.F.GETFL, 0);
+        if (linux.errno(flags) != .SUCCESS) return error.LogFlagsUnavailable;
+        const append = flags | @as(u32, @bitCast(linux.O{ .APPEND = true }));
+        if (linux.errno(linux.fcntl(file.handle, linux.F.SETFL, append)) != .SUCCESS) return error.LogAppendUnavailable;
+        return file;
+    }
+
     pub fn mkdir(c: Context, path: []const u8) !void {
         try std.Io.Dir.cwd().createDirPath(c.io, path);
     }

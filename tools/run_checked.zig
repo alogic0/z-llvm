@@ -28,7 +28,7 @@ fn run(c: *u.Context, args: []const []const u8) !i64 {
     const record_path = try c.join(&.{ output, try c.fmt("{s}.json", .{label}) });
     const log_path = try c.join(&.{ output, try c.fmt("{s}.log", .{label}) });
     if (u.exists(c.io, record_path) or u.exists(c.io, log_path)) return error.EvidenceAlreadyExists;
-    const log = try std.Io.Dir.cwd().createFile(c.io, log_path, .{ .exclusive = true });
+    const log = try c.createLog(log_path, true);
     defer log.close(c.io);
     const start = std.Io.Clock.awake.now(c.io);
     var record = u.object(c.a);

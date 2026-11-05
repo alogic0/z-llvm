@@ -6,6 +6,7 @@ and its accepted populations are unchanged. Shared process mechanics come from
 The [source ledger](../tools/vendor/README.md) records their revisions from the
 2026-11-03 inventory. Providers remain unchanged, and standalone `zig run`
 commands do not require another checkout at runtime.
+The validated host is x86-64 Linux, matching the existing execution gates.
 
 | Former Python role | Zig entry point / build step |
 | --- | --- |
@@ -51,6 +52,9 @@ space every two seconds. Labels beginning with `full-` additionally record raw
 and cached AIR inode/allocation samples using the command's explicit root
 arguments. The existing authoritative distribution runner continues to enforce
 startup and runtime disk reserves; this wrapper only observes them.
+Captured log descriptors use append mode so independent positional stdout or
+stderr writers cannot overwrite earlier diagnostics. The unchanged-program
+runner retains both the text summary and its original one-line JSON summary.
 
 ```sh
 zig run tools/run_checked.zig -- \

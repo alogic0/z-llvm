@@ -23,9 +23,9 @@ pub const Runner = struct {
         const c = r.context;
         const out_path = options.stdout_file orelse try c.fmt("{s}.stdout", .{stem});
         const err_path = try c.fmt("{s}.stderr", .{stem});
-        const out = try std.Io.Dir.cwd().createFile(c.io, out_path, .{});
+        const out = try c.createLog(out_path, false);
         defer out.close(c.io);
-        const err = try std.Io.Dir.cwd().createFile(c.io, err_path, .{});
+        const err = try c.createLog(err_path, false);
         defer err.close(c.io);
         const start = std.Io.Clock.awake.now(c.io);
         var outcome: []const u8 = "completed";

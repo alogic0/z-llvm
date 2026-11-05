@@ -152,6 +152,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     }) });
     validation_options.addOptionPath("checked_runner", checked_probe.getEmittedBin());
+    const log_fixture = b.addExecutable(.{ .name = "validation-log-fixture", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/validation/log_fixture.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    validation_options.addOptionPath("log_fixture", log_fixture.getEmittedBin());
     validation_options.addOption([]const u8, "workspace_root", std.Io.Dir.cwd().realPathFileAlloc(b.graph.io, ".", b.allocator) catch @panic("workspace path unavailable"));
     const real_policy_tests = b.addTest(.{ .root_module = b.createModule(.{
         .root_source_file = b.path("tools/validation_tests.zig"),

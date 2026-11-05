@@ -110,9 +110,20 @@ fn run(c: *u.Context, arguments: []const []const u8) !u8 {
         program,                                         (report.object.get("program_modes") orelse u.n(0)).integer, (try u.get(report, "reference_executions")).integer,
         (try u.get(report, "local_executions")).integer, (try u.get(report, "matched_program_modes")).integer,       @intFromBool(!passed),
     });
+    try c.print("{s}\n", .{try summaryJson(c, report)});
     try c.print("evidence: {s}/report.json\n", .{output});
     if (report.object.get("error")) |err| try std.Io.File.stderr().writeStreamingAll(c.io, try c.fmt("{s}\n", .{err.string}));
     return if (passed) 0 else 1;
+}
+
+pub fn summaryJson(c: *u.Context, report: u.Value) ![]const u8 {
+    // Preserve the original sorted, single-line JSON record used by full-log comparisons.
+    return c.fmt("{{\"local_executions\": {d}, \"matched_program_modes\": {d}, \"reference_executions\": {d}, \"status\": {s}}}", .{
+        (try u.get(report, "local_executions")).integer,
+        (try u.get(report, "matched_program_modes")).integer,
+        (try u.get(report, "reference_executions")).integer,
+        try std.json.Stringify.valueAlloc(c.a, try u.str(report, "status"), .{}),
+    });
 }
 
 fn execute(c: *u.Context, args: u.Args, output: []const u8, manifest_path: []const u8, runner: *Runner, report: *u.Value) !void {
