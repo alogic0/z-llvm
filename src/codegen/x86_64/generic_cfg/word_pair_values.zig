@@ -111,9 +111,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
     var names = Names.init(allocator);
     var serial: usize = 0;
     var extracts = false;
+    var stores = false;
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed) continue;
         if (inst.kind == .extractvalue and fields(inst.kind.extractvalue.aggregate_ty) != null) extracts = true;
+        if (inst.kind == .store and fields(inst.kind.store.ty) != null) stores = true;
         const ty = inst.resultType() orelse continue;
         if (fields(ty) == null) continue;
         const name = inst.result orelse return null;
@@ -136,7 +138,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         try values.put(name, ty);
         if (inst.kind != .insertvalue) try names.put(name, .{ try temporary(allocator, function, &serial), try temporary(allocator, function, &serial) });
     };
-    if (values.count() == 0 and !returning and !extracts) return null;
+    if (values.count() == 0 and !returning and !extracts and !stores) return null;
     var iterator = values.iterator();
     while (iterator.next()) |item| {
         for (function.blocks.items) |block| {

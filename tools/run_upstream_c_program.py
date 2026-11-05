@@ -46,6 +46,11 @@ def run_variadic_canary(runner, directory, zllvm, environment):
 
 
 MEMORY_CANARIES = {
+    "constant_pair": {
+        "prefix": "constant-pair", "fixture": "constant_pair",
+        "functions": {'constant_pair_ii_frame', 'constant_pair_pi_frame', 'constant_pair_ii_loaded', 'constant_pair_ii_argument', 'constant_pair_ip_argument', 'constant_pair_pi_argument', 'constant_pair_pp_frame', 'constant_pair_ip_loaded', 'constant_pair_pp_argument', 'constant_pair_pp_loaded', 'constant_pair_pi_loaded', 'constant_pair_ip_frame'},
+        "observations": 768, "stdout": 'constant-pair observations=768 fields=addresses=frames=live=guards=preserved\n',
+    },
     "integer_forms": {
         "prefix": "integer-forms", "fixture": "integer_forms",
         "functions": {
@@ -752,7 +757,7 @@ def main():
         print(f"summary integer-pointer-casts population=standalone-integer-pointer-casts routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['integer_pointer_local_observations']} reference_observations={report['integer_pointer_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary signed-nonnegative population=standalone-signed-nonnegative routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['signed_nonnegative_local_observations']} reference_observations={report['signed_nonnegative_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary type-layout-padding population=standalone-type-allocation-padding routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['type_layout_padding_local_observations']} reference_observations={report['type_layout_padding_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
-        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies", "bounded_frame", "general_array_stride", "rax_pointer_load", "constant_remainder", "narrow_abi", "aggregate_storage", "scalar_forms", "indirect_stack_calls", "safe_scalar_forms", "safe_comparisons", "bounded_storage", "stack_addresses", "checked_integers", "word_arithmetic", "switch_forms", "integer_intrinsics", "scalar_atomics", "pointer_flow", "address_flow", "call_contracts", "accumulator_store", "integer_forms"):
+        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies", "bounded_frame", "general_array_stride", "rax_pointer_load", "constant_remainder", "narrow_abi", "aggregate_storage", "scalar_forms", "indirect_stack_calls", "safe_scalar_forms", "safe_comparisons", "bounded_storage", "stack_addresses", "checked_integers", "word_arithmetic", "switch_forms", "integer_intrinsics", "scalar_atomics", "pointer_flow", "address_flow", "call_contracts", "accumulator_store", "integer_forms", "constant_pair"):
             extra = f" negative_controls={report.get('module_dependencies_negative_controls', 0)} environment_checks={report.get('module_dependencies_environment_checks', 0)}" if population == "module_dependencies" else ""
             if population == "bounded_storage":
                 extra += f" guard_checks={report['bounded_storage_guard_checks']}"
