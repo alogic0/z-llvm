@@ -1,5 +1,12 @@
 # Active direction
 
+Current action: stopped after the accepted arithmetic/hash slice, as requested.
+Do not resume the i65/i96 draft or another Fibonacci family without a new user
+request. The unchanged Safe program still has 46 emission failures; the first is
+`debug.writeCurrentStackTrace` / `inline-asm-call`. Fixed acceptance counters
+remain 100 lowered/emitted/linked and five executed functions per mode, with
+compiler-rt bypass ratchet 130.
+
 The [architecture refactor plan](roadmap/architecture_refactor_plan.md) is
 complete for its bounded scope: four refactors, the memset shared-lowering
 capability, the correctness checkpoint and the
@@ -41,7 +48,36 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [atomic, pointer, frame and call checkpoint](evidence/fibonacci_state_acceptance_20261105.json)
+The accepted [integer arithmetic and hash checkpoint](evidence/fibonacci_arithmetic_acceptance_20261105.json)
+at `9a8cc1c9` passes all 17 integration stages. Accumulator-address stores,
+narrow integer normalization and ABI carriers, constant two-word stores, and
+bounded i128 arithmetic preserve values and live operands. Reusing generated
+scalar words closes the unchanged `Wyhash.hash` and `Wyhash.init` emission rows.
+Immediate arithmetic and shifts now preserve live RCX sources and aliases in
+both typed and production dispatch; executable regression and rollback checks
+cover the repair. The i16 integration oracle now accounts for truncation before
+the reverse shift, with LLVM and local execution agreeing on `0x0234`.
+Native fixture accounting and provenance derive from the shared registry.
+
+All 1,862 unit tests, 13 structural checks, 38 captured objects, readiness and
+frozen executable canaries pass. The four added native populations check
+162,816 local observations against 81,408 LLVM references in all three modes.
+All 35 native populations and the unchanged 100-row/five-function cohort pass.
+Minimum free space is 35.46 GB, above the unchanged 24.36 GB reserve.
+The [focused evidence](evidence/fibonacci_arithmetic_focused_20261105.json)
+retains component mutation controls, both earlier integration failures and
+their fixes, exact source identities, and the native `Wyhash.init` check.
+
+Unchanged pinned Fibonacci executes all six assertions in Fast and Small with
+LLVM-equivalent exit status, stdout and stderr. Safe emits 1,522 of 1,568
+functions; 46 failures still prevent whole-program emission and execution.
+The first is `debug.writeCurrentStackTrace` / `inline-asm-call`.
+The broader i65/i96 work remains an uncommitted diagnostic draft under
+`local-state/worktrees/fibonacci-crash-investigation`; it is excluded from this
+acceptance. The thirteen original scratch probes remain unchanged; no archives
+were made. Work is stopped after this slice at the user's request.
+
+The earlier accepted [atomic, pointer, frame and call checkpoint](evidence/fibonacci_state_acceptance_20261105.json)
 at `4242debd` passes all 17 integration stages. Scalar atomics preserve old
 values and compare-exchange success flags. Pointer and two-word values retain
 symbols and layout, and boolean branches consume the low bit even when upper
@@ -552,8 +588,10 @@ The [constant remainder checkpoint](evidence/constant_remainder_acceptance_20261
 accepts that bounded unsigned operation. The unchanged capture now reaches
 `composed-block-call-arg-width`; all 24 function failures remain tracked.
 
-The user authorized implementation of the complete Fibonacci plan. Continue
-through these steps without stopping for another task-selection approval:
+The user's latest instruction is to finish the current slice and stop. The
+arithmetic/hash slice is finished and recorded above; no further slice is active.
+The earlier authorization to continue automatically is superseded. The remaining
+plan below is retained for a future user request:
 
 1. Narrow call arguments/returns, boolean parameter handling and the main
    function's call-preservation frame are accepted at the checkpoint above.

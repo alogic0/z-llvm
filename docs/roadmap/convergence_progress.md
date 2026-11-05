@@ -4496,6 +4496,15 @@ One line per completed cycle, append-only, newest last. This is the
   `docs/evidence/inbox59_would_remove.tsv`, and
   `docs/evidence/inbox59_report_only_fixture.summary`.
 
+- 2026-11-05 (arithmetic/hash slice, `9a8cc1c9`) Accepted accumulator-address
+  stores, narrow integer normalization, constant pairs, bounded i128 arithmetic,
+  scalar-word reuse, and live-RCX preservation. All 17 integration gates, 1,862
+  unit tests, 35 native populations and unchanged 100/5 cohorts pass. Fast and
+  Small execute unchanged Fibonacci; Safe remains at 1,522/1,568 emitted with
+  46 failures, so no three-mode completion is claimed. The i65/i96 draft remains
+  uncommitted. Work stopped at the user's request. Evidence:
+  `docs/evidence/fibonacci_arithmetic_acceptance_20261105.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4503,7 +4512,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `4242debdacb0a3c3eee8fcf3827c783f873dc00e`; tree: `3d4d4bc4df149233b2eb207666ff9f0549b82449`.
+Accepted revision: `9a8cc1c94374ee05fe87a56a954b51280e375038`; tree: `5187a5c7ebed819c08aa46551d0c480f1b1e1597`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

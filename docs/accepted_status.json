@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "4242debdacb0a3c3eee8fcf3827c783f873dc00e",
-  "accepted_tree": "3d4d4bc4df149233b2eb207666ff9f0549b82449",
+  "accepted_revision": "9a8cc1c94374ee05fe87a56a954b51280e375038",
+  "accepted_tree": "5187a5c7ebed819c08aa46551d0c480f1b1e1597",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 5,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "4242debd",
+  "declaration_revision": "9a8cc1c9",
   "evidence": [
+    "docs/evidence/fibonacci_arithmetic_acceptance_20261105.json",
+    "docs/evidence/fibonacci_arithmetic_20261105_cached.summary",
     "docs/evidence/fibonacci_state_acceptance_20261105.json",
     "docs/evidence/fibonacci_state_20261105_cached.summary",
     "docs/evidence/fibonacci_intrinsics_acceptance_20261105.json",

@@ -350,6 +350,19 @@ clobbering calls and guarded memory. Per-component mutation controls and the
 confirmed dirty-upper-bit boolean regression accompany the native evidence.
 Safe Fibonacci whole-program execution remains open.
 
+The accepted [integer arithmetic and hash canaries](evidence/fibonacci_arithmetic_acceptance_20261105.json)
+add four separate mandatory populations: 9,216 accumulator-store, 78,336
+integer-form, 4,608 constant-pair and 70,656 pair-arithmetic local observations,
+each with half as many LLVM references across all three modes. Pair arithmetic
+includes the stored-low-word/named-shift-count reuse case. Native tests cover live
+RCX sources and aliases in both typed and production dispatch; transaction tests
+also verify rollback.
+Population counters, fixture hashes and summaries come from the native registry;
+its failure-path control retains the original error with all counters present.
+The corrected i16 truncation oracle is independently checked against LLVM.
+Safe Fibonacci whole-program execution remains open; the i65/i96 draft is not
+part of this acceptance.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

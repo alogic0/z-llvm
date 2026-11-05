@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `4242debdacb0a3c3eee8fcf3827c783f873dc00e`; tree: `3d4d4bc4df149233b2eb207666ff9f0549b82449`.
+Accepted revision: `9a8cc1c94374ee05fe87a56a954b51280e375038`; tree: `5187a5c7ebed819c08aa46551d0c480f1b1e1597`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,36 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [atomic, pointer, frame and call checkpoint](evidence/fibonacci_state_acceptance_20261105.json)
+The accepted [integer arithmetic and hash checkpoint](evidence/fibonacci_arithmetic_acceptance_20261105.json)
+at `9a8cc1c9` passes all 17 integration stages. Accumulator-address stores,
+narrow integer normalization and ABI carriers, constant two-word stores, and
+bounded i128 arithmetic preserve values and live operands. Reusing generated
+scalar words closes the unchanged `Wyhash.hash` and `Wyhash.init` emission rows.
+Immediate arithmetic and shifts now preserve live RCX sources and aliases in
+both typed and production dispatch; executable regression and rollback checks
+cover the repair. The i16 integration oracle now accounts for truncation before
+the reverse shift, with LLVM and local execution agreeing on `0x0234`.
+Native fixture accounting and provenance derive from the shared registry.
+
+All 1,862 unit tests, 13 structural checks, 38 captured objects, readiness and
+frozen executable canaries pass. The four added native populations check
+162,816 local observations against 81,408 LLVM references in all three modes.
+All 35 native populations and the unchanged 100-row/five-function cohort pass.
+Minimum free space is 35.46 GB, above the unchanged 24.36 GB reserve.
+The [focused evidence](evidence/fibonacci_arithmetic_focused_20261105.json)
+retains component mutation controls, both earlier integration failures and
+their fixes, exact source identities, and the native `Wyhash.init` check.
+
+Unchanged pinned Fibonacci executes all six assertions in Fast and Small with
+LLVM-equivalent exit status, stdout and stderr. Safe emits 1,522 of 1,568
+functions; 46 failures still prevent whole-program emission and execution.
+The first is `debug.writeCurrentStackTrace` / `inline-asm-call`.
+The broader i65/i96 work remains an uncommitted diagnostic draft under
+`local-state/worktrees/fibonacci-crash-investigation`; it is excluded from this
+acceptance. The thirteen original scratch probes remain unchanged; no archives
+were made. Work is stopped after this slice at the user's request.
+
+The earlier accepted [atomic, pointer, frame and call checkpoint](evidence/fibonacci_state_acceptance_20261105.json)
 at `4242debd` passes all 17 integration stages. Scalar atomics preserve old
 values and compare-exchange success flags. Pointer and two-word values retain
 symbols and layout, and boolean branches consume the low bit even when upper

@@ -1,0 +1,1101 @@
+{
+  "schema": 1,
+  "status": "accepted by full integration",
+  "recorded_utc": "2026-11-05T18:07:15.121733+00:00",
+  "source_revision": "9a8cc1c94374ee05fe87a56a954b51280e375038",
+  "source_tree": "5187a5c7ebed819c08aa46551d0c480f1b1e1597",
+  "source_sha256": {
+    "src/codegen/x86_64/generic_cfg/accumulator_store_tests.zig": "d4047a667cca792d8c609d1a79b6f5e4dff389a4fa59cf4b184ab407c6cf1aa0",
+    "src/codegen/x86_64/generic_cfg/comparison_forms.zig": "089cc9484d325a10c2b4474ae0c786a729e869a64fb24b3eff73999619826c4d",
+    "src/codegen/x86_64/generic_cfg/composed_selector_scalar.zig": "a5428274ac9b61bfbaa6b42f9e1f3960084c08141fe19fadd457e52639525d9e",
+    "src/codegen/x86_64/generic_cfg/constant_pair_tests.zig": "2442f61438119f43a6e78b3de8b411d831b86ecd5c87cd57a2edba057dbb9513",
+    "src/codegen/x86_64/generic_cfg/integer_forms.zig": "194e4b05b8bf83a08e1f8601b36ec0abb75ac3260ec91f1a57d3e008a478d976",
+    "src/codegen/x86_64/generic_cfg/integer_forms_tests.zig": "25b5e7ffcfa49aeb22c78e943eb3fb58fee21158ceff6e900075ddd9e10fa6dd",
+    "src/codegen/x86_64/generic_cfg/narrow_abi.zig": "c14845c2905866227573974317a86441291fba9f6b8fc34e61f9114e4bbbb9bf",
+    "src/codegen/x86_64/generic_cfg/narrow_abi_tests.zig": "2c182683c4b8d1f5be1e201e7a5e16716b71d7353af78b61d37c0bdeb27f025b",
+    "src/codegen/x86_64/generic_cfg/pair_arithmetic.zig": "14bc9c394c9c91e3f84c18079c0250dc7b5f6797a3d2e5ebfa414af69e9bc598",
+    "src/codegen/x86_64/generic_cfg/pair_arithmetic_tests.zig": "cfb103f3e71db3ef9cc419e6a607fe9a47ba61ce7e10c5bbfdc89ce4975ede19",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/address_memory.zig": "eb7e08210ce26ea126960ccd0f46f27d8316b85f13550db560889ea77539ab24",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate.zig": "e65f73c3e7529d70418a54c6508ff35942d5da755a0f3da6e4eee2654b621621",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate_tests.zig": "47fd3078b89d872592602ea6a0f4ad962ad07f528fce84684d3ddf713fd66e1f",
+    "src/codegen/x86_64/generic_cfg/value_use/core.zig": "bb9a50a2af37fd6a07700ab2b680f86ec124f649b7873edd9e706b64f7096cf5",
+    "src/codegen/x86_64/generic_cfg/value_use/core_architecture_proof_tests.zig": "d4022724336c49a9284fce9477f77b75514f2de7b923bf0755e804c9f7d54723",
+    "src/codegen/x86_64/generic_cfg/value_use/model.zig": "1c7a9a95fad66ce6bfb12015992b70f4963bca3f19d6906d74143c718ff99f24",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/compatibility.zig": "94be74ba59a2793726ddc308dc7b047cc7d71635a9b30f9e1fd55c19e4ded3c5",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/physical_mapping.zig": "a46a34921cb708e50331dc25420ee9d4a869606741fd80488fccb8e725b0da98",
+    "src/codegen/x86_64/generic_cfg/word_pair_values.zig": "e477044a7997332cd3382bee23e0cd577f986dd317cff879d0bf1b0e0936cdb3",
+    "src/codegen/x86_64/generic_cfg_selector.zig": "7907dac8a64f6c97b14a2d2d873ac0947f412c72c9b13b29ce3687284341efde",
+    "src/tests.zig": "679e5ea4ecb8c66ed056050e3aaacf5a07845d741a43d655182464f677b3428e",
+    "src/tests/codegen_x86_64_generic_cfg_selector_planning.zig": "062f8347653ee6fdb84948578f81a76164a2e35ad2a3729bf91e256f91951f46",
+    "test/real_programs/accumulator_store.ll": "655ce3a39bab6974051e9352fc22fcafd6d2eb2cbaa6ba95678812584fa381f3",
+    "test/real_programs/accumulator_store_driver.c": "a614568e537b64d819d554c16d45c0d20e51fd3224d6350e093255558f263cbc",
+    "test/real_programs/constant_pair.ll": "0dad3edfa1fb28f156a6e5de7e05e96b8d9678974811b97ae81546679362bdd5",
+    "test/real_programs/constant_pair_driver.c": "f23306252dbbbd26a14963f64c35852ae34ebbf53429078ddff2f4144fcbabad",
+    "test/real_programs/integer_forms.ll": "18e800ea314dd398f94ea146d59022c864d6c57313055f1b525ad0310b2aabbb",
+    "test/real_programs/integer_forms_driver.c": "82115ae163432d6919f08b27fbe38ca284b22887e6628ebdd1ddce81b5109b68",
+    "test/real_programs/pair_arithmetic.ll": "b788760938b099772fbe98009c2c9189dbf009c97bbf947da11b80baa07dfa22",
+    "test/real_programs/pair_arithmetic_driver.c": "e8c5e8aeb4c715452b91cd36c1e631f91d7f229a0e3c3625fe4ca752c1258162",
+    "test/zig/integrated/compiler_rt_i128_arithmetic_start.zig": "2b6bdf9efbda2a70ee0e2b583a3b3191535dd0dcbafaec23d01cf9ded3814d86",
+    "tools/run_upstream_c_program.py": "b1c79da11d50077ef112ea28d50401bafc530e80cbbd0d0f22551f823cf5f3d8"
+  },
+  "behavior": [
+    "Accumulator-address stores preserve live address and value aliases; the mandatory native fixture exercises widths, calls, and guarded memory.",
+    "Narrow integer operations normalize significant bits and signed shifts correctly, including ABI carriers, while preserving the original input IR.",
+    "Constant i128 pair stores preserve both words and adjacent memory.",
+    "Bounded i128 arithmetic, comparisons, shifts and constant division/remainder lower through scalar word operations. Reusing generated words closes the unchanged Wyhash.hash and Wyhash.init emission rows.",
+    "Immediate arithmetic and arithmetic shifts preserve live RCX sources and aliases in both typed and production dispatch. Rollback restores selector state.",
+    "The i16 integration oracle accounts for truncation before the reverse shift; LLVM and both local routes agree on 0x0234 for (0x1234 << 4) >> 4.",
+    "Native fixture counters, provenance hashes, and summaries derive from the shared population registry. The production runner passes all 35 populations; its failure path preserves the original error.",
+    "The unchanged pinned upstream Fibonacci program executes all six assertions in ReleaseFast and ReleaseSmall with LLVM-equivalent exit status, stdout and stderr."
+  ],
+  "known_boundaries": [
+    "ReleaseSafe whole-program emission remains incomplete: 1522 of 1568 functions emit and 46 fail. No Safe local object, execution, or three-mode Fibonacci completion is claimed.",
+    "The i65/i96 implementation in local-state/worktrees/fibonacci-crash-investigation is an uncommitted diagnostic draft, excluded from this accepted source and scope.",
+    "The user requested finishing this slice and stopping. No further implementation is authorized by historical continue directives; remaining work is recorded for a future request."
+  ],
+  "validation": {
+    "combined_tier2": {
+      "status": "Tier 2 passed; full Tier 3 pending",
+      "source_snapshot": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-tier2-sources.json",
+        "sha256": "c98d3de86d11dfcc2c729cbc626baf69dfea1c8321388886d823f0938bdeffe7"
+      },
+      "source_files_verified": 1593,
+      "compiler_sha256": "b5286962bf61883ec6837c07db5c85df38151414dcec8613a70cf6fa8cd67261",
+      "checks": [
+        {
+          "argv": [
+            "/home/oleg/.zig/0.17.0/files/zig",
+            "build"
+          ],
+          "returncode": 0,
+          "wall_ns": 1972011201,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-build.json",
+            "sha256": "26677b49ef9b745477b4a65fdf6575c8a81a9d1585994a2cfe62a71226db5067"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-build.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "argv": [
+            "/home/oleg/.zig/0.17.0/files/zig",
+            "build",
+            "test-unit",
+            "--summary",
+            "all"
+          ],
+          "returncode": 0,
+          "wall_ns": 19096592923,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-units.json",
+            "sha256": "b1ec59c038f940d8e934b8552c38ac8aa1d739eb294e2bb3dc8d1f858621489b"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-units.log",
+            "sha256": "05c0e8ccb941819067d949d4571873868ccd5b5d9c9b56f869ab4ca42750ec35"
+          }
+        },
+        {
+          "argv": [
+            "env",
+            "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+            "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+            "/home/oleg/.zig/0.17.0/files/zig",
+            "build",
+            "readiness",
+            "--summary",
+            "all"
+          ],
+          "returncode": 0,
+          "wall_ns": 426085407931,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-readiness.json",
+            "sha256": "e79229ae95dd23248a45414a71aa1ff2557af048cfe998a3bdfef335ee9baba2"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-readiness.log",
+            "sha256": "0bf7b825f495c9e401f725ebaa0c2344f51af2e3008e05b7b98e7011c4976ea1"
+          }
+        },
+        {
+          "argv": [
+            "/home/oleg/.zig/0.17.0/files/zig",
+            "build",
+            "structural-smoke",
+            "--summary",
+            "all"
+          ],
+          "returncode": 0,
+          "wall_ns": 389636274,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-structural.json",
+            "sha256": "b1a61610a6cce50c072e2b9172ce4d62cd74e0cea1e400f1ef15a03c5fe74b95"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-structural.log",
+            "sha256": "77bc5cc2a318e7d4d70748aff1188faa02c83c9e564c22de0ea10038b2d6adfc"
+          }
+        },
+        {
+          "argv": [
+            "/home/oleg/.zig/0.17.0/files/zig",
+            "build",
+            "distribution-object",
+            "--summary",
+            "all"
+          ],
+          "returncode": 0,
+          "wall_ns": 5014193676,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-captured.json",
+            "sha256": "9dfd0230b1896f27b6f8af5039a07dccdaacac6bdc8da2e63ba23fe40ce043d5"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-captured.log",
+            "sha256": "99bf1dcd433a7ae9b1b1e5ece6c77f4c371b97ebd5aac2640cbe11c147de6d5c"
+          }
+        },
+        {
+          "argv": [
+            "env",
+            "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+            "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+            "/home/oleg/.zig/0.17.0/files/zig",
+            "run",
+            "tools/run_focused_codegen_canaries.zig"
+          ],
+          "returncode": 0,
+          "wall_ns": 777462819,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-canaries.json",
+            "sha256": "75d06a7763343cebcb4ae0a31146b9cf2a4745695be3ae8e3efb492ff59ac979"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-canaries.log",
+            "sha256": "6d7381be6229ccea728310b5dbf1882a87d96eb11442182d8edbbdc11d806cc1"
+          }
+        },
+        {
+          "argv": [
+            "/usr/bin/python3",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/reproduce_i128.py",
+            "arithmetic-slice-i128"
+          ],
+          "returncode": 0,
+          "wall_ns": 3651466358,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-i128.json",
+            "sha256": "1870f2002a1be8023f4a10eade0dbbad543f4a307382ddec55ab6de79202b0f9"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-i128.log",
+            "sha256": "c0ca90d22d2b40be11f77b06a45a67591d1dc0b778e636b0189d0697b30709f9"
+          }
+        },
+        {
+          "argv": [
+            "/usr/bin/python3",
+            "tools/run_upstream_c_program.py",
+            "--output-root",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-upstream-c",
+            "--zig-source",
+            "/home/oleg/prog/ziglang",
+            "--zig-emitter",
+            "/home/oleg/prog/ziglang/build/stage4/bin/zig"
+          ],
+          "returncode": 0,
+          "wall_ns": 384474818729,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-upstream-c.json",
+            "sha256": "7f14066121d87e3989796ec2349fd1bf305b0921864f42c98af968a92754ab06"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-upstream-c.log",
+            "sha256": "aa102b66a756c071a2cefd9aaa43007ac203eecbf3335c789b88e958ecd42edb"
+          }
+        },
+        {
+          "argv": [
+            "/usr/bin/python3",
+            "tools/run_real_program.py",
+            "--output-root",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-fast-program",
+            "--zig-source",
+            "/home/oleg/prog/ziglang",
+            "--zig-emitter",
+            "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+            "--manifest",
+            "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+            "--mode",
+            "ReleaseFast",
+            "--codegen-reachable"
+          ],
+          "returncode": 0,
+          "wall_ns": 2316434743,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-fast-program.json",
+            "sha256": "e1565f450d7cc46a7b6edc74f6ddfcf82a953725ac2c4411b482c86b4d7ed31d"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-fast-program.log",
+            "sha256": "c85eb5f15f83ba957832072fa785107b350eac5f2dd24b3e93bc98466883ff0a"
+          }
+        },
+        {
+          "argv": [
+            "/usr/bin/python3",
+            "tools/run_real_program.py",
+            "--output-root",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-small-program",
+            "--zig-source",
+            "/home/oleg/prog/ziglang",
+            "--zig-emitter",
+            "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+            "--manifest",
+            "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+            "--mode",
+            "ReleaseSmall",
+            "--codegen-reachable"
+          ],
+          "returncode": 0,
+          "wall_ns": 1952812763,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-small-program.json",
+            "sha256": "4e5cf16c50f9bce248e67d2b9089d9ce71efac90023bcc976bff891b68be3bee"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-small-program.log",
+            "sha256": "23517c21f3ef3741a2655e7360c638caa4322ec068f66f447687e949c25a1561"
+          }
+        },
+        {
+          "argv": [
+            "/usr/bin/python3",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_safe.py",
+            "arithmetic-slice-frontier",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-compiler"
+          ],
+          "returncode": 0,
+          "wall_ns": 255810002669,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-safe-check.json",
+            "sha256": "b81fd73af873b5c43a3662808ba2fc97437bfdbab18ee9d7c5a5cb111a44d8f2"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-safe-check.log",
+            "sha256": "7bc088670b3920e03f76201b9d83be22058e047bbc77724b90022d8a237635de"
+          }
+        },
+        {
+          "argv": [
+            "python3",
+            "local-state/validations/fibonacci-20261104/run_arithmetic_slice_tier2.py"
+          ],
+          "returncode": 0,
+          "wall_ns": 1101978838459,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-tier2.json",
+            "sha256": "1baffd794bc4ba4fddd752dfbcf7edc66e3dae77e822e0350c59bccb04a20eb7"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-tier2.log",
+            "sha256": "6fdbb692090b985cabe753b0d8072de082a64e1a6d54d728a989a7297d382204"
+          }
+        },
+        {
+          "argv": [
+            "/home/oleg/.zig/0.17.0/files/zig",
+            "build",
+            "test-unit",
+            "-Doptimize=ReleaseFast",
+            "-Dtest-filter=value-use immediate",
+            "--summary",
+            "all"
+          ],
+          "returncode": 0,
+          "wall_ns": 35914726870,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/rcx-preservation-ReleaseFast.json",
+            "sha256": "f088f2d72a478ccaddddb91a6621872a5dd640a0df477b9d992c0ce00472ad9c"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/rcx-preservation-ReleaseFast.log",
+            "sha256": "b733857bd267778da65a6ae033b8590724ec2db4f01471bb618b1e246336099d"
+          }
+        },
+        {
+          "argv": [
+            "/home/oleg/.zig/0.17.0/files/zig",
+            "build",
+            "test-unit",
+            "-Doptimize=ReleaseSafe",
+            "-Dtest-filter=value-use immediate",
+            "--summary",
+            "all"
+          ],
+          "returncode": 0,
+          "wall_ns": 24476274510,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/rcx-preservation-ReleaseSafe.json",
+            "sha256": "b1b698b2652da5fb700f912132e926604ae0f58d8c9c11912b822a5af20057b0"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/rcx-preservation-ReleaseSafe.log",
+            "sha256": "86017287317d3b1173444e5044addf43ad8fdbaae0ad19a63b2166cdfd84af06"
+          }
+        },
+        {
+          "argv": [
+            "/home/oleg/.zig/0.17.0/files/zig",
+            "build",
+            "test-unit",
+            "-Doptimize=ReleaseSmall",
+            "-Dtest-filter=value-use immediate",
+            "--summary",
+            "all"
+          ],
+          "returncode": 0,
+          "wall_ns": 7829592258,
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/rcx-preservation-ReleaseSmall.json",
+            "sha256": "0614aa3c0181b8f9b95ca1af1617b89338c7981d03e3c265ee49afe370239446"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/rcx-preservation-ReleaseSmall.log",
+            "sha256": "6cf304a0f41e5a5f23d5f995f636a3aa989acc7e2404cfaffad68cb56177e1c9"
+          }
+        }
+      ],
+      "unit_count": 1862,
+      "structural_tests": 13,
+      "captured_objects": 38,
+      "rcx_focused_tests_per_mode": 28,
+      "rcx_native_observations_per_test_run": 96,
+      "rcx_before_fix_controls": [
+        {
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/rcx-shift-before.json",
+            "sha256": "e9b129c5973713fb3323daf3ebe0e82d996c2912f6b339150e71f65792c125de"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/rcx-shift-before.log",
+            "sha256": "f7560082c8cc2484020e83df968a9b3ecddf13f9ae6e17040660f24a5aac17ac"
+          }
+        },
+        {
+          "record": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/rcx-shift-dispatch-before.json",
+            "sha256": "27107b5626a3fbf1f2d7a9f47af22b4cadc7f24cdb29a3e49fed2fd5306fbe77"
+          },
+          "log": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/rcx-shift-dispatch-before.log",
+            "sha256": "6353494acbeee20c99b3fc3899526ae28c3a0e91dbc2ccf0955e42374e433b9b"
+          }
+        }
+      ],
+      "native_report": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-upstream-c/report.json",
+        "sha256": "ed95f95e319e8ef1496db46fe6f4901eb57360c738ab5fd2695d33b5a9649fd2"
+      },
+      "native_populations": {
+        "pair_arithmetic": {
+          "local_observations": 70656,
+          "reference_observations": 35328
+        },
+        "constant_pair": {
+          "local_observations": 4608,
+          "reference_observations": 2304
+        },
+        "integer_forms": {
+          "local_observations": 78336,
+          "reference_observations": 39168
+        },
+        "accumulator_store": {
+          "local_observations": 9216,
+          "reference_observations": 4608
+        },
+        "call_contracts": {
+          "local_observations": 17664,
+          "reference_observations": 8832
+        },
+        "address_flow": {
+          "local_observations": 14208,
+          "reference_observations": 7104
+        },
+        "pointer_flow": {
+          "local_observations": 9216,
+          "reference_observations": 4608
+        },
+        "scalar_atomics": {
+          "local_observations": 112908,
+          "reference_observations": 56454
+        },
+        "integer_intrinsics": {
+          "local_observations": 87552,
+          "reference_observations": 43776
+        },
+        "switch_forms": {
+          "local_observations": 26112,
+          "reference_observations": 13056
+        },
+        "word_arithmetic": {
+          "local_observations": 29568,
+          "reference_observations": 14784
+        },
+        "checked_integers": {
+          "local_observations": 46464,
+          "reference_observations": 23232
+        },
+        "stack_addresses": {
+          "local_observations": 3456,
+          "reference_observations": 1728
+        },
+        "bounded_storage": {
+          "local_observations": 5760,
+          "reference_observations": 2880
+        },
+        "safe_comparisons": {
+          "local_observations": 17664,
+          "reference_observations": 8832
+        },
+        "safe_scalar_forms": {
+          "local_observations": 4992,
+          "reference_observations": 2496
+        },
+        "indirect_stack_calls": {
+          "local_observations": 9984,
+          "reference_observations": 4992
+        },
+        "scalar_forms": {
+          "local_observations": 3840,
+          "reference_observations": 1920
+        },
+        "aggregate_storage": {
+          "local_observations": 4608,
+          "reference_observations": 2304
+        },
+        "narrow_abi": {
+          "local_observations": 4992,
+          "reference_observations": 2496
+        },
+        "constant_remainder": {
+          "local_observations": 3072,
+          "reference_observations": 1536
+        },
+        "rax_pointer_load": {
+          "local_observations": 2688,
+          "reference_observations": 1344
+        },
+        "general_array_stride": {
+          "local_observations": 1920,
+          "reference_observations": 960
+        },
+        "bounded_frame": {
+          "local_observations": 768,
+          "reference_observations": 384
+        },
+        "module_dependencies": {
+          "local_observations": 330,
+          "reference_observations": 165
+        },
+        "array_stride": {
+          "local_observations": 1536,
+          "reference_observations": 768
+        },
+        "boolean_calls": {
+          "local_observations": 1536,
+          "reference_observations": 768
+        },
+        "global_addresses": {
+          "local_observations": 192,
+          "reference_observations": 96
+        },
+        "global_memory": {
+          "local_observations": 240,
+          "reference_observations": 120
+        },
+        "type_layout_padding": {
+          "local_observations": 768,
+          "reference_observations": 384
+        },
+        "word_pair": {
+          "local_observations": 384,
+          "reference_observations": 192
+        },
+        "signed_nonnegative": {
+          "local_observations": 1536,
+          "reference_observations": 768
+        },
+        "integer_pointer": {
+          "local_observations": 1536,
+          "reference_observations": 768
+        },
+        "scalar_stack": {
+          "local_observations": 486,
+          "reference_observations": 243
+        },
+        "pointer_stack": {
+          "local_observations": 768,
+          "reference_observations": 384
+        }
+      },
+      "native_accounting_negative_control": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-counter-negative-proof.json",
+        "sha256": "2ab00df5fcb395ffa27c28b88a60c11ac4569616cf232b2c10ea0f613124cb00"
+      },
+      "i128_executable": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-i128/proof.json",
+        "sha256": "4bc78af23bd18f0e17a67f7cd21c296594781782213179fb0bce6f9e8562effe"
+      },
+      "shift_oracle": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/integer-shift-oracle/proof.json",
+        "sha256": "5081c7d22ad4054cc508543452881bf3654d286391a6fe5c88c8b7e61f00986a"
+      },
+      "fibonacci_programs": [
+        {
+          "mode": "ReleaseFast",
+          "report": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-fast-program/report.json",
+            "sha256": "ad4a0e9e2b204392594e8da30af3e66dad715d08653398421794762e8e574e70"
+          },
+          "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+          "local_executions": 1,
+          "reference_executions": 1,
+          "exit_stdout_stderr_matched": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "report": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-small-program/report.json",
+            "sha256": "cb857a405fb50eeacfb79ffbe0a5f44a817420c263d16203a91d52dc0e262bf5"
+          },
+          "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+          "local_executions": 1,
+          "reference_executions": 1,
+          "exit_stdout_stderr_matched": true
+        }
+      ],
+      "release_safe": {
+        "target": "x86_64-unknown-linux-gnu",
+        "selected_functions": "1568",
+        "emitted_functions": "1522",
+        "failed_functions": "46",
+        "first_failing_function": "debug.writeCurrentStackTrace",
+        "first_failing_diagnostic": "UnsupportedCodegenControlFlow",
+        "first_failing_selector_tag": "unsupported_instruction",
+        "first_failing_selector_detail": "inline-asm-call",
+        "local_fail": "1",
+        "report": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-frontier.json",
+          "sha256": "904609cf8f9daf5bf2680cda3c075b586495c6d3dffab0c724ad89f533ed5181"
+        },
+        "first_failure": {
+          "function": "debug.writeCurrentStackTrace",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "inline-asm-call"
+        },
+        "object_bytes": 0,
+        "local_whole_program_executions": 0,
+        "input_sha256": "147ebba2de9f96cae9e6ce53fedd53b6fa082bc46048e51433652e5887a4f60c",
+        "compiler_sha256": "b5286962bf61883ec6837c07db5c85df38151414dcec8613a70cf6fa8cd67261"
+      },
+      "original_scratch_files_verified": 13,
+      "archives_created": 0
+    },
+    "component_proofs": [
+      {
+        "component": "stores",
+        "verification": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/stores-tier2-verification.json",
+          "sha256": "ab09aea4177ec160f115cab608303dc0e9730de112fc3f5e44b7d44c99e21176"
+        },
+        "compiler_sha256": "4862c6282070eff66e3ba508341139b8f8905989139fc5f8e0772c10428976c0",
+        "native_local_observations": 9216,
+        "native_reference_observations": 4608,
+        "negative_controls": 36
+      },
+      {
+        "component": "integers",
+        "verification": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/integers-tier2-verification.json",
+          "sha256": "887f88c2c5d2d411ec4430a54f8d9a05c8af69001fdbbb54fc88e929069eec18"
+        },
+        "compiler_sha256": "087c738b03cf42f7ed7ff05d6ac6a1faa8c81e87a076eeed591e00edb6a319e1",
+        "native_local_observations": 78336,
+        "native_reference_observations": 39168,
+        "negative_controls": 36
+      },
+      {
+        "component": "pairs",
+        "verification": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pairs-tier2-verification.json",
+          "sha256": "8211882aa8fb6acfdd0e5843faa9c2370175dacf3c063a7d9fd29a5138bffc5b"
+        },
+        "compiler_sha256": "56f8d9bd8884c13f972c323173141a0043bdd692a959e05d40e5b12bfa4def32",
+        "native_local_observations": 4608,
+        "native_reference_observations": 2304,
+        "negative_controls": 18
+      },
+      {
+        "component": "pair-arithmetic",
+        "verification": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pair-arithmetic-tier2-verification.json",
+          "sha256": "ee0adf9c123a00ae96b2e61973fbcf4236709df698de690ebb6f3af2f63b1b10"
+        },
+        "compiler_sha256": "bac6cd06be4f36f40981e84e783c7b74b71a2ca4e3114f115c746e391f4749f7",
+        "native_local_observations": 69120,
+        "native_reference_observations": 34560,
+        "negative_controls": 36
+      },
+      {
+        "component": "pair-reuse",
+        "verification": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pair-reuse-tier2-verification.json",
+          "sha256": "7d60941a63327152e84975f14213b10cd694a560f17d08874a86df27834ed54a"
+        },
+        "compiler_sha256": "e2582ddec8f3e659ac9e2351d6d6c3cb6ddb75f1ff046b3181abe757191b7e46",
+        "native_local_observations": 70656,
+        "native_reference_observations": 35328,
+        "negative_controls": 36
+      }
+    ],
+    "source_import": {
+      "status": "passed",
+      "prototype_revision": "6aa5b663",
+      "main_revision": "9a8cc1c94374ee05fe87a56a954b51280e375038",
+      "identical_non_documentation_sources": 1588,
+      "source_overrides": {
+        "src/codegen/x86_64/generic_cfg/composed_selector_scalar.zig": {
+          "prototype_sha256": "c1b786d94e46e18d6588a5de77c106a5f893102f45f014781fd5eb2e6c2ed0cf",
+          "main_sha256": "a5428274ac9b61bfbaa6b42f9e1f3960084c08141fe19fadd457e52639525d9e"
+        },
+        "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate.zig": {
+          "prototype_sha256": "efe3373df7161a20413d3a53b65ad7609e6c316b158f745e1cbcaf86e58376b9",
+          "main_sha256": "e65f73c3e7529d70418a54c6508ff35942d5da755a0f3da6e4eee2654b621621"
+        },
+        "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate_tests.zig": {
+          "prototype_sha256": "f89653182c27b83ef115095fd47032d8e9b5d7d583ee3b3028d652e34b118ba6",
+          "main_sha256": "47fd3078b89d872592602ea6a0f4ad962ad07f528fce84684d3ddf713fd66e1f"
+        },
+        "test/zig/integrated/compiler_rt_i128_arithmetic_start.zig": {
+          "prototype_sha256": "88f3aa9c3c157ca9592e2bbc2f90247ba1d724bcb98a93acb2476a4f5ff2bdd8",
+          "main_sha256": "2b6bdf9efbda2a70ee0e2b583a3b3191535dd0dcbafaec23d01cf9ded3814d86"
+        },
+        "tools/run_upstream_c_program.py": {
+          "prototype_sha256": "6915f5f56bd45fca03054e0334766bd5bce650d01b77670b87ffa0fccd7eb6cd",
+          "main_sha256": "b1c79da11d50077ef112ea28d50401bafc530e80cbbd0d0f22551f823cf5f3d8"
+        }
+      },
+      "prototype_snapshot": "pair-reuse-prototype-sources.json",
+      "compiler_sha256": "b5286962bf61883ec6837c07db5c85df38151414dcec8613a70cf6fa8cd67261",
+      "original_scratch_files_verified": 13,
+      "archives_created": 0
+    },
+    "prototype_snapshot": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pair-reuse-prototype-sources.json",
+      "sha256": "5a14e055d51ada763fca48b12dad9790da54af9d5e39c65920a7987ebe479e34"
+    },
+    "current_native_populations": {
+      "word-pair-memory": {
+        "population": "standalone-two-word-stack-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "384",
+        "reference_observations": "192",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "pointer-stack-memory": {
+        "population": "standalone-runtime-pointer-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-stack-memory": {
+        "population": "standalone-scalar-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "486",
+        "reference_observations": "243",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "integer-pointer-casts": {
+        "population": "standalone-integer-pointer-casts",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "signed-nonnegative": {
+        "population": "standalone-signed-nonnegative",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "type-layout-padding": {
+        "population": "standalone-type-allocation-padding",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-addresses": {
+        "population": "standalone-global-addresses",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "192",
+        "reference_observations": "96",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-memory": {
+        "population": "standalone-global-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "240",
+        "reference_observations": "120",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "boolean-calls": {
+        "population": "standalone-boolean-calls",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "array-stride": {
+        "population": "standalone-array-stride",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "module-dependencies": {
+        "population": "standalone-module-dependencies",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "330",
+        "reference_observations": "165",
+        "reference_reused_per_route": "true",
+        "local_fail": "0",
+        "negative_controls": "30",
+        "environment_checks": "3"
+      },
+      "bounded-frame": {
+        "population": "standalone-bounded-frame",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "general-array-stride": {
+        "population": "standalone-general-array-stride",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1920",
+        "reference_observations": "960",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "rax-pointer-load": {
+        "population": "standalone-rax-pointer-load",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "2688",
+        "reference_observations": "1344",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "constant-remainder": {
+        "population": "standalone-constant-remainder",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "3072",
+        "reference_observations": "1536",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "narrow-abi": {
+        "population": "standalone-narrow-abi",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "4992",
+        "reference_observations": "2496",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "aggregate-storage": {
+        "population": "standalone-aggregate-storage",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "4608",
+        "reference_observations": "2304",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-forms": {
+        "population": "standalone-scalar-forms",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "3840",
+        "reference_observations": "1920",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "indirect-stack-calls": {
+        "population": "standalone-indirect-stack-calls",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "9984",
+        "reference_observations": "4992",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "safe-scalar-forms": {
+        "population": "standalone-safe-scalar-forms",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "4992",
+        "reference_observations": "2496",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "safe-comparisons": {
+        "population": "standalone-safe-comparisons",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "17664",
+        "reference_observations": "8832",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "bounded-storage": {
+        "population": "standalone-bounded-storage",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "5760",
+        "reference_observations": "2880",
+        "reference_reused_per_route": "true",
+        "local_fail": "0",
+        "guard_checks": "18"
+      },
+      "stack-addresses": {
+        "population": "standalone-stack-addresses",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "3456",
+        "reference_observations": "1728",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "checked-integers": {
+        "population": "standalone-checked-integers",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "46464",
+        "reference_observations": "23232",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "word-arithmetic": {
+        "population": "standalone-word-arithmetic",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "29568",
+        "reference_observations": "14784",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "switch-forms": {
+        "population": "standalone-switch-forms",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "26112",
+        "reference_observations": "13056",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "integer-intrinsics": {
+        "population": "standalone-integer-intrinsics",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "87552",
+        "reference_observations": "43776",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-atomics": {
+        "population": "standalone-scalar-atomics",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "112908",
+        "reference_observations": "56454",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "pointer-flow": {
+        "population": "standalone-pointer-flow",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "9216",
+        "reference_observations": "4608",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "address-flow": {
+        "population": "standalone-address-flow",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "14208",
+        "reference_observations": "7104",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "call-contracts": {
+        "population": "standalone-call-contracts",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "17664",
+        "reference_observations": "8832",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "accumulator-store": {
+        "population": "standalone-accumulator-store",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "9216",
+        "reference_observations": "4608",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "integer-forms": {
+        "population": "standalone-integer-forms",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "78336",
+        "reference_observations": "39168",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "constant-pair": {
+        "population": "standalone-constant-pair",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "4608",
+        "reference_observations": "2304",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "pair-arithmetic": {
+        "population": "standalone-pair-arithmetic",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "70656",
+        "reference_observations": "35328",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    },
+    "prior_failed_runs": [
+      {
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/full-integers-cached.json",
+          "sha256": "1b91b143b8c2b8a11533327ffd37fff097ddeec3c97953439b0b94a9310dab45"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/full-integers-cached.log",
+          "sha256": "0f3dbf67e6f291674e2c256440fe8cbc26bc761c00848860021828dcc8e34720"
+        }
+      },
+      {
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/integer-oracle-integrated-exe.json",
+          "sha256": "79894bca63d50eb9917a379951e952762222e0388eaa4a70c570a36070ab3c03"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/integer-oracle-integrated-exe.log",
+          "sha256": "50302b2a17b6e046532e12142a878400ee703ca86d0f844d0e3fb0f925f7204a"
+        }
+      }
+    ],
+    "final_compiler_sha256": "b5286962bf61883ec6837c07db5c85df38151414dcec8613a70cf6fa8cd67261",
+    "wyhash_init_prototype_native": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pair-reuse-wyhash-init-native/proof.json",
+      "sha256": "8142fdb00aa830d0d78beee7199f17a509be23c852432760325a071ade860e9a"
+    }
+  },
+  "fibonacci_programs": [
+    {
+      "mode": "ReleaseFast",
+      "report": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-fast-program/report.json",
+        "sha256": "ad4a0e9e2b204392594e8da30af3e66dad715d08653398421794762e8e574e70"
+      },
+      "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+      "local_executions": 1,
+      "reference_executions": 1,
+      "exit_stdout_stderr_matched": true
+    },
+    {
+      "mode": "ReleaseSmall",
+      "report": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-small-program/report.json",
+        "sha256": "cb857a405fb50eeacfb79ffbe0a5f44a817420c263d16203a91d52dc0e262bf5"
+      },
+      "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+      "local_executions": 1,
+      "reference_executions": 1,
+      "exit_stdout_stderr_matched": true
+    }
+  ],
+  "release_safe": {
+    "target": "x86_64-unknown-linux-gnu",
+    "selected_functions": "1568",
+    "emitted_functions": "1522",
+    "failed_functions": "46",
+    "first_failing_function": "debug.writeCurrentStackTrace",
+    "first_failing_diagnostic": "UnsupportedCodegenControlFlow",
+    "first_failing_selector_tag": "unsupported_instruction",
+    "first_failing_selector_detail": "inline-asm-call",
+    "local_fail": "1",
+    "report": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/arithmetic-slice-frontier.json",
+      "sha256": "904609cf8f9daf5bf2680cda3c075b586495c6d3dffab0c724ad89f533ed5181"
+    },
+    "first_failure": {
+      "function": "debug.writeCurrentStackTrace",
+      "diagnostic": "UnsupportedCodegenControlFlow",
+      "selector_tag": "unsupported_instruction",
+      "selector_detail": "inline-asm-call"
+    },
+    "object_bytes": 0,
+    "local_whole_program_executions": 0,
+    "input_sha256": "147ebba2de9f96cae9e6ce53fedd53b6fa082bc46048e51433652e5887a4f60c",
+    "compiler_sha256": "b5286962bf61883ec6837c07db5c85df38151414dcec8613a70cf6fa8cd67261"
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0
+}
