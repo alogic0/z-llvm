@@ -55,6 +55,7 @@ pub fn tryLowerWithContext(
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try switch_phi_edges.legalize(arena.allocator(), function)) |legalized| {
+        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
         const selected = try tryLowerWithContext(allocator, machine, legalized, module_context);
         if (selected == .selected) try switch_phi_edges.retainLabels(allocator, machine, legalized.blocks.items[function.blocks.items.len..]);
         return selected;
@@ -223,6 +224,31 @@ const SelectionTransaction = struct {
         }
     }
 };
+
+// Existing composed forms retain their established machine stream. Private
+// edge/operand normalization is a fallback after transactional lowering rejects
+// the original form; failed attempts cannot publish instructions or ownership.
+fn tryOriginalComposedForm(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
+    inspected: SelectionResult,
+) !bool {
+    switch (inspected) {
+        .selected => return false,
+        .unsupported => |diagnostic| switch (diagnostic) {
+            .no_emitter, .unsupported_control_flow => {},
+            else => return false,
+        },
+    }
+    if (function.blocks.items.len > 1) {
+        const pressure = try analyzeStageTwoNoSpillEnvelope(allocator, function);
+        if (pressure.exceedsSpillEnvelope()) return false;
+        return (try tryLowerComposedCfgFailClosed(allocator, machine, function, module_context)) == .selected;
+    }
+    return (try tryLowerComposedBlockFailClosed(allocator, machine, function, module_context)) == .selected;
+}
 
 fn tryLowerComposedBlockFailClosed(
     allocator: std.mem.Allocator,
