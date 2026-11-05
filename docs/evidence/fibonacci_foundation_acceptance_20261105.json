@@ -1,0 +1,790 @@
+{
+  "schema": 1,
+  "status": "accepted",
+  "recorded_utc": "2026-11-05T10:10:14.130439+00:00",
+  "accepted_revision": "580a866f8ab6b5c5d4b9ebc0d9b76f2a8a15fed9",
+  "accepted_tree": "af908b9234b67558488fb5f3bd813109e1301d52",
+  "source_snapshot": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-source-snapshot.json",
+    "sha256": "a3f19da989205daf753e3c764e6748b405174aa6f7714d6f814e5779cf2df2f6"
+  },
+  "source_snapshot_files": 2770,
+  "source_sha256": {
+    "src/codegen/x86_64/generic_cfg/aggregate_storage_tests.zig": "8c107aec3691dc5b2f4e77c4c2e01dede4727cb17447af112c21b6f2f7552691",
+    "src/codegen/x86_64/generic_cfg/comparison_forms.zig": "9b7f398cc1c6ddc3ecb19ac426deda994325a3effe3c09d0182b3d05bd1bd063",
+    "src/codegen/x86_64/generic_cfg/composed_helpers.zig": "c5601540b6c4a41dca8c567828308298c1989e2c977cb5e6d865272d8a794d28",
+    "src/codegen/x86_64/generic_cfg/composed_selector_calls.zig": "0e7b4434b8c2aa60e4f644f197dd48a9549551b99e3a41b1e0f3d50df90d801b",
+    "src/codegen/x86_64/generic_cfg/composed_selector_frame.zig": "7d9026e715c5dbc82ec1b0424e6fcdab7f4c88eda156c23962d4c954bb38481f",
+    "src/codegen/x86_64/generic_cfg/composed_selector_impl.zig": "b09d0a3f70aa74553ddd96eb054e2bdaba411d16f2be97cecbbf3887412f0138",
+    "src/codegen/x86_64/generic_cfg/composed_selector_scalar.zig": "c1b786d94e46e18d6588a5de77c106a5f893102f45f014781fd5eb2e6c2ed0cf",
+    "src/codegen/x86_64/generic_cfg/composed_selector_state.zig": "30bec7f5044ff58bd1f3c5c0f0ae6256fae153ccc7d28918cc869527bce25a0a",
+    "src/codegen/x86_64/generic_cfg/indirect_stack_calls_tests.zig": "a45e2c5bb4d9424174ea76c52d76d59bf4e21de211b35ef21da43bbe6c5ef5f9",
+    "src/codegen/x86_64/generic_cfg/inspection.zig": "a9d4f0d1a7fa7d4d9251b517bc24d2c0b1b6d5ece2c9fae830b085e771b1b302",
+    "src/codegen/x86_64/generic_cfg/narrow_abi.zig": "084da53489978ec84e7970d4768a360f3cb5ec687315875145dbb53b2b36ef08",
+    "src/codegen/x86_64/generic_cfg/overflow_values.zig": "6676dcacff17ad26434dcdf15e5f47bd3f5a8ea91d569f90fa8d81a84ba24b02",
+    "src/codegen/x86_64/generic_cfg/padded_frame.zig": "6ea4ada4b944b9bb8f0923ba3b2ddfeb5f63b16f3109a3d09a225d5931ecaa11",
+    "src/codegen/x86_64/generic_cfg/padded_frame_tests.zig": "d81ca8898c418a354eabb69262560c3fd64df25f540de640450a993031f2d6a3",
+    "src/codegen/x86_64/generic_cfg/scalar_forms.zig": "32009e640edd2edc70c207a6c5eb87b8c48293bb249fd7745e98af5c2fde5132",
+    "src/codegen/x86_64/generic_cfg/scalar_forms_tests.zig": "7200b703779c0102a6fc43ac8308ce16e51107506afcb04154714c1a8a1e95d9",
+    "src/codegen/x86_64/generic_cfg/selector_types.zig": "b2752b283f1021dbd762852ce3221acaff9126f643ae8975499ff1d81a3618ab",
+    "src/codegen/x86_64/generic_cfg/source_guard/model.zig": "005059d95e8d38f529d94f0dc2a922d5e94def403c52eba7f262c58494b45c0c",
+    "src/codegen/x86_64/generic_cfg/stack_arguments.zig": "d0b649be71393a0b13a40870a763f2f5fa703b80a8c0436b6cc8de3b3f035ef4",
+    "src/codegen/x86_64/generic_cfg/storage_layout.zig": "8ee91b82219b6d221dfdde2b8a0feb433047477172b63a9377574951d87b809a",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_cast.zig": "f70e1bffa599c236546658cece24fd018264ed3ae591bfe2b535e899a31fd840",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/lifetime_admission.zig": "5cf1d39c7ade5ccb589cd9dffeeb1b44ba02166c11e1aa0d7c7378332dea4a94",
+    "src/codegen/x86_64/generic_cfg/word_pair_values.zig": "ad9174e411f9b4e37d41436991069c7354fee015cfda988a8947cd01b5167a7d",
+    "src/codegen/x86_64/generic_cfg_selector.zig": "c69b1a6d2ba0ecdf874097624e5a2b76c78ca430100847d7aeb17232785cf646",
+    "src/main_flow_ir_writer.zig": "fac505e11d9165b551812c4d9586716c3033cbae501943e9dc60d259c8c8f8ab",
+    "src/tests.zig": "ba81bbd2f9717bd9cb90c13b2e00b56c9cec0e3dc82cf51218bfd50e60c3d8a9",
+    "src/tests/codegen_x86_64_generic_cfg_selector_limb.zig": "a0e6af8a807761049573bc3fadf73885a2e7a02f4ae88887784f5ddea8ea4478",
+    "test/real_programs/bounded_storage.ll": "bbabca901723c46239ab3e7abb9e497255c746ca944018b02d2fd7e4035ae03f",
+    "test/real_programs/bounded_storage_driver.c": "348c2ab0a49da38586a1871a618b7b674db7c784988de39627fb7cf220d2214f",
+    "test/real_programs/indirect_stack_calls.ll": "dc750428fa3bc7231f1d42b8be25e226d797cd85c29d0bc68e4a145d035c30c7",
+    "test/real_programs/indirect_stack_calls_driver.c": "5e46c3e9db777c533595d6277904d127b580af0370d7813cdf6970b3a89d28f0",
+    "test/real_programs/safe_comparisons.ll": "a7011e0d8fedf92ec110b99aa61689763ba4f8d11d2127f6d4b76ff879b410bf",
+    "test/real_programs/safe_comparisons_driver.c": "afcaec8ef47a746cbeb388a30c9238ea9cab5791c893ec802c56c70cbae7a34c",
+    "test/real_programs/safe_scalar_forms.ll": "ef50752f4c2976aa6f8e9845acec2e87677bdf5f1f9191d86a454cce34a7b55e",
+    "test/real_programs/safe_scalar_forms_driver.c": "97e8538a05dc51e6d15f987de0937f81e51ba057de99b18808ae9ffef16f42d8",
+    "tools/run_upstream_c_program.py": "68799078d6e58bdb0e240fe210eb160d1ef6d01038551f717b31ffa10f7194c0"
+  },
+  "behavior": [
+    "Named indirect calls and bounded 7-16 word/pointer arguments use owned staging and existing System V homes; narrow and pair returns preserve their ABI bits.",
+    "Unsigned 64-bit add/sub overflow pairs, exact return-address depth zero, trap termination and i31 masks use existing scalar actions.",
+    "Narrow signed/unsigned comparisons normalize their actual widths, including two reproduced dirty-upper-bit wrong-code cases. Existing correct forms and the frozen FMA stream remain intact.",
+    "Exact native scalar storage supports objects through 64 KiB with private trailing padding, original copy extents, a bounded one-MiB total frame, and page touches that preserve incoming argument registers.",
+    "The unchanged pinned upstream Fibonacci program executes all six original assertions in ReleaseFast and ReleaseSmall, with LLVM-equivalent exit status, stdout and stderr."
+  ],
+  "known_boundaries": [
+    "ReleaseSafe whole-program emission is incomplete: 1025 of 1568 functions emit, and 543 fail; no Safe local object or execution is claimed.",
+    "Remaining Safe value flow, arithmetic, atomic, memory and control-flow forms and the real pinned compiler runtime link remain open.",
+    "The authorized plan continues through unchanged ReleaseSafe execution and a permanent mandatory three-mode regression."
+  ],
+  "focused_evidence": {
+    "path": "docs/evidence/fibonacci_foundation_focused_20261105.json",
+    "sha256": "f1550583c7ce663d82270407e3f98429e3e3399d5c70f4def7433954d121e678"
+  },
+  "fibonacci_programs": [
+    {
+      "mode": "ReleaseFast",
+      "report": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-fast-program/report.json",
+        "sha256": "0f264783d98b08866da516d8d14f27a9ce3d8010c30d4172786b328843e295e1"
+      },
+      "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+      "local_executions": 1,
+      "reference_executions": 1,
+      "exit_stdout_stderr_matched": true
+    },
+    {
+      "mode": "ReleaseSmall",
+      "report": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-small-program/report.json",
+        "sha256": "01e39b10870a28b0d37689a1dc730b41a0a4e0260b8cf33117eb29d002bce176"
+      },
+      "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+      "local_executions": 1,
+      "reference_executions": 1,
+      "exit_stdout_stderr_matched": true
+    }
+  ],
+  "release_safe": {
+    "selected_functions": 1568,
+    "emitted_functions": 1025,
+    "failed_functions": 543,
+    "first_failure": {
+      "function": "debug.defaultPanic",
+      "diagnostic": "UnsupportedCodegenControlFlow",
+      "selector_tag": "unsupported_value",
+      "selector_detail": "stage2-unsupported-value"
+    },
+    "object_bytes": 0,
+    "local_whole_program_executions": 0,
+    "input_sha256": "147ebba2de9f96cae9e6ce53fedd53b6fa082bc46048e51433652e5887a4f60c",
+    "prototype_compiler_sha256": "41f2af23ce35717e2ec32a8a786ab8da9e6a929a6a93f45515049f0cdc16e91d",
+    "source_equivalence": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-import-verification.json",
+      "sha256": "ae2ef6014825e946f9388829f4f0ffc39b68c4d7c4819f27c409e8f89a2142f2"
+    },
+    "report": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-frontier-r2.json",
+      "sha256": "91916ea86148431e0bd510b4ea02d90a98d7830d47a508e86410a427e6802628"
+    },
+    "stderr": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-frontier-r2.stderr",
+      "sha256": "fc73322e301cc6217ff662b6f14a41cde8bff3456c6da91a0d089702719b161c"
+    }
+  },
+  "validation_trigger": "Cumulative Tier 3 is required for ABI and shared frames, confirmed narrow-comparison wrong-code repairs, and the unchanged Fast/Small whole-program execution milestone. No later checkpoint is accepted before this full gate.",
+  "prior_result_reuse": "Scalar integration is accepted but predates these four commits. The cumulative imported source matches all 1547 frozen prototype non-documentation files, including the scalar canary repair. Reuse exact-source Tier 2/native evidence; execute all 17 stages and 22 native populations afresh on main. Only authenticated immutable AIR exports are cached.",
+  "frozen_plan": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-validation-plan.json",
+    "sha256": "9fdfe18bdde78a0de2a818aa63d2b8b879d186a12bb5ed92bee5428c3ea7152d"
+  },
+  "verification_script": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/verify_foundation_full_run.py",
+    "sha256": "e8f339dcf3cf09d678386f3d354d1b61ba98df040239970dcaa98860677d9eb5"
+  },
+  "verified_record": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/verified-full-foundation-cached.json",
+    "sha256": "f4967051f623545b9ed10ec4492ab88f7ae1153977c4cadff840d3c4c77e0e18"
+  },
+  "integration": {
+    "argv": [
+      "/home/oleg/.zig/0.17.0/files/zig",
+      "build",
+      "distribution-all",
+      "--",
+      "--serial",
+      "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+      "--real-rows-validation-root=local-state/validations/ir-headroom-20261103",
+      "--real-rows-cache-root=local-state/caches/ir-headroom-20261103"
+    ],
+    "returncode": 0,
+    "wall_ns": 2568076417644,
+    "raw_log": "local-state/validations/fibonacci-20261104/full-foundation-cached.log",
+    "raw_log_sha256": "176b5e39bf1afa261482c6ca912d6a7a610f0bdbcf54033697aa068c339f94f0",
+    "telemetry_sha256": "e4d679d70b68066f8a61564595c0c8ceae7b98a0b357a582868be61c4a0e7b7d",
+    "gates": [
+      {
+        "id": "selected-object-suite",
+        "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+        "exit_status": "0",
+        "duration_ms": "61109",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "1919",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "3379",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "3318",
+        "cache_status": "none"
+      },
+      {
+        "id": "zig-source-native-link",
+        "tool": "tools/run_distribution_zig_source_native_link.zig",
+        "exit_status": "0",
+        "duration_ms": "18077",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-postopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "77959",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-preopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "--pipeline": "preopt",
+        "exit_status": "0",
+        "duration_ms": "674549",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-ir-writer",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "22236",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-release",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "75718",
+        "cache_status": "none"
+      },
+      {
+        "id": "real-rows-release-fast",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseFast",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "504983",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-safe",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSafe",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "532251",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-small",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSmall",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "359120",
+        "cache_status": "hit"
+      },
+      {
+        "id": "integrated-executable",
+        "tool": "tools/run_distribution_zig_integrated_exe.zig",
+        "exit_status": "0",
+        "duration_ms": "973250",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "462",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "1145",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "1026",
+        "cache_status": "none"
+      },
+      {
+        "id": "boundary-gates",
+        "tool": "tools/run_distribution_boundary_gates.zig",
+        "exit_status": "0",
+        "duration_ms": "799",
+        "cache_status": "none"
+      }
+    ],
+    "serial": {
+      "schema_version": "1",
+      "run_id": "09493cb2499840c259d2bdc7e0156867",
+      "scratch_path": "tmp/distribution_all_serial_09493cb2499840c259d2bdc7e0156867",
+      "bundle_path": "tmp/distribution_all_serial_09493cb2499840c259d2bdc7e0156867/release_source_object_bundle",
+      "target": "x86_64-unknown-linux-gnu",
+      "mode": "serial",
+      "real_rows_concurrency": "3",
+      "subgates": "17",
+      "wall_ms": "2568044",
+      "starting_free_bytes": "41304780800",
+      "minimum_observed_free_bytes": "38800539648",
+      "final_free_bytes": "39464595456",
+      "observed_peak_bytes": "2504241152",
+      "reserve_bytes": "24359738368",
+      "required_start_bytes": "32949672960",
+      "local_fail": "0"
+    },
+    "real_rows": [
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseFast",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSafe",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSmall",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      }
+    ],
+    "cache_events": [
+      {
+        "mode": "ReleaseFast",
+        "status": "hit",
+        "duration_ms": "15281",
+        "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+        "descriptor_bytes": "1343891697"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "status": "hit",
+        "duration_ms": "16601",
+        "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+        "descriptor_bytes": "1473501276"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "status": "hit",
+        "duration_ms": "12690",
+        "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+        "descriptor_bytes": "1106432911"
+      }
+    ],
+    "real_rows_resources": {
+      "schema_version": "3",
+      "normalization_schema": "3",
+      "memory_policy": "os-managed-non-gating",
+      "concurrency": "3",
+      "workers": "3",
+      "modes": "ReleaseFast,ReleaseSafe,ReleaseSmall",
+      "run_id": "5d5c6cb163b8eebb948d05c0c0ddef2e",
+      "root": "local-state/validations/ir-headroom-20261103/real_rows_parallel_5d5c6cb163b8eebb948d05c0c0ddef2e",
+      "work_selection_root": "local-state/validations/ir-headroom-20261103",
+      "export_cache_selection_root": "local-state/caches/ir-headroom-20261103",
+      "fast_temp": "local-state/validations/ir-headroom-20261103/ReleaseFast/work_5d5c6cb163b8eebb948d05c0c0ddef2e",
+      "fast_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_5d5c6cb163b8eebb948d05c0c0ddef2e/ReleaseFast/zig-local-cache",
+      "fast_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_5d5c6cb163b8eebb948d05c0c0ddef2e/ReleaseFast/zig-global-cache",
+      "fast_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseFast/export",
+      "safe_temp": "local-state/validations/ir-headroom-20261103/ReleaseSafe/work_5d5c6cb163b8eebb948d05c0c0ddef2e",
+      "safe_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_5d5c6cb163b8eebb948d05c0c0ddef2e/ReleaseSafe/zig-local-cache",
+      "safe_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_5d5c6cb163b8eebb948d05c0c0ddef2e/ReleaseSafe/zig-global-cache",
+      "safe_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export",
+      "small_temp": "local-state/validations/ir-headroom-20261103/ReleaseSmall/work_5d5c6cb163b8eebb948d05c0c0ddef2e",
+      "small_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_5d5c6cb163b8eebb948d05c0c0ddef2e/ReleaseSmall/zig-local-cache",
+      "small_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_5d5c6cb163b8eebb948d05c0c0ddef2e/ReleaseSmall/zig-global-cache",
+      "small_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export",
+      "pin_manifest_sha256": "0d7370b61aa9f9871196371de428475b01a05554fd449a97a74f63ba4f948a29",
+      "cache_status": "hit,hit,hit",
+      "air_cache": "read-only",
+      "pruning": "suspended",
+      "wall_ms": "652611",
+      "summed_child_ms": "1396354",
+      "filesystem_total_bytes": "982240026624",
+      "post_run_free_floor_bytes": "24359738368",
+      "projected_peak_bytes": "8589934592",
+      "required_start_bytes": "32949672960",
+      "admission_source": "serial_preflight",
+      "admission_starting_free_bytes": "41304780800",
+      "starting_free_bytes": "40653484032",
+      "minimum_free_bytes": "38800539648",
+      "final_free_bytes": "38800539648",
+      "peak_disk_bytes": "5380841472",
+      "peak_aggregate_rss_bytes": "5261561856",
+      "minimum_available_memory_bytes": "12718829568",
+      "load_start": "1.97",
+      "load_end": "2.70",
+      "execution_results_cached": "false",
+      "local_fail": "0"
+    },
+    "native_memory_populations": {
+      "word-pair-memory": {
+        "population": "standalone-two-word-stack-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "384",
+        "reference_observations": "192",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "pointer-stack-memory": {
+        "population": "standalone-runtime-pointer-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-stack-memory": {
+        "population": "standalone-scalar-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "486",
+        "reference_observations": "243",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "integer-pointer-casts": {
+        "population": "standalone-integer-pointer-casts",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "signed-nonnegative": {
+        "population": "standalone-signed-nonnegative",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "type-layout-padding": {
+        "population": "standalone-type-allocation-padding",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-addresses": {
+        "population": "standalone-global-addresses",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "192",
+        "reference_observations": "96",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-memory": {
+        "population": "standalone-global-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "240",
+        "reference_observations": "120",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "boolean-calls": {
+        "population": "standalone-boolean-calls",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "array-stride": {
+        "population": "standalone-array-stride",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "module-dependencies": {
+        "population": "standalone-module-dependencies",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "330",
+        "reference_observations": "165",
+        "reference_reused_per_route": "true",
+        "local_fail": "0",
+        "negative_controls": "30",
+        "environment_checks": "3"
+      },
+      "bounded-frame": {
+        "population": "standalone-bounded-frame",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "general-array-stride": {
+        "population": "standalone-general-array-stride",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1920",
+        "reference_observations": "960",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "rax-pointer-load": {
+        "population": "standalone-rax-pointer-load",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "2688",
+        "reference_observations": "1344",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "constant-remainder": {
+        "population": "standalone-constant-remainder",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "3072",
+        "reference_observations": "1536",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "narrow-abi": {
+        "population": "standalone-narrow-abi",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "4992",
+        "reference_observations": "2496",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "aggregate-storage": {
+        "population": "standalone-aggregate-storage",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "4608",
+        "reference_observations": "2304",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-forms": {
+        "population": "standalone-scalar-forms",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "3840",
+        "reference_observations": "1920",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "indirect-stack-calls": {
+        "population": "standalone-indirect-stack-calls",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "9984",
+        "reference_observations": "4992",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "safe-scalar-forms": {
+        "population": "standalone-safe-scalar-forms",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "4992",
+        "reference_observations": "2496",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "safe-comparisons": {
+        "population": "standalone-safe-comparisons",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "17664",
+        "reference_observations": "8832",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "bounded-storage": {
+        "population": "standalone-bounded-storage",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "5760",
+        "reference_observations": "2880",
+        "reference_reused_per_route": "true",
+        "local_fail": "0",
+        "guard_checks": "18"
+      }
+    },
+    "c_program": {
+      "schema": "upstream-c-program-v1",
+      "programs": "1",
+      "program_modes": "3",
+      "matched_program_modes": "3",
+      "reference_case_executions": "6",
+      "local_case_executions": "6",
+      "integer_variadic_observations": "48",
+      "heap_call_observations": "18",
+      "native_call_observations": "66",
+      "local_fail": "0"
+    },
+    "ascii_rows": [
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseFast",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+        "object_bytes": "760",
+        "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+        "reference_bytes": "4154072",
+        "reference_sha256": "a861bffd336260d83a21947605f909a151a674c34ec4f2092b40550c80b3b7c1",
+        "linked_bytes": "6292446",
+        "linked_sha256": "a0abdeaef3e8f44f86f314e0462aad1ccbbfd450174f9bd7785f8feb6ff75ba9",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      },
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseSafe",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+        "object_bytes": "760",
+        "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+        "reference_bytes": "4040088",
+        "reference_sha256": "3cdbbd9f924e1991a20239c08b112b0a9175dc454ccce482795be80c53ffcec6",
+        "linked_bytes": "6147638",
+        "linked_sha256": "1ba129460b01c7381a61c6e70581ad7d200e306489a3ec24af5160eb8b6ca3b6",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      },
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseSmall",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+        "object_bytes": "760",
+        "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+        "reference_bytes": "149824",
+        "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+        "linked_bytes": "356198",
+        "linked_sha256": "ccd824f3e03578ba8d0548813705a7a53a9992c087f4ea7a3586bbed3cf526ca",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      }
+    ],
+    "fma": {
+      "cases": "8192",
+      "matched": "8192",
+      "reference": "llvm22-frozen-ir",
+      "local_fail": "0"
+    },
+    "source_snapshot": "local-state/validations/fibonacci-20261104/foundation-source-snapshot.json",
+    "source_snapshot_sha256": "a3f19da989205daf753e3c764e6748b405174aa6f7714d6f814e5779cf2df2f6",
+    "source_snapshot_files": 2770,
+    "source_worktree": "/home/oleg/prog/z_llvm",
+    "original_scratch_files_verified": 13,
+    "sources_unchanged": true,
+    "headroom_policy": {
+      "schema_version": "3",
+      "filesystem_total_bytes": "982240026624",
+      "reserve_bytes": "24359738368",
+      "projected_peak_bytes": "8589934592",
+      "required_start_bytes": "32949672960",
+      "authority": "tools/distribution_headroom_policy.zig",
+      "local_fail": "0"
+    },
+    "expected_cache_status": "hit",
+    "sampled_minimum_free_bytes": 38800519168,
+    "archives_created": 0
+  },
+  "headroom_policy": {
+    "schema_version": 3,
+    "reserve_bytes": 24359738368,
+    "projected_peak_bytes": 8589934592,
+    "required_start_bytes": 32949672960
+  },
+  "authenticated_exports_reused": [
+    {
+      "mode": "ReleaseFast",
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5.air",
+      "bytes": 1343891697,
+      "allocated_bytes": 1343922176,
+      "sha256": "bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5",
+      "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+      "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.meta",
+      "metadata_sha256": "037abbc2bc1e323c0174b6a43373654ee44ef22a91fcf9a8c092d5693f45f00a"
+    },
+    {
+      "mode": "ReleaseSafe",
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c.air",
+      "bytes": 1473501276,
+      "allocated_bytes": 1473531904,
+      "sha256": "53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c",
+      "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+      "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.meta",
+      "metadata_sha256": "24849930ee312cc3cb2d35cf0da327898ca4a16ad25c90b1a858ac5530300618"
+    },
+    {
+      "mode": "ReleaseSmall",
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809.air",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106452480,
+      "sha256": "e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809",
+      "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+      "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.meta",
+      "metadata_sha256": "b3f9cb704b31b4257b0e2c3b9f3415672c282a7bd10142d8dbf246de354c62f3"
+    }
+  ],
+  "summary_log": {
+    "path": "docs/evidence/fibonacci_foundation_20261105_cached.summary",
+    "sha256": "a25de82af3eac04adf3fcbf349fc72af4c28f35f8f39863196e5404d1f02c17b"
+  },
+  "toolchain": {
+    "project_zig_version": "0.17.0",
+    "project_zig": "/home/oleg/.zig/0.17.0/files/zig",
+    "emitter": "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+    "emitter_version": "0.17.0-dev.11+1c08b09d1",
+    "emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+    "emitter_bytes": 149918648,
+    "source_authority_sha256": "d4846f9d9032727d3903b31bdefc763447a92024483aa3c83b2ac0683167f492"
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0,
+  "cleanup": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-cache-cleanup.json",
+    "sha256": "cd0fd78e27b503029e226c288baca014723afbe8808adea06c14d2b81a4f83cb"
+  },
+  "unchanged_scope": {
+    "candidate_rows_per_mode": 100,
+    "executed_functions_per_mode": 5,
+    "compiler_rt_bypass_ratchet": 130,
+    "previous_native_populations": 18,
+    "selection_default": "legacy"
+  },
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-unknown-linux-gnu",
+  "modes": [
+    "ReleaseFast",
+    "ReleaseSafe",
+    "ReleaseSmall"
+  ],
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "selector_version": "real-candidate-selector-v3"
+}

@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "d8c135e5aabab3b411760845524415491cf6fd39",
-  "accepted_tree": "41521b78a3b58e9a1795fe4b55118e1acf68251f",
+  "accepted_revision": "580a866f8ab6b5c5d4b9ebc0d9b76f2a8a15fed9",
+  "accepted_tree": "af908b9234b67558488fb5f3bd813109e1301d52",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 5,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "d8c135e5",
+  "declaration_revision": "580a866f",
   "evidence": [
+    "docs/evidence/fibonacci_foundation_acceptance_20261105.json",
+    "docs/evidence/fibonacci_foundation_20261105_cached.summary",
     "docs/evidence/scalar_forms_acceptance_20261105.json",
     "docs/evidence/scalar_forms_20261105_cached.summary",
     "docs/evidence/aggregate_storage_acceptance_20261105.json",

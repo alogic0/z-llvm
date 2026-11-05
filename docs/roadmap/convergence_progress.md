@@ -4503,7 +4503,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `d8c135e5aabab3b411760845524415491cf6fd39`; tree: `41521b78a3b58e9a1795fe4b55118e1acf68251f`.
+Accepted revision: `580a866f8ab6b5c5d4b9ebc0d9b76f2a8a15fed9`; tree: `af908b9234b67558488fb5f3bd813109e1301d52`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

@@ -41,7 +41,27 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [scalar startup checkpoint](evidence/scalar_forms_acceptance_20261105.json)
+The accepted [Fibonacci foundation checkpoint](evidence/fibonacci_foundation_acceptance_20261105.json)
+at `580a866f` passes all 17 integration stages. Named indirect calls, seven to
+sixteen word/pointer arguments, checked word arithmetic and narrow comparisons
+use the existing scalar and System V machinery. Bounded storage supports objects
+through 64 KiB and total frames through one MiB, with page touches that preserve
+incoming arguments. All 1,803 unit tests, 13 structural checks, 22 storage tests
+per release mode, captured-object smoke and readiness pass. The four added native
+populations pass 38,400 local observations against 19,200 LLVM references;
+eighteen protected-stack checks verify page probing. Earlier populations and the
+100-row/five-function cohort retain their counts. Minimum free space is
+38.80 GB, above the 24.36 GB reserve.
+The unchanged pinned upstream Fibonacci program now executes all six assertions
+in ReleaseFast and ReleaseSmall, matching LLVM exit status, stdout and stderr.
+ReleaseSafe remains incomplete: 1,025 of 1,568 selected functions emit, and 543
+fail. Remaining Safe value flow, arithmetic, memory, control flow and the real
+compiler runtime link precede three-mode acceptance. The
+[focused evidence](evidence/fibonacci_foundation_focused_20261105.json) records
+source equivalence, exact validation and remaining boundaries. All thirteen
+original probes remain unchanged; no archives were made.
+
+The earlier accepted [scalar startup checkpoint](evidence/scalar_forms_acceptance_20261105.json)
 at `d8c135e5` passes all 17 integration stages. Unsigned minimum and signed
 less-equal forms reuse scalar compare/select operations. Switch PHI edges retain
 original block identities and privately owned machine labels. Bounded stack
@@ -460,11 +480,12 @@ through these steps without stopping for another task-selection approval:
 3. Unsigned minimum, signed less-equal, switch PHI edges and bounded stack
    memset are accepted above. Resolve any remaining scalar forms as they emerge
    in the call and Safe paths.
-4. Support the retained indirect callbacks and their required calling conventions,
-   argument placement and result handling.
-5. Emit and link the complete unchanged program, compare it with LLVM in
-   ReleaseFast, ReleaseSafe and ReleaseSmall, and add it as a permanent regression
-   before full integration acceptance.
+4. Named indirect calls, bounded stack arguments and their result handling are
+   accepted above. Fast and Small execute the complete unchanged program.
+5. Resolve the remaining Safe scalar, memory, atomic and control-flow forms,
+   link the real pinned compiler runtime and execute the unchanged Safe program.
+6. Retain matching LLVM exit status/stdout/stderr in all three release modes and
+   add a permanent mandatory regression before full integration acceptance.
 
 Rerun the whole captured failure report after each implementation change;
 newly exposed failures update the work order. Completion requires all six original

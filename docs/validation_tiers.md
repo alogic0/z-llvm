@@ -309,6 +309,16 @@ source independence and guards are checked; undef memory is overwritten before
 observation. Twenty-four mutation controls fail as expected. Earlier populations
 remain separate.
 
+The accepted [Fibonacci foundation canaries](evidence/fibonacci_foundation_acceptance_20261105.json)
+add indirect/stack calls (9,984 local observations), Safe scalar operations
+(4,992), signed/narrow/pointer comparisons (17,664), and bounded storage (5,760).
+Each population uses direct/release routes in all three modes and half as many
+independent LLVM reference observations. Storage also checks eighteen protected
+stack executions and six missing-page-probe mutation controls, alongside the
+ordinary result, live-value and guard mutations. Earlier populations remain
+separate. Unchanged upstream Fibonacci execution is proven in Fast and Small;
+Safe and a mandatory three-mode program regression remain open.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

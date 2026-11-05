@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `d8c135e5aabab3b411760845524415491cf6fd39`; tree: `41521b78a3b58e9a1795fe4b55118e1acf68251f`.
+Accepted revision: `580a866f8ab6b5c5d4b9ebc0d9b76f2a8a15fed9`; tree: `af908b9234b67558488fb5f3bd813109e1301d52`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,27 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [scalar startup checkpoint](evidence/scalar_forms_acceptance_20261105.json)
+The accepted [Fibonacci foundation checkpoint](evidence/fibonacci_foundation_acceptance_20261105.json)
+at `580a866f` passes all 17 integration stages. Named indirect calls, seven to
+sixteen word/pointer arguments, checked word arithmetic and narrow comparisons
+use the existing scalar and System V machinery. Bounded storage supports objects
+through 64 KiB and total frames through one MiB, with page touches that preserve
+incoming arguments. All 1,803 unit tests, 13 structural checks, 22 storage tests
+per release mode, captured-object smoke and readiness pass. The four added native
+populations pass 38,400 local observations against 19,200 LLVM references;
+eighteen protected-stack checks verify page probing. Earlier populations and the
+100-row/five-function cohort retain their counts. Minimum free space is
+38.80 GB, above the 24.36 GB reserve.
+The unchanged pinned upstream Fibonacci program now executes all six assertions
+in ReleaseFast and ReleaseSmall, matching LLVM exit status, stdout and stderr.
+ReleaseSafe remains incomplete: 1,025 of 1,568 selected functions emit, and 543
+fail. Remaining Safe value flow, arithmetic, memory, control flow and the real
+compiler runtime link precede three-mode acceptance. The
+[focused evidence](evidence/fibonacci_foundation_focused_20261105.json) records
+source equivalence, exact validation and remaining boundaries. All thirteen
+original probes remain unchanged; no archives were made.
+
+The earlier accepted [scalar startup checkpoint](evidence/scalar_forms_acceptance_20261105.json)
 at `d8c135e5` passes all 17 integration stages. Unsigned minimum and signed
 less-equal forms reuse scalar compare/select operations. Switch PHI edges retain
 original block identities and privately owned machine labels. Bounded stack
@@ -302,7 +322,8 @@ history are retired without archives. The latest
 of superseded AIR after the complete fresh replacement proof, making room for
 the cached run. Both runs now pass; old metadata and hashes remain. The retired
 checkout's dependency links are removed while their target repositories remain.
-The scalar startup slice is accepted. Continue the authorized full Fibonacci
-plan with indirect calls, stack arguments and remaining scalar forms. Complete
-Fast/Small execution, then continue the larger Safe frontier with its real
-runtime dependency. See [next steps](next_steps.md) for the full acceptance condition.
+The Fibonacci foundation is accepted, including unchanged Fast/Small execution.
+Continue the authorized plan through the remaining Safe code-generation forms,
+the real compiler runtime link and unchanged Safe execution. Add a permanent
+three-mode regression before final full integration acceptance. See
+[next steps](next_steps.md) for the full acceptance condition.

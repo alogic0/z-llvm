@@ -1,0 +1,1962 @@
+{
+  "schema": 1,
+  "status": "accepted by full integration",
+  "recorded_utc": "2026-11-05T10:10:14.126618+00:00",
+  "source_revision": "580a866f8ab6b5c5d4b9ebc0d9b76f2a8a15fed9",
+  "source_tree": "af908b9234b67558488fb5f3bd813109e1301d52",
+  "source_sha256": {
+    "src/codegen/x86_64/generic_cfg/aggregate_storage_tests.zig": "8c107aec3691dc5b2f4e77c4c2e01dede4727cb17447af112c21b6f2f7552691",
+    "src/codegen/x86_64/generic_cfg/comparison_forms.zig": "9b7f398cc1c6ddc3ecb19ac426deda994325a3effe3c09d0182b3d05bd1bd063",
+    "src/codegen/x86_64/generic_cfg/composed_helpers.zig": "c5601540b6c4a41dca8c567828308298c1989e2c977cb5e6d865272d8a794d28",
+    "src/codegen/x86_64/generic_cfg/composed_selector_calls.zig": "0e7b4434b8c2aa60e4f644f197dd48a9549551b99e3a41b1e0f3d50df90d801b",
+    "src/codegen/x86_64/generic_cfg/composed_selector_frame.zig": "7d9026e715c5dbc82ec1b0424e6fcdab7f4c88eda156c23962d4c954bb38481f",
+    "src/codegen/x86_64/generic_cfg/composed_selector_impl.zig": "b09d0a3f70aa74553ddd96eb054e2bdaba411d16f2be97cecbbf3887412f0138",
+    "src/codegen/x86_64/generic_cfg/composed_selector_scalar.zig": "c1b786d94e46e18d6588a5de77c106a5f893102f45f014781fd5eb2e6c2ed0cf",
+    "src/codegen/x86_64/generic_cfg/composed_selector_state.zig": "30bec7f5044ff58bd1f3c5c0f0ae6256fae153ccc7d28918cc869527bce25a0a",
+    "src/codegen/x86_64/generic_cfg/indirect_stack_calls_tests.zig": "a45e2c5bb4d9424174ea76c52d76d59bf4e21de211b35ef21da43bbe6c5ef5f9",
+    "src/codegen/x86_64/generic_cfg/inspection.zig": "a9d4f0d1a7fa7d4d9251b517bc24d2c0b1b6d5ece2c9fae830b085e771b1b302",
+    "src/codegen/x86_64/generic_cfg/narrow_abi.zig": "084da53489978ec84e7970d4768a360f3cb5ec687315875145dbb53b2b36ef08",
+    "src/codegen/x86_64/generic_cfg/overflow_values.zig": "6676dcacff17ad26434dcdf15e5f47bd3f5a8ea91d569f90fa8d81a84ba24b02",
+    "src/codegen/x86_64/generic_cfg/padded_frame.zig": "6ea4ada4b944b9bb8f0923ba3b2ddfeb5f63b16f3109a3d09a225d5931ecaa11",
+    "src/codegen/x86_64/generic_cfg/padded_frame_tests.zig": "d81ca8898c418a354eabb69262560c3fd64df25f540de640450a993031f2d6a3",
+    "src/codegen/x86_64/generic_cfg/scalar_forms.zig": "32009e640edd2edc70c207a6c5eb87b8c48293bb249fd7745e98af5c2fde5132",
+    "src/codegen/x86_64/generic_cfg/scalar_forms_tests.zig": "7200b703779c0102a6fc43ac8308ce16e51107506afcb04154714c1a8a1e95d9",
+    "src/codegen/x86_64/generic_cfg/selector_types.zig": "b2752b283f1021dbd762852ce3221acaff9126f643ae8975499ff1d81a3618ab",
+    "src/codegen/x86_64/generic_cfg/source_guard/model.zig": "005059d95e8d38f529d94f0dc2a922d5e94def403c52eba7f262c58494b45c0c",
+    "src/codegen/x86_64/generic_cfg/stack_arguments.zig": "d0b649be71393a0b13a40870a763f2f5fa703b80a8c0436b6cc8de3b3f035ef4",
+    "src/codegen/x86_64/generic_cfg/storage_layout.zig": "8ee91b82219b6d221dfdde2b8a0feb433047477172b63a9377574951d87b809a",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_cast.zig": "f70e1bffa599c236546658cece24fd018264ed3ae591bfe2b535e899a31fd840",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/lifetime_admission.zig": "5cf1d39c7ade5ccb589cd9dffeeb1b44ba02166c11e1aa0d7c7378332dea4a94",
+    "src/codegen/x86_64/generic_cfg/word_pair_values.zig": "ad9174e411f9b4e37d41436991069c7354fee015cfda988a8947cd01b5167a7d",
+    "src/codegen/x86_64/generic_cfg_selector.zig": "c69b1a6d2ba0ecdf874097624e5a2b76c78ca430100847d7aeb17232785cf646",
+    "src/main_flow_ir_writer.zig": "fac505e11d9165b551812c4d9586716c3033cbae501943e9dc60d259c8c8f8ab",
+    "src/tests.zig": "ba81bbd2f9717bd9cb90c13b2e00b56c9cec0e3dc82cf51218bfd50e60c3d8a9",
+    "src/tests/codegen_x86_64_generic_cfg_selector_limb.zig": "a0e6af8a807761049573bc3fadf73885a2e7a02f4ae88887784f5ddea8ea4478",
+    "test/real_programs/bounded_storage.ll": "bbabca901723c46239ab3e7abb9e497255c746ca944018b02d2fd7e4035ae03f",
+    "test/real_programs/bounded_storage_driver.c": "348c2ab0a49da38586a1871a618b7b674db7c784988de39627fb7cf220d2214f",
+    "test/real_programs/indirect_stack_calls.ll": "dc750428fa3bc7231f1d42b8be25e226d797cd85c29d0bc68e4a145d035c30c7",
+    "test/real_programs/indirect_stack_calls_driver.c": "5e46c3e9db777c533595d6277904d127b580af0370d7813cdf6970b3a89d28f0",
+    "test/real_programs/safe_comparisons.ll": "a7011e0d8fedf92ec110b99aa61689763ba4f8d11d2127f6d4b76ff879b410bf",
+    "test/real_programs/safe_comparisons_driver.c": "afcaec8ef47a746cbeb388a30c9238ea9cab5791c893ec802c56c70cbae7a34c",
+    "test/real_programs/safe_scalar_forms.ll": "ef50752f4c2976aa6f8e9845acec2e87677bdf5f1f9191d86a454cce34a7b55e",
+    "test/real_programs/safe_scalar_forms_driver.c": "97e8538a05dc51e6d15f987de0937f81e51ba057de99b18808ae9ffef16f42d8",
+    "tools/run_upstream_c_program.py": "68799078d6e58bdb0e240fe210eb160d1ef6d01038551f717b31ffa10f7194c0"
+  },
+  "behavior": [
+    "Named indirect calls and bounded 7-16 word/pointer arguments use owned staging and existing System V homes; narrow and pair returns preserve their ABI bits.",
+    "Unsigned 64-bit add/sub overflow pairs, exact return-address depth zero, trap termination and i31 masks use existing scalar actions.",
+    "Narrow signed/unsigned comparisons normalize their actual widths, including two reproduced dirty-upper-bit wrong-code cases. Existing correct forms and the frozen FMA stream remain intact.",
+    "Exact native scalar storage supports objects through 64 KiB with private trailing padding, original copy extents, a bounded one-MiB total frame, and page touches that preserve incoming argument registers.",
+    "The unchanged pinned upstream Fibonacci program executes all six original assertions in ReleaseFast and ReleaseSmall, with LLVM-equivalent exit status, stdout and stderr."
+  ],
+  "known_boundaries": [
+    "ReleaseSafe whole-program emission is incomplete: 1025 of 1568 functions emit, and 543 fail; no Safe local object or execution is claimed.",
+    "Remaining Safe value flow, arithmetic, atomic, memory and control-flow forms and the real pinned compiler runtime link remain open.",
+    "The authorized plan continues through unchanged ReleaseSafe execution and a permanent mandatory three-mode regression."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 2815805409,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-build-r2.json",
+          "sha256": "0a86d33e01ce1f928c9afd805670aa678cd6712a29abf528ef99f1c86e8eda0b"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-build-r2.log",
+          "sha256": "4e4a8c354084b7e6f332c16bb341023de9df90837e48439b0e9db9276e918880"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 12721810839,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-units-r2.json",
+          "sha256": "e4c7ccc4370a4b3cdfa2ebc773e1ac753618393676d9f80d42abf306b7057bb1"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-units-r2.log",
+          "sha256": "facdc5f524760983fbc76c4ae15fc4fc606fa0ca1cb818537aeeb4da1ee31363"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 535597330,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-structural.json",
+          "sha256": "1d6422475203090b216b798aa18c24d3c9a459e06c65a919613de190b27e5476"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-structural.log",
+          "sha256": "e023efbd4c352127e8f2b8d8ab1c2fad4ba773c0147b27c4db206050c6ad6a03"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 6115924642,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-captured-object.json",
+          "sha256": "65a9b5bd4a2b6195a44bfd289522df8d6880ef69a9b3994dae01ecc0b5c70df0"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-captured-object.log",
+          "sha256": "3c3d67f4ce9f7e7a5ff0391033dfd2143e17508c081b84638571e0a322571d06"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "run",
+          "tools/run_focused_codegen_canaries.zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 1215865094,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-canaries-r2.json",
+          "sha256": "d626613ad8add1803835855df6eaa3052c09b39c5cea356382a72cff0615ff8b"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-canaries-r2.log",
+          "sha256": "6d7381be6229ccea728310b5dbf1882a87d96eb11442182d8edbbdc11d806cc1"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseFast",
+          "-Dtest-filter=storage",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 58374670414,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-ReleaseFast.json",
+          "sha256": "9c93e7326c76fb06ebc32eca6f5b1be6a10506951ac156b1ecfc086abd1540a2"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-ReleaseFast.log",
+          "sha256": "4a9e813cdedb523099039c9b1d8af9f91eb163a93c8b25ea07cf50b93d75e126"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSafe",
+          "-Dtest-filter=storage",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 45733329524,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-ReleaseSafe.json",
+          "sha256": "3382491041f43d2ea197f468274953883a9e9d48a4b5732cf0a3436acbfe89de"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-ReleaseSafe.log",
+          "sha256": "5431ec51f3fe176a5cadd96cac33658eb126448ccba729e572db7b07b45e2b58"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSmall",
+          "-Dtest-filter=storage",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 19768035907,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-ReleaseSmall.json",
+          "sha256": "95616d83b1c3f771abb9b8b3cfae2d20c7a6619b8885dd39feb897baa43882e5"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-ReleaseSmall.log",
+          "sha256": "1fde4a3ec96cb28df6d714ba0bef097991e0ed16be49b7aa9dfdcfe245a105fa"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 457412367835,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-readiness.json",
+          "sha256": "7a3bfed0957a2bbba3113e5f29f7c4ec28eece380f1989b40b7246f677e5fef3"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-readiness.log",
+          "sha256": "e2f553074ccb57fc8e7681c7df6ae900e29a126c39c0e92722f2a9cb2e89b769"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_storage_existing_native.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 52498725294,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-existing-native.json",
+          "sha256": "98fee3b055cb16a5563738c59c1e06681e01cdc9baa000ceaa2101c8ae41c2ec"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-existing-native.log",
+          "sha256": "be6e3a6991aa84c099f2400e52dbaf7159d2774131468011a1f8ed1cc9861095"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_storage_controls.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 6516618915,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-controls-r2.json",
+          "sha256": "5bb130454031a10bfee19db8d1c576f46ed31f29704b2445cd5a263ed562b681"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-controls-r2.log",
+          "sha256": "21be1d396e8150324acf19a5cc10a501801d9b39087abf888ef78fc52c3e3dce"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/storage-fast-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseFast",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 2564150876,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-fast-program.json",
+          "sha256": "73cbed22cc249fd0646c59b6ebdb06946d97369561ec9a459507c1a73aa30a22"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-fast-program.log",
+          "sha256": "500c9e4f3acbf93b6236181f40f6cebb04cb0ec732a019834d8ce965a9c0bd58"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/storage-small-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseSmall",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 2205470977,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-small-program.json",
+          "sha256": "96835067de5ca49c006baee0da4328df6ec009587a5449b0a5fd6f6aef6ad336"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-small-program.log",
+          "sha256": "ea93caf9420ff0b9d15eaa788ecefd6efc5931d763e6d4d79cf3c86c3cc49779"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 1940906705,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-build.json",
+          "sha256": "30206a9db2900c3aca0907db191770bb432d7931d7267cb114659b4aa66b18b8"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-build.log",
+          "sha256": "f51a76ca2b1684b344c2a08a3d40a18e440be5950042cd78e9cf14a6bcb438d5"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/fibonacci-20261104/check_storage_native.py",
+          "local-state/validations/fibonacci-20261104/foundation-main-native"
+        ],
+        "returncode": 0,
+        "wall_ns": 9221822490,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-main-native.json",
+          "sha256": "646e70d5cbdb0066c4f33ba6e00250e508b78a81708e8c5eb2042887a8a54b57"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-main-native.log",
+          "sha256": "dec7ee32da2d08583f14f90ca8cea75ae7a6d97e08cdbebf7cdb90c7919b67a3"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/validations/fibonacci-20261104/foundation-fast-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseFast",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 1914374696,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-fast-program.json",
+          "sha256": "3c03c77c7a734f6683a701b573e4abcff3b2843efdd796b9b67512a61868659f"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-fast-program.log",
+          "sha256": "e7a66fb252c144bd66a945476e3930cff6d7bff8c8ff321d7888cfa8fe420034"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/validations/fibonacci-20261104/foundation-small-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseSmall",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 1561608204,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-small-program.json",
+          "sha256": "aed130a428f903ac59fa326537ed5994650edde8c2d20410c9dd8d80c2e3fe92"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-small-program.log",
+          "sha256": "8ecad9221059238ceb465e0016bdc431e2594a4b71a44aef68b96ec3f53350f9"
+        }
+      }
+    ],
+    "unit_tests": 1803,
+    "structural_tests": 13,
+    "focused_storage_tests_per_release_mode": 22,
+    "native": {
+      "status": "passed",
+      "bounded_storage_local_observations": 5760,
+      "bounded_storage_reference_observations": 2880,
+      "compiler_sha256": "cc8b57c409c7a67b6947a23433f81a03e88334e8ae2e9486753e4220f27d59f6",
+      "inputs": {
+        "test/real_programs/bounded_storage.ll": "bbabca901723c46239ab3e7abb9e497255c746ca944018b02d2fd7e4035ae03f",
+        "test/real_programs/bounded_storage_driver.c": "348c2ab0a49da38586a1871a618b7b674db7c784988de39627fb7cf220d2214f"
+      },
+      "bounded_storage_guard_checks": 18
+    },
+    "prior_native": {
+      "safe_comparisons_local_observations": 17664,
+      "safe_comparisons_reference_observations": 8832,
+      "safe_scalar_forms_local_observations": 4992,
+      "safe_scalar_forms_reference_observations": 2496,
+      "indirect_stack_calls_local_observations": 9984,
+      "indirect_stack_calls_reference_observations": 4992,
+      "scalar_forms_local_observations": 3840,
+      "scalar_forms_reference_observations": 1920,
+      "aggregate_storage_local_observations": 4608,
+      "aggregate_storage_reference_observations": 2304,
+      "narrow_abi_local_observations": 4992,
+      "narrow_abi_reference_observations": 2496,
+      "constant_remainder_local_observations": 3072,
+      "constant_remainder_reference_observations": 1536,
+      "rax_pointer_load_local_observations": 2688,
+      "rax_pointer_load_reference_observations": 1344,
+      "general_array_stride_local_observations": 1920,
+      "general_array_stride_reference_observations": 960,
+      "bounded_frame_local_observations": 768,
+      "bounded_frame_reference_observations": 384,
+      "module_dependencies_local_observations": 330,
+      "module_dependencies_reference_observations": 165,
+      "array_stride_local_observations": 1536,
+      "array_stride_reference_observations": 768,
+      "boolean_calls_local_observations": 1536,
+      "boolean_calls_reference_observations": 768,
+      "global_addresses_local_observations": 192,
+      "global_addresses_reference_observations": 96,
+      "global_memory_local_observations": 240,
+      "global_memory_reference_observations": 120,
+      "type_layout_padding_local_observations": 768,
+      "type_layout_padding_reference_observations": 384,
+      "word_pair_local_observations": 384,
+      "word_pair_reference_observations": 192,
+      "signed_nonnegative_local_observations": 1536,
+      "signed_nonnegative_reference_observations": 768,
+      "integer_pointer_local_observations": 1536,
+      "integer_pointer_reference_observations": 768,
+      "scalar_stack_local_observations": 486,
+      "scalar_stack_reference_observations": 243,
+      "pointer_stack_local_observations": 768,
+      "pointer_stack_reference_observations": 384,
+      "compiler_sha256": "41f2af23ce35717e2ec32a8a786ab8da9e6a929a6a93f45515049f0cdc16e91d",
+      "status": "passed",
+      "module_dependencies_environment_checks": 3,
+      "module_dependencies_negative_controls": 30
+    },
+    "negative_controls": {
+      "status": "passed",
+      "compiler_sha256": "41f2af23ce35717e2ec32a8a786ab8da9e6a929a6a93f45515049f0cdc16e91d",
+      "negative_controls": 30,
+      "cases": [
+        {
+          "control": "wrong-tail",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-tail",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-tail",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-tail",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-tail",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-tail",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-live-guard",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-live-guard",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-live-guard",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-live-guard",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-live-guard",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-live-guard",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-word-width",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-word-width",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-word-width",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-word-width",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-word-width",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-word-width",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-probe-result",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-probe-result",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-probe-result",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-probe-result",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-probe-result",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-probe-result",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "missing-page-probes",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "ordinary_exit_status": 0,
+          "exit_status": 1,
+          "removed_probe_touches": 9,
+          "frame_bytes_unchanged": 33032,
+          "rejected": true
+        },
+        {
+          "control": "missing-page-probes",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "ordinary_exit_status": 0,
+          "exit_status": 1,
+          "removed_probe_touches": 9,
+          "frame_bytes_unchanged": 33032,
+          "rejected": true
+        },
+        {
+          "control": "missing-page-probes",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "ordinary_exit_status": 0,
+          "exit_status": 1,
+          "removed_probe_touches": 9,
+          "frame_bytes_unchanged": 33032,
+          "rejected": true
+        },
+        {
+          "control": "missing-page-probes",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "ordinary_exit_status": 0,
+          "exit_status": 1,
+          "removed_probe_touches": 9,
+          "frame_bytes_unchanged": 33032,
+          "rejected": true
+        },
+        {
+          "control": "missing-page-probes",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "ordinary_exit_status": 0,
+          "exit_status": 1,
+          "removed_probe_touches": 9,
+          "frame_bytes_unchanged": 33032,
+          "rejected": true
+        },
+        {
+          "control": "missing-page-probes",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "ordinary_exit_status": 0,
+          "exit_status": 1,
+          "removed_probe_touches": 9,
+          "frame_bytes_unchanged": 33032,
+          "rejected": true
+        }
+      ],
+      "commands": [
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-tail-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-live-guard-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-word-width-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/wrong-probe-result-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=asm",
+            "test/real_programs/bounded_storage.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/direct-assembly"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/direct.S",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/direct-ordinary"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/direct",
+            "--guard-probe"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/direct-guard"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "test/real_programs/bounded_storage.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=asm",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/release-assembly"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/release.S",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/release-ordinary"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/release",
+            "--guard-probe"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseFast/release-guard"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=asm",
+            "test/real_programs/bounded_storage.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/direct-assembly"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/direct.S",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/direct-ordinary"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/direct",
+            "--guard-probe"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/direct-guard"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "test/real_programs/bounded_storage.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=asm",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/release-assembly"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/release.S",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/release-ordinary"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/release",
+            "--guard-probe"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSafe/release-guard"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=asm",
+            "test/real_programs/bounded_storage.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/direct-assembly"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/direct.S",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/direct-ordinary"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/direct",
+            "--guard-probe"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/direct-guard"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "test/real_programs/bounded_storage.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=asm",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/release-assembly"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/bounded_storage_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/release.S",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/release-ordinary"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/release",
+            "--guard-probe"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-native-controls-r2/missing-page-probes-ReleaseSmall/release-guard"
+        }
+      ],
+      "fixture_sha256": "bbabca901723c46239ab3e7abb9e497255c746ca944018b02d2fd7e4035ae03f",
+      "driver_sha256": "348c2ab0a49da38586a1871a618b7b674db7c784988de39627fb7cf220d2214f",
+      "fixture_unchanged": true,
+      "core_dumps_disabled": true
+    },
+    "source_import": {
+      "status": "passed",
+      "imported_revision": "580a866f8ab6b5c5d4b9ebc0d9b76f2a8a15fed9",
+      "prototype_revision": "af9036ba5bf0f1c64d1eae1f0b4cb8b397183047",
+      "identical_non_documentation_files": 1547,
+      "prototype_source_snapshot": "local-state/validations/fibonacci-20261104/storage-prototype-sources.json",
+      "includes_preserved_scalar_canary_repair": true,
+      "source_commits": [
+        "6f8a718b",
+        "55cf2966",
+        "98f82729",
+        "af9036ba"
+      ],
+      "imported_commits": [
+        "43fa8c15",
+        "4065b602",
+        "4e3c3541",
+        "580a866f"
+      ],
+      "archives_created": 0
+    },
+    "prototype_snapshot": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-prototype-sources.json",
+      "sha256": "85b58dd02e9a9a1e4fe258b6552962d7dabceb98b31c443abe765e88f026f99e"
+    },
+    "prototype_phase_records": [
+      {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/calls-tier2-verification.json",
+        "sha256": "521017dc96e091eec93f7178e024f62c5500ad8344103389ab976456f41ae7a6"
+      },
+      {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/safe-scalar-tier2-verification.json",
+        "sha256": "e0ec9a57b48fdec8a49341a8088d63da4cbc5674ff2200bf30719d6ac6d0cadf"
+      },
+      {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/comparisons-tier2-verification.json",
+        "sha256": "d0978234b1af54753b4f96b25cd3ea9cb8b4ca3963be73fd3d3b5beb7c8002a4"
+      },
+      {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-tier2-verification.json",
+        "sha256": "ae659328119030e4eb69d519bf03c14628dc619953243ad7f3274a7bf4b3ec08"
+      }
+    ],
+    "format_baseline": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-format-baseline.json",
+      "sha256": "88345a02949cc42a22532c78743e2675c7540745e9c0d99904c46650967431f7"
+    }
+  },
+  "fibonacci_programs": [
+    {
+      "mode": "ReleaseFast",
+      "report": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-fast-program/report.json",
+        "sha256": "0f264783d98b08866da516d8d14f27a9ce3d8010c30d4172786b328843e295e1"
+      },
+      "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+      "local_executions": 1,
+      "reference_executions": 1,
+      "exit_stdout_stderr_matched": true
+    },
+    {
+      "mode": "ReleaseSmall",
+      "report": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-small-program/report.json",
+        "sha256": "01e39b10870a28b0d37689a1dc730b41a0a4e0260b8cf33117eb29d002bce176"
+      },
+      "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+      "local_executions": 1,
+      "reference_executions": 1,
+      "exit_stdout_stderr_matched": true
+    }
+  ],
+  "release_safe": {
+    "selected_functions": 1568,
+    "emitted_functions": 1025,
+    "failed_functions": 543,
+    "first_failure": {
+      "function": "debug.defaultPanic",
+      "diagnostic": "UnsupportedCodegenControlFlow",
+      "selector_tag": "unsupported_value",
+      "selector_detail": "stage2-unsupported-value"
+    },
+    "object_bytes": 0,
+    "local_whole_program_executions": 0,
+    "input_sha256": "147ebba2de9f96cae9e6ce53fedd53b6fa082bc46048e51433652e5887a4f60c",
+    "prototype_compiler_sha256": "41f2af23ce35717e2ec32a8a786ab8da9e6a929a6a93f45515049f0cdc16e91d",
+    "source_equivalence": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/foundation-import-verification.json",
+      "sha256": "ae2ef6014825e946f9388829f4f0ffc39b68c4d7c4819f27c409e8f89a2142f2"
+    },
+    "report": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-frontier-r2.json",
+      "sha256": "91916ea86148431e0bd510b4ea02d90a98d7830d47a508e86410a427e6802628"
+    },
+    "stderr": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/storage-frontier-r2.stderr",
+      "sha256": "fc73322e301cc6217ff662b6f14a41cde8bff3456c6da91a0d089702719b161c"
+    }
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0
+}
