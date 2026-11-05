@@ -21,9 +21,10 @@ fn parameter(param: ir.Param) bool {
 
 fn callForm(call: ir.CallInst) bool {
     if (std.mem.startsWith(u8, call.callee, "llvm.") or
-        std.mem.eql(u8, call.callee, "zig.target.intByteSize") or call.callee_value != null or
+        std.mem.eql(u8, call.callee, "zig.target.intByteSize") or
         call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or
         call.callee_function_ty != null or !helpers.isDefaultOrFastcc(call.calling_conv)) return false;
+    if (call.callee_value) |callee| if (callee != .named or callee.named.len == 0 or callee.named[0] == '@') return false;
     sysv.rejectUnsupportedCallEnvelope(call) catch return false;
     for (call.args.items) |arg| sysv.rejectUnsupportedCallArgAttrs(arg) catch return false;
     return true;
@@ -31,7 +32,7 @@ fn callForm(call: ir.CallInst) bool {
 
 fn callReturn(call: ir.CallInst) bool {
     // Keep the established typed boolean-return action when it already applies.
-    return narrow(call.ret_ty) and call.ret_ty.int != 1 and call.ret_attrs == null;
+    return narrow(call.ret_ty) and (call.ret_ty.int != 1 or call.callee_value != null) and call.ret_attrs == null;
 }
 
 fn needsCall(call: ir.CallInst) bool {

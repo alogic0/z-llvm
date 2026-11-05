@@ -57,6 +57,7 @@ const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
 const stage2_max_blocks = stage2_planning.stage2_max_blocks;
 const stage2_spill_slots = stage2_planning.stage2_spill_slots;
 const phi_regs = [_]ArgReg{ .r8, .r9, .rcx };
+const stack_arguments = @import("stack_arguments.zig");
 
 const blockHasPhiIncomingFrom = composed_helpers.blockHasPhiIncomingFrom;
 const phiIncomingFrom = composed_helpers.phiIncomingFrom;
@@ -134,6 +135,7 @@ pub fn tryLowerComposedCfgWithContextAndAddressDependencies(
     if (try bindParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try bindPhiResults(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try selector_frame.prepareStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);
+    if (try bindStackParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try stabilizeFramedPhiDestinations(&composed)) |diagnostic| return unsupported(diagnostic);
     if (try stabilizeFramedParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (composed.stack_frame_bytes != 0) {
@@ -181,9 +183,16 @@ pub fn tryLowerComposedCfgWithContextAndAddressDependencies(
 pub const ComposedBlockSelector = selector_state.ComposedBlockSelector;
 
 fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
+    if (stack_arguments.hasParameters(function)) for (function.params.items) |param| {
+        try sysv_abi.rejectUnsupportedCallArgAttrs(.{ .ty = param.ty, .attrs = param.attrs, .value = .{ .named = param.name } });
+    };
     var gpr_index: usize = 0;
     var xmm_index: usize = 0;
     for (function.params.items) |param| {
+        if (gpr_index >= 6 and stack_arguments.hasParameters(function)) {
+            gpr_index += 1;
+            continue;
+        }
         if (param.ty == .half or param.ty == .float or param.ty == .double) {
             const reg = XmmReg.fromIndex(xmm_index) catch return .{ .unsupported_value = "composed-block-param-xmm-reg" };
             const bits: u16 = if (param.ty == .half) 16 else if (param.ty == .float) 32 else 64;
@@ -219,6 +228,32 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
             }
         }
         gpr_index += 1;
+    }
+    return null;
+}
+
+fn bindStackParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
+    if (!stack_arguments.hasParameters(function)) return null;
+    for (function.params.items[6..], 0..) |param, index| {
+        // The incoming return address precedes 8-byte argument slots. Copy
+        // only the declared scalar width into our own persistent spill home.
+        const offset: u32 = std.math.cast(u32, @as(usize, selector.stack_frame_bytes) + 8 + index * 8) orelse
+            return .{ .no_spill_envelope = "composed-block-stack-param-offset" };
+        const bits: u16 = if (param.ty == .ptr) 64 else param.ty.int;
+        var definition = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer definition.deinit();
+        if (try definition.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+        try selector.machine.instructions.append(selector.allocator, if (bits == 32)
+            .{ .load_stack_disp32_eax = offset }
+        else
+            .{ .load_stack_disp32_rax = offset });
+        try definition.define(param.name, if (bits == 32) .zeroExtending(32) else .fullRax());
+        try definition.commit();
+        if (try selector_state.spillValue(selector, param.name)) |diagnostic| return diagnostic;
+        if (param.ty == .ptr) {
+            try selector.abi_pointer_params.put(param.name, {});
+            if (param.attrs) |attrs| if (hasAttrToken(attrs, "readonly")) try selector.readonly_pointer_params.put(param.name, {});
+        }
     }
     return null;
 }
@@ -496,6 +531,7 @@ pub fn tryLowerComposedBlockWithContextAndAddressDependencies(
 
     if (try bindParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try selector_frame.prepareStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);
+    if (try bindStackParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try stabilizeFramedParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
 
     const block = function.blocks.items[0];

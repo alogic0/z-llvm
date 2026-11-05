@@ -39,6 +39,16 @@ fn signedLe(icmp: ir.IcmpInst) bool {
         icmp.lhs == .named and (icmp.rhs == .named or icmp.rhs == .int);
 }
 
+fn unsignedSaturatingSub(call: ir.CallInst) bool {
+    const bits: u16 = if (std.mem.eql(u8, call.callee, "llvm.usub.sat.i64")) 64 else if (std.mem.eql(u8, call.callee, "llvm.usub.sat.i32")) 32 else return false;
+    if (call.callee_value != null or call.inline_asm != null or call.raw_args != null or
+        call.operand_bundle != null or call.callee_function_ty != null or call.calling_conv != null or
+        call.ret_attrs != null or call.args.items.len != 2 or !call.ret_ty.eql(.{ .int = bits })) return false;
+    sysv.rejectUnsupportedCallEnvelope(call) catch return false;
+    for (call.args.items) |arg| if (!arg.ty.eql(call.ret_ty) or arg.attrs != null or arg.value != .named) return false;
+    return true;
+}
+
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
     var result = function;
     result.blocks = .empty;
@@ -69,8 +79,47 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     } } });
                     changed = true;
                     continue;
+                } else if (unsignedSaturatingSub(call)) {
+                    const condition = try temporary(allocator, function, &serial);
+                    const difference = try temporary(allocator, function, &serial);
+                    const lhs = call.args.items[0].value;
+                    const rhs = call.args.items[1].value;
+                    try block.instructions.append(allocator, .{ .result = condition, .kind = .{ .icmp = .{
+                        .predicate = .ult,
+                        .operand_ty = call.ret_ty,
+                        .lhs = lhs,
+                        .rhs = rhs,
+                    } } });
+                    // Wrapping subtraction is defined even on the discarded
+                    // underflow arm; attaching nuw here would create poison.
+                    try block.instructions.append(allocator, .{ .result = difference, .kind = .{ .binary = .{
+                        .op = .sub,
+                        .ty = call.ret_ty,
+                        .lhs = lhs,
+                        .rhs = rhs,
+                    } } });
+                    try block.instructions.append(allocator, .{ .result = inst.result, .kind = .{ .select = .{
+                        .cond_ty = .{ .int = 1 },
+                        .cond = .{ .named = condition },
+                        .ty = call.ret_ty,
+                        .true_value = .{ .int = 0 },
+                        .false_value = .{ .named = difference },
+                    } } });
+                    changed = true;
+                    continue;
                 },
-                .icmp => |icmp| if (signedLe(icmp)) {
+                .icmp => |icmp| if (!icmp.samesign and
+                    (icmp.predicate == .eq or icmp.predicate == .ne) and
+                    (icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })) and
+                    icmp.lhs == .int and icmp.rhs == .named)
+                {
+                    var comparison = inst;
+                    comparison.kind.icmp.lhs = icmp.rhs;
+                    comparison.kind.icmp.rhs = icmp.lhs;
+                    try block.instructions.append(allocator, comparison);
+                    changed = true;
+                    continue;
+                } else if (signedLe(icmp)) {
                     var comparison = inst;
                     comparison.result = try temporary(allocator, function, &serial);
                     comparison.kind.icmp.predicate = .sgt;

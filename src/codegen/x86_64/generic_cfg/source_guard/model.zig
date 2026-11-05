@@ -445,9 +445,9 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_fp.zig", .function = "lowerFloatToHalf", .body_sha256 = "ee1a865fa09595be9ac940a938d7ec3b5996b25a835a92afa7b17fbb72016960" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerHalfExtension", .body_sha256 = "86cd446354c4986acf2cc70c24d18f69f054f2a38703ab9ee7f2e47ae1e6be2c" },
 
-    .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .body_sha256 = "9815122b8c60a3b0cf21ce30c3d1df6a03f339ed7b61acc0bce57b96fab4a8a8" },
+    .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .body_sha256 = "3f5f2cea5796d0abf203512263e1048fff6a99055424e5af400bbc4d164ebd19" },
 
-    .{ .source = "composed_selector_impl.zig", .function = "bindParams", .body_sha256 = "57d9954389696dc118f20864ae522ee3709c8e7dda6816771e950fbf3d496e88" },
+    .{ .source = "composed_selector_impl.zig", .function = "bindParams", .body_sha256 = "8202324e1f10f6ca3472eb35af58f1a73d14555125d754007526b35a5f571279" },
     .{ .source = "composed_selector_impl.zig", .function = "bindPhiResults", .body_sha256 = "283fc0d5adddb7c7ac2fad47020bf99b026be3e2c09accabd0077d6e8b7abcf8" },
     .{ .source = "composed_selector_impl.zig", .function = "stabilizeFramedPhiDestinations", .body_sha256 = "84522a7d762d08de43dcffc4c9284f642605be75b0078f0bf74516df20f1196f" },
     .{ .source = "composed_selector_impl.zig", .function = "enterBlock", .body_sha256 = "edb2e130813a5ca0847f5e5060f9088d196db18deaec281dbd95a58b7db92b1f" },

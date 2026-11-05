@@ -298,7 +298,11 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
         }
         return null;
     }
-    if (call.callee_value != null) return .{ .unsupported_value = "indirect-call" };
+    if (call.callee_value) |callee| {
+        if (callee != .named or callee.named.len == 0 or callee.named[0] == '@' or
+            call.callee_function_ty != null or sysv_abi.callHasScalarSseType(call))
+            return .{ .unsupported_value = "indirect-call" };
+    }
     if (call.raw_args != null) return .{ .unsupported_instruction = "raw-call-args" };
     if (call.isDebugVariableLocation()) return null;
     if (std.mem.eql(u8, call.callee, "llvm.experimental.noalias.scope.decl"))

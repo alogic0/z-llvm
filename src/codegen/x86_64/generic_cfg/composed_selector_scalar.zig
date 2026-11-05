@@ -73,6 +73,11 @@ pub const lowerIcmp = selector_icmp.lowerIcmp;
 pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
+    if ((bits == 32 or bits == 64) and binary.op == .add and binary.lhs == .int and
+        binary.rhs == .int and (binary.rhs.int == 0 or binary.lhs.int == 0))
+    {
+        return lowerConstantIdentity(selector, result_name, binary, bits);
+    }
     if (bits == 52) return lowerI52Binary(selector, result_name, binary);
     if (bits == 1) {
         if ((binary.op != .@"and" and binary.op != .@"or") or valueIsInt(binary.lhs) or valueIsInt(binary.rhs)) return .{ .no_emitter = "composed-block-binary-width" };
@@ -119,6 +124,20 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
 
     _ = machineBinaryOp(binary.op) orelse return .{ .no_emitter = "composed-block-binary-op" };
     return lowerNamedScalarBinary(selector, result_name, binary, bits, exact_ei_narrow, .b07);
+}
+
+fn lowerConstantIdentity(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst, bits: u16) !?Diagnostic {
+    // Private aggregate extraction uses an identity add to name a scalar
+    // constant. Adding zero cannot overflow, including with nuw/nsw.
+    const value = if (binary.rhs.int == 0) binary.lhs else binary.rhs;
+    var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer transaction.deinit();
+    if (try transaction.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+    const definition: selector_state.AccumulatorDefinition = if (bits == 32) .zeroExtending(32) else .fullRax();
+    try transaction.materialize(value, definition);
+    try transaction.define(result_name, definition);
+    try transaction.commit();
+    return null;
 }
 
 fn lowerB01NamedScalarBinary(

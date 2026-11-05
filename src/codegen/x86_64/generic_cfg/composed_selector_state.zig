@@ -2413,21 +2413,36 @@ fn dropExpiredAccumulatorBindingsExcept(selector: *ComposedBlockSelector, exclud
 /// Preserve the simultaneous call inputs before sequential ABI placement.
 /// In particular, a last-use argument can alias a register filled for an earlier
 /// argument even though it is not live after the call.
+/// Preserve the simultaneous pointer input before any ABI register changes.
+/// Consumers receive its durable frame index, never a borrowed register home.
+pub fn preserveIndirectCallTarget(selector: *ComposedBlockSelector, callee: ir.Value) !FrameIndex {
+    if (callee != .named) return error.UnsupportedCodegenValue;
+    const binding = selector.values.get(callee.named) orelse return error.UnsupportedCodegenValue;
+    if (binding.vreg.bits != 64 or binding.vreg.class != .gpr64) return error.UnsupportedCodegenValue;
+    if (try spillValue(selector, callee.named)) |_| return error.UnsupportedCodegenValue;
+    const home = selector.values.get(callee.named).?.loc;
+    if (home != .spill64) return error.UnsupportedCodegenValue;
+    return home.spill64;
+}
+
 pub fn preserveCallArgumentSources(selector: *ComposedBlockSelector, call: ir.CallInst) !?Diagnostic {
+    const stages_stack = @import("stack_arguments.zig").callCount(call) != null;
     var abi_index: usize = 0;
     for (call.args.items) |arg| {
         const previous = abi_index;
         abi_index += composed_helpers.callArgRegisterCount(arg.ty) orelse continue;
         if (arg.value != .named or !try valueIsLiveAtOrAfterCurrent(selector, arg.value.named)) continue;
         const loc = resolveValue(selector, arg.value) orelse continue;
-        var overlaps = false;
+        // Staging stack inputs precedes final register placement. Preserve
+        // every register source, including inputs at their final use.
+        var overlaps = stages_stack;
         for (0..@min(previous, 6)) |index| {
             const reg = ArgReg.fromIndex(index) catch unreachable;
             if (composed_helpers.locContainsReg(loc, reg)) overlaps = true;
         }
         if (!overlaps) continue;
         switch (loc) {
-            .arg32, .arg64, .scratch32, .scratch64, .readonly_table_ptr => {
+            .eax, .rax, .arg32, .arg64, .scratch32, .scratch64, .readonly_table_ptr => {
                 if (try spillValue(selector, arg.value.named)) |diagnostic| return diagnostic;
             },
             .arg128, .scratch128 => if (try spillPairValue(selector, arg.value.named)) |diagnostic| return diagnostic,

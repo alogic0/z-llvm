@@ -169,7 +169,7 @@ test "aggregate storage pair legalization rejects barriers unsupported ABI and u
         "define void @f(ptr %p) {\nentry:\n  %v = insertvalue { ptr, i64 } poison, i64 1, 1\n  store volatile { ptr, i64 } %v, ptr %p\n  ret void\n}\n",
         "define { ptr, i64 } @f({ ptr, i64 } %p) {\nentry:\n  ret { ptr, i64 } %p\n}\n",
         "declare coldcc { ptr, i64 } @callee()\ndefine i64 @f() {\nentry:\n  %v = call coldcc { ptr, i64 } @callee()\n  %x = extractvalue { ptr, i64 } %v, 1\n  ret i64 %x\n}\n",
-        "define i64 @f(ptr %callee) {\nentry:\n  %v = call { ptr, i64 } %callee()\n  %x = extractvalue { ptr, i64 } %v, 1\n  ret i64 %x\n}\n",
+        "define i64 @f(ptr %callee) {\nentry:\n  %v = call coldcc { ptr, i64 } %callee()\n  %x = extractvalue { ptr, i64 } %v, 1\n  ret i64 %x\n}\n",
         "define i64 @f() {\nentry:\n  %v = extractvalue { ptr, i64 } { i64 1, i64 2 }, 1\n  ret i64 %v\n}\n",
     };
     for (cases) |text| {

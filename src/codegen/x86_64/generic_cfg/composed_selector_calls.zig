@@ -15,6 +15,7 @@ const selector_fp = @import("composed_selector_fp.zig");
 const selector_memory = @import("composed_selector_memory.zig");
 const value_use = @import("composed_selector_value_use_transaction.zig");
 const intrinsic_attrs = @import("intrinsic_attrs.zig");
+const stack_arguments = @import("stack_arguments.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 const ArgReg = x86_64_types.ArgReg;
@@ -137,13 +138,18 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64")) return try lowerSmulOverflowI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128")) return try lowerSmulOverflowI128(selector, result, call);
     if (std.mem.startsWith(u8, call.callee, "llvm.")) return .{ .no_emitter = "composed-block-llvm-intrinsic" };
-    if (call.callee_value != null) return .{ .unsupported_value = "composed-block-indirect-call" };
+    if (call.callee_value) |callee| {
+        if (callee != .named or callee.named.len == 0 or callee.named[0] == '@' or
+            call.callee_function_ty != null or sysv_abi.callHasScalarSseType(call) or call.ret_ty.eql(.{ .int = 1 }))
+            return .{ .unsupported_value = "composed-block-indirect-call" };
+    }
     if (!isDefaultOrFastcc(call.calling_conv) or !sysv_abi.callReturnAttrsSupported(call) or call.raw_args != null or call.operand_bundle != null) {
         return .{ .no_emitter = "composed-block-call-form" };
     }
     if (sysv_abi.callHasScalarSseType(call)) return lowerScalarSseCall(selector, result, call);
     try sysv_abi.rejectUnsupportedCallEnvelope(call);
     try sysv_abi.rejectUnsupportedCallSignature(call);
+    for (call.args.items) |arg| try sysv_abi.rejectUnsupportedCallArgAttrs(arg);
     if (call.ret_ty.eql(.{ .int = 1 })) return lowerBooleanCall(selector, result, call);
     const ret_bits = if (call.ret_ty == .void) @as(u16, 0) else if (call.ret_ty == .ptr) @as(u16, 64) else intBits(call.ret_ty) orelse return .{ .no_emitter = "composed-block-call-ret" };
     if (ret_bits != 0 and ret_bits != 32 and ret_bits != 64 and ret_bits != 128) return .{ .no_emitter = "composed-block-call-ret-width" };
@@ -157,11 +163,34 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (transaction) |*active| {
         if (try active.prepareCallBeforeArguments(.clobber)) |diagnostic| return diagnostic;
     } else if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+    // The call target is another simultaneous input and can die at this call.
+    // Preserve it before argument registers change, then load RAX last.
+    const indirect_target: ?FrameIndex = if (call.callee_value) |callee|
+        selector_state.preserveIndirectCallTarget(selector, callee) catch |err| switch (err) {
+            error.UnsupportedCodegenValue => return .{ .unsupported_value = "composed-block-indirect-target" },
+            else => return err,
+        }
+    else
+        null;
     if (sysv_abi.isVariadicCall(call)) {
         if (try selector_state.preserveVariadicArgumentSources(selector, call)) |diagnostic| return diagnostic;
     }
     if (try selector_state.preserveCallArgumentSources(selector, call)) |diagnostic| return diagnostic;
-    for (call.args.items) |arg| {
+    const stack_count = stack_arguments.callCount(call) orelse 0;
+    var stack_sources: [stack_arguments.max_arguments - 6]FrameIndex = undefined;
+    if (stack_count != 0) {
+        for (call.args.items[6..], 0..) |arg, index| {
+            if (try lowerDirectCallArg(selector, arg, .rdi)) |diagnostic| return diagnostic;
+            // NUL cannot be an unquoted IR identifier. The state authority
+            // owns a copy of this private slot key and reuses it across calls.
+            var key_buffer: [40]u8 = undefined;
+            const key = try std.fmt.bufPrint(&key_buffer, "\x00outgoing.{d}", .{index});
+            const frame = selector_state.allocateSpillSlot(selector, key) orelse return .{ .no_spill_envelope = "composed-block-call-stack-slots" };
+            stack_sources[index] = frame;
+            try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame, .reg = .rdi } });
+        }
+    }
+    for (call.args.items[0..if (stack_count != 0) 6 else call.args.items.len]) |arg| {
         const target = ArgReg.fromIndex(abi_index) catch return .{ .unsupported_value = "composed-block-call-arg-reg" };
         if (try lowerDirectCallArg(selector, arg, target)) |diagnostic| return diagnostic;
         abi_index += callArgRegisterCount(arg.ty) orelse return .{ .no_emitter = "composed-block-call-arg-type" };
@@ -171,16 +200,38 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
 
     const needs_alignment = selector.stack_frame_bytes == 0;
     if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
+    var pushed_bytes: u32 = 0;
+    if (stack_count != 0) {
+        if (needs_alignment) return .{ .no_spill_envelope = "composed-block-call-stack-frame" };
+        if (stack_count % 2 != 0) {
+            try selector_frame.appendSubRsp(selector, 8);
+            pushed_bytes = 8;
+        }
+        var index = stack_count;
+        while (index != 0) {
+            index -= 1;
+            const displacement = std.math.add(u32, try stack_sources[index].byteOffset(), pushed_bytes) catch
+                return .{ .no_spill_envelope = "composed-block-call-stack-offset" };
+            try selector.machine.instructions.append(selector.allocator, .{ .push_stack_disp32 = displacement });
+            pushed_bytes += 8;
+        }
+    }
     if (sysv_abi.isVariadicCall(call)) {
         // Caller values are preserved and integer/pointer arguments materialized.
         // MOV leaves condition flags unchanged and supplies the SysV AL count.
         try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = 0 });
     }
-    if (transaction != null)
+    if (indirect_target) |frame| {
+        if (needs_alignment) return .{ .no_spill_envelope = "composed-block-indirect-frame" };
+        const displacement = std.math.add(u32, try frame.byteOffset(), pushed_bytes) catch return .{ .no_spill_envelope = "composed-block-indirect-offset" };
+        try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_rax = displacement });
+        try selector_state.emitEflagsInstruction(selector, .{ .indirect_call_rax = call.ret_ty }, .clobber);
+    } else if (transaction != null)
         try selector_state.emitEflagsInstruction(selector, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } }, .clobber)
     else
         try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
     if (needs_alignment) try selector_frame.appendAddRsp(selector, 8);
+    if (pushed_bytes != 0) try selector_frame.appendAddRsp(selector, pushed_bytes);
     if (result) |result_name| switch (ret_bits) {
         0 => return .{ .unsupported_value = "composed-block-void-call-result" },
         32 => {
