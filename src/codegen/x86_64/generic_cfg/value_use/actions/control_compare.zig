@@ -355,6 +355,7 @@ pub fn executeScratchCompare(
         return error.ValueUseScratchCompareAccumulatorSessionRequired;
 
     try preserveScratchCompareLiveAccumulator(Authority, transaction);
+    try preserveScratchCompareOverlappingRhs(Authority, transaction, action, plan.lhs_register);
     try refreshScratchCompareOperandViews(Authority, transaction, lhs_index, action);
     try failScratchCompareForTest(Authority, transaction, .after_canonical_view_refresh);
 
@@ -497,6 +498,28 @@ pub fn executeScratchCompare(
     try failScratchCompareForTest(Authority, transaction, .after_result_definition);
     try session.finalize();
     try failScratchCompareForTest(Authority, transaction, .after_result_finalization);
+}
+fn preserveScratchCompareOverlappingRhs(
+    comptime Authority: type,
+    transaction: anytype,
+    action: *const Types.ScratchCompareAction,
+    lhs_register: ArgReg,
+) !void {
+    const handle = switch (action.rhs) {
+        .named => |handle| handle,
+        .immediate, .null_pointer => return,
+    };
+    const rhs_index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
+    const name = switch (transaction.requests[rhs_index].source) {
+        .named => |*identity| identity.slice(),
+        else => return error.ValueUseUnsupportedSource,
+    };
+    const binding = transaction.selector.values.get(name) orelse return error.ValueUseUnresolvedSource;
+    // Staging the left operand can overwrite the right operand's register.
+    // Save its current value before rebuilding both canonical views, even
+    // when the comparison is its final use.
+    if (composed_helpers.locContainsReg(binding.loc, lhs_register))
+        try selector_state.spillValueOrError(transaction.selector, name);
 }
 fn preserveScratchCompareLiveAccumulator(
     comptime Authority: type,

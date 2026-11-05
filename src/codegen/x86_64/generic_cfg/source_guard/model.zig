@@ -422,10 +422,10 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_calls.zig", .function = "lowerUnsignedOverflowI32", .body_sha256 = "4dc4da7d4dd45a3ddb97b01d1c722605a902b76c147962bfc5581e59333d0121" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerSmulOverflowI64", .body_sha256 = "2a2054e1320aecd14ce33eea5acce117193675bcf71cbf9efc8160f573b98ded" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerCtpop", .body_sha256 = "386892044354332641c3184338b678f04aa018652f909cb27820bb82788fd66a" },
-    .{ .source = "composed_selector_calls.zig", .function = "lowerBitPermutation", .body_sha256 = "7ae35efc097e20cbd351e3b31531210c4c4dbf3395add38c8ddc5d8901b7d2b7" },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerBitPermutation", .body_sha256 = "ff4e9bae90ab951677b25c6f17249cc8bd2fb4600351488ecd0056ea33d9341a" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerAbsI128", .body_sha256 = "cf69f866c281db4b54bbeec420603927e57fc1b11220102ce0da5d2137296d79" },
 
-    .{ .source = "composed_selector_cfg.zig", .function = "lowerSelect", .body_sha256 = "7de55a040bf63ee1db4c709fde09ddf8c865a3dc6ba7ceadcd3677520937a5f1" },
+    .{ .source = "composed_selector_cfg.zig", .function = "lowerSelect", .body_sha256 = "45196a45740c3059e1f64929653e78e45620b04a0685368d268a5fbb1b01f5e0" },
     .{ .source = "composed_selector_cfg.zig", .function = "emitScalarSelectValue", .body_sha256 = "3cfedbd0e4c15ed10dbf266fcc09854fcc0a183f9eb6367f21c5a2a17832143a" },
     .{ .source = "composed_selector_cfg.zig", .function = "restoreDisplacedPhiDestinations", .body_sha256 = "60fd82341b65b3871cd42cc35b5b2b9accadccf217c551d619b742da4664dd1a" },
     .{ .source = "composed_selector_cfg.zig", .function = "emitPhiEdgeMoves", .body_sha256 = "01698460d35fe4d18ab53ffd9b16d92f778625d29c4d9dde5d16b41251311d70" },
@@ -445,7 +445,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_fp.zig", .function = "lowerFloatToHalf", .body_sha256 = "ee1a865fa09595be9ac940a938d7ec3b5996b25a835a92afa7b17fbb72016960" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerHalfExtension", .body_sha256 = "86cd446354c4986acf2cc70c24d18f69f054f2a38703ab9ee7f2e47ae1e6be2c" },
 
-    .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .body_sha256 = "c552e672aa7b21cc0ed1777e8f54ab6147e41a5c5d73b72a30777ae1a0d3d7ec" },
+    .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .body_sha256 = "6c358b8760fc62753d7ce806ff48d2df8aba5eac0b122f3d77357e67b684f377" },
 
     .{ .source = "composed_selector_impl.zig", .function = "bindParams", .body_sha256 = "8202324e1f10f6ca3472eb35af58f1a73d14555125d754007526b35a5f571279" },
     .{ .source = "composed_selector_impl.zig", .function = "bindPhiResults", .body_sha256 = "283fc0d5adddb7c7ac2fad47020bf99b026be3e2c09accabd0077d6e8b7abcf8" },

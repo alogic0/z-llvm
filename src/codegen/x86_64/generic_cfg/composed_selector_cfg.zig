@@ -104,7 +104,14 @@ pub fn lowerSelect(selector: *ComposedBlockSelector, result: ?[]const u8, select
     const bits: u16 = if (select.ty.eql(.ptr)) 64 else intBits(select.ty) orelse return .{ .no_emitter = "composed-block-select-type" };
     if (bits == 0 or (bits > 32 and bits != 64)) return .{ .no_emitter = "composed-block-select-width" };
 
-    if (try emitBranchCondition(selector, select.cond)) |diagnostic| return diagnostic;
+    {
+        // Forming the condition may use RCX. Both select arms are still live
+        // at this instruction, even when this is their final use.
+        const previous = selector.preserve_current_position_values;
+        selector.preserve_current_position_values = true;
+        defer selector.preserve_current_position_values = previous;
+        if (try emitBranchCondition(selector, select.cond)) |diagnostic| return diagnostic;
+    }
     if (select.true_value == .named) {
         const true_name = select.true_value.named;
         switch (selector_state.resolveValue(selector, select.true_value) orelse return .{ .unsupported_value = "composed-block-select-true-value" }) {

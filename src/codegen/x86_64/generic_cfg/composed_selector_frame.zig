@@ -145,6 +145,8 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
                     std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i128"))) saw_fixed_smul_overflow = true;
             if (instruction.kind == .call and
                 (std.mem.eql(u8, instruction.kind.call.callee, "llvm.bswap.i128") or
+                    std.mem.eql(u8, instruction.kind.call.callee, "llvm.bitreverse.i32") or
+                    std.mem.eql(u8, instruction.kind.call.callee, "llvm.bitreverse.i64") or
                     std.mem.eql(u8, instruction.kind.call.callee, "llvm.bitreverse.i128") or
                     std.mem.eql(u8, instruction.kind.call.callee, "llvm.ctpop.i128"))) saw_pair_intrinsic = true;
             if (instruction.kind == .call and

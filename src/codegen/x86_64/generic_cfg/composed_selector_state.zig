@@ -856,6 +856,14 @@ pub fn preserveFixedProductOperands(selector: *ComposedBlockSelector, lhs: ir.Va
     }
 }
 
+pub fn preserveFixedPermutationOperand(selector: *ComposedBlockSelector, value: ir.Value, bits: u16) !void {
+    if (value != .named) return;
+    const loc = resolveValue(selector, value) orelse return error.UnsupportedCodegenValue;
+    if ((bits == 32 and composed_helpers.locContainsReg(loc, .rdi)) or
+        composed_helpers.locContainsReg(loc, .rcx) or composed_helpers.locContainsReg(loc, .rdx))
+        try spillValueOrError(selector, value.named);
+}
+
 pub fn prepareFixedProductDefs(selector: *ComposedBlockSelector) !void {
     try clobberAccumulator(selector);
     try clobberArgReg(selector, .rdx);

@@ -12,6 +12,7 @@ const scalar_forms = @import("generic_cfg/scalar_forms.zig");
 const comparison_forms = @import("generic_cfg/comparison_forms.zig");
 const overflow_values = @import("generic_cfg/overflow_values.zig");
 const word_arithmetic = @import("generic_cfg/word_arithmetic.zig");
+const integer_intrinsics = @import("generic_cfg/integer_intrinsics.zig");
 const switch_phi_edges = @import("generic_cfg/switch_phi_edges.zig");
 const switch_forms = @import("generic_cfg/switch_forms.zig");
 const word_pair_values = @import("generic_cfg/word_pair_values.zig");
@@ -66,6 +67,9 @@ pub fn tryLowerWithContext(
     }
     if (try word_arithmetic.legalize(arena.allocator(), function)) |legalized| {
         if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
+    if (try integer_intrinsics.legalize(arena.allocator(), function)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try scalar_forms.legalize(arena.allocator(), function)) |legalized| {

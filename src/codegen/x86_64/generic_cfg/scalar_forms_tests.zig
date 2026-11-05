@@ -785,3 +785,134 @@ test "word arithmetic private legalization is idempotent and rejects invalid env
         try std.testing.expect(try words.legalize(arena.allocator(), module.functions.items[0]) == null);
     }
 }
+
+test "integer intrinsics saturating arithmetic preserves exact widths and extrema" {
+    for ([_]u16{ 1, 2, 7, 8, 9, 15, 16, 31, 32, 64 }) |bits| for ([_][]const u8{ "uadd", "usub" }, 0..) |op, op_index| {
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const allocator = arena.allocator();
+        const text = try std.fmt.allocPrint(
+            allocator,
+            "declare i{0d} @llvm.{1s}.sat.i{0d}(i{0d}, i{0d})\ndefine i64 @saturate(i64 %a, i64 %b) {{\nentry:\n{2s}  %result = call i{0d} @llvm.{1s}.sat.i{0d}(i{0d} %{3s}, i{0d} %{4s})\n{5s}  ret i64 %{6s}\n}}\n",
+            .{ bits, op, if (bits == 64) "" else try std.fmt.allocPrint(allocator, "  %x = trunc i64 %a to i{0d}\n  %y = trunc i64 %b to i{0d}\n", .{bits}), if (bits == 64) "a" else "x", if (bits == 64) "b" else "y", if (bits == 64) "" else try std.fmt.allocPrint(allocator, "  %wide = zext i{d} %result to i64\n", .{bits}), if (bits == 64) "result" else "wide" },
+        );
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        const sign: u64 = @as(u64, 1) << @intCast(bits - 1);
+        const mask = (sign - 1) | sign;
+        const values = [_]u64{ 0, 1, sign - 1, sign, mask - 1, mask, std.math.maxInt(u64) };
+        for (values) |a| for (values) |b| {
+            const x = a & mask;
+            const y = b & mask;
+            const expected: u64 = if (op_index == 0) @intCast(@min(@as(u128, x) + y, mask)) else x -| y;
+            try std.testing.expectEqual(expected, run(a, b));
+        };
+    };
+}
+
+test "integer intrinsics bit reversal preserves narrow significant bits" {
+    for ([_]u16{ 1, 2, 7, 8, 9, 15, 16, 31, 33, 63 }) |bits| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare i{0d} @llvm.bitreverse.i{0d}(i{0d})\ndefine i64 @reverse(i64 %input) {{\nentry:\n  %value = trunc i64 %input to i{0d}\n  %result = call i{0d} @llvm.bitreverse.i{0d}(i{0d} %value)\n  %wide = zext i{0d} %result to i64\n  ret i64 %wide\n}}\n", .{bits});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for ([_]u64{ 0, 1, 2, 0x8000000000000000, 0x123456789abcdef0, std.math.maxInt(u64) }) |x| {
+            const expected = @bitReverse(x) >> @as(u6, @intCast(64 - bits));
+            try std.testing.expectEqual(expected, run(x));
+        }
+    }
+}
+
+test "integer intrinsics narrow extrema preserve signed and unsigned ordering" {
+    for ([_]u16{ 1, 2, 7, 8, 9, 15, 16, 31, 33, 63 }) |bits| for ([_][]const u8{ "umin", "umax", "smin", "smax" }, 0..) |op, op_index| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare i{0d} @llvm.{1s}.i{0d}(i{0d}, i{0d})\ndefine i64 @extrema(i64 %a, i64 %b) {{\nentry:\n  %x = trunc i64 %a to i{0d}\n  %y = trunc i64 %b to i{0d}\n  %result = call i{0d} @llvm.{1s}.i{0d}(i{0d} %x, i{0d} %y)\n  %wide = zext i{0d} %result to i64\n  ret i64 %wide\n}}\n", .{ bits, op });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        const sign: u64 = @as(u64, 1) << @intCast(bits - 1);
+        const mask = (sign - 1) | sign;
+        const values = [_]u64{ 0, 1, sign - 1, sign, mask - 1, mask, std.math.maxInt(u64) };
+        for (values) |a| for (values) |b| {
+            const x = a & mask;
+            const y = b & mask;
+            const lesser = if (op_index < 2) x < y else (x ^ sign) < (y ^ sign);
+            const expected = if (lesser == (op_index % 2 == 0)) x else y;
+            try std.testing.expectEqual(expected, run(a, b));
+        };
+    };
+}
+
+test "integer intrinsics private legalization preserves inputs and rejects invalid envelopes" {
+    const intrinsics = @import("integer_intrinsics.zig");
+    for ([_][]const u8{
+        "  %result = call i8 @llvm.uadd.sat.i8(i8 %a, i8 255)",
+        "  %result = call i8 @llvm.usub.sat.i8(i8 %a, i8 1)",
+        "  %result = call i8 @llvm.bitreverse.i8(i8 %a)",
+        "  %result = call i8 @llvm.smin.i8(i8 %a, i8 -1)",
+    }) |instruction| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i8 @probe(i8 %a) {{\nentry:\n{s}\n  ret i8 %result\n}}\n", .{instruction});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        const original = module.functions.items[0];
+        const count = original.blocks.items[0].instructions.items.len;
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const view = (try intrinsics.legalize(arena.allocator(), original)).?;
+        try std.testing.expect(try intrinsics.legalize(arena.allocator(), view) == null);
+        try std.testing.expectEqual(count, original.blocks.items[0].instructions.items.len);
+        try std.testing.expect(original.blocks.items[0].instructions.items[0].kind == .call);
+    }
+    for ([_][]const u8{
+        "  %result = call i8 @llvm.uadd.sat.i8(i8 %a, i8 256)",
+        "  %result = call i8 @llvm.usub.sat.i8(i8 %a, i8 -129)",
+        "  %result = call fastcc i8 @llvm.uadd.sat.i8(i8 %a, i8 2)",
+        "  %result = call i8 @llvm.bitreverse.i8(i8 inreg %a)",
+        "  %result = call i8 @llvm.umax.i8(i8 %a, i8 poison)",
+        "  %result = call i8 @llvm.smin.i16(i8 %a, i8 2)",
+    }) |instruction| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i8 @probe(i8 %a) {{\nentry:\n{s}\n  ret i8 %result\n}}\n", .{instruction});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect(try intrinsics.legalize(arena.allocator(), module.functions.items[0]) == null);
+    }
+}
+
+test "integer intrinsics extrema preserve final-use and live register aliases" {
+    for ([_]u16{ 33, 63 }) |bits| for ([_][]const u8{ "umin", "umax" }, 0..) |op, op_index| for ([_]bool{ false, true }) |constant_rhs| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare i{d} @llvm.{s}.i{d}(i{d}, i{d})\ndefine i64 @probe(i64 %input_a, i64 %input_b, ptr %out, i64 %salt) {{\nentry:\n  %a = trunc i64 %input_a to i{d}\n  %b = trunc i64 %input_b to i{d}\n  %result = call i{d} @llvm.{s}.i{d}(i{d} %a, i{d} {s})\n  %value = zext i{d} %result to i64\n  store i64 %value, ptr %out, align 8\n  %next = getelementptr i8, ptr %out, i64 8\n  %xor = xor i64 %input_a, %input_b\n  %live = xor i64 %xor, %salt\n  store i64 %live, ptr %next, align 8\n  ret i64 %value\n}}\n", .{ bits, op, bits, bits, bits, bits, bits, bits, op, bits, bits, bits, if (constant_rhs) "-1" else "%b", bits });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64, *[2]u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        const inputs = [_]u64{ 0, 1, 0xffffffff, 0x100000000, 0x8000000000000000, 0xffffffffffffffff };
+        for (inputs) |a| for (inputs) |b| {
+            var out: [2]u64 = .{ 0, 0 };
+            const mask = (@as(u64, 1) << @as(u6, @intCast(bits))) - 1;
+            const left = a & mask;
+            const right = if (constant_rhs) mask else b & mask;
+            const expected = if (op_index == 0) @min(left, right) else @max(left, right);
+            try std.testing.expectEqual(expected, run(a, b, &out, 0x765432109abcdef0));
+            try std.testing.expectEqual(expected, out[0]);
+            try std.testing.expectEqual(a ^ b ^ 0x765432109abcdef0, out[1]);
+        };
+    };
+}

@@ -1212,6 +1212,9 @@ fn lowerBitPermutation(
         return null;
     }
 
+    if (operation == .bit_reverse and (bits == 32 or bits == 64))
+        try selector_state.preserveFixedPermutationOperand(selector, call.args.items[0].value, bits);
+
     if (bits == 32) {
         if (operation != .bit_reverse) unreachable;
         var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
