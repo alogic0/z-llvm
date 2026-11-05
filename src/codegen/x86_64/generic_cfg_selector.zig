@@ -13,6 +13,7 @@ const comparison_forms = @import("generic_cfg/comparison_forms.zig");
 const overflow_values = @import("generic_cfg/overflow_values.zig");
 const word_arithmetic = @import("generic_cfg/word_arithmetic.zig");
 const switch_phi_edges = @import("generic_cfg/switch_phi_edges.zig");
+const switch_forms = @import("generic_cfg/switch_forms.zig");
 const word_pair_values = @import("generic_cfg/word_pair_values.zig");
 const word_pair_memory = @import("generic_cfg/word_pair_memory.zig");
 const padded_frame = @import("generic_cfg/padded_frame.zig");
@@ -72,6 +73,11 @@ pub fn tryLowerWithContext(
     }
     if (try switch_phi_edges.legalize(arena.allocator(), function)) |legalized| {
         if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
+        const selected = try tryLowerWithContext(allocator, machine, legalized, module_context);
+        if (selected == .selected) try switch_phi_edges.retainLabels(allocator, machine, legalized.blocks.items[function.blocks.items.len..]);
+        return selected;
+    }
+    if (try switch_forms.legalize(arena.allocator(), function)) |legalized| {
         const selected = try tryLowerWithContext(allocator, machine, legalized, module_context);
         if (selected == .selected) try switch_phi_edges.retainLabels(allocator, machine, legalized.blocks.items[function.blocks.items.len..]);
         return selected;

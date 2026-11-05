@@ -425,7 +425,7 @@ test "generic cfg selector stage two composes 65-block CFG" {
 }
 
 test "generic cfg selector stage two rejects beyond block envelope" {
-    const text = try makeBranchChainIr(std.testing.allocator, 129);
+    const text = try makeBranchChainIr(std.testing.allocator, 1025);
     defer std.testing.allocator.free(text);
     var module = try ir.Module.parse(std.testing.allocator, text);
     defer module.deinit();
@@ -444,7 +444,7 @@ test "generic cfg selector stage two rejects beyond block envelope" {
 }
 
 test "generic cfg selector reports structured fallback diagnostic through codegen options" {
-    const text = try makeBranchChainIr(std.testing.allocator, 129);
+    const text = try makeBranchChainIr(std.testing.allocator, 1025);
     defer std.testing.allocator.free(text);
 
     var module = try ir.Module.parse(std.testing.allocator, text);

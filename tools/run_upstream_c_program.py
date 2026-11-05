@@ -46,6 +46,12 @@ def run_variadic_canary(runner, directory, zllvm, environment):
 
 
 MEMORY_CANARIES = {
+    "switch_forms": {
+        "prefix": "switch-forms", "fixture": "switch_forms",
+        "functions": {'switch_8_0', 'switch_8_9', 'switch_8_61', 'switch_8_127', 'switch_32_0', 'switch_32_9', 'switch_32_61', 'switch_32_127', 'switch_64_0', 'switch_64_9', 'switch_64_61', 'switch_64_127', 'cfg_129', 'cfg_779', 'cfg_1024', 'switch_duplicate', 'switch_loop'},
+        "observations": 4352,
+        "stdout": 'switch-forms observations=4352 cases=widths=phis=loops=blocks=live=guards=preserved\n',
+    },
     "word_arithmetic": {
         "prefix": "word-arithmetic", "fixture": "word_arithmetic",
         "functions": {'word_udiv32_1', 'word_udiv32_2', 'word_udiv32_3', 'word_udiv32_24', 'word_udiv32_100', 'word_udiv32_2147483648', 'word_udiv32_4294967295', 'word_udiv32_left', 'word_urem32_1', 'word_urem32_2', 'word_urem32_3', 'word_urem32_24', 'word_urem32_100', 'word_urem32_2147483648', 'word_urem32_4294967295', 'word_urem32_left', 'word_udiv64_1', 'word_udiv64_2', 'word_udiv64_3', 'word_udiv64_24', 'word_udiv64_100', 'word_udiv64_9223372036854775808', 'word_udiv64_18446744073709551615', 'word_udiv64_left', 'word_urem64_1', 'word_urem64_2', 'word_urem64_3', 'word_urem64_24', 'word_urem64_100', 'word_urem64_9223372036854775808', 'word_urem64_18446744073709551615', 'word_urem64_left', 'word_umul_0', 'word_umul_1', 'word_umul_2', 'word_umul_fixed_1', 'word_umul_fixed_2', 'word_smul_0', 'word_smul_1', 'word_smul_2', 'word_smul_fixed_1', 'word_smul_fixed_2', 'word_sadd_0', 'word_sadd_1', 'word_sadd_2', 'word_sadd_fixed_1', 'word_sadd_fixed_2', 'word_ssub_0', 'word_ssub_1', 'word_ssub_2', 'word_ssub_fixed_1', 'word_ssub_fixed_2', 'word_umax32_0', 'word_umax32_1', 'word_umax32_2', 'word_smin32_0', 'word_smin32_1', 'word_smin32_2', 'word_smax32_0', 'word_smax32_1', 'word_smax32_2', 'word_umax64_0', 'word_umax64_1', 'word_umax64_2', 'word_smin64_0', 'word_smin64_1', 'word_smin64_2', 'word_smax64_0', 'word_smax64_1', 'word_smax64_2', 'word_swap16_0', 'word_swap16_1', 'word_swap32_0', 'word_swap32_1', 'word_swap64_0', 'word_swap64_1', 'word_zero_extend'},
@@ -354,6 +360,7 @@ def main():
               "scalar_forms_local_observations": 0, "scalar_forms_reference_observations": 0,
               "indirect_stack_calls_local_observations": 0, "indirect_stack_calls_reference_observations": 0,
               "safe_scalar_forms_local_observations": 0, "safe_scalar_forms_reference_observations": 0,
+              "switch_forms_local_observations": 0, "switch_forms_reference_observations": 0,
               "word_arithmetic_local_observations": 0, "word_arithmetic_reference_observations": 0,
               "checked_integers_local_observations": 0, "checked_integers_reference_observations": 0,
               "stack_addresses_local_observations": 0, "stack_addresses_reference_observations": 0,
@@ -404,7 +411,7 @@ def main():
                            "array_stride.ll", "array_stride_driver.c", "module_dependencies.ll", "module_dependencies_driver.c",
                            "general_array_stride.ll", "general_array_stride_driver.c",
                            "rax_pointer_load.ll", "rax_pointer_load_driver.c",
-                           "constant_remainder.ll", "constant_remainder_driver.c", "narrow_abi.ll", "narrow_abi_driver.c", "aggregate_storage.ll", "aggregate_storage_driver.c", "scalar_forms.ll", "scalar_forms_driver.c", "indirect_stack_calls.ll", "indirect_stack_calls_driver.c", "safe_scalar_forms.ll", "safe_scalar_forms_driver.c", "safe_comparisons.ll", "safe_comparisons_driver.c", "bounded_storage.ll", "bounded_storage_driver.c", "stack_addresses.ll", "stack_addresses_driver.c", "checked_integers.ll", "checked_integers_driver.c", "word_arithmetic.ll", "word_arithmetic_driver.c")}})
+                           "constant_remainder.ll", "constant_remainder_driver.c", "narrow_abi.ll", "narrow_abi_driver.c", "aggregate_storage.ll", "aggregate_storage_driver.c", "scalar_forms.ll", "scalar_forms_driver.c", "indirect_stack_calls.ll", "indirect_stack_calls_driver.c", "safe_scalar_forms.ll", "safe_scalar_forms_driver.c", "safe_comparisons.ll", "safe_comparisons_driver.c", "bounded_storage.ll", "bounded_storage_driver.c", "stack_addresses.ll", "stack_addresses_driver.c", "checked_integers.ll", "checked_integers_driver.c", "word_arithmetic.ll", "word_arithmetic_driver.c", "switch_forms.ll", "switch_forms_driver.c")}})
         environment = {k: v for k, v in os.environ.items() if not k.startswith(("ZLLVM_", "ZIG_USE_ZLLVM"))}
         environment.update({"ZIG_LOCAL_CACHE_DIR": str(output / "frontend-cache"),
                             "ZIG_GLOBAL_CACHE_DIR": str(output / "global-cache")})
@@ -483,7 +490,7 @@ def main():
         print(f"summary integer-pointer-casts population=standalone-integer-pointer-casts routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['integer_pointer_local_observations']} reference_observations={report['integer_pointer_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary signed-nonnegative population=standalone-signed-nonnegative routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['signed_nonnegative_local_observations']} reference_observations={report['signed_nonnegative_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary type-layout-padding population=standalone-type-allocation-padding routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['type_layout_padding_local_observations']} reference_observations={report['type_layout_padding_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
-        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies", "bounded_frame", "general_array_stride", "rax_pointer_load", "constant_remainder", "narrow_abi", "aggregate_storage", "scalar_forms", "indirect_stack_calls", "safe_scalar_forms", "safe_comparisons", "bounded_storage", "stack_addresses", "checked_integers", "word_arithmetic"):
+        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies", "bounded_frame", "general_array_stride", "rax_pointer_load", "constant_remainder", "narrow_abi", "aggregate_storage", "scalar_forms", "indirect_stack_calls", "safe_scalar_forms", "safe_comparisons", "bounded_storage", "stack_addresses", "checked_integers", "word_arithmetic", "switch_forms"):
             extra = f" negative_controls={report.get('module_dependencies_negative_controls', 0)} environment_checks={report.get('module_dependencies_environment_checks', 0)}" if population == "module_dependencies" else ""
             if population == "bounded_storage":
                 extra += f" guard_checks={report['bounded_storage_guard_checks']}"

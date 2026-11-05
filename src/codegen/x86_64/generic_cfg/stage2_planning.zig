@@ -45,7 +45,7 @@ pub const StageTwoSummary = struct {
 const no_spill_register_values = 6;
 const stage2_frame_slots = 32;
 pub const stage2_spill_slots = stage2_frame_slots;
-pub const stage2_max_blocks = 128;
+pub const stage2_max_blocks = 1024;
 pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir.Function) !StageTwoSummary {
     var liveness = try buildStageTwoLiveness(allocator, function);
     defer liveness.deinit();
