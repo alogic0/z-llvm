@@ -41,7 +41,25 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [Fibonacci foundation checkpoint](evidence/fibonacci_foundation_acceptance_20261105.json)
+The accepted [checked-integer and address checkpoint](evidence/fibonacci_checked_acceptance_20261105.json)
+at `9b6bf0c8` passes all 17 integration stages. Stack addresses can flow through
+pointer PHIs, selects, stores, casts and returns. Call preservation saves all
+live aliases. Signed and unsigned checked arithmetic covers widths one through
+32, and general boolean calls preserve their low ABI bit through pointer,
+indirect and stack-argument calls. Zero extension from i32 clears stale upper
+accumulator bits. All 1,812 unit tests, 13 structural checks, 13 focused tests per
+release mode, captured-object smoke and readiness pass. The two added native
+populations pass 49,920 local observations against 24,960 LLVM references,
+with 54 mutation controls. All 24 native populations and the 100-row/five-function
+cohort pass. Minimum free space is 36.14 GB, above the 24.36 GB reserve.
+The unchanged pinned Fibonacci program still passes its six assertions in Fast
+and Small with LLVM-equivalent exit status, stdout and stderr. Safe emission
+reaches 1,155 of 1,568 functions; 413 failures still prevent a local object and
+whole-program execution. The [focused evidence](evidence/fibonacci_checked_focused_20261105.json)
+records the two wrong-code repairs and exact source equivalence. All thirteen
+original probes remain unchanged; no archives were made.
+
+The earlier accepted [Fibonacci foundation checkpoint](evidence/fibonacci_foundation_acceptance_20261105.json)
 at `580a866f` passes all 17 integration stages. Named indirect calls, seven to
 sixteen word/pointer arguments, checked word arithmetic and narrow comparisons
 use the existing scalar and System V machinery. Bounded storage supports objects

@@ -319,6 +319,14 @@ ordinary result, live-value and guard mutations. Earlier populations remain
 separate. Unchanged upstream Fibonacci execution is proven in Fast and Small;
 Safe and a mandatory three-mode program regression remain open.
 
+The accepted [address and checked-integer canaries](evidence/fibonacci_checked_acceptance_20261105.json)
+add stack-address flow (3,456 local observations) and checked integers/general
+boolean calls (46,464), with half as many independent LLVM observations and
+54 mutation controls. They exercise live register aliases across calls, exact
+narrow overflow, dirty upper return bits, indirect and stack arguments, and
+32-bit zero extension. These are mandatory populations in all three modes;
+the unchanged Safe Fibonacci whole-program regression remains open.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine
