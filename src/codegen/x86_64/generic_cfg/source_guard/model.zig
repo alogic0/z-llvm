@@ -445,7 +445,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_fp.zig", .function = "lowerFloatToHalf", .body_sha256 = "ee1a865fa09595be9ac940a938d7ec3b5996b25a835a92afa7b17fbb72016960" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerHalfExtension", .body_sha256 = "86cd446354c4986acf2cc70c24d18f69f054f2a38703ab9ee7f2e47ae1e6be2c" },
 
-    .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .body_sha256 = "4899a9759d064760a080e84a6066188c1d46c40e11b977ea2cdd38de477a1288" },
+    .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .body_sha256 = "1c5dcc4e6e25e23480fa789d29062e2fbe4fa816d5e567d7503fad09fdf42ef1" },
 
     .{ .source = "composed_selector_impl.zig", .function = "bindParams", .body_sha256 = "8202324e1f10f6ca3472eb35af58f1a73d14555125d754007526b35a5f571279" },
     .{ .source = "composed_selector_impl.zig", .function = "bindPhiResults", .body_sha256 = "283fc0d5adddb7c7ac2fad47020bf99b026be3e2c09accabd0077d6e8b7abcf8" },

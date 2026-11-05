@@ -46,6 +46,13 @@ def run_variadic_canary(runner, directory, zllvm, environment):
 
 
 MEMORY_CANARIES = {
+    "bounded_storage": {
+        "prefix": "bounded-storage", "fixture": "bounded_storage",
+        "functions": {"storage_bytes1", "storage_bytes2", "storage_bytes3", "storage_bytes5", "storage_bytes257", "storage_page", "storage_pages", "storage_limit", "storage_slot16", "storage_slot32", "storage_packed", "storage_padded", "storage_word16", "storage_word32", "storage_probe"},
+        "observations": 960,
+        "stdout": "bounded-storage observations=960 bytes=words=padding=pages=calls=live=guards=preserved\n",
+        "guard_probe": True,
+    },
     "safe_comparisons": {
         "prefix": "safe-comparisons", "fixture": "safe_comparisons",
         "functions": {"compare_1_ne", "compare_1_ule", "compare_1_uge", "compare_1_sle", "compare_1_sge", "compare_1_reverse", "compare_6_ne", "compare_6_ule", "compare_6_uge", "compare_6_sle", "compare_6_sge", "compare_6_reverse", "compare_8_ne", "compare_8_ule", "compare_8_uge", "compare_8_sle", "compare_8_sge", "compare_8_reverse", "compare_16_ne", "compare_16_ule", "compare_16_uge", "compare_16_sle", "compare_16_sge", "compare_16_reverse", "compare_31_ne", "compare_31_ule", "compare_31_uge", "compare_31_sle", "compare_31_sge", "compare_31_reverse", "compare_32_ne", "compare_32_ule", "compare_32_uge", "compare_32_sle", "compare_32_sge", "compare_32_reverse", "compare_64_ne", "compare_64_ule", "compare_64_uge", "compare_64_sle", "compare_64_sge", "compare_64_reverse", "compare_pointer_ne", "compare_pointer_ule", "compare_pointer_uge", "compare_frame"},
@@ -284,6 +291,11 @@ def run_memory_canary(runner, directory, zllvm, environment, mode, report, popul
             raise RuntimeError(prefix + " local link failed")
         require_observation(runner, executable, expected, directory / (prefix + "-" + route + "-run"), environment)
         report[population + "_local_observations"] += canary["observations"]
+        if canary.get("guard_probe"):
+            require_observation(runner, executable, {"argv": ["--guard-probe"], "exit_status": 0,
+                                "stdout": "bounded-storage guard_checks=3 accessible=small-frame=guard-fault=verified\n"},
+                                directory / (prefix + "-" + route + "-guard-probe"), environment)
+            report[population + "_guard_checks"] = report.get(population + "_guard_checks", 0) + 3
     if population == "module_dependencies":
         run_module_dependency_controls(runner, directory, zllvm, environment, report)
 
@@ -324,6 +336,7 @@ def main():
               "scalar_forms_local_observations": 0, "scalar_forms_reference_observations": 0,
               "indirect_stack_calls_local_observations": 0, "indirect_stack_calls_reference_observations": 0,
               "safe_scalar_forms_local_observations": 0, "safe_scalar_forms_reference_observations": 0,
+              "bounded_storage_local_observations": 0, "bounded_storage_reference_observations": 0, "bounded_storage_guard_checks": 0,
               "safe_comparisons_local_observations": 0, "safe_comparisons_reference_observations": 0,
               "module_dependencies_local_observations": 0, "module_dependencies_reference_observations": 0, "rows": []}
     try:
@@ -370,7 +383,7 @@ def main():
                            "array_stride.ll", "array_stride_driver.c", "module_dependencies.ll", "module_dependencies_driver.c",
                            "general_array_stride.ll", "general_array_stride_driver.c",
                            "rax_pointer_load.ll", "rax_pointer_load_driver.c",
-                           "constant_remainder.ll", "constant_remainder_driver.c", "narrow_abi.ll", "narrow_abi_driver.c", "aggregate_storage.ll", "aggregate_storage_driver.c", "scalar_forms.ll", "scalar_forms_driver.c", "indirect_stack_calls.ll", "indirect_stack_calls_driver.c", "safe_scalar_forms.ll", "safe_scalar_forms_driver.c", "safe_comparisons.ll", "safe_comparisons_driver.c")}})
+                           "constant_remainder.ll", "constant_remainder_driver.c", "narrow_abi.ll", "narrow_abi_driver.c", "aggregate_storage.ll", "aggregate_storage_driver.c", "scalar_forms.ll", "scalar_forms_driver.c", "indirect_stack_calls.ll", "indirect_stack_calls_driver.c", "safe_scalar_forms.ll", "safe_scalar_forms_driver.c", "safe_comparisons.ll", "safe_comparisons_driver.c", "bounded_storage.ll", "bounded_storage_driver.c")}})
         environment = {k: v for k, v in os.environ.items() if not k.startswith(("ZLLVM_", "ZIG_USE_ZLLVM"))}
         environment.update({"ZIG_LOCAL_CACHE_DIR": str(output / "frontend-cache"),
                             "ZIG_GLOBAL_CACHE_DIR": str(output / "global-cache")})
@@ -449,8 +462,10 @@ def main():
         print(f"summary integer-pointer-casts population=standalone-integer-pointer-casts routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['integer_pointer_local_observations']} reference_observations={report['integer_pointer_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary signed-nonnegative population=standalone-signed-nonnegative routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['signed_nonnegative_local_observations']} reference_observations={report['signed_nonnegative_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary type-layout-padding population=standalone-type-allocation-padding routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['type_layout_padding_local_observations']} reference_observations={report['type_layout_padding_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
-        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies", "bounded_frame", "general_array_stride", "rax_pointer_load", "constant_remainder", "narrow_abi", "aggregate_storage", "scalar_forms", "indirect_stack_calls", "safe_scalar_forms", "safe_comparisons"):
+        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies", "bounded_frame", "general_array_stride", "rax_pointer_load", "constant_remainder", "narrow_abi", "aggregate_storage", "scalar_forms", "indirect_stack_calls", "safe_scalar_forms", "safe_comparisons", "bounded_storage"):
             extra = f" negative_controls={report.get('module_dependencies_negative_controls', 0)} environment_checks={report.get('module_dependencies_environment_checks', 0)}" if population == "module_dependencies" else ""
+            if population == "bounded_storage":
+                extra += f" guard_checks={report['bounded_storage_guard_checks']}"
             print(f"summary {population.replace('_', '-')} population=standalone-{population.replace('_', '-')} routes=direct,release modes={report.get('program_modes', 0)} local_observations={report[population + '_local_observations']} reference_observations={report[population + '_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}{extra}")
         print(f"evidence: {output / 'report.json'}")
         if "error" in report:

@@ -1,4 +1,4 @@
-//! Private storage view for bounded integer result wrappers. The existing i32
+//! Private storage view for bounded scalar and aggregate objects. The existing i32
 //! array frame allocator owns the bytes; typed byte-address actions own access.
 //! This does not legalize aggregate values or alter the source module/ABI.
 const std = @import("std");
@@ -123,10 +123,12 @@ fn legalizeImpl(allocator: std.mem.Allocator, function: ir.Function, context: ?*
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed or inst.kind != .alloca or inst.result == null) continue;
         const ty = inst.kind.alloca.allocated_ty;
-        if (ty != .aggregate or helpers.parseI32ArrayType(ty) != null) continue;
+        const scalar = general and ty == .int and ty.int > 8 and ty.int < 64;
+        if ((!scalar and ty != .aggregate) or helpers.parseI32ArrayType(ty) != null) continue;
         const bytes = if (general) (storage.query(context, ty) orelse continue).bytes else size(context, ty, 0) orelse continue;
-        // The private i32-array carrier must describe exactly the object's bytes.
-        if (bytes == 0 or bytes % 4 != 0) continue;
+        // General storage may have private trailing padding. Keep the original
+        // extent in slots so memcpy admission never treats that padding as data.
+        if (!general and (bytes == 0 or bytes % 4 != 0)) continue;
         _ = alignment(inst.kind.alloca) orelse return null;
         try slots.put(inst.result.?, bytes);
     };
@@ -143,7 +145,8 @@ fn legalizeImpl(allocator: std.mem.Allocator, function: ir.Function, context: ?*
             if (!inst.removed) switch (inst.kind) {
                 .alloca => |alloca| if (inst.result) |name| {
                     if (slots.get(name)) |bytes| {
-                        copy.kind.alloca.allocated_ty = .{ .aggregate = try std.fmt.allocPrint(allocator, "[{d} x i32]", .{bytes / 4}) };
+                        const carrier_bytes = std.mem.alignForward(u32, @max(bytes, 1), 4);
+                        copy.kind.alloca.allocated_ty = .{ .aggregate = try std.fmt.allocPrint(allocator, "[{d} x i32]", .{carrier_bytes / 4}) };
                         const natural = if (general) storage.query(context, alloca.allocated_ty).?.alignment else 8;
                         copy.kind.alloca.attrs = try std.fmt.allocPrint(allocator, "align {d}", .{@max(alignment(alloca).?, natural)});
                     }

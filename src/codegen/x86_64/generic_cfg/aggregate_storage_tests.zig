@@ -29,13 +29,114 @@ test "aggregate storage layouts include nested packed fields and reject incomple
         .{ .text = "[3 x { i8, i32 }]", .bytes = 24, .alignment = 4 },
         .{ .text = "{ i8, [2 x i24] }", .bytes = 12, .alignment = 4 },
         .{ .text = "[32 x i64]", .bytes = 256, .alignment = 8 },
+        .{ .text = "[8192 x i64]", .bytes = 65536, .alignment = 8 },
+        .{ .text = "[0 x i8]", .bytes = 0, .alignment = 1 },
+        .{ .text = "{ double }", .bytes = 8, .alignment = 8 },
+        .{ .text = "{ i8, x86_fp80 }", .bytes = 32, .alignment = 16 },
+        .{ .text = "<{ i8, half, float, double, fp128 }>", .bytes = 31, .alignment = 1 },
     };
     for (cases) |case| try std.testing.expectEqualDeep(storage.Layout{ .bytes = case.bytes, .alignment = case.alignment }, storage.query(&context, .{ .aggregate = case.text }).?);
-    for ([_][]const u8{ "%Cycle", "%Duplicate", "%Missing", "{ i64, %Missing }", "{ i64, }", "{ i64 } junk", "{ i64", "[33 x i64]", "[4294967295 x i128]", "<{ i8, ptr addrspace(1) }>", "{ <2 x i64> }", "{ double }" }) |text|
+    for ([_][]const u8{ "%Cycle", "%Duplicate", "%Missing", "{ i64, %Missing }", "{ i64, }", "{ i64 } junk", "{ i64", "[8193 x i64]", "[4294967295 x i128]", "<{ i8, ptr addrspace(1) }>", "{ <2 x i64> }" }) |text|
         try std.testing.expect(storage.query(&context, .{ .aggregate = text }) == null);
     context.target_datalayout = "e-a:64";
     try std.testing.expectEqualDeep(storage.Layout{ .bytes = 8, .alignment = 8 }, storage.query(&context, .{ .aggregate = "{ i8 }" }).?);
     try std.testing.expectEqualDeep(storage.Layout{ .bytes = 1, .alignment = 1 }, storage.query(&context, .{ .aggregate = "<{ i8 }>" }).?);
+    for ([_][]const u8{ "e-f32:64", "e-f80:64", "e-f64:64:32", "e-f16:16:24", "e-a:4" }) |layout| {
+        context.target_datalayout = layout;
+        try std.testing.expect(storage.query(&context, .{ .aggregate = "{ float, double }" }) == null);
+    }
+    context.target_datalayout = "e-f80:128-f128:128:128";
+    try std.testing.expectEqualDeep(storage.Layout{ .bytes = 32, .alignment = 16 }, storage.query(&context, .{ .aggregate = "{ x86_fp80, fp128 }" }).?);
+}
+
+test "bounded storage executes narrow odd and large objects without changing adjacent values" {
+    const cases = [_]struct { ty: []const u8, bytes: u32 }{
+        .{ .ty = "i16", .bytes = 2 },
+        .{ .ty = "i32", .bytes = 4 },
+        .{ .ty = "[1 x i8]", .bytes = 1 },
+        .{ .ty = "[2 x i8]", .bytes = 2 },
+        .{ .ty = "[3 x i8]", .bytes = 3 },
+        .{ .ty = "[5 x i8]", .bytes = 5 },
+        .{ .ty = "{ <{ i8, float, double }> }", .bytes = 13 },
+        .{ .ty = "[4000 x i8]", .bytes = 4000 },
+        .{ .ty = "[4096 x i8]", .bytes = 4096 },
+        .{ .ty = "[8193 x i8]", .bytes = 8193 },
+        .{ .ty = "[65536 x i8]", .bytes = 65536 },
+    };
+    for (cases) |case| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            \\define i64 @object_{d}(i64 %a, i64 %b) {{
+            \\entry:
+            \\  %slot = alloca {s}, align 8
+            \\  %guard = alloca [8 x i8], align 8
+            \\  %tail = getelementptr i8, ptr %slot, i64 {d}
+            \\  %first = trunc i64 %a to i8
+            \\  %last = trunc i64 %b to i8
+            \\  store i64 %a, ptr %guard
+            \\  store i8 %first, ptr %slot
+            \\  store i8 %last, ptr %tail
+            \\  %x = load i8, ptr %slot
+            \\  %y = load i8, ptr %tail
+            \\  %saved = load i64, ptr %guard
+            \\  %left = zext i8 %x to i64
+            \\  %right = zext i8 %y to i64
+            \\  %live = xor i64 %saved, %b
+            \\  %sum = add i64 %live, %left
+            \\  %result = xor i64 %sum, %right
+            \\  ret i64 %result
+            \\}}
+        , .{ case.bytes, case.ty, case.bytes - 1 });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        const inputs = [_]u64{ 0, 1, 0xdeadbeef01234567, 0x80000000000000ff, std.math.maxInt(u64) };
+        for (inputs) |a| for (inputs) |b|
+            try std.testing.expectEqual(((a ^ b) +% (if (case.bytes == 1) b & 255 else a & 255)) ^ (b & 255), run(a, b));
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const view = (try frame.legalizeStorage(arena.allocator(), module.functions.items[0], null)).?;
+        try std.testing.expect(try frame.legalizeStorage(arena.allocator(), view, null) == null);
+        try module.verify();
+    }
+}
+
+test "bounded storage copy extents exclude carrier padding and zero sized objects" {
+    for ([_]u32{ 0, 1, 2, 3, 5 }) |bytes| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)\ndefine void @copy(ptr %out) {{\nentry:\n  %slot = alloca [{d} x i8], align 1\n  call void @llvm.memcpy.p0.p0.i64(ptr %out, ptr %slot, i64 {d}, i1 false)\n  ret void\n}}\n", .{ bytes, bytes });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const function = &module.functions.items[0];
+        try std.testing.expect(try frame.legalizeStorage(arena.allocator(), function.*, null) != null);
+        function.blocks.items[0].instructions.items[1].kind.call.args.items[2].value = .{ .int = bytes + 1 };
+        try std.testing.expect(try frame.legalizeStorage(arena.allocator(), function.*, null) == null);
+    }
+}
+
+test "bounded storage rejects huge frame arithmetic and unsupported stack alignment" {
+    const helpers = @import("composed_helpers.zig");
+    try std.testing.expect(helpers.alignedCallFrameBytes(std.math.maxInt(u32)) == null);
+    try std.testing.expect(helpers.alignedCallFrameBytes(std.math.maxInt(u32) - 7) == null);
+    for ([_][]const u8{
+        "[262144 x i32], align 4", "[1073741823 x i32], align 4", "[4294967295 x i32], align 4", "i64, align 32", "[1 x i32], align 2147483648",
+    }) |allocation| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i32 @large() {{\nentry:\n  %slot = alloca {s}\n  store i32 7, ptr %slot\n  ret i32 7\n}}\n", .{allocation});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var output = machine.MachineFunction.init("large", .{ .int = 32 });
+        defer output.deinit(std.testing.allocator);
+        const result = try selector.tryLower(std.testing.allocator, &output, module.functions.items[0]);
+        try std.testing.expect(result == .unsupported);
+        try std.testing.expectEqual(@as(usize, 0), output.instructions.items.len);
+    }
 }
 
 fn executable(module: ir.Module) ![]align(std.heap.page_size_min) u8 {

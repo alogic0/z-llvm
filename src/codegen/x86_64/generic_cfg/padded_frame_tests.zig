@@ -192,7 +192,10 @@ test "bounded frame address authority checks actual extent before emission and r
         .{ .location = .{ .stack128 = 32 }, .extent = 16 },
         .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 4 } }, .extent = 16 },
         .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 6 } }, .extent = 24 },
-        .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 65 } }, .extent = 0 },
+        .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 65 } }, .extent = 260 },
+        .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 16384 } }, .extent = 65536 },
+        .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 16385 } }, .extent = 0 },
+        .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = std.math.maxInt(u32) } }, .extent = 0 },
     };
     for (cases) |case| for (0..5) |boundary| {
         var output = machine.MachineFunction.init("frame-address", .ptr);
@@ -203,7 +206,7 @@ test "bounded frame address authority checks actual extent before emission and r
         var state = support.ComposedBlockSelector.init(std.testing.allocator, &output);
         defer state.deinit();
         state.allocation_plan = &plan;
-        state.stack_frame_bytes = 128;
+        state.stack_frame_bytes = 1024 * 1024;
         try support.selector_state.bindValueLoc(&state, "base", case.location);
         try support.selector_state.bindValueLoc(&state, "offset", .{ .arg64 = .rdi });
         const original = state.values.get("base").?;

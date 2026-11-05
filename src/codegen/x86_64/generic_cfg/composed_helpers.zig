@@ -183,7 +183,7 @@ pub fn parseI32ArrayType(ty: ir.Type) ?u32 {
 
 pub fn alignedCallFrameBytes(payload_bytes: u32) ?u32 {
     if (payload_bytes == 0) return null;
-    const rounded_payload = std.mem.alignForward(u32, payload_bytes, 16);
+    const rounded_payload = (std.math.add(u32, payload_bytes, 15) catch return null) & ~@as(u32, 15);
     return std.math.add(u32, rounded_payload, 8) catch null;
 }
 

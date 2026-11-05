@@ -5,6 +5,8 @@ const x86_64_types = @import("../types.zig");
 pub const ArgReg = x86_64_types.ArgReg;
 pub const FrameIndex = x86_64_types.FrameIndex;
 pub const XmmReg = x86_64_types.XmmReg;
+/// Maximum byte-addressed stack object admitted by the storage view/authority.
+pub const max_stack_object_bytes: u32 = 64 * 1024;
 
 pub const RegPair = struct {
     lo: ArgReg,

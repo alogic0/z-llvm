@@ -1,4 +1,4 @@
-//! Exact bounded storage layout for integer/pointer aggregates. Named types
+//! Exact bounded storage layout for scalar aggregates. Named types
 //! come only from the current module; unresolved or cyclic shapes fail closed.
 const std = @import("std");
 const ir = @import("../../../ir.zig");
@@ -9,7 +9,7 @@ const machine = @import("../machine.zig");
 const pairs = @import("word_pair_memory.zig");
 
 pub const Layout = struct { bytes: u32, alignment: u32 };
-pub const max_bytes: u32 = 256;
+pub const max_bytes: u32 = @import("selector_types.zig").max_stack_object_bytes;
 
 fn trim(text: []const u8) []const u8 {
     return std.mem.trim(u8, text, " \t\r\n");
@@ -27,17 +27,38 @@ pub fn query(context: ?*const machine.ReadOnlyModuleContext, ty: ir.Type) ?Layou
     const dl = target.DataLayout.parse(text) catch return null;
     var aggregate_alignment: u32 = 1;
     var parts = std.mem.splitScalar(u8, text, '-');
-    while (parts.next()) |part| if (std.mem.startsWith(u8, part, "a:")) {
-        const end = std.mem.indexOfScalarPos(u8, part, 2, ':') orelse part.len;
-        const bits = std.fmt.parseUnsigned(u32, part[2..end], 10) catch return null;
-        aggregate_alignment = @max(1, bits / 8);
-    };
+    while (parts.next()) |part| {
+        if (std.mem.startsWith(u8, part, "a:")) {
+            const end = std.mem.indexOfScalarPos(u8, part, 2, ':') orelse part.len;
+            const bits = std.fmt.parseUnsigned(u32, part[2..end], 10) catch return null;
+            if (bits != 0 and (bits < 8 or bits > 128 or !std.math.isPowerOfTwo(bits))) return null;
+            aggregate_alignment = @max(1, bits / 8);
+        }
+        // DataLayout's floating queries use the native x86 allocation widths.
+        // Do not admit an explicit override that those queries cannot describe.
+        if (part.len != 0 and part[0] == 'f') {
+            var fields = std.mem.splitScalar(u8, part[1..], ':');
+            const width = std.fmt.parseUnsigned(u16, fields.next() orelse return null, 10) catch return null;
+            const expected: u16 = switch (width) {
+                16, 32, 64 => width,
+                80, 128 => 128,
+                else => return null,
+            };
+            const bits = std.fmt.parseUnsigned(u16, fields.next() orelse return null, 10) catch return null;
+            if (bits != expected) return null;
+            if (fields.next()) |field| {
+                const preferred = std.fmt.parseUnsigned(u16, field, 10) catch return null;
+                if (preferred < bits or !std.math.isPowerOfTwo(preferred)) return null;
+            }
+            if (fields.next() != null) return null;
+        }
+    }
     return queryDepth(context, dl, aggregate_alignment, ty, 0);
 }
 
 fn queryDepth(context: ?*const machine.ReadOnlyModuleContext, dl: target.DataLayout, aggregate_alignment: u32, ty: ir.Type, depth: u8) ?Layout {
     if (depth >= 32) return null;
-    if (ty == .ptr or ty == .int) {
+    if (ty == .ptr or ty == .int or ty == .half or ty == .float or ty == .double or ty == .x86_fp80 or ty == .fp128) {
         if (ty == .int and (ty.int == 0 or ty.int > 128)) return null;
         const bytes = dl.typeAllocSizeBytes(ty) catch return null;
         const bits = dl.typeAbiAlignmentBits(ty) catch return null;
