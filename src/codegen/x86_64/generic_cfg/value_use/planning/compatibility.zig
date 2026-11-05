@@ -216,6 +216,16 @@ pub fn validateBindingCompatibility(
     }
     if (request.form == .memcpy_pointer or request.form == .memcpy_length) {
         try validateExpectedType(request.expected, request.form);
+        if (request.form == .memcpy_pointer and binding.vreg.class == .stack_object) {
+            if (request.prepared_action) |action| if (action == .inline_memset and action.inline_memset.length == null) {
+                const extent: ?u64 = switch (current) {
+                    .stack128 => 16,
+                    .stack_i32_array => |array| @as(u64, array.len) * 4,
+                    else => null,
+                };
+                if (extent) |bytes| if (action.inline_memset.length_immediate <= bytes) return;
+            };
+        }
         if (binding.vreg.bits < 64) return if (request.form == .memcpy_pointer)
             error.ValueUseMemcpyPointerWidthMismatch
         else
@@ -575,6 +585,7 @@ pub fn validateSourceView(loc: ValueLoc, form: Types.UseForm) !void {
         },
         .memcpy_pointer, .memcpy_length => switch (loc) {
             .arg64, .scratch64, .rax, .spill64, .arg128, .scratch128 => {},
+            .stack128, .stack_i32_array => if (form != .memcpy_pointer) return error.ValueUseSourceViewMismatch,
             else => return error.ValueUseSourceViewMismatch,
         },
         .load_address => switch (loc) {

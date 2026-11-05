@@ -747,6 +747,7 @@ fn materializeMemcpyRequestUnchecked(
         return error.ValueUseUnsupportedSource;
     };
     switch (current) {
+        .stack128, .stack_i32_array => try materialization.materializePointer(transaction.selector, current, .{ .gpr64 = destination }),
         .arg128, .scratch128 => |pair| {
             if (pair.lo == destination) return;
             try selector_state.clobberArgReg(transaction.selector, destination);

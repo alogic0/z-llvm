@@ -8,6 +8,8 @@ const composed_selector = @import("generic_cfg/composed_selector.zig");
 const address_dependencies = @import("generic_cfg/composed_selector_address_dependencies.zig");
 const abi_legalization = @import("generic_cfg/abi_legalization.zig");
 const narrow_abi = @import("generic_cfg/narrow_abi.zig");
+const scalar_forms = @import("generic_cfg/scalar_forms.zig");
+const switch_phi_edges = @import("generic_cfg/switch_phi_edges.zig");
 const word_pair_values = @import("generic_cfg/word_pair_values.zig");
 const word_pair_memory = @import("generic_cfg/word_pair_memory.zig");
 const padded_frame = @import("generic_cfg/padded_frame.zig");
@@ -49,6 +51,14 @@ pub fn tryLowerWithContext(
     }
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
+    if (try scalar_forms.legalize(arena.allocator(), function)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
+    if (try switch_phi_edges.legalize(arena.allocator(), function)) |legalized| {
+        const selected = try tryLowerWithContext(allocator, machine, legalized, module_context);
+        if (selected == .selected) try switch_phi_edges.retainLabels(allocator, machine, legalized.blocks.items[function.blocks.items.len..]);
+        return selected;
+    }
     if (try narrow_abi.legalize(arena.allocator(), function)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }

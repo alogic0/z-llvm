@@ -572,7 +572,9 @@ fn lowerMemset(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.C
     // in CallArg. Admit only the alignment annotation used by this intrinsic.
     if (!memsetAlignmentAttribute(dst.attrs) or fill.attrs != null or len.attrs != null or vol.attrs != null)
         return .{ .no_emitter = "composed-block-memset-attrs" };
-    if (dst.value != .named or (fill.value != .named and fill.value != .int) or
+    // Undef permits any concrete byte; select zero. Poison and all memory/ABI
+    // envelope restrictions retain their existing fail-closed behavior.
+    if (dst.value != .named or (fill.value != .named and fill.value != .int and fill.value != .undef) or
         (len.value != .named and len.value != .int))
         return .{ .unsupported_value = "composed-block-memset-value" };
     const fill_immediate: u8 = if (fill.value == .int) blk: {
