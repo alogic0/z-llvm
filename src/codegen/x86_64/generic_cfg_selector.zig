@@ -86,6 +86,9 @@ pub fn tryLowerWithContext(
         if (selected == .selected) try switch_phi_edges.retainLabels(allocator, machine, legalized.blocks.items[function.blocks.items.len..]);
         return selected;
     }
+    if (try @import("generic_cfg/boolean_values.zig").legalize(arena.allocator(), function)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
     if (try narrow_abi.legalize(arena.allocator(), function)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
@@ -109,6 +112,9 @@ pub fn tryLowerWithContext(
     }
     if (try stack_addresses.legalize(arena.allocator(), function, module_context)) |legalized| {
         if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
+    if (try @import("generic_cfg/pointer_values.zig").legalize(arena.allocator(), function, module_context)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try global_memory.legalize(arena.allocator(), function, module_context)) |legalized| {

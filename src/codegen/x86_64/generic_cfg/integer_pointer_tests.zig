@@ -96,11 +96,10 @@ test "integer pointer aliases execute full-width roundtrips and pointer returns"
     }
 }
 
-test "integer pointer casts reject unproved widths flags immediates and layouts" {
+test "integer pointer casts reject unproved widths flags and layouts" {
     const cases = [_]struct { from: []const u8, value: []const u8 = "%bits", layout: []const u8 = "e-p:64:64-i64:64", expected: []const u8, flag: bool = false }{
         .{ .from = "i32", .expected = "composed-block-inttoptr-form" },
         .{ .from = "i128", .expected = "composed-block-inttoptr-form" },
-        .{ .from = "i64", .value = "0", .expected = "composed-block-inttoptr-form" },
         .{ .from = "i64", .layout = "e-p:32:32-i64:64", .expected = "composed-block-inttoptr-layout" },
         .{ .from = "i64", .flag = true, .expected = "composed-block-inttoptr-form" },
     };

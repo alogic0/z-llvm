@@ -126,6 +126,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 if (call.callee_value) |callee| if (callee != .named or callee.named.len == 0 or callee.named[0] == '@') return null;
                 sysv.rejectUnsupportedCallEnvelope(call) catch return null;
             },
+            .phi, .select => {},
             .insertvalue => |insert| {
                 const which = index(insert.indices) orelse return null;
                 if (!insert.value_ty.eql(fields(ty).?[which])) return null;
@@ -146,6 +147,8 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                     .extractvalue => |extract| {
                         if (!extract.aggregate_ty.eql(item.value_ptr.*) or index(extract.indices) == null) return null;
                     },
+                    .phi => |phi| if (!phi.ty.eql(item.value_ptr.*)) return null,
+                    .select => |select| if (!select.ty.eql(item.value_ptr.*)) return null,
                     .store => |store| {
                         if (!store.ty.eql(item.value_ptr.*) or store.value != .named or !ir.identifiers.eql(store.value.named, item.key_ptr.*) or
                             (store.ptr == .named and ir.identifiers.eql(store.ptr.named, item.key_ptr.*)) or !memory(store.attrs, store.ty_addrspace, store.ptr_addrspace)) return null;
@@ -198,6 +201,29 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                             _ = try cast(allocator, function, &block, &serial, .inttoptr, word, .{ .int = 0 }, .ptr, inst.result);
                         } else _ = try address(allocator, function, &block, &serial, value, 0, inst.result);
                     } else _ = try binary(allocator, function, &block, &serial, .add, word, value, .{ .int = 0 }, inst.result);
+                    continue;
+                },
+                .phi => |phi| if (fields(phi.ty)) |types| {
+                    for (types, 0..) |ty, part| {
+                        var copy = inst;
+                        copy.result = names.get(inst.result.?).?[part];
+                        copy.kind.phi.ty = ty;
+                        copy.kind.phi.incoming = try phi.incoming.clone(allocator);
+                        for (copy.kind.phi.incoming.items) |*incoming|
+                            incoming.value = leaf(function, names, incoming.value, phi.ty, part, 0) orelse return null;
+                        try block.instructions.append(allocator, copy);
+                    }
+                    continue;
+                },
+                .select => |select| if (fields(select.ty)) |types| {
+                    for (types, 0..) |ty, part| {
+                        var copy = inst;
+                        copy.result = names.get(inst.result.?).?[part];
+                        copy.kind.select.ty = ty;
+                        copy.kind.select.true_value = leaf(function, names, select.true_value, select.ty, part, 0) orelse return null;
+                        copy.kind.select.false_value = leaf(function, names, select.false_value, select.ty, part, 0) orelse return null;
+                        try block.instructions.append(allocator, copy);
+                    }
                     continue;
                 },
                 .call => |call| if (fields(call.ret_ty)) |types| {
