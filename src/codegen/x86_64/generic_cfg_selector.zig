@@ -74,6 +74,10 @@ pub fn tryLowerWithContext(
             try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
+    if (try @import("generic_cfg/pair_arithmetic.zig").legalize(arena.allocator(), function)) |legalized| {
+        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
     if (try integer_intrinsics.legalize(arena.allocator(), function)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }

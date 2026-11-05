@@ -277,12 +277,14 @@ test "generic cfg selector skeleton preserves recognizer fallback while opt-in" 
 }
 
 test "generic cfg selector reports composed diagnostic over skeleton fallback" {
+    // The scalar expansion admits defined pair products, while undef operands
+    // retain the composed rejection exercised by this diagnostic test.
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
         \\define i128 @mul128(i128 %a, i128 %b) {
         \\entry:
-        \\  %product = mul i128 %a, %b
+        \\  %product = mul i128 %a, undef
         \\  ret i128 %product
         \\}
         \\
@@ -304,6 +306,8 @@ test "generic cfg selector reports composed diagnostic over skeleton fallback" {
 }
 
 test "generic cfg selector transaction restores seeded state after unsupported mutation" {
+    // Defined i128 selects are legalizable. An undef arm keeps this rejection
+    // after the same frame/condition writes, so rollback is still exercised.
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -313,7 +317,7 @@ test "generic cfg selector transaction restores seeded state after unsupported m
         \\  br label %next
         \\next:
         \\  %condition = icmp ne i32 %flag, 0
-        \\  %selected = select i1 %condition, i128 1, i128 2
+        \\  %selected = select i1 %condition, i128 undef, i128 2
         \\  ret i128 %selected
         \\}
         \\
