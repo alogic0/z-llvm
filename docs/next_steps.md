@@ -41,7 +41,27 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [narrow ABI checkpoint](evidence/narrow_abi_acceptance_20261105.json)
+The accepted [aggregate storage checkpoint](evidence/aggregate_storage_acceptance_20261105.json)
+at `fa2371d0` passes all 17 integration stages. Module-owned integer/pointer
+layouts up to 256 bytes retain exact padding and alignment. Flat two-word values
+support loads, stores, insertion, extraction and ordinary call/return carriers.
+Shared frame planning preserves scalar values across stores and argument
+permutations, including final-use operands. The 1,783-test unit population,
+13 structural checks, 26 focused tests per release mode, captured-object smoke
+and readiness pass. Twelve native functions pass 4,608 local observations against
+2,304 LLVM references; eighteen mutation controls reject wrong values. Sixteen
+earlier native populations and the 100-row/five-function cohort retain their counts.
+Minimum free space is 36.84 GB, above the 24.36 GB reserve.
+The unchanged canonical Fast capture emits twenty of 34 selected functions and
+rejects fourteen, first at `start.expandStackSize composed-block-llvm-intrinsic`.
+No complete local Fibonacci object or execution is claimed. Scalar/memory forms,
+switch PHI edges, indirect calls and stack arguments remain. Safe retains its
+separate larger frontier and real stack-probe runtime requirement. The
+[focused evidence](evidence/aggregate_storage_focused_20261105.json) records the
+bounded envelopes and validation provenance. All thirteen original probes remain
+unchanged; no archives were made.
+
+The earlier accepted [narrow ABI checkpoint](evidence/narrow_abi_acceptance_20261105.json)
 at `85f557e9` passes all 17 integration stages. Private register carriers
 normalize unannotated integer parameters, returns and ordinary calls at widths
 one through sixteen, including direct boolean branches and boolean xor. Ordinary
@@ -416,8 +436,9 @@ through these steps without stopping for another task-selection approval:
 
 1. Narrow call arguments/returns, boolean parameter handling and the main
    function's call-preservation frame are accepted at the checkpoint above.
-2. Resolve remaining stack structures and aggregate loads, insertion/extraction
-   and return values.
+2. Bounded stack structures and flat two-word aggregate loads,
+   insertion/extraction and call/return values are accepted above. Larger or
+   unsupported layouts remain explicit boundaries.
 3. Resolve remaining scalar and memory-intrinsic forms exposed by those steps.
 4. Support the retained indirect callbacks and their required calling conventions,
    argument placement and result handling.

@@ -1,0 +1,791 @@
+{
+  "schema": 1,
+  "status": "accepted",
+  "recorded_utc": "2026-11-05T07:46:53.116642+00:00",
+  "accepted_revision": "fa2371d03a1f5be37e81e71eb7cfd2d092272ed2",
+  "accepted_tree": "76f22370c3edc75019ef84da7ae735a47d9096fe",
+  "source_snapshot": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/aggregate-source-snapshot.json",
+    "sha256": "e1f34d12bdca940160fec0c5fcff4e311bda2eb4210dddd22f869d07fd49fa30"
+  },
+  "source_snapshot_files": 2747,
+  "source_sha256": {
+    "src/codegen/x86_64/generic_cfg/aggregate_storage_tests.zig": "d72d1506d2e7b2a75c35ec4a0c744318b65239cdc790e85e032f2c5f8fcbc38e",
+    "src/codegen/x86_64/generic_cfg/composed_selector_calls.zig": "176821a68c4f05feb8af6cec0e5f4c5bdaff8b38331164c3ab32160d40bbe734",
+    "src/codegen/x86_64/generic_cfg/composed_selector_state.zig": "316d398b4a8ff004330fe126520ddb88e8bd3d24577ebaf8463b808dd60faa26",
+    "src/codegen/x86_64/generic_cfg/global_memory.zig": "b5e209ff4ea090ec4b1bf0767742a3c00d0aa023a62badeba6929b78373b3a45",
+    "src/codegen/x86_64/generic_cfg/padded_frame.zig": "2c8f8420e0dab21410522274302bd15ca2de1dc8f872e8cda274313640ef5728",
+    "src/codegen/x86_64/generic_cfg/padded_frame_tests.zig": "bb350e8a7f2db3f99f51c01d3606d62b407b513737ead9df1457d32dfc85e0c6",
+    "src/codegen/x86_64/generic_cfg/stage2_planning.zig": "7b2a09976a876573126b6f44040a49e919003f71155736ab448c72e31f4ded7e",
+    "src/codegen/x86_64/generic_cfg/storage_layout.zig": "5844d61e6cdcdc96f1bd6a3f1ff5a0485f8cb2f2f8c9849cbabd17ef6eb8e9ab",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/lifetime_admission.zig": "8f8192a63d54ae6b7afef6fe35ec32e6f1538433a4fc4f5491a1d6edeee40f8c",
+    "src/codegen/x86_64/generic_cfg/word_pair_values.zig": "b95eaea9e1beebc62357d4b841d5a710b366d5185b6569ad07518b45079ffbac",
+    "src/codegen/x86_64/generic_cfg_selector.zig": "c42475bd48c5897839f587b2ab2405cb763ce07cfae318b31bf6b9419254f85f",
+    "src/tests.zig": "05f6b88b8684bd644d02d4102ef04761d8a8bc2db343f09ffc613025779a67c1",
+    "src/tests/codegen_x86_64_generic_cfg_selector_limb.zig": "094063058713a05674ae40c563727e8ba4cd234cd1810c2a419b792758b3a987",
+    "src/tests/codegen_x86_64_generic_cfg_selector_planning.zig": "3c3871cd1123701cb607cad8d97aa662235ea58adff6b405515bfaee9a2c46e9",
+    "test/real_programs/aggregate_storage.ll": "2ace2295eeab8594869e916575527b369cf81b7db187416a249a4e4ccd3bd63d",
+    "test/real_programs/aggregate_storage_driver.c": "5a31b1a8bc6dec179d93ade5ab4372f0709baa264b125ec1f01d673c0383359f",
+    "tools/run_upstream_c_program.py": "d2f23d3313be1d978e6025452d20d622491ebd3f80f25b72897f85485ba5c7df"
+  },
+  "behavior": [
+    "Module-owned integer/pointer layouts up to 256 bytes lower to exact bounded stack storage, including packed and nested fields with allocation padding.",
+    "Flat two-word integer/pointer SSA loads, stores, insertions, extractions and call/return values use private scalar carriers with the existing RAX/RDX ABI.",
+    "Shared frame planning preserves instruction-produced values across stores and final-use argument permutations. Global pointer store values materialize through ordinary symbol addresses.",
+    "The canonical unchanged Fast capture emits 20 of 34 selected functions and rejects 14; no complete local object or execution is claimed."
+  ],
+  "known_boundaries": [
+    "Unresolved, cyclic, over-aligned or oversized layouts, aggregate parameters, unsupported pair users, memory barriers and unsupported ABI annotations retain fail-closed boundaries.",
+    "Scalar, switch, indirect-call and stack-argument forms remain ahead of whole-program execution. ReleaseSafe is a separate larger frontier; its previously recorded narrow-checkpoint diagnostic and real stack-probe runtime requirement remain open.",
+    "Conservative preservation can introduce frames where some homes already use registers; this checkpoint makes no performance claim.",
+    "The full authorized plan continues until unchanged upstream Fibonacci executes its original six assertions in ReleaseFast, ReleaseSafe and ReleaseSmall with LLVM-equivalent exit/stdout/stderr."
+  ],
+  "focused_evidence": {
+    "path": "docs/evidence/aggregate_storage_focused_20261105.json",
+    "sha256": "a915afbe1128294d018bdd42e4ca0bb403dc34c4ceb921d52953d46e9ae12aba"
+  },
+  "fibonacci": {
+    "argv": [
+      "zig-out/bin/z_llvm",
+      "--generic-cfg-selector",
+      "--report-all-codegen-failures",
+      "--target=x86_64-unknown-linux-gnu",
+      "--input-limit=67108864",
+      "--emit=obj",
+      "--codegen-reachable",
+      "local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/object-input.ll"
+    ],
+    "returncode": 1,
+    "input_sha256": "2f72c59ebf876c48b671cbf39890f4a974b8b87545a3a3103d2cce2df85d180a",
+    "compiler_sha256": "4525052137f2ffedcc88d92fcab6924e8edba9104a68e3e9bfaf52dff4c4705c",
+    "object_bytes": 0,
+    "summary_lines": [
+      "summary zllvm-codegen-selection mode=reachable coverage=complete selected_globals=15 selected_aliases=1",
+      "summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=34 emitted_functions=20 failed_functions=14 first_failing_function=start.expandStackSize first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=no_emitter first_failing_selector_detail=composed-block-llvm-intrinsic local_fail=1"
+    ],
+    "failures": [
+      {
+        "function": "start.expandStackSize",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-llvm-intrinsic"
+      },
+      {
+        "function": "c.errno__func_20",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-icmp-form"
+      },
+      {
+        "function": "posix.getrlimit",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-memset-value"
+      },
+      {
+        "function": "Io.Writer.defaultRebase",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.File.Writer.drainStreaming",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-call-arg-reg"
+      },
+      {
+        "function": "Io.File.Writer.drainPositional",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.File.Reader.Mode.toStreaming",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "stage2-switch-phi-edge"
+      },
+      {
+        "function": "Io.File.Writer.seekToUnbuffered",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-indirect-call"
+      },
+      {
+        "function": "Io.Writer.flush",
+        "diagnostic": "UnsupportedCodegenInstruction",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.File.writeStreaming",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-param-reg"
+      },
+      {
+        "function": "Io.operate",
+        "diagnostic": "UnsupportedCodegenInstruction",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.Writer.defaultFlush",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.File.Writer.sendFilePositional",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.File.Writer.sendFileStreaming",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      }
+    ],
+    "local_whole_program_executions": 0,
+    "record": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/aggregate-main-fibonacci.json",
+      "sha256": "7da32aca4ec1ea94722ea6cbbac9cc57c8b3c747c7af0a0fbb17e0ff2e4c75b1"
+    },
+    "stderr": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/aggregate-main-fibonacci.stderr",
+      "sha256": "ba45db351854aac656c424dbe67aa6c21ba0cf6554a17d62727b88d6889ac561"
+    },
+    "input_unchanged": true
+  },
+  "validation_trigger": "Tier 3 is required for ABI, shared frame and register-preservation changes before aggregate acceptance and the following scalar/call families.",
+  "prior_result_reuse": "The accepted narrow checkpoint predates these aggregate, storage and preservation changes. Prototype Tier 2 has 1530 byte-identical non-documentation files; reuse that focused evidence and rerun all 17 full stages and seventeen native populations on the imported main source. Only authenticated immutable AIR exports are reused; execution is repeated.",
+  "frozen_plan": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/aggregate-validation-plan.json",
+    "sha256": "bcdcd7b9baf6855abcf9eadc9f5c3097d47c7d161cd45f2f0233db437f874e82"
+  },
+  "verification_script": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/verify_aggregate_full_run.py",
+    "sha256": "f8b4b965baacf5f605848496134c1e583602d51cd933ef623b4c528d103e9dc0"
+  },
+  "verified_record": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/verified-full-aggregate-cached.json",
+    "sha256": "f5cda412c11f7e0b7542dcd0a36c08ca1e4db2345bf682e2f1a48e08c8edc439"
+  },
+  "integration": {
+    "argv": [
+      "/home/oleg/.zig/0.17.0/files/zig",
+      "build",
+      "distribution-all",
+      "--",
+      "--serial",
+      "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+      "--real-rows-validation-root=local-state/validations/ir-headroom-20261103",
+      "--real-rows-cache-root=local-state/caches/ir-headroom-20261103"
+    ],
+    "returncode": 0,
+    "wall_ns": 2514448954607,
+    "raw_log": "local-state/validations/fibonacci-20261104/full-aggregate-cached.log",
+    "raw_log_sha256": "8544abc705056dddc090245d14958cd69b14e137d29cd80a67f04159c12f8ac7",
+    "telemetry_sha256": "fbbf9de9e4ba204b8a918243de371a38ef268c8cf587426fafc4fae4bce5380e",
+    "gates": [
+      {
+        "id": "selected-object-suite",
+        "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+        "exit_status": "0",
+        "duration_ms": "62919",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "1889",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "3499",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "3498",
+        "cache_status": "none"
+      },
+      {
+        "id": "zig-source-native-link",
+        "tool": "tools/run_distribution_zig_source_native_link.zig",
+        "exit_status": "0",
+        "duration_ms": "19430",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-postopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "83508",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-preopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "--pipeline": "preopt",
+        "exit_status": "0",
+        "duration_ms": "648716",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-ir-writer",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "21865",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-release",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "74119",
+        "cache_status": "none"
+      },
+      {
+        "id": "real-rows-release-fast",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseFast",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "523092",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-safe",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSafe",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "529073",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-small",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSmall",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "349812",
+        "cache_status": "hit"
+      },
+      {
+        "id": "integrated-executable",
+        "tool": "tools/run_distribution_zig_integrated_exe.zig",
+        "exit_status": "0",
+        "duration_ms": "944071",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "468",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "1129",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "1025",
+        "cache_status": "none"
+      },
+      {
+        "id": "boundary-gates",
+        "tool": "tools/run_distribution_boundary_gates.zig",
+        "exit_status": "0",
+        "duration_ms": "761",
+        "cache_status": "none"
+      }
+    ],
+    "serial": {
+      "schema_version": "1",
+      "run_id": "7b832c78d7caae761725cba36d30b08b",
+      "scratch_path": "tmp/distribution_all_serial_7b832c78d7caae761725cba36d30b08b",
+      "bundle_path": "tmp/distribution_all_serial_7b832c78d7caae761725cba36d30b08b/release_source_object_bundle",
+      "target": "x86_64-unknown-linux-gnu",
+      "mode": "serial",
+      "real_rows_concurrency": "3",
+      "subgates": "17",
+      "wall_ms": "2514420",
+      "starting_free_bytes": "39327789056",
+      "minimum_observed_free_bytes": "36835311616",
+      "final_free_bytes": "37219606528",
+      "observed_peak_bytes": "2492477440",
+      "reserve_bytes": "24359738368",
+      "required_start_bytes": "32949672960",
+      "local_fail": "0"
+    },
+    "real_rows": [
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseFast",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSafe",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      },
+      {
+        "counter_schema": "distribution-real-rows-v2",
+        "mode": "ReleaseSmall",
+        "selector_version": "real-candidate-selector-v3",
+        "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+        "limit": "100",
+        "candidate_rows": "100",
+        "real_functions_lowered": "100",
+        "real_objects_emitted": "100",
+        "real_native_linked": "100",
+        "real_executed": "5",
+        "real_programs_ok": "5",
+        "first_failing_real_row": "-",
+        "first_failing_stage": "-",
+        "local_fail": "0"
+      }
+    ],
+    "cache_events": [
+      {
+        "mode": "ReleaseFast",
+        "status": "hit",
+        "duration_ms": "14958",
+        "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+        "descriptor_bytes": "1343891697"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "status": "hit",
+        "duration_ms": "16342",
+        "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+        "descriptor_bytes": "1473501276"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "status": "hit",
+        "duration_ms": "12310",
+        "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+        "descriptor_bytes": "1106432911"
+      }
+    ],
+    "real_rows_resources": {
+      "schema_version": "3",
+      "normalization_schema": "3",
+      "memory_policy": "os-managed-non-gating",
+      "concurrency": "3",
+      "workers": "3",
+      "modes": "ReleaseFast,ReleaseSafe,ReleaseSmall",
+      "run_id": "e823ef9d68b0646b550ed4346b25c5ab",
+      "root": "local-state/validations/ir-headroom-20261103/real_rows_parallel_e823ef9d68b0646b550ed4346b25c5ab",
+      "work_selection_root": "local-state/validations/ir-headroom-20261103",
+      "export_cache_selection_root": "local-state/caches/ir-headroom-20261103",
+      "fast_temp": "local-state/validations/ir-headroom-20261103/ReleaseFast/work_e823ef9d68b0646b550ed4346b25c5ab",
+      "fast_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_e823ef9d68b0646b550ed4346b25c5ab/ReleaseFast/zig-local-cache",
+      "fast_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_e823ef9d68b0646b550ed4346b25c5ab/ReleaseFast/zig-global-cache",
+      "fast_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseFast/export",
+      "safe_temp": "local-state/validations/ir-headroom-20261103/ReleaseSafe/work_e823ef9d68b0646b550ed4346b25c5ab",
+      "safe_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_e823ef9d68b0646b550ed4346b25c5ab/ReleaseSafe/zig-local-cache",
+      "safe_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_e823ef9d68b0646b550ed4346b25c5ab/ReleaseSafe/zig-global-cache",
+      "safe_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export",
+      "small_temp": "local-state/validations/ir-headroom-20261103/ReleaseSmall/work_e823ef9d68b0646b550ed4346b25c5ab",
+      "small_local_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_e823ef9d68b0646b550ed4346b25c5ab/ReleaseSmall/zig-local-cache",
+      "small_global_cache": "local-state/validations/ir-headroom-20261103/real_rows_parallel_e823ef9d68b0646b550ed4346b25c5ab/ReleaseSmall/zig-global-cache",
+      "small_air_cache": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export",
+      "pin_manifest_sha256": "0d7370b61aa9f9871196371de428475b01a05554fd449a97a74f63ba4f948a29",
+      "cache_status": "hit,hit,hit",
+      "air_cache": "read-only",
+      "pruning": "suspended",
+      "wall_ms": "647121",
+      "summed_child_ms": "1401977",
+      "filesystem_total_bytes": "982240026624",
+      "post_run_free_floor_bytes": "24359738368",
+      "projected_peak_bytes": "8589934592",
+      "required_start_bytes": "32949672960",
+      "admission_source": "serial_preflight",
+      "admission_starting_free_bytes": "39327789056",
+      "starting_free_bytes": "39051161600",
+      "minimum_free_bytes": "36835311616",
+      "final_free_bytes": "36835311616",
+      "peak_disk_bytes": "5417054208",
+      "peak_aggregate_rss_bytes": "5262770176",
+      "minimum_available_memory_bytes": "12305637376",
+      "load_start": "2.19",
+      "load_end": "3.97",
+      "execution_results_cached": "false",
+      "local_fail": "0"
+    },
+    "native_memory_populations": {
+      "word-pair-memory": {
+        "population": "standalone-two-word-stack-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "384",
+        "reference_observations": "192",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "pointer-stack-memory": {
+        "population": "standalone-runtime-pointer-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-stack-memory": {
+        "population": "standalone-scalar-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "486",
+        "reference_observations": "243",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "integer-pointer-casts": {
+        "population": "standalone-integer-pointer-casts",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "signed-nonnegative": {
+        "population": "standalone-signed-nonnegative",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "type-layout-padding": {
+        "population": "standalone-type-allocation-padding",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-addresses": {
+        "population": "standalone-global-addresses",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "192",
+        "reference_observations": "96",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-memory": {
+        "population": "standalone-global-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "240",
+        "reference_observations": "120",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "boolean-calls": {
+        "population": "standalone-boolean-calls",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "array-stride": {
+        "population": "standalone-array-stride",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "module-dependencies": {
+        "population": "standalone-module-dependencies",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "330",
+        "reference_observations": "165",
+        "reference_reused_per_route": "true",
+        "local_fail": "0",
+        "negative_controls": "30",
+        "environment_checks": "3"
+      },
+      "bounded-frame": {
+        "population": "standalone-bounded-frame",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "general-array-stride": {
+        "population": "standalone-general-array-stride",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1920",
+        "reference_observations": "960",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "rax-pointer-load": {
+        "population": "standalone-rax-pointer-load",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "2688",
+        "reference_observations": "1344",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "constant-remainder": {
+        "population": "standalone-constant-remainder",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "3072",
+        "reference_observations": "1536",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "narrow-abi": {
+        "population": "standalone-narrow-abi",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "4992",
+        "reference_observations": "2496",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "aggregate-storage": {
+        "population": "standalone-aggregate-storage",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "4608",
+        "reference_observations": "2304",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    },
+    "c_program": {
+      "schema": "upstream-c-program-v1",
+      "programs": "1",
+      "program_modes": "3",
+      "matched_program_modes": "3",
+      "reference_case_executions": "6",
+      "local_case_executions": "6",
+      "integer_variadic_observations": "48",
+      "heap_call_observations": "18",
+      "native_call_observations": "66",
+      "local_fail": "0"
+    },
+    "ascii_rows": [
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseFast",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+        "object_bytes": "728",
+        "object_sha256": "2fc26b078a4a6b51ec5cf81bd250e58de5a6f59bf881867d2b95fe980ab8a16c",
+        "reference_bytes": "4154072",
+        "reference_sha256": "908b70616ca64cd8a90036355b1c56e2b25600832ceaac268ffc2f9b25a31ec3",
+        "linked_bytes": "6292404",
+        "linked_sha256": "f2de38579a683f5c3744a1081cfe7fa2b8779f74912ce57d39ddcc2cdaccd85b",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      },
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseSafe",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+        "object_bytes": "728",
+        "object_sha256": "2fc26b078a4a6b51ec5cf81bd250e58de5a6f59bf881867d2b95fe980ab8a16c",
+        "reference_bytes": "4040088",
+        "reference_sha256": "f27b6cfab7f4f4adfc033ac844894e62a9469f3b3aeaac26121ac14eed372b96",
+        "linked_bytes": "6147596",
+        "linked_sha256": "9d66dc7aa7855e6fb892583fd42a50a511090155c78819b939d73de73eaec13e",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      },
+      {
+        "schema": "distribution-execution-cohort-v3",
+        "mode": "ReleaseSmall",
+        "source": "../ziglang/src/main.zig",
+        "function": "ascii.isAscii",
+        "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+        "object_bytes": "728",
+        "object_sha256": "2fc26b078a4a6b51ec5cf81bd250e58de5a6f59bf881867d2b95fe980ab8a16c",
+        "reference_bytes": "149824",
+        "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+        "linked_bytes": "356156",
+        "linked_sha256": "65355bfe707bc5b33675b9e5e11337b3ef43b392f96c3b1591a4f466202cf1d9",
+        "result": "128",
+        "witness": "8256",
+        "observations": "256",
+        "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+        "reference_status": "0",
+        "linked_status": "0",
+        "real_executed": "1",
+        "real_programs_ok": "1"
+      }
+    ],
+    "fma": {
+      "cases": "8192",
+      "matched": "8192",
+      "reference": "llvm22-frozen-ir",
+      "local_fail": "0"
+    },
+    "source_snapshot": "local-state/validations/fibonacci-20261104/aggregate-source-snapshot.json",
+    "source_snapshot_sha256": "e1f34d12bdca940160fec0c5fcff4e311bda2eb4210dddd22f869d07fd49fa30",
+    "source_snapshot_files": 2747,
+    "source_worktree": "/home/oleg/prog/z_llvm",
+    "original_scratch_files_verified": 13,
+    "sources_unchanged": true,
+    "headroom_policy": {
+      "schema_version": "3",
+      "filesystem_total_bytes": "982240026624",
+      "reserve_bytes": "24359738368",
+      "projected_peak_bytes": "8589934592",
+      "required_start_bytes": "32949672960",
+      "authority": "tools/distribution_headroom_policy.zig",
+      "local_fail": "0"
+    },
+    "expected_cache_status": "hit",
+    "sampled_minimum_free_bytes": 36671705088,
+    "archives_created": 0
+  },
+  "headroom_policy": {
+    "schema_version": 3,
+    "reserve_bytes": 24359738368,
+    "projected_peak_bytes": 8589934592,
+    "required_start_bytes": 32949672960
+  },
+  "authenticated_exports_reused": [
+    {
+      "mode": "ReleaseFast",
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5.air",
+      "bytes": 1343891697,
+      "allocated_bytes": 1343922176,
+      "sha256": "bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5",
+      "cache_key": "08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea",
+      "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.meta",
+      "metadata_sha256": "037abbc2bc1e323c0174b6a43373654ee44ef22a91fcf9a8c092d5693f45f00a"
+    },
+    {
+      "mode": "ReleaseSafe",
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c.air",
+      "bytes": 1473501276,
+      "allocated_bytes": 1473531904,
+      "sha256": "53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c",
+      "cache_key": "24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2",
+      "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.meta",
+      "metadata_sha256": "24849930ee312cc3cb2d35cf0da327898ca4a16ad25c90b1a858ac5530300618"
+    },
+    {
+      "mode": "ReleaseSmall",
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809.air",
+      "bytes": 1106432911,
+      "allocated_bytes": 1106452480,
+      "sha256": "e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809",
+      "cache_key": "b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e",
+      "metadata_path": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.meta",
+      "metadata_sha256": "b3f9cb704b31b4257b0e2c3b9f3415672c282a7bd10142d8dbf246de354c62f3"
+    }
+  ],
+  "summary_log": {
+    "path": "docs/evidence/aggregate_storage_20261105_cached.summary",
+    "sha256": "51e14910c64948228fc59d50da9fd0357ba510d387310c889c6c490c79829bec"
+  },
+  "toolchain": {
+    "project_zig_version": "0.17.0",
+    "project_zig": "/home/oleg/.zig/0.17.0/files/zig",
+    "emitter": "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+    "emitter_version": "0.17.0-dev.11+1c08b09d1",
+    "emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+    "emitter_bytes": 149918648,
+    "source_authority_sha256": "d4846f9d9032727d3903b31bdefc763447a92024483aa3c83b2ac0683167f492"
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0,
+  "cleanup": {
+    "deleted_paths": [],
+    "archives_created": 0
+  },
+  "unchanged_scope": {
+    "candidate_rows_per_mode": 100,
+    "executed_functions_per_mode": 5,
+    "compiler_rt_bypass_ratchet": 130,
+    "previous_native_populations": 16,
+    "selection_default": "legacy",
+    "fibonacci_whole_program_local_executions": 0
+  },
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-unknown-linux-gnu",
+  "modes": [
+    "ReleaseFast",
+    "ReleaseSafe",
+    "ReleaseSmall"
+  ],
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "selector_version": "real-candidate-selector-v3"
+}

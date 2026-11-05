@@ -293,6 +293,14 @@ references. The helpers dirty return padding and clobber volatile registers;
 independent values and guards detect incorrect extension and lost values.
 Eighteen mutation controls fail as expected. Earlier populations remain separate.
 
+The accepted [aggregate storage canary](evidence/aggregate_storage_acceptance_20261105.json)
+adds twelve functions for exact 8/24/48/256-byte frames, two-word loads/stores and
+returns, ordinary calls, argument permutations and global pointer values.
+Direct/release routes in all three modes check 4,608 local observations against
+2,304 LLVM references. Independent guards, initialized padding, caller clobbers
+and alignment checks detect layout and preservation defects. Eighteen mutation
+controls fail as expected. Earlier populations remain separate.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

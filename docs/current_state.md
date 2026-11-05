@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `85f557e9e889c87431f6e95582f1fe7399d0867d`; tree: `159ededed7686f319af211d576a7586e30b77f70`.
+Accepted revision: `fa2371d03a1f5be37e81e71eb7cfd2d092272ed2`; tree: `76f22370c3edc75019ef84da7ae735a47d9096fe`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,27 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [narrow ABI checkpoint](evidence/narrow_abi_acceptance_20261105.json)
+The accepted [aggregate storage checkpoint](evidence/aggregate_storage_acceptance_20261105.json)
+at `fa2371d0` passes all 17 integration stages. Module-owned integer/pointer
+layouts up to 256 bytes retain exact padding and alignment. Flat two-word values
+support loads, stores, insertion, extraction and ordinary call/return carriers.
+Shared frame planning preserves scalar values across stores and argument
+permutations, including final-use operands. The 1,783-test unit population,
+13 structural checks, 26 focused tests per release mode, captured-object smoke
+and readiness pass. Twelve native functions pass 4,608 local observations against
+2,304 LLVM references; eighteen mutation controls reject wrong values. Sixteen
+earlier native populations and the 100-row/five-function cohort retain their counts.
+Minimum free space is 36.84 GB, above the 24.36 GB reserve.
+The unchanged canonical Fast capture emits twenty of 34 selected functions and
+rejects fourteen, first at `start.expandStackSize composed-block-llvm-intrinsic`.
+No complete local Fibonacci object or execution is claimed. Scalar/memory forms,
+switch PHI edges, indirect calls and stack arguments remain. Safe retains its
+separate larger frontier and real stack-probe runtime requirement. The
+[focused evidence](evidence/aggregate_storage_focused_20261105.json) records the
+bounded envelopes and validation provenance. All thirteen original probes remain
+unchanged; no archives were made.
+
+The earlier accepted [narrow ABI checkpoint](evidence/narrow_abi_acceptance_20261105.json)
 at `85f557e9` passes all 17 integration stages. Private register carriers
 normalize unannotated integer parameters, returns and ordinary calls at widths
 one through sixteen, including direct boolean branches and boolean xor. Ordinary
@@ -264,8 +284,8 @@ history are retired without archives. The latest
 of superseded AIR after the complete fresh replacement proof, making room for
 the cached run. Both runs now pass; old metadata and hashes remain. The retired
 checkout's dependency links are removed while their target repositories remain.
-The narrow ABI slice is accepted. Continue the authorized full Fibonacci plan
-with remaining stack structures and aggregate values, then scalar/memory forms
-and indirect calls with their required argument placement. Finish the smaller
-Fast/Small execution path while retaining the larger Safe frontier and its
-runtime dependency. See [next steps](next_steps.md) for the full acceptance condition.
+The aggregate storage slice is accepted. Continue the authorized full Fibonacci
+plan with scalar/memory and switch-edge forms, then indirect calls and stack
+arguments. Finish the smaller Fast/Small execution path while retaining the
+larger Safe frontier and its runtime dependency. See [next steps](next_steps.md)
+for the full acceptance condition.
