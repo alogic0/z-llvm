@@ -1341,3 +1341,89 @@ test "value-use immediate mixed-width preservation rolls back every alias" {
         try std.testing.expect(selector.values.get("result") == null);
     }
 }
+
+test "value-use immediate RCX writes preserve live sources and aliases" {
+    const encoding = @import("../../../../../mc/encoding.zig");
+    const verify = @import("../../../verify.zig");
+    for ([_]ir.BinaryOp{ .ashr, .add, .sub }) |operation| for ([_]bool{ false, true }) |typed| for ([_]bool{ false, true }) |alias| {
+        const row = PlanRow{ .id = "rcx-live-write", .direction = .rhs, .operation = operation, .bits = 64, .literal = if (operation == .ashr) 63 else 7, .accumulator = false, .scratch = true, .writes = 1 };
+        var machine = MachineFunction.init(row.id, .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        if (alias) {
+            try support.addLive(&plan, "wide-alias");
+            try addAtCurrent(&plan, "source");
+        } else try support.addLive(&plan, "source");
+        try addAtCurrent(&plan, "result");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 136;
+        try selector_state.bindValueLoc(&selector, "source", .{ .scratch64 = .rcx });
+        if (alias) try selector_state.bindValueLoc(&selector, "wide-alias", .{ .scratch64 = .rcx });
+        try machine.instructions.appendSlice(std.testing.allocator, &.{ .{ .sub_rsp_imm32 = 136 }, .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } } });
+        if (typed) {
+            var transaction = try Transaction.begin(&selector);
+            defer transaction.deinit();
+            const handle = try registerImmediate(&transaction, row);
+            try transaction.seal();
+            try transaction.prepare();
+            try transaction.materializeAll();
+            try transaction.executePreparedAction(try transaction.preparedView(handle));
+            try transaction.commit();
+        } else {
+            try std.testing.expect((try support.selector_scalar.lowerBinary(&selector, "result", binary(row))) == null);
+        }
+        try selector_state.emitValueIntoRax(&selector, .{ .named = if (alias) "wide-alias" else "source" });
+        try machine.instructions.appendSlice(std.testing.allocator, &.{ .{ .add_rsp_imm32 = 136 }, .ret });
+        try verify.verifyFunction(machine);
+        const code = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(code);
+        const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..code.len], code);
+        const run: *const fn (u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+        for ([_]u64{ 0, 1, 2, 0x7fffffffffffffff, 0x8000000000000000, 0x8000000000000001, 0xdeadbeef12345678, std.math.maxInt(u64) }) |input| {
+            try std.testing.expectEqual(input, run(input));
+        }
+    };
+}
+
+test "value-use immediate RCX writes restore aliases on rollback" {
+    for ([_]ir.BinaryOp{ .ashr, .add, .sub }) |operation| for ([_]Transaction.ImmediateScalarTestFailure{ .after_first_instruction, .after_result_definition }) |boundary| {
+        const row = PlanRow{ .id = "rcx-write-rollback", .direction = .rhs, .operation = operation, .bits = 64, .literal = if (operation == .ashr) 63 else 7, .accumulator = false, .scratch = true, .writes = 1 };
+        var machine = MachineFunction.init(row.id, .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try support.addLive(&plan, "source");
+        try support.addLive(&plan, "alias");
+        try addAtCurrent(&plan, "result");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 136;
+        try selector_state.bindValueLoc(&selector, "source", .{ .scratch64 = .rcx });
+        try selector_state.bindValueLoc(&selector, "alias", .{ .scratch64 = .rcx });
+        const before_source = selector.values.get("source").?;
+        const before_alias = selector.values.get("alias").?;
+        const before_flags = selector.eflags.snapshot();
+        const before_virtual = selector.next_virtual_reg;
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handle = try registerImmediate(&transaction, row);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.setImmediateScalarTestFailure(boundary);
+        try std.testing.expectError(error.ValueUseImmediateScalarTestFailure, transaction.executePreparedAction(try transaction.preparedView(handle)));
+        try std.testing.expectEqual(before_source, selector.values.get("source").?);
+        try std.testing.expectEqual(before_alias, selector.values.get("alias").?);
+        try std.testing.expectEqual(before_virtual, selector.next_virtual_reg);
+        try selector.eflags.validateSnapshot(before_flags);
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+        try std.testing.expect(selector.values.get("result") == null);
+    };
+}

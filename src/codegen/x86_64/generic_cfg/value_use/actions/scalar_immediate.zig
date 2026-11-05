@@ -694,6 +694,9 @@ fn executeImmediateR03(
         );
         try failImmediateScalarForTest(transaction, .after_rcx_staging);
         if (amount != 0) {
+            // Staging is a no-op when the source already lives in RCX.
+            // Preserve every live alias before the shift overwrites that home.
+            try selector_state.clobberArgReg(transaction.selector, .rcx);
             try emitImmediateWrite(transaction, .{ .sar_arg64_imm6 = .{
                 .reg = .rcx,
                 .amount = @intCast(amount),
@@ -766,6 +769,7 @@ fn executeImmediateR04R06(
         );
         try failImmediateScalarForTest(transaction, .after_rcx_staging);
         const immediate: i32 = @intCast(action.literal);
+        if (immediate != 0) try selector_state.clobberArgReg(transaction.selector, .rcx);
         try emitImmediateWrite(transaction, .{ .add_arg64_imm32 = .{
             .reg = .rcx,
             .imm = if (action.operation == .sub) -immediate else immediate,

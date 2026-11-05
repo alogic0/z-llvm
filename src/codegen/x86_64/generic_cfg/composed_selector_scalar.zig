@@ -462,10 +462,13 @@ fn scalar_immediate_live_shared_source_preservation(
 
     const amount = try shiftAmount6(literal);
     try selector_state.emitValueIntoScratch(selector, binary.lhs, .rcx, bits);
-    if (amount != 0) try emitArithmeticWrite(selector, .{ .sar_arg64_imm6 = .{
-        .reg = .rcx,
-        .amount = amount,
-    } });
+    if (amount != 0) {
+        try selector_state.clobberArgReg(selector, .rcx);
+        try emitArithmeticWrite(selector, .{ .sar_arg64_imm6 = .{
+            .reg = .rcx,
+            .amount = amount,
+        } });
+    }
     try selector_state.bindScratch(selector, result_name, .rcx, bits);
     if (try selector_state.spillValue(selector, result_name)) |diagnostic| return diagnostic;
     return null;
