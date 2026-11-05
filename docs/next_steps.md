@@ -1,10 +1,20 @@
 # Active direction
 
-Current action: migrate the maintained Python validation tools to Zig, as
-requested, using the pinned process and support libraries from the inventory.
-Complete the tool equivalence checks, frozen performance protocol and integration
-validation, then stop. The compiler work remains stopped after the accepted
-arithmetic/hash slice, as requested.
+Current action: stopped after completing the requested
+[Python-to-Zig tooling migration](evidence/python_tools_migration_20261105.json)
+at `978ffaf9`. All nine maintained Python modules were replaced using the pinned
+`zig-process` and `zig-test-support` sources. All 22 policy/provider tests pass in
+Debug and ReleaseSafe, all 17 integration gates pass, and the final log matches
+all 1,430 canonical records from the Python-backed accepted run. The separate
+fresh/cache replay matches all 24 records across three modes. The frozen
+15-pair performance matrix retains its supported outcomes and semantics;
+cross-engine timings do not establish a speedup. See the
+[tool commands and scope](validation_tools.md).
+
+Obsolete build caches and the verified temporary export cache were removed,
+with hashes, metadata and reports retained. No archives were made. The compiler
+source and accepted status remain unchanged; compiler work remains stopped
+after the accepted arithmetic/hash slice, as requested.
 Do not resume the i65/i96 draft or another Fibonacci family without a new user
 request. The unchanged Safe program still has 46 emission failures; the first is
 `debug.writeCurrentStackTrace` / `inline-asm-call`. Fixed acceptance counters

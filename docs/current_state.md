@@ -25,6 +25,17 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
+The [Python-to-Zig tooling migration](evidence/python_tools_migration_20261105.json)
+is separately validated at `978ffaf9`. The maintained program, native, candidate,
+fact and benchmark tools now use Zig with pinned process and test-support sources.
+All 22 policy/provider tests pass in Debug and ReleaseSafe; all 17 integration
+gates pass with Python blocked. The full log matches all 1,430 canonical records
+from the preceding Python-backed run, and fresh/cache replay matches all 24
+records across three modes. Compiler source and the accepted population above
+are unchanged. [Tooling documentation](validation_tools.md) records the commands
+and historical-evidence boundary. This task is complete; Fibonacci work remains
+stopped.
+
 The accepted [integer arithmetic and hash checkpoint](evidence/fibonacci_arithmetic_acceptance_20261105.json)
 at `9a8cc1c9` passes all 17 integration stages. Accumulator-address stores,
 narrow integer normalization and ABI carriers, constant two-word stores, and

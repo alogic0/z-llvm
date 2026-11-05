@@ -1,0 +1,571 @@
+{
+  "schema": 1,
+  "status": "accepted",
+  "scope": "Python-to-Zig validation tooling; no compiler capability change",
+  "recorded_utc": "2026-11-05T21:44:51Z",
+  "tooling_revision": "978ffaf913f60538b6def5792ebbfe7c578cec54",
+  "tooling_tree": "fbd31aae386b894cd15408b5ef65787234a8c3a1",
+  "compiler_accepted_revision": "9a8cc1c94374ee05fe87a56a954b51280e375038",
+  "source_snapshot": {
+    "path": "local-state/validations/python-tools-20261105/source-final.json",
+    "files": 2867,
+    "verified_after_final_integration": true
+  },
+  "target": "x86_64-unknown-linux-gnu",
+  "zig_version": "0.17.0",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "providers": [
+    {
+      "name": "zig-process",
+      "version": "0.6.0",
+      "revision": "800c6ea9739cdf98405471df0120f1c9ad6ae1e0",
+      "origin": "~/prog/zig-process",
+      "ledger": "tools/vendor/process.SHA256SUMS"
+    },
+    {
+      "name": "zig-test-support",
+      "version": "0.1.0",
+      "revision": "e23cb642765677807c2e80f613fb873f9780554a",
+      "origin": "~/prog/zig-test-support",
+      "ledger": "tools/vendor/test_support.SHA256SUMS"
+    }
+  ],
+  "provider_adoption": {
+    "inventory": "~/zig-inventory-2026-11-03/inventory.json",
+    "verbatim_selected_sources": true,
+    "provider_repositories_unchanged": true,
+    "per_file_digests_verified": true,
+    "standalone_zig_run_preserved": true,
+    "archives_created": 0
+  },
+  "replaced_python_files": [
+    "tools/run_real_program.py",
+    "tools/run_upstream_c_program.py",
+    "tools/build_real_candidates_v3.py",
+    "tools/real_candidate_facts.py",
+    "tools/freeze_real_candidate_facts.py",
+    "tools/fixed_program_baseline.py",
+    "tools/test_real_program.py",
+    "tools/test_real_candidates_v3.py",
+    "tools/test_real_candidate_facts.py"
+  ],
+  "additional_zig_workflow_tools": [
+    "tools/run_checked.zig",
+    "tools/validation_progress.zig",
+    "tools/validation_snapshot.zig"
+  ],
+  "behavior": [
+    "Program and native validation run through the pinned process provider, with owned child groups, binary logs, timeout/cancellation outcomes and durable evidence.",
+    "The native capture hook is the Zig executable itself; ELF section/symbol/relocation checks and selector ownership checks remain enforced.",
+    "Native fixture definitions moved unchanged into test/real_programs/native_canaries.json.",
+    "Candidate selection, checked compact facts, raw fact freezing, deterministic ranking, frozen authority checks and quoted TSV output are implemented in Zig.",
+    "The frozen benchmark preserves two warmups, nine samples, rotated routes, CPU affinity, independent LLVM inputs, semantic checks and deterministic object hashes.",
+    "The recorder, progress reader and source snapshot checker replace recurring one-off Python workflow helpers.",
+    "Captured Linux log descriptors append, preserving diagnostics from independent positional writers. The program runner retains the original text and sorted JSON summaries."
+  ],
+  "python_guard": {
+    "path": "local-state/validations/python-tools-20261105/no-python",
+    "blocked_names": [
+      "python",
+      "python3"
+    ],
+    "attempts": 0,
+    "scope": "Maintained source has no Python entry points or invocations; validation commands ran with PATH stubs that reject and record Python use.",
+    "historical_python_helpers_retained": 215,
+    "historical_scope": "Ignored Fibonacci evidence only; not active workflow dependencies."
+  },
+  "tests": {
+    "original_python_policy_tests_passed": 15,
+    "zig_debug_tests_passed": 22,
+    "zig_release_safe_tests_passed": 22,
+    "source_digest_checks_passed": true,
+    "coverage": [
+      "provider capture/cleanup failure paths",
+      "binary output, nonzero exits, signals and timeouts",
+      "owned descendant cleanup and cancellation",
+      "durable recorder failures and positional-writer diagnostics",
+      "ELF mutation and relocation contracts",
+      "raw/compact fact framing, hashes, duplicate definitions and tampering",
+      "selection authority, deterministic ranking and manifest binding",
+      "quoted TSV, owned output paths and symlink escape rejection",
+      "native owner controls and benchmark statistics",
+      "three-mode 101-function raw-to-compact-to-table freeze replay"
+    ]
+  },
+  "candidate_parity": {
+    "all_candidate_audit_fields_equal": true,
+    "entire_table_byte_identical": true,
+    "rows": 21117,
+    "selected": 100,
+    "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31"
+  },
+  "native_registry_parity": {
+    "all_registry_fields_equal": true,
+    "populations": 35,
+    "local_observations": 579564,
+    "reference_observations": 289782,
+    "sha256": "f4c0d53a2f63134fa626cfaf9753f1274b9fcb2fbdfa5512e07c3ed8c6263f23"
+  },
+  "initial_integration": {
+    "revision": "13edaa159ad811c9ef1bf830a09fbfaf9f390c0a",
+    "returncode": 0,
+    "subgates": 17,
+    "log": "local-state/validations/python-tools-20261105/full-tooling-cached.log",
+    "comparison": {
+      "returncode": 1,
+      "expected_records": 1430,
+      "actual_records": 1429,
+      "cause": "The Zig port omitted the original redundant one-line JSON summary."
+    },
+    "repair_revision": "978ffaf913f60538b6def5792ebbfe7c578cec54",
+    "diagnostic_regression": "The count diagnostic was overwritten by a subsequent positional Zig error writer. Append-mode capture now retains both; log-diagnostic-regression.log deliberately reproduces the earlier comparison failure."
+  },
+  "final_integration": {
+    "argv": [
+      "zig",
+      "build",
+      "distribution-all",
+      "--",
+      "--serial",
+      "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+      "--real-rows-validation-root=local-state/validations/ir-headroom-20261103",
+      "--real-rows-cache-root=local-state/caches/ir-headroom-20261103"
+    ],
+    "returncode": 0,
+    "wall_ns": 2826045048221,
+    "minimum_available_bytes": 34840223744,
+    "final_available_bytes": 36308553728,
+    "runner_binary_sha256": "28c38f904a19c5bd60459e1ae1ae3bc298523a6cd93df9aa75f0afa3bdd3da24",
+    "subgates": 17,
+    "gates": [
+      {
+        "id": "selected-object-suite",
+        "exit_status": 0,
+        "duration_ms": 63928,
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-object-inspection",
+        "exit_status": 0,
+        "duration_ms": 1983,
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-link",
+        "exit_status": 0,
+        "duration_ms": 3549,
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-probe",
+        "exit_status": 0,
+        "duration_ms": 3485,
+        "cache_status": "none"
+      },
+      {
+        "id": "zig-source-native-link",
+        "exit_status": 0,
+        "duration_ms": 18883,
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-postopt",
+        "exit_status": 0,
+        "duration_ms": 77471,
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-preopt",
+        "exit_status": 0,
+        "duration_ms": 656320,
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-ir-writer",
+        "exit_status": 0,
+        "duration_ms": 23028,
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-release",
+        "exit_status": 0,
+        "duration_ms": 86180,
+        "cache_status": "none"
+      },
+      {
+        "id": "real-rows-release-fast",
+        "exit_status": 0,
+        "duration_ms": 528919,
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-safe",
+        "exit_status": 0,
+        "duration_ms": 554704,
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-small",
+        "exit_status": 0,
+        "duration_ms": 368317,
+        "cache_status": "hit"
+      },
+      {
+        "id": "integrated-executable",
+        "exit_status": 0,
+        "duration_ms": 1207955,
+        "cache_status": "none"
+      },
+      {
+        "id": "release-object-inspection",
+        "exit_status": 0,
+        "duration_ms": 547,
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-link",
+        "exit_status": 0,
+        "duration_ms": 1160,
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-probe",
+        "exit_status": 0,
+        "duration_ms": 1052,
+        "cache_status": "none"
+      },
+      {
+        "id": "boundary-gates",
+        "exit_status": 0,
+        "duration_ms": 849,
+        "cache_status": "none"
+      }
+    ],
+    "log": "local-state/validations/python-tools-20261105/full-tooling-final-cached.log",
+    "telemetry": "local-state/validations/python-tools-20261105/full-tooling-final-cached.json",
+    "internal_minimum_free_bytes": 34838757376,
+    "bundle_identity": "a5dcce564ade761f3cf47c9767f69615cdadbe0d6c2cc88419efaaf52e9518fa"
+  },
+  "full_python_zig_equivalence": {
+    "schema_version": 4,
+    "gates": 17,
+    "canonical_records": 1430,
+    "semantic_match": true,
+    "returncode": 0,
+    "expected": "local-state/validations/fibonacci-20261104/full-arithmetic-slice-cached.log",
+    "actual": "local-state/validations/python-tools-20261105/full-tooling-final-cached.log",
+    "comparison_log": "local-state/validations/python-tools-20261105/final-python-zig-comparison.log",
+    "comparator_unchanged": true
+  },
+  "fresh_cache_equivalence": {
+    "schema_version": 4,
+    "modes": 3,
+    "canonical_records": 24,
+    "semantic_match": true,
+    "returncode": 0,
+    "fresh": {
+      "argv": [
+        "zig",
+        "run",
+        "tools/run_distribution_real_rows_parallel.zig",
+        "--",
+        "--concurrency=1",
+        "--fresh-export",
+        "--scratch-root=local-state/validations/python-tools-20261105",
+        "--export-cache-root=local-state/caches/python-tools-20261105",
+        "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig"
+      ],
+      "returncode": 0,
+      "wall_ns": 1800691420586,
+      "minimum_available_bytes": 30735290368,
+      "final_available_bytes": 33270620160,
+      "runner_binary_sha256": "7f7dc319e3ea90e7b1ad3629afc30681b8b7298277ee7a772c0b44c7471f07fb",
+      "log": "local-state/validations/python-tools-20261105/fresh-rows.log",
+      "source_continuity": "local-state/validations/python-tools-20261105/fresh-source-continuity.json"
+    },
+    "cached": {
+      "argv": [
+        "zig",
+        "run",
+        "tools/run_distribution_real_rows_parallel.zig",
+        "--",
+        "--concurrency=3",
+        "--scratch-root=local-state/validations/python-tools-20261105",
+        "--export-cache-root=local-state/caches/python-tools-20261105",
+        "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig"
+      ],
+      "returncode": 0,
+      "wall_ns": 670695498122,
+      "minimum_available_bytes": 31452999680,
+      "final_available_bytes": 32952418304,
+      "runner_binary_sha256": "28c38f904a19c5bd60459e1ae1ae3bc298523a6cd93df9aa75f0afa3bdd3da24",
+      "log": "local-state/validations/python-tools-20261105/cached-rows.log"
+    },
+    "pin_manifest_sha256": "2cff40335ecbd0a39f1b2c7068acc75d12cea21a064f7da00ed129431012fa3c",
+    "comparison_log": "local-state/validations/python-tools-20261105/fresh-cache-comparison.log",
+    "same_export_generation_and_scratch_root": true,
+    "comparator_unchanged": true,
+    "scope": "Fresh worker/source/cache code is unchanged by the logging repair. The fresh and cached records use their own exact generation; raw bytes are not claimed equal to the retained authority cache."
+  },
+  "accepted_counters_unchanged": {
+    "candidate_rows": 100,
+    "lowered_per_mode": 100,
+    "emitted_per_mode": 100,
+    "native_linked_per_mode": 100,
+    "executed_functions_per_mode": 5,
+    "paired_harnesses_per_mode": 5,
+    "compiler_rt_bypass_ratchet": 130
+  },
+  "native_validation": {
+    "populations": 35,
+    "local_observations": 579564,
+    "reference_observations": 289782,
+    "local_fail": 0,
+    "unchanged_upstream_c_program_modes": 3,
+    "matched_program_modes": 3,
+    "reference_case_executions": 6,
+    "local_case_executions": 6,
+    "integer_variadic_observations": 48,
+    "heap_call_observations": 18,
+    "native_call_observations": 66
+  },
+  "unchanged_hello": {
+    "modes": 3,
+    "local_executions": 3,
+    "reference_executions": 3,
+    "matched": 3,
+    "report": "local-state/validations/python-tools-20261105/final-integrated-unchanged-hello-libc.json"
+  },
+  "benchmark": {
+    "complete": true,
+    "rows": 15,
+    "supported": 15,
+    "compile_samples": 135,
+    "runtime_samples": 135,
+    "measurement_engine": "zig-process-0.6.0-pidfd-v1",
+    "warmups": 2,
+    "samples": 9,
+    "cpu_affinity": [
+      2
+    ],
+    "cross_engine_speedup_claim": false,
+    "historical_status_and_semantics_equal": true,
+    "historical_object_hash_matches": 13,
+    "historical_object_hash_differences": [
+      {
+        "workload": "nested_calls",
+        "route": "direct"
+      },
+      {
+        "workload": "nested_calls",
+        "route": "release-o3"
+      }
+    ],
+    "historical_object_difference_scope": "Two nested_calls object shapes differ from the older compiler baseline; compiler source is unchanged in this migration.",
+    "results": "local-state/validations/python-tools-20261105/baseline/results.json",
+    "metadata": "local-state/validations/python-tools-20261105/baseline/metadata.json",
+    "source_snapshot": "local-state/validations/python-tools-20261105/source-tooling.json",
+    "source_continuity": "local-state/validations/python-tools-20261105/baseline-source-continuity.json",
+    "actual_git_head": "e261d59c8f322bc32b5bbf9a7b91a173d403a075",
+    "source_equivalent_to_revision": "13edaa159ad811c9ef1bf830a09fbfaf9f390c0a",
+    "note": "Measurements precede the logging repair and bind the complete source/procedure hashes. That repair changes log opening and the CLI summary; it does not change the benchmark protocol or timed interval. No cross-engine speedup is claimed."
+  },
+  "compiler_identity": {
+    "compiler_source_changed": false,
+    "performance_fixtures_changed": false,
+    "initial_binary_sha256": "b5286962bf61883ec6837c07db5c85df38151414dcec8613a70cf6fa8cd67261",
+    "final_rebuilt_binary_sha256": "1aefcf52084a5ac2f2c65f8790bd221264fbb30c431684c3d628f9fc26e8a1e4",
+    "benchmark_release_fast_binary_sha256": "895550ad81480c613947fde72bb6fd8b82e1e399a7d2eddb05dadf38e8cb027b",
+    "note": "The final build rebuilt the compiler after build-cache cleanup. Its digest differs; source and canonical validation output are unchanged. Bit-for-bit compiler binary identity is not claimed."
+  },
+  "cleanup": {
+    "obsolete_build_cache_allocated_bytes": 2247598080,
+    "temporary_export_cache_allocated_bytes": 3923955712,
+    "build_record": "local-state/validations/python-tools-20261105/build-cache-cleanup.json",
+    "export_record": "local-state/validations/python-tools-20261105/export-cache-cleanup.json",
+    "export_metadata_and_hashes": "local-state/validations/python-tools-20261105/export-cache-inventory.json",
+    "temporary_export_payloads_rehashed_before_removal": true,
+    "retained_authority_cache": "local-state/caches/ir-headroom-20261103",
+    "historical_reports_preserved": true,
+    "original_scratch_probes": 13,
+    "scratch_hashes_verified": true,
+    "outside_project_deletions": 0,
+    "archives_created": 0
+  },
+  "disk_policy_unchanged": {
+    "required_start_bytes": 32949672960,
+    "reserve_bytes": 24359738368,
+    "projected_peak_bytes": 8589934592
+  },
+  "stop_state": "Tool migration complete. Compiler acceptance remains at 9a8cc1c9. Fibonacci compiler work is stopped; Safe still has 46 emission failures. The separate i65/i96 diagnostic draft and original scratch probes were not modified.",
+  "artifacts": {
+    "local-state/validations/python-tools-20261105/source-final.json": {
+      "sha256": "3395a1114fbb28a756c553564eba1c9e526753b5f847f7575b36a984816b32aa",
+      "bytes": 365173
+    },
+    "local-state/validations/python-tools-20261105/source-integration.json": {
+      "sha256": "82c3a761c58c22e1c38f71464ce9793356e2ac8bf53bf740e0bfa3b909c9ba88",
+      "bytes": 365065
+    },
+    "local-state/validations/python-tools-20261105/source-tooling.json": {
+      "sha256": "3a80565da360063b8f2de1fd7b026b2016cbca8ee246c80eac2ebe425235167a",
+      "bytes": 365468
+    },
+    "local-state/validations/python-tools-20261105/final-validation-plan.json": {
+      "sha256": "dfe8d18f4503470bf9dc6257668c457322de6490b16571c0dcb0a8f70e35aabf",
+      "bytes": 3122
+    },
+    "local-state/validations/python-tools-20261105/candidate-python-parity.json": {
+      "sha256": "bd441c2ca1ea311b8be11bf72e36f40f02d8ed678fd891568685289d93246bda",
+      "bytes": 212
+    },
+    "local-state/validations/python-tools-20261105/native-registry-parity.json": {
+      "sha256": "a4c372143c4c0e99cf90dca9a939cb91c7e3cbef2a7f123ab7fc7e3209fb1fb1",
+      "bytes": 209
+    },
+    "local-state/validations/python-tools-20261105/final-candidates.tsv": {
+      "sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "bytes": 4215795
+    },
+    "local-state/validations/python-tools-20261105/final-candidates.audit.json": {
+      "sha256": "ae13c654360362f4574b16519ba81857721b79f4c394935c9ba545d126e7ddf0",
+      "bytes": 282984
+    },
+    "local-state/validations/python-tools-20261105/python-policy-reference.log": {
+      "sha256": "07d14c98f4a16ba271454e0f6567f6e1905e4522fedb599479702673ce2be873",
+      "bytes": 114
+    },
+    "local-state/validations/python-tools-20261105/zig-policy-final-debug.log": {
+      "sha256": "4914cce13a6235deae295413531cf407edee9eceecf684af09edf68d0182e10c",
+      "bytes": 718
+    },
+    "local-state/validations/python-tools-20261105/zig-policy-final-debug.json": {
+      "sha256": "51dddf32a15c308ea9da607fe948dd609a46d70deb6af902aa99ee45a42deb8d",
+      "bytes": 853
+    },
+    "local-state/validations/python-tools-20261105/zig-policy-final-safe.log": {
+      "sha256": "ba488d99bc1526be0904de26429cfcb82a557c70f7c41455d56c2153d48a222d",
+      "bytes": 559
+    },
+    "local-state/validations/python-tools-20261105/zig-policy-final-safe.json": {
+      "sha256": "d32558c1f09e47ccce8fe1406a4dcb2532dc98074f4018634a76e8136a773a20",
+      "bytes": 2449
+    },
+    "local-state/validations/python-tools-20261105/full-tooling-cached.log": {
+      "sha256": "2160f697b968ff4e30f118aeac06d5a163ad43e71289f18fab792c6539801f5f",
+      "bytes": 543592
+    },
+    "local-state/validations/python-tools-20261105/full-tooling-cached.json": {
+      "sha256": "ce7175f8517d8c3d9bc20312bf08470ef3b4e65f6eab1bbab4946b010bf7a4cc",
+      "bytes": 1987043
+    },
+    "local-state/validations/python-tools-20261105/full-python-zig-comparison.log": {
+      "sha256": "2ecd538841d9bf9118009a4ad38aeb832f5e885b8ece03b133ec5ff61cbf01a6",
+      "bytes": 196
+    },
+    "local-state/validations/python-tools-20261105/log-diagnostic-regression.log": {
+      "sha256": "1d33465be2224bad4bd9ec51e237b3e1a24fae703b3de37d8e8df5dd3eda07fa",
+      "bytes": 254
+    },
+    "local-state/validations/python-tools-20261105/full-tooling-final-cached.log": {
+      "sha256": "dcb9d2bb3505e805330fbc8a15f9988b2ce1a20b4daafe98a22eb12a7e46ccc7",
+      "bytes": 543690
+    },
+    "local-state/validations/python-tools-20261105/full-tooling-final-cached.json": {
+      "sha256": "a15fc1b1d9d407aad41307c65275942ec8fd6790d29f50469b677fba65650dd5",
+      "bytes": 2039393
+    },
+    "local-state/validations/python-tools-20261105/final-python-zig-comparison.log": {
+      "sha256": "82ed0339992c94507cbd0603b8a3b93d33699ff4bc2d30f89dd8903a3f700e3c",
+      "bytes": 287
+    },
+    "local-state/validations/python-tools-20261105/final-python-zig-comparison.json": {
+      "sha256": "b92fed556ecc7f3d4f57de916f0fdd201d4240667af5ec2b746e980ef7ec4b9e",
+      "bytes": 878
+    },
+    "local-state/validations/python-tools-20261105/fresh-rows.log": {
+      "sha256": "4a5e36c751140d8d6d3237596e3905e769032f2c8f1385a67119147f6debff7f",
+      "bytes": 15963
+    },
+    "local-state/validations/python-tools-20261105/fresh-rows.json": {
+      "sha256": "63c3c907ae8d5bcf502b4965cfe1dfdf0b6b610b74675bb9fdecc356a0e62937",
+      "bytes": 79888
+    },
+    "local-state/validations/python-tools-20261105/cached-rows.log": {
+      "sha256": "c644ef0edbbaa85af3e198bd05c4c317a6ec26fa0a985c77ac4d9a469937262c",
+      "bytes": 15892
+    },
+    "local-state/validations/python-tools-20261105/cached-rows.json": {
+      "sha256": "19015570df9003db1d7a42a5167019ba451e6f56c11ca07c00fdb376e39453d1",
+      "bytes": 30322
+    },
+    "local-state/validations/python-tools-20261105/fresh-cache-comparison.log": {
+      "sha256": "0822a601b08a47de7715d8a7cd08edefdbe291628a0950a3888a79bbe9e84f58",
+      "bytes": 248
+    },
+    "local-state/validations/python-tools-20261105/fresh-cache-comparison.json": {
+      "sha256": "911bac3e77bdaaf083f022ce406195807edb788154d25587dcfb29cffe5c6144",
+      "bytes": 863
+    },
+    "local-state/validations/python-tools-20261105/fresh-source-continuity.json": {
+      "sha256": "5093075e094b5c568288cf7966791ef6dc3bb62ae32c268399d8eccccb1617d6",
+      "bytes": 773
+    },
+    "local-state/validations/python-tools-20261105/zig-baseline.json": {
+      "sha256": "fee01e3b346917237ab5b58a99c5ab7834021d05e019d90c84fa44b417e5c4cc",
+      "bytes": 14401
+    },
+    "local-state/validations/python-tools-20261105/baseline/results.json": {
+      "sha256": "cc5b4cbdf91087015982ecd4b156b926be38a44434408f8ce1211573b03d634e",
+      "bytes": 37830
+    },
+    "local-state/validations/python-tools-20261105/baseline/metadata.json": {
+      "sha256": "83822e66d4fd67638feab02463aaabf984c38103d66f89471ee1b30d4ad456f9",
+      "bytes": 118385
+    },
+    "local-state/validations/python-tools-20261105/baseline/commands.json": {
+      "sha256": "73e3f99cf532f26a9044df89175a2436b2edc75f7178e2f69e2cf52e5185fca9",
+      "bytes": 335020
+    },
+    "local-state/validations/python-tools-20261105/baseline-historical-comparison.json": {
+      "sha256": "a6b0706c017f69ca813ff6215a03b59b4e114f337328cbcd8fd2ba909a5aeb24",
+      "bytes": 2700
+    },
+    "local-state/validations/python-tools-20261105/baseline-source-continuity.json": {
+      "sha256": "514ebff48a2bf892b58e5ff975abd5e87e94114190075f011a376f4836e7a198",
+      "bytes": 496
+    },
+    "local-state/validations/python-tools-20261105/final-integrated-unchanged-hello-libc.json": {
+      "sha256": "f0382d4d2132962b4df7aa751ea30bf5d63fd2dda30df24497c4211799dbe82c",
+      "bytes": 21509
+    },
+    "local-state/validations/python-tools-20261105/build-cache-cleanup.json": {
+      "sha256": "be0e9b34abfb77685210654182c55871311a5963c5b422df3bd1c94b561e4fe2",
+      "bytes": 1852
+    },
+    "local-state/validations/python-tools-20261105/cache-cleanup-preserved.sha256": {
+      "sha256": "d79c471dd53f9f4beebebe8e9e99a64f5a4b5040d19299707daaa9297e51d8ed",
+      "bytes": 1415
+    },
+    "local-state/validations/python-tools-20261105/export-cache-inventory.json": {
+      "sha256": "a4cb6975cbdd0674296bd060a22ad8d91af58f69e3766fccad404b6a3688923b",
+      "bytes": 13757
+    },
+    "local-state/validations/python-tools-20261105/export-cache-cleanup.json": {
+      "sha256": "64037be1af74f43bebe03ecf047982671b92a5b125445644756df68cf3285dc9",
+      "bytes": 1928
+    },
+    "local-state/validations/python-tools-20261105/scratch-before.sha256": {
+      "sha256": "3a538e11538029e855c4588780e32ce40953a624864d241571e2bc6a9eb71d29",
+      "bytes": 1163
+    },
+    "tools/vendor/process.SHA256SUMS": {
+      "sha256": "c573dcd67b2c5c9611b7a4eabf5946a08757a8a3c99dbec94d61741c7d5dbfe7",
+      "bytes": 1208
+    },
+    "tools/vendor/test_support.SHA256SUMS": {
+      "sha256": "9f6992662a3fa4f8fb10ce3e6c910c1dbfce4f1da3691a9a9674ddb698b71603",
+      "bytes": 311
+    }
+  }
+}

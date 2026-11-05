@@ -8,6 +8,13 @@ The [source ledger](../tools/vendor/README.md) records their revisions from the
 commands do not require another checkout at runtime.
 The validated host is x86-64 Linux, matching the existing execution gates.
 
+The [migration acceptance](evidence/python_tools_migration_20261105.json) and
+[gate summary](evidence/python_tools_migration_20261105.summary) bind the source,
+provider digests, output comparisons and cleanup. At `978ffaf9`, all 22 tests
+pass in Debug and ReleaseSafe and all 17 integration gates pass with Python
+blocked. The complete log matches 1,430 prior canonical records; the separate
+fresh/cache pair matches all 24 records. Compiler acceptance remains unchanged.
+
 | Former Python role | Zig entry point / build step |
 | --- | --- |
 | Unchanged upstream Zig program, including capture hook | `tools/run_real_program.zig` / `real-program` |
