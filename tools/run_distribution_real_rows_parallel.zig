@@ -716,19 +716,53 @@ fn sampleDiskBytes(allocator: std.mem.Allocator, io: std.Io, paths: *const Owned
     if (options.test_options) |test_options| return test_options.disk_bytes;
     // The work directories and publication cache are outside paths.root.
     // Sample all seven disjoint roots in one du invocation, in allocated bytes.
-    const argv = [_][]const u8{ "du", "-s", "-B1", paths.root, paths.mode_paths[0].work, paths.mode_paths[1].work, paths.mode_paths[2].work, paths.mode_paths[0].export_cache, paths.mode_paths[1].export_cache, paths.mode_paths[2].export_cache };
-    const result = try common.runCapture(allocator, io, &argv, "real-row parallel disk sample");
+    const roots = [_][]const u8{ paths.root, paths.mode_paths[0].work, paths.mode_paths[1].work, paths.mode_paths[2].work, paths.mode_paths[0].export_cache, paths.mode_paths[1].export_cache, paths.mode_paths[2].export_cache };
+    const argv = [_][]const u8{ "env", "LC_ALL=C", "du", "-s", "-B1" } ++ roots;
+    const result = try std.process.run(allocator, io, .{
+        .argv = &argv,
+        .stdout_limit = .limited(1024 * 1024),
+        .stderr_limit = .limited(1024 * 1024),
+    });
     defer common.freeRunResult(allocator, result);
+    return parseDiskSample(result, &roots) catch |err| {
+        try common.forwardCommandFailure(io, "real-row parallel disk sample", result);
+        return err;
+    };
+}
+
+fn parseDiskSample(result: std.process.RunResult, roots: []const []const u8) !u64 {
+    const code = switch (result.term) {
+        .exited => |code| code,
+        else => return error.InvalidRealRowsDiskSample,
+    };
+    if (code > 1 or (code == 0 and result.stderr.len != 0) or (code == 1 and result.stderr.len == 0))
+        return error.InvalidRealRowsDiskSample;
+    // A linker can rename or delete a file between du's readdir and stat.
+    // Only ENOENT for descendants is recoverable, and every root must still
+    // produce a complete summary. The independent df sample enforces reserve.
+    var diagnostics = std.mem.tokenizeScalar(u8, result.stderr, '\n');
+    while (diagnostics.next()) |line| {
+        const prefix = "du: cannot access '";
+        const suffix = "': No such file or directory";
+        if (!std.mem.startsWith(u8, line, prefix) or !std.mem.endsWith(u8, line, suffix) or line.len < prefix.len + suffix.len)
+            return error.InvalidRealRowsDiskSample;
+        const path = line[prefix.len .. line.len - suffix.len];
+        var descendant = false;
+        for (roots) |root| {
+            if (path.len > root.len + 1 and std.mem.startsWith(u8, path, root) and path[root.len] == '/') descendant = true;
+        }
+        if (!descendant) return error.InvalidRealRowsDiskSample;
+    }
     var lines = std.mem.tokenizeScalar(u8, result.stdout, '\n');
     var total: u64 = 0;
-    var count: usize = 0;
-    while (lines.next()) |line| {
-        var fields = std.mem.tokenizeAny(u8, line, " \t");
-        const bytes = try std.fmt.parseUnsigned(u64, fields.next() orelse return error.InvalidRealRowsDiskSample, 10);
-        total = try std.math.add(u64, total, bytes);
-        count += 1;
+    for (roots) |root| {
+        const line = lines.next() orelse return error.InvalidRealRowsDiskSample;
+        const tab = std.mem.indexOfScalar(u8, line, '\t') orelse return error.InvalidRealRowsDiskSample;
+        if (!std.mem.eql(u8, line[tab + 1 ..], root)) return error.InvalidRealRowsDiskSample;
+        const bytes = std.fmt.parseUnsigned(u64, line[0..tab], 10) catch return error.InvalidRealRowsDiskSample;
+        total = std.math.add(u64, total, bytes) catch return error.InvalidRealRowsDiskSample;
     }
-    if (count != 7) return error.InvalidRealRowsDiskSample;
+    if (lines.next() != null) return error.InvalidRealRowsDiskSample;
     return total;
 }
 
@@ -2115,4 +2149,43 @@ test "injected child failure preserves bounded stdout and stderr after reap with
     try std.testing.expect(std.mem.indexOf(u8, manifest, "success_summary_emitted=false") != null);
     try std.testing.expect(std.mem.indexOf(u8, manifest, "mode=ReleaseFast failure_evidence_stream=stdout status=preserved bytes=31") != null);
     try std.testing.expect(std.mem.indexOf(u8, manifest, "mode=ReleaseFast failure_evidence_stream=stderr status=preserved bytes=31") != null);
+}
+
+test "allocated disk sampling tolerates disappearing descendants and rejects incomplete or unrelated errors" {
+    const roots = &[_][]const u8{ "owned/one", "owned/two" };
+    const stdout = "4096\towned/one\n8192\towned/two\n";
+    const missing = "du: cannot access 'owned/one/link.o.tmp123': No such file or directory\n";
+    const result: std.process.RunResult = .{ .term = .{ .exited = 1 }, .stdout = @constCast(stdout), .stderr = @constCast(missing) };
+    try std.testing.expectEqual(@as(u64, 12288), try parseDiskSample(result, roots));
+    var changed = result;
+    changed.term = .{ .exited = 0 };
+    changed.stderr = @constCast("");
+    try std.testing.expectEqual(@as(u64, 12288), try parseDiskSample(changed, roots));
+    for ([_][]const u8{
+        "du: cannot access 'owned/one': No such file or directory\n",
+        "du: cannot access 'owned/one-other/tmp': No such file or directory\n",
+        "du: cannot access 'unrelated/tmp': No such file or directory\n",
+        "du: cannot read directory 'owned/one/secret': Permission denied\n",
+        "du: cannot access 'owned/one/tmp': Input/output error\n",
+        missing ++ "unexpected diagnostic\n",
+        "",
+    }) |stderr| {
+        changed = result;
+        changed.stderr = @constCast(stderr);
+        try std.testing.expectError(error.InvalidRealRowsDiskSample, parseDiskSample(changed, roots));
+    }
+    for ([_][]const u8{
+        "4096\towned/one\n",
+        "4096\towned/one\n8192\towned/one\n",
+        stdout ++ "1\tunrelated\n",
+        "invalid\towned/one\n8192\towned/two\n",
+        "18446744073709551615\towned/one\n8192\towned/two\n",
+    }) |output| {
+        changed = result;
+        changed.stdout = @constCast(output);
+        try std.testing.expectError(error.InvalidRealRowsDiskSample, parseDiskSample(changed, roots));
+    }
+    changed = result;
+    changed.term = .{ .exited = 2 };
+    try std.testing.expectError(error.InvalidRealRowsDiskSample, parseDiskSample(changed, roots));
 }
