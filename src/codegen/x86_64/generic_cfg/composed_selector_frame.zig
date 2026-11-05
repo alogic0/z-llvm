@@ -141,6 +141,7 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
             }
             if (instruction.kind == .call and
                 (std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i64") or
+                    std.mem.eql(u8, instruction.kind.call.callee, "llvm.umul.with.overflow.i64") or
                     std.mem.eql(u8, instruction.kind.call.callee, "llvm.smul.with.overflow.i128"))) saw_fixed_smul_overflow = true;
             if (instruction.kind == .call and
                 (std.mem.eql(u8, instruction.kind.call.callee, "llvm.bswap.i128") or

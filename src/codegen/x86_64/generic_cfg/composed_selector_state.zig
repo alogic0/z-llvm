@@ -844,6 +844,18 @@ fn updateAddressDependenciesForBinding(
     try domain.replaceAddress(owner_name, dependencies[0..count]);
 }
 
+/// Preserve final-use inputs before RAX/RDX and the RCX staging register
+/// change. A multiplication's operands are simultaneous uses, even when the
+/// allocation interval ends at this instruction.
+pub fn preserveFixedProductOperands(selector: *ComposedBlockSelector, lhs: ir.Value, rhs: ir.Value) !void {
+    for ([_]ir.Value{ lhs, rhs }) |value| {
+        if (value != .named) continue;
+        const loc = resolveValue(selector, value) orelse return error.UnsupportedCodegenValue;
+        if (locIsAccumulator(loc) or composed_helpers.locContainsReg(loc, .rdx) or composed_helpers.locContainsReg(loc, .rcx))
+            try spillValueOrError(selector, value.named);
+    }
+}
+
 pub fn prepareFixedProductDefs(selector: *ComposedBlockSelector) !void {
     try clobberAccumulator(selector);
     try clobberArgReg(selector, .rdx);

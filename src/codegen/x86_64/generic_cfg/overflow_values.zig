@@ -31,7 +31,7 @@ fn operation(call: ir.CallInst) ?Operation {
         const spelling = std.fmt.bufPrint(&buffer, "llvm.{s}.with.overflow.i{d}", .{ name, ty.int }) catch return null;
         if (std.mem.eql(u8, call.callee, spelling)) {
             const signed = name[0] == 's';
-            if (ty.int == 64 and (signed or op == .mul)) return null;
+            if (ty.int == 64 and op == .mul) return null;
             return .{ .op = op, .signed = signed, .bits = ty.int };
         }
     }
@@ -162,7 +162,23 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                             .lhs = lhs,
                             .rhs = rhs,
                         } } });
-                        try block.instructions.append(allocator, .{ .result = entry.overflow, .kind = .{ .icmp = .{
+                        if (entry.operation.signed) {
+                            const builder: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
+                            const changed_sign = try builder.emit(.{ .binary = .{ .op = .xor, .ty = word, .lhs = lhs, .rhs = .{ .named = entry.wrapped } } });
+                            const other_sign = try builder.emit(.{ .binary = .{
+                                .op = .xor,
+                                .ty = word,
+                                .lhs = if (entry.operation.op == .add) rhs else lhs,
+                                .rhs = if (entry.operation.op == .add) .{ .named = entry.wrapped } else rhs,
+                            } });
+                            const both = try builder.emit(.{ .binary = .{ .op = .@"and", .ty = word, .lhs = changed_sign, .rhs = other_sign } });
+                            try block.instructions.append(allocator, .{ .result = entry.overflow, .kind = .{ .icmp = .{
+                                .predicate = .slt,
+                                .operand_ty = word,
+                                .lhs = both,
+                                .rhs = .{ .int = 0 },
+                            } } });
+                        } else try block.instructions.append(allocator, .{ .result = entry.overflow, .kind = .{ .icmp = .{
                             .predicate = .ult,
                             .operand_ty = word,
                             .lhs = if (entry.operation.op == .add) .{ .named = entry.wrapped } else lhs,

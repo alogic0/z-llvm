@@ -71,7 +71,7 @@ test "constant unsigned remainder divisor admission respects width and signed sp
         try std.testing.expectEqual(@as(?i128, null), helpers.unsignedPowerOfTwoRemainderMask(bits, 2));
 }
 
-test "constant unsigned remainder single block admission rejects unsupported divisors" {
+test "constant unsigned remainder single block admission supports nonzero divisors and rejects zero" {
     for ([_]i128{ 1, 4096, 0x100000000, 0x8000000000000000, -0x8000000000000000, 0, 3, -1 }) |divisor| {
         const text = try std.fmt.allocPrint(std.testing.allocator,
             \\define i64 @remainder(i64 %input) {{
@@ -87,7 +87,7 @@ test "constant unsigned remainder single block admission rejects unsupported div
         var output = machine.MachineFunction.init("remainder", .{ .int = 64 });
         defer output.deinit(std.testing.allocator);
         const selected = try selector.tryLower(std.testing.allocator, &output, module.functions.items[0]);
-        if (divisor == 0 or divisor == 3 or divisor == -1) {
+        if (divisor == 0) {
             try std.testing.expect(selected == .unsupported);
             try std.testing.expectEqual(@as(usize, 0), output.instructions.items.len);
             continue;

@@ -577,3 +577,211 @@ test "checked integer pairs normalize an i32 alias of a live full accumulator" {
         try std.testing.expectEqual(input +% 7, output);
     }
 }
+
+test "word arithmetic unsigned word product preserves both halves overflow and live inputs" {
+    const values = [_]u64{ 0, 1, 2, 0xffffffff, 0x100000000, 0x7fffffffffffffff, 0x8000000000000000, std.math.maxInt(u64) };
+    for (0..3) |constant_side| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare {{ i64, i1 }} @llvm.umul.with.overflow.i64(i64, i64)\n" ++
+            "define i64 @product{d}(i64 %a, i64 %b, ptr %out) {{\nentry:\n" ++
+            "  %pair = call {{ i64, i1 }} @llvm.umul.with.overflow.i64(i64 {s}, i64 {s})\n" ++
+            "  %flag = extractvalue {{ i64, i1 }} %pair, 1\n  %value = extractvalue {{ i64, i1 }} %pair, 0\n" ++
+            "  store i64 %value, ptr %out, align 8\n  %next = getelementptr i8, ptr %out, i64 8\n" ++
+            "  %live = xor i64 %a, %b\n  store i64 %live, ptr %next, align 8\n" ++
+            "  %result = zext i1 %flag to i64\n  ret i64 %result\n}}\n", .{ constant_side, if (constant_side == 1) "-1" else "%a", if (constant_side == 2) "-1" else "%b" });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64, *u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for (values) |a| for (values) |b| {
+            const expected = @as(u128, if (constant_side == 1) std.math.maxInt(u64) else a) * @as(u128, if (constant_side == 2) std.math.maxInt(u64) else b);
+            var out = [_]u64{ 0xa5a5a5a5a5a5a5a5, 0, 0, 0xa5a5a5a5a5a5a5a5 };
+            try std.testing.expectEqual(@as(u64, @intFromBool(expected > std.math.maxInt(u64))), run(a, b, &out[1]));
+            try std.testing.expectEqual(@as(u64, @truncate(expected)), out[1]);
+            try std.testing.expectEqual(a ^ b, out[2]);
+            try std.testing.expectEqual(@as(u64, 0xa5a5a5a5a5a5a5a5), out[0]);
+            try std.testing.expectEqual(out[0], out[3]);
+        };
+    }
+}
+
+test "word arithmetic constant unsigned division and remainder retain high-bit divisors" {
+    for ([_]u16{ 32, 64 }) |bits| for ([_][]const u8{ "udiv", "urem" }) |op| {
+        const mask: u64 = if (bits == 64) std.math.maxInt(u64) else std.math.maxInt(u32);
+        const sign: u64 = @as(u64, 1) << @intCast(bits - 1);
+        for ([_]u64{ 1, 2, 3, 24, 100, sign, mask }) |divisor| {
+            const text = try std.fmt.allocPrint(std.testing.allocator, "define i{0d} @divide(i{0d} %a, ptr %out) {{\nentry:\n" ++
+                "  %value = {1s} i{0d} %a, {2d}\n  store i{0d} %value, ptr %out\n" ++
+                "  %live = xor i{0d} %a, 55\n  ret i{0d} %live\n}}\n", .{ bits, op, divisor });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            const code = try executable(module);
+            defer std.posix.munmap(code);
+            for ([_]u64{ 0, 1, 2, 23, 24, 99, 100, sign - 1, sign, mask }) |a| {
+                const expected = if (std.mem.eql(u8, op, "udiv")) a / divisor else a % divisor;
+                var out = [_]u64{ 0xa5a5a5a5a5a5a5a5, 0, 0xa5a5a5a5a5a5a5a5 };
+                if (bits == 64) {
+                    const run: *const fn (u64, *u64) callconv(.c) u64 = @ptrCast(code.ptr);
+                    try std.testing.expectEqual(a ^ 55, run(a, &out[1]));
+                } else {
+                    const run: *const fn (u32, *u32) callconv(.c) u32 = @ptrCast(code.ptr);
+                    try std.testing.expectEqual(@as(u32, @intCast(a)) ^ 55, run(@intCast(a), @ptrCast(&out[1])));
+                }
+                try std.testing.expectEqual(expected, out[1]);
+                try std.testing.expectEqual(@as(u64, 0xa5a5a5a5a5a5a5a5), out[0]);
+                try std.testing.expectEqual(out[0], out[2]);
+            }
+        }
+    };
+}
+
+test "word arithmetic zero extension clears a truncated named sum in RAX" {
+    const text =
+        \\define i64 @roundtrip(i64 %input, i64 %addend, ptr %out) {
+        \\entry:
+        \\  %full = add i64 %input, %addend
+        \\  %low = trunc i64 %full to i32
+        \\  %result = zext i32 %low to i64
+        \\  store i64 %full, ptr %out, align 8
+        \\  ret i64 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const code = try executable(module);
+    defer std.posix.munmap(code);
+    const run: *const fn (u64, u64, *u64) callconv(.c) u64 = @ptrCast(code.ptr);
+    for ([_]u64{ 0, 0xffffffff, 0x100000000, 0x8000000000000000, std.math.maxInt(u64) }) |input| {
+        var output: u64 = 0;
+        try std.testing.expectEqual((input +% 7) & 0xffffffff, run(input, 7, &output));
+        try std.testing.expectEqual(input +% 7, output);
+    }
+}
+
+test "word arithmetic byte permutations preserve exact width and dirty upper inputs" {
+    for ([_]u16{ 16, 32, 64 }) |bits| {
+        const narrow = if (bits == 64) "" else try std.fmt.allocPrint(std.testing.allocator, "  %narrow = trunc i64 %input to i{d}\n", .{bits});
+        defer if (bits != 64) std.testing.allocator.free(narrow);
+        const wide = if (bits == 64) "" else try std.fmt.allocPrint(std.testing.allocator, "  %wide = zext i{d} %value to i64\n", .{bits});
+        defer if (bits != 64) std.testing.allocator.free(wide);
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare i{0d} @llvm.bswap.i{0d}(i{0d})\ndefine i64 @swap(i64 %input, ptr %out) {{\nentry:\n{1s}" ++
+            "  %value = call i{0d} @llvm.bswap.i{0d}(i{0d} %{2s})\n{3s}" ++
+            "  store i64 %{4s}, ptr %out\n  %live = xor i64 %input, 55\n  ret i64 %live\n}}\n", .{ bits, narrow, if (bits == 64) "input" else "narrow", wide, if (bits == 64) "value" else "wide" });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, *u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for ([_]u64{ 0, 1, 255, 256, 0x123456789abcdef0, 0x8000000000000000, std.math.maxInt(u64) }) |input| {
+            const expected: u64 = switch (bits) {
+                16 => @byteSwap(@as(u16, @truncate(input))),
+                32 => @byteSwap(@as(u32, @truncate(input))),
+                else => @byteSwap(input),
+            };
+            var output: u64 = 0;
+            try std.testing.expectEqual(input ^ 55, run(input, &output));
+            try std.testing.expectEqual(expected, output);
+        }
+    }
+}
+
+test "word arithmetic signed and unsigned extrema select full-word values" {
+    const ops = [_][]const u8{ "umax", "smin", "smax" };
+    for ([_]u16{ 32, 64 }) |bits| for (ops, 0..) |op, op_index| {
+        for (0..3) |constant_side| {
+            const text = try std.fmt.allocPrint(std.testing.allocator, "declare i{0d} @llvm.{1s}.i{0d}(i{0d}, i{0d})\ndefine i{0d} @extrema(i{0d} %a, i{0d} %b) {{\nentry:\n" ++
+                "  %result = call i{0d} @llvm.{1s}.i{0d}(i{0d} {2s}, i{0d} {3s})\n  ret i{0d} %result\n}}\n", .{ bits, op, if (constant_side == 1) "-1" else "%a", if (constant_side == 2) "-1" else "%b" });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            const code = try executable(module);
+            defer std.posix.munmap(code);
+            const mask: u64 = if (bits == 64) std.math.maxInt(u64) else std.math.maxInt(u32);
+            const sign: u64 = @as(u64, 1) << @intCast(bits - 1);
+            const values = [_]u64{ 0, 1, sign - 1, sign, sign + 1, mask };
+            for (values) |a| for (values) |b| {
+                const x = if (constant_side == 1) mask else a;
+                const y = if (constant_side == 2) mask else b;
+                const expected = if (op_index == 0) @max(x, y) else if (op_index == 1) (if ((x ^ sign) < (y ^ sign)) x else y) else (if ((x ^ sign) > (y ^ sign)) x else y);
+                if (bits == 64) {
+                    const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+                    try std.testing.expectEqual(expected, run(a, b));
+                } else {
+                    const run: *const fn (u32, u32) callconv(.c) u32 = @ptrCast(code.ptr);
+                    try std.testing.expectEqual(@as(u32, @intCast(expected)), run(@intCast(a), @intCast(b)));
+                }
+            };
+        }
+    };
+}
+
+test "word arithmetic signed checked add and subtract preserve extrema and constants" {
+    const values = [_]i64{ std.math.minInt(i64), std.math.minInt(i64) + 1, -1, 0, 1, 2, std.math.maxInt(i64) - 1, std.math.maxInt(i64) };
+    for ([_][]const u8{ "sadd", "ssub" }) |op| for (0..3) |side| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare {{ i64, i1 }} @llvm.{s}.with.overflow.i64(i64, i64)\ndefine i64 @signed(i64 %a, i64 %b, ptr %out) {{\nentry:\n" ++
+            "  %pair = call {{ i64, i1 }} @llvm.{s}.with.overflow.i64(i64 {s}, i64 {s})\n" ++
+            "  %flag = extractvalue {{ i64, i1 }} %pair, 1\n  %value = extractvalue {{ i64, i1 }} %pair, 0\n" ++
+            "  store i64 %value, ptr %out\n  %result = zext i1 %flag to i64\n  ret i64 %result\n}}\n", .{ op, op, if (side == 1) "-1" else "%a", if (side == 2) "-1" else "%b" });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (i64, i64, *i64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for (values) |a| for (values) |b| {
+            const x: i64 = if (side == 1) -1 else a;
+            const y: i64 = if (side == 2) -1 else b;
+            const expected = if (std.mem.eql(u8, op, "sadd")) @addWithOverflow(x, y) else @subWithOverflow(x, y);
+            var output: i64 = 0;
+            try std.testing.expectEqual(@as(u64, expected[1]), run(a, b, &output));
+            try std.testing.expectEqual(expected[0], output);
+        };
+    };
+}
+
+test "word arithmetic private legalization is idempotent and rejects invalid envelopes" {
+    const words = @import("word_arithmetic.zig");
+    for ([_][]const u8{
+        "  %result = udiv i64 %a, 24",
+        "  %result = call i64 @llvm.umax.i64(i64 %a, i64 -1)",
+    }) |instruction| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @probe(i64 %a) {{\nentry:\n{s}\n  ret i64 %result\n}}\n", .{instruction});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        const original = module.functions.items[0];
+        const count = original.blocks.items[0].instructions.items.len;
+        const kind = std.meta.activeTag(original.blocks.items[0].instructions.items[0].kind);
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const view = (try words.legalize(arena.allocator(), original)).?;
+        try std.testing.expect(try words.legalize(arena.allocator(), view) == null);
+        try std.testing.expectEqual(count, original.blocks.items[0].instructions.items.len);
+        try std.testing.expectEqual(kind, std.meta.activeTag(original.blocks.items[0].instructions.items[0].kind));
+    }
+    for ([_][]const u8{
+        "  %result = udiv i64 %a, 0",
+        "  %result = udiv i64 %a, 18446744073709551616",
+        "  %result = udiv i64 %a, -9223372036854775809",
+        "  %result = call fastcc i64 @llvm.umax.i64(i64 %a, i64 2)",
+        "  %result = call i64 @llvm.umax.i64(i64 inreg %a, i64 2)",
+        "  %result = call i64 @llvm.umax.i64(i64 %a, i64 poison)",
+    }) |instruction| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @probe(i64 %a) {{\nentry:\n{s}\n  ret i64 %result\n}}\n", .{instruction});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect(try words.legalize(arena.allocator(), module.functions.items[0]) == null);
+    }
+}

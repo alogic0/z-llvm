@@ -430,6 +430,8 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
     defer call_preparation_positions.deinit(allocator);
     var store_positions: std.ArrayList(usize) = .empty;
     defer store_positions.deinit(allocator);
+    var fixed_scalar_positions: std.ArrayList(usize) = .empty;
+    defer fixed_scalar_positions.deinit(allocator);
 
     var simple_loop_backedge_values = NameSet.init(allocator);
     defer simple_loop_backedge_values.deinit();
@@ -463,6 +465,15 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
             if (instruction.kind == .gep and arrayStrideRequiresPreservationFrame(instruction.kind.gep)) {
                 try preservation_barrier_positions.append(allocator, position);
             }
+            // Word compares and remainders use fixed scratch registers even
+            // when their virtual intervals fit in the register budget. Keep
+            // room for inputs that survive those physical register writes.
+            if ((instruction.kind == .icmp and
+                (instruction.kind.icmp.operand_ty.eql(.{ .int = 32 }) or
+                    instruction.kind.icmp.operand_ty.eql(.{ .int = 64 }))) or
+                (instruction.kind == .binary and
+                    (instruction.kind.binary.op == .udiv or instruction.kind.binary.op == .urem)))
+                try fixed_scalar_positions.append(allocator, position);
             if (instruction.kind == .store) try store_positions.append(allocator, position);
             position += 1;
         }
@@ -539,6 +550,16 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
     while (forward_it.next()) |entry| try plan.forward_values.put(entry.key_ptr.*, entry.value_ptr.*);
     try recordPreservationDemands(&plan, intervals.items, preservation_barrier_positions.items);
     try recordCallPreparationDemands(&plan, intervals.items, call_preparation_positions.items);
+    // These actions preserve their actual clobbers on demand. Reserve space
+    // without moving unaffected incoming arguments away from their ABI homes.
+    for (fixed_scalar_positions.items) |scalar_position| {
+        var live_slots: usize = 0;
+        for (intervals.items) |interval| {
+            if (interval.start >= scalar_position or interval.end <= scalar_position) continue;
+            live_slots += selectorSpillSlotCount(interval);
+        }
+        plan.preservation_spill_slots = @max(plan.preservation_spill_slots, live_slots);
+    }
     // Scalar results and their aliases may remain in RAX until their next use.
     // Stores also use RAX, so every instruction-produced scalar that survives
     // a store may need preservation even below peak register pressure.
@@ -919,6 +940,7 @@ fn collectPressureExemptValues(exempt_values: *NameSet, function: ir.Function) !
                             std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i64") or
                             std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i64") or
                             std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64") or
+                            std.mem.eql(u8, call.callee, "llvm.umul.with.overflow.i64") or
                             std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128");
                         if (is_overflow_tuple and !exempt_values.contains(result)) {
                             try exemptValuesPut(exempt_values, result);

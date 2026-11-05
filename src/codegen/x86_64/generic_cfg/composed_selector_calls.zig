@@ -119,6 +119,9 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.ctpop.i64")) return try lowerCtpop(selector, result, call, 64);
     if (std.mem.eql(u8, call.callee, "llvm.ctpop.i128")) return try lowerCtpop(selector, result, call, 128);
     if (std.mem.startsWith(u8, call.callee, "llvm.usub.sat.")) return try lowerUsubSat(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.bswap.i16")) return try lowerBitPermutation(selector, result, call, 16, .byte_swap);
+    if (std.mem.eql(u8, call.callee, "llvm.bswap.i32")) return try lowerBitPermutation(selector, result, call, 32, .byte_swap);
+    if (std.mem.eql(u8, call.callee, "llvm.bswap.i64")) return try lowerBitPermutation(selector, result, call, 64, .byte_swap);
     if (std.mem.eql(u8, call.callee, "llvm.bswap.i128")) return try lowerBitPermutation(selector, result, call, 128, .byte_swap);
     if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i32")) return try lowerBitPermutation(selector, result, call, 32, .bit_reverse);
     if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i64")) return try lowerBitPermutation(selector, result, call, 64, .bit_reverse);
@@ -136,7 +139,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "strnlen")) return try lowerInlineStrnlen(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .add);
     if (std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .sub);
-    if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64")) return try lowerSmulOverflowI64(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64") or std.mem.eql(u8, call.callee, "llvm.umul.with.overflow.i64")) return try lowerSmulOverflowI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128")) return try lowerSmulOverflowI128(selector, result, call);
     if (std.mem.startsWith(u8, call.callee, "llvm.")) return .{ .no_emitter = "composed-block-llvm-intrinsic" };
     if (call.callee_value) |callee| {
@@ -565,6 +568,7 @@ pub fn lowerSmulOverflowI128(selector: *ComposedBlockSelector, result: ?[]const 
 }
 
 pub fn lowerSmulOverflowI64(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    const signed = !std.mem.eql(u8, call.callee, "llvm.umul.with.overflow.i64");
     const result_name = result orelse return .{ .unsupported_value = "composed-block-smulo-i64-missing-result" };
     if (call.inline_asm != null or call.callee_value != null or !isDefaultOrFastcc(call.calling_conv) or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null) {
         return .{ .no_emitter = "composed-block-smulo-i64-call-form" };
@@ -577,18 +581,24 @@ pub fn lowerSmulOverflowI64(selector: *ComposedBlockSelector, result: ?[]const u
     const rhs = call.args.items[1];
     if (!lhs.ty.eql(.{ .int = 64 }) or !rhs.ty.eql(.{ .int = 64 })) return .{ .no_emitter = "composed-block-smulo-i64-args" };
 
+    selector_state.preserveFixedProductOperands(selector, lhs.value, rhs.value) catch return .{ .no_spill_envelope = "composed-block-smulo-i64-operands" };
     selector_state.prepareFixedProductDefs(selector) catch return .{ .no_spill_envelope = "composed-block-smulo-i64-fixed-defs" };
     selector_state.emitValueIntoScratch(selector, rhs.value, .rcx, 64) catch return .{ .unsupported_value = "composed-block-smulo-i64-rhs" };
     selector_state.emitValueIntoAccumulator(selector, lhs.value, 64) catch return .{ .unsupported_value = "composed-block-smulo-i64-lhs" };
-    try selector_state.emitEflagsInstruction(selector, .{ .imul_rax_arg64_full = .rcx }, .write);
+    try selector_state.emitEflagsInstruction(selector, if (signed) .{ .imul_rax_arg64_full = .rcx } else .{ .mul_rax_arg64_full = .rcx }, .write);
 
     const value_name = try ownedInternalValueName(selector, result_name, "value");
     const value_spill = selector_state.allocateSpillSlot(selector, value_name) orelse return .{ .no_spill_envelope = "composed-block-smulo-i64-value" };
     try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = value_spill });
-    selector_state.clobberArgReg(selector, .rcx) catch return .{ .no_spill_envelope = "composed-block-smulo-i64-sign" };
-    try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .rcx });
-    try selector_state.emitEflagsInstruction(selector, .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 63 } }, .write);
-    try selector_state.emitEflagsInstruction(selector, .{ .cmp_rcx_arg64 = .rdx }, .definition);
+    if (signed) {
+        selector_state.clobberArgReg(selector, .rcx) catch return .{ .no_spill_envelope = "composed-block-smulo-i64-sign" };
+        try selector.machine.instructions.append(selector.allocator, .{ .mov_rax_to_arg = .rcx });
+        try selector_state.emitEflagsInstruction(selector, .{ .sar_arg64_imm6 = .{ .reg = .rcx, .amount = 63 } }, .write);
+        try selector_state.emitEflagsInstruction(selector, .{ .cmp_rcx_arg64 = .rdx }, .definition);
+    } else {
+        // Unsigned overflow is exactly a nonzero upper half of RDX:RAX.
+        try selector_state.emitEflagsInstruction(selector, .{ .test_arg64 = .rdx }, .definition);
+    }
     selector_state.clobberAccumulator(selector) catch return .{ .no_spill_envelope = "composed-block-smulo-i64-overflow" };
     try selector_state.emitEflagsInstruction(selector, .setne_eax, .use);
     const overflow_name = try ownedInternalValueName(selector, result_name, "overflow");
@@ -1183,6 +1193,23 @@ fn lowerBitPermutation(
     const ty: ir.Type = .{ .int = bits };
     if (!call.ret_ty.eql(ty) or call.args.items.len != 1 or !call.args.items[0].ty.eql(ty)) {
         return .{ .no_emitter = "composed-block-bit-permutation-signature" };
+    }
+
+    if (operation == .byte_swap and (bits == 16 or bits == 32 or bits == 64)) {
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer transaction.deinit();
+        const effect: selector_state.AccumulatorPreparationEffect = if (bits == 16) .clobber else .preserve;
+        if (try transaction.prepare(effect, accumulatorInputDisplacement(selector, call.args.items[0].value, .spill_live))) |diagnostic| return diagnostic;
+        const definition: selector_state.AccumulatorDefinition = if (bits == 64) .fullRax() else .zeroExtending(bits);
+        transaction.materialize(call.args.items[0].value, definition) catch
+            return .{ .unsupported_value = "composed-block-bit-permutation-value" };
+        if (bits == 16) {
+            try selector_state.emitEflagsInstruction(selector, .{ .rol_ax_imm8 = 8 }, .write);
+            try selector_state.emitEflagsInstruction(selector, .{ .and_eax_imm32 = 65535 }, .write);
+        } else try selector_state.emitEflagsInstruction(selector, if (bits == 32) .bswap_eax else .bswap_rax, .preserve);
+        try transaction.define(result_name, definition);
+        try transaction.commit();
+        return null;
     }
 
     if (bits == 32) {
