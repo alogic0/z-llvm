@@ -91,6 +91,19 @@ fn stackFpBits(ty: ir.Type) ?u16 {
     return if (ty == .half) 16 else if (ty == .float) 32 else if (ty == .double) 64 else null;
 }
 
+// Scalar conversions and named literals use fixed accumulator/scratch writes.
+// Their preservation demand is additional to virtual-register interval pressure.
+fn needsScalarPreservation(inst: ir.Instruction) bool {
+    return switch (inst.kind) {
+        .cast => |cast| cast.op == .zext and cast.from_ty == .int and cast.to_ty == .int and
+            cast.from_ty.int < cast.to_ty.int and (cast.to_ty.int == 32 or cast.to_ty.int == 64),
+        .binary => |binary| binary.op == .add and
+            (binary.ty.eql(.{ .int = 32 }) or binary.ty.eql(.{ .int = 64 })) and
+            binary.lhs == .int and binary.rhs == .int and (binary.lhs.int == 0 or binary.rhs.int == 0),
+        else => false,
+    };
+}
+
 pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
     var payload_bytes: u32 = 0;
     var scalar_slot_count: usize = 0;
@@ -104,6 +117,8 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
     var saw_scalar_sse_call = false;
     var saw_memory_fill = false;
     var saw_int_to_fp_cast = false;
+    var scalar_conversions: usize = 0;
+    var saw_scalar_literal = false;
     var saw_stack_arguments = stack_arguments.hasParameters(function);
     var outgoing_stack_slots: u32 = 0;
     if (selector.allocation_plan) |plan| selector.next_spill_slot = @max(selector.next_spill_slot, plan.spill_slots);
@@ -111,6 +126,9 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
     for (function.blocks.items) |block| {
         for (block.instructions.items) |instruction| {
             if (instruction.removed) continue;
+            if (needsScalarPreservation(instruction)) {
+                if (instruction.kind == .cast) scalar_conversions += 1 else saw_scalar_literal = true;
+            }
             if (instruction.kind == .call) if (stack_arguments.callCount(instruction.kind.call)) |count| {
                 saw_stack_arguments = true;
                 outgoing_stack_slots = @max(outgoing_stack_slots, @as(u32, @intCast(count)));
@@ -147,7 +165,8 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
     }
 
     const pressure = try analyzeStageTwoNoSpillEnvelope(selector.allocator, function);
-    const reserve_spill_area = saw_stack_arguments or saw_alloca or pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp or saw_pair_intrinsic or saw_scalar_sse_call or saw_memory_fill or saw_int_to_fp_cast or (selector.allocation_plan != null and (selector.allocation_plan.?.spill_slots != 0 or selector.allocation_plan.?.preservation_spill_slots != 0));
+    const saw_scalar_preservation = scalar_conversions > 1 or saw_scalar_literal;
+    const reserve_spill_area = saw_scalar_preservation or saw_stack_arguments or saw_alloca or pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp or saw_pair_intrinsic or saw_scalar_sse_call or saw_memory_fill or saw_int_to_fp_cast or (selector.allocation_plan != null and (selector.allocation_plan.?.spill_slots != 0 or selector.allocation_plan.?.preservation_spill_slots != 0));
     const spill_reserved_bytes = std.math.add(u32, spillReservedBytes(selector, reserve_spill_area) orelse return .{ .no_spill_envelope = "composed-block-spill-frame-size" }, outgoing_stack_slots * 8) catch return .{ .no_spill_envelope = "composed-block-call-stack-frame-size" };
     payload_bytes = if (saw_array_alloca) @max(spill_reserved_bytes, stage2SpillReservedBytes()) else 0;
 
@@ -206,7 +225,7 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
     }
 
     if (payload_bytes == 0) {
-        if (saw_stack_arguments or pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp or saw_pair_intrinsic or saw_scalar_sse_call or saw_memory_fill or saw_int_to_fp_cast or (selector.allocation_plan != null and selector.allocation_plan.?.preservation_spill_slots != 0)) payload_bytes = spill_reserved_bytes;
+        if (saw_scalar_preservation or saw_stack_arguments or pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp or saw_pair_intrinsic or saw_scalar_sse_call or saw_memory_fill or saw_int_to_fp_cast or (selector.allocation_plan != null and selector.allocation_plan.?.preservation_spill_slots != 0)) payload_bytes = spill_reserved_bytes;
     }
 
     if (payload_bytes == 0) return null;

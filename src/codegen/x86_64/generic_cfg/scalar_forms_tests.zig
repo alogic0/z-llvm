@@ -361,3 +361,133 @@ test "safe scalar return address rejects unsupported depths and ABI annotations"
         try std.testing.expectEqual(@as(usize, 0), output.owned_labels.items.len);
     }
 }
+
+test "safe comparison forms preserve every narrow signed and unsigned predicate" {
+    const values = [_]u64{ 0, 1, 2, 63, 127, 128, 255, 32767, 32768, 65535, 0x3fffffff, 0x40000000, 0x7fffffff, 0x80000000, 0x7fffffffffffffff, 0x8000000000000000, std.math.maxInt(u64) };
+    for ([_]u16{ 1, 2, 6, 7, 8, 16, 31, 32, 64 }) |bits| {
+        for (std.enums.values(ir.IcmpPredicate)) |predicate| {
+            const operands = if (bits == 64) "" else try std.fmt.allocPrint(std.testing.allocator, "  %x = trunc i64 %a to i{d}\n  %y = trunc i64 %b to i{d}\n", .{ bits, bits });
+            defer if (bits != 64) std.testing.allocator.free(operands);
+            const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @compare(i64 %a, i64 %b, ptr %out) {{\nentry:\n{s}" ++
+                "  %c = icmp {s} i{d} %{s}, %{s}\n  %r = zext i1 %c to i32\n" ++
+                "  store i32 %r, ptr %out, align 4\n  %live = xor i64 %a, %b\n  ret i64 %live\n}}\n", .{ operands, @tagName(predicate), bits, if (bits == 64) "a" else "x", if (bits == 64) "b" else "y" });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            const code = executable(module) catch |err| {
+                std.debug.print("comparison input: {s}\n", .{text});
+                return err;
+            };
+            defer std.posix.munmap(code);
+            const run: *const fn (u64, u64, *u32) callconv(.c) u64 = @ptrCast(code.ptr);
+            const mask: u64 = if (bits == 64) std.math.maxInt(u64) else (@as(u64, 1) << @as(u6, @intCast(bits))) - 1;
+            const sign = @as(u64, 1) << @as(u6, @intCast(bits - 1));
+            for (values) |a| for (values) |b| {
+                const x = a & mask;
+                const y = b & mask;
+                const expected = switch (predicate) {
+                    .eq => x == y,
+                    .ne => x != y,
+                    .ult => x < y,
+                    .ule => x <= y,
+                    .ugt => x > y,
+                    .uge => x >= y,
+                    .slt => (x ^ sign) < (y ^ sign),
+                    .sle => (x ^ sign) <= (y ^ sign),
+                    .sgt => (x ^ sign) > (y ^ sign),
+                    .sge => (x ^ sign) >= (y ^ sign),
+                };
+                var out = [_]u32{ 0xa5a5a5a5, 0xdeadbeef, 0xa5a5a5a5 };
+                try std.testing.expectEqual(a ^ b, run(a, b, &out[1]));
+                std.testing.expectEqual(@as(u32, @intFromBool(expected)), out[1]) catch |err| {
+                    std.debug.print("failed compare i{d} {s}: a={x} b={x}\n", .{ bits, @tagName(predicate), a, b });
+                    return err;
+                };
+                try std.testing.expectEqual(@as(u32, 0xa5a5a5a5), out[0]);
+                try std.testing.expectEqual(out[0], out[2]);
+            };
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer arena.deinit();
+            const comparisons = @import("comparison_forms.zig");
+            if (try comparisons.legalize(arena.allocator(), module.functions.items[0], null)) |view| {
+                try std.testing.expect(try comparisons.legalize(arena.allocator(), view, null) == null);
+                var private_module = module;
+                private_module.functions = try module.functions.clone(arena.allocator());
+                private_module.functions.items[0] = view;
+                try private_module.verify();
+            }
+            try module.verify();
+        }
+    }
+}
+
+test "safe comparison forms canonicalize reversed and full width constants" {
+    for ([_]u16{ 8, 16, 32, 64 }) |bits| {
+        const high: u64 = @as(u64, 1) << @as(u6, @intCast(bits - 1));
+        const mask: u64 = if (bits == 64) std.math.maxInt(u64) else high * 2 - 1;
+        for ([_]bool{ false, true }) |reversed| {
+            for ([_]u64{ 0, high, mask }) |constant| {
+                const operands = if (bits == 64) "" else try std.fmt.allocPrint(std.testing.allocator, "  %x = trunc i64 %a to i{d}\n", .{bits});
+                defer if (bits != 64) std.testing.allocator.free(operands);
+                const name = if (bits == 64) "%a" else "%x";
+                const literal = try std.fmt.allocPrint(std.testing.allocator, "{d}", .{constant});
+                defer std.testing.allocator.free(literal);
+                const text = try std.fmt.allocPrint(std.testing.allocator, "define i32 @constant(i64 %a) {{\nentry:\n{s}  %c = icmp ule i{d} {s}, {s}\n  %r = zext i1 %c to i32\n  ret i32 %r\n}}\n", .{ operands, bits, if (reversed) literal else name, if (reversed) name else literal });
+                defer std.testing.allocator.free(text);
+                var module = try ir.Module.parse(std.testing.allocator, text);
+                defer module.deinit();
+                const code = executable(module) catch |err| {
+                    std.debug.print("comparison input: {s}\n", .{text});
+                    return err;
+                };
+                defer std.posix.munmap(code);
+                const run: *const fn (u64) callconv(.c) u32 = @ptrCast(code.ptr);
+                for ([_]u64{ 0, 1, high - 1, high, high + 1, mask, std.math.maxInt(u64) }) |input| {
+                    const x = input & mask;
+                    const expected = if (reversed) constant <= x else x <= constant;
+                    std.testing.expectEqual(@as(u32, @intFromBool(expected)), run(input)) catch |err| {
+                        std.debug.print("failed constant i{d} reversed={any} value={x} input={x}\n", .{ bits, reversed, constant, input });
+                        return err;
+                    };
+                }
+            }
+        }
+    }
+}
+
+test "safe comparison forms preserve pointer order and layout boundaries" {
+    const comparisons = @import("comparison_forms.zig");
+    for ([_]ir.IcmpPredicate{ .ne, .ult, .ule, .ugt, .uge }) |predicate| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i32 @pointer(ptr %a, ptr %b) {{\nentry:\n  %c = icmp {s} ptr %a, %b\n  %r = zext i1 %c to i32\n  ret i32 %r\n}}\n", .{@tagName(predicate)});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        const code = executable(module) catch |err| {
+            std.debug.print("comparison input: {s}\n", .{text});
+            return err;
+        };
+        defer std.posix.munmap(code);
+        const run: *const fn (usize, usize) callconv(.c) u32 = @ptrCast(code.ptr);
+        const values = [_]usize{ 0, 1, 0x7fffffffffffffff, 0x8000000000000000, std.math.maxInt(usize) };
+        for (values) |a| for (values) |b| {
+            const expected = switch (predicate) {
+                .ne => a != b,
+                .ult => a < b,
+                .ule => a <= b,
+                .ugt => a > b,
+                .uge => a >= b,
+                else => unreachable,
+            };
+            try std.testing.expectEqual(@as(u32, @intFromBool(expected)), run(a, b));
+        };
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        var context = machine.ReadOnlyModuleContext{ .globals = &.{}, .named_types = &.{}, .target_datalayout = "e-p:32:32" };
+        try std.testing.expect(try comparisons.legalize(arena.allocator(), module.functions.items[0], &context) == null);
+        context.target_datalayout = "e-p:64:64-ni:0";
+        try std.testing.expect(try comparisons.legalize(arena.allocator(), module.functions.items[0], &context) == null);
+        module.functions.items[0].blocks.items[0].instructions.items[0].kind.icmp.samesign = true;
+        try std.testing.expect(try comparisons.legalize(arena.allocator(), module.functions.items[0], null) == null);
+    }
+}
