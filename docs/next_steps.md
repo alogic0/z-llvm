@@ -41,7 +41,28 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [word arithmetic and switch checkpoint](evidence/fibonacci_flow_acceptance_20261105.json)
+The accepted [integer-intrinsic and comparison checkpoint](evidence/fibonacci_intrinsics_acceptance_20261105.json)
+at `fb39db75` passes all 17 integration stages. Scalar saturating operations,
+narrow extrema and bit reversal preserve significant bits and live operands.
+Compare staging now saves overlapping operands: the confirmed `umax33(1, 0)`
+wrong-code case returns one. Select condition formation also preserves its arms.
+All 1,827 unit tests, 13 structural checks, captured-object smoke and readiness
+pass; focused tests pass in all three release modes. The added native population
+checks 87,552 local observations against 43,776 LLVM references, and all 36
+mutation controls are rejected. All 27 native populations and the unchanged
+100-row/five-function cohort pass. Minimum free space is 33.59 GB, above
+the 24.36 GB reserve. Unchanged pinned Fibonacci executes all six assertions in
+Fast and Small with LLVM-equivalent exit status, stdout and stderr. Safe emits
+1,289 of 1,568 functions; 279 failures still prevent whole-program execution.
+The disk sampler accepts disappearing linker temporary files only when every
+owned root still has a complete count; other sampling errors remain failures.
+A fresh export and a cache hit on its exact authenticated bundles check the
+same three cohorts.
+The [focused evidence](evidence/fibonacci_intrinsics_focused_20261105.json)
+records source identity and checks. The thirteen original probes remain
+unchanged; no archives were made.
+
+The earlier accepted [word arithmetic and switch checkpoint](evidence/fibonacci_flow_acceptance_20261105.json)
 at `be90e939` passes all 17 integration stages. Full-word division, remainder,
 checked products, signed checked sums, extrema and byte swaps preserve exact
 results and live inputs. Fixed-register arithmetic receives spill capacity

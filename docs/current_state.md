@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `be90e9399b50d6e4ee6c9570dc5b7638fdf09b8c`; tree: `59bdb615e4bc9a23d47d5b1df1aa8655f5f5a7af`.
+Accepted revision: `fb39db758855913a0f2ade1c296f03fc3c45284d`; tree: `13a1ddd06f9e99987580f23a620b1c2b8bb7c5d6`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,28 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [word arithmetic and switch checkpoint](evidence/fibonacci_flow_acceptance_20261105.json)
+The accepted [integer-intrinsic and comparison checkpoint](evidence/fibonacci_intrinsics_acceptance_20261105.json)
+at `fb39db75` passes all 17 integration stages. Scalar saturating operations,
+narrow extrema and bit reversal preserve significant bits and live operands.
+Compare staging now saves overlapping operands: the confirmed `umax33(1, 0)`
+wrong-code case returns one. Select condition formation also preserves its arms.
+All 1,827 unit tests, 13 structural checks, captured-object smoke and readiness
+pass; focused tests pass in all three release modes. The added native population
+checks 87,552 local observations against 43,776 LLVM references, and all 36
+mutation controls are rejected. All 27 native populations and the unchanged
+100-row/five-function cohort pass. Minimum free space is 33.59 GB, above
+the 24.36 GB reserve. Unchanged pinned Fibonacci executes all six assertions in
+Fast and Small with LLVM-equivalent exit status, stdout and stderr. Safe emits
+1,289 of 1,568 functions; 279 failures still prevent whole-program execution.
+The disk sampler accepts disappearing linker temporary files only when every
+owned root still has a complete count; other sampling errors remain failures.
+A fresh export and a cache hit on its exact authenticated bundles check the
+same three cohorts.
+The [focused evidence](evidence/fibonacci_intrinsics_focused_20261105.json)
+records source identity and checks. The thirteen original probes remain
+unchanged; no archives were made.
+
+The earlier accepted [word arithmetic and switch checkpoint](evidence/fibonacci_flow_acceptance_20261105.json)
 at `be90e939` passes all 17 integration stages. Full-word division, remainder,
 checked products, signed checked sums, extrema and byte swaps preserve exact
 results and live inputs. Fixed-register arithmetic receives spill capacity

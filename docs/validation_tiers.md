@@ -335,6 +335,13 @@ large and wide switches, duplicate PHI edges, loops, and CFGs through 1,024
 blocks. Both are mandatory populations in all three modes; Safe Fibonacci
 whole-program execution remains open.
 
+The accepted [integer-intrinsic canary](evidence/fibonacci_intrinsics_acceptance_20261105.json)
+adds 87,552 local observations against 43,776 LLVM references and 36 mutation
+controls. Its 228 functions check saturation, narrow extrema, bit reversal,
+constant operands, dirty upper bits, live fixed registers and guarded memory.
+It includes the confirmed compare-overlap wrong-code regression and is mandatory
+in all three modes. Safe Fibonacci whole-program execution remains open.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

@@ -1,0 +1,2207 @@
+{
+  "schema": 1,
+  "status": "accepted by full integration",
+  "recorded_utc": "2026-11-05T13:34:03.085933+00:00",
+  "source_revision": "fb39db758855913a0f2ade1c296f03fc3c45284d",
+  "source_tree": "13a1ddd06f9e99987580f23a620b1c2b8bb7c5d6",
+  "source_sha256": {
+    "src/codegen/x86_64/generic_cfg/composed_selector_calls.zig": "e34d2e760f800332bcaf9969134ad7e309ddc6178b2f61a01481c5072928f508",
+    "src/codegen/x86_64/generic_cfg/composed_selector_cfg.zig": "56b180f1f33199ab81c80c91e256f55b699e21a9ae1f979f6ae353b999556292",
+    "src/codegen/x86_64/generic_cfg/composed_selector_frame.zig": "91de6de7532ad877f7d0e2a1d98bc6fc015983c42b4d8e355055a2794cb01a59",
+    "src/codegen/x86_64/generic_cfg/composed_selector_state.zig": "0d1c772123fef062db60fbfe171bfa86d5efa2c41a04a448b4bf9954f7c92ca3",
+    "src/codegen/x86_64/generic_cfg/integer_intrinsics.zig": "852821c73167e1cfd048b36bf04180b18a021a7bc66a632494f3de321e3bd92f",
+    "src/codegen/x86_64/generic_cfg/scalar_forms_tests.zig": "6d706eb5903fcdc168f8eced7f4634e90cad195eee59eceb1fa61fd6822eafdf",
+    "src/codegen/x86_64/generic_cfg/source_guard/model.zig": "3d995853f98ce64ffc4080c8ac1a3878aff36a90d925c3d80dfa418f449968bc",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/control_compare.zig": "f2eae8ddf31b7f31f1f79af0e33fa119467759e3ea9748b729dd005add084a56",
+    "src/codegen/x86_64/generic_cfg_selector.zig": "b2ea0f273689b8a44a3052be371141911bcf46c6441126726c92212a4aead51d",
+    "test/real_programs/integer_intrinsics.ll": "a9cf056debb514f988a8007d775e03b6a936abe01798776bf24d9b0cd9473856",
+    "test/real_programs/integer_intrinsics_driver.c": "c04dc27d2bc989a0a370b9e5a5682f21b3415f2a2244971967576bc64167ec9d",
+    "tools/run_distribution_real_rows_parallel.zig": "e51b32b3f86ba8c2ab8a33988dc78917ea7bf1460255f3ecf54bcf59e05497d0",
+    "tools/run_upstream_c_program.py": "cac9517bf283ee188703a459b7cc2c27446b3e07aedd917c84fdd5d30b2999c5"
+  },
+  "behavior": [
+    "Private scalar legalization adds unsigned saturating arithmetic, narrow signed/unsigned extrema and bit reversal with exact significant bits.",
+    "Fixed-register bit permutations preserve final-use operands and reserve existing intrinsic scratch space.",
+    "Select condition formation preserves live result arms.",
+    "Compare staging preserves an overlapping right-hand operand before replacing its register. This fixes a confirmed wrong-code case: umax33(1, 0) previously returned zero.",
+    "The unchanged pinned upstream Fibonacci program executes all six assertions in ReleaseFast and ReleaseSmall with LLVM-equivalent exit status, stdout and stderr."
+  ],
+  "known_boundaries": [
+    "ReleaseSafe whole-program emission remains incomplete: 1289 of 1568 functions emit and 279 fail; no Safe local object or execution is claimed.",
+    "Remaining Safe atomic, memory, aggregate, scalar and ABI forms and pinned runtime linkage remain open.",
+    "The authorized plan continues through unchanged ReleaseSafe execution and a permanent mandatory three-mode regression."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 1970913118,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-build-r4.json",
+          "sha256": "6105b7f9aac31fe60ac8ea07dad83b13ee0d19549a1cb306e8eb8fc376e38516"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-build-r4.log",
+          "sha256": "cefcaec8b8f165e49b77e72549b4ed2e6a6c7eca74e37d64be5f15f1bcb6487e"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 22568367823,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-units-r4.json",
+          "sha256": "93760279ee64ca687eeaafb162625a76987ef3b5e92e008f739b608fc4a93bdb"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-units-r4.log",
+          "sha256": "2e9f7a6e72ba8624b35059f3388bbf66e0b3c569561ab1f7f70c886f07f01889"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 437345126,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-structural-r2.json",
+          "sha256": "ad41c26eb3da6db38d1325b1e2faed6661e3b7b342630044942051f6e267aaf7"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-structural-r2.log",
+          "sha256": "b9dd4239c699d6d6e59b1ce9542c07b0d818363a3bfb7ce76982d0173f258204"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 5667309117,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-captured-object-r2.json",
+          "sha256": "1fdd7721a56a641223d973bbf2a5fcbba032a074721ca9f48cd5deed3c292b8d"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-captured-object-r2.log",
+          "sha256": "99bf1dcd433a7ae9b1b1e5ece6c77f4c371b97ebd5aac2640cbe11c147de6d5c"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "run",
+          "tools/run_focused_codegen_canaries.zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 817267321,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-canaries-r2.json",
+          "sha256": "cfb3bc8993dc40577bd4df3af6727af5aac950a74e37ceac3bfdb50b26af79c9"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-canaries-r2.log",
+          "sha256": "6d7381be6229ccea728310b5dbf1882a87d96eb11442182d8edbbdc11d806cc1"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseFast",
+          "-Dtest-filter=integer intrinsics",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 55401506797,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-ReleaseFast-r2.json",
+          "sha256": "e7e5648c3ce1892080f705ce3b3d7e0c4910ea2294d1b78e0c0944a3e3626a3f"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-ReleaseFast-r2.log",
+          "sha256": "c15085783c83dd4098d0fb01ed69f102c3d8e04dc00d358e05d732e933ea3de4"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSafe",
+          "-Dtest-filter=integer intrinsics",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 40220028369,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-ReleaseSafe-r2.json",
+          "sha256": "2cfcab3b67ff35545ba89be74703e22666b647c78550d780f43acda38ce946c3"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-ReleaseSafe-r2.log",
+          "sha256": "3fe6b902fc48c070578616228c675d7fcbdb650b0be03303a64291762b50f492"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSmall",
+          "-Dtest-filter=integer intrinsics",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 16960050066,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-ReleaseSmall-r2.json",
+          "sha256": "7840a97e4c3416632d31b7039c4d7fb475fe01d6288477ec074664eb61495f44"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-ReleaseSmall-r2.log",
+          "sha256": "521218a2ad102def24145e8a2994f75c7a73a6010b9869b1ac84b1b6c521c5a9"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 443418176287,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-readiness-r2.json",
+          "sha256": "b94ddb14f9f056c3bca0a870e9bbd50e4a86b6d276b35e2d677c63b5c2821ccb"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-readiness-r2.log",
+          "sha256": "f2fb9e24f644042c8b252f093ce8ca6fb737548ccf9010cca65c02aa6572e826"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_intrinsics_existing_native.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 346447914107,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-existing-native.json",
+          "sha256": "8c0ab7fe6883514ab372fa0d231f1cc07c6bafe28c2fe2e31a24f1d54591f37d"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-existing-native.log",
+          "sha256": "4e16f77af8c8667508f32e289e5b42fac5e4c58c94d8eb0102e5900e3f56fdf4"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_intrinsics_controls.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 49781461556,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-controls.json",
+          "sha256": "54494979c25d0ab3682ced5d1575e1344ae39ed54251bf47b91d77e667c4979a"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-controls.log",
+          "sha256": "dfd2e0969f5d81fa0b2747bb593d5c2c8e6da31c7a5dcb9181cf775966e74853"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/intrinsics-fast-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseFast",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 2269243645,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-fast-program.json",
+          "sha256": "9c109c55d3d44ecb8f24f9647a360cc602370459ee73690457dae88868345d84"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-fast-program.log",
+          "sha256": "c435c01f1eeee6ba4e92533fceb50d8ebbe7b40611d72e49ff70e6f724070371"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/intrinsics-small-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseSmall",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 1890031216,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-small-program.json",
+          "sha256": "7aa9ed1582d960058bf66bc9ec24abe1495e5b1954eeb75a2e930d2f0fd9c4bc"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-small-program.log",
+          "sha256": "b3d6b9ebb3ce0604be92a4e308495f95a6ce6ce671b4e88d3911f8ca53376a18"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build"
+        ],
+        "returncode": 0,
+        "wall_ns": 1907159808,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-main-build.json",
+          "sha256": "417c8004106d4e402311a2e37eb37ad5ff96ee7b545b6ceb7f9283ef7b6aa453"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-main-build.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/fibonacci-20261104/check_intrinsics_native.py",
+          "local-state/validations/fibonacci-20261104/intrinsics-main-native"
+        ],
+        "returncode": 0,
+        "wall_ns": 11941388515,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-main-native.json",
+          "sha256": "01b7cf2732988502d8a5110cdb6153579df0c76622ec3068eb018d2660bc2d0f"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-main-native.log",
+          "sha256": "83a54f8e1a7169d84b93115af2feda36d8c4dfd21fd7bc48d8089ab13811cd76"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/validations/fibonacci-20261104/intrinsics-main-fast-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseFast",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 1704162120,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-main-fast-program.json",
+          "sha256": "6426c83b58bf66c095435f7364995af06bcccfeeb6943c13afa7ea77a0ec3b28"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-main-fast-program.log",
+          "sha256": "6bf896faf69695896453a2ec1cf54fe419da2edee47af464c919c8589d340f59"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/validations/fibonacci-20261104/intrinsics-main-small-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseSmall",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 1449434645,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-main-small-program.json",
+          "sha256": "2f1118611aa3d5786a504dbebb71eb93f0a8fe03819cf90d5bdb082b9d3d0305"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-main-small-program.log",
+          "sha256": "a1f41de00e303be2ba4d4fc1724656ba748a778f578cbc37fccdf17ddc5dcef2"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "run",
+          "tools/run_distribution_real_rows_parallel.zig",
+          "--",
+          "--fresh-export",
+          "--concurrency=3",
+          "--scratch-root=local-state/validations/disk-sampler-20261105",
+          "--export-cache-root=local-state/caches/disk-sampler-20261105",
+          "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 776622256802,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/disk-sample-fresh-cohort-r2.json",
+          "sha256": "124eb27b3a1673058410d9bb501a33c6e965a42d1eabd470507222cd141faf27"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/disk-sample-fresh-cohort-r2.log",
+          "sha256": "5147ad3b35b5577a2c41149334b6cc09f2ace7bfe560d4ebd524905acb80d294"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "run",
+          "tools/run_distribution_real_rows_parallel.zig",
+          "--",
+          "--concurrency=3",
+          "--scratch-root=local-state/validations/disk-sampler-20261105",
+          "--export-cache-root=local-state/caches/disk-sampler-20261105",
+          "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 649211850438,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/disk-sample-cache-cohort.json",
+          "sha256": "06ed9ca12463cb892a447574fb2fe964d97832b81f1723e16b5c27ade5d617bc"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/disk-sample-cache-cohort.log",
+          "sha256": "6d4b0137f3c1014fe473478c9716fdf8869efc79f7a306fe1fe1d0fb9d949d2f"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "test",
+          "tools/run_distribution_real_rows_parallel.zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 605901411,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/disk-sample-tests-r1.json",
+          "sha256": "99002db36d024a5803d646ceca2501450a556a8c202dd5ce1c1f7e789429abb8"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/disk-sample-tests-r1.log",
+          "sha256": "141814fecb0f8f54469641b6424db4ee81d7cf3922e2183eba18a962766de98a"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "test",
+          "tools/run_distribution_all_gates.zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 592655126,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/disk-sample-integration-contract.json",
+          "sha256": "d95ba2d71696eb5cb1bc7ed979882ef535a80bd1eb55011c58b68b84a7adaea2"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/disk-sample-integration-contract.log",
+          "sha256": "dc012241c7355dc4bb7d772e726146cc422031051e0b0fe2a25b13bf6d572403"
+        }
+      }
+    ],
+    "unit_tests": 1827,
+    "structural_tests": 13,
+    "focused_tests_per_release_mode": 14,
+    "native": {
+      "status": "passed",
+      "integer_intrinsics_local_observations": 87552,
+      "integer_intrinsics_reference_observations": 43776,
+      "compiler_sha256": "e8fe183848e18d10093264911e8fa2597ae101d4fcc5bb967c7081357fb727d1",
+      "inputs": {
+        "test/real_programs/integer_intrinsics.ll": "a9cf056debb514f988a8007d775e03b6a936abe01798776bf24d9b0cd9473856",
+        "test/real_programs/integer_intrinsics_driver.c": "c04dc27d2bc989a0a370b9e5a5682f21b3415f2a2244971967576bc64167ec9d"
+      }
+    },
+    "prior_native": {
+      "switch_forms_local_observations": 26112,
+      "switch_forms_reference_observations": 13056,
+      "word_arithmetic_local_observations": 29568,
+      "word_arithmetic_reference_observations": 14784,
+      "checked_integers_local_observations": 46464,
+      "checked_integers_reference_observations": 23232,
+      "stack_addresses_local_observations": 3456,
+      "stack_addresses_reference_observations": 1728,
+      "bounded_storage_local_observations": 5760,
+      "bounded_storage_reference_observations": 2880,
+      "safe_comparisons_local_observations": 17664,
+      "safe_comparisons_reference_observations": 8832,
+      "safe_scalar_forms_local_observations": 4992,
+      "safe_scalar_forms_reference_observations": 2496,
+      "indirect_stack_calls_local_observations": 9984,
+      "indirect_stack_calls_reference_observations": 4992,
+      "scalar_forms_local_observations": 3840,
+      "scalar_forms_reference_observations": 1920,
+      "aggregate_storage_local_observations": 4608,
+      "aggregate_storage_reference_observations": 2304,
+      "narrow_abi_local_observations": 4992,
+      "narrow_abi_reference_observations": 2496,
+      "constant_remainder_local_observations": 3072,
+      "constant_remainder_reference_observations": 1536,
+      "rax_pointer_load_local_observations": 2688,
+      "rax_pointer_load_reference_observations": 1344,
+      "general_array_stride_local_observations": 1920,
+      "general_array_stride_reference_observations": 960,
+      "bounded_frame_local_observations": 768,
+      "bounded_frame_reference_observations": 384,
+      "module_dependencies_local_observations": 330,
+      "module_dependencies_reference_observations": 165,
+      "array_stride_local_observations": 1536,
+      "array_stride_reference_observations": 768,
+      "boolean_calls_local_observations": 1536,
+      "boolean_calls_reference_observations": 768,
+      "global_addresses_local_observations": 192,
+      "global_addresses_reference_observations": 96,
+      "global_memory_local_observations": 240,
+      "global_memory_reference_observations": 120,
+      "type_layout_padding_local_observations": 768,
+      "type_layout_padding_reference_observations": 384,
+      "word_pair_local_observations": 384,
+      "word_pair_reference_observations": 192,
+      "signed_nonnegative_local_observations": 1536,
+      "signed_nonnegative_reference_observations": 768,
+      "integer_pointer_local_observations": 1536,
+      "integer_pointer_reference_observations": 768,
+      "scalar_stack_local_observations": 486,
+      "scalar_stack_reference_observations": 243,
+      "pointer_stack_local_observations": 768,
+      "pointer_stack_reference_observations": 384,
+      "compiler_sha256": "cff3d6b53a2d09e3ff4e44e69e3b21750bb5b58cedc96248fef5224310017f4e",
+      "status": "passed",
+      "bounded_storage_guard_checks": 18,
+      "module_dependencies_environment_checks": 3,
+      "module_dependencies_negative_controls": 30
+    },
+    "negative_controls": {
+      "status": "passed",
+      "compiler_sha256": "cff3d6b53a2d09e3ff4e44e69e3b21750bb5b58cedc96248fef5224310017f4e",
+      "negative_controls": 36,
+      "cases": [
+        {
+          "control": "wrong-add-saturation",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-add-saturation",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-add-saturation",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-add-saturation",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-add-saturation",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-add-saturation",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-sub-saturation",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-sub-saturation",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-sub-saturation",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-sub-saturation",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-sub-saturation",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-sub-saturation",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-reverse",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-reverse",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-reverse",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-reverse",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-reverse",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-reverse",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-signed-minimum",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-signed-minimum",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-signed-minimum",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-signed-minimum",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-signed-minimum",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-signed-minimum",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-maximum",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-maximum",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-maximum",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-maximum",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-maximum",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-maximum",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-live-register",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-live-register",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-live-register",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-live-register",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-live-register",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-live-register",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        }
+      ],
+      "commands": [
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-add-saturation-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-sub-saturation-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-reverse-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-signed-minimum-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/wrong-maximum-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/integer_intrinsics_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-native-controls/lost-live-register-ReleaseSmall/release-run"
+        }
+      ],
+      "fixture_sha256": "a9cf056debb514f988a8007d775e03b6a936abe01798776bf24d9b0cd9473856",
+      "driver_sha256": "c04dc27d2bc989a0a370b9e5a5682f21b3415f2a2244971967576bc64167ec9d",
+      "fixture_unchanged": true,
+      "core_dumps_disabled": true
+    },
+    "source_import": {
+      "status": "passed",
+      "imported_revision": "c4554f6dc93c8b6d272fdc73ec4a9447efa7a6c7",
+      "prototype_revision": "998e743b84d41e5cf55a3ade18a4c4c6c0d13e23",
+      "identical_non_documentation_files": 1562,
+      "prototype_snapshot_sha256": "b3f7236c7b861ac81f1d983d2b9e08f31be15f86b17c6b4501ea8d2bc0b40acb"
+    },
+    "prototype_snapshot": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-prototype-sources.json",
+      "sha256": "b3f7236c7b861ac81f1d983d2b9e08f31be15f86b17c6b4501ea8d2bc0b40acb"
+    },
+    "prototype_phase_records": [
+      {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-tier2-verification.json",
+        "sha256": "5b048e0f098ce1871f11bdefd8e46743ff21694451260ab1c7c6fa3e874dd357"
+      }
+    ],
+    "fingerprint_review": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-fingerprint-review.json",
+      "sha256": "b6e57e93755f85cdf746310f6269a86f4a43c140da9eb5254b78f538f40b2047"
+    },
+    "wrong_code_repair": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-compare-repair.json",
+      "sha256": "b8a642aa9d94e4e10b3e4896f8e08dedb3b3e6297fb617e1fd77355cfcbd305e"
+    },
+    "disk_sampling_repair": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/disk-sample-repair.json",
+      "sha256": "adf48cded721e48332213a9d34487a16f0c90e464583bf417d83a5ea0a35bf70"
+    },
+    "disk_sampling_cache_validation": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/disk-sample-cache-verification.json",
+      "sha256": "6c800ed593ced161fa0194e34d7bafd9147238da7e70a9bcfee3db4964972325"
+    }
+  },
+  "fibonacci_programs": [
+    {
+      "mode": "ReleaseFast",
+      "report": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-main-fast-program/report.json",
+        "sha256": "583c9021fd80c25946c35a4ff1c88c855758a03cdde6dfdd0433fb955b8b06c3"
+      },
+      "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+      "local_executions": 1,
+      "reference_executions": 1,
+      "exit_stdout_stderr_matched": true
+    },
+    {
+      "mode": "ReleaseSmall",
+      "report": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-main-small-program/report.json",
+        "sha256": "0d32daa47e69f0688d640889363d2dec69fde413b0d3d92f2d3d287a31188db2"
+      },
+      "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+      "local_executions": 1,
+      "reference_executions": 1,
+      "exit_stdout_stderr_matched": true
+    }
+  ],
+  "release_safe": {
+    "selected_functions": 1568,
+    "emitted_functions": 1289,
+    "failed_functions": 279,
+    "first_failure": {
+      "function": "debug.defaultPanic",
+      "diagnostic": "UnsupportedCodegenControlFlow",
+      "selector_tag": "unsupported_instruction",
+      "selector_detail": "atomicrmw"
+    },
+    "object_bytes": 0,
+    "local_whole_program_executions": 0,
+    "input_sha256": "147ebba2de9f96cae9e6ce53fedd53b6fa082bc46048e51433652e5887a4f60c",
+    "prototype_compiler_sha256": "cff3d6b53a2d09e3ff4e44e69e3b21750bb5b58cedc96248fef5224310017f4e",
+    "source_equivalence": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-import-verification.json",
+      "sha256": "37d60abd4837b582b854f767c646ebf73f1c633cac939b6fa67cb5e3bf78ad06"
+    },
+    "report": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-frontier-r4.json",
+      "sha256": "160330fae686c72c8dc7ed312195378fb7db7854084f7a4711c13a40c6965864"
+    },
+    "stderr": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/intrinsics-frontier-r4.stderr",
+      "sha256": "d3929f447ef9550e9b565ded66216f8e1db2e1e6321ddfe2f96eee99400d7288"
+    }
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0
+}
