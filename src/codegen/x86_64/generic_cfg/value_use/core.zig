@@ -612,6 +612,7 @@ fn core_rollbackInternal(comptime Authority: type, transaction: anytype) void {
     transaction.request_count = 0;
     transaction.request_phase = .registering;
     transaction.write_nodes = @splat(false);
+    transaction.store_address_registers = @splat(null);
     transaction.early_plans = @splat(.{});
     resetSemanticOrderPlan(Authority, transaction);
     transaction.early_home_valid = @splat(false);
@@ -992,7 +993,7 @@ fn executePreparedActionInternal(
         .form_readonly_table_address => |address| try address_memory.executeReadOnlyTableAddress(Authority, transaction, view, request, address),
         .store_scalar => |store| try address_memory.executeStoreScalar(Authority, transaction, view, store),
         .store_immediate => |store| try address_memory.executeStoreImmediate(Authority, transaction, view, store),
-        .store_i64 => |store| try address_memory.executeStoreI64(Authority, transaction, view, store),
+        .store_i64 => |store| try address_memory.executeStoreI64(Authority, transaction, request_index, view, store),
         .store_stack_pointer => |store| try address_memory.executeStoreStackPointer(Authority, transaction, view, store),
         .branch_condition => try control_compare_module.executeBranchCondition(Authority, transaction, view),
         .switch_compare_chain => |switch_action| try control_compare_module.executeSwitchCompareChain(Authority, transaction, view, &switch_action),

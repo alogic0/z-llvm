@@ -549,10 +549,17 @@ fn stageAccumulatorPointer(comptime Authority: type, transaction: anytype, view:
 pub fn executeStoreI64(
     comptime Authority: type,
     transaction: anytype,
+    request_index: u8,
     pointer_view: *const Types.PreparedView,
     action: Types.StoreI64Action,
 ) !void {
-    const pointer = try materialization.preparedViewLoc(pointer_view);
+    var pointer = try materialization.preparedViewLoc(pointer_view);
+    if (transaction.store_address_registers[request_index]) |address| {
+        try materializeActionPointer(Authority, transaction, pointer, address);
+        pointer = .{ .scratch64 = address };
+    }
+    // Address staging precedes the value read. The sealed plan keeps its
+    // chosen register even if preparation relocates a canonical source.
     if (pointer == .stack_scalar) {
         const frame_index = try scalar64StoreFrameIndex(transaction.selector, pointer.stack_scalar);
         const value_view = try Authority.registeredOperandView(Authority, transaction, action.value);

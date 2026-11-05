@@ -1439,6 +1439,8 @@ pub fn Transaction(comptime Impl: type) type {
         request_phase: Self.RequestPhase = .registering,
         lifecycle: Self.Lifecycle = .active,
         write_nodes: [Self.physical_node_count]bool = @splat(false),
+        // Chosen by sealing; action intent never carries discovered homes.
+        store_address_registers: [Self.max_requests]?ArgReg = @splat(null),
         early_plans: [Self.max_requests]Self.EarlyPlan = @splat(.{}),
         semantic_order_edges: [Self.max_requests][Self.max_requests]bool =
             @splat(@splat(false)),

@@ -52,7 +52,10 @@ const MappingList = struct {
 pub fn seal(comptime Authority: type, transaction: anytype) !void {
     try Authority.requireActive(Authority, transaction);
     if (transaction.request_phase != .registering) return error.ValueUsePlanAlreadySealed;
-    errdefer semantic_ordering.resetSemanticOrderPlan(Authority, transaction);
+    errdefer {
+        semantic_ordering.resetSemanticOrderPlan(Authority, transaction);
+        transaction.store_address_registers = @splat(null);
+    }
     // Validate the action-owned role graph before destination planning can
     // obscure a semantic ownership contradiction with a physical conflict.
     try semantic_ordering.validateSemanticOrderTopology(Authority, transaction);
@@ -71,7 +74,7 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
             return err;
         };
         const current = if (deferred_switch) null else try lifetime_admission.validateRequestAt(Authority, transaction, request_index);
-        const destination_nodes = requestDestinationNodes(Authority, transaction, request, current) catch |err| {
+        const destination_nodes = requestDestinationNodes(Authority, transaction, request, request_index, current) catch |err| {
             Authority.noteRequestBoundaryError(Authority, transaction, request_index, err);
             return err;
         };
@@ -128,6 +131,7 @@ pub fn requestDestinationNodes(
     comptime Authority: type,
     transaction: anytype,
     request: *const Types.StoredRequest,
+    request_index: u8,
     current: ?ValueLoc,
 ) !NodeList {
     var result: NodeList = .{};
@@ -200,10 +204,17 @@ pub fn requestDestinationNodes(
                     store.bits,
                 );
             },
-            .store_i64 => {
+            .store_i64 => |store| {
                 const pointer = current orelse return error.ValueUseUnresolvedSource;
                 try compatibility.validateI64StorePointer(pointer);
-                if (pointer != .stack_scalar) try appendStorePointerDestinationNodes(&result, pointer, 64);
+                if (pointer == .rax) {
+                    const value = try Authority.registeredOperandCurrent(Authority, transaction, store.value);
+                    // A separate address register breaks RAX/RCX exchange
+                    // without suppressing the transaction's copy-cycle check.
+                    const address: ArgReg = if (scalarSourceNode(value) == .rcx) .rdx else .rcx;
+                    transaction.store_address_registers[request_index] = address;
+                    try result.append(nodeForArgReg(address));
+                } else if (pointer != .stack_scalar) try appendStorePointerDestinationNodes(&result, pointer, 64);
                 try result.append(.accumulator);
             },
             .store_stack_pointer => try result.append(.rcx),
@@ -635,7 +646,9 @@ pub fn requestMappings(
             .store_i64 => |store| {
                 const pointer = current orelse return error.ValueUseUnresolvedSource;
                 try compatibility.validateI64StorePointer(pointer);
-                if (pointer != .stack_scalar) try appendStorePointerMappings(
+                if (transaction.store_address_registers[request_index]) |address| {
+                    mappings.append(.{ .source = scalarSourceNode(pointer), .destination = nodeForArgReg(address), .source_request_index = request_index });
+                } else if (pointer != .stack_scalar) try appendStorePointerMappings(
                     Authority,
                     transaction,
                     &mappings,
@@ -839,7 +852,7 @@ pub fn requestMappings(
                 .source_request_index = request_index,
             }),
             .i128_eq_min, .i128_sign_bit => {
-                const destinations = try requestDestinationNodes(Authority, transaction, request, current);
+                const destinations = try requestDestinationNodes(Authority, transaction, request, request_index, current);
                 for (destinations.slice()) |destination| mappings.append(.{
                     .source = null,
                     .destination = destination,
@@ -856,7 +869,7 @@ pub fn requestMappings(
             .scalar_multiply,
             .unsigned_quotient,
             => {
-                const destinations = try requestDestinationNodes(Authority, transaction, request, current);
+                const destinations = try requestDestinationNodes(Authority, transaction, request, request_index, current);
                 for (destinations.slice()) |destination| mappings.append(.{
                     .source = null,
                     .destination = destination,
@@ -868,7 +881,7 @@ pub fn requestMappings(
         }
         if (action != .emit_copy_to) return mappings;
     }
-    const destinations = try requestDestinationNodes(Authority, transaction, request, current);
+    const destinations = try requestDestinationNodes(Authority, transaction, request, request_index, current);
     if (current == null) {
         for (destinations.slice()) |destination| mappings.append(.{
             .source = null,
@@ -904,7 +917,7 @@ fn appendStorePointerDestinationNodes(
 ) !void {
     switch (pointer) {
         .rax => {
-            if (bits == 0 or (bits > 8 and bits != 16 and bits != 32)) return error.ValueUseStorePointerFormUnsupported;
+            if (bits == 0 or (bits > 8 and bits != 16 and bits != 32 and bits != 64)) return error.ValueUseStorePointerFormUnsupported;
             try nodes.append(.rcx);
         },
         .stack_scalar => |stack| if (bits == 64) {
@@ -938,7 +951,7 @@ fn appendStorePointerMappings(
 ) !void {
     switch (pointer) {
         .rax => {
-            if (bits == 0 or (bits > 8 and bits != 16 and bits != 32)) return error.ValueUseStorePointerFormUnsupported;
+            if (bits == 0 or (bits > 8 and bits != 16 and bits != 32 and bits != 64)) return error.ValueUseStorePointerFormUnsupported;
             mappings.append(.{ .source = .accumulator, .destination = .rcx, .source_request_index = source_request_index });
         },
         .stack_scalar => |stack| if (bits == 64) {

@@ -60,7 +60,7 @@ pub fn validateMemcpyLengthOperand(request: *const Types.StoredRequest) !void {
 }
 pub fn validateI64StorePointer(pointer: ValueLoc) !void {
     switch (pointer) {
-        .arg64, .scratch64, .spill64 => {},
+        .arg64, .scratch64, .spill64, .rax => {},
         .stack_scalar => _ = try stackStoreFrameIndex(pointer),
         else => return error.ValueUseStorePointerFormUnsupported,
     }
