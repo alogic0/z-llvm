@@ -115,6 +115,7 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
     var saw_fixed_smul_overflow = false;
     var saw_wide_icmp = false;
     var saw_pair_intrinsic = false;
+    var atomic_slots: u32 = 0;
     var saw_scalar_sse_call = false;
     var saw_memory_fill = false;
     var saw_int_to_fp_cast = false;
@@ -135,6 +136,17 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
                 outgoing_stack_slots = @max(outgoing_stack_slots, @as(u32, @intCast(count)));
             };
             if (instruction.kind == .phi) saw_phi = true;
+            if (instruction.kind == .atomicrmw) saw_pair_intrinsic = true;
+            if (instruction.kind == .cmpxchg) {
+                saw_pair_intrinsic = true;
+                atomic_slots = std.math.add(u32, atomic_slots, 2) catch return .{ .no_spill_envelope = "scalar-atomic-frame-size" };
+            }
+            if (instruction.kind == .store and instruction.kind.store.attrs.atomic_ordering != null and
+                std.mem.eql(u8, instruction.kind.store.attrs.atomic_ordering.?, "seq_cst"))
+            {
+                saw_pair_intrinsic = true;
+                atomic_slots = std.math.add(u32, atomic_slots, 1) catch return .{ .no_spill_envelope = "scalar-atomic-frame-size" };
+            }
             if (instruction.kind == .alloca) {
                 saw_alloca = true;
                 if (parseI32ArrayType(instruction.kind.alloca.allocated_ty) != null) saw_array_alloca = true;
@@ -171,7 +183,7 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
     const pressure = try analyzeStageTwoNoSpillEnvelope(selector.allocator, function);
     const saw_scalar_preservation = scalar_conversions > 1 or saw_scalar_literal;
     const reserve_spill_area = saw_scalar_preservation or saw_stack_arguments or saw_alloca or pressure.exceedsNoSpill() or saw_phi or saw_fixed_smul_overflow or saw_wide_icmp or saw_pair_intrinsic or saw_scalar_sse_call or saw_memory_fill or saw_int_to_fp_cast or (selector.allocation_plan != null and (selector.allocation_plan.?.spill_slots != 0 or selector.allocation_plan.?.preservation_spill_slots != 0));
-    const spill_reserved_bytes = std.math.add(u32, spillReservedBytes(selector, reserve_spill_area) orelse return .{ .no_spill_envelope = "composed-block-spill-frame-size" }, outgoing_stack_slots * 8) catch return .{ .no_spill_envelope = "composed-block-call-stack-frame-size" };
+    const spill_reserved_bytes = std.math.add(u32, spillReservedBytes(selector, reserve_spill_area) orelse return .{ .no_spill_envelope = "composed-block-spill-frame-size" }, std.math.mul(u32, std.math.add(u32, outgoing_stack_slots, atomic_slots) catch return .{ .no_spill_envelope = "scalar-atomic-frame-size" }, 8) catch return .{ .no_spill_envelope = "scalar-atomic-frame-size" }) catch return .{ .no_spill_envelope = "composed-block-call-stack-frame-size" };
     if (spill_reserved_bytes > max_frame_bytes - 24) return .{ .no_spill_envelope = "composed-block-stack-frame-limit" };
     payload_bytes = if (saw_array_alloca) @max(spill_reserved_bytes, stage2SpillReservedBytes()) else 0;
 

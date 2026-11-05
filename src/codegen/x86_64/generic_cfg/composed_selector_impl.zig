@@ -14,6 +14,7 @@ const selector_fp = @import("composed_selector_fp.zig");
 const selector_conversion = @import("composed_selector_conversion.zig");
 const selector_vector = @import("composed_selector_vector.zig");
 const selector_memory = @import("composed_selector_memory.zig");
+const selector_atomic = @import("composed_selector_atomic.zig");
 const selector_calls = @import("composed_selector_calls.zig");
 const selector_cfg = @import("composed_selector_cfg.zig");
 const selector_aggregate = @import("composed_selector_aggregate.zig");
@@ -458,6 +459,8 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
         else
             selector_fp.lowerFcmp(selector, instruction.result, fcmp) catch |err| return instructionValueError(selector, err, "stage2-fcmp-value"),
         .load => |load| selector_memory.lowerLoad(selector, instruction.result, load) catch |err| return instructionValueError(selector, err, "stage2-load-value"),
+        .atomicrmw => |rmw| selector_atomic.lowerRmw(selector, instruction.result, rmw) catch |err| return instructionValueError(selector, err, "stage2-atomic-rmw-value"),
+        .cmpxchg => |cmp| selector_atomic.lowerCmpxchg(selector, instruction.result, cmp) catch |err| return instructionValueError(selector, err, "stage2-atomic-cmpxchg-value"),
         .store => |store| selector_memory.lowerStore(selector, store) catch |err| return instructionValueError(selector, err, "stage2-store-value"),
         .gep => |gep| selector_memory.lowerGep(selector, instruction.result, gep) catch |err| return instructionValueError(selector, err, "stage2-gep-value"),
         .call => |call| selector_calls.lowerCall(selector, instruction.result, call) catch |err| return instructionValueError(selector, err, "stage2-call-value"),

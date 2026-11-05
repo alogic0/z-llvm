@@ -41,6 +41,10 @@ fn needsRewrite(allocator: std.mem.Allocator, function: ir.Function, context: *c
                 .call => |call| if (memcpy(call) and
                     (addresses.fromValue(call.args.items[0].value) != null or addresses.fromValue(call.args.items[1].value) != null)) return true,
                 .store => |store| if (store.ptr_addrspace == null and (addresses.fromValue(store.ptr) != null or (store.ty == .ptr and store.ty_addrspace == null and addresses.fromValue(store.value) != null))) return true,
+                .load => |load| if (load.attrs.isAtomic() and load.ptr_addrspace == null and addresses.fromValue(load.ptr) != null) return true,
+                .atomicrmw => |rmw| if (addresses.fromValue(rmw.ptr) != null or (rmw.ty == .ptr and addresses.fromValue(rmw.value) != null)) return true,
+                .cmpxchg => |cmp| if (addresses.fromValue(cmp.ptr) != null or (cmp.ty == .ptr and
+                    (addresses.fromValue(cmp.expected) != null or addresses.fromValue(cmp.replacement) != null))) return true,
                 else => {},
             }
         }
@@ -100,6 +104,20 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 .store => |store| if (store.ptr_addrspace == null) {
                     copy.kind.store.ptr = try materialize(allocator, function, &block, &serial, store.ptr);
                     if (store.ty == .ptr and store.ty_addrspace == null) copy.kind.store.value = try materialize(allocator, function, &block, &serial, store.value);
+                },
+                .load => |load| if (load.attrs.isAtomic() and load.ptr_addrspace == null) {
+                    copy.kind.load.ptr = try materialize(allocator, function, &block, &serial, load.ptr);
+                },
+                .atomicrmw => |rmw| {
+                    copy.kind.atomicrmw.ptr = try materialize(allocator, function, &block, &serial, rmw.ptr);
+                    if (rmw.ty == .ptr) copy.kind.atomicrmw.value = try materialize(allocator, function, &block, &serial, rmw.value);
+                },
+                .cmpxchg => |cmp| {
+                    copy.kind.cmpxchg.ptr = try materialize(allocator, function, &block, &serial, cmp.ptr);
+                    if (cmp.ty == .ptr) {
+                        copy.kind.cmpxchg.expected = try materialize(allocator, function, &block, &serial, cmp.expected);
+                        copy.kind.cmpxchg.replacement = try materialize(allocator, function, &block, &serial, cmp.replacement);
+                    }
                 },
                 else => {},
             };

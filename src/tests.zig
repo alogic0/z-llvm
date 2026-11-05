@@ -10,6 +10,7 @@ comptime {
     _ = @import("codegen/x86_64/generic_cfg/aggregate_storage_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/scalar_forms_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/switch_forms_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/atomic_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/indirect_stack_calls_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/general_stride_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/rax_load_tests.zig");

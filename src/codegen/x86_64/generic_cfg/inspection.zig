@@ -81,8 +81,8 @@ fn inspectInstruction(instruction: ir.Instruction, context: ?*const x86_64_types
         .phi => |phi| if (isSelectorScalarType(phi.ty)) null else .{ .unsupported_type = "phi" },
         .freeze => |freeze| if (isSelectorScalarType(freeze.ty)) null else .{ .unsupported_type = "freeze" },
         .fcmp => |fcmp| inspectFcmp(fcmp),
-        .atomicrmw => .{ .unsupported_instruction = "atomicrmw" },
-        .cmpxchg => .{ .unsupported_instruction = "cmpxchg" },
+        .atomicrmw => |rmw| @import("composed_selector_atomic.zig").inspectRmw(rmw),
+        .cmpxchg => |cmp| @import("composed_selector_atomic.zig").inspectCmpxchg(cmp),
         .fence => .{ .unsupported_instruction = "fence" },
         .extractelement => |extract| inspectExtractElement(extract),
         .insertelement => |insert| inspectInsertElement(insert),
@@ -419,16 +419,11 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
 }
 
 fn inspectExtractValue(extract: ir.ExtractValueInst) ?Diagnostic {
-    const value_bits: u16 = if (extract.aggregate_ty.eql(.{ .aggregate = "{ i32, i1 }" }))
-        32
-    else if (extract.aggregate_ty.eql(.{ .aggregate = "{ i64, i1 }" }))
-        64
-    else if (extract.aggregate_ty.eql(.{ .aggregate = "{ i128, i1 }" }))
-        128
-    else
-        return .{ .unsupported_type = "extractvalue-aggregate" };
+    if (extract.aggregate_ty != .aggregate) return .{ .unsupported_type = "extractvalue-aggregate" };
+    const spelling = @import("word_pair_memory.zig").spelling;
+    const ty: ir.Type = if (spelling(extract.aggregate_ty.aggregate, "{ptr,i1}")) .ptr else if (spelling(extract.aggregate_ty.aggregate, "{i8,i1}")) .{ .int = 8 } else if (spelling(extract.aggregate_ty.aggregate, "{i16,i1}")) .{ .int = 16 } else if (spelling(extract.aggregate_ty.aggregate, "{i32,i1}")) .{ .int = 32 } else if (spelling(extract.aggregate_ty.aggregate, "{i64,i1}")) .{ .int = 64 } else if (spelling(extract.aggregate_ty.aggregate, "{i128,i1}")) .{ .int = 128 } else return .{ .unsupported_type = "extractvalue-aggregate" };
     if (std.mem.eql(u8, extract.indices, "0")) {
-        return if (extract.result_ty.eql(.{ .int = value_bits })) null else .{ .unsupported_type = "extractvalue-result" };
+        return if (extract.result_ty.eql(ty)) null else .{ .unsupported_type = "extractvalue-result" };
     }
     if (std.mem.eql(u8, extract.indices, "1")) {
         return if (extract.result_ty.eql(.{ .int = 1 })) null else .{ .unsupported_type = "extractvalue-result" };

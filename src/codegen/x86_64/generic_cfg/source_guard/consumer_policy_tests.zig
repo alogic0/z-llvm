@@ -1022,3 +1022,22 @@ test "unsigned quotient production wiring is complete and exclusive" {
         ),
     );
 }
+
+test "composed selector source guard confines scalar atomics accumulator composition" {
+    const source = @embedFile("../composed_selector_atomic.zig");
+    try validateAccumulatorCompositionProductionSites("composed_selector_atomic.zig", source);
+    for ([_][2][]const u8{
+        .{ "fn lowerRmw(", "fn unreviewedAtomic(" },
+        .{ "transaction.seal()", "transaction.skipSeal()" },
+        .{ "transaction.prepare()", "transaction.skipPrepare()" },
+        .{ "transaction.materializeAll()", "transaction.skipMaterialization()" },
+        .{ "transaction.commit()", "transaction.commitAccumulatorSession(accumulator)" },
+        .{ "normalization.commit()", "normalization.skipCommit()" },
+    }) |mutation| {
+        const changed = try std.mem.replaceOwned(u8, std.testing.allocator, source, mutation[0], mutation[1]);
+        defer std.testing.allocator.free(changed);
+        const terminated = try std.testing.allocator.dupeSentinel(u8, changed, 0);
+        defer std.testing.allocator.free(terminated);
+        try std.testing.expectError(error.ValueUseAccumulatorCompositionAllowlistMismatch, validateAccumulatorCompositionProductionSites("composed_selector_atomic.zig", terminated));
+    }
+}

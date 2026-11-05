@@ -1950,6 +1950,52 @@ pub fn validateAccumulatorCompositionProductionSites(source_name: []const u8, so
             return error.ValueUseAccumulatorCompositionAllowlistMismatch;
         return;
     }
+    if (std.mem.eql(u8, source_name, "composed_selector_atomic.zig")) {
+        var body_storage: [max_function_bodies]FunctionBody = undefined;
+        const bodies = try collectFunctionBodies(source, &body_storage);
+        var classified_count: usize = 0;
+        for (bodies) |body| {
+            const function_source = source[body.start..body.end];
+            var contains_api = false;
+            for (composition_api) |pattern| {
+                if (std.mem.indexOf(u8, function_source, pattern) != null) contains_api = true;
+            }
+            if (!contains_api) continue;
+            const compare_exchange = std.mem.eql(u8, body.name, "lowerCmpxchg");
+            if ((!compare_exchange and !std.mem.eql(u8, body.name, "lowerRmw")) or
+                countPattern(function_source, "ValueUseTransaction.begin(selector)") != 1 or
+                countPattern(function_source, "transaction.seal()") != 1 or
+                countPattern(function_source, "transaction.prepare()") != 1 or
+                countPattern(function_source, "transaction.materializeAll()") != 1 or
+                countPattern(function_source, "beginAccumulatorSession(") != 1 or
+                countPattern(function_source, "prepareAccumulator(") != 1 or
+                countPattern(function_source, "defineAccumulatorResult(") != 1 or
+                countPattern(function_source, "finalizeAccumulatorResult(") != 1 or
+                countPattern(function_source, "transaction.commit()") != 1 or
+                countPattern(function_source, "prepareAccumulatorCallBeforeArguments(") != 0 or
+                countPattern(function_source, "finishAccumulatorCallPreparationAfterArguments(") != 0 or
+                countPattern(function_source, "materializeAccumulator(") != 0 or
+                countPattern(function_source, "spillAccumulatorValue(") != 0 or
+                countPattern(function_source, "commitAccumulatorSession(") != 0 or
+                countPattern(function_source, "AccumulatorDefinitionSession.init(") != 0 or
+                countPattern(function_source, "AccumulatorDefinitionTransaction.begin(") != @intFromBool(compare_exchange))
+            {
+                return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+            }
+            if (compare_exchange) {
+                const committed = std.mem.indexOf(u8, function_source, "transaction.commit()") orelse unreachable;
+                const normalization = std.mem.indexOf(u8, function_source, "AccumulatorDefinitionTransaction.begin(") orelse unreachable;
+                if (normalization <= committed or
+                    countPattern(function_source, "normalization.prepare(") != 1 or
+                    countPattern(function_source, "normalization.define(") != 1 or
+                    countPattern(function_source, "normalization.commit()") != 1)
+                    return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+            }
+            classified_count += 1;
+        }
+        if (classified_count != 2) return error.ValueUseAccumulatorCompositionAllowlistMismatch;
+        return;
+    }
     if (!std.mem.eql(u8, source_name, "composed_selector_calls.zig"))
         return error.ValueUseAccumulatorCompositionOutsideAllowlist;
 

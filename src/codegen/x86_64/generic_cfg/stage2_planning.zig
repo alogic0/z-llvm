@@ -472,7 +472,8 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
                 (instruction.kind.icmp.operand_ty.eql(.{ .int = 32 }) or
                     instruction.kind.icmp.operand_ty.eql(.{ .int = 64 }))) or
                 (instruction.kind == .binary and
-                    (instruction.kind.binary.op == .udiv or instruction.kind.binary.op == .urem)))
+                    (instruction.kind.binary.op == .udiv or instruction.kind.binary.op == .urem)) or
+                instruction.kind == .atomicrmw or instruction.kind == .cmpxchg)
                 try fixed_scalar_positions.append(allocator, position);
             if (instruction.kind == .store) try store_positions.append(allocator, position);
             position += 1;
@@ -729,8 +730,8 @@ fn selectorInstructionResultMetadata(instruction: ir.Instruction) ?VirtualRegMet
         .extractvalue => |extract| selectorValueMetadata(extract.result_ty),
         .gep => .{ .class = .stack_pointer, .bits = 64 },
         .alloca => .{ .class = .stack_object, .bits = 0 },
+        .atomicrmw => |rmw| selectorValueMetadata(rmw.ty),
         .store,
-        .atomicrmw,
         .cmpxchg,
         .insertvalue,
         .fence,
@@ -915,6 +916,12 @@ fn collectPressureExemptValues(exempt_values: *NameSet, function: ir.Function) !
                 if (instruction.removed) continue;
                 const result = instruction.result orelse continue;
                 switch (instruction.kind) {
+                    .cmpxchg => {
+                        if (!exempt_values.contains(result)) {
+                            try exemptValuesPut(exempt_values, result);
+                            changed = true;
+                        }
+                    },
                     .alloca => {
                         if (!exempt_values.contains(result)) {
                             try exemptValuesPut(exempt_values, result);
