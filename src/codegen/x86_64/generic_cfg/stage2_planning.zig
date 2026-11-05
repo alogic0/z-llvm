@@ -426,6 +426,8 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
 
     var preservation_barrier_positions: std.ArrayList(usize) = .empty;
     defer preservation_barrier_positions.deinit(allocator);
+    var call_preparation_positions: std.ArrayList(usize) = .empty;
+    defer call_preparation_positions.deinit(allocator);
     var store_positions: std.ArrayList(usize) = .empty;
     defer store_positions.deinit(allocator);
     var loaded_values = NameSet.init(allocator);
@@ -454,6 +456,9 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
             }
             if (instruction.kind == .call and callRequiresPreservationFrame(instruction.kind.call)) {
                 try preservation_barrier_positions.append(allocator, position);
+                const callee = instruction.kind.call.callee;
+                if (!std.mem.startsWith(u8, callee, "llvm.") and !std.mem.eql(u8, callee, "zig.target.intByteSize"))
+                    try call_preparation_positions.append(allocator, position);
             }
             // Dynamic array strides use a scaled-address action with fixed
             // scratch destinations. Values live across it can need spilling
@@ -536,6 +541,7 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
     var forward_it = forward_values.iterator();
     while (forward_it.next()) |entry| try plan.forward_values.put(entry.key_ptr.*, entry.value_ptr.*);
     try recordPreservationDemands(&plan, intervals.items, preservation_barrier_positions.items);
+    try recordCallPreparationDemands(&plan, intervals.items, call_preparation_positions.items);
     // Loads can remain in RAX until their next use. Scalar stores also use RAX,
     // so a loaded snapshot that survives a store needs a preservation slot even
     // below peak register pressure. Assigned arithmetic registers do not.
@@ -628,6 +634,22 @@ fn recordPreservationDemands(plan: *SelectorAllocationPlan, intervals: []const S
         var live_slots: usize = 0;
         for (intervals) |interval| {
             if (interval.start >= position or interval.end <= position) continue;
+            live_slots += selectorSpillSlotCount(interval);
+            try plan.preservation_values.put(interval.name, {});
+        }
+        plan.preservation_spill_slots = @max(plan.preservation_spill_slots, live_slots);
+    }
+}
+
+fn recordCallPreparationDemands(plan: *SelectorAllocationPlan, intervals: []const SelectorValueInterval, positions: []const usize) !void {
+    for (positions) |position| {
+        var live_slots: usize = 0;
+        for (intervals) |interval| {
+            if (interval.start >= position or interval.end < position) continue;
+            // Instruction results can remain in the accumulator through their
+            // final argument use. Call preparation saves them before placing
+            // arguments. Entry parameters already have fixed register homes.
+            if (interval.end == position and interval.start == 0) continue;
             live_slots += selectorSpillSlotCount(interval);
             try plan.preservation_values.put(interval.name, {});
         }

@@ -7,6 +7,7 @@ const stage2_planning = @import("generic_cfg/stage2_planning.zig");
 const composed_selector = @import("generic_cfg/composed_selector.zig");
 const address_dependencies = @import("generic_cfg/composed_selector_address_dependencies.zig");
 const abi_legalization = @import("generic_cfg/abi_legalization.zig");
+const narrow_abi = @import("generic_cfg/narrow_abi.zig");
 const word_pair_memory = @import("generic_cfg/word_pair_memory.zig");
 const padded_frame = @import("generic_cfg/padded_frame.zig");
 const global_memory = @import("generic_cfg/global_memory.zig");
@@ -47,6 +48,9 @@ pub fn tryLowerWithContext(
     }
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
+    if (try narrow_abi.legalize(arena.allocator(), function)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
     if (try abi_legalization.integerPair(arena.allocator(), function)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
