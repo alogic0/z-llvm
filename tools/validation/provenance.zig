@@ -29,12 +29,12 @@ pub fn tools(c: *u.Context) !u.Value {
     var result = u.object(c.a);
     try u.put(c.a, &result, "binary_sha256", u.s(try c.digest("/proc/self/exe")));
     try u.put(c.a, &result, "source_sha256", try toolSources(c));
-    try u.put(c.a, &result, "process_provider_revision", u.s("800c6ea9739cdf98405471df0120f1c9ad6ae1e0"));
-    try u.put(c.a, &result, "test_support_provider_revision", u.s("e23cb642765677807c2e80f613fb873f9780554a"));
+    try u.put(c.a, &result, "process_provider_revision", u.s("e9fcfccecc84f44a362b12de1bee78258b1e811f"));
+    try u.put(c.a, &result, "test_support_provider_revision", u.s("f0f54d4e8cb649af7673ca498f259b6b2f9aa25e"));
     return result;
 }
 pub fn verifyTools(c: *u.Context, before: u.Value) !void {
-    if (!try u.equal(c.a, before, try tools(c))) return error.ValidationToolsChanged;
+    if (!u.json.eql(before, try tools(c))) return error.ValidationToolsChanged;
 }
 pub fn snapshot(c: *u.Context) !u.Value {
     var result = u.object(c.a);

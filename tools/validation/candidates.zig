@@ -114,7 +114,7 @@ pub fn validateAuthority(c: *u.Context, manifest: u.Value, authority: u.Value, p
     if (!u.json.is(try u.get(manifest, "schema"), facts.manifest_schema) or !u.json.is(try u.get(manifest, "source_pin"), pin) or !u.json.is(try u.get(manifest, "target"), facts.target) or !u.json.is(try u.get(manifest, "releasefast_inventory_sha256"), inventory_hash)) return c.fail("candidate fact manifest identity mismatch", .{});
     try u.json.exact(try u.get(manifest, "inputs"), &u.modes);
     if (!u.json.is(try u.get(manifest, "historical_audit_sha256"), authority_hash) or !u.json.is(try u.get(authority, "source_pin"), pin)) return error.FrozenAuditMismatch;
-    for ([_][]const u8{ "candidate_sha256", "rows", "selected_rows" }) |key| if (!try u.equal(c.a, try u.get(manifest, key), try u.get(authority, key))) return error.FrozenAuditMismatch;
+    for ([_][]const u8{ "candidate_sha256", "rows", "selected_rows" }) |key| if (!u.json.eql(try u.get(manifest, key), try u.get(authority, key))) return error.FrozenAuditMismatch;
     if (try u.json.integer(try u.get(manifest, "rejected_count")) != try facts.rejectionCount(authority)) return error.FrozenAuditMismatch;
 }
 pub fn checkSelected(c: *u.Context, rows: []const Row) !void {
@@ -177,7 +177,7 @@ pub fn build(c: *u.Context, args: u.Args) !void {
             if (!u.json.is(try u.get(try u.get(try u.get(authority.?, "inputs"), mode), "sha256"), parent)) return error.RawParentMismatch;
             const path = try u.str(entry, "path");
             modes[i] = try facts.load(c, try c.join(&.{path}), mode, pin, try u.str(entry, "sha256"), parent);
-            if (try u.json.integer(try u.get(entry, "unambiguous_functions")) != modes[i].functions.count() or !try u.equal(c.a, try u.get(entry, "ambiguous_symbols_excluded"), try u.strings(c.a, modes[i].duplicates))) return error.ManifestPopulationMismatch;
+            if (try u.json.integer(try u.get(entry, "unambiguous_functions")) != modes[i].functions.count() or !u.json.eql(try u.get(entry, "ambiguous_symbols_excluded"), try u.strings(c.a, modes[i].duplicates))) return error.ManifestPopulationMismatch;
             for ([_][]const u8{ "path", "sha256", "descriptor_sha256" }) |field| try u.put(c.a, &input, field, try u.get(entry, field));
             try u.put(c.a, &input, "format", u.s(facts.schema));
         } else {
@@ -199,7 +199,7 @@ pub fn build(c: *u.Context, args: u.Args) !void {
     const rendered = try render(c.a, selection.rows);
     const digest = try u.digestBytes(c.a, rendered);
     if (manifest) |value| {
-        if (!try u.equal(c.a, selected_facts, try u.get(authority.?, "selected")) or selection.rejected.len != try facts.rejectionCount(authority.?) or !u.json.is(try u.get(value, "rejected_names_sha256"), try facts.rejectionDigest(c.a, selection.rejected))) return error.FrozenAuditDecisionChanged;
+        if (!u.json.eql(selected_facts, try u.get(authority.?, "selected")) or selection.rejected.len != try facts.rejectionCount(authority.?) or !u.json.is(try u.get(value, "rejected_names_sha256"), try facts.rejectionDigest(c.a, selection.rejected))) return error.FrozenAuditDecisionChanged;
         if (!u.json.is(try u.get(value, "candidate_sha256"), digest)) return error.FrozenCandidateTableChanged;
     }
     const old = try tsv.parse(c.a, try c.read(try c.join(&.{args.get("previous") orelse "docs/evidence/real_candidates_release_v2.tsv"})));

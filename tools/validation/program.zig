@@ -226,7 +226,7 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     if (!std.mem.eql(u8, fields.get("zllvm_passes") orelse "", try u.pipeline(mode))) return c.fail("local hook marker does not identify the accepted mode pipeline", .{});
     const hook = try c.join(&.{ capture_dir, "local.o" });
     const hook_contract = try elf.parse(c.a, try c.read(hook));
-    if (!try u.equal(c.a, hook_contract, try elf.parse(c.a, try c.read(candidate)))) return c.fail("linked candidate changed hook sections, symbols or relocations", .{});
+    if (!u.json.eql(hook_contract, try elf.parse(c.a, try c.read(candidate)))) return c.fail("linked candidate changed hook sections, symbols or relocations", .{});
     try c.writeJson(try c.join(&.{ directory, "object-contract.json" }), hook_contract);
     try u.put(c.a, row, "hook_object_sha256", u.s(try c.digest(hook)));
     try u.put(c.a, row, "failure_stage", u.s("selection-owner-manifest"));

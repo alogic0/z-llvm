@@ -13,11 +13,9 @@ pub const Runner = struct {
     pub const Options = struct {
         timeout_ms: u32 = 120_000,
         stdout_file: ?[]const u8 = null,
-        /// Benchmarks block on the borrowed pidfd; no millisecond polling quantization.
-        blocking: bool = false,
         group: u.process.Group = .owned,
     };
-    pub const Result = struct { code: i64, wall_ns: i128 };
+    pub const Result = struct { code: i64, wall_ns: u64 };
 
     pub fn run(r: *Runner, argv: []const []const u8, stem: []const u8, env: *const std.process.Environ.Map, options: Options) !Result {
         const c = r.context;
@@ -27,13 +25,8 @@ pub const Runner = struct {
         defer out.close(c.io);
         const err = try c.createLog(err_path, false);
         defer err.close(c.io);
-        const start = std.Io.Clock.awake.now(c.io);
-        var outcome: []const u8 = "completed";
-        var failure: ?[]const u8 = null;
-        var actual_term: ?std.process.Child.Term = null;
-        var cleanup_failure: ?[]const u8 = null;
-        const code: i64 = blk: {
-            var child = u.process.Child.spawn(c.gpa, c.io, .{
+        const report = try u.file_command.run(c.gpa, c.io, .{
+            .spawn = .{
                 .argv = argv,
                 .cwd = .{ .path = c.root },
                 .environ_map = env,
@@ -42,56 +35,45 @@ pub const Runner = struct {
                 .stderr = .{ .file = err },
                 .cancellation = u.cancellation(),
                 .group = options.group,
-            }) catch |e| {
-                outcome = "launch_failed";
-                failure = @errorName(e);
-                try err.writeStreamingAll(c.io, failure.?);
-                break :blk 127;
-            };
-            defer child.deinit();
-            actual_term = wait(&child, c, options) catch |e| {
-                outcome = if (e == error.Timeout) "timed_out" else if (e == error.Canceled) "canceled" else "supervision_failed";
-                failure = @errorName(e);
-                actual_term = child.stop(if (e == error.Canceled) 1000 else 0) catch |cleanup| failed: {
-                    cleanup_failure = @errorName(cleanup);
-                    break :failed null;
-                };
-                break :blk if (e == error.Timeout) 124 else if (e == error.Canceled) u.cancellationCode() else 125;
-            };
-            break :blk u.returnCode(actual_term.?);
+            },
+            .timeout_ms = options.timeout_ms,
+            .cancel_grace_ms = 1000,
+        });
+        var outcome: []const u8 = "completed";
+        var failure: ?[]const u8 = null;
+        const code: i64 = switch (report.outcome) {
+            .completed => u.returnCode(report.term.?),
+            .timed_out => blk: {
+                outcome = "timed_out";
+                failure = "Timeout";
+                break :blk 124;
+            },
+            .canceled => blk: {
+                outcome = "canceled";
+                failure = "Canceled";
+                break :blk u.cancellationCode();
+            },
+            .failed => |failed| blk: {
+                outcome = if (failed.phase == .launch) "launch_failed" else "supervision_failed";
+                failure = @errorName(failed.cause);
+                if (failed.phase == .launch) try err.writeStreamingAll(c.io, failure.?);
+                break :blk if (failed.phase == .launch) 127 else 125;
+            },
+            .output_limit => unreachable, // File commands never capture output.
         };
-        const elapsed = std.Io.Clock.awake.now(c.io).nanoseconds - start.nanoseconds;
         var record = u.object(c.a);
         try u.put(c.a, &record, "argv", try u.strings(c.a, argv));
         try u.put(c.a, &record, "returncode", u.n(code));
-        try u.put(c.a, &record, "wall_ns", u.n(elapsed));
+        try u.put(c.a, &record, "wall_ns", u.n(report.wall_ns));
         try u.put(c.a, &record, "stdout", u.s(out_path));
         try u.put(c.a, &record, "stderr", u.s(err_path));
         try u.put(c.a, &record, "outcome", u.s(outcome));
         if (failure) |name| try u.put(c.a, &record, "failure", u.s(name));
-        if (cleanup_failure) |name| try u.put(c.a, &record, "cleanup_failure", u.s(name));
-        if (actual_term) |term| try u.put(c.a, &record, "actual_returncode", u.n(u.returnCode(term)));
+        if (report.cleanup_failure) |cleanup| try u.put(c.a, &record, "cleanup_failure", u.s(@errorName(cleanup)));
+        if (report.term) |term| try u.put(c.a, &record, "actual_returncode", u.n(u.returnCode(term)));
         try u.add(&r.commands, record);
         try c.writeJson(try c.join(&.{ r.output, "commands.json" }), r.commands);
-        return .{ .code = code, .wall_ns = elapsed };
-    }
-
-    fn wait(child: *u.process.Child, c: *u.Context, options: Options) !std.process.Child.Term {
-        if (!options.blocking) return child.waitUntil(std.Io.Clock.awake.now(c.io).addDuration(.fromMilliseconds(options.timeout_ms)), u.cancellation());
-        // Observe readiness only. The provider exclusively owns reaping and group cleanup.
-        var fds = [_]std.os.linux.pollfd{.{ .fd = child.pollHandle() orelse return error.MissingPollHandle, .events = std.os.linux.POLL.IN, .revents = 0 }};
-        while (true) {
-            if (u.cancellation().isRequested()) return error.Canceled;
-            switch (std.os.linux.errno(std.os.linux.poll(&fds, fds.len, -1))) {
-                .SUCCESS => {
-                    if (fds[0].revents & (std.os.linux.POLL.ERR | std.os.linux.POLL.NVAL) != 0) return error.ProcessPollFailed;
-                    break;
-                },
-                .INTR => continue,
-                else => return error.ProcessPollFailed,
-            }
-        }
-        return child.finish();
+        return .{ .code = code, .wall_ns = report.wall_ns };
     }
 
     pub fn require(r: *Runner, argv: []const []const u8, stem: []const u8, env: *const std.process.Environ.Map) !void {

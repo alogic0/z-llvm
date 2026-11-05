@@ -3,6 +3,7 @@ const std = @import("std");
 pub const process = @import("../vendor/process/src/root.zig");
 pub const json = @import("../vendor/test_support/src/json.zig");
 pub const files = @import("../vendor/test_support/src/files.zig");
+pub const file_command = @import("../vendor/test_support/src/file_command.zig").WithProcess(process);
 pub const Value = std.json.Value;
 pub const modes = [_][]const u8{ "ReleaseFast", "ReleaseSafe", "ReleaseSmall" };
 var canceled: process.Cancellation = .{};
@@ -76,14 +77,7 @@ pub const Context = struct {
     /// Linux log descriptors append even when a child uses positional stdout/stderr
     /// writers. Independent writers must not overwrite earlier diagnostics.
     pub fn createLog(c: Context, path: []const u8, exclusive: bool) !std.Io.File {
-        const file = try std.Io.Dir.cwd().createFile(c.io, path, .{ .exclusive = exclusive });
-        errdefer file.close(c.io);
-        const linux = std.os.linux;
-        const flags = linux.fcntl(file.handle, linux.F.GETFL, 0);
-        if (linux.errno(flags) != .SUCCESS) return error.LogFlagsUnavailable;
-        const append = flags | @as(u32, @bitCast(linux.O{ .APPEND = true }));
-        if (linux.errno(linux.fcntl(file.handle, linux.F.SETFL, append)) != .SUCCESS) return error.LogAppendUnavailable;
-        return file;
+        return files.createLog(c.io, .{ .path = path, .exclusive = exclusive });
     }
 
     pub fn mkdir(c: Context, path: []const u8) !void {
@@ -104,33 +98,11 @@ pub const Context = struct {
     }
 
     pub fn digest(c: Context, path: []const u8) ![]const u8 {
-        const file = try std.Io.Dir.cwd().openFile(c.io, path, .{});
-        defer file.close(c.io);
-        var buffer: [65536]u8 = undefined;
-        var reader = file.readerStreaming(c.io, &buffer);
-        var hash = std.crypto.hash.sha2.Sha256.init(.{});
-        while (true) {
-            const bytes = reader.interface.peekGreedy(1) catch |err| switch (err) {
-                error.EndOfStream => break,
-                else => return err,
-            };
-            hash.update(bytes);
-            reader.interface.toss(bytes.len);
-        }
-        return c.a.dupe(u8, &std.fmt.bytesToHex(hash.finalResult(), .lower));
+        return c.a.dupe(u8, &std.fmt.bytesToHex(try files.sha256(c.io, path), .lower));
     }
 
     pub fn writeJson(c: Context, path: []const u8, value: anytype) !void {
-        const bytes = try std.json.Stringify.valueAlloc(c.gpa, value, .{ .whitespace = .indent_2 });
-        defer c.gpa.free(bytes);
-        const temporary = try c.fmt("{s}.tmp.{d}", .{ path, std.os.linux.getpid() });
-        {
-            const file = try std.Io.Dir.cwd().createFile(c.io, temporary, .{});
-            defer file.close(c.io);
-            try file.writeStreamingAll(c.io, bytes);
-            try file.writeStreamingAll(c.io, "\n");
-        }
-        try std.Io.Dir.renameAbsolute(temporary, path, c.io);
+        try json.writeAtomic(c.gpa, c.io, .{ .path = path, .replace = true }, value);
     }
 
     pub fn print(c: Context, comptime format: []const u8, args: anytype) !void {
@@ -223,9 +195,7 @@ pub fn get(value: Value, key: []const u8) !Value {
     return json.field(value, key);
 }
 pub fn str(value: Value, key: []const u8) ![]const u8 {
-    const item = try json.field(value, key);
-    if (item != .string) return error.ExpectedString;
-    return item.string;
+    return json.textField(value, key);
 }
 pub fn strings(a: std.mem.Allocator, values: []const []const u8) !Value {
     var result = array(a);
@@ -236,8 +206,7 @@ pub fn stringSlice(a: std.mem.Allocator, value: Value) ![]const []const u8 {
     const items = try json.array(value);
     const out = try a.alloc([]const u8, items.len);
     for (items, out) |item, *dest| {
-        if (item != .string) return error.ExpectedString;
-        dest.* = item.string;
+        dest.* = try json.text(item);
     }
     return out;
 }
@@ -297,33 +266,7 @@ pub fn contains(values: []const []const u8, value: []const u8) bool {
     return false;
 }
 
-pub fn canonical(a: std.mem.Allocator, value: Value) ![]const u8 {
-    return std.json.Stringify.valueAlloc(a, try ordered(a, value), .{ .escape_unicode = true });
-}
-fn ordered(a: std.mem.Allocator, value: Value) error{OutOfMemory}!Value {
-    return switch (value) {
-        .object => |map| blk: {
-            const keys = try a.dupe([]const u8, map.keys());
-            std.mem.sort([]const u8, keys, {}, struct {
-                fn less(_: void, lhs: []const u8, rhs: []const u8) bool {
-                    return std.mem.lessThan(u8, lhs, rhs);
-                }
-            }.less);
-            var result = object(a);
-            for (keys) |key| try put(a, &result, key, try ordered(a, map.get(key).?));
-            break :blk result;
-        },
-        .array => |items| blk: {
-            var result = array(a);
-            for (items.items) |item| try add(&result, try ordered(a, item));
-            break :blk result;
-        },
-        else => value,
-    };
-}
-pub fn equal(a: std.mem.Allocator, lhs: Value, rhs: Value) !bool {
-    return std.mem.eql(u8, try canonical(a, lhs), try canonical(a, rhs));
-}
+pub const canonical = json.canonicalAlloc;
 pub fn big(a: std.mem.Allocator, number: u64) !Value {
     return if (number <= std.math.maxInt(i64)) n(number) else .{ .number_string = try std.fmt.allocPrint(a, "{d}", .{number}) };
 }

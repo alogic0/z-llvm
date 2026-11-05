@@ -137,7 +137,7 @@ fn moduleObject(c: *u.Context, path: []const u8) !void {
     for ([_][2][]const u8{ .{ "module_entry", "module_entry_impl" }, .{ "module_callback_alias", "module_callback" }, .{ "module_callback_first", "debug.module_callback_impl" } }) |pair| {
         const lhs = symbols.get(pair[0]).?;
         const rhs = symbols.get(pair[1]).?;
-        for (3..6) |i| if (!try u.equal(c.a, lhs[i], rhs[i])) return error.ModuleDependencyAliasDiffers;
+        for (3..6) |i| if (!u.json.eql(lhs[i], rhs[i])) return error.ModuleDependencyAliasDiffers;
     }
     for ([_][]const u8{ "module_callback_alias", "module_get_slot" }) |name| if (symbols.get(name).?[2].integer != 2) return error.ModuleDependencyVisibilityDiffers;
     const stem = path[0 .. path.len - std.fs.path.extension(path).len];

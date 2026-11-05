@@ -47,7 +47,7 @@ pub fn freeze(c: *u.Context, args: u.Args) !void {
         const path = try c.join(&.{try u.str(parent, "path")});
         const before = try std.Io.Dir.cwd().statFile(c.io, path, .{});
         const raw = try facts.scan(c, path, mode, pin);
-        if (!u.json.is(try u.get(parent, "sha256"), raw.descriptor_sha256) or try u.json.integer(try u.get(parent, "unambiguous_functions")) != raw.functions.count() or !try u.equal(c.a, try u.get(parent, "ambiguous_symbols_excluded"), try u.strings(c.a, raw.duplicates))) return error.HistoricalRawFactsChanged;
+        if (!u.json.is(try u.get(parent, "sha256"), raw.descriptor_sha256) or try u.json.integer(try u.get(parent, "unambiguous_functions")) != raw.functions.count() or !u.json.eql(try u.get(parent, "ambiguous_symbols_excluded"), try u.strings(c.a, raw.duplicates))) return error.HistoricalRawFactsChanged;
         const after = try std.Io.Dir.cwd().statFile(c.io, path, .{});
         if (before.inode != after.inode or before.size != after.size or before.mtime.nanoseconds != after.mtime.nanoseconds) return error.DescriptorChangedDuringScan;
         const fact_path = try c.join(&.{ output, try c.fmt("{s}.facts.json", .{mode}) });
@@ -57,7 +57,7 @@ pub fn freeze(c: *u.Context, args: u.Args) !void {
         var iterator = raw.functions.iterator();
         while (iterator.next()) |item| {
             const reloaded = compact.functions.get(item.key_ptr.*) orelse return error.FactRoundtripMismatch;
-            if (!try u.equal(c.a, try item.value_ptr.value(c.a), try reloaded.value(c.a))) return error.FactRoundtripMismatch;
+            if (!u.json.eql(try item.value_ptr.value(c.a), try reloaded.value(c.a))) return error.FactRoundtripMismatch;
         }
         raw_modes[i] = raw;
         compact_modes[i] = compact;
@@ -104,7 +104,7 @@ pub fn freeze(c: *u.Context, args: u.Args) !void {
     const compact_selection = try candidates.derive(c.a, compact_modes, classes);
     const rendered = try candidates.render(c.a, compact_selection.rows);
     if (!std.mem.eql(u8, rendered, try candidates.render(c.a, raw_selection.rows)) or !std.mem.eql(u8, try facts.rejectionDigest(c.a, raw_selection.rejected), try facts.rejectionDigest(c.a, compact_selection.rejected)) or !std.mem.eql(u8, rendered, try c.read(candidate_path)) or !u.json.is(try u.get(audit, "candidate_sha256"), try u.digestBytes(c.a, rendered)) or try u.json.integer(try u.get(audit, "rows")) != compact_selection.rows.len) return error.FactReplayPopulationChanged;
-    if (!try u.equal(c.a, try candidates.selected(c.a, compact_selection.rows, compact_modes), try u.get(audit, "selected")) or compact_selection.rejected.len != try facts.rejectionCount(audit)) return error.HistoricalAuditDecisionChanged;
+    if (!u.json.eql(try candidates.selected(c.a, compact_selection.rows, compact_modes), try u.get(audit, "selected")) or compact_selection.rejected.len != try facts.rejectionCount(audit)) return error.HistoricalAuditDecisionChanged;
     try candidates.checkSelected(c, compact_selection.rows);
     try provenance.verifyTools(c, tool_provenance);
     var proof = u.object(c.a);

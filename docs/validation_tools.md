@@ -2,10 +2,10 @@
 
 The maintained Python tools were replaced by Zig 0.17.0 programs. The compiler
 and its accepted populations are unchanged. Shared process mechanics come from
-`zig-process` 0.6.0; file/JSON helpers come from `zig-test-support` 0.1.0.
-The [source ledger](../tools/vendor/README.md) records their revisions from the
-2026-11-03 inventory. Providers remain unchanged, and standalone `zig run`
-commands do not require another checkout at runtime.
+`zig-process` 0.6.1; file/JSON helpers and file-backed reports come from
+`zig-test-support` 0.2.0. The [source ledger](../tools/vendor/README.md) records
+their committed revisions and exact copied files. Standalone `zig run` commands
+do not require another checkout at runtime.
 The validated host is x86-64 Linux, matching the existing execution gates.
 
 The [migration acceptance](evidence/python_tools_migration_20261105.json) and
@@ -14,6 +14,14 @@ provider digests, output comparisons and cleanup. At `978ffaf9`, all 22 tests
 pass in Debug and ReleaseSafe and all 17 integration gates pass with Python
 blocked. The complete log matches 1,430 prior canonical records; the separate
 fresh/cache pair matches all 24 records. Compiler acceptance remains unchanged.
+
+The subsequent [shared-library adoption](evidence/shared_validation_libraries_20261105.md)
+adds atomic JSON writes, shared append-safe logs and file-backed command reports,
+streaming hashes and deterministic JSON helpers. Ordinary and benchmark commands
+now use one deadline covering launch and execution. Structural JSON comparison
+preserves object-order independence and distinguishes number representations;
+empty strings use explicit permissive extraction. Compiler and Fibonacci policy
+remain in this repository.
 
 | Former Python role | Zig entry point / build step |
 | --- | --- |
@@ -85,9 +93,11 @@ owned group so stopping the emitter also stops the backend.
 
 The benchmark keeps two warmups, nine samples, rotated route order, CPU affinity,
 independent LLVM inputs, output/ownership checks, and deterministic object hashes.
-Its clock is Zig's awake nanosecond clock and it blocks on the provider's borrowed
-pidfd before provider-owned reaping. Reports identify this as
-`zig-process-0.6.0-pidfd-v1`. Historical Python timing measurements remain valid
-records of their original procedure; cross-engine differences do not establish
-a compiler speedup. Compiler build time, links and verification remain outside
-the measured IR-to-object interval.
+Its clock is Zig's awake nanosecond clock. The shared file-command helper uses
+provider readiness waits and exact-child cleanup under a deadline, including
+launch. Reports identify this as `zig-process-0.6.1-readiness-v2`. Historical Python
+and `zig-process-0.6.0-pidfd-v1` measurements remain records of their original
+procedure; cross-engine differences do not establish a compiler speedup. Compiler
+build time, links and verification remain outside the measured IR-to-object
+interval. The adoption checks exercise timeout handling but do not rerun the
+performance matrix or claim a speedup.

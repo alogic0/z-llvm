@@ -253,7 +253,7 @@ test "runner retains binary output, exit status, signals, timeout and launch fai
     try std.testing.expectEqual(@as(i64, 7), (try runner.run(&.{ "/bin/sh", "-c", "printf 'a\\000b'; printf diagnostic >&2; exit 7" }, binary, &f.c.env, .{})).code);
     try equal("a\x00b", try f.c.read(try f.c.fmt("{s}.stdout", .{binary})));
     try equal("diagnostic", try f.c.read(try f.c.fmt("{s}.stderr", .{binary})));
-    try std.testing.expectEqual(@as(i64, -15), (try runner.run(&.{ "/bin/sh", "-c", "kill -TERM $$" }, try f.path("signal"), &f.c.env, .{ .blocking = true })).code);
+    try std.testing.expectEqual(@as(i64, -15), (try runner.run(&.{ "/bin/sh", "-c", "kill -TERM $$" }, try f.path("signal"), &f.c.env, .{})).code);
     try std.testing.expectEqual(@as(i64, 124), (try runner.run(&.{ "/bin/sh", "-c", "sleep 30" }, try f.path("timeout"), &f.c.env, .{ .timeout_ms = 20 })).code);
     try equal("timed_out", try u.str(runner.commands.array.items[2], "outcome"));
     try std.testing.expectEqual(@as(i64, 127), (try runner.run(&.{try f.path("absent-command")}, try f.path("missing"), &f.c.env, .{})).code);
@@ -261,6 +261,20 @@ test "runner retains binary output, exit status, signals, timeout and launch fai
     try std.testing.expectEqual(@as(usize, 4), persisted.array.items.len);
     try equal("launch_failed", try u.str(persisted.array.items[3], "outcome"));
 }
+test "measurement runner keeps its deadline when stdout uses an explicit output file" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    var runner = Runner.init(&f.c, f.directory);
+    const output = try f.path("measurement.out");
+    const result = try runner.run(&.{ "/bin/sh", "-c", "exec sleep 30" }, try f.path("measurement"), &f.c.env, .{ .stdout_file = output, .timeout_ms = 100 });
+    try std.testing.expectEqual(@as(i64, 124), result.code);
+    const persisted = try f.c.load(try f.path("commands.json"));
+    try equal("timed_out", try u.str(persisted.array.items[0], "outcome"));
+    try equal(output, try u.str(persisted.array.items[0], "stdout"));
+    try expect((try u.json.integer(try u.get(persisted.array.items[0], "actual_returncode"))) < 0);
+}
+
 test "observations reject wrong output, nonzero status and stderr" {
     var f: Fixture = undefined;
     try f.init();
@@ -276,12 +290,20 @@ test "owned group cleans descendants after leader exits" {
     var runner = Runner.init(&f.c, f.directory);
     _ = try runner.run(&.{ "/bin/sh", "-c", "sleep 30 & printf '%s\\n' \"$!\"" }, try f.path("descendant"), &f.c.env, .{});
     const pid = u.trim(try f.c.read(try f.path("descendant.stdout")));
-    const state = f.c.read(try f.c.fmt("/proc/{s}/stat", .{pid})) catch |err| switch (err) {
-        error.FileNotFound => return,
-        else => return err,
-    };
-    const end = std.mem.lastIndexOfScalar(u8, state, ')') orelse return error.InvalidProcStat;
-    try expect(state[end + 2] == 'Z' or state[end + 2] == 'X');
+    const status_path = try f.c.fmt("/proc/{s}/stat", .{pid});
+    const deadline = std.Io.Clock.awake.now(io).addDuration(.fromSeconds(2));
+    // The provider joins its leader and kills the group. Grandchildren still
+    // need a kernel scheduling turn to observe SIGKILL; they are not our waitpid children.
+    while (true) {
+        const state = f.c.read(status_path) catch |err| switch (err) {
+            error.FileNotFound => return,
+            else => return err,
+        };
+        const end = std.mem.lastIndexOfScalar(u8, state, ')') orelse return error.InvalidProcStat;
+        if (state[end + 2] == 'Z' or state[end + 2] == 'X') return;
+        if (std.Io.Clock.awake.now(io).nanoseconds >= deadline.nanoseconds) return error.DescendantSurvivedGroupCleanup;
+        try io.sleep(.fromMilliseconds(1), .awake);
+    }
 }
 test "ELF repacking preserves contract while code and symbol mutations differ" {
     var f: Fixture = undefined;
@@ -294,7 +316,7 @@ test "ELF repacking preserves contract while code and symbol mutations differ" {
     _ = try f.c.capture(&.{ "ld", "-r", original, "-o", repacked });
     const bytes = try f.c.read(original);
     const contract = try elf.parse(f.c.a, bytes);
-    try expect(try u.equal(f.c.a, contract, try elf.parse(f.c.a, try f.c.read(repacked))));
+    try expect(u.json.eql(contract, try elf.parse(f.c.a, try f.c.read(repacked))));
     try expect((try u.get(contract, "relocations")).array.items.len > 0);
     const changed = try f.c.a.dupe(u8, bytes);
     const table = std.mem.readInt(u64, changed[40..48], .little);
@@ -306,8 +328,8 @@ test "ELF repacking preserves contract while code and symbol mutations differ" {
             break;
         }
     }
-    try expect(!try u.equal(f.c.a, contract, try elf.parse(f.c.a, changed)));
-    try expect(!try u.equal(f.c.a, contract, try elf.parse(f.c.a, try std.mem.replaceOwned(u8, f.c.a, bytes, "external\x00", "altered!\x00"))));
+    try expect(!u.json.eql(contract, try elf.parse(f.c.a, changed)));
+    try expect(!u.json.eql(contract, try elf.parse(f.c.a, try std.mem.replaceOwned(u8, f.c.a, bytes, "external\x00", "altered!\x00"))));
 }
 fn frame(c: *u.Context, key: []const u8, bytes: []const u8) ![]const u8 {
     return c.fmt("{s}={d}\n{s}\n", .{ key, bytes.len, bytes });
@@ -357,7 +379,7 @@ test "compact facts roundtrip every field and reject tampering, duplicate keys a
     const output = try f.path("facts.json");
     const digest = try facts.write(&f.c, output, "ReleaseFast", "test", original);
     const reloaded = try facts.load(&f.c, output, "ReleaseFast", "test", digest, original.descriptor_sha256);
-    try expect(try u.equal(f.c.a, try original.functions.get("unique").?.value(f.c.a), try reloaded.functions.get("unique").?.value(f.c.a)));
+    try expect(u.json.eql(try original.functions.get("unique").?.value(f.c.a), try reloaded.functions.get("unique").?.value(f.c.a)));
     try equal("duplicate", reloaded.duplicates[0]);
     try std.testing.expectError(error.PathAlreadyExists, facts.write(&f.c, output, "ReleaseFast", "test", original));
     const bytes = try f.c.read(output);

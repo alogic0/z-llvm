@@ -29,7 +29,7 @@ pub fn stats(a: std.mem.Allocator, values: []const f64) !Stats {
     return .{ .median = mid, .min = sorted[0], .max = sorted[sorted.len - 1], .mad = median(deviations) };
 }
 fn run(r: *Runner, argv: []const []const u8, stem: []const u8, output: ?[]const u8, check: bool) !Runner.Result {
-    const result = try r.run(argv, stem, &r.context.env, .{ .stdout_file = output, .blocking = true });
+    const result = try r.run(argv, stem, &r.context.env, .{ .stdout_file = output });
     if (check and result.code != 0) return r.context.fail("command failed ({d}): {s}; see {s}.stderr", .{ result.code, argv[0], stem });
     return result;
 }
@@ -61,7 +61,7 @@ fn unsupported(c: *u.Context, frozen: u.Value, case: []const u8, route: []const 
     const diagnostic = try c.read(try c.fmt("{s}.stderr", .{stem}));
     const key = try c.fmt("{s}/{s}", .{ case, route });
     const expected = (try u.get(frozen, "unsupported")).object.get(key) orelse return c.fail("unexpected {s} failure: {s}", .{ stage, key });
-    if (!try u.equal(c.a, expected, try u.toValue(c.a, .{ .stage = stage, .returncode = result.code, .stderr = diagnostic }))) return error.UnsupportedDiagnosticChanged;
+    if (!u.json.eql(expected, try u.toValue(c.a, .{ .stage = stage, .returncode = result.code, .stderr = diagnostic }))) return error.UnsupportedDiagnosticChanged;
     try u.put(c.a, row, "status", u.s("unsupported"));
     try u.put(c.a, row, "stage", u.s(stage));
     try u.put(c.a, row, "diagnostic", u.s(diagnostic));
@@ -142,8 +142,8 @@ fn measure(c: *u.Context, args: u.Args, invocation: []const []const u8) !void {
         .target = "x86_64-unknown-linux-gnu",
         .harness = "ReleaseFast x86_64-linux-gnu baseline CPU, no LTO",
         .cache = "warm OS page cache; no cache flush; fresh compiler processes; no compiler result cache",
-        .timing = "Zig awake nanosecond clock; blocking pidfd observation with zig-process-owned reap; IR-to-object excludes build/link/verify/hash; runtime includes process startup and driver",
-        .measurement_engine = "zig-process-0.6.0-pidfd-v1",
+        .timing = "Zig awake nanosecond clock; zig-process readiness waits and owned reap under one launch/execution deadline; IR-to-object excludes build/link/verify/hash; runtime includes process startup and driver",
+        .measurement_engine = "zig-process-0.6.1-readiness-v2",
         .cross_engine_speedup_claim = false,
     });
     try c.writeJson(try c.join(&.{ output, "metadata.json" }), metadata);
@@ -297,7 +297,7 @@ fn measure(c: *u.Context, args: u.Args, invocation: []const []const u8) !void {
         }
         try c.writeJson(results_path, .{ .schema = 1, .complete = false, .rows = rows });
     }
-    if (!try u.equal(c.a, source_state, try provenance.files(c, &.{ "src", "build.zig", ".zigversion" }))) return error.SourceChangedDuringMeasurement;
+    if (!u.json.eql(source_state, try provenance.files(c, &.{ "src", "build.zig", ".zigversion" }))) return error.SourceChangedDuringMeasurement;
     try checkHashes(c, try u.get(frozen, "inputs_sha256"));
     try provenance.verifyTools(c, procedure);
     if (!std.mem.eql(u8, manifest_hash, try c.digest(manifest_path))) return error.MeasurementProcedureChanged;
