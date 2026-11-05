@@ -174,6 +174,11 @@ pub fn executeAccumulatorScalarCast(
     action: *const Types.AccumulatorScalarCastAction,
 ) !void {
     _ = initial_source_view;
+    const source_loc = transaction.prepared_views[source_index].canonical_source_loc;
+    // A truncation may bind EAX as an alias of a full-width RAX producer.
+    // Reusing that location does not perform the 32-bit write that zext needs.
+    const normalize_eax = action.op == .zext and action.from_bits == 32 and
+        (source_loc == .eax or source_loc == .rax);
     try validateAccumulatorScalarCastAction(action);
     const session = if (transaction.accumulator_session) |*session|
         session
@@ -186,7 +191,7 @@ pub fn executeAccumulatorScalarCast(
         .preserve
     else if (action.from_bits == 52)
         if (action.to_bits == 32 or action.to_bits == 64) .preserve else .clobber
-    else if (action.from_bits < 32 or action.from_bits > 32)
+    else if (action.from_bits < 32 or action.from_bits > 32 or normalize_eax)
         .clobber
     else
         .preserve;
@@ -231,6 +236,9 @@ pub fn executeAccumulatorScalarCast(
             .{ .binary_arg_rax = .{ .op = .@"and", .reg = .rcx } },
             .write,
         );
+        try failScalarCastForTest(Authority, transaction, .after_mask);
+    } else if (normalize_eax) {
+        try selector_state.emitEflagsInstruction(transaction.selector, .{ .and_eax_imm32 = -1 }, .write);
         try failScalarCastForTest(Authority, transaction, .after_mask);
     } else if (action.from_bits < 32 or (action.from_bits == 52 and action.to_bits == 6)) {
         const shift: u5 = @intCast(if (action.from_bits == 52) action.to_bits else action.from_bits);

@@ -199,7 +199,7 @@ test "value-use scalar cast displacement table is explicit and byte exact" {
             .exact_ei = false,
             .source_loc = .eax,
             .displacement = .source_dependent_reuse,
-            .expected_instructions = &.{},
+            .expected_instructions = &.{.{ .and_eax_imm32 = -1 }},
         },
         .{
             .id = "C52-0",

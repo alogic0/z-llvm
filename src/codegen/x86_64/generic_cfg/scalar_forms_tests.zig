@@ -491,3 +491,89 @@ test "safe comparison forms preserve pointer order and layout boundaries" {
         try std.testing.expect(try comparisons.legalize(arena.allocator(), module.functions.items[0], null) == null);
     }
 }
+
+test "checked integer pairs preserve signed and unsigned overflow at every narrow width" {
+    const ops = [_][]const u8{ "uadd", "usub", "umul", "sadd", "ssub", "smul" };
+    for (1..33) |bits| for (ops, 0..) |op, operation_index| {
+        for (0..3) |constant_side| {
+            const lhs = if (constant_side == 1) "-1" else "%a";
+            const rhs = if (constant_side == 2) "-1" else "%b";
+            const text = try std.fmt.allocPrint(std.testing.allocator, "declare {{ i{0d}, i1 }} @llvm.{1s}.with.overflow.i{0d}(i{0d}, i{0d})\n" ++
+                "define i64 @checked(i64 %input_a, i64 %input_b, ptr %out) {{\nentry:\n" ++
+                "  %a = trunc i64 %input_a to i{0d}\n  %b = trunc i64 %input_b to i{0d}\n" ++
+                "  %pair = call {{ i{0d}, i1 }} @llvm.{1s}.with.overflow.i{0d}(i{0d} {2s}, i{0d} {3s})\n" ++
+                "  %flag = extractvalue {{ i{0d}, i1 }} %pair, 1\n  %value = extractvalue {{ i{0d}, i1 }} %pair, 0\n" ++
+                "  %wide = zext i{0d} %value to i64\n  store i64 %wide, ptr %out, align 8\n" ++
+                "  %next = getelementptr i8, ptr %out, i64 8\n  %live = xor i64 %input_a, %input_b\n" ++
+                "  store i64 %live, ptr %next, align 8\n  %result = zext i1 %flag to i64\n  ret i64 %result\n}}\n", .{ bits, op, lhs, rhs });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            const code = try executable(module);
+            defer std.posix.munmap(code);
+            const run: *const fn (u64, u64, *u64) callconv(.c) u64 = @ptrCast(code.ptr);
+            const sign = @as(u64, 1) << @intCast(bits - 1);
+            const mask = 2 * sign - 1;
+            const values = [_]u64{ 0, 1, sign - 1, sign, sign + 1, mask, mask + 1, std.math.maxInt(u64) };
+            for (values) |a| for (values) |b| {
+                const x: i128 = if (constant_side == 1) mask else a & mask;
+                const y: i128 = if (constant_side == 2) mask else b & mask;
+                const signed = operation_index >= 3;
+                const sx = if (signed) (x ^ sign) - sign else x;
+                const sy = if (signed) (y ^ sign) - sign else y;
+                const mathematical: i128 = switch (operation_index % 3) {
+                    0 => sx + sy,
+                    1 => sx - sy,
+                    else => sx * sy,
+                };
+                const low: i128 = if (signed) -@as(i128, sign) else 0;
+                const high: i128 = if (signed) sign - 1 else mask;
+                const guard = 0xa5a5a5a5a5a5a5a5;
+                var output = [_]u64{ guard, 0, 0, guard };
+                const actual = run(a, b, &output[1]);
+                const expected: u64 = @intFromBool(mathematical < low or mathematical > high);
+                if (actual != expected) std.debug.print("checked {s} i{d} constants={d} a={x} b={x} value={x} flag={d} expected={d}\n", .{ op, bits, constant_side, a, b, output[1], actual, expected });
+                try std.testing.expectEqual(expected, actual);
+                try std.testing.expectEqual(@as(u64, @intCast(mathematical & mask)), output[1]);
+                try std.testing.expectEqual(a ^ b, output[2]);
+                try std.testing.expectEqual(@as(u64, guard), output[0]);
+                try std.testing.expectEqual(output[0], output[3]);
+            };
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer arena.deinit();
+            const overflow = @import("overflow_values.zig");
+            const view = (try overflow.legalize(arena.allocator(), module.functions.items[0])).?;
+            try std.testing.expect(try overflow.legalize(arena.allocator(), view) == null);
+            var private_module = module;
+            private_module.functions = try module.functions.clone(arena.allocator());
+            private_module.functions.items[0] = view;
+            try private_module.verify();
+            try std.testing.expect(module.functions.items[0].blocks.items[0].instructions.items[2].kind == .call);
+        }
+    };
+}
+
+test "checked integer pairs normalize an i32 alias of a live full accumulator" {
+    const text =
+        \\define i64 @roundtrip(i64 %input, ptr %out) {
+        \\entry:
+        \\  %full = add i64 %input, 7
+        \\  %low = trunc i64 %full to i32
+        \\  %result = zext i32 %low to i64
+        \\  store i64 %full, ptr %out, align 8
+        \\  ret i64 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const code = try executable(module);
+    defer std.posix.munmap(code);
+    const run: *const fn (u64, *u64) callconv(.c) u64 = @ptrCast(code.ptr);
+    for ([_]u64{ 0, 0xfffffff9, 0xffffffff, 0x100000000, 0x7fffffffffffffff, 0x8000000000000000, std.math.maxInt(u64) }) |input| {
+        var output: u64 = 0;
+        try std.testing.expectEqual((input +% 7) & 0xffffffff, run(input, &output));
+        try std.testing.expectEqual(input +% 7, output);
+    }
+}

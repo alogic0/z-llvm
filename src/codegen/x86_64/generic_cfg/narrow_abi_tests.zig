@@ -155,3 +155,59 @@ test "narrow ABI retains unsupported extension call convention and intrinsic bou
         try std.testing.expect((try legalization.legalize(arena.allocator(), module.functions.items[0])) == null);
     }
 }
+
+test "checked integer pairs boolean calls admit general pointers constants and stack arguments" {
+    const cases = [_]struct { signature: []const u8, args: []const u8 }{
+        .{ .signature = "ptr", .args = "ptr %p" },
+        .{ .signature = "i64", .args = "i64 -1" },
+        .{ .signature = "i64, i64, i64, i64, i64, i64, i64, i64", .args = "i64 %a, i64 %b, i64 7, i64 %a, i64 %b, i64 11, i64 %a, i64 %b" },
+    };
+    for (cases) |case| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare i1 @helper({s})\ndefine i64 @caller(ptr %p, i64 %a, i64 %b) {{\nentry:\n" ++
+            "  %flag = call i1 @helper({s})\n  %r = zext i1 %flag to i64\n  ret i64 %r\n}}\n", .{ case.signature, case.args });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const view = (try legalization.legalize(arena.allocator(), module.functions.items[0])).?;
+        try std.testing.expectEqual(@as(u16, 32), view.blocks.items[0].instructions.items[0].kind.call.ret_ty.int);
+        try std.testing.expectEqual(@as(u16, 1), module.functions.items[0].blocks.items[0].instructions.items[0].kind.call.ret_ty.int);
+        try std.testing.expect(try legalization.legalize(arena.allocator(), view) == null);
+        var output = machine.MachineFunction.init("caller", .{ .int = 64 });
+        defer output.deinit(std.testing.allocator);
+        try std.testing.expectEqual(selector.SelectionResult.selected, try selector.tryLower(std.testing.allocator, &output, module.functions.items[0]));
+        try verify.verifyFunction(output);
+    }
+}
+
+test "checked integer pairs retain the typed boolean stack-object call" {
+    const text =
+        \\declare i1 @helper(ptr)
+        \\define i64 @caller(i64 %a) {
+        \\entry:
+        \\  %slot = alloca i64, align 8
+        \\  store i64 %a, ptr %slot, align 8
+        \\  %flag = call i1 @helper(ptr %slot)
+        \\  %r = zext i1 %flag to i64
+        \\  ret i64 %r
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    try std.testing.expect(try legalization.legalize(arena.allocator(), module.functions.items[0]) == null);
+    var output = machine.MachineFunction.init("caller", .{ .int = 64 });
+    defer output.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector.SelectionResult.selected, try selector.tryLower(std.testing.allocator, &output, module.functions.items[0]));
+    try verify.verifyFunction(output);
+    var calls: usize = 0;
+    for (output.instructions.items) |inst| if (inst == .direct_call) {
+        try std.testing.expectEqual(ir.Type{ .int = 1 }, inst.direct_call.ret_ty);
+        calls += 1;
+    };
+    try std.testing.expectEqual(@as(usize, 1), calls);
+}

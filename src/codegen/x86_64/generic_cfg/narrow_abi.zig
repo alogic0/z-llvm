@@ -30,14 +30,31 @@ fn callForm(call: ir.CallInst) bool {
     return true;
 }
 
-fn callReturn(call: ir.CallInst) bool {
-    // Keep the established typed boolean-return action when it already applies.
-    return narrow(call.ret_ty) and (call.ret_ty.int != 1 or call.callee_value != null) and call.ret_attrs == null;
+fn stackObject(function: ir.Function, value: ir.Value) bool {
+    if (value != .named) return false;
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (!inst.removed and inst.kind == .alloca and inst.result != null and ir.identifiers.eql(inst.result.?, value.named)) return true;
+    };
+    return false;
 }
 
-fn needsCall(call: ir.CallInst) bool {
+fn callReturn(function: ir.Function, call: ir.CallInst) bool {
+    if (!narrow(call.ret_ty) or call.ret_attrs != null) return false;
+    if (call.ret_ty.int != 1 or call.callee_value != null) return true;
+    // The established typed boolean action owns up to six named scalar or
+    // stack-object arguments. Other ordinary calls use the general ABI path,
+    // then mask AL before publishing the original boolean SSA value.
+    if (call.args.items.len > 6) return true;
+    for (call.args.items) |arg| {
+        if (arg.value != .named or std.mem.startsWith(u8, arg.value.named, "@")) return true;
+        if (arg.ty == .ptr and !stackObject(function, arg.value)) return true;
+    }
+    return false;
+}
+
+fn needsCall(function: ir.Function, call: ir.CallInst) bool {
     if (!callForm(call)) return false;
-    if (callReturn(call)) return true;
+    if (callReturn(function, call)) return true;
     for (call.args.items) |arg| if (narrow(arg.ty)) return true;
     return false;
 }
@@ -107,7 +124,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
     };
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed) continue;
-        if (booleanXor(inst) or (inst.kind == .call and needsCall(inst.kind.call))) needed = true;
+        if (booleanXor(inst) or (inst.kind == .call and needsCall(function, inst.kind.call))) needed = true;
     };
     if (!needed) return null;
     var result = function;
@@ -142,19 +159,19 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                 } } });
                 continue;
             }
-            if (!inst.removed and inst.kind == .call and needsCall(inst.kind.call)) {
+            if (!inst.removed and inst.kind == .call and needsCall(function, inst.kind.call)) {
                 const call = inst.kind.call;
                 copy.kind.call.args = try call.args.clone(allocator);
                 for (copy.kind.call.args.items) |*arg| if (narrow(arg.ty)) {
                     arg.value = try widen(allocator, function, &block, &serial, arg.ty, arg.value);
                     arg.ty = carrier;
                 };
-                if (callReturn(call)) {
+                if (callReturn(function, call)) {
                     copy.kind.call.ret_ty = carrier;
                     if (inst.result != null) copy.result = try temporary(allocator, function, &serial);
                 }
                 try block.instructions.append(allocator, copy);
-                if (callReturn(call) and inst.result != null)
+                if (callReturn(function, call) and inst.result != null)
                     try receive(allocator, function, &block, &serial, call.ret_ty, .{ .named = copy.result.? }, inst.result.?);
                 continue;
             }
