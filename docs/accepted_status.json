@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "cf1b30cdaefede344f95d9599b7bdf468ac7d265",
-  "accepted_tree": "7df74540ed2da89ef0159eb643d32b5b2ff21006",
+  "accepted_revision": "85f557e9e889c87431f6e95582f1fe7399d0867d",
+  "accepted_tree": "159ededed7686f319af211d576a7586e30b77f70",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 5,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "cf1b30cd",
+  "declaration_revision": "85f557e9",
   "evidence": [
+    "docs/evidence/narrow_abi_acceptance_20261105.json",
+    "docs/evidence/narrow_abi_20261105_cached.summary",
     "docs/evidence/constant_remainder_acceptance_20261104.json",
     "docs/evidence/constant_remainder_20261104_cached.summary",
     "docs/evidence/rax_load_acceptance_20261104.json",

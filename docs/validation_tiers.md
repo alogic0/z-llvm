@@ -285,6 +285,14 @@ Clobbering calls, skipped branches, live inputs and output guards are checked.
 Twelve mutation controls reject wrong masks and lost input values. Unit execution
 checks 1,955 additional observations per run. Earlier populations remain separate.
 
+The accepted [narrow ABI canary](evidence/narrow_abi_acceptance_20261105.json)
+adds thirteen functions covering narrow parameters, returns and call results,
+signed-spelled constants, last-use arguments and live caller values. Direct and
+release routes in three modes check 4,992 local observations against 2,496 LLVM
+references. The helpers dirty return padding and clobber volatile registers;
+independent values and guards detect incorrect extension and lost values.
+Eighteen mutation controls fail as expected. Earlier populations remain separate.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

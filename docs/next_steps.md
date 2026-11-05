@@ -41,7 +41,27 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [constant remainder checkpoint](evidence/constant_remainder_acceptance_20261104.json)
+The accepted [narrow ABI checkpoint](evidence/narrow_abi_acceptance_20261105.json)
+at `85f557e9` passes all 17 integration stages. Private register carriers
+normalize unannotated integer parameters, returns and ordinary calls at widths
+one through sixteen, including direct boolean branches and boolean xor. Ordinary
+call preparation now reserves storage for instruction-produced final-use arguments.
+All 1,778 units, 13 structural checks, 58 focused tests in each release mode,
+captured-object smoke and readiness pass. Thirteen native functions pass 4,992
+local observations against 2,496 LLVM references; eighteen mutation controls
+reject wrong values. Fifteen earlier populations retain their counts, as do the
+100-row/five-function cohort and bypass ratchet. Minimum free space is
+39.17 GB, above the 24.36 GB reserve.
+The canonical Fast capture emits sixteen of 34 functions and rejects eighteen,
+first at `start.expandStackSize composed-block-llvm-intrinsic`. Small has the same
+counts. Safe is a separate, larger frontier: conservative selection includes
+1,568 functions, of which 206 emit and 1,362 reject. Its LLVM reference also needs
+the real `__zig_probe_stack` runtime when linked. No complete local Fibonacci
+object or execution is claimed. The [focused evidence](evidence/narrow_abi_focused_20261105.json)
+records these mode-specific results and retained scalar limits. All thirteen
+original probes remain unchanged; no archives were made.
+
+The earlier accepted [constant remainder checkpoint](evidence/constant_remainder_acceptance_20261104.json)
 at `cf1b30cd` passes all 17 integration stages. Unsigned remainder by a
 constant power of two now uses the existing AND lowering at 8/16/32/64 bits,
 including divisor one and high-bit divisors with signed or unsigned spelling.
@@ -394,9 +414,10 @@ accepts that bounded unsigned operation. The unchanged capture now reaches
 The user authorized implementation of the complete Fibonacci plan. Continue
 through these steps without stopping for another task-selection approval:
 
-1. Resolve narrow call arguments/returns and boolean parameter handling.
-2. Resolve the main function's spill frame, remaining stack structures and
-   aggregate loads, insertion/extraction and return values.
+1. Narrow call arguments/returns, boolean parameter handling and the main
+   function's call-preservation frame are accepted at the checkpoint above.
+2. Resolve remaining stack structures and aggregate loads, insertion/extraction
+   and return values.
 3. Resolve remaining scalar and memory-intrinsic forms exposed by those steps.
 4. Support the retained indirect callbacks and their required calling conventions,
    argument placement and result handling.

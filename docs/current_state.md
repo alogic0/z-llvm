@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `cf1b30cdaefede344f95d9599b7bdf468ac7d265`; tree: `7df74540ed2da89ef0159eb643d32b5b2ff21006`.
+Accepted revision: `85f557e9e889c87431f6e95582f1fe7399d0867d`; tree: `159ededed7686f319af211d576a7586e30b77f70`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,27 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [constant remainder checkpoint](evidence/constant_remainder_acceptance_20261104.json)
+The accepted [narrow ABI checkpoint](evidence/narrow_abi_acceptance_20261105.json)
+at `85f557e9` passes all 17 integration stages. Private register carriers
+normalize unannotated integer parameters, returns and ordinary calls at widths
+one through sixteen, including direct boolean branches and boolean xor. Ordinary
+call preparation now reserves storage for instruction-produced final-use arguments.
+All 1,778 units, 13 structural checks, 58 focused tests in each release mode,
+captured-object smoke and readiness pass. Thirteen native functions pass 4,992
+local observations against 2,496 LLVM references; eighteen mutation controls
+reject wrong values. Fifteen earlier populations retain their counts, as do the
+100-row/five-function cohort and bypass ratchet. Minimum free space is
+39.17 GB, above the 24.36 GB reserve.
+The canonical Fast capture emits sixteen of 34 functions and rejects eighteen,
+first at `start.expandStackSize composed-block-llvm-intrinsic`. Small has the same
+counts. Safe is a separate, larger frontier: conservative selection includes
+1,568 functions, of which 206 emit and 1,362 reject. Its LLVM reference also needs
+the real `__zig_probe_stack` runtime when linked. No complete local Fibonacci
+object or execution is claimed. The [focused evidence](evidence/narrow_abi_focused_20261105.json)
+records these mode-specific results and retained scalar limits. All thirteen
+original probes remain unchanged; no archives were made.
+
+The earlier accepted [constant remainder checkpoint](evidence/constant_remainder_acceptance_20261104.json)
 at `cf1b30cd` passes all 17 integration stages. Unsigned remainder by a
 constant power of two now uses the existing AND lowering at 8/16/32/64 bits,
 including divisor one and high-bit divisors with signed or unsigned spelling.
@@ -244,8 +264,8 @@ history are retired without archives. The latest
 of superseded AIR after the complete fresh replacement proof, making room for
 the cached run. Both runs now pass; old metadata and hashes remain. The retired
 checkout's dependency links are removed while their target repositories remain.
-The constant remainder slice is accepted. The authorized goal is now the full
-unchanged Fibonacci program in all three release modes. Continue with narrow
-call arguments and returns, then the remaining stack/aggregate, scalar/memory
-and indirect-call forms. See [next steps](next_steps.md) for the work order and
-the whole-program acceptance condition.
+The narrow ABI slice is accepted. Continue the authorized full Fibonacci plan
+with remaining stack structures and aggregate values, then scalar/memory forms
+and indirect calls with their required argument placement. Finish the smaller
+Fast/Small execution path while retaining the larger Safe frontier and its
+runtime dependency. See [next steps](next_steps.md) for the full acceptance condition.
