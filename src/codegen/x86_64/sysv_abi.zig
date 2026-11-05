@@ -596,14 +596,14 @@ pub fn functionHasVariadicCall(function: ir.Function) bool {
     return false;
 }
 
-// Bounded C varargs: one or two fixed pointers and at most one unnamed i32
-// after C's default integer promotions. No vector arguments, so AL is zero.
-// Floating, aggregate, indirect and stack varargs remain unsupported.
+// Direct C variadic calls with ordinary pointer/i32/i64 arguments. The
+// existing scalar call owner supplies register/stack placement and AL = 0.
+// Floating, split-wide and indirect variadic calls remain separate boundaries.
 pub fn isSupportedPointerVariadicCall(call: ir.CallInst) bool {
     if (!isVariadicCall(call) or call.callee_value != null or call.inline_asm != null or
         call.raw_args != null or call.operand_bundle != null or call.ret_attrs != null or
-        call.args.items.len == 0 or call.args.items.len > 3 or
-        !call.ret_ty.eql(.{ .int = 32 })) return false;
+        call.args.items.len == 0 or call.args.items.len > 16 or
+        !(call.ret_ty == .void or call.ret_ty == .ptr or call.ret_ty.eql(.{ .int = 32 }) or call.ret_ty.eql(.{ .int = 64 }))) return false;
     if (call.calling_conv) |cc| if (!std.mem.eql(u8, cc, "ccc")) return false;
     var ty = std.mem.trim(u8, call.callee_function_ty.?, " \t");
     if (ty.len >= 2 and ty[0] == '(' and ty[ty.len - 1] == ')') ty = ty[1 .. ty.len - 1];
@@ -617,14 +617,14 @@ pub fn isSupportedPointerVariadicCall(call: ir.CallInst) bool {
             if (fields.next() != null) return false;
             break;
         }
-        if (!std.mem.eql(u8, text, "ptr")) return false;
+        if (fixed >= call.args.items.len) return false;
+        const expected: ir.Type = if (std.mem.eql(u8, text, "ptr")) .ptr else if (std.mem.eql(u8, text, "i32")) .{ .int = 32 } else if (std.mem.eql(u8, text, "i64")) .{ .int = 64 } else return false;
+        if (!call.args.items[fixed].ty.eql(expected)) return false;
         fixed += 1;
     }
-    if (!variadic or fixed < 1 or fixed > 2 or call.args.items.len < fixed or call.args.items.len > fixed + 1) return false;
-    for (call.args.items, 0..) |arg, index| {
-        if (index < fixed) {
-            if (arg.ty != .ptr) return false;
-        } else if (!arg.ty.eql(.{ .int = 32 })) return false;
+    if (!variadic or fixed == 0) return false;
+    for (call.args.items) |arg| {
+        if (!(arg.ty == .ptr or arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 }))) return false;
         rejectUnsupportedCallArgAttrs(arg) catch return false;
     }
     return true;
@@ -676,6 +676,7 @@ fn pointerCallAttrsAreAdvisory(attrs: []const u8) bool {
         if (std.mem.eql(u8, token, "noundef")) continue;
         if (std.mem.eql(u8, token, "nonnull")) continue;
         if (std.mem.eql(u8, token, "readonly")) continue;
+        if (std.mem.eql(u8, token, "noalias")) continue;
         if (!std.mem.eql(u8, token, "align")) return false;
         const alignment_text = tokens.next() orelse return false;
         const alignment = std.fmt.parseUnsigned(u64, alignment_text, 10) catch return false;
@@ -913,7 +914,7 @@ test "SysV call signature helper rejects varargs and non-default callconv" {
     try std.testing.expectError(error.UnsupportedCallConvAbi, rejectUnsupportedCallSignature(callconv_call));
 }
 
-test "SysV variadic pointer envelope admits only a fixed pointer with no unnamed arguments" {
+test "call contracts variadic signatures retain exact fixed types and calling conventions" {
     var module = try ir.Module.parse(std.testing.allocator,
         \\declare i32 @sink(ptr, ...)
         \\define i32 @caller(ptr %p) {
@@ -937,7 +938,7 @@ test "SysV variadic pointer envelope admits only a fixed pointer with no unnamed
     try std.testing.expectError(error.UnsupportedVarargsAbi, rejectUnsupportedCallSignature(call));
 }
 
-test "SysV C integer varargs require fixed pointers and a promoted i32" {
+test "call contracts C integer varargs validate fixed argument types and scalar unnamed values" {
     var module = try ir.Module.parse(std.testing.allocator,
         \\declare i32 @sink(ptr, ptr, ...)
         \\define i32 @caller(ptr %p, ptr %q, i32 %value) {
@@ -949,7 +950,7 @@ test "SysV C integer varargs require fixed pointers and a promoted i32" {
     defer module.deinit();
     var call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
     try std.testing.expect(isSupportedPointerVariadicCall(call));
-    for ([_]ir.Type{ .float, .double, .{ .int = 8 }, .{ .int = 64 }, .ptr }) |ty| {
+    for ([_]ir.Type{ .float, .double, .{ .int = 8 }, .{ .int = 128 }, .{ .aggregate = "{ i64, i64 }" } }) |ty| {
         call.args.items[2].ty = ty;
         try std.testing.expect(!isSupportedPointerVariadicCall(call));
     }
@@ -964,7 +965,7 @@ test "SysV C integer varargs require fixed pointers and a promoted i32" {
     try std.testing.expect(!isSupportedPointerVariadicCall(call));
 }
 
-test "SysV C advisory attributes preserve representation without admitting extension attributes" {
+test "call contracts advisory attributes preserve representation without admitting extension attributes" {
     var call: ir.CallInst = .{ .callee = "allocate", .ret_ty = .ptr, .ret_attrs = "noalias", .args = .empty };
     try rejectUnsupportedCallEnvelope(call);
     call.ret_ty = .{ .int = 32 };
@@ -974,6 +975,8 @@ test "SysV C advisory attributes preserve representation without admitting exten
     try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallEnvelope(call));
     try rejectUnsupportedCallArgAttrs(.{ .ty = .{ .int = 32 }, .attrs = "noundef", .value = .{ .int = 123 } });
     try rejectUnsupportedCallArgAttrs(.{ .ty = .ptr, .attrs = "noundef nonnull align 8", .value = .{ .named = "p" } });
+    try rejectUnsupportedCallArgAttrs(.{ .ty = .ptr, .attrs = "noalias nonnull readonly align 8", .value = .{ .named = "p" } });
+    try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallArgAttrs(.{ .ty = .ptr, .attrs = "noalias signext", .value = .{ .named = "p" } }));
     try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallArgAttrs(.{ .ty = .{ .int = 32 }, .attrs = "noundef zeroext", .value = .{ .int = 123 } }));
 }
 

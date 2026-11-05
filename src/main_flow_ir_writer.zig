@@ -504,6 +504,8 @@ pub fn emitCodegenModule(
         .target_datalayout = module.target_datalayout,
         .emit_all_globals = options.codegen_reachable,
         .require_resolved_aliases = options.codegen_reachable,
+        .functions = module.functions.items,
+        .declarations = module.declarations.items,
     };
     for (module.functions.items) |function| {
         const selected = if (reachable) |selection| selection.contains(.function, function.name) else shouldLowerCodegenFunction(module, function);

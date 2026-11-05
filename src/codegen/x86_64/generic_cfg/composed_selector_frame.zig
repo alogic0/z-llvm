@@ -96,6 +96,7 @@ fn stackFpBits(ty: ir.Type) ?u16 {
 // Their preservation demand is additional to virtual-register interval pressure.
 fn needsScalarPreservation(inst: ir.Instruction) bool {
     return switch (inst.kind) {
+        .call => |call| sysv_abi.isVariadicCall(call) and call.args.items.len > 3,
         .cast => |cast| cast.op == .zext and cast.from_ty == .int and cast.to_ty == .int and
             cast.from_ty.int < cast.to_ty.int and (cast.to_ty.int == 32 or cast.to_ty.int == 64),
         .binary => |binary| binary.op == .add and

@@ -10,6 +10,33 @@ pub const ReadOnlyModuleContext = struct {
     /// its globals even when only another object refers to an exported root.
     emit_all_globals: bool = false,
     require_resolved_aliases: bool = false,
+    functions: []const ir.Function = &.{},
+    declarations: []const ir.FunctionDecl = &.{},
+
+    /// Return a module-owned name only for an admitted function definition or
+    /// declaration. Unknown and weak symbols keep their separate boundaries.
+    pub fn functionAddress(context: ReadOnlyModuleContext, symbol: []const u8) ?[]const u8 {
+        const name = if (std.mem.startsWith(u8, symbol, "@")) symbol[1..] else symbol;
+        if (context.findGlobal(name) != null) return null;
+        var found: ?[]const u8 = null;
+        for (context.functions) |function| if (ir.identifiers.eql(function.name, name)) {
+            if (found != null) return null;
+            switch (function.linkage) {
+                .default, .external, .internal, .private => {},
+                else => return null,
+            }
+            found = function.name;
+        };
+        for (context.declarations) |declaration| if (ir.identifiers.eql(declaration.name, name)) {
+            if (found != null) return null;
+            switch (declaration.linkage) {
+                .default, .external => {},
+                else => return null,
+            }
+            found = declaration.name;
+        };
+        return found;
+    }
 
     pub fn findGlobal(context: ReadOnlyModuleContext, symbol: []const u8) ?ir.Global {
         const name = if (std.mem.startsWith(u8, symbol, "@")) symbol[1..] else symbol;

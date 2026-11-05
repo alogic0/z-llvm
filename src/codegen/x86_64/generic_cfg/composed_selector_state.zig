@@ -2775,7 +2775,9 @@ pub fn spillValueOrError(selector: *ComposedBlockSelector, name: []const u8) !vo
 /// later source before an earlier argument overwrites its current ABI register,
 /// even when the source's last use is this call instruction itself.
 pub fn preserveVariadicArgumentSources(selector: *ComposedBlockSelector, call: ir.CallInst) !?Diagnostic {
-    if (call.args.items.len > 3) return .{ .no_emitter = "composed-block-variadic-argument-count" };
+    // Larger scalar signatures reserve an ordinary spill frame. Use the
+    // existing simultaneous-input owner instead of assuming a spare register.
+    if (call.args.items.len > 3) return preserveCallArgumentSources(selector, call);
     for (call.args.items, 0..) |arg, index| {
         if (arg.value != .named) continue;
         const binding = selector.values.get(arg.value.named) orelse continue;
