@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `9b6bf0c854b5a57c5ecf7c6ce97493ba0bb59377`; tree: `3f80cc2c2c0dd0d80b2c0766e1de59ee189b89ea`.
+Accepted revision: `be90e9399b50d6e4ee6c9570dc5b7638fdf09b8c`; tree: `59bdb615e4bc9a23d47d5b1df1aa8655f5f5a7af`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,25 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [checked-integer and address checkpoint](evidence/fibonacci_checked_acceptance_20261105.json)
+The accepted [word arithmetic and switch checkpoint](evidence/fibonacci_flow_acceptance_20261105.json)
+at `be90e939` passes all 17 integration stages. Full-word division, remainder,
+checked products, signed checked sums, extrema and byte swaps preserve exact
+results and live inputs. Fixed-register arithmetic receives spill capacity
+without eagerly relocating all parameters. Private switch chains support wide
+conditions and large case lists; the bounded CFG envelope now admits 1,024 blocks.
+All 1,822 unit tests, 13 structural checks, captured-object smoke and readiness
+pass. Focused word and switch tests pass in all three release modes. The two
+added native populations pass 55,680 local observations against 27,840 LLVM
+references, with 66 mutation controls. All 26 native populations and the unchanged
+100-row/five-function cohort pass. Minimum free space is 33.58 GB, above
+the 24.36 GB reserve. The unchanged pinned Fibonacci program still passes all
+six assertions in Fast and Small with LLVM-equivalent exit status, stdout and
+stderr. Safe emits 1,264 of 1,568 functions; 304 failures still prevent a local
+object and whole-program execution. The [focused evidence](evidence/fibonacci_flow_focused_20261105.json)
+records the source identity and checks. All thirteen original probes remain
+unchanged; no archives were made.
+
+The earlier accepted [checked-integer and address checkpoint](evidence/fibonacci_checked_acceptance_20261105.json)
 at `9b6bf0c8` passes all 17 integration stages. Stack addresses can flow through
 pointer PHIs, selects, stores, casts and returns. Call preservation saves all
 live aliases. Signed and unsigned checked arithmetic covers widths one through
@@ -340,8 +358,8 @@ history are retired without archives. The latest
 of superseded AIR after the complete fresh replacement proof, making room for
 the cached run. Both runs now pass; old metadata and hashes remain. The retired
 checkout's dependency links are removed while their target repositories remain.
-The Fibonacci foundation, stack-address flow and checked narrow integers are
-accepted, including unchanged Fast/Small execution.
+The Fibonacci foundation, stack-address flow, checked integers, word arithmetic
+and larger switches are accepted, including unchanged Fast/Small execution.
 Continue the authorized plan through the remaining Safe code-generation forms,
 the real compiler runtime link and unchanged Safe execution. Add a permanent
 three-mode regression before final full integration acceptance. See

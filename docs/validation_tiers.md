@@ -327,6 +327,14 @@ narrow overflow, dirty upper return bits, indirect and stack arguments, and
 32-bit zero extension. These are mandatory populations in all three modes;
 the unchanged Safe Fibonacci whole-program regression remains open.
 
+The accepted [word arithmetic and switch canaries](evidence/fibonacci_flow_acceptance_20261105.json)
+add 29,568 and 26,112 local observations respectively, with half as many LLVM
+references and 66 mutation controls. They cover high-bit constant divisors,
+checked products and sums, live fixed-register operands, narrow zero extension,
+large and wide switches, duplicate PHI edges, loops, and CFGs through 1,024
+blocks. Both are mandatory populations in all three modes; Safe Fibonacci
+whole-program execution remains open.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine
