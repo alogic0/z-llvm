@@ -42,3 +42,29 @@ then runs the shared CLI. No product paths are added to the provider. Supply
 consumer-owned `--rules` JSON explicitly when enforcing architecture constraints.
 The 0.1.1 patch corrects installation documentation; the analysis source is
 byte-identical to the initial 0.1.0 adoption.
+
+## Process and validation support
+
+`process/` is a verbatim source selection from the independent `zig-process`
+0.6.0 repository at `800c6ea9739cdf98405471df0120f1c9ad6ae1e0`, copied directly
+from `~/prog/zig-process`. It includes all six public source files, the native
+test fixture, compiler pin, license and provider design/status documentation.
+`test_support/` contains the unchanged `files.zig` and `json.zig` modules and
+license from `zig-test-support` 0.1.0 at
+`e23cb642765677807c2e80f613fb873f9780554a`. Both revisions match
+`~/zig-inventory-2026-11-03/inventory.json`; no archives were created.
+
+The per-file ledgers are `process.SHA256SUMS` and `test_support.SHA256SUMS`.
+Run `zig build verify-validation-sources real-program-policy-tests`, including
+`-Doptimize=ReleaseSafe`. Provider capture-failure tests use its unmodified
+fixture through build options. Consumer tests cover process status, binary
+logs, cancellation, timeouts, descendant cleanup, ELF provenance, candidate
+admission, fact freezing and measurement statistics.
+
+These tools use the same standalone source boundary as regex. They do not
+depend on an absolute path to another checkout. Signal handlers, output
+directories, validation decisions and evidence formats belong to
+`tools/validation/`; the provider retains exclusive child and process-group
+ownership. The benchmark observes the provider's borrowed pidfd with blocking
+`poll`, then lets the provider reap and clean up. This avoids millisecond
+polling quantization without introducing a second reaper.

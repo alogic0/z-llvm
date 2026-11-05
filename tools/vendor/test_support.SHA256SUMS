@@ -1,0 +1,3 @@
+9e85321c02dc37d37eea1f6b032b7f59f0fac4bb451c670fbed33202e791c389  tools/vendor/test_support/LICENSE
+339cddcb635d91ab98c18d0c60833a656dafb37ad3673e7d8063149b1b9c2872  tools/vendor/test_support/src/files.zig
+6bfc45bb9e714211704fb4379e46572616d18bedf9a0729e0b2a3cb8d477d656  tools/vendor/test_support/src/json.zig
