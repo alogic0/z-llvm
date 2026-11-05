@@ -174,4 +174,3 @@ entry:
   %answer = xor i64 %sum, %live
   ret i64 %answer
 }
-

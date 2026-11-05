@@ -2617,4 +2617,3 @@ entry:
   %answer = xor i64 %wide, %live
   ret i64 %answer
 }
-

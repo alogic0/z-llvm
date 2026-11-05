@@ -46,4 +46,3 @@ int main(void) {
  }
  printf("constant-pair observations=%u fields=addresses=frames=live=guards=preserved\n",observations);return 0;
 }
-
