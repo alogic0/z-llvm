@@ -606,39 +606,9 @@ def main():
               "status": "failed", "programs": 1, "matched_program_modes": 0,
               "reference_case_executions": 0, "local_case_executions": 0, "integer_variadic_observations": 0,
               "heap_call_observations": 0, "native_call_observations": 0,
-              "word_pair_local_observations": 0, "word_pair_reference_observations": 0,
-              "bounded_frame_local_observations": 0, "bounded_frame_reference_observations": 0,
-              "pointer_stack_local_observations": 0, "pointer_stack_reference_observations": 0,
-              "scalar_stack_local_observations": 0, "scalar_stack_reference_observations": 0,
-              "integer_pointer_local_observations": 0, "integer_pointer_reference_observations": 0,
-              "signed_nonnegative_local_observations": 0, "signed_nonnegative_reference_observations": 0,
-              "type_layout_padding_local_observations": 0, "type_layout_padding_reference_observations": 0,
-              "global_addresses_local_observations": 0, "global_addresses_reference_observations": 0,
-              "global_memory_local_observations": 0, "global_memory_reference_observations": 0,
-              "boolean_calls_local_observations": 0, "boolean_calls_reference_observations": 0,
-              "array_stride_local_observations": 0, "array_stride_reference_observations": 0,
-              "general_array_stride_local_observations": 0, "general_array_stride_reference_observations": 0,
-              "rax_pointer_load_local_observations": 0, "rax_pointer_load_reference_observations": 0,
-              "constant_remainder_local_observations": 0, "constant_remainder_reference_observations": 0,
-              "narrow_abi_local_observations": 0, "narrow_abi_reference_observations": 0,
-              "aggregate_storage_local_observations": 0, "aggregate_storage_reference_observations": 0,
-              "scalar_forms_local_observations": 0, "scalar_forms_reference_observations": 0,
-              "indirect_stack_calls_local_observations": 0, "indirect_stack_calls_reference_observations": 0,
-              "safe_scalar_forms_local_observations": 0, "safe_scalar_forms_reference_observations": 0,
-              "pointer_flow_local_observations": 0, "pointer_flow_reference_observations": 0,
-              "address_flow_local_observations": 0, "address_flow_reference_observations": 0,
-              "call_contracts_local_observations": 0, "call_contracts_reference_observations": 0,
-              "accumulator_store_local_observations": 0, "accumulator_store_reference_observations": 0,
-              "integer_forms_local_observations": 0, "integer_forms_reference_observations": 0,
-              "scalar_atomics_local_observations": 0, "scalar_atomics_reference_observations": 0,
-              "integer_intrinsics_local_observations": 0, "integer_intrinsics_reference_observations": 0,
-              "switch_forms_local_observations": 0, "switch_forms_reference_observations": 0,
-              "word_arithmetic_local_observations": 0, "word_arithmetic_reference_observations": 0,
-              "checked_integers_local_observations": 0, "checked_integers_reference_observations": 0,
-              "stack_addresses_local_observations": 0, "stack_addresses_reference_observations": 0,
-              "bounded_storage_local_observations": 0, "bounded_storage_reference_observations": 0, "bounded_storage_guard_checks": 0,
-              "safe_comparisons_local_observations": 0, "safe_comparisons_reference_observations": 0,
-              "module_dependencies_local_observations": 0, "module_dependencies_reference_observations": 0, "rows": []}
+              "bounded_storage_guard_checks": 0, "rows": [],
+              **{f"{population}_{route}_observations": 0
+                 for population in MEMORY_CANARIES for route in ("local", "reference")}}
     try:
         if platform.system() != "Linux" or platform.machine() != "x86_64":
             raise RuntimeError("this bounded gate requires x86_64 Linux")
@@ -670,20 +640,8 @@ def main():
                        "runner_sha256": digest(Path(__file__)),
                        "fixture_sha256": {name: digest(ROOT / "test/real_programs" / name) for name in (
                            "c_compiler.json", "variadic_integer.ll", "variadic_integer_driver.c", "variadic_integer_shim.S",
-                           "word_pair_memory.ll", "word_pair_memory_driver.c",
-                           "bounded_frame.ll", "bounded_frame_driver.c",
-                           "runtime_pointer_stack.ll", "runtime_pointer_stack_driver.c",
-                           "scalar_stack_memory.ll", "scalar_stack_memory_driver.c",
-                           "integer_pointer.ll", "integer_pointer_driver.c",
-                           "signed_nonnegative.ll", "signed_nonnegative_driver.c",
-                           "type_layout_padding.ll", "type_layout_padding_driver.c",
-                           "global_addresses.ll", "global_addresses_driver.c",
-                           "global_memory.ll", "global_memory_driver.c",
-                           "boolean_calls.ll", "boolean_calls_driver.c",
-                           "array_stride.ll", "array_stride_driver.c", "module_dependencies.ll", "module_dependencies_driver.c",
-                           "general_array_stride.ll", "general_array_stride_driver.c",
-                           "rax_pointer_load.ll", "rax_pointer_load_driver.c",
-                           "constant_remainder.ll", "constant_remainder_driver.c", "narrow_abi.ll", "narrow_abi_driver.c", "aggregate_storage.ll", "aggregate_storage_driver.c", "scalar_forms.ll", "scalar_forms_driver.c", "indirect_stack_calls.ll", "indirect_stack_calls_driver.c", "safe_scalar_forms.ll", "safe_scalar_forms_driver.c", "safe_comparisons.ll", "safe_comparisons_driver.c", "bounded_storage.ll", "bounded_storage_driver.c", "stack_addresses.ll", "stack_addresses_driver.c", "checked_integers.ll", "checked_integers_driver.c", "word_arithmetic.ll", "word_arithmetic_driver.c", "switch_forms.ll", "switch_forms_driver.c", "integer_intrinsics.ll", "integer_intrinsics_driver.c", "scalar_atomics.ll", "scalar_atomics_driver.c", "pointer_flow.ll", "pointer_flow_driver.c", "address_flow.ll", "address_flow_driver.c", "call_contracts.ll", "call_contracts_driver.c", "accumulator_store.ll", "accumulator_store_driver.c", "integer_forms.ll", "integer_forms_driver.c")}})
+                           *(config["fixture"] + suffix for config in MEMORY_CANARIES.values()
+                             for suffix in (".ll", "_driver.c")))}})
         environment = {k: v for k, v in os.environ.items() if not k.startswith(("ZLLVM_", "ZIG_USE_ZLLVM"))}
         environment.update({"ZIG_LOCAL_CACHE_DIR": str(output / "frontend-cache"),
                             "ZIG_GLOBAL_CACHE_DIR": str(output / "global-cache")})
@@ -762,7 +720,9 @@ def main():
         print(f"summary integer-pointer-casts population=standalone-integer-pointer-casts routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['integer_pointer_local_observations']} reference_observations={report['integer_pointer_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary signed-nonnegative population=standalone-signed-nonnegative routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['signed_nonnegative_local_observations']} reference_observations={report['signed_nonnegative_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary type-layout-padding population=standalone-type-allocation-padding routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['type_layout_padding_local_observations']} reference_observations={report['type_layout_padding_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
-        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies", "bounded_frame", "general_array_stride", "rax_pointer_load", "constant_remainder", "narrow_abi", "aggregate_storage", "scalar_forms", "indirect_stack_calls", "safe_scalar_forms", "safe_comparisons", "bounded_storage", "stack_addresses", "checked_integers", "word_arithmetic", "switch_forms", "integer_intrinsics", "scalar_atomics", "pointer_flow", "address_flow", "call_contracts", "accumulator_store", "integer_forms", "constant_pair", "pair_arithmetic"):
+        for population in MEMORY_CANARIES:
+            if population in {"word_pair", "pointer_stack", "scalar_stack", "integer_pointer", "signed_nonnegative", "type_layout_padding"}:
+                continue
             extra = f" negative_controls={report.get('module_dependencies_negative_controls', 0)} environment_checks={report.get('module_dependencies_environment_checks', 0)}" if population == "module_dependencies" else ""
             if population == "bounded_storage":
                 extra += f" guard_checks={report['bounded_storage_guard_checks']}"
