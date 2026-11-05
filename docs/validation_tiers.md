@@ -342,6 +342,14 @@ constant operands, dirty upper bits, live fixed registers and guarded memory.
 It includes the confirmed compare-overlap wrong-code regression and is mandatory
 in all three modes. Safe Fibonacci whole-program execution remains open.
 
+The accepted [atomic, pointer, frame and call canaries](evidence/fibonacci_state_acceptance_20261105.json)
+add four separate mandatory populations: 112,908 scalar-atomic, 9,216 pointer-flow,
+14,208 address-flow and 17,664 call-contract local observations, each with half as
+many LLVM references. All three modes exercise full values, live registers,
+clobbering calls and guarded memory. Per-component mutation controls and the
+confirmed dirty-upper-bit boolean regression accompany the native evidence.
+Safe Fibonacci whole-program execution remains open.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

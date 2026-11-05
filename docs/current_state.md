@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `fb39db758855913a0f2ade1c296f03fc3c45284d`; tree: `13a1ddd06f9e99987580f23a620b1c2b8bb7c5d6`.
+Accepted revision: `4242debdacb0a3c3eee8fcf3827c783f873dc00e`; tree: `3d4d4bc4df149233b2eb207666ff9f0549b82449`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,33 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [integer-intrinsic and comparison checkpoint](evidence/fibonacci_intrinsics_acceptance_20261105.json)
+The accepted [atomic, pointer, frame and call checkpoint](evidence/fibonacci_state_acceptance_20261105.json)
+at `4242debd` passes all 17 integration stages. Scalar atomics preserve old
+values and compare-exchange success flags. Pointer and two-word values retain
+symbols and layout, and boolean branches consume the low bit even when upper
+bits are dirty. Bounded frame addresses and scaled indexes preserve byte offsets;
+CFG scheduling respects definitions. Direct C integer/pointer variadic calls
+support up to sixteen arguments through the existing register and stack paths,
+and ordinary known function addresses retain module-owned symbol names.
+All 1,847 unit tests, 13 structural checks, captured-object smoke, readiness and
+frozen executable canaries pass. The four added populations check 153,996 local
+observations against 76,998 LLVM references. Each component also rejects its
+36 mutation controls. All 31 native populations and the unchanged 100-row/five-function
+cohort pass. Minimum free space is 33.03 GB, above the 24.36 GB reserve.
+Unchanged pinned Fibonacci executes all six assertions in Fast and Small with
+LLVM-equivalent exit status, stdout and stderr. Safe emits 1,478 of 1,568
+functions; 90 failures still prevent whole-program execution. The remaining
+scalar, memory, vector, CFG and ABI forms, pinned runtime linkage and mandatory
+three-mode Fibonacci regression remain open.
+The [focused evidence](evidence/fibonacci_state_focused_20261105.json) records
+source identity, component checks and the repaired boolean regression. Full-width
+accumulator aliases now survive immediate arithmetic and spills; the old poisoned
+high-half failure and its regression tests are retained. The separately diagnosed
+narrow arithmetic-shift error remains in this checkpoint; its tested prototype
+repair awaits the next cumulative full integration. The
+thirteen original probes remain unchanged; no archives were made.
+
+The earlier accepted [integer-intrinsic and comparison checkpoint](evidence/fibonacci_intrinsics_acceptance_20261105.json)
 at `fb39db75` passes all 17 integration stages. Scalar saturating operations,
 narrow extrema and bit reversal preserve significant bits and live operands.
 Compare staging now saves overlapping operands: the confirmed `umax33(1, 0)`

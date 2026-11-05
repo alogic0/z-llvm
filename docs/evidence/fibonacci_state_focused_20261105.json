@@ -1,0 +1,3760 @@
+{
+  "schema": 1,
+  "status": "accepted by full integration",
+  "recorded_utc": "2026-11-05T15:53:59.448392+00:00",
+  "source_revision": "4242debdacb0a3c3eee8fcf3827c783f873dc00e",
+  "source_tree": "3d4d4bc4df149233b2eb207666ff9f0549b82449",
+  "source_sha256": {
+    "src/codegen/x86_64/constant_table.zig": "6e6a476581a0492558adb7f7cc10ad8bf1770e393320d6edf7f97ea15f616d13",
+    "src/codegen/x86_64/generic_cfg/address_flow_tests.zig": "2785631e36cb915d58cb2630a1d8d7dec0e54d22cd861bfc8713c4a51bbebc52",
+    "src/codegen/x86_64/generic_cfg/address_forms.zig": "952b34fc74b6c95fe0577fd033502795ff3120acbb711bac13c794e748af64f9",
+    "src/codegen/x86_64/generic_cfg/atomic_tests.zig": "58f9f7a63b449484702a92b582ece6b17a0b69d1b269bd859871e57041c19ca6",
+    "src/codegen/x86_64/generic_cfg/block_order.zig": "07e021e5748e95d62456b9bff39c813ea51f2f812e038c755a234e0a3ad92da7",
+    "src/codegen/x86_64/generic_cfg/boolean_values.zig": "c0e0eb66bb90df10dfc57bc41cd9bf72dce15388da43be47587f43770ec78f7b",
+    "src/codegen/x86_64/generic_cfg/call_contracts_tests.zig": "a161e59933aae557334f1cfd7495fbeaaa6668095e0589150f520609a9da76d1",
+    "src/codegen/x86_64/generic_cfg/composed_selector_atomic.zig": "41d3baf0c96de78a1216e872e98cd8ff94b2961135661dc917a80b549601ccab",
+    "src/codegen/x86_64/generic_cfg/composed_selector_frame.zig": "805317fae8858b1e59c32f83c51d74b1b646c61f12d909ef6cf5717856d08d1d",
+    "src/codegen/x86_64/generic_cfg/composed_selector_impl.zig": "7029918d5dc725203c5085a6e8d569c4b5f5c98c91c778f89e2c2f6152c0ed6c",
+    "src/codegen/x86_64/generic_cfg/composed_selector_memory.zig": "8e912944ade636cbf274358a9ef09f69b00bd84872747b0b5f45d42c94cb7186",
+    "src/codegen/x86_64/generic_cfg/composed_selector_state.zig": "9608d78d6fe39ab5b63c6e4ae1d5f67393015a99873ad1e0a7067102c852d3e5",
+    "src/codegen/x86_64/generic_cfg/global_memory.zig": "775723804e812256ebed58cd786db5d87e3e0cd9991f983f0caf74eafd44be26",
+    "src/codegen/x86_64/generic_cfg/inspection.zig": "68ff470283425869d852bb012c8aa70f6f824491f2cfcc244e0d13cf7090db0b",
+    "src/codegen/x86_64/generic_cfg/integer_pointer_tests.zig": "e717b2ab248115c7de9d5dce60ea17373ef45bb8dba6eadcb6b72e937edee921",
+    "src/codegen/x86_64/generic_cfg/pointer_values.zig": "99030800db98b9dac8e5a88691fd1b71354d0ddce92cd851d059aae1dba0713f",
+    "src/codegen/x86_64/generic_cfg/pointer_values_tests.zig": "8653a9e2a4c0fe431e190be3a834aca76ad3bdd6d0c7eebae12354d4e8005ad5",
+    "src/codegen/x86_64/generic_cfg/source_guard/consumer_policy.zig": "96730dfd1eee9900cdbc87cee4567265e9779fa06e5ba1051e556dcfb2220ea6",
+    "src/codegen/x86_64/generic_cfg/source_guard/consumer_policy_tests.zig": "726359562e20ae300eb7fe4823c78e79df1021ea8fe3d22e6d72029ceeea2635",
+    "src/codegen/x86_64/generic_cfg/source_guard/model.zig": "4fd5ceaec239009c1ca7c161b2e1cb064371dafe81a66c6bb55f43c2e39607d2",
+    "src/codegen/x86_64/generic_cfg/stack_addresses.zig": "e4b0d6d1695b7fe79dd51749eaf0de92b04c123c0bce4a6a7c69801ea2c5a346",
+    "src/codegen/x86_64/generic_cfg/stage2_planning.zig": "ec54a0658406d5db2a816350fe585318dc2d94eac2b3bada153d34c45d6e2039",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate.zig": "efe3373df7161a20413d3a53b65ad7609e6c316b158f745e1cbcaf86e58376b9",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate_tests.zig": "f89653182c27b83ef115095fd47032d8e9b5d7d583ee3b3028d652e34b118ba6",
+    "src/codegen/x86_64/generic_cfg/word_pair_values.zig": "24988376d0267fa79e75c9637079385bd0989ab6b8280e63e5cba33ae98afa37",
+    "src/codegen/x86_64/generic_cfg_selector.zig": "485bf4d9842da02d03916cb3b788467c2f582b6450eee810693b1643243c5926",
+    "src/codegen/x86_64/sysv_abi.zig": "1a84667903ae6b7827b4671a050772ba0a2cfe6190da36674963cac1cbc12368",
+    "src/main_flow_ir_writer.zig": "5b043ee0367d94a0b924e7f7770cb58e995223f8f3e281367375b32c733e5790",
+    "src/tests.zig": "e11141c3ec2b012701a5fab15cafd8a0a983295f496f3ff0004401bb13d973c9",
+    "src/tests/codegen_x86_64_generic_cfg_selector_limb.zig": "1d3d2bf9ede9b812a576b12b601180af053bfd911904887919cd5c21914fe483",
+    "test/real_programs/address_flow.ll": "26df083b6eefbdfdcbfbafa08205f5399111d854c8924cb12f4a517a645716d4",
+    "test/real_programs/address_flow_driver.c": "812211c06887843170f35c668f0c378e27a935738e211986b61106a51c90e48a",
+    "test/real_programs/call_contracts.ll": "3d4eb4581f23722543c64afdcd97597cff02d5cd753cbade8d584ba4b7294e48",
+    "test/real_programs/call_contracts_driver.c": "e7c8a68d031adc00bf9ea9ee15b759ad79992f9d7b5f009a4a683bed29f81570",
+    "test/real_programs/pointer_flow.ll": "da95157a73476b295b699fedb3140db2f572d5b416395454ff47208087cd558f",
+    "test/real_programs/pointer_flow_driver.c": "f47f403185b7d4f7db216ce4f442c131a5dfaee0cd49fa55d913975b0cc9d97b",
+    "test/real_programs/scalar_atomics.ll": "b28fef5ce25b83f4a6e688504ab5a9c082bd28b65ead5938e90cdbce28c3a175",
+    "test/real_programs/scalar_atomics_driver.c": "a555d217baf4df85eb1e743d08b8b8675f8d8c58c44d91073ef23faa5d5597ac",
+    "tools/run_upstream_c_program.py": "8289c167c9b5bb0210c47312489612eda7927745e4e25b1b5951d8c8d879fb9d"
+  },
+  "behavior": [
+    "Naturally aligned scalar atomics and compare-exchange preserve old values, success flags and live inputs.",
+    "Private pointer and boolean flow preserves significant bits, symbols and two-word layouts. The confirmed dirty-upper-bit boolean branch regression is fixed.",
+    "Bounded frame addresses and scaled indexes preserve byte offsets, and reachable CFG scheduling respects definitions without dropping unreachable blocks.",
+    "Direct C integer/pointer variadic calls use existing register and stack ownership through sixteen arguments. Only ordinary known function symbols and exact advisory pointer contracts are admitted.",
+    "Full-width accumulator aliases survive immediate operations and later spills; poisoned-spill tests reproduce the old stale upper half and prove the repair.",
+    "The unchanged pinned upstream Fibonacci program executes all six assertions in ReleaseFast and ReleaseSmall with LLVM-equivalent exit status, stdout and stderr."
+  ],
+  "known_boundaries": [
+    "The separately diagnosed narrow arithmetic-shift error remains in this accepted checkpoint. Its tested repair is in the integer prototype and awaits the next cumulative full integration.",
+    "ReleaseSafe whole-program emission remains incomplete: 1478 of 1568 functions emit and 90 fail; no Safe local object or execution is claimed.",
+    "The authorized plan continues through remaining scalar, memory, vector, CFG and ABI forms, pinned runtime linkage, and unchanged ReleaseSafe execution with a mandatory permanent three-mode regression."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build"
+        ],
+        "returncode": 0,
+        "wall_ns": 19815455,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-build-r6.json",
+          "sha256": "f98bb241f73521fc383710a656e81a6ffc282bf166953b3aa6d2e2438d3b735f"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-build-r6.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 18746908864,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-units-r6.json",
+          "sha256": "6d1a52c5180aabe582461093a54d285a66dccaa1918220da5617a90f63ea46a6"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-units-r6.log",
+          "sha256": "9acef3efd94230791fbacc693b7683d58328da8c667370a114d85d667e43f3c4"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 415791120,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-structural.json",
+          "sha256": "0e0293964372d19164bdc269e939577dd660a540a869720bbe5250ad0eb34115"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-structural.log",
+          "sha256": "ffca003d0b2666a52d640abd58cebf51dff0155c27ae176eca2ceaad8e5862a9"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 7090091009,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-captured-object.json",
+          "sha256": "ef6f7628f498fddead42fd96f2ab4f68395a9938ba7a6bea2e77e114ef130006"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-captured-object.log",
+          "sha256": "91eaac9c9bddabdf988b9d923cb2bb53a8254ff003334557156507a20d9b1c6a"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "run",
+          "tools/run_focused_codegen_canaries.zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 767638175,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-canaries.json",
+          "sha256": "bd5fdf3c3d0bd7e5588f9b2412a6f57dfbe0caacea57cc101e6e7b9502c38cdf"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-canaries.log",
+          "sha256": "6d7381be6229ccea728310b5dbf1882a87d96eb11442182d8edbbdc11d806cc1"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseFast",
+          "-Dtest-filter=scalar atomics",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 43429875289,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-ReleaseFast.json",
+          "sha256": "dc834ca5e4df831f35f7e18498c8babc44ac35fef5d35daffc84df860623fa92"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-ReleaseFast.log",
+          "sha256": "dc7e49c9d488762b2411948fc3c53b58cf1d4a63b5805c843c21d181550d79d5"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSafe",
+          "-Dtest-filter=scalar atomics",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 33742521727,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-ReleaseSafe.json",
+          "sha256": "4110f2c3e553be6937707652047e58a7b8c47a6f383329b4e948abcb47de485c"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-ReleaseSafe.log",
+          "sha256": "f7a61a71789065dacace5695ad953edb1d03177bc56ba51957e2c0998240bb37"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSmall",
+          "-Dtest-filter=scalar atomics",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 14073622224,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-ReleaseSmall.json",
+          "sha256": "38fcfd5849d0760f881b8339195c4abfab144d037f71748dc67b739f676260c0"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-ReleaseSmall.log",
+          "sha256": "f324196a0d691b0c957a3e87fbf62d5a17cd2a18c6f1a3a9b54e1b8cc2e2164e"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 411917553641,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-readiness.json",
+          "sha256": "e7200dad9ae75224d05fec5bdd23fdff3330a9f5462f89906da4fed18cea4069"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-readiness.log",
+          "sha256": "214386e233dd5519003203a7cde524f212de11fe60d9f2885f2828bb8e79778a"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_atomic_existing_native_r2.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 340717008571,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-existing-native-r2.json",
+          "sha256": "f9450139850986d3745127f67005b3ea94d02ba5a18e7fddd2246607131cb515"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-existing-native-r2.log",
+          "sha256": "d8fc439563687a50ba35ab9befd7a1b06990606bca052cf4ddeef5aa10ce59de"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_atomic_controls_r2.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 45705326802,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-controls-r2.json",
+          "sha256": "b3516edcd8b06106101d0150a9b487730ad6513b63ceb15a35369376a0e48c8e"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-controls-r2.log",
+          "sha256": "8e50ba52c790fad5094d131ac513e10cea31c36a0ad01f588e467505e910eac8"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/atomic-fast-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseFast",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 1809879930,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-fast-program.json",
+          "sha256": "7358323c4fb7d5a8093c5a0a92db452b020866b3ddf5581a8c35e2ca3856881b"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-fast-program.log",
+          "sha256": "e7034a3346b302be4649fcf02d80aa39ee774f21ad1110aeea242c4612515a82"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/atomic-small-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseSmall",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 1456076169,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-small-program.json",
+          "sha256": "a7bdfd059794a83fbcfaa8924568e446f118747803c08e80fc53dece92016236"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-small-program.log",
+          "sha256": "a17ab1bf7ff50abbbd8859ead85486c3b61d11a6bacb33ed1bbda315c66b34f0"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 444936003475,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-readiness-r2.json",
+          "sha256": "e21852d312576e02b3a5fbeef224a3507332aacdce43088b54edc28a97698c74"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-readiness-r2.log",
+          "sha256": "bf70276fc2d689514acba8cf17b8802b865d9b4aec04d21fd105760314f5d8ce"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 19466600,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-units-r5.json",
+          "sha256": "d088383dec964576b0ae80c2b05baaa911341b1d87217bd0e45c1957ca27458e"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-units-r5.log",
+          "sha256": "6ed9a7f2b92ec20e3379ca0b854f1e53eea2048ab21b832648bd3cee8470ef23"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "test",
+          "-Odebug",
+          "-Mroot=src/tests.zig",
+          "--cache-dir",
+          ".zig-cache",
+          "--global-cache-dir",
+          "/home/oleg/.cache/zig",
+          "--name",
+          "test"
+        ],
+        "returncode": 0,
+        "wall_ns": 15758074917,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-units-count-r2.json",
+          "sha256": "2c0871139bea670d895181049cad36c89507effafb0d2be752640086cd0524cc"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-units-count-r2.log",
+          "sha256": "fcf382c9d243e5778ecb54d4e656b774074bcecfa8dd6e0b846408df9c0e9768"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 377061279,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-structural-r2.json",
+          "sha256": "4cc51bc271a6139d0230fcfb6d19fab8cdfd4f92e011174d69cb51d57dd73e28"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-structural-r2.log",
+          "sha256": "78db85edbe47551c04771c33974209501293262c8175f5e218a814b34d1e4f0f"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 5068580511,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-captured-object-r2.json",
+          "sha256": "f992b8a446550e6f0914dd9648158122ddd4846b1a2a861306907f902591a2c1"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-captured-object-r2.log",
+          "sha256": "99bf1dcd433a7ae9b1b1e5ece6c77f4c371b97ebd5aac2640cbe11c147de6d5c"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "run",
+          "tools/run_focused_codegen_canaries.zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 729896031,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-canaries-r3.json",
+          "sha256": "d2385b232c9f3d32730461bba167c30820fc050011caaae0b64f494868ef8735"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-canaries-r3.log",
+          "sha256": "6d7381be6229ccea728310b5dbf1882a87d96eb11442182d8edbbdc11d806cc1"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseFast",
+          "-Dtest-filter=pointer flow",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 43813180701,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-ReleaseFast.json",
+          "sha256": "f17e1014e6ae4dff10b2d3f0639f1ae8cb3941190e0e676a7ea130bad0aa9647"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-ReleaseFast.log",
+          "sha256": "0075e848a5cfc6776fad579b01d8fae81d20c757d5e7ce2c180177551a295e9b"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSafe",
+          "-Dtest-filter=pointer flow",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 33964010909,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-ReleaseSafe.json",
+          "sha256": "6c14e5c3b824c335b7bce59bfb6533533cf4c5973873c2545f03aa9e56a5e94f"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-ReleaseSafe.log",
+          "sha256": "9ae0ab083646f5761c4c7327012a5620775469bc4913bd5c16947418deae2a47"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSmall",
+          "-Dtest-filter=pointer flow",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 14380664922,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-ReleaseSmall.json",
+          "sha256": "6dbb1006e57dab01418b10c68181e80d0383107b7535ab838d270808c8ec27de"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-ReleaseSmall.log",
+          "sha256": "5f81b4788d1508c0ed05ae532ca793084ecb679591791bd3f727a0514bb616ae"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_pointer_native.py",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-native-r4"
+        ],
+        "returncode": 0,
+        "wall_ns": 3825425848,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-native-r4.json",
+          "sha256": "77e2d43894b7cf6a15dd6acb9986e460e7f3c532fd1efa1c70c18c487b55adab"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-native-r4.log",
+          "sha256": "79d8b7df08e25493d6fed93fe94996920e64d914c69d4519fa7be3b6d64aee64"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_pointer_existing_native.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 341943413962,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-existing-native.json",
+          "sha256": "16f869149f7b40c506af4bffe2010531e294543e39ba3bd3eb745ce190100b22"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-existing-native.log",
+          "sha256": "7ec6518431ad102008e6a5d1472cf34b2da7bd896c398d7513d2f732d831c8a9"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_pointer_controls.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 10641472712,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-controls.json",
+          "sha256": "ad5909971f84265bdcc89806049d666685f15bdc4459ff28db4e2c78e8d0bdb1"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-controls.log",
+          "sha256": "c2fa3974fa2e1f47f3c968520e750df57bb1d3cdcd66327866027b3f711d0535"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/pointer-fast-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseFast",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 1927019187,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-fast-program.json",
+          "sha256": "9eb1f9fadf8027ea813ebd01af5c043f7745a526586c0282b65b85dcf033cc25"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-fast-program.log",
+          "sha256": "25d8e0a391fff3bc350709b29194339155ef5706388c7156bf4f3fa8e338847b"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/pointer-small-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseSmall",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 1619025339,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-small-program.json",
+          "sha256": "841239886e7a58349da3f79599c8fb129c7020fa8f5cb1d65a25576d2770516f"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-small-program.log",
+          "sha256": "ba28a10493039429616768f91c21480c5d58f88a07b2362d941cfff6365033b4"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 424278140572,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-readiness-r1.json",
+          "sha256": "980c7ea4bd29999876b7bfd5f4511866839a67a47be83ad008dd9525cfc2e0f4"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-readiness-r1.log",
+          "sha256": "5966c498d0671af188781983e7c99a9c690ebe2bb8009e81760fe45a5bd4dc4a"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 23236531,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-units-r3.json",
+          "sha256": "6cd56a01a43af104d8e068a07f5294e743257e111c53a366f1675c0b77218192"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-units-r3.log",
+          "sha256": "79eba2f9ba0226a2609a80a5dcb770f0da9835f35258cf78a93254fbb8f9a3df"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 424991612,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-structural-r1.json",
+          "sha256": "9c62724c31643e53f850ee657f5301d95c12bb1ed96042bac6fdaaaa98f5ab74"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-structural-r1.log",
+          "sha256": "4082944feadb796a0e89a3f88518da7c3fccd3a56da9cd8ef3cb812487ca53f6"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 5501909001,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-captured-object-r1.json",
+          "sha256": "97fb5eb89239b59329b5e0e095b34b045104a2f71d9ce54b7592c6b6e19d47ac"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-captured-object-r1.log",
+          "sha256": "99bf1dcd433a7ae9b1b1e5ece6c77f4c371b97ebd5aac2640cbe11c147de6d5c"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "run",
+          "tools/run_focused_codegen_canaries.zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 766814706,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-canaries-r1.json",
+          "sha256": "080b22b2951e526d94377ab106b900b75de2ca75c62a5839d6ff0f5515adfed3"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-canaries-r1.log",
+          "sha256": "6d7381be6229ccea728310b5dbf1882a87d96eb11442182d8edbbdc11d806cc1"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseFast",
+          "-Dtest-filter=address flow",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 47752491227,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-ReleaseFast.json",
+          "sha256": "c17149de584f8b6f880706116db1d4e87dc9d145854edb5fce5152381fc791df"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-ReleaseFast.log",
+          "sha256": "848597045a8453786d5776735bf30e6bee0c28a9a56d4c341814a05c0d275e5b"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSafe",
+          "-Dtest-filter=address flow",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 37268017816,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-ReleaseSafe.json",
+          "sha256": "2d92d2e82b0ebe9c0a6114146af7ac23aacd99ff2672af3c1b14bb2cea138dc8"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-ReleaseSafe.log",
+          "sha256": "64cbba7d5d442119b6a4573abfecd919afff132bb6ec0c66cb3fb754c7543bd9"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSmall",
+          "-Dtest-filter=address flow",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 15908164827,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-ReleaseSmall.json",
+          "sha256": "9050eed281f1ffd015243ccb0778cd5c5ac56d579e03db483ae5964ca6db9d42"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-ReleaseSmall.log",
+          "sha256": "c8c8fd2eda9f8b35fb7c740a754dedcfdc339d0889bb087e9af53d6f03e92aa3"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_address_flow_native.py",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-native-r2"
+        ],
+        "returncode": 0,
+        "wall_ns": 3884058045,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-native-r2.json",
+          "sha256": "8a01b12e3d544e11d0883bc7abb9436fce56ae1c7e0e2cc0df6bd86416c7788a"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-native-r2.log",
+          "sha256": "7f12d85446698861f3d70bc84e5228d5edfc81e8f4503c5797e9b5eeee550ebf"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_address_existing_native.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 393951977370,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-existing-native.json",
+          "sha256": "071414f95055a97303d120b917c8e61b35562b1eb5a881c38a8ec672884884d6"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-existing-native.log",
+          "sha256": "b2be6c832e13a40f08015b25848df7e91df5a0819f4b975d6ad154c29802423a"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_address_controls.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 10312792990,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-controls.json",
+          "sha256": "4702fcf792271447204a623841e6c38c26ed983503d174af9591b0526652d63d"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-controls.log",
+          "sha256": "0d457ba8a497aa5738601adf2d15bc41d6d7a1490aa4c4859350d8396892dfb0"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/address-fast-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseFast",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 2375669043,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-fast-program.json",
+          "sha256": "2343334b4364e6a4b2ae747ce193437cb5c82b5eb2a86337f3fde61c64e6dbf0"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-fast-program.log",
+          "sha256": "9b5c3274a4e2be7aef881d4dbd5f0d86fb0ac54cf9a5508f2f2add7eee90ade8"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/address-small-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseSmall",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 2015695502,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-small-program.json",
+          "sha256": "a970a9a5e699719e8e3e9a6d5d28e727979e477c6159092f2affef185679bfa5"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-small-program.log",
+          "sha256": "c95f1963a9d5700df25f7cf282f782ba58f134fd38f225f04c965544ca302602"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 436819674564,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-readiness-r1.json",
+          "sha256": "8c095c93c873711cd8cf587d7ffa0365ef975d364e5b7680da356bbdc69e2855"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-readiness-r1.log",
+          "sha256": "b3fed96d41c10b5dfcfe31ff9bb0c0305aa39bd5d782d0a0bf167f40afd8faa4"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 19436342,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-units-r3.json",
+          "sha256": "7f2b0127d446ef6f96b933a5ebc17737438747190b9cb37caa6a1d49b047c28d"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-units-r3.log",
+          "sha256": "a54db768b26f31588ced152a426c391862272558ea2f696010be280a687891c7"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 401064841,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-structural-r1.json",
+          "sha256": "0cf7212721a637dd3b4bf1948baa17d0ed560e2e5e7410f13622a87e78971928"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-structural-r1.log",
+          "sha256": "b4987a4dffb9aa0be525f1c4d14d68aed5084331b56b3b20e2f5c757282fdd6c"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 5250620735,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-captured-object-r1.json",
+          "sha256": "797a7563d5e5268338c2235a35957fbcac6ee0f90c5f8a065dfdc89cefa458ab"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-captured-object-r1.log",
+          "sha256": "99bf1dcd433a7ae9b1b1e5ece6c77f4c371b97ebd5aac2640cbe11c147de6d5c"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "run",
+          "tools/run_focused_codegen_canaries.zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 904039047,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-canaries-r1.json",
+          "sha256": "25ff962eca1a68b60ee8b9802e45d6c7654aa4be5fc1b48e0aa2cbd9cedb3686"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-canaries-r1.log",
+          "sha256": "6d7381be6229ccea728310b5dbf1882a87d96eb11442182d8edbbdc11d806cc1"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseFast",
+          "-Dtest-filter=call contracts",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 48818718504,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-ReleaseFast.json",
+          "sha256": "24956ad2453e766c4eb937732ae8125f6bc3a10be6e63bb9be3571b393dc77c8"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-ReleaseFast.log",
+          "sha256": "7a46fd0d07373114fa05447021c48542ce92f82489eb614211467bf745edb327"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSafe",
+          "-Dtest-filter=call contracts",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 36300507341,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-ReleaseSafe.json",
+          "sha256": "4b97ada3943086f7043cf5a934a1b03de3c308e4cecaaf56480605300a92b9e9"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-ReleaseSafe.log",
+          "sha256": "adec73be94698e5be55199e06b574969635c6d6656fab345ed94ac515bd97cb4"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSmall",
+          "-Dtest-filter=call contracts",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 15147759937,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-ReleaseSmall.json",
+          "sha256": "2888d536546e0e917bb834ffa03118a91e000d122ce2c55396d811a95f25e2f2"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-ReleaseSmall.log",
+          "sha256": "774898a2778205ca2703a1020dd14299fbd53b4ea976e05073b7e37e41ccd42c"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_call_contracts_native.py",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-native-r1"
+        ],
+        "returncode": 0,
+        "wall_ns": 5070556944,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-native-r1.json",
+          "sha256": "ea7bad1bdd1fac7c68e219dd59c699f3c07d33992e5516b3de655edb937def1d"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-native-r1.log",
+          "sha256": "ae80b9109166081809cdcb830c9df51ebe6e46687b079bcb0fa7ef1b0bba099f"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_call_contracts_existing_native.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 364484888703,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-existing-native.json",
+          "sha256": "33d3b38e121e9035299b27812eee26f4d4d3767150583f518cff960032fdd2cc"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-existing-native.log",
+          "sha256": "4bbbb83ad7bbdd12f81b68a18584372fcbdb1f09a87864e5da6c61d6b10f9bd3"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_call_contracts_controls.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 14222327484,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-controls-r2.json",
+          "sha256": "4c1db242ea6de6f6ba229b05463000fe25d115d559b250f5d579fb4d8d95d9a4"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-controls-r2.log",
+          "sha256": "77e5f564ca0179bca78b98ab2bf599dda760159f74fa02a31eea6f8862b69d4a"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/contracts-fast-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseFast",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 2150917690,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-fast-program.json",
+          "sha256": "88490292805b0fc8b39a292cddd2dc18127bbed0c74d62c008fe05aa36f533dd"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-fast-program.log",
+          "sha256": "bdd0f57f4e227bdd7d2f7a014efa8176276da99040c2d5c2f79c5f6487506365"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "local-state/contracts-small-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseSmall",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 1900651050,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-small-program.json",
+          "sha256": "2f79efc672745e031fb067d58b70f4de960bc8e6a6429bac2341b9e99a5ce469"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-small-program.log",
+          "sha256": "e4a7f1b8c2a328fa37cf78f14561b4ee424ba26a19486282c3637e4341ac4964"
+        }
+      },
+      {
+        "argv": [
+          "zig",
+          "build"
+        ],
+        "returncode": 0,
+        "wall_ns": 1880761704,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-main-build.json",
+          "sha256": "6339eda88c697a1cfb97cc383362321864fb2c7b31839f8f5b1d2c3050a2e003"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-main-build.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_state_native.py",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-main-native"
+        ],
+        "returncode": 0,
+        "wall_ns": 26217799727,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-main-native.json",
+          "sha256": "e5326f93882f821a0a07beb3268a66bc0d77a8411615b27b630ade14e7b09d45"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-main-native.log",
+          "sha256": "4e0c267e05e5f90645d77560cb0498afd5af10e1dc91f0b4fcfdb6c44c943308"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-main-fast-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseFast",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 2270839267,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-main-fast-program.json",
+          "sha256": "dd7307f395f270184687178ff311fe1d1433da22263c69516ff1cec20575c7c2"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-main-fast-program.log",
+          "sha256": "9aa46bb43e14fe37642c22cbedc861f2d861b298ceaa24c91d3c5253471f8c12"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-main-small-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseSmall",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 1957471351,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-main-small-program.json",
+          "sha256": "56ab987adf4a9a79a97df509ca69f5076cdc454c8e0335189b47c13ae28eeefc"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-main-small-program.log",
+          "sha256": "ad7ddca9baa08aae2ba79b8ce3e0587cc5138d01bb8a26c75359549d09a7538e"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/fibonacci-20261104/run_spill_width_tier2.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 1635374981979,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-tier2.json",
+          "sha256": "51f5beba1966075dae3f54851db125f0e00ade4ff36314b1d4e08ff78fda8441"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-tier2.log",
+          "sha256": "a1bf89f3f845834bfda9b6bc2fdd1c5addb08b55369249a8a04252e453bca879"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 18139404201,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-units-final.json",
+          "sha256": "747218df545698c9433c32ae7418e93ff574259975b4c9617646a0c3b7785896"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-units-final.log",
+          "sha256": "5ab9f0cf1fc76f0937a3fd368f54571c941b196caf88eb4844ea86c6aafe5f00"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build"
+        ],
+        "returncode": 0,
+        "wall_ns": 1858553245,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-main-build-final.json",
+          "sha256": "c2773d2b86e6ae71aec8e040c8ed418676ee47bd1f67d1a02ce5288a6247fb1f"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-main-build-final.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 397801522085,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-readiness.json",
+          "sha256": "a98f73c4cdee4485761d8e6493a7da96af2bcbde72302d4aeec0c7298a9aaefb"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-readiness.log",
+          "sha256": "6d35fe98554a1624107d6490667ed2675222dff44c82f3fa3fb08b4ca8ff1535"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 360941763,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-structural.json",
+          "sha256": "6ed13ece2c5e21a7a0a7c5bbc2307d0ecba2495b47288725c555b9f4a3f59620"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-structural.log",
+          "sha256": "17e7fad8369e27dc0ab5114ab1ff686e4a813c1c9cefb437c3bfb51a3702c5e6"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 4798774909,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-captured.json",
+          "sha256": "6c2745ef03a6a551e37ed0442d330ace014200527f8408bfefe98c1561c4a6ee"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-captured.log",
+          "sha256": "8b49e4b4970ef70f5b18546516255e9839dfbd4de682084ffd3f8dc3d748a316"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "run",
+          "tools/run_distribution_zig_integrated_exe.zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 1150049743745,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-integrated.json",
+          "sha256": "3cd0fa5c9db6d6b2ded3d5eba85982d76820cf4c624f585532aa067ddaadbec7"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-integrated.log",
+          "sha256": "e5fb676c634f8ab93c831789529935f7f9506eb5aad0fb467582b1115cee1324"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "test",
+          "src/tests.zig",
+          "-OReleaseFast",
+          "--test-filter",
+          "value-use immediate"
+        ],
+        "returncode": 0,
+        "wall_ns": 30998401510,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-ReleaseFast.json",
+          "sha256": "c052767f12be26f0c3415a17e46109e9ee1f943d940e4648beebed3fbb7d1061"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-ReleaseFast.log",
+          "sha256": "c83411f779994117a4291b096b64368b26bb07fbf8a40e2a4a88ec564d0923c9"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "test",
+          "src/tests.zig",
+          "-OReleaseSafe",
+          "--test-filter",
+          "value-use immediate"
+        ],
+        "returncode": 0,
+        "wall_ns": 20796604818,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-ReleaseSafe.json",
+          "sha256": "903e235733564ebf993db902c06877eb0ba724532873ebe48bc8dcd76253b64f"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-ReleaseSafe.log",
+          "sha256": "c83411f779994117a4291b096b64368b26bb07fbf8a40e2a4a88ec564d0923c9"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "test",
+          "src/tests.zig",
+          "-OReleaseSmall",
+          "--test-filter",
+          "value-use immediate"
+        ],
+        "returncode": 0,
+        "wall_ns": 6342828574,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-ReleaseSmall.json",
+          "sha256": "f2168697722fb9eaa6fa4c9bc1b2ef9bfa37ca8a3302b5d721e7d46502056782"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-ReleaseSmall.log",
+          "sha256": "c83411f779994117a4291b096b64368b26bb07fbf8a40e2a4a88ec564d0923c9"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-fast-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseFast",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 2160270966,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-fast-program.json",
+          "sha256": "5d68e76f57064cdb0bd0205c7372297dad372aaff92cc6f6766f3ea5b61473fb"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-fast-program.log",
+          "sha256": "2b5896ec92bacc3e6a934c0370c50659675c089421bff531e1951b9fa8957326"
+        }
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "tools/run_real_program.py",
+          "--output-root",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-small-program",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--manifest",
+          "/home/oleg/prog/z_llvm/local-state/validations/startup-headroom-20261102/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseSmall",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 1808422776,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-small-program.json",
+          "sha256": "08eb488840c530d4cc8a70c001cbf44b8d86a5e9b592c5401b8aba0bc649d224"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-small-program.log",
+          "sha256": "2d65eccef2b25c0c7706f5909cb5f75cfd7ef82ba519f2a5335810e731b78e85"
+        }
+      }
+    ],
+    "unit_tests": 1847,
+    "structural_tests": 13,
+    "focused_tests_per_component_and_mode": {
+      "atomic": 14,
+      "pointer": 15,
+      "address": 16,
+      "contracts": 14
+    },
+    "component_native_before_spill_repair": {
+      "status": "passed",
+      "scalar_atomics_local_observations": 112908,
+      "scalar_atomics_reference_observations": 56454,
+      "pointer_flow_local_observations": 9216,
+      "pointer_flow_reference_observations": 4608,
+      "address_flow_local_observations": 14208,
+      "address_flow_reference_observations": 7104,
+      "call_contracts_local_observations": 17664,
+      "call_contracts_reference_observations": 8832,
+      "compiler_sha256": "53c15ccdd079c8dc307d2dbcf8a0b0f584830c02cb36b6e33f81a12859626c89",
+      "inputs": {
+        "test/real_programs/scalar_atomics.ll": "b28fef5ce25b83f4a6e688504ab5a9c082bd28b65ead5938e90cdbce28c3a175",
+        "test/real_programs/scalar_atomics_driver.c": "a555d217baf4df85eb1e743d08b8b8675f8d8c58c44d91073ef23faa5d5597ac",
+        "test/real_programs/pointer_flow.ll": "da95157a73476b295b699fedb3140db2f572d5b416395454ff47208087cd558f",
+        "test/real_programs/pointer_flow_driver.c": "f47f403185b7d4f7db216ce4f442c131a5dfaee0cd49fa55d913975b0cc9d97b",
+        "test/real_programs/address_flow.ll": "26df083b6eefbdfdcbfbafa08205f5399111d854c8924cb12f4a517a645716d4",
+        "test/real_programs/address_flow_driver.c": "812211c06887843170f35c668f0c378e27a935738e211986b61106a51c90e48a",
+        "test/real_programs/call_contracts.ll": "3d4eb4581f23722543c64afdcd97597cff02d5cd753cbade8d584ba4b7294e48",
+        "test/real_programs/call_contracts_driver.c": "e7c8a68d031adc00bf9ea9ee15b759ad79992f9d7b5f009a4a683bed29f81570"
+      }
+    },
+    "current_native_populations": {
+      "word-pair-memory": {
+        "population": "standalone-two-word-stack-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "384",
+        "reference_observations": "192",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "pointer-stack-memory": {
+        "population": "standalone-runtime-pointer-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-stack-memory": {
+        "population": "standalone-scalar-stack",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "486",
+        "reference_observations": "243",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "integer-pointer-casts": {
+        "population": "standalone-integer-pointer-casts",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "signed-nonnegative": {
+        "population": "standalone-signed-nonnegative",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "type-layout-padding": {
+        "population": "standalone-type-allocation-padding",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-addresses": {
+        "population": "standalone-global-addresses",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "192",
+        "reference_observations": "96",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "global-memory": {
+        "population": "standalone-global-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "240",
+        "reference_observations": "120",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "boolean-calls": {
+        "population": "standalone-boolean-calls",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "array-stride": {
+        "population": "standalone-array-stride",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1536",
+        "reference_observations": "768",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "module-dependencies": {
+        "population": "standalone-module-dependencies",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "330",
+        "reference_observations": "165",
+        "reference_reused_per_route": "true",
+        "local_fail": "0",
+        "negative_controls": "30",
+        "environment_checks": "3"
+      },
+      "bounded-frame": {
+        "population": "standalone-bounded-frame",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "768",
+        "reference_observations": "384",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "general-array-stride": {
+        "population": "standalone-general-array-stride",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "1920",
+        "reference_observations": "960",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "rax-pointer-load": {
+        "population": "standalone-rax-pointer-load",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "2688",
+        "reference_observations": "1344",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "constant-remainder": {
+        "population": "standalone-constant-remainder",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "3072",
+        "reference_observations": "1536",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "narrow-abi": {
+        "population": "standalone-narrow-abi",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "4992",
+        "reference_observations": "2496",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "aggregate-storage": {
+        "population": "standalone-aggregate-storage",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "4608",
+        "reference_observations": "2304",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-forms": {
+        "population": "standalone-scalar-forms",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "3840",
+        "reference_observations": "1920",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "indirect-stack-calls": {
+        "population": "standalone-indirect-stack-calls",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "9984",
+        "reference_observations": "4992",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "safe-scalar-forms": {
+        "population": "standalone-safe-scalar-forms",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "4992",
+        "reference_observations": "2496",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "safe-comparisons": {
+        "population": "standalone-safe-comparisons",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "17664",
+        "reference_observations": "8832",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "bounded-storage": {
+        "population": "standalone-bounded-storage",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "5760",
+        "reference_observations": "2880",
+        "reference_reused_per_route": "true",
+        "local_fail": "0",
+        "guard_checks": "18"
+      },
+      "stack-addresses": {
+        "population": "standalone-stack-addresses",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "3456",
+        "reference_observations": "1728",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "checked-integers": {
+        "population": "standalone-checked-integers",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "46464",
+        "reference_observations": "23232",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "word-arithmetic": {
+        "population": "standalone-word-arithmetic",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "29568",
+        "reference_observations": "14784",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "switch-forms": {
+        "population": "standalone-switch-forms",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "26112",
+        "reference_observations": "13056",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "integer-intrinsics": {
+        "population": "standalone-integer-intrinsics",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "87552",
+        "reference_observations": "43776",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "scalar-atomics": {
+        "population": "standalone-scalar-atomics",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "112908",
+        "reference_observations": "56454",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "pointer-flow": {
+        "population": "standalone-pointer-flow",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "9216",
+        "reference_observations": "4608",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "address-flow": {
+        "population": "standalone-address-flow",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "14208",
+        "reference_observations": "7104",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      "call-contracts": {
+        "population": "standalone-call-contracts",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "17664",
+        "reference_observations": "8832",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    },
+    "prior_native": {
+      "address_flow_local_observations": 14208,
+      "address_flow_reference_observations": 7104,
+      "pointer_flow_local_observations": 9216,
+      "pointer_flow_reference_observations": 4608,
+      "scalar_atomics_local_observations": 112908,
+      "scalar_atomics_reference_observations": 56454,
+      "integer_intrinsics_local_observations": 87552,
+      "integer_intrinsics_reference_observations": 43776,
+      "switch_forms_local_observations": 26112,
+      "switch_forms_reference_observations": 13056,
+      "word_arithmetic_local_observations": 29568,
+      "word_arithmetic_reference_observations": 14784,
+      "checked_integers_local_observations": 46464,
+      "checked_integers_reference_observations": 23232,
+      "stack_addresses_local_observations": 3456,
+      "stack_addresses_reference_observations": 1728,
+      "bounded_storage_local_observations": 5760,
+      "bounded_storage_reference_observations": 2880,
+      "safe_comparisons_local_observations": 17664,
+      "safe_comparisons_reference_observations": 8832,
+      "safe_scalar_forms_local_observations": 4992,
+      "safe_scalar_forms_reference_observations": 2496,
+      "indirect_stack_calls_local_observations": 9984,
+      "indirect_stack_calls_reference_observations": 4992,
+      "scalar_forms_local_observations": 3840,
+      "scalar_forms_reference_observations": 1920,
+      "aggregate_storage_local_observations": 4608,
+      "aggregate_storage_reference_observations": 2304,
+      "narrow_abi_local_observations": 4992,
+      "narrow_abi_reference_observations": 2496,
+      "constant_remainder_local_observations": 3072,
+      "constant_remainder_reference_observations": 1536,
+      "rax_pointer_load_local_observations": 2688,
+      "rax_pointer_load_reference_observations": 1344,
+      "general_array_stride_local_observations": 1920,
+      "general_array_stride_reference_observations": 960,
+      "bounded_frame_local_observations": 768,
+      "bounded_frame_reference_observations": 384,
+      "module_dependencies_local_observations": 330,
+      "module_dependencies_reference_observations": 165,
+      "array_stride_local_observations": 1536,
+      "array_stride_reference_observations": 768,
+      "boolean_calls_local_observations": 1536,
+      "boolean_calls_reference_observations": 768,
+      "global_addresses_local_observations": 192,
+      "global_addresses_reference_observations": 96,
+      "global_memory_local_observations": 240,
+      "global_memory_reference_observations": 120,
+      "type_layout_padding_local_observations": 768,
+      "type_layout_padding_reference_observations": 384,
+      "word_pair_local_observations": 384,
+      "word_pair_reference_observations": 192,
+      "signed_nonnegative_local_observations": 1536,
+      "signed_nonnegative_reference_observations": 768,
+      "integer_pointer_local_observations": 1536,
+      "integer_pointer_reference_observations": 768,
+      "scalar_stack_local_observations": 486,
+      "scalar_stack_reference_observations": 243,
+      "pointer_stack_local_observations": 768,
+      "pointer_stack_reference_observations": 384,
+      "compiler_sha256": "4019127d06c649c64dd8903c0ccf1cac24cacc38422ec065e3a5b3a96833ec16",
+      "status": "passed",
+      "bounded_storage_guard_checks": 18,
+      "module_dependencies_environment_checks": 3,
+      "module_dependencies_negative_controls": 30
+    },
+    "call_negative_controls": {
+      "status": "passed",
+      "compiler_sha256": "4019127d06c649c64dd8903c0ccf1cac24cacc38422ec065e3a5b3a96833ec16",
+      "negative_controls": 36,
+      "cases": [
+        {
+          "control": "lost-promoted-value",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-promoted-value",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-promoted-value",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-promoted-value",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-promoted-value",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-promoted-value",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-wide-value",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-wide-value",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-wide-value",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-wide-value",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-wide-value",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-wide-value",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-function-address",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-function-address",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-function-address",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-function-address",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-function-address",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-function-address",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "swapped-function-select",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "swapped-function-select",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "swapped-function-select",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "swapped-function-select",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "swapped-function-select",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "swapped-function-select",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-advisory-result",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-advisory-result",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-advisory-result",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-advisory-result",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-advisory-result",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-advisory-result",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-call-output",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-call-output",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-call-output",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-call-output",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-call-output",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-call-output",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        }
+      ],
+      "commands": [
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-promoted-value-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-wide-value-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/wrong-function-address-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/swapped-function-select-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-advisory-result-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/call_contracts_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/call-contracts-native-controls-r2/lost-call-output-ReleaseSmall/release-run"
+        }
+      ],
+      "fixture_sha256": "3d4eb4581f23722543c64afdcd97597cff02d5cd753cbade8d584ba4b7294e48",
+      "driver_sha256": "e7c8a68d031adc00bf9ea9ee15b759ad79992f9d7b5f009a4a683bed29f81570",
+      "fixture_unchanged": true,
+      "core_dumps_disabled": true
+    },
+    "source_import": {
+      "status": "passed",
+      "prototype_revision": "146c0c0c6ae1fe792b7ab46b34e7ed9ba5610ea4",
+      "imported_revision": "4242debdacb0a3c3eee8fcf3827c783f873dc00e",
+      "identical_non_documentation_files": 1576,
+      "compiler_sha256": "58edefb562dee7b572423aeaf568f9c2693dbf732306692e1c21550f7fe23f3f",
+      "prototype_snapshot": "local-state/validations/fibonacci-20261104/contracts-prototype-sources.json",
+      "components": {
+        "atomic": [
+          "37cd91a0",
+          "64415449"
+        ],
+        "pointer": [
+          "15f8fa72",
+          "f61891fa"
+        ],
+        "address": [
+          "a322acb8",
+          "646afe29"
+        ],
+        "contracts": [
+          "146c0c0c",
+          "25dfb212"
+        ]
+      },
+      "base_import": {
+        "path": "local-state/validations/fibonacci-20261104/state-import-verification.json",
+        "sha256": "cf114b91ddaf9cd0d7de211339776593e7ebe397cd261783cac4e90a9c74356d"
+      },
+      "repaired_source_files": [
+        "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate.zig",
+        "src/codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate_tests.zig",
+        "src/tests.zig"
+      ],
+      "spill_repair": {
+        "path": "local-state/validations/fibonacci-20261104/spill-width-tier2-verification.json",
+        "sha256": "a9637a1830f7a6041343a1eef835b7bd731ec78b0114b7717221e25a4478ed3c"
+      }
+    },
+    "prototype_snapshot": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-prototype-sources.json",
+      "sha256": "c81145f540b727cbffa4225231b95d69af09c77ded8403550786cd36209c5870"
+    },
+    "prototype_phases": [
+      {
+        "component": "atomic",
+        "verification": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/atomic-tier2-verification.json",
+          "sha256": "b2bc84eef44dda3c9cb328459613878fda5316c891c65f789390b98fa5c5fb4c"
+        },
+        "evidence": {
+          "status": "Tier 2 passed; awaiting full Tier 3 before scalar atomic acceptance",
+          "cwd": "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow",
+          "source_snapshot": "atomic-prototype-sources.json",
+          "source_files_verified": 1566,
+          "checks": [
+            "atomic-build-r6",
+            "atomic-units-r6",
+            "atomic-structural",
+            "atomic-captured-object",
+            "atomic-canaries",
+            "atomic-ReleaseFast",
+            "atomic-ReleaseSafe",
+            "atomic-ReleaseSmall",
+            "atomic-readiness",
+            "atomic-existing-native-r2",
+            "atomic-controls-r2",
+            "atomic-fast-program",
+            "atomic-small-program"
+          ],
+          "compiler_sha256": "ade5e117ada84c1d83e0c72a6a9fc4e6067cccb9a9de5844d96b1f8618a1b9bb",
+          "unit_count": 1832,
+          "native_local_observations": 112908,
+          "native_reference_observations": 56454,
+          "prior_native_populations": 27,
+          "negative_controls": 36,
+          "fibonacci_programs": [
+            {
+              "mode": "ReleaseFast",
+              "report": "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/local-state/atomic-fast-program/report.json",
+              "sha256": "96e8e86f943091b8013cecd88a1cd6013951231b229248c3a54bcdba485bbfdc",
+              "local_executions": 1,
+              "reference_executions": 1
+            },
+            {
+              "mode": "ReleaseSmall",
+              "report": "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/local-state/atomic-small-program/report.json",
+              "sha256": "78416b73a767ca9ae66a8f07d3e0e75067f1d23c4e78936ec927b196a86ce548",
+              "local_executions": 1,
+              "reference_executions": 1
+            }
+          ],
+          "known_boundary": "ReleaseSafe program emission remains incomplete: 1322 of 1568 functions emit, 246 fail. This source revision does not claim Safe whole-program execution.",
+          "archives_created": 0
+        }
+      },
+      {
+        "component": "pointer",
+        "verification": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/pointer-tier2-verification.json",
+          "sha256": "1f383a1af28db81e7fa937990a11e38ee43ba31217f043cc203acc76bad75771"
+        },
+        "evidence": {
+          "status": "Tier 2 passed; awaiting full Tier 3 before pointer and boolean acceptance",
+          "cwd": "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow",
+          "source_snapshot": "pointer-prototype-sources.json",
+          "source_files_verified": 1571,
+          "checks": [
+            "pointer-readiness-r2",
+            "pointer-units-r5",
+            "pointer-units-count-r2",
+            "pointer-structural-r2",
+            "pointer-captured-object-r2",
+            "pointer-canaries-r3",
+            "pointer-ReleaseFast",
+            "pointer-ReleaseSafe",
+            "pointer-ReleaseSmall",
+            "pointer-native-r4",
+            "pointer-existing-native",
+            "pointer-controls",
+            "pointer-fast-program",
+            "pointer-small-program"
+          ],
+          "compiler_sha256": "98121a26cad9f4f18653bdc264191dbba622e9ed110ffda99a33888cbe69f206",
+          "unit_count": 1838,
+          "native_local_observations": 9216,
+          "native_reference_observations": 4608,
+          "prior_native_populations": 28,
+          "negative_controls": 36,
+          "fibonacci_programs": [
+            {
+              "mode": "ReleaseFast",
+              "report": "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/local-state/pointer-fast-program/report.json",
+              "sha256": "41c171c211839bcd8229cfa1ee5816000a6f2bec68f6e194823a6b8df4270ee0",
+              "local_executions": 1,
+              "reference_executions": 1
+            },
+            {
+              "mode": "ReleaseSmall",
+              "report": "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/local-state/pointer-small-program/report.json",
+              "sha256": "7f49406dc9e3a5f588b57fbe053c88d4a6741604a74ca740e16702794db2760b",
+              "local_executions": 1,
+              "reference_executions": 1
+            }
+          ],
+          "known_boundary": "ReleaseSafe program emission remains incomplete: 1389 of 1568 functions emit, 179 fail. No Safe whole-program execution is claimed.",
+          "archives_created": 0
+        }
+      },
+      {
+        "component": "address",
+        "verification": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/address-tier2-verification.json",
+          "sha256": "b5bfb2784a7d03b030e236f4f45832f8b87a108b535de7ff99fa8c14ffa60759"
+        },
+        "evidence": {
+          "status": "Tier 2 passed; awaiting full Tier 3 before address and CFG acceptance",
+          "cwd": "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow",
+          "source_snapshot": "address-prototype-sources.json",
+          "source_files_verified": 1576,
+          "checks": [
+            "address-readiness-r1",
+            "address-units-r3",
+            "address-structural-r1",
+            "address-captured-object-r1",
+            "address-canaries-r1",
+            "address-ReleaseFast",
+            "address-ReleaseSafe",
+            "address-ReleaseSmall",
+            "address-native-r2",
+            "address-existing-native",
+            "address-controls",
+            "address-fast-program",
+            "address-small-program"
+          ],
+          "compiler_sha256": "6541f75f43fd561c599fc91e088e10ee6b778b520368d994369092a5363f253a",
+          "unit_count": 1843,
+          "native_local_observations": 14208,
+          "native_reference_observations": 7104,
+          "prior_native_populations": 29,
+          "negative_controls": 36,
+          "fibonacci_programs": [
+            {
+              "mode": "ReleaseFast",
+              "report": "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/local-state/address-fast-program/report.json",
+              "sha256": "aea93b1ec92aecf2180a6567563a78628954c573474cabc10fac7c293f8592c6",
+              "local_executions": 1,
+              "reference_executions": 1
+            },
+            {
+              "mode": "ReleaseSmall",
+              "report": "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/local-state/address-small-program/report.json",
+              "sha256": "42f38f37a0ddee3b10ce784b941265c686ab5f851a4c2b08184ed29e5778e2a4",
+              "local_executions": 1,
+              "reference_executions": 1
+            }
+          ],
+          "known_boundary": "ReleaseSafe program emission remains incomplete: 1448 of 1568 functions emit, 120 fail. No Safe whole-program execution is claimed.",
+          "archives_created": 0
+        }
+      },
+      {
+        "component": "contracts",
+        "verification": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/contracts-tier2-verification.json",
+          "sha256": "6aab225e48c53573a098cc63aa08ec05e366dc3254755661ca655e8f7268349e"
+        },
+        "evidence": {
+          "status": "Tier 2 passed; awaiting full Tier 3 before C-call and function-address acceptance",
+          "cwd": "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow",
+          "source_snapshot": "contracts-prototype-sources.json",
+          "source_files_verified": 1579,
+          "checks": [
+            "contracts-readiness-r1",
+            "contracts-units-r3",
+            "contracts-structural-r1",
+            "contracts-captured-object-r1",
+            "contracts-canaries-r1",
+            "contracts-ReleaseFast",
+            "contracts-ReleaseSafe",
+            "contracts-ReleaseSmall",
+            "contracts-native-r1",
+            "contracts-existing-native",
+            "contracts-controls-r2",
+            "contracts-fast-program",
+            "contracts-small-program"
+          ],
+          "compiler_sha256": "4019127d06c649c64dd8903c0ccf1cac24cacc38422ec065e3a5b3a96833ec16",
+          "unit_count": 1845,
+          "native_local_observations": 17664,
+          "native_reference_observations": 8832,
+          "prior_native_populations": 30,
+          "negative_controls": 36,
+          "fibonacci_programs": [
+            {
+              "mode": "ReleaseFast",
+              "report": "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/local-state/contracts-fast-program/report.json",
+              "sha256": "9f755298fbed6fe63ff7a0affc494911c77cae5b318a0fee14f9092c2e2b2081",
+              "local_executions": 1,
+              "reference_executions": 1
+            },
+            {
+              "mode": "ReleaseSmall",
+              "report": "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/local-state/contracts-small-program/report.json",
+              "sha256": "1ed03a80a2107d1dc12b493e489c482b9054f4b2f49193f57544854bd303ca12",
+              "local_executions": 1,
+              "reference_executions": 1
+            }
+          ],
+          "known_boundary": "ReleaseSafe program emission remains incomplete: 1478 of 1568 functions emit, 90 fail. No Safe whole-program execution is claimed.",
+          "archives_created": 0
+        }
+      }
+    ],
+    "wrong_code_repair": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/boolean-low-bit-repair.json",
+      "sha256": "0378c65ec55a9fda99467adf1f9a2ade6f72aa03fd7892a84f75117f838cae0f"
+    },
+    "spill_width_repair": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-tier2-verification.json",
+      "sha256": "a9637a1830f7a6041343a1eef835b7bd731ec78b0114b7717221e25a4478ed3c"
+    },
+    "confirmed_failed_full_run": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/full-state-cached.json",
+      "sha256": "4fe573860a3173f4691bef39192b8511cd6c0b29dc257fb5083584bf8efd77f4"
+    },
+    "final_compiler_sha256": "58edefb562dee7b572423aeaf568f9c2693dbf732306692e1c21550f7fe23f3f"
+  },
+  "fibonacci_programs": [
+    {
+      "mode": "ReleaseFast",
+      "report": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-fast-program/report.json",
+        "sha256": "109a6ae29e5bcb30f3c4cf0d550dc7d4dfc711217a6bc0bb610167512a22ad6a"
+      },
+      "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+      "local_executions": 1,
+      "reference_executions": 1,
+      "exit_stdout_stderr_matched": true
+    },
+    {
+      "mode": "ReleaseSmall",
+      "report": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/spill-width-small-program/report.json",
+        "sha256": "af02ca0f4b3d22b54c35166a6decbed82a91699a3b6fd37590fc6e66789546b8"
+      },
+      "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+      "local_executions": 1,
+      "reference_executions": 1,
+      "exit_stdout_stderr_matched": true
+    }
+  ],
+  "release_safe": {
+    "selected_functions": 1568,
+    "emitted_functions": 1478,
+    "failed_functions": 90,
+    "first_failure": {
+      "function": "debug.defaultPanic",
+      "diagnostic": "UnsupportedCodegenControlFlow",
+      "selector_tag": "no_emitter",
+      "selector_detail": "composed-block-store-ptr"
+    },
+    "object_bytes": 0,
+    "local_whole_program_executions": 0,
+    "input_sha256": "147ebba2de9f96cae9e6ce53fedd53b6fa082bc46048e51433652e5887a4f60c",
+    "compiler_sha256": "58edefb562dee7b572423aeaf568f9c2693dbf732306692e1c21550f7fe23f3f",
+    "source_equivalence": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-r2-import-verification.json",
+      "sha256": "7a07287312e2a112686752d273561ac9a7d7265d5dde136b10e955f902b5c9c9"
+    },
+    "report": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-r2-frontier.json",
+      "sha256": "3cf3b4f748b019bf5f14aeeeda7ee547d379d7b5dfd3467c39d1035cfb29b9af"
+    },
+    "stderr": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/state-r2-frontier.stderr",
+      "sha256": "a753cd83c3fbf35c6e482dd90b0f45b5e5b7c0e4758b245dbacdfd90586a7a3f"
+    }
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0
+}
