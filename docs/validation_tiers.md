@@ -301,6 +301,14 @@ Direct/release routes in all three modes check 4,608 local observations against
 and alignment checks detect layout and preservation defects. Eighteen mutation
 controls fail as expected. Earlier populations remain separate.
 
+The accepted [scalar startup canary](evidence/scalar_forms_acceptance_20261105.json)
+adds ten functions for scalar min/compare operations, duplicate switch PHI edges,
+and runtime/stack memset. Direct/release routes in all three modes check 3,840
+local observations against 1,920 LLVM references. Exact values, live operands,
+source independence and guards are checked; undef memory is overwritten before
+observation. Twenty-four mutation controls fail as expected. Earlier populations
+remain separate.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine

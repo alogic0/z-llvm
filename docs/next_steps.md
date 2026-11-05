@@ -41,7 +41,25 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [aggregate storage checkpoint](evidence/aggregate_storage_acceptance_20261105.json)
+The accepted [scalar startup checkpoint](evidence/scalar_forms_acceptance_20261105.json)
+at `d8c135e5` passes all 17 integration stages. Unsigned minimum and signed
+less-equal forms reuse scalar compare/select operations. Switch PHI edges retain
+original block identities and privately owned machine labels. Bounded stack
+memset preserves exact extents and memory boundaries. All 1,788 unit tests,
+13 structural checks, 14 focused tests per release mode, captured-object smoke
+and readiness pass. Ten native functions pass 3,840 local observations against
+1,920 LLVM references; twenty-four mutation controls reject wrong results.
+Seventeen earlier native populations and the 100-row/five-function cohort retain
+their counts. Minimum free space is 31.29 GB, above the 24.36 GB reserve.
+At this source revision, the unchanged canonical Fast capture emits 24 of 34
+selected functions and rejects ten, first at `Io.Writer.defaultRebase indirect-call`.
+No complete local Fibonacci object or execution is claimed for this checkpoint.
+Indirect calls, stack arguments and remaining scalar forms precede execution;
+Safe retains its larger separate frontier. The [focused evidence](evidence/scalar_forms_focused_20261105.json)
+records the exact validation and unsupported boundaries. All thirteen original
+probes remain unchanged; no archives were made.
+
+The earlier accepted [aggregate storage checkpoint](evidence/aggregate_storage_acceptance_20261105.json)
 at `fa2371d0` passes all 17 integration stages. Module-owned integer/pointer
 layouts up to 256 bytes retain exact padding and alignment. Flat two-word values
 support loads, stores, insertion, extraction and ordinary call/return carriers.
@@ -439,7 +457,9 @@ through these steps without stopping for another task-selection approval:
 2. Bounded stack structures and flat two-word aggregate loads,
    insertion/extraction and call/return values are accepted above. Larger or
    unsupported layouts remain explicit boundaries.
-3. Resolve remaining scalar and memory-intrinsic forms exposed by those steps.
+3. Unsigned minimum, signed less-equal, switch PHI edges and bounded stack
+   memset are accepted above. Resolve any remaining scalar forms as they emerge
+   in the call and Safe paths.
 4. Support the retained indirect callbacks and their required calling conventions,
    argument placement and result handling.
 5. Emit and link the complete unchanged program, compare it with LLVM in

@@ -1,0 +1,1626 @@
+{
+  "schema": 1,
+  "status": "accepted by full integration",
+  "recorded_utc": "2026-11-05T09:21:04.435081+00:00",
+  "source_revision": "d8c135e5aabab3b411760845524415491cf6fd39",
+  "source_tree": "41521b78a3b58e9a1795fe4b55118e1acf68251f",
+  "source_sha256": {
+    "src/codegen/x86_64/generic_cfg/composed_selector_calls.zig": "e3b98d15cc8b910bd869b0a2f083be9a00701407a2aa2a0c5eb0d214cde2135e",
+    "src/codegen/x86_64/generic_cfg/scalar_forms.zig": "ee3b6ac92d647fb7748a48840c3d7e8d231b47a3a31bb21e05ced4952a5f237b",
+    "src/codegen/x86_64/generic_cfg/scalar_forms_tests.zig": "55920720a30cac0e8ab716dfe703b8d362a9db12e15530614fb10785a779dd16",
+    "src/codegen/x86_64/generic_cfg/switch_phi_edges.zig": "3cb44e09dd2b733463416da53a60f107ef2267b68da7a12b47f9d93ab2baabe8",
+    "src/codegen/x86_64/generic_cfg/value_use/actions/calls.zig": "f80444ce2fd9dda1d5ad3054786f9be31a0ccd6def85f0b1db4e2dca2c68cbfe",
+    "src/codegen/x86_64/generic_cfg/value_use/materialization.zig": "6e691c8413183aa69c3d198fe90b1979c9bbdf616b2a08429b8b661e613361f3",
+    "src/codegen/x86_64/generic_cfg/value_use/planning/compatibility.zig": "c74ba8da9007a117646c42b1641c5cd765f074e9c70204fdf4875b51f1647ed5",
+    "src/codegen/x86_64/generic_cfg_selector.zig": "ca30018e81a7cd2710ab6fcce837c94dbfbc7b096abed794f6ebd7b286b6c065",
+    "src/tests.zig": "fb49b10d5f9b6b2af031c5f70a84fb480a53c38113b08e0522fe8793f943b10b",
+    "test/real_programs/scalar_forms.ll": "624957f350b9dd5b300db72bad598447b1229892928ad88dd6a24906a16df485",
+    "test/real_programs/scalar_forms_driver.c": "95c8b6a0fc30065e5ae59bfb7decfa35e31cec7cda48eecfb76a37ea22ac1e35",
+    "tools/run_upstream_c_program.py": "21a758390b45569a336e97cbe39ac43b19d34790bf8da07f75a48f13708cd402"
+  },
+  "behavior": [
+    "Existing switch lowering is attempted transactionally before private edges are introduced; the original FMA identities and 8192 differential observations pass.",
+    "Private unsigned minimum and signed less-equal expansions reuse existing scalar comparison and select paths.",
+    "Switch predecessors with PHIs receive private edge blocks; duplicate equal incoming edges merge while original block identities and machine-label ownership remain intact.",
+    "Bounded stack memset accepts exact known extents and permitted undef fills; volatile, poison, oversized and unknown-extent forms remain fail-closed.",
+    "The canonical unchanged Fast capture emits 24 of 34 functions and rejects 10, first at an indirect call. No complete local object or execution is claimed for this scalar source revision."
+  ],
+  "known_boundaries": [
+    "Indirect calls, stack arguments, constant aggregate extraction and named saturating subtraction remain ahead of whole-program execution at this accepted revision.",
+    "The separate ReleaseSafe runtime dependency and larger unsupported-form population remain open.",
+    "The full authorized plan continues until the unchanged pinned upstream program executes its original six assertions in Fast, Safe and Small with LLVM-equivalent exit/stdout/stderr."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 12130546276,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-units-r3.json",
+          "sha256": "b783f9c12f669dd056ec2b64a000cd0aea4457b4f434dcde9ed05e5e11e103f7"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-units-r3.log",
+          "sha256": "a3882876d8e52e606c8d725ff59609474e5db1255b0f913febe99d72db14673a"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 412726291,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-structural.json",
+          "sha256": "bd3968a68fc63bc761517a7357a999e705c467472e5587c3f48b7f2b61af26d6"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-structural.log",
+          "sha256": "470114d401d6e2efdb3019530026c1d86a14912f2d5df577ab8978336efb2946"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 5131741698,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-captured-object.json",
+          "sha256": "a92a5d779cd0d320fd1cbc39b7093680c9069027873c63464bb57ca02ac44156"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-captured-object.log",
+          "sha256": "99bf1dcd433a7ae9b1b1e5ece6c77f4c371b97ebd5aac2640cbe11c147de6d5c"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseFast",
+          "-Dtest-filter=scalar forms",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 46323725297,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-ReleaseFast.json",
+          "sha256": "f1d4f5fee88953057bd5c58185dadae88204af7849f9f419ce7d6828a01259c8"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-ReleaseFast.log",
+          "sha256": "ffdcc0f49fe30bf87d9098a23f8e71f013554c8b98cc66b137e18f86639c5f05"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSafe",
+          "-Dtest-filter=scalar forms",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 35109402663,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-ReleaseSafe.json",
+          "sha256": "2bb8311657453901942673d310db05d055d8e138ffecd53856fa3fc36db34d2e"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-ReleaseSafe.log",
+          "sha256": "9b7308bea4b97496f2535e4b4ec291eee40b23c99a0cf1b9e3006e8c12c01bb6"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSmall",
+          "-Dtest-filter=scalar forms",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 13930776676,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-ReleaseSmall.json",
+          "sha256": "1146d377680ceca3713f5075ad7559f32b7aaeb6c60d289c9f39b923134d79b3"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-ReleaseSmall.log",
+          "sha256": "a0e40c9aa181654e1b1a013cfb0bc49191b0309d301304cdc897b8a8f1acaffa"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 443628181580,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-readiness.json",
+          "sha256": "91fb0baf63d6ac3376e136ea2add67daac63904426927d52105a7c1c46bebe2c"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-readiness.log",
+          "sha256": "872d69222e626cbebf763450b2dcbe71f3e20fa4028e7996c5b920d0f9ca7017"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_scalar_native.py",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-r3"
+        ],
+        "returncode": 0,
+        "wall_ns": 1828336857,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-r3.json",
+          "sha256": "8cec0a38c851c7e7f421206088e0824e15ef6176104e802ade00876fc3ccca69"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-r3.log",
+          "sha256": "7e65e483b15d0195da018e6fe2b3c6407e66484fd22b985b043f9068a86041ae"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_scalar_existing_native.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 38317701474,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-existing-native.json",
+          "sha256": "a52568bbb2faa361eb83eefd7c67779599cf65686d8ec326be4de863df424551"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-existing-native.log",
+          "sha256": "b40df3a9e32de634ae8283a2bf8d1f24e16116518d91446c57c09fba40d26f8b"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/check_scalar_controls.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 2742835702,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-controls.json",
+          "sha256": "965da1e950ce022584decb589edeb22829fc6c1bf2271343633b547ac40534b3"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-controls.log",
+          "sha256": "2687d938bcdaf7aa19f252bd0a6b6c4ba13d59d7e16c5ea659a2360b9283c1ea"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 1960910470,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-build.json",
+          "sha256": "49cb0d180607bc390f6fe2e2dcf0b04949888849399c15b7684158d7e8242486"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-build.log",
+          "sha256": "01c655eafcf1d73e89060a689b4ba8d51a74c7728d0b0121b46fffe74ec6300d"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 13135958056,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-units.json",
+          "sha256": "dad2e660456ef7fe19b296799dc0f66bd064fbdbf74b370ee3736f6af8dd60ac"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-units.log",
+          "sha256": "d67c635f6058efd22ebdb0ab6e63a92d6bc1013858b993676528d27fe76e1348"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 419163488,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-structural.json",
+          "sha256": "59cd2d4bd39e333bc5666e8c72ca056e11b6c82eed3a791234f994c5c2042b02"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-structural.log",
+          "sha256": "496a19891166b5e1146ceb06a7c8f7d0d367d558e887e70bc4628b9a7b218f30"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 5179454895,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-captured-object.json",
+          "sha256": "e36e9e9811dcab5f8d965c9492832b8a13a65e6e6ae57622519be929629da37a"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-captured-object.log",
+          "sha256": "99bf1dcd433a7ae9b1b1e5ece6c77f4c371b97ebd5aac2640cbe11c147de6d5c"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/fibonacci-20261104/check_scalar_native.py",
+          "local-state/validations/fibonacci-20261104/scalar-canary-fix-native"
+        ],
+        "returncode": 0,
+        "wall_ns": 1824347173,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-native.json",
+          "sha256": "dcf353eed8879b6599cc758356ee933e33fbe65449aa4066a5d9431e9f8f01d7"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-native.log",
+          "sha256": "3d2fe4c8af9ceee9c80f5840419ed1ee0f67363415c3a316f5370e100dcb0aca"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "run",
+          "tools/run_focused_codegen_canaries.zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 1082349011,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-canaries.json",
+          "sha256": "ca0a07c8a4ed6eeeef7cc303d49902df9833a8227c13a6b46f969e1ea8889b3f"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-canaries.log",
+          "sha256": "6d7381be6229ccea728310b5dbf1882a87d96eb11442182d8edbbdc11d806cc1"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "ZIG_SOURCE_DIR=/home/oleg/prog/ziglang",
+          "ZIG_EMITTER=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 429182556663,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-readiness.json",
+          "sha256": "59f573ac95ffc8dfa773e0df13f263808ac3b74c8a1f3abad3a19174683e590e"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-readiness.log",
+          "sha256": "1f4b7ab538acac9557861a5cb043a18aa88615e78d6006a9b847c6f28bb33f7d"
+        }
+      }
+    ],
+    "unit_tests": 1788,
+    "unit_count_provenance": "All 1788 unit tests pass on the frozen source. Initial test failures exposed a generated-label lifetime bug, an unsupported direct stack load in the test, and a forbidden materialization-to-planning import; subsequent changes fixed ownership and preserved the existing architectural boundary.",
+    "unit_count_log": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-fix-units.log",
+      "sha256": "d67c635f6058efd22ebdb0ab6e63a92d6bc1013858b993676528d27fe76e1348"
+    },
+    "structural_tests": 13,
+    "focused_tests_per_release_mode": 14,
+    "native": {
+      "status": "passed",
+      "scalar_forms_local_observations": 3840,
+      "scalar_forms_reference_observations": 1920,
+      "compiler_sha256": "e01211e8fa5d9d92f8f1a4d58b4fd24b2fd1c3e8ac7487cb8735ec8fd435288f",
+      "inputs": {
+        "test/real_programs/scalar_forms.ll": "624957f350b9dd5b300db72bad598447b1229892928ad88dd6a24906a16df485",
+        "test/real_programs/scalar_forms_driver.c": "95c8b6a0fc30065e5ae59bfb7decfa35e31cec7cda48eecfb76a37ea22ac1e35",
+        "tools/run_upstream_c_program.py": "21a758390b45569a336e97cbe39ac43b19d34790bf8da07f75a48f13708cd402"
+      }
+    },
+    "prototype_native": {
+      "status": "passed",
+      "scalar_forms_local_observations": 3840,
+      "scalar_forms_reference_observations": 1920,
+      "compiler_sha256": "c988877e322e3c9219b547f64788980a19b1a035414578a6c94ef1204a7e8ead",
+      "inputs": {
+        "test/real_programs/scalar_forms.ll": "624957f350b9dd5b300db72bad598447b1229892928ad88dd6a24906a16df485",
+        "test/real_programs/scalar_forms_driver.c": "95c8b6a0fc30065e5ae59bfb7decfa35e31cec7cda48eecfb76a37ea22ac1e35",
+        "tools/run_upstream_c_program.py": "21a758390b45569a336e97cbe39ac43b19d34790bf8da07f75a48f13708cd402"
+      }
+    },
+    "existing_native": {
+      "aggregate_storage_local_observations": 4608,
+      "aggregate_storage_reference_observations": 2304,
+      "narrow_abi_local_observations": 4992,
+      "narrow_abi_reference_observations": 2496,
+      "constant_remainder_local_observations": 3072,
+      "constant_remainder_reference_observations": 1536,
+      "rax_pointer_load_local_observations": 2688,
+      "rax_pointer_load_reference_observations": 1344,
+      "general_array_stride_local_observations": 1920,
+      "general_array_stride_reference_observations": 960,
+      "bounded_frame_local_observations": 768,
+      "bounded_frame_reference_observations": 384,
+      "module_dependencies_local_observations": 330,
+      "module_dependencies_reference_observations": 165,
+      "array_stride_local_observations": 1536,
+      "array_stride_reference_observations": 768,
+      "boolean_calls_local_observations": 1536,
+      "boolean_calls_reference_observations": 768,
+      "global_addresses_local_observations": 192,
+      "global_addresses_reference_observations": 96,
+      "global_memory_local_observations": 240,
+      "global_memory_reference_observations": 120,
+      "type_layout_padding_local_observations": 768,
+      "type_layout_padding_reference_observations": 384,
+      "word_pair_local_observations": 384,
+      "word_pair_reference_observations": 192,
+      "signed_nonnegative_local_observations": 1536,
+      "signed_nonnegative_reference_observations": 768,
+      "integer_pointer_local_observations": 1536,
+      "integer_pointer_reference_observations": 768,
+      "scalar_stack_local_observations": 486,
+      "scalar_stack_reference_observations": 243,
+      "pointer_stack_local_observations": 768,
+      "pointer_stack_reference_observations": 384,
+      "compiler_sha256": "c988877e322e3c9219b547f64788980a19b1a035414578a6c94ef1204a7e8ead",
+      "status": "passed",
+      "module_dependencies_environment_checks": 3,
+      "module_dependencies_negative_controls": 30
+    },
+    "negative_controls": {
+      "status": "passed",
+      "compiler_sha256": "c988877e322e3c9219b547f64788980a19b1a035414578a6c94ef1204a7e8ead",
+      "negative_controls": 24,
+      "cases": [
+        {
+          "control": "lost-minimum",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 2,
+          "rejected": true
+        },
+        {
+          "control": "lost-minimum",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 2,
+          "rejected": true
+        },
+        {
+          "control": "lost-minimum",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 2,
+          "rejected": true
+        },
+        {
+          "control": "lost-minimum",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 2,
+          "rejected": true
+        },
+        {
+          "control": "lost-minimum",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 2,
+          "rejected": true
+        },
+        {
+          "control": "lost-minimum",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 2,
+          "rejected": true
+        },
+        {
+          "control": "wrong-signed-bound",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 4,
+          "rejected": true
+        },
+        {
+          "control": "wrong-signed-bound",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 4,
+          "rejected": true
+        },
+        {
+          "control": "wrong-signed-bound",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 4,
+          "rejected": true
+        },
+        {
+          "control": "wrong-signed-bound",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 4,
+          "rejected": true
+        },
+        {
+          "control": "wrong-signed-bound",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 4,
+          "rejected": true
+        },
+        {
+          "control": "wrong-signed-bound",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 4,
+          "rejected": true
+        },
+        {
+          "control": "wrong-phi",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 7,
+          "rejected": true
+        },
+        {
+          "control": "wrong-phi",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 7,
+          "rejected": true
+        },
+        {
+          "control": "wrong-phi",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 7,
+          "rejected": true
+        },
+        {
+          "control": "wrong-phi",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 7,
+          "rejected": true
+        },
+        {
+          "control": "wrong-phi",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 7,
+          "rejected": true
+        },
+        {
+          "control": "wrong-phi",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 7,
+          "rejected": true
+        },
+        {
+          "control": "wrong-fill",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 10,
+          "rejected": true
+        },
+        {
+          "control": "wrong-fill",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 10,
+          "rejected": true
+        },
+        {
+          "control": "wrong-fill",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 10,
+          "rejected": true
+        },
+        {
+          "control": "wrong-fill",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 10,
+          "rejected": true
+        },
+        {
+          "control": "wrong-fill",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 10,
+          "rejected": true
+        },
+        {
+          "control": "wrong-fill",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 10,
+          "rejected": true
+        }
+      ],
+      "commands": [
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/direct"
+          ],
+          "returncode": 2,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/release"
+          ],
+          "returncode": 2,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/direct"
+          ],
+          "returncode": 2,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/release"
+          ],
+          "returncode": 2,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/direct"
+          ],
+          "returncode": 2,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/release"
+          ],
+          "returncode": 2,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/lost-minimum-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/direct"
+          ],
+          "returncode": 4,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/release"
+          ],
+          "returncode": 4,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/direct"
+          ],
+          "returncode": 4,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/release"
+          ],
+          "returncode": 4,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/direct"
+          ],
+          "returncode": 4,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/release"
+          ],
+          "returncode": 4,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-signed-bound-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/direct"
+          ],
+          "returncode": 7,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/release"
+          ],
+          "returncode": 7,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/direct"
+          ],
+          "returncode": 7,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/release"
+          ],
+          "returncode": 7,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/direct"
+          ],
+          "returncode": 7,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/release"
+          ],
+          "returncode": 7,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-phi-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/direct"
+          ],
+          "returncode": 10,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/release"
+          ],
+          "returncode": 10,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/direct"
+          ],
+          "returncode": 10,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/release"
+          ],
+          "returncode": 10,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/direct"
+          ],
+          "returncode": 10,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/local-state/worktrees/fibonacci-narrow/test/real_programs/scalar_forms_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/release"
+          ],
+          "returncode": 10,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-native-controls/wrong-fill-ReleaseSmall/release-run"
+        }
+      ],
+      "fixture_sha256": "624957f350b9dd5b300db72bad598447b1229892928ad88dd6a24906a16df485",
+      "driver_sha256": "95c8b6a0fc30065e5ae59bfb7decfa35e31cec7cda48eecfb76a37ea22ac1e35",
+      "fixture_unchanged": true,
+      "core_dumps_disabled": true
+    },
+    "source_import": {
+      "status": "passed",
+      "prototype_revision": "2452c2b5",
+      "imported_revision": "4ce8ee10b04ed7f8f328fdcfd680a79c67c52d66",
+      "identical_non_documentation_files": 1535,
+      "original_scratch_files_verified": 13,
+      "archives_created": 0
+    },
+    "canary_repair": {
+      "status": "Tier 2 passed; full integration required",
+      "changed_files": [
+        "src/codegen/x86_64/generic_cfg_selector.zig"
+      ],
+      "original_source_revision": "4ce8ee10b04ed7f8f328fdcfd680a79c67c52d66",
+      "checks": [
+        "scalar-canary-fix-build",
+        "scalar-canary-fix-units",
+        "scalar-canary-fix-structural",
+        "scalar-canary-fix-captured-object",
+        "scalar-canary-fix-native",
+        "scalar-canary-fix-canaries",
+        "scalar-canary-fix-readiness"
+      ],
+      "compiler_sha256": "e01211e8fa5d9d92f8f1a4d58b4fd24b2fd1c3e8ac7487cb8735ec8fd435288f",
+      "failure": "Full scalar integration rejected an altered frozen FMA stream caused by eager switch edge splitting.",
+      "repair": "Try the existing transactional composed lowering before applying switch-edge normalization.",
+      "fma_stream_sha256": "77da479e910f9d1f3334d1ba961e66a1396689cf9f34c2690dbaefb34ae7f83a",
+      "fma_differential_observations": 8192,
+      "original_scratch_files_verified": 13,
+      "archives_created": 0,
+      "record": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-repair-verification.json",
+        "sha256": "893a6166c1d564d2a57b1601ed2a57420bbeb6d8c287650335a90a7b1fc22885"
+      },
+      "patch": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-canary-repair.patch",
+        "sha256": "bb05bd8fbfabc6a0d491ab5fc19a6cb7472d840cc92e27fe9e7d24d5d8dea8e6"
+      }
+    },
+    "prototype_source_snapshot": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-prototype-sources.json",
+      "sha256": "7dc342f532647be5e97084513ac88d71a157383dfce1c7b66983c89ce801a010"
+    }
+  },
+  "fibonacci": {
+    "argv": [
+      "zig-out/bin/z_llvm",
+      "--generic-cfg-selector",
+      "--report-all-codegen-failures",
+      "--target=x86_64-unknown-linux-gnu",
+      "--input-limit=67108864",
+      "--emit=obj",
+      "--codegen-reachable",
+      "local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/object-input.ll"
+    ],
+    "returncode": 1,
+    "input_sha256": "2f72c59ebf876c48b671cbf39890f4a974b8b87545a3a3103d2cce2df85d180a",
+    "compiler_sha256": "e01211e8fa5d9d92f8f1a4d58b4fd24b2fd1c3e8ac7487cb8735ec8fd435288f",
+    "object_bytes": 0,
+    "summary_lines": [
+      "summary zllvm-codegen-selection mode=reachable coverage=complete selected_globals=15 selected_aliases=1",
+      "summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=34 emitted_functions=24 failed_functions=10 first_failing_function=Io.Writer.defaultRebase first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=unsupported_value first_failing_selector_detail=indirect-call local_fail=1"
+    ],
+    "failures": [
+      {
+        "function": "Io.Writer.defaultRebase",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.File.Writer.drainStreaming",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-call-arg-reg"
+      },
+      {
+        "function": "Io.File.Writer.drainPositional",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.File.Writer.seekToUnbuffered",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-indirect-call"
+      },
+      {
+        "function": "Io.Writer.flush",
+        "diagnostic": "UnsupportedCodegenInstruction",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.File.writeStreaming",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-param-reg"
+      },
+      {
+        "function": "Io.operate",
+        "diagnostic": "UnsupportedCodegenInstruction",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.Writer.defaultFlush",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.File.Writer.sendFilePositional",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.File.Writer.sendFileStreaming",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      }
+    ],
+    "local_whole_program_executions": 0,
+    "record": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-repaired-fibonacci.json",
+      "sha256": "e36b9e411e96a721c78ef38b50d3e17966148d813ec25b829b6f1f93bfddbf43"
+    },
+    "stderr": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/scalar-repaired-fibonacci.stderr",
+      "sha256": "1b5a2c0ae90e450bcded0c81fc8d08e6eeb5d5b2d1a2a3416eaa5de43c5ec2f6"
+    },
+    "input_unchanged": true
+  },
+  "original_scratch_files_verified": 13,
+  "archives_created": 0
+}

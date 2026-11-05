@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `fa2371d03a1f5be37e81e71eb7cfd2d092272ed2`; tree: `76f22370c3edc75019ef84da7ae735a47d9096fe`.
+Accepted revision: `d8c135e5aabab3b411760845524415491cf6fd39`; tree: `41521b78a3b58e9a1795fe4b55118e1acf68251f`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,25 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [aggregate storage checkpoint](evidence/aggregate_storage_acceptance_20261105.json)
+The accepted [scalar startup checkpoint](evidence/scalar_forms_acceptance_20261105.json)
+at `d8c135e5` passes all 17 integration stages. Unsigned minimum and signed
+less-equal forms reuse scalar compare/select operations. Switch PHI edges retain
+original block identities and privately owned machine labels. Bounded stack
+memset preserves exact extents and memory boundaries. All 1,788 unit tests,
+13 structural checks, 14 focused tests per release mode, captured-object smoke
+and readiness pass. Ten native functions pass 3,840 local observations against
+1,920 LLVM references; twenty-four mutation controls reject wrong results.
+Seventeen earlier native populations and the 100-row/five-function cohort retain
+their counts. Minimum free space is 31.29 GB, above the 24.36 GB reserve.
+At this source revision, the unchanged canonical Fast capture emits 24 of 34
+selected functions and rejects ten, first at `Io.Writer.defaultRebase indirect-call`.
+No complete local Fibonacci object or execution is claimed for this checkpoint.
+Indirect calls, stack arguments and remaining scalar forms precede execution;
+Safe retains its larger separate frontier. The [focused evidence](evidence/scalar_forms_focused_20261105.json)
+records the exact validation and unsupported boundaries. All thirteen original
+probes remain unchanged; no archives were made.
+
+The earlier accepted [aggregate storage checkpoint](evidence/aggregate_storage_acceptance_20261105.json)
 at `fa2371d0` passes all 17 integration stages. Module-owned integer/pointer
 layouts up to 256 bytes retain exact padding and alignment. Flat two-word values
 support loads, stores, insertion, extraction and ordinary call/return carriers.
@@ -284,8 +302,7 @@ history are retired without archives. The latest
 of superseded AIR after the complete fresh replacement proof, making room for
 the cached run. Both runs now pass; old metadata and hashes remain. The retired
 checkout's dependency links are removed while their target repositories remain.
-The aggregate storage slice is accepted. Continue the authorized full Fibonacci
-plan with scalar/memory and switch-edge forms, then indirect calls and stack
-arguments. Finish the smaller Fast/Small execution path while retaining the
-larger Safe frontier and its runtime dependency. See [next steps](next_steps.md)
-for the full acceptance condition.
+The scalar startup slice is accepted. Continue the authorized full Fibonacci
+plan with indirect calls, stack arguments and remaining scalar forms. Complete
+Fast/Small execution, then continue the larger Safe frontier with its real
+runtime dependency. See [next steps](next_steps.md) for the full acceptance condition.
