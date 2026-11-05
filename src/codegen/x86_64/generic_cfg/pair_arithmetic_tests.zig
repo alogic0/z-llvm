@@ -46,3 +46,31 @@ test "pair arithmetic unsupported divisors operands widths and vectors stay clos
         try std.testing.expect((try forms.legalize(arena.allocator(), module.functions.items[0])) == null);
     }
 }
+
+test "pair arithmetic reuses product words after observing the low word" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\define i128 @project(i64 %a, i64 %b, ptr %out) {
+        \\entry:
+        \\ %wide_a = zext i64 %a to i128
+        \\ %wide_b = zext i64 %b to i128
+        \\ %product = mul i128 %wide_a, %wide_b
+        \\ %low = trunc i128 %product to i64
+        \\ store i64 %low, ptr %out, align 8
+        \\ %count = zext i7 -64 to i128
+        \\ %high = lshr i128 %product, %count
+        \\ ret i128 %high
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const original = module.functions.items[0];
+    const expanded = (try forms.legalize(arena.allocator(), original)).?;
+    for (expanded.blocks.items[0].instructions.items) |inst| {
+        if (inst.kind == .binary and inst.kind.binary.ty.eql(.{ .int = 128 }))
+            try std.testing.expect(inst.kind.binary.op != .lshr);
+    }
+    try std.testing.expectEqual(ir.BinaryOp.lshr, original.blocks.items[0].instructions.items[6].kind.binary.op);
+    try std.testing.expect((try forms.legalize(arena.allocator(), expanded)) == null);
+}

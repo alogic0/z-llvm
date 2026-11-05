@@ -800,3 +800,29 @@ entry:
   %answer = xor i64 %sum, %live
   ret i64 %answer
 }
+
+define i64 @pair_arithmetic_stored_low_named_count(i128 %a, i128 %b, i64 %live, ptr %out) {
+entry:
+  %alo = trunc i128 %a to i64
+  %blo = trunc i128 %b to i64
+  %aw = zext i64 %alo to i128
+  %bw = zext i64 %blo to i128
+  %product = mul i128 %aw, %bw
+  %product_low = trunc i128 %product to i64
+  %observation = getelementptr i8, ptr %out, i64 24
+  store i64 %product_low, ptr %observation, align 8
+  %named_count = zext i7 -64 to i128
+  %v = lshr i128 %product, %named_count
+  %noise = call i64 @pair_arithmetic_clobber(i64 %live)
+  %tag = getelementptr i8, ptr %out, i64 16
+  store i64 %noise, ptr %tag, align 8
+  %lo = trunc i128 %v to i64
+  %shifted = lshr i128 %v, 64
+  %hi = trunc i128 %shifted to i64
+  store i64 %lo, ptr %out, align 8
+  %upper = getelementptr i8, ptr %out, i64 8
+  store i64 %hi, ptr %upper, align 8
+  %sum = add i64 %lo, %hi
+  %answer = xor i64 %sum, %live
+  ret i64 %answer
+}

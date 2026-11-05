@@ -16,6 +16,7 @@ const Builder = struct {
     function: ir.Function,
     block: *ir.BasicBlock,
     serial: *usize,
+    known_parts: *std.StringHashMap(Parts),
 
     fn emit(self: Builder, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
         const name = try forms.temporary(self.allocator, self.function, self.serial);
@@ -43,6 +44,10 @@ const Builder = struct {
             const bits: u128 = @bitCast(value.int);
             return .{ .lo = .{ .int = @as(u64, @truncate(bits)) }, .hi = .{ .int = @as(u64, @truncate(bits >> 64)) } };
         }
+        // Expanded definitions already have exact scalar SSA words. Reuse
+        // those words across later operations instead of projecting a newly
+        // constructed pair and demanding another two-register scratch home.
+        if (self.known_parts.get(value.named)) |parts| return parts;
         // A zero extension already proves the upper word. Use its original
         // scalar operand instead of materializing a redundant pair projection.
         for (self.function.blocks.items) |block| for (block.instructions.items) |inst| {
@@ -64,6 +69,7 @@ const Builder = struct {
         var copy = original;
         copy.kind = .{ .binary = .{ .op = .@"or", .ty = pair, .lhs = lo, .rhs = shifted } };
         try self.block.instructions.append(self.allocator, copy);
+        try self.known_parts.put(original.result.?, parts);
     }
     fn sign(self: Builder, parts: Parts) !ir.Value {
         return self.binary(.ashr, parts.hi, .{ .int = 63 });
@@ -145,10 +151,12 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
     result.blocks = .empty;
     var serial: usize = 0;
     var changed = false;
+    var known_parts = std.StringHashMap(Parts).init(allocator);
+    defer known_parts.deinit();
     for (function.blocks.items) |original| {
         var block = original;
         block.instructions = .empty;
-        const builder: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
+        const builder: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial, .known_parts = &known_parts };
         for (original.instructions.items) |inst| {
             if (!inst.removed and inst.result != null) switch (inst.kind) {
                 .binary => |value| if (value.ty.eql(pair) and operand(value.lhs) and operand(value.rhs)) {
