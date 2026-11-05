@@ -160,6 +160,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (sysv_abi.isVariadicCall(call)) {
         if (try selector_state.preserveVariadicArgumentSources(selector, call)) |diagnostic| return diagnostic;
     }
+    if (try selector_state.preserveCallArgumentSources(selector, call)) |diagnostic| return diagnostic;
     for (call.args.items) |arg| {
         const target = ArgReg.fromIndex(abi_index) catch return .{ .unsupported_value = "composed-block-call-arg-reg" };
         if (try lowerDirectCallArg(selector, arg, target)) |diagnostic| return diagnostic;
@@ -190,7 +191,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
             try transaction.?.define(result_name, .fullRax());
             try transaction.?.commit();
         },
-        128 => {},
+        128 => try selector_state.bindFixedProductResult(selector, result_name),
         else => unreachable,
     };
     return null;
@@ -1503,6 +1504,11 @@ pub fn lowerDirectCallArg(selector: *ComposedBlockSelector, arg: ir.CallArg, tar
             try sysv_abi.rejectUnsupportedCallArgAttrs(arg);
             try selector_state.clobberArgReg(selector, target);
             try selector.machine.instructions.append(selector.allocator, .{ .lea_global_arg64 = .{ .reg = target, .symbol = symbol } });
+            return null;
+        }
+        if (arg.value == .null_value) {
+            try sysv_abi.rejectUnsupportedCallArgAttrs(arg);
+            try selector_state.emitZeroArg64(selector, target);
             return null;
         }
         const loc = selector_state.resolveValue(selector, arg.value) orelse return .{ .unsupported_value = "composed-block-call-unknown-ptr-arg" };

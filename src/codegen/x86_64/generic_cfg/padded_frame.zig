@@ -7,6 +7,8 @@ const syntax = @import("../../../ir/parser_syntax.zig");
 const target = @import("../../../target.zig");
 const machine = @import("../machine.zig");
 const pairs = @import("word_pair_memory.zig");
+const storage = @import("storage_layout.zig");
+const helpers = @import("composed_helpers.zig");
 
 fn trim(text: []const u8) []const u8 {
     return std.mem.trim(u8, text, " \t\r\n");
@@ -61,6 +63,9 @@ fn temporary(allocator: std.mem.Allocator, function: ir.Function, serial: *usize
         for (function.params.items) |param| if (ir.identifiers.eql(param.name, name)) {
             collision = true;
         };
+        for (function.blocks.items) |block| if (ir.identifiers.eql(block.name, name)) {
+            collision = true;
+        };
         for (function.blocks.items) |block| for (block.instructions.items) |inst| {
             if (inst.result) |result| if (ir.identifiers.eql(result, name)) {
                 collision = true;
@@ -103,13 +108,25 @@ fn copyLength(function: ir.Function, value: ir.Value) ?i128 {
 }
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
+    return legalizeImpl(allocator, function, context, false);
+}
+
+pub fn legalizeStorage(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
+    return legalizeImpl(allocator, function, context, true);
+}
+
+fn legalizeImpl(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext, comptime general: bool) !?ir.Function {
     if (!pairs.supportsLayout(context)) return null;
     const dl = target.DataLayout.parse(if (context) |ctx| ctx.target_datalayout orelse "" else "") catch return null;
     inline for (.{ 8, 16, 32 }) |bits| if ((dl.integerAbiAlignmentBits(bits) catch return null) != bits) return null;
     var slots = std.StringHashMap(u32).init(allocator);
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed or inst.kind != .alloca or inst.result == null) continue;
-        const bytes = size(context, inst.kind.alloca.allocated_ty, 0) orelse continue;
+        const ty = inst.kind.alloca.allocated_ty;
+        if (ty != .aggregate or helpers.parseI32ArrayType(ty) != null) continue;
+        const bytes = if (general) (storage.query(context, ty) orelse continue).bytes else size(context, ty, 0) orelse continue;
+        // The private i32-array carrier must describe exactly the object's bytes.
+        if (bytes == 0 or bytes % 4 != 0) continue;
         _ = alignment(inst.kind.alloca) orelse return null;
         try slots.put(inst.result.?, bytes);
     };
@@ -126,8 +143,9 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
             if (!inst.removed) switch (inst.kind) {
                 .alloca => |alloca| if (inst.result) |name| {
                     if (slots.get(name)) |bytes| {
-                        copy.kind.alloca.allocated_ty = .{ .aggregate = if (bytes == 16) "[4 x i32]" else "[6 x i32]" };
-                        copy.kind.alloca.attrs = try std.fmt.allocPrint(allocator, "align {d}", .{alignment(alloca).?});
+                        copy.kind.alloca.allocated_ty = .{ .aggregate = try std.fmt.allocPrint(allocator, "[{d} x i32]", .{bytes / 4}) };
+                        const natural = if (general) storage.query(context, alloca.allocated_ty).?.alignment else 8;
+                        copy.kind.alloca.attrs = try std.fmt.allocPrint(allocator, "align {d}", .{@max(alignment(alloca).?, natural)});
                     }
                 },
                 .load => |load| if (slotSize(slots, load.ptr) != null) {

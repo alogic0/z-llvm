@@ -2410,6 +2410,33 @@ fn dropExpiredAccumulatorBindingsExcept(selector: *ComposedBlockSelector, exclud
     }
 }
 
+/// Preserve the simultaneous call inputs before sequential ABI placement.
+/// In particular, a last-use argument can alias a register filled for an earlier
+/// argument even though it is not live after the call.
+pub fn preserveCallArgumentSources(selector: *ComposedBlockSelector, call: ir.CallInst) !?Diagnostic {
+    var abi_index: usize = 0;
+    for (call.args.items) |arg| {
+        const previous = abi_index;
+        abi_index += composed_helpers.callArgRegisterCount(arg.ty) orelse continue;
+        if (arg.value != .named or !try valueIsLiveAtOrAfterCurrent(selector, arg.value.named)) continue;
+        const loc = resolveValue(selector, arg.value) orelse continue;
+        var overlaps = false;
+        for (0..@min(previous, 6)) |index| {
+            const reg = ArgReg.fromIndex(index) catch unreachable;
+            if (composed_helpers.locContainsReg(loc, reg)) overlaps = true;
+        }
+        if (!overlaps) continue;
+        switch (loc) {
+            .arg32, .arg64, .scratch32, .scratch64, .readonly_table_ptr => {
+                if (try spillValue(selector, arg.value.named)) |diagnostic| return diagnostic;
+            },
+            .arg128, .scratch128 => if (try spillPairValue(selector, arg.value.named)) |diagnostic| return diagnostic,
+            else => {},
+        }
+    }
+    return null;
+}
+
 pub fn spillLiveCallerClobbersForCall(selector: *ComposedBlockSelector) !?Diagnostic {
     const AccumulatorAlias = struct {
         name: []const u8,

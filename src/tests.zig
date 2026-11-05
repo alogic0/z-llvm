@@ -7,6 +7,7 @@ comptime {
     _ = @import("mc/global_data.zig");
     _ = @import("codegen/x86_64/generic_cfg/word_pair_memory_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/padded_frame_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/aggregate_storage_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/general_stride_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/rax_load_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/constant_remainder_tests.zig");

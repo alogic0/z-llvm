@@ -192,7 +192,7 @@ test "bounded frame address authority checks actual extent before emission and r
         .{ .location = .{ .stack128 = 32 }, .extent = 16 },
         .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 4 } }, .extent = 16 },
         .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 6 } }, .extent = 24 },
-        .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 8 } }, .extent = 0 },
+        .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 65 } }, .extent = 0 },
     };
     for (cases) |case| for (0..5) |boundary| {
         var output = machine.MachineFunction.init("frame-address", .ptr);

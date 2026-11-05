@@ -8,6 +8,7 @@ const composed_selector = @import("generic_cfg/composed_selector.zig");
 const address_dependencies = @import("generic_cfg/composed_selector_address_dependencies.zig");
 const abi_legalization = @import("generic_cfg/abi_legalization.zig");
 const narrow_abi = @import("generic_cfg/narrow_abi.zig");
+const word_pair_values = @import("generic_cfg/word_pair_values.zig");
 const word_pair_memory = @import("generic_cfg/word_pair_memory.zig");
 const padded_frame = @import("generic_cfg/padded_frame.zig");
 const global_memory = @import("generic_cfg/global_memory.zig");
@@ -57,10 +58,16 @@ pub fn tryLowerWithContext(
     if (try abi_legalization.paddedHalf(arena.allocator(), function)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
+    if (try word_pair_values.legalize(arena.allocator(), function, module_context)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
     if (try word_pair_memory.legalize(arena.allocator(), function, module_context)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try padded_frame.legalize(arena.allocator(), function, module_context)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
+    if (try padded_frame.legalizeStorage(arena.allocator(), function, module_context)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try global_memory.legalize(arena.allocator(), function, module_context)) |legalized| {

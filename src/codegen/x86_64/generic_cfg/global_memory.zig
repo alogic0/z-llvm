@@ -40,7 +40,7 @@ fn needsRewrite(allocator: std.mem.Allocator, function: ir.Function, context: *c
             switch (inst.kind) {
                 .call => |call| if (memcpy(call) and
                     (addresses.fromValue(call.args.items[0].value) != null or addresses.fromValue(call.args.items[1].value) != null)) return true,
-                .store => |store| if (store.ptr_addrspace == null and addresses.fromValue(store.ptr) != null) return true,
+                .store => |store| if (store.ptr_addrspace == null and (addresses.fromValue(store.ptr) != null or (store.ty == .ptr and store.ty_addrspace == null and addresses.fromValue(store.value) != null))) return true,
                 else => {},
             }
         }
@@ -99,6 +99,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 },
                 .store => |store| if (store.ptr_addrspace == null) {
                     copy.kind.store.ptr = try materialize(allocator, function, &block, &serial, store.ptr);
+                    if (store.ty == .ptr and store.ty_addrspace == null) copy.kind.store.value = try materialize(allocator, function, &block, &serial, store.value);
                 },
                 else => {},
             };

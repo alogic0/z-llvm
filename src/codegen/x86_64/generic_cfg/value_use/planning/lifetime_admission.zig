@@ -70,7 +70,7 @@ pub fn validateRequest(
                 if (request.prepared_action) |action| if (action == .form_byte_address) {
                     const extent: u32 = switch (current) {
                         .stack128 => 16,
-                        .stack_i32_array => |array| if (array.len == 4 or array.len == 6) array.len * 4 else return error.ValueUseUnsupportedAddressForm,
+                        .stack_i32_array => |array| if (array.len > 0 and array.len <= 64) array.len * 4 else return error.ValueUseUnsupportedAddressForm,
                         else => return error.ValueUseUnsupportedAddressForm,
                     };
                     if (action.form_byte_address.offset != .constant or
