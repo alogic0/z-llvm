@@ -46,6 +46,12 @@ def run_variadic_canary(runner, directory, zllvm, environment):
 
 
 MEMORY_CANARIES = {
+    "constant_remainder": {
+        "prefix": "constant-remainder", "fixture": "constant_remainder",
+        "functions": {"remainder_u8", "remainder_u16", "remainder_u32", "remainder_u64", "remainder_signed_spelling", "remainder_one", "remainder_page", "remainder_word"},
+        "observations": 512,
+        "stdout": "constant-remainder observations=512 widths=high-bit=one=branches=calls=live=guards=preserved\n",
+    },
     "rax_pointer_load": {
         "prefix": "rax-pointer-load", "fixture": "rax_pointer_load",
         "functions": {"rax_load_u8", "rax_load_u16", "rax_load_u32", "rax_load_u64", "rax_load_pointer", "rax_load_called", "rax_load_loop"},
@@ -276,6 +282,7 @@ def main():
               "array_stride_local_observations": 0, "array_stride_reference_observations": 0,
               "general_array_stride_local_observations": 0, "general_array_stride_reference_observations": 0,
               "rax_pointer_load_local_observations": 0, "rax_pointer_load_reference_observations": 0,
+              "constant_remainder_local_observations": 0, "constant_remainder_reference_observations": 0,
               "module_dependencies_local_observations": 0, "module_dependencies_reference_observations": 0, "rows": []}
     try:
         if platform.system() != "Linux" or platform.machine() != "x86_64":
@@ -320,7 +327,8 @@ def main():
                            "boolean_calls.ll", "boolean_calls_driver.c",
                            "array_stride.ll", "array_stride_driver.c", "module_dependencies.ll", "module_dependencies_driver.c",
                            "general_array_stride.ll", "general_array_stride_driver.c",
-                           "rax_pointer_load.ll", "rax_pointer_load_driver.c")}})
+                           "rax_pointer_load.ll", "rax_pointer_load_driver.c",
+                           "constant_remainder.ll", "constant_remainder_driver.c")}})
         environment = {k: v for k, v in os.environ.items() if not k.startswith(("ZLLVM_", "ZIG_USE_ZLLVM"))}
         environment.update({"ZIG_LOCAL_CACHE_DIR": str(output / "frontend-cache"),
                             "ZIG_GLOBAL_CACHE_DIR": str(output / "global-cache")})
@@ -399,7 +407,7 @@ def main():
         print(f"summary integer-pointer-casts population=standalone-integer-pointer-casts routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['integer_pointer_local_observations']} reference_observations={report['integer_pointer_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary signed-nonnegative population=standalone-signed-nonnegative routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['signed_nonnegative_local_observations']} reference_observations={report['signed_nonnegative_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
         print(f"summary type-layout-padding population=standalone-type-allocation-padding routes=direct,release modes={report.get('program_modes', 0)} local_observations={report['type_layout_padding_local_observations']} reference_observations={report['type_layout_padding_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}")
-        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies", "bounded_frame", "general_array_stride", "rax_pointer_load"):
+        for population in ("global_addresses", "global_memory", "boolean_calls", "array_stride", "module_dependencies", "bounded_frame", "general_array_stride", "rax_pointer_load", "constant_remainder"):
             extra = f" negative_controls={report.get('module_dependencies_negative_controls', 0)} environment_checks={report.get('module_dependencies_environment_checks', 0)}" if population == "module_dependencies" else ""
             print(f"summary {population.replace('_', '-')} population=standalone-{population.replace('_', '-')} routes=direct,release modes={report.get('program_modes', 0)} local_observations={report[population + '_local_observations']} reference_observations={report[population + '_reference_observations']} reference_reused_per_route=true local_fail={int(report['status'] != 'passed')}{extra}")
         print(f"evidence: {output / 'report.json'}")

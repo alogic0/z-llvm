@@ -568,7 +568,17 @@ fn scalar_immediate_frameless64(
     return null;
 }
 
-pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
+pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []const u8, original: ir.BinaryInst) !?Diagnostic {
+    var binary = original;
+    if (binary.op == .urem) {
+        const bits = intBits(binary.ty) orelse return .{ .no_emitter = "composed-block-binary-not-int" };
+        const mask = composed_helpers.unsignedPowerOfTwoRemainderMask(bits, binary.rhs.int) orelse
+            return .{ .no_emitter = "composed-block-binary-imm-rhs" };
+        // Normalize the proven unsigned operation before typed action planning.
+        // The ordinary AND action retains ownership of writes and rollback.
+        binary.op = .@"and";
+        binary.rhs = .{ .int = mask };
+    }
     const literal = switch (binary.rhs) {
         .int => |int| int,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => unreachable,

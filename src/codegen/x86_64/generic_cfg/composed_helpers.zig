@@ -3,6 +3,19 @@ const std = @import("std");
 pub fn isPositivePowerOfTwoDivisor(literal: i128) bool {
     return literal >= 2 and literal <= (1 << 30) and (literal & (literal - 1)) == 0;
 }
+
+pub fn unsignedPowerOfTwoRemainderMask(bits: u16, literal: i128) ?i128 {
+    switch (bits) {
+        8, 16, 32, 64 => {},
+        else => return null,
+    }
+    const width_mask = (@as(u128, 1) << @intCast(bits)) - 1;
+    const signed_minimum = -(@as(i128, 1) << @intCast(bits - 1));
+    if (literal < signed_minimum or literal > width_mask) return null;
+    const divisor: u64 = @intCast(@as(u128, @bitCast(literal)) & width_mask);
+    if (divisor == 0 or (divisor & (divisor - 1)) != 0) return null;
+    return divisor - 1;
+}
 const ir = @import("../../../ir.zig");
 const sysv_abi = @import("../sysv_abi.zig");
 const x86_64_types = @import("../types.zig");

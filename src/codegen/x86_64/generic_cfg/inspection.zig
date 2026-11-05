@@ -141,7 +141,8 @@ fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
     return switch (binary.op) {
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => null,
         .sdiv => if (binary.ty.eql(.{ .int = 32 }) and valueIsNamed(binary.lhs) and binary.rhs == .int and @import("composed_helpers.zig").isPositivePowerOfTwoDivisor(binary.rhs.int)) null else .{ .unsupported_instruction = @tagName(binary.op) },
-        .udiv, .urem, .srem => .{ .unsupported_instruction = @tagName(binary.op) },
+        .urem => if (binary.ty == .int and valueIsNamed(binary.lhs) and binary.rhs == .int and @import("composed_helpers.zig").unsignedPowerOfTwoRemainderMask(binary.ty.int, binary.rhs.int) != null) null else .{ .unsupported_instruction = @tagName(binary.op) },
+        .udiv, .srem => .{ .unsupported_instruction = @tagName(binary.op) },
         .fadd => if (binary.ty == .half or binary.ty == .float or binary.ty == .double) null else .{ .unsupported_instruction = @tagName(binary.op) },
         .fsub, .fmul, .fdiv => if (binary.ty == .float or binary.ty == .double) null else .{ .unsupported_instruction = @tagName(binary.op) },
         .frem => .{ .unsupported_instruction = @tagName(binary.op) },
