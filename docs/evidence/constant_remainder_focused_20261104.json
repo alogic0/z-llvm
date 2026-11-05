@@ -1,0 +1,1020 @@
+{
+  "schema": 1,
+  "status": "accepted by full integration",
+  "recorded_utc": "2026-11-05T06:14:05.683489+00:00",
+  "source_revision": "cf1b30cdaefede344f95d9599b7bdf468ac7d265",
+  "source_tree": "7df74540ed2da89ef0159eb643d32b5b2ff21006",
+  "source_sha256": {
+    "src/codegen/x86_64/generic_cfg/composed_helpers.zig": "8c18af0a6f79033123faecf311dc14dd6962bfc8430fd9423c2547a3a418cf04",
+    "src/codegen/x86_64/generic_cfg/composed_selector_scalar.zig": "1cfa0d7374e5858560f9ac1d8c496873bc2e23b61910cd031d836c6fcd477708",
+    "src/codegen/x86_64/generic_cfg/constant_remainder_tests.zig": "f5185d537fa22e4936d9a75b590f71d180f9defe438c536dd420a2f4aaea3e84",
+    "src/codegen/x86_64/generic_cfg/inspection.zig": "7c19c11163ef6261b727835adce96d2e0aa88138c668e141829365f468ae65a2",
+    "src/tests.zig": "efd6c7e682f917cd9ddd13100c58ba41a8c730c3dbc8d29c0f7c2a607ba1e53b",
+    "test/real_programs/constant_remainder.ll": "d543ea99a46ae82c94f02fec1c60e2a1ebefcda60da5f088c3c02a7e52c5f33e",
+    "test/real_programs/constant_remainder_driver.c": "9a60e58935133fd89d889a6734e1b30d03bab850026f60db93d78798606f6018",
+    "tools/run_upstream_c_program.py": "d7bc715667ff4fced60afa835536e85ad3737ba23ddaaa765fc647c42a6d82e7"
+  },
+  "behavior": [
+    "Unsigned remainder by a constant power of two lowers to the existing AND path through a private instruction copy.",
+    "The bounded 8/16/32/64-bit classifier accepts one and high-bit divisors, including their signed spelling, and rejects zero, nonpowers and out-of-width literals.",
+    "Native tests preserve original inputs, scalar values and guards across clobbering calls and skipped branches; three modes run direct/release routes against LLVM.",
+    "The unchanged Fibonacci capture passes remainder and now reaches composed-block-call-arg-width."
+  ],
+  "known_boundaries": [
+    "Other divisor forms, signed remainder and widths outside 8/16/32/64 retain existing rules.",
+    "Existing AND preservation/home limits remain: a frameless loaded RAX value with a 2^32 divisor rejects; the retained reproducer records that limitation.",
+    "Fibonacci still has 24 rejected functions out of 34, no whole object, and zero local whole-program executions. The full authorized plan continues with narrow call arguments/returns, storage and aggregate forms, remaining scalar/memory forms, indirect calls, and native program acceptance."
+  ],
+  "validation": {
+    "checks": [
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 13074365546,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-units-final.json",
+          "sha256": "4ca56af69eaa6e0214dfeea6b0952ed01f5a7951391c45125914fe25d4a8d3b3"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-units-final.log",
+          "sha256": "c8ec926635850f55016959af14753675289bb27f9bcbf924249a687ec973e34b"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 394346331,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-structural.json",
+          "sha256": "f0b823c0a474a6ba52a60f0bf7b12033767909b07fa96c193d02d34947ab5a3d"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-structural.log",
+          "sha256": "2740fcc03c37a75bfb22e0516f9bef1f0aa54aef536f256241483159375d2495"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=constant unsigned remainder",
+          "-Dtest-filter=immediate scalar",
+          "-Doptimize=ReleaseFast",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 57323244556,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-fast-final.json",
+          "sha256": "0de6e91db897292607ce169611299034c8a85dfdfb957b05784e403f020bf50b"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-fast-final.log",
+          "sha256": "986044e68985fc2d5d9c7effe8d366972bb149a723d6e29c9f8c8447d4786229"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "test-unit",
+          "-Dtest-filter=constant unsigned remainder",
+          "-Dtest-filter=immediate scalar",
+          "-Doptimize=ReleaseSafe",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 41258966318,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-safe-final.json",
+          "sha256": "9777e16db57adfd03e8e9487b84b28ebce9438cd82e6a815c8ebe2f098040922"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-safe-final.log",
+          "sha256": "390d39b9fe5891d2868aa630902ef55d77a25d463ffe7b08d23b8548216fd011"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "readiness",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 452805284115,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-readiness.json",
+          "sha256": "7959c3624b00651e535d717f2d19e1dec226a555bf2e115ba557bd9920f4ca5b"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-readiness.log",
+          "sha256": "badef9344c2696e71dd68085b62eb9e8bee4df733a586dfb0e69c0ee7ffc4a9c"
+        }
+      },
+      {
+        "argv": [
+          "/home/oleg/.zig/0.17.0/files/zig",
+          "build",
+          "distribution-object",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 5845708896,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-captured-object.json",
+          "sha256": "6610a2760195fffcc0e5ed217bf541b17e229b620fc6dff5c4dddaa9f41d9851"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-captured-object.log",
+          "sha256": "99bf1dcd433a7ae9b1b1e5ece6c77f4c371b97ebd5aac2640cbe11c147de6d5c"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/fibonacci-20261104/check_remainder_native.py",
+          "local-state/validations/fibonacci-20261104/remainder-native-r1"
+        ],
+        "returncode": 0,
+        "wall_ns": 2067382565,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-native-r1.json",
+          "sha256": "c652bba1217a0a362620ef3eac4cb31ebb6b6855b025832320e8dd5fbdd88889"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-native-r1.log",
+          "sha256": "bfed5241fba948d887dafbdafd78525ab5cc688220eb513ae443e8a3b25edce4"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/fibonacci-20261104/check_existing_native.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 33511666589,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-existing-native.json",
+          "sha256": "13c2514d7a00957538846101628a31f199ad3a70e558ccf675c810c9af7ef488"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-existing-native.log",
+          "sha256": "30235f96f6ce10b9acce0170aafc77c838d2f22fa9a46aa54e500ada704df274"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "local-state/validations/fibonacci-20261104/check_controls.py"
+        ],
+        "returncode": 0,
+        "wall_ns": 1972428400,
+        "record": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-controls.json",
+          "sha256": "8cbaaaf33c1424b51f93bde3c27e747db7eeef8f87ce65e9cbcc2c41a7605d53"
+        },
+        "log": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-controls.log",
+          "sha256": "98a7f35f5cedfd54346bf7be306c2674eaa8f7d6d5464ec805be9fc86cd09e18"
+        }
+      }
+    ],
+    "unit_tests": 1773,
+    "structural_tests": 13,
+    "focused_tests_per_release_mode": 32,
+    "native_unit_observations_per_run": 1955,
+    "native": {
+      "status": "passed",
+      "constant_remainder_local_observations": 3072,
+      "constant_remainder_reference_observations": 1536,
+      "compiler_sha256": "ee72286193350795b1defb5384328b7e65058a380ede5bfb616c489ae6779bee",
+      "inputs": {
+        "test/real_programs/constant_remainder.ll": "d543ea99a46ae82c94f02fec1c60e2a1ebefcda60da5f088c3c02a7e52c5f33e",
+        "test/real_programs/constant_remainder_driver.c": "9a60e58935133fd89d889a6734e1b30d03bab850026f60db93d78798606f6018",
+        "tools/run_upstream_c_program.py": "d7bc715667ff4fced60afa835536e85ad3737ba23ddaaa765fc647c42a6d82e7"
+      }
+    },
+    "existing_native": {
+      "rax_pointer_load_local_observations": 2688,
+      "rax_pointer_load_reference_observations": 1344,
+      "general_array_stride_local_observations": 1920,
+      "general_array_stride_reference_observations": 960,
+      "bounded_frame_local_observations": 768,
+      "bounded_frame_reference_observations": 384,
+      "module_dependencies_local_observations": 330,
+      "module_dependencies_reference_observations": 165,
+      "array_stride_local_observations": 1536,
+      "array_stride_reference_observations": 768,
+      "boolean_calls_local_observations": 1536,
+      "boolean_calls_reference_observations": 768,
+      "global_addresses_local_observations": 192,
+      "global_addresses_reference_observations": 96,
+      "global_memory_local_observations": 240,
+      "global_memory_reference_observations": 120,
+      "type_layout_padding_local_observations": 768,
+      "type_layout_padding_reference_observations": 384,
+      "word_pair_local_observations": 384,
+      "word_pair_reference_observations": 192,
+      "signed_nonnegative_local_observations": 1536,
+      "signed_nonnegative_reference_observations": 768,
+      "integer_pointer_local_observations": 1536,
+      "integer_pointer_reference_observations": 768,
+      "scalar_stack_local_observations": 486,
+      "scalar_stack_reference_observations": 243,
+      "pointer_stack_local_observations": 768,
+      "pointer_stack_reference_observations": 384,
+      "compiler_sha256": "ee72286193350795b1defb5384328b7e65058a380ede5bfb616c489ae6779bee",
+      "status": "passed",
+      "module_dependencies_environment_checks": 3,
+      "module_dependencies_negative_controls": 30
+    },
+    "negative_controls": {
+      "status": "passed",
+      "compiler_sha256": "ee72286193350795b1defb5384328b7e65058a380ede5bfb616c489ae6779bee",
+      "negative_controls": 12,
+      "cases": [
+        {
+          "control": "wrong-mask",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-mask",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-mask",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-mask",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-mask",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "wrong-mask",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-live-input",
+          "mode": "ReleaseFast",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-live-input",
+          "mode": "ReleaseFast",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-live-input",
+          "mode": "ReleaseSafe",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-live-input",
+          "mode": "ReleaseSafe",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-live-input",
+          "mode": "ReleaseSmall",
+          "route": "direct",
+          "exit_status": 1,
+          "rejected": true
+        },
+        {
+          "control": "lost-live-input",
+          "mode": "ReleaseSmall",
+          "route": "release",
+          "exit_status": 1,
+          "rejected": true
+        }
+      ],
+      "commands": [
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/constant_remainder_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/constant_remainder_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/constant_remainder_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/constant_remainder_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/constant_remainder_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/constant_remainder_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/wrong-mask-ReleaseSmall/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/constant_remainder_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-fast-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/constant_remainder_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseFast/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/constant_remainder_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-safe-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/constant_remainder_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSafe/release-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/direct-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/constant_remainder_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/direct.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/direct"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/direct-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/direct"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/direct-run"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--pipeline=zig-release-small-accepted",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/optimize"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/zig-out/bin/z_llvm",
+            "--generic-cfg-selector",
+            "--target=x86_64-unknown-linux-gnu",
+            "--emit=obj",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/optimized.ll"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/release-object"
+        },
+        {
+          "argv": [
+            "cc",
+            "-O2",
+            "-no-pie",
+            "-Wl,-z,noexecstack",
+            "/home/oleg/prog/z_llvm/test/real_programs/constant_remainder_driver.c",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/release.o",
+            "-o",
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/release"
+          ],
+          "returncode": 0,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/release-link"
+        },
+        {
+          "argv": [
+            "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/release"
+          ],
+          "returncode": 1,
+          "stem": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/native-controls/lost-live-input-ReleaseSmall/release-run"
+        }
+      ],
+      "fixture_sha256": "d543ea99a46ae82c94f02fec1c60e2a1ebefcda60da5f088c3c02a7e52c5f33e",
+      "driver_sha256": "9a60e58935133fd89d889a6734e1b30d03bab850026f60db93d78798606f6018",
+      "fixture_unchanged": true,
+      "core_dumps_disabled": true
+    }
+  },
+  "fibonacci": {
+    "argv": [
+      "zig-out/bin/z_llvm",
+      "--generic-cfg-selector",
+      "--report-all-codegen-failures",
+      "--target=x86_64-unknown-linux-gnu",
+      "--input-limit=67108864",
+      "--emit=obj",
+      "--codegen-reachable",
+      "local-state/validations/module-selection-20261103/fibonacci-r2/ReleaseFast/capture/object-input.ll"
+    ],
+    "returncode": 1,
+    "input_sha256": "2f72c59ebf876c48b671cbf39890f4a974b8b87545a3a3103d2cce2df85d180a",
+    "compiler_sha256": "ee72286193350795b1defb5384328b7e65058a380ede5bfb616c489ae6779bee",
+    "object_bytes": 0,
+    "summary_lines": [
+      "summary zllvm-codegen-selection mode=reachable coverage=complete selected_globals=15 selected_aliases=1",
+      "summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=34 emitted_functions=10 failed_functions=24 first_failing_function=start.expandStackSize first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=no_emitter first_failing_selector_detail=composed-block-call-arg-width local_fail=1"
+    ],
+    "failures": [
+      {
+        "function": "start.expandStackSize",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-call-arg-width"
+      },
+      {
+        "function": "recursive_fibonacci.main",
+        "diagnostic": "UnsupportedCodegenValue",
+        "selector_tag": "no_spill_envelope",
+        "selector_detail": "composed-block-spill-frame"
+      },
+      {
+        "function": "posix.setrlimit",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-call-ret-width"
+      },
+      {
+        "function": "recursive_fibonacci.assert",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-param-i8-extension"
+      },
+      {
+        "function": "c.errno__func_20",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-icmp-form"
+      },
+      {
+        "function": "posix.getrlimit",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-memset-value"
+      },
+      {
+        "function": "debug.assert",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-param-i8-extension"
+      },
+      {
+        "function": "Thread.maybeAttachSignalStack",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "alloca"
+      },
+      {
+        "function": "posix.sigaltstack",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-call-ret-width"
+      },
+      {
+        "function": "Io.File.Writer.drain",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_instruction",
+        "selector_detail": "insertvalue"
+      },
+      {
+        "function": "Io.Writer.defaultRebase",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "extractvalue-aggregate"
+      },
+      {
+        "function": "Io.File.Writer.drainStreaming",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "alloca"
+      },
+      {
+        "function": "Io.File.Writer.drainPositional",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "alloca"
+      },
+      {
+        "function": "Io.Writer.consume",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "load"
+      },
+      {
+        "function": "Io.File.Writer.seekTo",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-call-ret-width"
+      },
+      {
+        "function": "Io.File.Reader.Mode.toStreaming",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-param-i8-extension"
+      },
+      {
+        "function": "Io.File.Writer.seekToUnbuffered",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "alloca"
+      },
+      {
+        "function": "Io.Writer.flush",
+        "diagnostic": "UnsupportedCodegenInstruction",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "indirect-call"
+      },
+      {
+        "function": "Io.File.writeStreaming",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "alloca"
+      },
+      {
+        "function": "Io.Writer.buffered",
+        "diagnostic": "UnsupportedCodegenInstruction",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "unsupported-return-type"
+      },
+      {
+        "function": "Io.operate",
+        "diagnostic": "UnsupportedCodegenInstruction",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "alloca"
+      },
+      {
+        "function": "Io.Writer.defaultFlush",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "extractvalue-aggregate"
+      },
+      {
+        "function": "Io.File.Writer.sendFilePositional",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "alloca"
+      },
+      {
+        "function": "Io.File.Writer.sendFileStreaming",
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "alloca"
+      }
+    ],
+    "local_whole_program_executions": 0,
+    "record": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-fibonacci-r1.json",
+      "sha256": "592f0e6bc0231fdf991751440907c9aca73619c0fe1c5b1b4abad1ef38530a5f"
+    },
+    "stderr": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/fibonacci-20261104/remainder-fibonacci-r1.stderr",
+      "sha256": "37201ee1df8d4522ffc2114a58513771ca0cd0b542e36883d117c4c81dcfcd34"
+    },
+    "input_unchanged": true
+  },
+  "full_plan": {
+    "objective": "Build and execute the unchanged pinned recursive_fibonacci.zig through the local backend in ReleaseFast, ReleaseSafe and ReleaseSmall; retain mandatory all-mode regression and full integration proof.",
+    "starting_revision": "f3e2d1df8af6e6a40446a9ed67237066c8ab19d7",
+    "baseline_report": "local-state/validations/rax-load-20261104/fibonacci-r1.json",
+    "baseline_selected": 34,
+    "baseline_emitted": 10,
+    "baseline_failed": 24,
+    "baseline_local_executions": 0,
+    "steps": [
+      "constant unsigned remainder",
+      "narrow parameters and returns",
+      "stack and aggregate storage",
+      "remaining scalar and memory operations",
+      "indirect call ABI",
+      "unchanged full-program execution and permanent gate"
+    ],
+    "validation_policy": "docs/validation_tiers.md",
+    "required_start_bytes": 32949672960,
+    "runtime_reserve_bytes": 24359738368,
+    "original_scratch_sha256": {
+      "scratch/test_bitset.ll": "b34f6bfd3750284e36ff225111aed27e7961f570048b42628b375cfa99a6d8eb",
+      "scratch/test_llvm.ll": "17738822b102735f481bddb59f6bf63b4ddfdf48d9f9812008167e7c7cb35da6",
+      "scratch/test_query_debug.ll": "3a0798cb323fe6928565a8e5d450e85312df8437f2a79d5583d2a618a658d11c",
+      "scratch/test_size.zig": "a255ebc31f0eba577c2b616708dbb42a1727b9bc29b839abf2c30a1c35b57f10",
+      "scratch/test_opt.zig": "c2cfadc84692240bdfaca03406cae67692310b30fd11fcfb94a338fc80c95242",
+      "scratch/test_abi.zig": "e889e005850511755f57196e564a41e486686b9fd4f98c478482c969b7638d32",
+      "scratch/test_bitset.zig": "a0ae945f89311108811a07bdfaf65ddd2e9b453b59436df15c66dce739b6e137",
+      "scratch/test_init.zig": "38c327156a57e8a989db2d7ff35fafcb6fba9ae761bfafabf965ef92b71c343e",
+      "scratch/test_chunkstate_layout.zig": "8f12f11ced9863d48bb1e949ab5c414db8005d80569fb6bfb27b17a2a91473d6",
+      "scratch/test_query.ll": "99d0ca5c1b9472ef33bf9eb2dbf2cf8c05c69aab775588109826b763b233d476",
+      "scratch/test_offset.zig": "8b49ea64bf64a90fbd741d299eb1bacaccf24e5805073a08303dbfa26dec9534",
+      "scratch/test_query.zig": "5c7cbb510723d088f389cc932a67222e72ad736b651189c6b3e88bffd6fe3dbf",
+      "scratch/test_abi.s": "d439a7beb674e08b519923b308207f6c510f463ab229af7ca098fd1ce0ccdb15"
+    },
+    "archives_created": 0
+  },
+  "baseline": {
+    "path": "local-state/validations/rax-load-20261104/fibonacci-r1.json",
+    "sha256": "e42439614bc6c37ee01f9e71ea349696578ff78b85ab85d2de3740bf835c1d2c"
+  },
+  "frameless_boundary": {
+    "argv": [
+      "zig-out/bin/z_llvm",
+      "--generic-cfg-selector",
+      "--report-all-codegen-failures",
+      "--emit=obj",
+      "--target=x86_64-unknown-linux-gnu",
+      "local-state/validations/fibonacci-20261104/remainder-frameless-limit.ll"
+    ],
+    "returncode": 1,
+    "object_bytes": 0,
+    "stderr": "zllvm-codegen-failure function=remainder_frameless diagnostic=UnsupportedCodegenControlFlow selector_tag=unsupported_value selector_detail=stage2-binary-value\nsummary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=1 emitted_functions=0 failed_functions=1 first_failing_function=remainder_frameless first_failing_diagnostic=UnsupportedCodegenControlFlow first_failing_selector_tag=unsupported_value first_failing_selector_detail=stage2-binary-value local_fail=1\n",
+    "input_sha256": "beecb4b0b528afbb74eee5ef680868803a43199dc80001c00aa1d2a7950a71cd"
+  },
+  "fixture_development": [
+    "remainder-r1 and remainder-r2 exposed the existing frameless loaded-RAX mask limitation; the exhaustive width test now supplies a frame, and a separate single-block native test proves supported frameless argument homes."
+  ],
+  "original_scratch_files_verified": 13,
+  "archives_created": 0
+}

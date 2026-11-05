@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `c6b46f0c38f56c6bdb159c2c4eb784da7699bb9d`; tree: `714168c2a384da14c7d0cd1463307c4a9f961c56`.
+Accepted revision: `cf1b30cdaefede344f95d9599b7bdf468ac7d265`; tree: `7df74540ed2da89ef0159eb643d32b5b2ff21006`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,25 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [RAX pointer-load checkpoint](evidence/rax_load_acceptance_20261104.json)
+The accepted [constant remainder checkpoint](evidence/constant_remainder_acceptance_20261104.json)
+at `cf1b30cd` passes all 17 integration stages. Unsigned remainder by a
+constant power of two now uses the existing AND lowering at 8/16/32/64 bits,
+including divisor one and high-bit divisors with signed or unsigned spelling.
+The original IR remains unchanged. Existing preservation/home limits remain;
+the [focused evidence](evidence/constant_remainder_focused_20261104.json) retains
+the frameless loaded-RAX limitation for a 2^32 divisor.
+All 1,773 units, 13 structural checks, 32 focused tests in each of ReleaseFast
+and ReleaseSafe, captured-object smoke and readiness pass. Eight native functions
+pass 3,072 local observations against 1,536 LLVM references, and twelve mutation
+controls reject wrong masks or lost live inputs. Fourteen earlier populations,
+the fixed 100-row/five-function counts and bypass ratchet remain unchanged.
+Minimum reported free space is 41.68 GB, above the 24.36 GB reserve.
+Fibonacci still emits ten of 34 selected functions and rejects 24, now first at
+`start.expandStackSize composed-block-call-arg-width`. No complete local object
+or whole-program execution is claimed. All 13 original probes remain unchanged;
+no archives were made.
+
+The earlier accepted [RAX pointer-load checkpoint](evidence/rax_load_acceptance_20261104.json)
 at `c6b46f0c` passes all 17 integration stages on a frozen 2,726-file snapshot.
 Ordinary integer and pointer loads now stage RAX addresses before preparing the
 accumulator result, using the same typed address helper as stores. Physical write
@@ -226,7 +244,8 @@ history are retired without archives. The latest
 of superseded AIR after the complete fresh replacement proof, making room for
 the cached run. Both runs now pass; old metadata and hashes remain. The retired
 checkout's dependency links are removed while their target repositories remain.
-The RAX ordinary-load slice is accepted. Next, support unsigned remainder by a
-constant power of two through existing typed scalar operations, with exact-width
-native checks and full integration. See [next steps](next_steps.md) for the
-retained reproducer and later Fibonacci boundaries.
+The constant remainder slice is accepted. The authorized goal is now the full
+unchanged Fibonacci program in all three release modes. Continue with narrow
+call arguments and returns, then the remaining stack/aggregate, scalar/memory
+and indirect-call forms. See [next steps](next_steps.md) for the work order and
+the whole-program acceptance condition.

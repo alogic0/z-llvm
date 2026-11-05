@@ -41,7 +41,25 @@ runtime execution pass across 0, 32, and 64 byte inputs.
 
 ## Current checkpoint and next work
 
-The accepted [RAX pointer-load checkpoint](evidence/rax_load_acceptance_20261104.json)
+The accepted [constant remainder checkpoint](evidence/constant_remainder_acceptance_20261104.json)
+at `cf1b30cd` passes all 17 integration stages. Unsigned remainder by a
+constant power of two now uses the existing AND lowering at 8/16/32/64 bits,
+including divisor one and high-bit divisors with signed or unsigned spelling.
+The original IR remains unchanged. Existing preservation/home limits remain;
+the [focused evidence](evidence/constant_remainder_focused_20261104.json) retains
+the frameless loaded-RAX limitation for a 2^32 divisor.
+All 1,773 units, 13 structural checks, 32 focused tests in each of ReleaseFast
+and ReleaseSafe, captured-object smoke and readiness pass. Eight native functions
+pass 3,072 local observations against 1,536 LLVM references, and twelve mutation
+controls reject wrong masks or lost live inputs. Fourteen earlier populations,
+the fixed 100-row/five-function counts and bypass ratchet remain unchanged.
+Minimum reported free space is 41.68 GB, above the 24.36 GB reserve.
+Fibonacci still emits ten of 34 selected functions and rejects 24, now first at
+`start.expandStackSize composed-block-call-arg-width`. No complete local object
+or whole-program execution is claimed. All 13 original probes remain unchanged;
+no archives were made.
+
+The earlier accepted [RAX pointer-load checkpoint](evidence/rax_load_acceptance_20261104.json)
 at `c6b46f0c` passes all 17 integration stages on a frozen 2,726-file snapshot.
 Ordinary integer and pointer loads now stage RAX addresses before preparing the
 accumulator result, using the same typed address helper as stores. Physical write
@@ -369,12 +387,29 @@ reported as `start.expandStackSize composed-block-binary-imm-rhs`.
 The [focused evidence](evidence/rax_load_focused_20261104.json) retains a small
 control-flow reproducer with that exact rejection and a successful Clang compile.
 
-Next, lower bounded unsigned remainder by constant powers of two through existing
-typed immediate scalar operations. Check exact integer widths, zero/high-bit
-inputs, live operands, EFLAGS and rollback, with native comparisons and matching
-integration. Arbitrary or zero divisors, signed remainder and narrower call ABI
-forms remain separate later work. Keep fixed populations, default legacy
-selection and the bypass ratchet unchanged.
+The [constant remainder checkpoint](evidence/constant_remainder_acceptance_20261104.json)
+accepts that bounded unsigned operation. The unchanged capture now reaches
+`composed-block-call-arg-width`; all 24 function failures remain tracked.
+
+The user authorized implementation of the complete Fibonacci plan. Continue
+through these steps without stopping for another task-selection approval:
+
+1. Resolve narrow call arguments/returns and boolean parameter handling.
+2. Resolve the main function's spill frame, remaining stack structures and
+   aggregate loads, insertion/extraction and return values.
+3. Resolve remaining scalar and memory-intrinsic forms exposed by those steps.
+4. Support the retained indirect callbacks and their required calling conventions,
+   argument placement and result handling.
+5. Emit and link the complete unchanged program, compare it with LLVM in
+   ReleaseFast, ReleaseSafe and ReleaseSmall, and add it as a permanent regression
+   before full integration acceptance.
+
+Rerun the whole captured failure report after each implementation change;
+newly exposed failures update the work order. Completion requires all six original
+assertions to pass with matching exit status/stdout/stderr through the local
+backend. Use the validation tiers for provisional commits and family acceptance.
+Keep fixed populations, default legacy selection, the bypass ratchet and agreed
+disk limits unchanged. Preserve the original scratch probes and create no archives.
 
 Keep broader optional ABIs and
 floating/indirect/aggregate/stack varargs as explicit boundaries. Use the frozen

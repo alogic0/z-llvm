@@ -277,6 +277,14 @@ and rollback reject or restore state before publication. All 1,770 units,
 integration pass. The thirteen earlier native populations and all fixed
 compiler-core and compiler-rt counters remain unchanged.
 
+The accepted [constant remainder canary](evidence/constant_remainder_acceptance_20261104.json)
+adds eight functions covering 8/16/32/64-bit power-of-two divisors, signed spelling
+of a high-bit divisor, divisor one, page and word boundaries. Direct/release
+routes in three modes check 3,072 local observations against 1,536 LLVM references.
+Clobbering calls, skipped branches, live inputs and output guards are checked.
+Twelve mutation controls reject wrong masks and lost input values. Unit execution
+checks 1,955 additional observations per run. Earlier populations remain separate.
+
 Inside the i128 and fma cases, the mandatory runner uses the same production
 canary implementation as the standalone focused tool to require the frozen
 __multi3 and fma machine
