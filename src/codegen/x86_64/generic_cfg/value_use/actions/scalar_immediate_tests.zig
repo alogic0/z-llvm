@@ -1248,3 +1248,96 @@ test "value-use immediate scalar rollback spans preservation scratch and multi-i
         try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
     }
 }
+
+test "value-use immediate mixed-width accumulator aliases retain full bits through poisoned spills" {
+    const encoding = @import("../../../../../mc/encoding.zig");
+    const verify = @import("../../../verify.zig");
+    const row = PlanRow{ .id = "mixed-width-spill", .direction = .rhs, .operation = .add, .bits = 32, .literal = 9, .accumulator = true, .scratch = false, .writes = 1 };
+    for ([_][]const u8{ "wide", "9", "alias-a", "prior-result" }) |wide_name| {
+        var machine = MachineFunction.init(row.id, .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try support.addLive(&plan, wide_name);
+        try support.addLive(&plan, "narrow");
+        try addAtCurrent(&plan, "source");
+        try addAtCurrent(&plan, "result");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 136;
+        try selector_state.bindValueLoc(&selector, wide_name, .rax);
+        try selector_state.bindValueLoc(&selector, "narrow", .eax);
+        try selector_state.bindValueLoc(&selector, "source", .{ .arg32 = .rsi });
+        try machine.instructions.appendSlice(std.testing.allocator, &.{ .{ .sub_rsp_imm32 = 136 }, .{ .mov_imm_rax = -1 } });
+        for (0..16) |slot| try machine.instructions.append(std.testing.allocator, .{ .spill_rax_rsp = selector_state.spillFrameIndex(slot) });
+        try machine.instructions.append(std.testing.allocator, .{ .mov_arg_rax = .rdi });
+        {
+            var transaction = try Transaction.begin(&selector);
+            defer transaction.deinit();
+            const handle = try registerImmediate(&transaction, row);
+            try transaction.seal();
+            try transaction.prepare();
+            try transaction.materializeAll();
+            try transaction.executePreparedAction(try transaction.preparedView(handle));
+            try transaction.commit();
+        }
+        try std.testing.expect((try selector_state.spillValue(&selector, wide_name)) == null);
+        try selector_state.emitValueIntoRax(&selector, .{ .named = wide_name });
+        try machine.instructions.appendSlice(std.testing.allocator, &.{ .{ .add_rsp_imm32 = 136 }, .ret });
+        try verify.verifyFunction(machine);
+        const code = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(code);
+        const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..code.len], code);
+        const run: *const fn (u64, u32) callconv(.c) u64 = @ptrCast(memory.ptr);
+        for ([_]u64{ 0, 1, 65535, 0xffffffff, 0x123456789abcdef0, std.math.maxInt(u64) }) |input| {
+            try std.testing.expectEqual(input, run(input, 17));
+        }
+    }
+}
+
+test "value-use immediate mixed-width preservation rolls back every alias" {
+    const row = PlanRow{ .id = "mixed-width-rollback", .direction = .rhs, .operation = .add, .bits = 32, .literal = 9, .accumulator = true, .scratch = false, .writes = 1 };
+    for ([_]Transaction.ImmediateScalarTestFailure{ .after_preservation, .after_canonical_refresh }) |boundary| {
+        var machine = MachineFunction.init(row.id, .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try support.addLive(&plan, "wide");
+        try support.addLive(&plan, "narrow");
+        try addAtCurrent(&plan, "source");
+        try addAtCurrent(&plan, "result");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 136;
+        try selector_state.bindValueLoc(&selector, "wide", .rax);
+        try selector_state.bindValueLoc(&selector, "narrow", .eax);
+        try selector_state.bindValueLoc(&selector, "source", .{ .arg32 = .rsi });
+        const before_wide = selector.values.get("wide").?;
+        const before_narrow = selector.values.get("narrow").?;
+        const before_source = selector.values.get("source").?;
+        const before_next = selector.next_virtual_reg;
+        const before_dependencies = selector.address_dependencies;
+        const before_flags = selector.eflags.snapshot();
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handle = try registerImmediate(&transaction, row);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.setImmediateScalarTestFailure(boundary);
+        try std.testing.expectError(error.ValueUseImmediateScalarTestFailure, transaction.executePreparedAction(try transaction.preparedView(handle)));
+        try std.testing.expectEqual(before_wide, selector.values.get("wide").?);
+        try std.testing.expectEqual(before_narrow, selector.values.get("narrow").?);
+        try std.testing.expectEqual(before_source, selector.values.get("source").?);
+        try std.testing.expectEqual(before_next, selector.next_virtual_reg);
+        try std.testing.expect(std.meta.eql(before_dependencies, selector.address_dependencies));
+        try selector.eflags.validateSnapshot(before_flags);
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+        try std.testing.expect(selector.values.get("result") == null);
+    }
+}

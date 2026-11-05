@@ -363,7 +363,7 @@ fn preserveImmediateUnrelatedAccumulator(
         .accumulator,
         source_index,
     ) orelse return;
-    const preserve_name = switch (preamble) {
+    var preserve_name = switch (preamble) {
         .scratch_preferred => live_name,
         .spill_source => switch (transaction.selector.values.get(source_name).?.loc) {
             .eax, .rax => source_name,
@@ -371,6 +371,16 @@ fn preserveImmediateUnrelatedAccumulator(
         },
         .none => unreachable,
     };
+    // A narrow alias does not describe the full physical value. Preserve a
+    // RAX binding whenever one shares this home, so a later 64-bit spill or
+    // use cannot observe truncated bits or an unwritten half of a stack slot.
+    var aliases = transaction.selector.values.iterator();
+    while (aliases.next()) |entry| {
+        if (entry.value_ptr.loc == .rax) {
+            preserve_name = entry.key_ptr.*;
+            break;
+        }
+    }
     switch (preamble) {
         .scratch_preferred => {
             if (try selector_state.preserveLiveAccumulatorValue(
@@ -411,7 +421,12 @@ fn preserveImmediateUnrelatedAccumulator(
             }
         }
         const name = alias_name orelse break;
-        try selector_state.bindValueLoc(transaction.selector, name, preserved_loc);
+        const alias_loc: selector_types.ValueLoc = if (transaction.selector.values.get(name).?.loc == .eax and
+            preserved_loc == .scratch64)
+            .{ .scratch32 = preserved_loc.scratch64 }
+        else
+            preserved_loc;
+        try selector_state.bindValueLoc(transaction.selector, name, alias_loc);
     }
     try failImmediateScalarForTest(transaction, .after_preservation);
     try refreshImmediateScalarSource(Authority, transaction, source_index);
