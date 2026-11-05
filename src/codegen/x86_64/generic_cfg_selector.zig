@@ -110,14 +110,23 @@ pub fn tryLowerWithContext(
     if (try padded_frame.legalizeStorage(arena.allocator(), function, module_context)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
+    if (try @import("generic_cfg/address_forms.zig").legalize(arena.allocator(), function, module_context)) |legalized| {
+        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
     if (try stack_addresses.legalize(arena.allocator(), function, module_context)) |legalized| {
         if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try @import("generic_cfg/pointer_values.zig").legalize(arena.allocator(), function, module_context)) |legalized| {
+        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try global_memory.legalize(arena.allocator(), function, module_context)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
+    if (try @import("generic_cfg/block_order.zig").legalize(arena.allocator(), function)) |legalized| {
+        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     switch (inspected) {

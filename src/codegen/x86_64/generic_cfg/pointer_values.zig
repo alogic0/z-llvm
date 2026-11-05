@@ -82,6 +82,10 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                     } } });
                     copy.kind.cast.value = .{ .named = name };
                 },
+                .icmp => |cmp| if (cmp.operand_ty == .ptr) {
+                    copy.kind.icmp.lhs = try materialize(allocator, function, &block, &serial, cmp.lhs);
+                    copy.kind.icmp.rhs = try materialize(allocator, function, &block, &serial, cmp.rhs);
+                },
                 .gep => |gep| if (gep.ptr_addrspace == null and addresses.fromGep(gep) == null and constant(gep.ptr) and !try tableGep(allocator, context, gep)) {
                     copy.kind.gep.ptr = try materialize(allocator, function, &block, &serial, gep.ptr);
                 },

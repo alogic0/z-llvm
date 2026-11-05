@@ -2,6 +2,7 @@ const std = @import("std");
 
 comptime {
     _ = @import("codegen/x86_64/generic_cfg/pointer_values_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/address_flow_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/narrow_abi_tests.zig");
     _ = @import("air_export_cache.zig");
     _ = @import("codegen/x86_64/symbol_address.zig");

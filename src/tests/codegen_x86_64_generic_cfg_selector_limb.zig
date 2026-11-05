@@ -968,7 +968,7 @@ test "generic cfg selector emits limb64 not envelope through opt-in selector" {
     try std.testing.expectEqual(.not_limb64_rdi_rsi_dl_cx, machine.instructions.items[0]);
 }
 
-test "generic cfg selector keeps limb64 not near miss fail-closed" {
+test "address flow composes limb64 not near miss without a legacy envelope" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -990,11 +990,37 @@ test "generic cfg selector keeps limb64 not near miss fail-closed" {
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try std.testing.expectEqual(.composed_block, machine.selection_owner);
+    for (machine.instructions.items) |instruction|
+        try std.testing.expect(instruction != .not_limb64_rdi_rsi_dl_cx);
+    try codegen.x86_64.verifyFunction(machine);
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const helper = [_]u8{ 0x89, 0xf8, 0x83, 0xc0, 0x07, 0xc1, 0xe8, 0x03, 0xc3 };
+    const memory = try std.posix.mmap(null, bytes.len + helper.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(memory);
+    @memcpy(memory[0..bytes.len], bytes);
+    @memcpy(memory[bytes.len..], &helper);
+    var offset: usize = 0;
+    var calls: usize = 0;
+    for (machine.instructions.items) |instruction| {
+        if (instruction == .direct_call) {
+            try std.testing.expectEqualStrings("zig.target.intByteSize", instruction.direct_call.symbol);
+            std.mem.writeInt(i32, memory[offset + 1 ..][0..4], @intCast(bytes.len - offset - 5), .little);
+            calls += 1;
+        }
+        offset += mc.encoding.instructionSize(instruction);
+    }
+    try std.testing.expectEqual(@as(usize, 1), calls);
+    const run: *const fn (*u64, *const u64, u8, u16) callconv(.c) void = @ptrCast(memory.ptr);
+    for ([_]u64{ 0, 1, 2, 0xdeadbeef01234567, 0x8000000000000000, std.math.maxInt(u64) }) |input| {
+        var output = [_]u64{ 123, 0, 456 };
+        run(&output[1], &input, 0, 64);
+        try std.testing.expectEqual(~input, output[1]);
+        try std.testing.expectEqual(@as(u64, 123), output[0]);
+        try std.testing.expectEqual(@as(u64, 456), output[2]);
+    }
 }
 
 test "generic cfg selector emits limb64 bitwise envelopes through opt-in selector" {

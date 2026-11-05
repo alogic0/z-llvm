@@ -11,7 +11,24 @@ fn named(value: ir.Value, name: []const u8) bool {
     return value == .named and ir.identifiers.eql(value.named, name);
 }
 
-fn scalarUse(function: ir.Function, name: []const u8) bool {
+fn boundedMemoryUses(function: ir.Function, name: []const u8, bytes: u32) bool {
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (inst.removed or inst.kind != .call) continue;
+        const call = inst.kind.call;
+        const memory = std.mem.startsWith(u8, call.callee, "llvm.memcpy.") or
+            std.mem.startsWith(u8, call.callee, "llvm.memmove.") or
+            std.mem.startsWith(u8, call.callee, "llvm.memset.");
+        if (!memory) continue;
+        for (call.args.items) |arg| if (arg.ty == .ptr and named(arg.value, name)) {
+            if (call.args.items.len != 4) return false;
+            const length = call.args.items[2].value;
+            if (length != .int or length.int < 0 or length.int > bytes) return false;
+        };
+    };
+    return true;
+}
+
+fn scalarUse(function: ir.Function, name: []const u8, bytes: u32) bool {
     for (function.blocks.items) |block| {
         for (block.instructions.items) |inst| {
             if (inst.removed) continue;
@@ -20,7 +37,29 @@ fn scalarUse(function: ir.Function, name: []const u8) bool {
                     for (phi.incoming.items) |incoming| if (named(incoming.value, name)) return true;
                 },
                 .select => |select| if (select.ty == .ptr and (named(select.true_value, name) or named(select.false_value, name))) return true,
-                .store => |store| if (store.ty == .ptr and named(store.value, name)) return true,
+                .store => |store| {
+                    if (store.ty == .ptr and named(store.value, name)) return true;
+                    const width: u32 = if (store.ty == .ptr) 64 else if (store.ty == .int) store.ty.int else 0;
+                    if (named(store.ptr, name) and width > 0 and width <= 64 and (width + 7) / 8 <= bytes) return true;
+                },
+                .load => |load| {
+                    const width: u32 = if (load.ty == .ptr) 64 else if (load.ty == .int) load.ty.int else 0;
+                    if (named(load.ptr, name) and width > 0 and width <= 64 and (width + 7) / 8 <= bytes) return true;
+                },
+                .call => |call| if (call.inline_asm == null and call.raw_args == null) {
+                    const memory = std.mem.startsWith(u8, call.callee, "llvm.memcpy.") or
+                        std.mem.startsWith(u8, call.callee, "llvm.memmove.") or
+                        std.mem.startsWith(u8, call.callee, "llvm.memset.");
+                    for (call.args.items, 0..) |arg, index| {
+                        if (arg.ty != .ptr or !named(arg.value, name)) continue;
+                        if (memory) {
+                            if (index > 1 or call.args.items.len != 4) continue;
+                            const length = call.args.items[2].value;
+                            if (length != .int or length.int < 0 or length.int > bytes) continue;
+                        }
+                        return true;
+                    }
+                },
                 .cast => |cast| if (cast.from_ty == .ptr and named(cast.value, name)) return true,
                 .icmp => |icmp| if (icmp.operand_ty == .ptr and (named(icmp.lhs, name) or named(icmp.rhs, name))) return true,
                 .gep => |gep| if (named(gep.ptr, name)) {
@@ -45,9 +84,10 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         // Aggregate allocation admission belongs to padded_frame. Only its
         // concrete array carrier and native scalar objects enter this view.
         if (alloca.allocated_ty == .aggregate and helpers.parseI32ArrayType(alloca.allocated_ty) == null) continue;
-        if (!scalarUse(function, inst.result.?)) continue;
+        const layout = storage.query(context, alloca.allocated_ty) orelse continue;
+        if (!scalarUse(function, inst.result.?, layout.bytes)) continue;
+        if (!boundedMemoryUses(function, inst.result.?, layout.bytes)) return null;
         if (!alloca.isSingleObject() or alloca.allocated_ty_addrspace != null) return null;
-        const layout = storage.query(context, alloca.allocated_ty) orelse return null;
         var alignment = layout.alignment;
         if (alloca.attrs) |attrs| {
             const text = std.mem.trim(u8, attrs, " \t\r\n");
