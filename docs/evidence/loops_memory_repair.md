@@ -105,7 +105,8 @@ and the original baseline evidence is preserved at
 is versioned to schema 1, population `fixed-architecture-programs-v2`, with
 `"unsupported": {}`. All 15 pairs are fully supported.
 
-The standalone runner [`tools/fixed_program_baseline.py`](../../tools/fixed_program_baseline.py)
+The historical Python baseline runner (now replaced by the
+[Zig runner](../../tools/fixed_program_baseline.zig))
 executed two full measurement runs on logical CPU 2 (`AMD Ryzen 7 7840HS`, Zig 0.17.0,
 LLVM 22.1.8). Raw measured samples, summaries and identities are retained in
 [`docs/evidence/loops_memory_repair/`](loops_memory_repair/).

@@ -38,8 +38,10 @@ diagnostic are frozen in the manifest. It has no measured compile-time, runtime
 or size result. Other failures, semantic mismatches, missing tools, unexpected
 support changes and structural fallback fail the procedure.
 
-The [standalone runner](../../tools/fixed_program_baseline.py) uses Python 3's
-standard library. It performs all builds, links, LLVM verification, semantic
+The historical runner used Python 3's standard library. Its
+[Zig successor](../../tools/fixed_program_baseline.zig) is documented in the
+[tooling migration](../validation_tools.md); the measurements below retain their
+original timing procedure. The runner performs builds, links, LLVM verification, semantic
 comparisons and ownership checks before timing a workload. Scalar semantic
 drivers compare all 272 original boundary/LCG results; the memset driver checks
 1,442 observations plus both SIGILL bounds traps. Runtime-driver output must

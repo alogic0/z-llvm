@@ -299,7 +299,7 @@ pub fn main(init: std.process.Init) !void {
     defer allocator.free(program_root);
     const program_arg = try std.fmt.allocPrint(allocator, "--output-root={s}", .{program_root});
     defer allocator.free(program_arg);
-    const program_result = try common.runCapture(allocator, io, &.{ "python3", "tools/run_real_program.py", program_arg }, "unchanged upstream hello libc");
+    const program_result = try common.runCapture(allocator, io, &.{ "zig", "run", "tools/run_real_program.zig", "--", program_arg }, "unchanged upstream hello libc");
     defer common.freeRunResult(allocator, program_result);
     try stdout_writer.interface.writeAll(program_result.stdout);
     try stdout_writer.interface.flush();
@@ -308,7 +308,7 @@ pub fn main(init: std.process.Init) !void {
     defer allocator.free(c_program_root);
     const c_program_arg = try std.fmt.allocPrint(allocator, "--output-root={s}", .{c_program_root});
     defer allocator.free(c_program_arg);
-    const c_program_result = try common.runCapture(allocator, io, &.{ "python3", "tools/run_upstream_c_program.py", c_program_arg }, "unchanged upstream C fixture");
+    const c_program_result = try common.runCapture(allocator, io, &.{ "zig", "run", "tools/run_upstream_c_program.zig", "--", c_program_arg }, "unchanged upstream C fixture");
     defer common.freeRunResult(allocator, c_program_result);
     try stdout_writer.interface.writeAll(c_program_result.stdout);
     try stdout_writer.interface.flush();

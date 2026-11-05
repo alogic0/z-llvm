@@ -30,6 +30,13 @@ with per-file digests. See [tool dependency provenance](tools/vendor/README.md).
 Standalone and nested `zig run tools/FILE.zig` commands keep their existing
 interface; `zig build verify-regex-source` verifies the snapshot.
 
+Program validation, candidate selection/fact freezing, and performance
+measurement run in Zig with pinned `zig-process` and `zig-test-support`
+sources. The maintained tools require no Python interpreter. Run
+`zig build real-program-policy-tests verify-validation-sources` for their
+policy and lifecycle tests. See [validation tooling](docs/validation_tools.md)
+for commands, provenance and the migration boundary.
+
 The independent source-analysis CLI is also pinned for this repository:
 
 ```sh

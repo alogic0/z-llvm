@@ -1,6 +1,10 @@
 # Active direction
 
-Current action: stopped after the accepted arithmetic/hash slice, as requested.
+Current action: migrate the maintained Python validation tools to Zig, as
+requested, using the pinned process and support libraries from the inventory.
+Complete the tool equivalence checks, frozen performance protocol and integration
+validation, then stop. The compiler work remains stopped after the accepted
+arithmetic/hash slice, as requested.
 Do not resume the i65/i96 draft or another Fibonacci family without a new user
 request. The unchanged Safe program still has 46 emission failures; the first is
 `debug.writeCurrentStackTrace` / `inline-asm-call`. Fixed acceptance counters

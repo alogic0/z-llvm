@@ -117,11 +117,11 @@ pub fn build(b: *std.Build) void {
     addToolStep(b, "byte-loops-diff", "Execute checked strncpy and scalar byte loops against LLVM", "tools/run_byte_loops_diff.zig");
     addToolStep(b, "memcpy-diff", "Execute retained checked memcpy and compositions against LLVM", "tools/run_memcpy_diff.zig");
     addToolStepWithArgs(b, "behavioral-diff", "Execute composed programs against an independent LLVM reference", "tools/run_behavioral_diff.zig");
-    const real_program_run = b.addSystemCommand(&.{ "python3", "tools/run_real_program.py" });
+    const real_program_run = b.addSystemCommand(&.{ b.graph.zig_exe, "run", "tools/run_real_program.zig", "--" });
     real_program_run.step.dependOn(b.getInstallStep());
     real_program_run.addPassthruArgs();
     b.step("real-program", "Compare an unchanged pinned upstream Zig program with local optimizer and codegen").dependOn(&real_program_run.step);
-    const upstream_c_run = b.addSystemCommand(&.{ "python3", "tools/run_upstream_c_program.py" });
+    const upstream_c_run = b.addSystemCommand(&.{ b.graph.zig_exe, "run", "tools/run_upstream_c_program.zig", "--" });
     upstream_c_run.step.dependOn(b.getInstallStep());
     upstream_c_run.addPassthruArgs();
     b.step("upstream-c-program", "Compare the unchanged upstream C fixture and integer-varargs native canary").dependOn(&upstream_c_run.step);
@@ -129,11 +129,43 @@ pub fn build(b: *std.Build) void {
     addToolStep(b, "check-zig-stage4-emitter", "Check the authoritative Zig stage4 emitter", "tools/check_zig_stage4_emitter.zig");
     addToolStep(b, "focused-codegen-canaries", "Run procedural fma and __multi3 codegen canaries (non-gating)", "tools/run_focused_codegen_canaries.zig");
     addToolStepWithArgs(b, "real-candidates-v2", "Build the mode-stable real-row candidate denominator", "tools/build_real_candidates_v2.zig");
-    const candidates_v3_run = b.addSystemCommand(&.{ "python3", "tools/build_real_candidates_v3.py" });
+    const candidates_v3_run = b.addSystemCommand(&.{ b.graph.zig_exe, "run", "tools/build_real_candidates_v3.zig", "--" });
     candidates_v3_run.addPassthruArgs();
     b.step("real-candidates-v3", "Derive the audited current-pin candidate population").dependOn(&candidates_v3_run.step);
-    const real_policy_tests = b.addSystemCommand(&.{ "python3", "-m", "unittest", "discover", "-s", "tools", "-p", "test_real_*.py" });
-    b.step("real-program-policy-tests", "Check candidate admission and object provenance negative controls").dependOn(&real_policy_tests.step);
+    addToolStepWithArgs(b, "freeze-real-candidate-facts", "Freeze and verify semantic candidate facts without deleting raw inputs", "tools/freeze_real_candidate_facts.zig");
+    addToolStepWithArgs(b, "fixed-program-baseline", "Measure the frozen non-gating workload matrix", "tools/fixed_program_baseline.zig");
+    addToolStepWithArgs(b, "run-checked", "Capture a command with durable logs and disk telemetry", "tools/run_checked.zig");
+    addToolStepWithArgs(b, "validation-progress", "Read a validation command's durable progress", "tools/validation_progress.zig");
+    addToolStepWithArgs(b, "validation-snapshot", "Freeze or verify source membership and hashes", "tools/validation_snapshot.zig");
+    const process_module = b.createModule(.{ .root_source_file = b.path("tools/vendor/process/src/root.zig"), .target = b.graph.host, .optimize = optimize });
+    const process_fixture = b.addExecutable(.{ .name = "validation-process-fixture", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/vendor/process/tests/fixture.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "process", .module = process_module }},
+    }) });
+    const validation_options = b.addOptions();
+    validation_options.addOptionPath("fixture", process_fixture.getEmittedBin());
+    const checked_probe = b.addExecutable(.{ .name = "validation-checked-probe", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/run_checked.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    validation_options.addOptionPath("checked_runner", checked_probe.getEmittedBin());
+    validation_options.addOption([]const u8, "workspace_root", std.Io.Dir.cwd().realPathFileAlloc(b.graph.io, ".", b.allocator) catch @panic("workspace path unavailable"));
+    const real_policy_tests = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/validation_tests.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    real_policy_tests.root_module.addOptions("test_options", validation_options);
+    const policy_run = b.addRunArtifact(real_policy_tests);
+    policy_run.has_side_effects = true;
+    const verify_validation = b.addSystemCommand(&.{ "sha256sum", "--check", "--quiet", "tools/vendor/process.SHA256SUMS", "tools/vendor/test_support.SHA256SUMS" });
+    verify_validation.setCwd(b.path("."));
+    policy_run.step.dependOn(&verify_validation.step);
+    b.step("verify-validation-sources", "Verify pinned process and test-support provider sources").dependOn(&verify_validation.step);
+    b.step("real-program-policy-tests", "Check process lifecycle, candidate admission and object provenance controls").dependOn(&policy_run.step);
     const derive_real_candidate_definition_run = b.addSystemCommand(&.{
         b.graph.zig_exe,
         "run",
