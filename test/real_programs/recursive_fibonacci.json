@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "source": "test/cases/recursive_fibonacci.zig",
+  "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+  "target": "x86_64-linux-gnu",
+  "cpu": "baseline",
+  "modes": ["ReleaseFast", "ReleaseSafe", "ReleaseSmall"],
+  "stdout": "",
+  "exit_status": 0,
+  "local_pipeline": "preopt",
+  "link_driver": "zig-compiler-rt",
+  "extra_compile_args": ["-fsingle-threaded"],
+  "remaining_dependencies": ["libLLVM IR construction", "Zig linker and compiler-rt", "libc and CRT", "single-threaded Zig startup"]
+}

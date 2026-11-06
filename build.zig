@@ -126,6 +126,10 @@ pub fn build(b: *std.Build) void {
     real_program_run.step.dependOn(b.getInstallStep());
     real_program_run.addPassthruArgs();
     b.step("real-program", "Compare an unchanged pinned upstream Zig program with local optimizer and codegen").dependOn(&real_program_run.step);
+    const fibonacci_run = b.addSystemCommand(&.{ b.graph.zig_exe, "run", "tools/run_real_program.zig", "--", "--manifest=test/real_programs/recursive_fibonacci.json", "--codegen-reachable" });
+    fibonacci_run.step.dependOn(b.getInstallStep());
+    fibonacci_run.addPassthruArgs();
+    b.step("fibonacci-regression", "Execute the unchanged pinned Fibonacci program in Fast, Safe and Small").dependOn(&fibonacci_run.step);
     const upstream_c_run = b.addSystemCommand(&.{ b.graph.zig_exe, "run", "tools/run_upstream_c_program.zig", "--" });
     upstream_c_run.step.dependOn(b.getInstallStep());
     upstream_c_run.addPassthruArgs();

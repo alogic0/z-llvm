@@ -304,6 +304,18 @@ pub fn main(init: std.process.Init) !void {
     try stdout_writer.interface.writeAll(program_result.stdout);
     try stdout_writer.interface.flush();
     if (!common.termOk(program_result.term)) try common.forwardCommandFailure(io, "unchanged upstream hello libc", program_result);
+    const fibonacci_root = try temp.join(allocator, "unchanged-recursive-fibonacci");
+    defer allocator.free(fibonacci_root);
+    const fibonacci_result = try common.runCapture(allocator, io, &.{
+        "zig",           "run",          "tools/run_real_program.zig", "--",
+        "--output-root", fibonacci_root, "--manifest",                 "test/real_programs/recursive_fibonacci.json",
+        "--zig-emitter", zig_emitter,    "--zig-source",               zig_source_dir,
+        "--zllvm",       zllvm_exe,      "--codegen-reachable",
+    }, "unchanged upstream recursive Fibonacci");
+    defer common.freeRunResult(allocator, fibonacci_result);
+    try stdout_writer.interface.writeAll(fibonacci_result.stdout);
+    try stdout_writer.interface.flush();
+    if (!common.termOk(fibonacci_result.term)) try common.forwardCommandFailure(io, "unchanged upstream recursive Fibonacci", fibonacci_result);
     const c_program_root = try temp.join(allocator, "unchanged-upstream-c");
     defer allocator.free(c_program_root);
     const c_program_arg = try std.fmt.allocPrint(allocator, "--output-root={s}", .{c_program_root});

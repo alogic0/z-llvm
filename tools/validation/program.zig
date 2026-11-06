@@ -36,6 +36,13 @@ pub fn selectedModes(c: *u.Context, args: u.Args, manifest: u.Value) ![]const []
     }
     return available;
 }
+pub fn linkDriver(args: u.Args, manifest: u.Value) !enum { system, zig_compiler_rt } {
+    const driver = if (manifest.object.get("link_driver")) |value| try u.json.string(value) else "system";
+    if (std.mem.eql(u8, driver, "system")) return .system;
+    if (!std.mem.eql(u8, driver, "zig-compiler-rt")) return error.UnsupportedProgramLinkDriver;
+    if (args.get("linker") != null) return error.ConflictingProgramLinker;
+    return .zig_compiler_rt;
+}
 pub fn argv(c: *u.Context, first: []const []const u8, last: []const []const u8) ![]const []const u8 {
     return std.mem.concat(c.a, []const u8, &.{ first, last });
 }
@@ -131,6 +138,7 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, manifest_path: []con
     const procedure = try provenance.tools(c);
     try u.put(c.a, report, "tool_provenance", procedure);
     const manifest = try c.load(try c.join(&.{manifest_path}));
+    _ = try linkDriver(args, manifest);
     const modes = try selectedModes(c, args, manifest);
     const source_root = try c.join(&.{args.get("zig-source") orelse "../ziglang"});
     const zig = try c.join(&.{args.get("zig-emitter") orelse try c.join(&.{ source_root, "build/stage4/bin/zig" })});
@@ -146,6 +154,8 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, manifest_path: []con
     try u.put(c.a, report, "source", u.s(source));
     try u.put(c.a, report, "source_sha256", u.s(try c.digest(source)));
     try u.put(c.a, report, "zig_revision", u.s(pin));
+    try u.put(c.a, report, "zig_emitter_sha256", u.s(try c.digest(zig)));
+    try u.put(c.a, report, "link_driver", manifest.object.get("link_driver") orelse u.s("system"));
     try u.put(c.a, report, "zllvm_sha256", u.s(try c.digest(zllvm)));
     try u.put(c.a, report, "source_head", u.s(u.trim(try c.capture(&.{ "git", "rev-parse", "HEAD" }))));
     for ([_][]const u8{ "target", "cpu", "remaining_dependencies" }) |key| try u.put(c.a, report, key, try u.get(manifest, key));
@@ -187,7 +197,7 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     const linker = args.get("linker") orelse "cc";
     try u.put(c.a, row, "failure_stage", u.s("reference-link"));
     const reference_exe = try c.join(&.{ directory, "reference" });
-    if ((try runner.run(&.{ linker, "-no-pie", reference, "-o", reference_exe }, try c.join(&.{ directory, "reference-link" }), base_env, .{})).code != 0) return;
+    if ((try runner.run(try linkCommand(c, args, manifest, zig, linker, mode, reference, reference_exe, global_cache), try c.join(&.{ directory, "reference-link" }), base_env, .{})).code != 0) return;
     try u.increment(c.a, report, "reference_executions", 1);
     try u.put(c.a, row, "failure_stage", u.s("reference-execution"));
     runner.observe(reference_exe, &.{}, try u.json.integer(try u.get(manifest, "exit_status")), try u.str(manifest, "stdout"), try c.join(&.{ directory, "reference-run" }), base_env) catch |err| {
@@ -244,7 +254,7 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     try u.put(c.a, row, "object_sha256", u.s(try c.digest(candidate)));
     try u.put(c.a, row, "failure_stage", u.s("local-link"));
     const candidate_exe = try c.join(&.{ directory, "candidate" });
-    if ((try runner.run(&.{ linker, "-no-pie", candidate, "-o", candidate_exe }, try c.join(&.{ directory, "local-link" }), base_env, .{})).code != 0) return;
+    if ((try runner.run(try linkCommand(c, args, manifest, zig, linker, mode, candidate, candidate_exe, global_cache), try c.join(&.{ directory, "local-link" }), base_env, .{})).code != 0) return;
     try u.increment(c.a, row, "local_executions", 1);
     try u.increment(c.a, report, "local_executions", 1);
     try u.put(c.a, row, "failure_stage", u.s("local-execution"));
@@ -255,4 +265,15 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     try u.put(c.a, row, "status", u.s("matched"));
     try u.put(c.a, row, "failure_stage", .null);
     try u.increment(c.a, report, "matched_program_modes", 1);
+}
+
+fn linkCommand(c: *u.Context, args: u.Args, manifest: u.Value, zig: []const u8, linker: []const u8, mode: []const u8, object: []const u8, executable: []const u8, global_cache: []const u8) ![]const []const u8 {
+    if (try linkDriver(args, manifest) == .system) return c.a.dupe([]const u8, &.{ linker, "-no-pie", object, "-o", executable });
+    // Both objects use the same pinned runtime and CRT. This only links the
+    // already admitted object; it does not compile the program source again.
+    return c.a.dupe([]const u8, &.{
+        zig,                                        "build-exe", object,                        "-lc",                                                 "-fcompiler-rt",      "-fllvm",     "-flibllvm",   "-fno-lto",
+        try c.fmt("-O{s}", .{mode}),                "-target",   try u.str(manifest, "target"), try c.fmt("-mcpu={s}", .{try u.str(manifest, "cpu")}), "--global-cache-dir", global_cache, "--cache-dir", try c.fmt("{s}-link-cache", .{executable}),
+        try c.fmt("-femit-bin={s}", .{executable}),
+    });
 }

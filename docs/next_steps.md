@@ -1,6 +1,16 @@
 # Active direction
 
-Current action: stopped after completing the requested
+Current action: resume compiler work under the
+[Fibonacci completion plan](plans/2026-11-05-fibonacci-completion.md), following
+the user's new authorization. The working compiler emits all 1,568 definitions
+in the retained Safe input. Unchanged pinned Fibonacci now executes all six
+assertions in Fast, Safe and Small with LLVM-equivalent status and output.
+The permanent regression is wired into integration. The accepted compiler
+checkpoint is unchanged until the new full integration run passes.
+The [completion evidence](evidence/fibonacci_completion.md) records the changes,
+native execution results and remaining boundaries.
+
+The preceding completed task was the requested
 [Python-to-Zig tooling migration](evidence/python_tools_migration_20261105.json)
 at `978ffaf9`. All nine maintained Python modules were replaced using the pinned
 `zig-process` and `zig-test-support` sources. All 22 policy/provider tests pass in
@@ -13,10 +23,8 @@ cross-engine timings do not establish a speedup. See the
 
 Obsolete build caches and the verified temporary export cache were removed,
 with hashes, metadata and reports retained. No archives were made. The compiler
-source and accepted status remain unchanged; compiler work remains stopped
-after the accepted arithmetic/hash slice, as requested.
-Do not resume the i65/i96 draft or another Fibonacci family without a new user
-request. The unchanged Safe program still has 46 emission failures; the first is
+source and accepted status remained unchanged during that tooling task.
+At that tooling checkpoint, unchanged Safe had 46 emission failures; the first was
 `debug.writeCurrentStackTrace` / `inline-asm-call`. Fixed acceptance counters
 remain 100 lowered/emitted/linked and five executed functions per mode, with
 compiler-rt bypass ratchet 130.
@@ -85,11 +93,12 @@ their fixes, exact source identities, and the native `Wyhash.init` check.
 Unchanged pinned Fibonacci executes all six assertions in Fast and Small with
 LLVM-equivalent exit status, stdout and stderr. Safe emits 1,522 of 1,568
 functions; 46 failures still prevent whole-program emission and execution.
-The first is `debug.writeCurrentStackTrace` / `inline-asm-call`.
+The first was `debug.writeCurrentStackTrace` / `inline-asm-call`.
 The broader i65/i96 work remains an uncommitted diagnostic draft under
 `local-state/worktrees/fibonacci-crash-investigation`; it is excluded from this
 acceptance. The thirteen original scratch probes remain unchanged; no archives
-were made. Work is stopped after this slice at the user's request.
+were made. That slice was stopped at the user's request; the active plan above
+records the subsequent authorization to continue.
 
 The earlier accepted [atomic, pointer, frame and call checkpoint](evidence/fibonacci_state_acceptance_20261105.json)
 at `4242debd` passes all 17 integration stages. Scalar atomics preserve old

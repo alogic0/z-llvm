@@ -39,6 +39,23 @@ test "real program JSON summary preserves the prior success and failure log cont
     const blocked = try u.toValue(f.c.a, .{ .local_executions = 0, .matched_program_modes = 0, .reference_executions = 1, .status = "blocked" });
     try equal("{\"local_executions\": 0, \"matched_program_modes\": 0, \"reference_executions\": 1, \"status\": \"blocked\"}", try @import("validation/program.zig").summaryJson(&f.c, blocked));
 }
+test "program runtime linking requires an explicit known manifest driver without a conflicting linker" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const program = @import("validation/program.zig");
+    var args: u.Args = .{ .values = std.StringHashMap([]const u8).init(f.c.a) };
+    var manifest = u.object(f.c.a);
+    try expect(try program.linkDriver(args, manifest) == .system);
+    try u.put(f.c.a, &manifest, "link_driver", u.s("zig-compiler-rt"));
+    try expect(try program.linkDriver(args, manifest) == .zig_compiler_rt);
+    try args.values.put("linker", "cc");
+    try std.testing.expectError(error.ConflictingProgramLinker, program.linkDriver(args, manifest));
+    try u.put(f.c.a, &manifest, "link_driver", u.s("system"));
+    try expect(try program.linkDriver(args, manifest) == .system);
+    try u.put(f.c.a, &manifest, "link_driver", u.s("unknown"));
+    try std.testing.expectError(error.UnsupportedProgramLinkDriver, program.linkDriver(args, manifest));
+}
 test "command wrapper preserves binary log, durable failure, cancellation and owned child cleanup" {
     var f: Fixture = undefined;
     try f.init();
