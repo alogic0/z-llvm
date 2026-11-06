@@ -462,6 +462,11 @@ test "value-use planning split guard freezes the revised facade DAG and internal
         ),
     );
 
+    const physical: [:0]const u8 = @embedFile("../value_use/planning/physical_mapping.zig");
+    const missing_parallel_plan = try replaceOnceSentinel(std.testing.allocator, physical, "transaction.parallel_sources = parallelSourceSnapshots(graph);", "transaction.parallel_sources = @splat(false);");
+    defer std.testing.allocator.free(missing_parallel_plan);
+    try std.testing.expectError(error.ValueUsePlanningInternalOwnershipMismatch, validatePlanningInternalOwnership("src/codegen/x86_64/generic_cfg/value_use/planning/physical_mapping.zig", missing_parallel_plan));
+
     const core: [:0]const u8 = @embedFile("../value_use/core.zig");
     const bypassed_alias = try replaceOnceSentinel(
         std.testing.allocator,

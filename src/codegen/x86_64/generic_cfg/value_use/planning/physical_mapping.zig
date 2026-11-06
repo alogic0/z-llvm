@@ -16,7 +16,6 @@ const RegPair = selector_types.RegPair;
 const ValueLoc = selector_types.ValueLoc;
 const ComposedBlockSelector = state_data.ComposedBlockSelector;
 const Mapping = planning_model.Mapping;
-const CopyVisitState = planning_model.CopyVisitState;
 const ActionIdentity = Types.ActionIdentity;
 const physical_node_count = Types.physical_node_count;
 const max_mappings = Types.max_mappings;
@@ -55,6 +54,8 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
     errdefer {
         semantic_ordering.resetSemanticOrderPlan(Authority, transaction);
         transaction.store_address_registers = @splat(null);
+        transaction.parallel_sources = @splat(false);
+        transaction.transfer_nodes = @splat(false);
     }
     // Validate the action-owned role graph before destination planning can
     // obscure a semantic ownership contradiction with a physical conflict.
@@ -62,6 +63,7 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
     var destinations: [physical_node_count]bool = @splat(false);
     var graph: [physical_node_count][physical_node_count]bool = @splat(@splat(false));
     var writes: [physical_node_count]bool = @splat(false);
+    var ordered_sources: [physical_node_count]bool = @splat(false);
     var mappings: [max_mappings]Mapping = undefined;
     var mapping_count: usize = 0;
 
@@ -89,7 +91,18 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
         };
         const deferred_writes = request.prepared_action != null and
             semantic_ordering.actionOwnsOrderedWrites(request.prepared_action.?);
+        var overwritten: [physical_node_count]bool = @splat(false);
         for (request_mappings.slice()) |mapping| {
+            // Action operands retain their semantic order. Acyclic chains can
+            // also overwrite a later source, including a value dying here.
+            if (request.prepared_action != null and
+                (request.prepared_action.? == .inline_memcpy or request.prepared_action.? == .inline_memset))
+            {
+                if (mapping.source) |source| {
+                    if (overwritten[@backingInt(source)]) ordered_sources[@backingInt(source)] = true;
+                }
+                if (mapping.source != mapping.destination) overwritten[@backingInt(mapping.destination)] = true;
+            }
             if (mapping_count == mappings.len) return error.ValueUseMappingCapacityExceeded;
             mappings[mapping_count] = mapping;
             mapping_count += 1;
@@ -118,22 +131,51 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
                 }
                 continue;
             }
-            // Scratch comparison snapshots an overlapping RHS before staging
-            // either operand (preserveScratchCompareOverlappingRhs). Its saved
-            // RHS therefore does not depend on the overwritten physical home.
-            // Keep the full mappings for semantic ordering: an early move must
-            // still see that the original RHS register is occupied.
-            const snapshotted_rhs = if (request.prepared_action) |*action| blk: {
-                if (action.* != .scratch_compare or action.scratch_compare.rhs != .named) break :blk false;
-                const compare_plan = try control_compare.classifyScratchCompare(&action.scratch_compare);
-                break :blk mapping.source_request_index == action.scratch_compare.rhs.named.index and
-                    source == nodeForArgReg(compare_plan.lhs_register);
-            } else false;
-            if (!snapshotted_rhs) graph[@backingInt(source)][@backingInt(mapping.destination)] = true;
+            graph[@backingInt(source)][@backingInt(mapping.destination)] = true;
             if (!deferred_writes) writes[@backingInt(mapping.destination)] = true;
         }
     }
-    try rejectCopyCycles(graph);
+    var call_sources: [physical_node_count]bool = @splat(false);
+    var call_nodes: [physical_node_count]bool = @splat(false);
+    var call_forward_nodes: [physical_node_count]bool = @splat(false);
+    if (transaction.call_action) |action| if (action == .direct_call) {
+        var overwritten: [physical_node_count]bool = @splat(false);
+        for (action.direct_call.arguments[0..action.direct_call.argument_count], 0..) |handle, argument_index| {
+            const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
+            const destination = nodeForArgReg(try ArgReg.fromIndex(argument_index));
+            const current = try lifetime_admission.validateRequestAt(Authority, transaction, index);
+            const source = if (current) |loc| scalarSourceNode(loc) else null;
+            call_nodes[@backingInt(destination)] = true;
+            if (source) |node| {
+                call_nodes[@backingInt(node)] = true;
+                if (transaction.lifetime_context.forward_snapshots[index] != null) call_forward_nodes[@backingInt(node)] = true;
+                if (overwritten[@backingInt(node)]) call_sources[@backingInt(node)] = true;
+                if (node != destination) graph[@backingInt(node)][@backingInt(destination)] = true;
+            }
+            if (source != destination) overwritten[@backingInt(destination)] = true;
+        }
+    };
+    transaction.parallel_sources = parallelSourceSnapshots(graph);
+    for (call_sources, 0..) |needed, index| {
+        transaction.parallel_sources[index] = transaction.parallel_sources[index] or needed or ordered_sources[index];
+        if (transaction.parallel_sources[index] and call_forward_nodes[index]) return error.ValueUseParallelForwardUnsupported;
+    }
+    for (mappings[0..mapping_count]) |mapping| {
+        const source = mapping.source orelse continue;
+        if (!transaction.parallel_sources[@backingInt(source)]) continue;
+        if (mapping.source_request_index) |index| {
+            if (transaction.lifetime_context.forward_snapshots[index] != null)
+                return error.ValueUseParallelForwardUnsupported;
+        }
+    }
+    transaction.transfer_nodes = destinations;
+    for (call_nodes, 0..) |reserved, index| {
+        transaction.transfer_nodes[index] = transaction.transfer_nodes[index] or reserved;
+    }
+    for (mappings[0..mapping_count]) |mapping| {
+        transaction.transfer_nodes[@backingInt(mapping.destination)] = true;
+        if (mapping.source) |source| transaction.transfer_nodes[@backingInt(source)] = true;
+    }
     try semantic_ordering.planEarlyMaterializations(Authority, transaction, mappings[0..mapping_count]);
     transaction.write_nodes = writes;
     transaction.request_phase = .sealed;
@@ -996,22 +1038,18 @@ fn appendStorePointerMappings(
         else => return error.ValueUseStorePointerFormUnsupported,
     }
 }
-fn rejectCopyCycles(graph: [Types.physical_node_count][Types.physical_node_count]bool) !void {
-    var states: [Types.physical_node_count]CopyVisitState = @splat(.unseen);
-    for (0..Types.physical_node_count) |node| try visitCopyNode(graph, node, &states);
-}
-fn visitCopyNode(
-    graph: [Types.physical_node_count][Types.physical_node_count]bool,
-    node: usize,
-    states: *[Types.physical_node_count]CopyVisitState,
-) !void {
-    switch (states[node]) {
-        .complete => return,
-        .visiting => return error.ValueUseCopyCycleRequiresO4,
-        .unseen => states[node] = .visiting,
-    }
-    for (graph[node], 0..) |edge, destination| if (edge) try visitCopyNode(graph, destination, states);
-    states[node] = .complete;
+fn parallelSourceSnapshots(graph: [physical_node_count][physical_node_count]bool) [physical_node_count]bool {
+    // Actions retain their semantic operand order. Snapshot every source in
+    // a strongly connected component before that order begins, so cycles and
+    // fan-out read the original values regardless of transfer width.
+    var reachable = graph;
+    for (0..physical_node_count) |via| for (0..physical_node_count) |from| {
+        for (0..physical_node_count) |to|
+            reachable[from][to] = reachable[from][to] or (reachable[from][via] and reachable[via][to]);
+    };
+    var snapshots: [physical_node_count]bool = @splat(false);
+    for (0..physical_node_count) |node| snapshots[node] = reachable[node][node];
+    return snapshots;
 }
 pub fn scalarSourceNode(loc: ValueLoc) ?Types.PhysicalNode {
     return Types.PhysicalNode.scalarSource(loc);

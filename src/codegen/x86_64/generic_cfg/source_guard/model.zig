@@ -429,7 +429,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_cfg.zig", .function = "lowerSelect", .body_sha256 = "45196a45740c3059e1f64929653e78e45620b04a0685368d268a5fbb1b01f5e0" },
     .{ .source = "composed_selector_cfg.zig", .function = "emitScalarSelectValue", .body_sha256 = "3cfedbd0e4c15ed10dbf266fcc09854fcc0a183f9eb6367f21c5a2a17832143a" },
     .{ .source = "composed_selector_cfg.zig", .function = "restoreDisplacedPhiDestinations", .body_sha256 = "60fd82341b65b3871cd42cc35b5b2b9accadccf217c551d619b742da4664dd1a" },
-    .{ .source = "composed_selector_cfg.zig", .function = "emitPhiEdgeMoves", .body_sha256 = "01698460d35fe4d18ab53ffd9b16d92f778625d29c4d9dde5d16b41251311d70" },
+    .{ .source = "composed_selector_cfg.zig", .function = "emitPhiEdgeMoves", .body_sha256 = "30642795ea9ee29f0c32ecd42c5e98a065c39dc102308746e8bf431def8d28a5" },
     .{ .source = "composed_selector_cfg.zig", .function = "materializeScalarPhiSnapshot", .body_sha256 = "b4362e002bdf4d9d26b75e6c054c0294250fbe894a34c42e4ad4b542d8a75616" },
     .{ .source = "composed_selector_cfg.zig", .function = "emitValueIntoLoc", .body_sha256 = "d2a8cdd3327dca52cf55a1bc5825b5b5e3210dad426c33073233d4a2ea00de3c" },
 
@@ -446,7 +446,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_fp.zig", .function = "lowerFloatToHalf", .body_sha256 = "ee1a865fa09595be9ac940a938d7ec3b5996b25a835a92afa7b17fbb72016960" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerHalfExtension", .body_sha256 = "86cd446354c4986acf2cc70c24d18f69f054f2a38703ab9ee7f2e47ae1e6be2c" },
 
-    .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .body_sha256 = "5a791da3aca1ee2637f3cf7bd6ed382983717d186bf0631d7b207d73b9b28f0f" },
+    .{ .source = "composed_selector_frame.zig", .function = "prepareStackFrame", .body_sha256 = "a60d36b75ee20732877ee0dc4d358d739248f3e6303778e6ae7a5671b070291f" },
 
     .{ .source = "composed_selector_impl.zig", .function = "bindParams", .body_sha256 = "4d3bf734f9ba78c6c184d3569c31fc6cfddb461080a30d30b7cf6a7bb31aac7a" },
     .{ .source = "composed_selector_impl.zig", .function = "bindPhiResults", .body_sha256 = "283fc0d5adddb7c7ac2fad47020bf99b026be3e2c09accabd0077d6e8b7abcf8" },

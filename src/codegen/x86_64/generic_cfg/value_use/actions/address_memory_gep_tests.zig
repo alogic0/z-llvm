@@ -313,8 +313,11 @@ test "value-use address actions include every physical destination in conflict a
             .offset = .{ .request = cycle_offset },
         } },
     ));
-    try std.testing.expectError(error.ValueUseCopyCycleRequiresO4, cycle.seal());
+    try cycle.seal();
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try cycle.prepare();
+    try cycle.materializeAll();
+    try cycle.rollback();
 
     var conflict = try Transaction.begin(&selector);
     defer conflict.deinit();

@@ -137,6 +137,39 @@ fn registerForwardGpr64(transaction: *Transaction, name: []const u8, destination
     ));
 }
 
+test "value-use parallel transfers reject unbound forward homes before mutation" {
+    for ([_]bool{ false, true }) |call| {
+        var machine = MachineFunction.init("forward-parallel", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try installForward(&plan, "forward", 8, 10, .gpr64, 64, .{ .gpr64 = .rdi });
+        try addLive(&plan, "current");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 2;
+        try selector_state.bindValueLoc(&selector, "current", .{ .arg64 = .rsi });
+        const before = selector.values.get("current").?;
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const first = try registerForwardGpr64(&transaction, "current", if (call) .prepared_source else .{ .gpr64 = .rdi });
+        const second = try registerForwardGpr64(&transaction, "forward", if (call) .prepared_source else .{ .gpr64 = .rsi });
+        if (call) try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init(
+            "forward_cycle",
+            null,
+            .void,
+            &.{ first, second },
+            &.{ .{ .int = 64 }, .{ .int = 64 } },
+        ) });
+        try std.testing.expectError(error.ValueUseParallelForwardUnsupported, transaction.seal());
+        try std.testing.expectEqual(before, selector.values.get("current").?);
+        try std.testing.expect(!selector.values.contains("forward"));
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        for (transaction.parallel_sources) |needed| try std.testing.expect(!needed);
+    }
+}
+
 test "value-use current binding characterizes missing plan and missing interval" {
     var machine = MachineFunction.init("current-binding-plan-errors", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);

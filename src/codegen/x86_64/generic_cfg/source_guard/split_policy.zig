@@ -521,14 +521,21 @@ pub fn validatePlanningInternalOwnership(path: []const u8, source: [:0]const u8)
     {
         return error.ValueUsePlanningInternalOwnershipMismatch;
     }
-    if (is_semantic or is_physical) {
+    if (is_physical) {
+        if (countPattern(source, "const Mapping = planning_model.Mapping;") != 1 or
+            countPattern(source, "fn parallelSourceSnapshots(") != 1 or
+            countPattern(source, "transaction.parallel_sources = parallelSourceSnapshots(graph);") != 1 or
+            countPattern(source, "CopyVisitState") != 0)
+            return error.ValueUsePlanningInternalOwnershipMismatch;
+    }
+    if (is_semantic) {
         if (countPattern(source, "const Mapping = planning_model.Mapping;") != 1 or
             countPattern(source, "const CopyVisitState = planning_model.CopyVisitState;") != 1)
         {
             return error.ValueUsePlanningInternalOwnershipMismatch;
         }
-        const reject_name = if (is_semantic) "rejectSemanticOrderCycles" else "rejectCopyCycles";
-        const visit_name = if (is_semantic) "visitSemanticOrderNode" else "visitCopyNode";
+        const reject_name = "rejectSemanticOrderCycles";
+        const visit_name = "visitSemanticOrderNode";
         var reject_buffer: [96]u8 = undefined;
         var visit_buffer: [96]u8 = undefined;
         const reject_declaration = std.fmt.bufPrint(
@@ -541,14 +548,8 @@ pub fn validatePlanningInternalOwnership(path: []const u8, source: [:0]const u8)
             "fn {s}(",
             .{visit_name},
         ) catch return error.ValueUsePlanningInternalOwnershipMismatch;
-        const state_storage = if (is_semantic)
-            "var states: [Types.max_requests]CopyVisitState = @splat(.unseen);"
-        else
-            "var states: [Types.physical_node_count]CopyVisitState = @splat(.unseen);";
-        const state_parameter = if (is_semantic)
-            "states: *[Types.max_requests]CopyVisitState,"
-        else
-            "states: *[Types.physical_node_count]CopyVisitState,";
+        const state_storage = "var states: [Types.max_requests]CopyVisitState = @splat(.unseen);";
+        const state_parameter = "states: *[Types.max_requests]CopyVisitState,";
         if (countPattern(source, reject_declaration) != 1 or
             countPattern(source, visit_declaration) != 1 or
             countPattern(source, state_storage) != 1 or

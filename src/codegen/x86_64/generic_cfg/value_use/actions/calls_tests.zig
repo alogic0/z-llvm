@@ -215,7 +215,7 @@ test "value-use inline memcpy supports same-source destinations and audited pair
     };
     try expectCallInstructions(&expected_stream, machine.instructions.items);
 }
-test "value-use inline memcpy rejects unsupported forms and genuine copy cycles before mutation" {
+test "value-use inline memcpy preserves copy cycles and rejects unsupported forms" {
     var machine = MachineFunction.init("value-use-inline-memcpy-negative", .void);
     defer machine.deinit(std.testing.allocator);
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
@@ -231,11 +231,15 @@ test "value-use inline memcpy rejects unsupported forms and genuine copy cycles 
     var cycle = try Transaction.begin(&selector);
     defer cycle.deinit();
     const cycle_requests = try registerMemcpyRequests(&cycle, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" });
-    try std.testing.expectError(error.ValueUseCopyCycleRequiresO4, cycle.seal());
+    try cycle.seal();
     try std.testing.expect(!cycle.failedRequestIs(cycle_requests.destination));
     try std.testing.expect(!cycle.failedRequestIs(cycle_requests.source));
     try std.testing.expect(!cycle.failedRequestIs(cycle_requests.length));
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try cycle.prepare();
+    try cycle.materializeAll();
+    try cycle.executePreparedAction(try cycle.preparedView(cycle_requests.destination));
+    try cycle.rollback();
 
     var immediate = try Transaction.begin(&selector);
     defer immediate.deinit();
@@ -930,7 +934,7 @@ test "value-use dormant call retained forms reject without mutation" {
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
-test "value-use dormant direct call rejects genuine copy scheduling before mutation" {
+test "value-use direct call stages parallel arguments and rolls back exactly" {
     var machine = MachineFunction.init("value-use-call-copy-cycle", .void);
     defer machine.deinit(std.testing.allocator);
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
@@ -958,9 +962,10 @@ test "value-use dormant direct call rejects genuine copy scheduling before mutat
     ) });
     try transaction.seal();
     try transaction.prepare();
-    try std.testing.expectError(error.ValueUseCopyCycleRequiresO4, transaction.materializeAll());
+    try transaction.materializeAll();
     try std.testing.expect(!transaction.failedRequestIs(lhs));
     try std.testing.expect(!transaction.failedRequestIs(rhs));
+    try transaction.rollback();
     try std.testing.expectEqual(lhs_binding, selector.values.get("lhs").?);
     try std.testing.expectEqual(rhs_binding, selector.values.get("rhs").?);
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);

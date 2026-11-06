@@ -2191,7 +2191,7 @@ pub fn validateMemcpyActionProductionSites(source_name: []const u8, source: [:0]
     } else 0;
     if (countPattern(source, ".inline_memset =") != fill_count)
         return error.ValueUseMemcpyActionOutsideAllowlist;
-    const body = functionBodyNamed(bodies, "lowerInlineMemcpy") orelse
+    const body = functionBodyNamed(bodies, "lowerMemoryCopyOperands") orelse
         return error.ValueUseMemcpyActionAllowlistMismatch;
     const function_source = source[body.start..body.end];
     if (countPattern(function_source, pointer_pattern) != 2 or
@@ -2201,16 +2201,24 @@ pub fn validateMemcpyActionProductionSites(source_name: []const u8, source: [:0]
     {
         return error.ValueUseMemcpyActionAllowlistMismatch;
     }
-    const operand_validation = std.mem.indexOf(u8, function_source, "if (dst.ty != .ptr") orelse
-        return error.ValueUseMemcpyDispatchOrderingMismatch;
-    const transaction_begin = std.mem.indexOf(u8, function_source, "ValueUseTransaction.begin(selector)") orelse
-        return error.ValueUseMemcpyDispatchOrderingMismatch;
-    if (operand_validation >= transaction_begin or
-        countPattern(function_source, "ValueUseTransaction.begin(selector)") != 1 or
+    if (countPattern(function_source, "ValueUseTransaction.begin(selector)") != 1 or
+        countPattern(function_source, ".may_overlap = may_overlap") != 1 or
         countPattern(function_source, "spillLiveCallerClobbersForCall(") != 0 or
         countPattern(function_source, "emitValueIntoScratch(") != 0)
     {
         return error.ValueUseMemcpyDispatchOrderingMismatch;
+    }
+    const callers = .{
+        .{ "lowerInlineMemcpy", "lowerMemoryCopyOperands(selector, dst, src, len, false)" },
+        .{ "lowerInlineMemmove", "lowerMemoryCopyOperands(selector, dst, src, len, true)" },
+    };
+    inline for (callers) |caller| {
+        const caller_body = functionBodyNamed(bodies, caller[0]) orelse return error.ValueUseMemcpyDispatchOrderingMismatch;
+        const caller_source = source[caller_body.start..caller_body.end];
+        const validation = std.mem.indexOf(u8, caller_source, "if (dst.ty != .ptr") orelse return error.ValueUseMemcpyDispatchOrderingMismatch;
+        const delegation = std.mem.indexOf(u8, caller_source, caller[1]) orelse return error.ValueUseMemcpyDispatchOrderingMismatch;
+        if (validation >= delegation or countPattern(caller_source, "lowerMemoryCopyOperands(") != 1)
+            return error.ValueUseMemcpyDispatchOrderingMismatch;
     }
 }
 

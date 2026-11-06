@@ -888,6 +888,9 @@ test "value-use store writes participate in conflict and copy-cycle planning" {
         .{ .store_i64 = .{ .value = cycle_value } },
     ));
     _ = try cycle.register(request("writer", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rcx }));
-    try std.testing.expectError(error.ValueUseCopyCycleRequiresO4, cycle.seal());
+    try cycle.seal();
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try cycle.prepare();
+    try cycle.materializeAll();
+    try cycle.rollback();
 }

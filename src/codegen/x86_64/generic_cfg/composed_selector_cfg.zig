@@ -993,13 +993,14 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
     const previous_preserve_current = selector.preserve_current_position_values;
     selector.preserve_current_position_values = true;
     defer selector.preserve_current_position_values = previous_preserve_current;
-    if (try stabilizePhiEdgeSources(selector, target, predecessor)) |diagnostic| return diagnostic;
+    const parallel_scalars = try emitParallelScalarPhiEdge(selector, target, predecessor);
+    if (!parallel_scalars) if (try stabilizePhiEdgeSources(selector, target, predecessor)) |diagnostic| return diagnostic;
     var scalar_snapshots: std.ArrayList(ScalarPhiSnapshot) = .empty;
     defer scalar_snapshots.deinit(selector.allocator);
-    if (try snapshotScalarPhiSources(selector, target, predecessor, &scalar_snapshots)) |diagnostic| return diagnostic;
+    if (!parallel_scalars) if (try snapshotScalarPhiSources(selector, target, predecessor, &scalar_snapshots)) |diagnostic| return diagnostic;
     var xmm_snapshots: std.ArrayList(XmmPhiSnapshot) = .empty;
     defer xmm_snapshots.deinit(selector.allocator);
-    if (try snapshotXmmPhiSources(selector, target, predecessor, &xmm_snapshots)) |diagnostic| return diagnostic;
+    if (!parallel_scalars) if (try snapshotXmmPhiSources(selector, target, predecessor, &xmm_snapshots)) |diagnostic| return diagnostic;
     for (target.instructions.items) |instruction| {
         if (instruction.removed) continue;
         const phi = switch (instruction.kind) {
@@ -1010,7 +1011,10 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
         const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
         const dst = selector.phi_destinations.get(result_name) orelse return .{ .unsupported_value = "stage2-phi-dst" };
         const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
-        if (scalarPhiSnapshot(&scalar_snapshots, result_name)) |snapshot| {
+        if (parallel_scalars) {
+            // All source reads and destination writes complete before any
+            // PHI result identity is rebound, including loop-carried swaps.
+        } else if (scalarPhiSnapshot(&scalar_snapshots, result_name)) |snapshot| {
             materializeScalarPhiSnapshot(selector, snapshot.loc, dst, metadata.bits) catch return .{ .unsupported_value = "stage2-phi-src" };
         } else if (xmmPhiSnapshot(&xmm_snapshots, result_name)) |snapshot| {
             selector_state.materializeLocIntoLoc(selector, .{ .xmm = snapshot.loc }, dst) catch return .{ .unsupported_value = "stage2-phi-src" };
@@ -1022,6 +1026,55 @@ pub fn emitPhiEdgeMoves(selector: *ComposedBlockSelector, target: ir.BasicBlock,
         }
     }
     return null;
+}
+
+fn emitParallelScalarPhiEdge(selector: *ComposedBlockSelector, target: ir.BasicBlock, predecessor: []const u8) !bool {
+    var count: usize = 0;
+    // Keep pair, vector and spill destinations in their existing envelopes.
+    // Register scalar edges use the same transaction as call argument moves.
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            else => break,
+        };
+        const bits = intBits(phi.ty) orelse return false;
+        if (bits == 0 or bits > 64) return false;
+        const name = instruction.result orelse return false;
+        const destination = selector.phi_destinations.get(name) orelse return false;
+        if (destination != .scratch32 and destination != .scratch64) return false;
+        const incoming = phiIncomingFrom(phi, predecessor) orelse return false;
+        if (incoming.value != .named and incoming.value != .int) return false;
+        count += 1;
+        if (count > ValueUseTransaction.max_requests) return false;
+    }
+    if (count == 0) return false;
+    var transfer = try ValueUseTransaction.begin(selector);
+    defer transfer.deinit();
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            else => break,
+        };
+        const destination = selector.phi_destinations.get(instruction.result.?).?;
+        const narrow = intBits(phi.ty).? <= 32;
+        _ = try transfer.register(.{
+            .source = phiIncomingFrom(phi, predecessor).?.value,
+            .expected = .{ .ty = phi.ty, .register_class = if (narrow) .gpr32 else .gpr64 },
+            .form = if (narrow) .gpr32 else .gpr64,
+            .destination = switch (destination) {
+                .scratch32 => |reg| .{ .gpr32 = reg },
+                .scratch64 => |reg| .{ .gpr64 = reg },
+                else => unreachable,
+            },
+        });
+    }
+    try transfer.seal();
+    try transfer.prepare();
+    try transfer.materializeAll();
+    try transfer.commit();
+    return true;
 }
 
 const ScalarPhiSnapshot = struct {

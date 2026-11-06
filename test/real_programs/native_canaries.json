@@ -2,6 +2,14 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "parallel_transfer",
+      "prefix": "parallel-transfer",
+      "fixture": "parallel_transfer",
+      "functions": ["parallel_copy_swap", "parallel_fill_rotate", "parallel_move_swap", "parallel_call_swap", "parallel_call_fanout", "parallel_call_mixed", "parallel_phi_rotate", "parallel_global_base", "parallel_global_stride", "parallel_left_ops"],
+      "observations": 8192,
+      "stdout": "parallel-transfer observations=8192 cycles=2,3 fanout=checked aliases=checked phi=checked calls=checked memory=guarded\n"
+    },
+    {
       "population": "checked_scalar",
       "prefix": "checked-scalar",
       "fixture": "checked_scalar",

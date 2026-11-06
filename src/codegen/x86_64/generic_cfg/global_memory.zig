@@ -38,6 +38,7 @@ fn needsRewrite(allocator: std.mem.Allocator, function: ir.Function, context: *c
         for (block.instructions.items) |inst| {
             if (inst.removed) continue;
             switch (inst.kind) {
+                .gep => |gep| if (gep.ptr_addrspace == null and gep.ptr == .constant_expr and addresses.fromValue(gep.ptr) != null) return true,
                 .call => |call| if (memcpy(call) and
                     (addresses.fromValue(call.args.items[0].value) != null or addresses.fromValue(call.args.items[1].value) != null)) return true,
                 .store => |store| if (store.ptr_addrspace == null and (addresses.fromValue(store.ptr) != null or (store.ty == .ptr and store.ty_addrspace == null and addresses.fromValue(store.value) != null))) return true,
@@ -96,6 +97,9 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         for (original.instructions.items) |inst| {
             var copy = inst;
             if (!inst.removed) switch (inst.kind) {
+                .gep => |gep| if (gep.ptr_addrspace == null and gep.ptr == .constant_expr) {
+                    copy.kind.gep.ptr = try materialize(allocator, function, &block, &serial, gep.ptr);
+                },
                 .call => |call| if (memcpy(call)) {
                     copy.kind.call.args = try call.args.clone(allocator);
                     for (copy.kind.call.args.items[0..2]) |*arg|

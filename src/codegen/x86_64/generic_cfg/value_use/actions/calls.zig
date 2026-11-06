@@ -375,7 +375,7 @@ fn validateDirectCallCopySchedule(
         if (source != null and source.? == destination) continue;
         for (action.arguments[argument_index + 1 .. action.argument_count]) |later_handle| {
             if ((try preparedCallSourceArgReg(Authority, transaction, later_handle)) == destination)
-                return error.ValueUseCopyCycleRequiresO4;
+                return error.ValueUseParallelSourceNotPreserved;
         }
     }
 }
@@ -652,7 +652,7 @@ pub fn executeInlineMemcpy(
 
     try selector_state.emitEflagsInstruction(
         transaction.selector,
-        .memcpy_rdi_rsi_rdx_rax,
+        if (action.may_overlap) .memmove_rdi_rsi_rdx_rax else .memcpy_rdi_rsi_rdx_rax,
         .clobber,
     );
     try failMemcpyForTest(Authority, transaction, .after_call_append);

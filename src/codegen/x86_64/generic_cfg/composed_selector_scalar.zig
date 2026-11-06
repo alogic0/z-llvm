@@ -93,7 +93,7 @@ pub fn lowerBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary
     }
     if (valueIsInt(binary.lhs)) {
         switch (binary.op) {
-            .add, .@"or", .@"and", .xor => {
+            .add, .mul, .@"or", .@"and", .xor => {
                 var commuted = binary;
                 commuted.lhs = binary.rhs;
                 commuted.rhs = binary.lhs;

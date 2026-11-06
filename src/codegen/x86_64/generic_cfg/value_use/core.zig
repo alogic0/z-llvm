@@ -612,6 +612,8 @@ fn core_rollbackInternal(comptime Authority: type, transaction: anytype) void {
     transaction.request_count = 0;
     transaction.request_phase = .registering;
     transaction.write_nodes = @splat(false);
+    transaction.parallel_sources = @splat(false);
+    transaction.transfer_nodes = @splat(false);
     transaction.store_address_registers = @splat(null);
     transaction.early_plans = @splat(.{});
     resetSemanticOrderPlan(Authority, transaction);
@@ -654,7 +656,8 @@ fn core_noteRequestBoundaryError(
         error.ValueUseRequestCapacityExceeded,
         error.ValueUseMappingCapacityExceeded,
         error.ValueUseConflictingDestination,
-        error.ValueUseCopyCycleRequiresO4,
+        error.ValueUseParallelSourceNotPreserved,
+        error.ValueUseParallelForwardUnsupported,
         error.ValueUseEarlyOrderingConflict,
         error.ValueUseEarlyOrderingCycle,
         error.ValueUseActionDiagnostic,

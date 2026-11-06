@@ -99,9 +99,9 @@ fn needsScalarPreservation(inst: ir.Instruction) bool {
         .call => |call| sysv_abi.isVariadicCall(call) and call.args.items.len > 3,
         .cast => |cast| cast.op == .zext and cast.from_ty == .int and cast.to_ty == .int and
             cast.from_ty.int < cast.to_ty.int and (cast.to_ty.int == 32 or cast.to_ty.int == 64),
-        .binary => |binary| binary.op == .add and
-            (binary.ty.eql(.{ .int = 32 }) or binary.ty.eql(.{ .int = 64 })) and
-            binary.lhs == .int and binary.rhs == .int and (binary.lhs.int == 0 or binary.rhs.int == 0),
+        .binary => |binary| (binary.ty.eql(.{ .int = 32 }) or binary.ty.eql(.{ .int = 64 })) and
+            (binary.lhs == .int or (binary.op == .add and binary.rhs == .int and binary.rhs.int == 0)),
+        .gep => |gep| @import("../symbol_address.zig").fromGep(gep) != null,
         else => false,
     };
 }
@@ -164,6 +164,7 @@ pub fn prepareStackFrame(selector: *ComposedBlockSelector, function: ir.Function
                     std.mem.eql(u8, instruction.kind.call.callee, "llvm.ctpop.i128"))) saw_pair_intrinsic = true;
             if (instruction.kind == .call and
                 (std.mem.eql(u8, instruction.kind.call.callee, "llvm.memset.p0.i64") or
+                    std.mem.eql(u8, instruction.kind.call.callee, "llvm.memmove.p0.p0.i64") or
                     std.mem.eql(u8, instruction.kind.call.callee, "llvm.memcpy.p0.p0.i64") or
                     std.mem.eql(u8, instruction.kind.call.callee, "llvm.memcpy.inline.p0.p0.i64"))) saw_memory_fill = true;
             if (instruction.kind == .call and sysv_abi.callHasScalarSseType(instruction.kind.call)) saw_scalar_sse_call = true;

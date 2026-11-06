@@ -148,7 +148,7 @@ test "production inline memcpy maps unresolved length through request provenance
     try expectUnresolvedInlineMemcpyDiagnostic(.length, "composed-block-memcpy-len");
 }
 
-test "production inline memcpy rejects cycles and operand forms before mutation" {
+test "production inline memcpy preserves cycles and rejects unsupported operand forms" {
     var machine = MachineFunction.init("inline-memcpy-production-negative", .void);
     defer machine.deinit(std.testing.allocator);
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
@@ -165,9 +165,6 @@ test "production inline memcpy rejects cycles and operand forms before mutation"
     var cycle = ir.CallInst{ .ret_ty = .void, .callee = "llvm.memcpy.inline.p0.p0.i64", .args = .empty };
     defer cycle.deinit(std.testing.allocator);
     try appendInlineMemcpyArgs(&cycle, .{ .named = "dst" }, .{ .named = "src" }, .{ .named = "len" }, .{ .int = 0 });
-    try std.testing.expectError(error.ValueUseCopyCycleRequiresO4, selector_calls.lowerInlineMemcpy(&selector, null, cycle));
-    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
-    try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
 
     const bad_operands = [_]struct { dst: ir.Value, src: ir.Value, len: ir.Value, detail: []const u8 }{
         .{ .dst = .null_value, .src = .{ .named = "src" }, .len = .{ .named = "len" }, .detail = "composed-block-memcpy-dst" },
@@ -183,6 +180,8 @@ test "production inline memcpy rejects cycles and operand forms before mutation"
         try std.testing.expectEqualStrings(case.detail, diagnostic.detail());
         try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
     }
+    try std.testing.expect((try selector_calls.lowerInlineMemcpy(&selector, null, cycle)) == null);
+    try std.testing.expect(machine.instructions.items.len > 0);
 }
 
 test "production inline memcpy preserves pre-transaction diagnostics and rolls back preservation" {

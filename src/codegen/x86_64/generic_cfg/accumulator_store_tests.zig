@@ -62,7 +62,7 @@ test "accumulator stores preserve live aliases and roll back address staging" {
     };
 }
 
-test "accumulator stores reject address copy cycles and conflicting writes before mutation" {
+test "accumulator stores preserve address copy cycles and reject conflicting writes" {
     for ([_]bool{ false, true }) |conflict| {
         var output = machine.MachineFunction.init("accumulator-store-reject", .void);
         defer output.deinit(std.testing.allocator);
@@ -82,7 +82,14 @@ test "accumulator stores reject address copy cycles and conflicting writes befor
         const value = try transaction.register(support.preparedSourceRequest("value", .{ .int = 64 }, .gpr64, .gpr64));
         _ = try transaction.register(support.preparedRequest("pointer", .ptr, .gpr64, .pointer, .{ .store_i64 = .{ .value = value } }));
         _ = try transaction.register(support.request("other", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rcx }));
-        try std.testing.expectError(if (conflict) error.ValueUseConflictingDestination else error.ValueUseCopyCycleRequiresO4, transaction.seal());
+        if (conflict) {
+            try std.testing.expectError(error.ValueUseConflictingDestination, transaction.seal());
+        } else {
+            try transaction.seal();
+            try transaction.prepare();
+            try transaction.materializeAll();
+            try transaction.rollback();
+        }
         try std.testing.expectEqual(pointer_before, state.values.get("pointer").?);
         try std.testing.expectEqual(value_before, state.values.get("value").?);
         try std.testing.expectEqual(@as(usize, 0), output.instructions.items.len);

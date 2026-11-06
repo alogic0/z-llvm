@@ -268,6 +268,7 @@ pub const MemcpyAction = struct {
     source: RequestHandle,
     length: ?RequestHandle = null,
     length_immediate: u64 = 0,
+    may_overlap: bool = false,
 };
 
 /// Byte fill with named operands or typed immediate values. The destination
@@ -1439,6 +1440,10 @@ pub fn Transaction(comptime Impl: type) type {
         request_phase: Self.RequestPhase = .registering,
         lifecycle: Self.Lifecycle = .active,
         write_nodes: [Self.physical_node_count]bool = @splat(false),
+        // Parallel source snapshots precede every destination write, including
+        // action-owned writes. Scratch homes must avoid the entire transfer.
+        parallel_sources: [Self.physical_node_count]bool = @splat(false),
+        transfer_nodes: [Self.physical_node_count]bool = @splat(false),
         // Chosen by sealing; action intent never carries discovered homes.
         store_address_registers: [Self.max_requests]?ArgReg = @splat(null),
         early_plans: [Self.max_requests]Self.EarlyPlan = @splat(.{}),

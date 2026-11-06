@@ -128,6 +128,7 @@ pub fn prepare(comptime Authority: type, transaction: anytype) !void {
     defer transaction.selector.preserve_current_position_values = saved_preserve;
 
     try materializeEarlyPlans(Authority, transaction);
+    try preserveParallelSources(transaction);
     var nodes = transaction.write_nodes;
     for (transaction.requests[0..transaction.request_count], 0..) |*request, request_index_usize| {
         if (request.destination == .prepared_source) continue;
@@ -155,6 +156,88 @@ pub fn prepare(comptime Authority: type, transaction: anytype) !void {
         try clobberPhysicalNode(transaction.selector, @fromBackingInt(@intCast(index)));
     }
     transaction.request_phase = .prepared;
+}
+
+fn preserveParallelSources(transaction: anytype) !void {
+    const selector = transaction.selector;
+    var reserved = transaction.transfer_nodes;
+    for (transaction.early_plans) |plan| {
+        if (plan.destination) |reg| reserved[@backingInt(PhysicalNode.fromArgReg(reg))] = true;
+    }
+    for (transaction.parallel_sources, 0..) |needed, index| {
+        if (!needed) continue;
+        const source: PhysicalNode = @fromBackingInt(@intCast(index));
+        var scratch: ?ArgReg = null;
+        if (parallelSourceCanRelocate(selector, source)) {
+            for (0..6) |candidate_index| {
+                const candidate = try ArgReg.fromIndex(candidate_index);
+                if (reserved[@backingInt(PhysicalNode.fromArgReg(candidate))]) continue;
+                if (!selector_state.scratchRegIsProvenFree(selector, candidate)) continue;
+                scratch = candidate;
+                break;
+            }
+        }
+        if (scratch) |destination| {
+            // Save the full physical value once: a narrow alias must not erase
+            // the upper bits belonging to another alias of the same register.
+            try selector.machine.instructions.append(selector.allocator, if (source.argReg()) |reg|
+                .{ .mov_arg64_arg = .{ .dst = destination, .src = reg } }
+            else
+                .{ .mov_rax_to_arg = destination });
+            while (parallelSourceName(selector, source)) |name| {
+                const loc = selector.values.get(name).?.loc;
+                const replacement: ValueLoc = switch (loc) {
+                    .arg32, .scratch32, .eax => .{ .scratch32 = destination },
+                    .arg64, .scratch64, .rax => .{ .scratch64 = destination },
+                    .readonly_table_ptr => |pointer| blk: {
+                        var moved = pointer;
+                        moved.storage = .{ .reg = destination };
+                        break :blk .{ .readonly_table_ptr = moved };
+                    },
+                    else => return error.ValueUseParallelSourceUnsupported,
+                };
+                // Restart lookup after binding: the map may grow, and every
+                // alias must keep its original virtual identity and width.
+                try selector_state.bindValueLoc(selector, name, replacement);
+            }
+            reserved[@backingInt(PhysicalNode.fromArgReg(destination))] = true;
+        } else {
+            // Existing preservation owns spill slots and the full rollback
+            // snapshot. Missing frame space remains a checked rejection.
+            try clobberPhysicalNode(selector, source);
+        }
+    }
+}
+
+fn parallelSourceName(selector: *const ComposedBlockSelector, source: PhysicalNode) ?[]const u8 {
+    var it = selector.values.iterator();
+    while (it.next()) |entry| {
+        if (PhysicalNode.scalarSource(entry.value_ptr.loc) == source) return entry.key_ptr.*;
+    }
+    return null;
+}
+
+fn parallelSourceCanRelocate(selector: *const ComposedBlockSelector, source: PhysicalNode) bool {
+    var found = false;
+    var it = selector.values.iterator();
+    while (it.next()) |entry| {
+        const loc = entry.value_ptr.loc;
+        switch (loc) {
+            .arg128, .scratch128 => |pair| {
+                if (source.argReg()) |reg| if (pair.contains(reg)) return false;
+            },
+            .stack_i32_ptr => |pointer| {
+                if (pointer.index) |index| if (source.argReg() == index.reg) return false;
+            },
+            else => {},
+        }
+        if (PhysicalNode.scalarSource(loc) != source) continue;
+        switch (loc) {
+            .arg32, .scratch32, .eax, .arg64, .scratch64, .rax, .readonly_table_ptr => found = true,
+            else => return false,
+        }
+    }
+    return found;
 }
 pub fn materializeAll(comptime Authority: type, transaction: anytype) !void {
     try Authority.requireActive(Authority, transaction);

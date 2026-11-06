@@ -55,52 +55,53 @@ const expectTableLoadFailure = support.expectTableLoadFailure;
 const I128PairRollbackBoundary = support.I128PairRollbackBoundary;
 const expectI128PairRollbackExact = support.expectI128PairRollbackExact;
 
-test "value-use generic transaction layout pins the bounded store plan" {
-    // The R0-derived transaction grows by exactly 32 bytes for sixteen
-    // optional address registers. No extra binding or rollback snapshot is
-    // introduced. Pin the compiler's resulting field placement explicitly.
-    try std.testing.expectEqual(@as(usize, 366272), @sizeOf(Transaction));
+test "value-use generic transaction layout pins bounded store and parallel plans" {
+    // Two seven-node bitmaps add sixteen bytes including alignment to the
+    // bounded store plan. There is still only one binding/rollback snapshot.
+    try std.testing.expectEqual(@as(usize, 366288), @sizeOf(Transaction));
     try std.testing.expectEqual(@as(usize, 16), @alignOf(Transaction));
     const expected_layout = .{
         .{ "selector", 356544 },
         .{ "snapshot", 36624 },
         .{ "requests", 0 },
-        .{ "request_count", 366231 },
-        .{ "request_phase", 366230 },
-        .{ "lifecycle", 366229 },
-        .{ "write_nodes", 366222 },
-        .{ "store_address_registers", 366190 },
-        .{ "early_plans", 366158 },
-        .{ "semantic_order_edges", 365804 },
-        .{ "ordered_operands", 366078 },
-        .{ "ordered_operand_count", 366233 },
+        .{ "request_count", 366198 },
+        .{ "request_phase", 366197 },
+        .{ "lifecycle", 366196 },
+        .{ "write_nodes", 366189 },
+        .{ "parallel_sources", 366182 },
+        .{ "transfer_nodes", 366175 },
+        .{ "store_address_registers", 366111 },
+        .{ "early_plans", 365804 },
+        .{ "semantic_order_edges", 365839 },
+        .{ "ordered_operands", 366200 },
+        .{ "ordered_operand_count", 365838 },
         .{ "early_homes", 35088 },
-        .{ "early_home_valid", 366062 },
-        .{ "prepared_views", 356584 },
-        .{ "prepared_view_valid", 366126 },
-        .{ "switch_boundary_applied", 366142 },
+        .{ "early_home_valid", 366095 },
+        .{ "prepared_views", 356552 },
+        .{ "prepared_view_valid", 366143 },
+        .{ "switch_boundary_applied", 366159 },
         .{ "view_generation", 365800 },
-        .{ "action_diagnostic", 356552 },
+        .{ "action_diagnostic", 365768 },
         .{ "lifetime_context", 186816 },
         .{ "failed_request", 186792 },
         .{ "accumulator_session", 186624 },
         .{ "call_action", 33280 },
-        .{ "call_action_executed", 366232 },
-        .{ "call_test_failure", 366060 },
-        .{ "call_test_argument_index", 366234 },
-        .{ "memcpy_test_failure", 366235 },
-        .{ "load_test_failure", 366237 },
-        .{ "scratch_compare_test_failure", 366239 },
-        .{ "current_home_eq_zero_test_failure", 366241 },
-        .{ "setcc_eax_compare_test_failure", 366243 },
-        .{ "current_home_sign_bit_test_failure", 366245 },
-        .{ "i128_eq_min_test_failure", 366247 },
-        .{ "i128_sign_bit_test_failure", 366249 },
-        .{ "scalar_cast_test_failure", 366251 },
-        .{ "immediate_scalar_test_failure", 366253 },
-        .{ "named_scalar_test_failure", 366255 },
-        .{ "scalar_multiply_test_failure", 366257 },
-        .{ "unsigned_quotient_test_failure", 366259 },
+        .{ "call_action_executed", 366199 },
+        .{ "call_test_failure", 365836 },
+        .{ "call_test_argument_index", 366248 },
+        .{ "memcpy_test_failure", 366249 },
+        .{ "load_test_failure", 366251 },
+        .{ "scratch_compare_test_failure", 366253 },
+        .{ "current_home_eq_zero_test_failure", 366255 },
+        .{ "setcc_eax_compare_test_failure", 366257 },
+        .{ "current_home_sign_bit_test_failure", 366259 },
+        .{ "i128_eq_min_test_failure", 366261 },
+        .{ "i128_sign_bit_test_failure", 366263 },
+        .{ "scalar_cast_test_failure", 366265 },
+        .{ "immediate_scalar_test_failure", 366267 },
+        .{ "named_scalar_test_failure", 366269 },
+        .{ "scalar_multiply_test_failure", 366271 },
+        .{ "unsigned_quotient_test_failure", 366273 },
     };
     inline for (expected_layout) |field|
         try std.testing.expectEqual(@as(usize, field[1]), @offsetOf(Transaction, field[0]));

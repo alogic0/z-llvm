@@ -407,12 +407,15 @@ test "composed selector source guard conditionally confines call provenance mapp
         ),
     );
 }
-test "composed selector source guard freezes memcpy action to lowerInlineMemcpy" {
-    const accepted: [:0]const u8 =
-        "fn lowerInlineMemcpy() void { if (dst.ty != .ptr) return; " ++
+test "composed selector source guard owns copy and move staging in one authority" {
+    const shared =
+        "fn lowerMemoryCopyOperands() void { " ++
         "_ = ValueUseTransaction.begin(selector); " ++
         "_ = .{ .form = .memcpy_pointer }; _ = .{ .form = .memcpy_length }; " ++
-        "_ = .{ .form = .memcpy_pointer, .inline_memcpy = intent }; }";
+        "_ = .{ .form = .memcpy_pointer, .inline_memcpy = intent, .may_overlap = may_overlap }; }";
+    const move = "fn lowerInlineMemmove() void { if (dst.ty != .ptr) return; return lowerMemoryCopyOperands(selector, dst, src, len, true); }";
+    const accepted: [:0]const u8 = shared ++ move ++
+        "fn lowerInlineMemcpy() void { if (dst.ty != .ptr) return; return lowerMemoryCopyOperands(selector, dst, src, len, false); }";
     try validateMemcpyActionProductionSites("composed_selector_calls.zig", accepted);
     try std.testing.expectError(
         error.ValueUseMemcpyActionAllowlistMismatch,
@@ -425,11 +428,13 @@ test "composed selector source guard freezes memcpy action to lowerInlineMemcpy"
         error.ValueUseMemcpyDispatchOrderingMismatch,
         validateMemcpyActionProductionSites(
             "composed_selector_calls.zig",
-            "fn lowerInlineMemcpy() void { _ = ValueUseTransaction.begin(selector); " ++
-                "if (dst.ty != .ptr) return; _ = .{ .form = .memcpy_pointer }; " ++
-                "_ = .{ .form = .memcpy_length }; _ = .{ .form = .memcpy_pointer, .inline_memcpy = intent }; }",
+            shared ++ move ++ "fn lowerInlineMemcpy() void { _ = lowerMemoryCopyOperands(selector, dst, src, len, false); if (dst.ty != .ptr) return; }",
         ),
     );
+    try std.testing.expectError(error.ValueUseMemcpyDispatchOrderingMismatch, validateMemcpyActionProductionSites(
+        "composed_selector_calls.zig",
+        shared ++ move ++ "fn lowerInlineMemcpy() void { if (dst.ty != .ptr) return; return lowerMemoryCopyOperands(selector, dst, src, len, true); }",
+    ));
 }
 test "composed selector source guard freezes production store actions by function" {
     const accepted: [:0]const u8 =

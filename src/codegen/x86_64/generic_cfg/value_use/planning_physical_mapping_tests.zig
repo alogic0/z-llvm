@@ -75,7 +75,7 @@ test "value-use transaction phase capacity identity and coalescing rules fail be
     defer transaction.deinit();
     var capacity_first: ?Transaction.RequestHandle = null;
     for (names, 0..) |name, index| {
-        const handle = try transaction.register(request(name, .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = @enumFromInt(index % 6) }));
+        const handle = try transaction.register(request(name, .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = @fromBackingInt(@intCast(index % 6)) }));
         if (capacity_first == null) capacity_first = handle;
     }
     try std.testing.expectError(error.ValueUseRequestCapacityExceeded, transaction.register(request(
@@ -128,7 +128,7 @@ test "value-use transaction phase capacity identity and coalescing rules fail be
     try std.testing.expectError(error.ValueUsePreparedActionUnexpected, unexpected_action.seal());
 }
 
-test "value-use transaction separates safe overlap from genuine copy cycles and conflicting destinations" {
+test "value-use transaction preserves parallel cycles and rejects conflicting destinations" {
     var machine = MachineFunction.init("value-use-overlap", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
@@ -155,8 +155,11 @@ test "value-use transaction separates safe overlap from genuine copy cycles and 
     defer cycle.deinit();
     _ = try cycle.register(request("left", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rsi }));
     _ = try cycle.register(request("right", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rdi }));
-    try std.testing.expectError(error.ValueUseCopyCycleRequiresO4, cycle.seal());
+    try cycle.seal();
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try cycle.prepare();
+    try cycle.materializeAll();
+    try cycle.rollback();
 
     var conflict = try Transaction.begin(&selector);
     defer conflict.deinit();

@@ -1,6 +1,8 @@
 const std = @import("std");
 
 comptime {
+    _ = @import("codegen/x86_64/generic_cfg/composed_selector_value_use_transaction_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/parallel_transfer_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/indirect_branches_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/aligned_stack_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/integer_vectors_tests.zig");

@@ -796,6 +796,10 @@ pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, 
             return .{ .no_emitter = "composed-block-memcpy-attrs" };
     }
 
+    return lowerMemoryCopyOperands(selector, dst, src, len, false);
+}
+
+fn lowerMemoryCopyOperands(selector: *ComposedBlockSelector, dst: ir.CallArg, src: ir.CallArg, len: ir.CallArg, may_overlap: bool) !?Diagnostic {
     var authority = try ValueUseTransaction.begin(selector);
     defer authority.deinit();
     const source_request = authority.register(.{
@@ -820,6 +824,7 @@ pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, 
             .source = source_request,
             .length = length_request,
             .length_immediate = length_immediate,
+            .may_overlap = may_overlap,
         } },
     }) catch return .{ .unsupported_value = "composed-block-memcpy-dst" };
     authority.seal() catch |err| return inlineMemcpyValueUseDiagnostic(
@@ -882,13 +887,11 @@ pub fn lowerInlineMemmove(selector: *ComposedBlockSelector, result: ?[]const u8,
         return .{ .no_emitter = "composed-block-memmove-args" };
     }
 
-    if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
-    if (try lowerDirectCallArg(selector, dst, .rdi)) |diagnostic| return diagnostic;
-    if (try lowerDirectCallArg(selector, src, .rsi)) |diagnostic| return diagnostic;
-    if (try lowerDirectCallArg(selector, len, .rdx)) |diagnostic| return diagnostic;
-
-    try selector_state.emitEflagsInstruction(selector, .memmove_rdi_rsi_rdx_rax, .clobber);
-    return null;
+    if (call.callee_function_ty != null or call.calling_conv != null or
+        !memsetAlignmentAttribute(dst.attrs) or !memcpySourceAttributes(src.attrs) or
+        len.attrs != null or is_volatile.attrs != null)
+        return .{ .no_emitter = "composed-block-memmove-attrs" };
+    return lowerMemoryCopyOperands(selector, dst, src, len, true);
 }
 
 pub fn lowerInlineStrlen(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
