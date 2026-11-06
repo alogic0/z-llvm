@@ -535,6 +535,82 @@ test "mem2reg replaces uninitialized stack loads with undef" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "mem2reg preserves repeated conditional and switch PHI edges" {
+    for ([_][]const u8{
+        "br i1 %cond, label %merge, label %merge",
+        "switch i32 %pick, label %merge [\n i32 0, label %merge\n i32 1, label %merge\n ]",
+    }, [_]usize{ 2, 3 }) |terminator, edges| {
+        const input = try std.fmt.allocPrint(std.testing.allocator,
+            \\define i32 @promote_edges(i1 %cond, i32 %pick, i32 %a, i32 %b) {{
+            \\entry:
+            \\  %slot = alloca i32
+            \\  br i1 %cond, label %left, label %right
+            \\left:
+            \\  store i32 %a, ptr %slot
+            \\  {s}
+            \\right:
+            \\  store i32 %b, ptr %slot
+            \\  br label %merge
+            \\merge:
+            \\  %v = load i32, ptr %slot
+            \\  ret i32 %v
+            \\}}
+            \\
+        , .{terminator});
+        defer std.testing.allocator.free(input);
+        var module = try ir.Module.parse(std.testing.allocator, input);
+        defer module.deinit();
+        var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+        _ = try mem2reg.pass.run(&module, &context);
+        try module.verify();
+        const phi = module.functions.items[0].blocks.items[3].instructions.items[0].kind.phi;
+        try std.testing.expectEqual(edges + 1, phi.incoming.items.len);
+        var from_left: usize = 0;
+        for (phi.incoming.items) |incoming| {
+            if (std.mem.eql(u8, incoming.block, "left")) {
+                from_left += 1;
+                try std.testing.expect(incoming.value.eql(.{ .named = "a" }));
+            } else {
+                try std.testing.expectEqualStrings("right", incoming.block);
+                try std.testing.expect(incoming.value.eql(.{ .named = "b" }));
+            }
+        }
+        try std.testing.expectEqual(edges, from_left);
+    }
+}
+
+test "mem2reg names from numeric slots remain valid and avoid quoted collisions" {
+    const text =
+        \\define ptr @promote(i1 %condition, ptr %value, i64 %"__zllvm_phi_0") {
+        \\entry:
+        \\  %8 = alloca ptr
+        \\  br i1 %condition, label %left, label %right
+        \\left:
+        \\  store ptr null, ptr %8
+        \\  br label %merge
+        \\right:
+        \\  store ptr %value, ptr %8
+        \\  br label %merge
+        \\merge:
+        \\  %result = load ptr, ptr %8
+        \\  ret ptr %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    _ = try mem2reg.pass.run(&module, &context);
+    try module.verify();
+    const function = module.functions.items[0];
+    const phi = function.blocks.items[3].instructions.items[0];
+    try std.testing.expectEqualStrings("__zllvm_phi_1", phi.result.?);
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const pointers = @import("../codegen/x86_64/generic_cfg/pointer_values.zig");
+    const normalized = (try pointers.legalize(arena.allocator(), function, null)).?;
+    try std.testing.expect(try pointers.legalize(arena.allocator(), normalized, null) == null);
+}
+
 test "mem2reg promotes if-else stack slot with phi" {
     const input =
         \\define i32 @promote_if(i1 %cond, i32 %a, i32 %b) {

@@ -21,6 +21,26 @@ fn executable(module: ir.Module) ![]align(std.heap.page_size_min) u8 {
     return memory;
 }
 
+test "address flow named struct fields use complete padded and packed layouts" {
+    for ([_][]const u8{ "{ i8, i64, i32 }", "<{ i8, i64, i32 }>" }, [_]u64{ 16, 9 }) |body, offset| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "%Record = type {s}\ndefine i64 @field(ptr %p) {{\nentry:\n %q = getelementptr %Record, ptr %p, i32 0, i32 2\n %bits = ptrtoint ptr %q to i64\n ret i64 %bits\n}}\n", .{body});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const memory = try executable(module);
+        defer std.posix.munmap(memory);
+        const run: *const fn (u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+        for ([_]u64{ 0, 1000, std.math.maxInt(u64) - 3 }) |base| try std.testing.expectEqual(base +% offset, run(base));
+        const storage = @import("storage_layout.zig");
+        const context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = module.named_types.items, .target_datalayout = null };
+        try std.testing.expectEqual(@as(?u32, @intCast(offset)), storage.fieldOffset(&context, .{ .aggregate = "%Record" }, 2));
+        try std.testing.expect(storage.fieldOffset(&context, .{ .aggregate = "%Record" }, 3) == null);
+        try std.testing.expect(storage.fieldOffset(&context, .{ .aggregate = "%Missing" }, 0) == null);
+        try std.testing.expect(storage.fieldOffset(&context, .{ .aggregate = "{ i8, %Missing }" }, 0) == null);
+    }
+}
+
 test "address flow schedules late dominators and retains every unreachable block" {
     const text =
         \\define i64 @f(i64 %a, i64 %b) {

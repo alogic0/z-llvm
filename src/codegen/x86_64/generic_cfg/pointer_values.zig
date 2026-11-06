@@ -148,10 +148,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
             }
             if (cloned) {
                 const name = inst.result orelse return null;
+                var found = false;
                 for (result.blocks.items[block_index].instructions.items) |*copy| if (copy.result != null and ir.identifiers.eql(copy.result.?, name)) {
                     copy.kind.phi = phi;
+                    found = true;
                     break;
                 };
+                if (!found) return error.InvalidPointerPhiIdentity;
                 changed = true;
             }
         }

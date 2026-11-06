@@ -11,6 +11,46 @@ const pairs = @import("word_pair_memory.zig");
 pub const Layout = struct { bytes: u32, alignment: u32 };
 pub const max_bytes: u32 = @import("selector_types.zig").max_stack_object_bytes;
 
+/// Exact field displacement, with the same complete-layout admission as frame
+/// storage and pointer strides. Resolve names only from the current module.
+pub fn fieldOffset(context: ?*const machine.ReadOnlyModuleContext, source: ir.Type, index: usize) ?u32 {
+    _ = query(context, source) orelse return null;
+    var ty = source;
+    var depth: usize = 0;
+    while (depth < 32) : (depth += 1) {
+        if (ty != .aggregate) return null;
+        const text = trim(ty.aggregate);
+        if (text.len == 0) return null;
+        if (text[0] == '%') {
+            const ctx = context orelse return null;
+            var resolved: ?[]const u8 = null;
+            for (ctx.named_types) |named| if (ir.identifiers.eql(named.name, text[1..])) {
+                if (resolved != null) return null;
+                resolved = named.body;
+            };
+            ty = parse(resolved orelse return null) orelse return null;
+            continue;
+        }
+        const packed_type = std.mem.startsWith(u8, text, "<{") and std.mem.endsWith(u8, text, "}>");
+        if (!packed_type and !(text[0] == '{' and text[text.len - 1] == '}')) return null;
+        const edge: usize = if (packed_type) 2 else 1;
+        var rest = trim(text[edge .. text.len - edge]);
+        var offset: u32 = 0;
+        var field_index: usize = 0;
+        while (rest.len != 0) : (field_index += 1) {
+            const comma = syntax.findTopLevelComma(rest);
+            const field = trim(if (comma) |at| rest[0..at] else rest);
+            const child = query(context, parse(field) orelse return null) orelse return null;
+            if (!packed_type) offset = std.mem.alignForward(u32, offset, child.alignment);
+            if (field_index == index) return offset;
+            offset = std.math.add(u32, offset, child.bytes) catch return null;
+            rest = if (comma) |at| trim(rest[at + 1 ..]) else "";
+        }
+        return null;
+    }
+    return null;
+}
+
 fn trim(text: []const u8) []const u8 {
     return std.mem.trim(u8, text, " \t\r\n");
 }

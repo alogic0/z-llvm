@@ -19,6 +19,23 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         for (original.instructions.items) |inst| {
             if (!inst.removed and inst.result != null and inst.kind == .gep) {
                 const gep = inst.kind.gep;
+                if (gep.ptr_addrspace == null and gep.indices.items.len == 2 and
+                    gep.indices.items[0].ty == .int and gep.indices.items[0].ty.int <= 64 and
+                    gep.indices.items[0].value.eql(.{ .int = 0 }) and
+                    gep.indices.items[1].ty.eql(.{ .int = 32 }) and gep.indices.items[1].value == .int)
+                {
+                    if (std.math.cast(usize, gep.indices.items[1].value.int)) |field| {
+                        if (storage.fieldOffset(context, gep.source_ty, field)) |offset| {
+                            var copy = inst;
+                            copy.kind.gep.source_ty = .{ .int = 8 };
+                            copy.kind.gep.indices = .empty;
+                            try copy.kind.gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = offset } });
+                            try block.instructions.append(allocator, copy);
+                            changed = true;
+                            continue;
+                        }
+                    }
+                }
                 // A leading zero steps within the same array; the second
                 // index selects a byte. Keep the layout proof explicit and
                 // reuse ordinary byte addressing for globals and parameters.

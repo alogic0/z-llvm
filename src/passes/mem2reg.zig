@@ -226,7 +226,7 @@ fn promoteMultiBlockSlot(
         for (frontiers.frontier(def_block)) |frontier_block| {
             if (!live_in[frontier_block]) continue;
             if (has_phi[frontier_block]) continue;
-            const phi_name = try newPhiName(module, slot, countPhis(phi_names));
+            const phi_name = try newPhiName(module, function.*, slot, countPhis(phi_names));
             try insertSlotPhi(allocator, function, frontier_block, ty, phi_name);
             has_phi[frontier_block] = true;
             phi_names[frontier_block] = phi_name;
@@ -354,8 +354,30 @@ fn promoteSingleStoreSlot(function: *ir.Function, alloca_block_index: usize, all
     }
 }
 
-fn newPhiName(module: *ir.Module, slot: []const u8, index: usize) ![]const u8 {
-    return module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.{}", .{ slot, index }));
+fn newPhiName(module: *ir.Module, function: ir.Function, slot: []const u8, initial: usize) ![]const u8 {
+    var index = initial;
+    while (true) : (index += 1) {
+        var name = try std.fmt.allocPrint(module.allocator, "{s}.{}", .{ slot, index });
+        // Numeric slots and quoted identifiers cannot acquire an unquoted
+        // suffix. Invalid identities previously made pointer PHIs rewrite
+        // forever because identity-aware lookup could never find the result.
+        if (!ir.identifiers.isValid(name)) {
+            module.allocator.free(name);
+            name = try std.fmt.allocPrint(module.allocator, "__zllvm_phi_{}", .{index});
+        }
+        var collision = false;
+        for (function.params.items) |param| if (ir.identifiers.eql(param.name, name)) {
+            collision = true;
+        };
+        for (function.blocks.items) |block| {
+            if (ir.identifiers.eql(block.name, name)) collision = true;
+            for (block.instructions.items) |instruction| if (instruction.result) |result| {
+                if (ir.identifiers.eql(result, name)) collision = true;
+            };
+        }
+        if (!collision) return module.ownString(name);
+        module.allocator.free(name);
+    }
 }
 
 fn countPhis(phi_names: []const ?[]const u8) usize {
@@ -445,7 +467,9 @@ fn renameSlot(
     const outgoing_value = current_value orelse .undef;
     for (graph.successors(block_index)) |successor| {
         const phi_name = phi_names[successor] orelse continue;
-        try addPhiIncoming(allocator, function, successor, phi_name, outgoing_value, function.blocks.items[block_index].name);
+        for (0..graph.edgeCount(block_index, successor)) |_| {
+            try addPhiIncoming(allocator, function, successor, phi_name, outgoing_value, function.blocks.items[block_index].name);
+        }
     }
 
     for (children[block_index].items) |child| {

@@ -3,10 +3,12 @@ const ir = @import("../ir.zig");
 
 pub const BlockEdges = struct {
     successors: std.ArrayList(usize) = .empty,
+    successor_counts: std.ArrayList(usize) = .empty,
     predecessors: std.ArrayList(usize) = .empty,
 
     pub fn deinit(edges: *BlockEdges, allocator: std.mem.Allocator) void {
         edges.successors.deinit(allocator);
+        edges.successor_counts.deinit(allocator);
         edges.predecessors.deinit(allocator);
     }
 };
@@ -60,6 +62,16 @@ pub const Graph = struct {
         return graph.edges.items[block_index].predecessors.items;
     }
 
+    /// Analyses traverse unique successors; PHIs require one incoming value per
+    /// terminator edge, including repeated switch/conditional destinations.
+    pub fn edgeCount(graph: Graph, from: usize, to: usize) usize {
+        const edges = graph.edges.items[from];
+        for (edges.successors.items, edges.successor_counts.items) |successor, count| {
+            if (successor == to) return count;
+        }
+        return 0;
+    }
+
     pub fn reachableFromEntry(graph: Graph, allocator: std.mem.Allocator) ![]bool {
         const reachable = try allocator.alloc(bool, graph.edges.items.len);
         errdefer allocator.free(reachable);
@@ -85,7 +97,15 @@ pub const Graph = struct {
 
     fn addEdge(graph: *Graph, function: ir.Function, from: usize, target_name: []const u8) !void {
         const to = function.blockIndex(target_name) orelse return error.UnknownBlock;
-        try appendUnique(graph.allocator, &graph.edges.items[from].successors, to);
+        const edges = &graph.edges.items[from];
+        for (edges.successors.items, 0..) |successor, i| {
+            if (successor == to) {
+                edges.successor_counts.items[i] += 1;
+                return;
+            }
+        }
+        try edges.successors.append(graph.allocator, to);
+        try edges.successor_counts.append(graph.allocator, 1);
         try appendUnique(graph.allocator, &graph.edges.items[to].predecessors, from);
     }
 };
