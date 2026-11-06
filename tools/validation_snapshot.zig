@@ -13,7 +13,7 @@ pub fn main(init: std.process.Init) !void {
     if ((args.get("output") != null) == (args.get("verify") != null)) return error.ChooseOneOperation;
     const snapshot = try provenance.snapshot(&c);
     if (args.get("verify")) |path| {
-        if (!try u.equal(c.a, try c.load(try c.join(&.{path})), snapshot)) return error.SourceSnapshotChanged;
+        if (!u.json.eql(try c.load(try c.join(&.{path})), snapshot)) return error.SourceSnapshotChanged;
         try c.print("source snapshot verified: {s}\n", .{path});
     } else {
         const path = try c.ownedPath(try args.require("output"));
