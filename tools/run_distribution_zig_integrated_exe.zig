@@ -322,16 +322,16 @@ pub fn main(init: std.process.Init) !void {
         defer allocator.free(root);
         const manifest = try std.fmt.allocPrint(allocator, "test/real_programs/{s}.json", .{program});
         defer allocator.free(manifest);
-        const program_result = try common.runCapture(allocator, io, &.{
+        const unchanged_result = try common.runCapture(allocator, io, &.{
             "zig",           "run",       "tools/run_real_program.zig", "--",
             "--output-root", root,        "--manifest",                 manifest,
             "--zig-emitter", zig_emitter, "--zig-source",               zig_source_dir,
             "--zllvm",       zllvm_exe,   "--codegen-reachable",
         }, label);
-        defer common.freeRunResult(allocator, program_result);
-        try stdout_writer.interface.writeAll(program_result.stdout);
+        defer common.freeRunResult(allocator, unchanged_result);
+        try stdout_writer.interface.writeAll(unchanged_result.stdout);
         try stdout_writer.interface.flush();
-        if (!common.termOk(program_result.term)) try common.forwardCommandFailure(io, label, program_result);
+        if (!common.termOk(unchanged_result.term)) try common.forwardCommandFailure(io, label, unchanged_result);
     }
     const c_program_root = try temp.join(allocator, "unchanged-upstream-c");
     defer allocator.free(c_program_root);
