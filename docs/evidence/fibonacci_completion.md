@@ -22,7 +22,7 @@ check. Most runtime helpers are not exercised by Fibonacci's successful path.
 
 ## Changes
 
-Mandatory semantic normalization now runs before selection. It refines scalar
+Mandatory semantic normalization now runs before generic x86-64 selection. It refines scalar
 undef/poison PHI inputs, normalizes narrow comparisons and integer width semantics,
 and checks that no required normalization remains. Original source IR and ABI
 parameters remain unchanged. Seventeen existing limb and pointer whole-function
@@ -73,6 +73,18 @@ checks. The 24 rendered Base64 recipes compile and execute with LLVM 22 and
 AddressSanitizer (`base64-reference-v4.json` and `.log`), including corrected
 value/block name separation in the textual rendering.
 
+The second full run passes gates 1–12, then stops in the Fibonacci executable
+gate. Fast and Small match; Safe's Debug compiler exceeds the program runner's
+default 120-second compile deadline. The isolated
+`fibonacci-debug-deadline-repro/commands.json` records `timed_out`, return code
+124, actual termination -15, and 120.012 seconds for the local compile. The
+earlier three-mode focused run used a ReleaseFast compiler. The Fibonacci
+manifest now gives compilation and selection-owner replay a 900,000 ms budget;
+executable observations retain their five-second limit. Failed stage reports
+retain command outcome, return code, deadline, timing and diagnostics, and the
+runner prints the termination reason. This tooling repair still needs a new
+full acceptance run.
+
 Shared register repairs cover overlapping compare moves, accumulator divisors,
 live RCX shift sources, 32-bit shift writeback, and odd-width cast sources. The
 reviewed C52-0 authority policy reuses a final-use source, preserves a live source
@@ -115,8 +127,9 @@ three modes. Counts are observations, not unique source programs.
 | Indirect branches and packed records | 18,432 | 9,216 | `packed-branches-modes` |
 | Vector ABI | 15,360 | 7,680 | `vector-abi-modes-v3` |
 
-The full unit suite passes 1,889 tests in Debug and ReleaseSafe. The validation
-policy suite passes 24 tests in each mode. Compilation contract checks pass.
+The full unit suite passes 1,897 tests in Debug and ReleaseSafe. The validation
+policy suite passes 26 tests in each mode, including silent timeout reporting
+and compile-budget validation. Compilation contract checks pass.
 The initial reference-link failure (missing compiler runtime), quoted-symbol
 link failure, and earlier vector failures remain in the raw evidence.
 

@@ -65,6 +65,7 @@ pub const Runner = struct {
         try u.put(c.a, &record, "argv", try u.strings(c.a, argv));
         try u.put(c.a, &record, "returncode", u.n(code));
         try u.put(c.a, &record, "wall_ns", u.n(report.wall_ns));
+        try u.put(c.a, &record, "timeout_ms", u.n(options.timeout_ms));
         try u.put(c.a, &record, "stdout", u.s(out_path));
         try u.put(c.a, &record, "stderr", u.s(err_path));
         try u.put(c.a, &record, "outcome", u.s(outcome));

@@ -9,6 +9,7 @@
   "exit_status": 0,
   "local_pipeline": "preopt",
   "link_driver": "zig-compiler-rt",
+  "compile_timeout_ms": 900000,
   "extra_compile_args": ["-fsingle-threaded"],
   "remaining_dependencies": ["libLLVM IR construction", "Zig linker and compiler-rt", "libc and CRT", "single-threaded Zig startup"]
 }

@@ -43,6 +43,23 @@ pub fn linkDriver(args: u.Args, manifest: u.Value) !enum { system, zig_compiler_
     if (args.get("linker") != null) return error.ConflictingProgramLinker;
     return .zig_compiler_rt;
 }
+pub fn compileTimeoutMs(manifest: u.Value) !u32 {
+    const value = manifest.object.get("compile_timeout_ms") orelse return 120_000;
+    const timeout = u.json.integer(value) catch return error.InvalidProgramCompileTimeout;
+    if (timeout <= 0 or timeout > std.math.maxInt(u32)) return error.InvalidProgramCompileTimeout;
+    return @intCast(timeout);
+}
+
+pub fn runStage(c: *u.Context, runner: *Runner, row: *u.Value, stage: []const u8, command: []const []const u8, stem: []const u8, env: *const std.process.Environ.Map, options: Runner.Options) !bool {
+    try u.put(c.a, row, "failure_stage", u.s(stage));
+    if ((try runner.run(command, stem, env, options)).code == 0) return true;
+    // Keep termination details in the program report even when a supervisor
+    // kills a silent compiler or the outer gate removes its temporary logs.
+    try u.put(c.a, row, "failed_command", runner.commands.array.items[runner.commands.array.items.len - 1]);
+    const diagnostic = try c.read(try c.fmt("{s}.stderr", .{stem}));
+    try u.put(c.a, row, "diagnostic", u.s(diagnostic[diagnostic.len -| 8192..]));
+    return false;
+}
 pub fn argv(c: *u.Context, first: []const []const u8, last: []const []const u8) ![]const []const u8 {
     return std.mem.concat(c.a, []const u8, &.{ first, last });
 }
@@ -112,6 +129,14 @@ fn run(c: *u.Context, arguments: []const []const u8) !u8 {
         try u.put(c.a, &report, "error", u.s(c.diagnostic orelse @errorName(err)));
     };
     try c.writeJson(try c.join(&.{ output, "report.json" }), report);
+    for ((try u.get(report, "rows")).array.items) |row| {
+        if (row.object.get("failed_command")) |command| {
+            try std.Io.File.stderr().writeStreamingAll(c.io, try c.fmt("real-program-failure program={s} mode={s} stage={s} outcome={s} returncode={d} timeout_ms={d}\n", .{
+                program,                                              try u.str(row, "mode"),                               try u.str(row, "failure_stage"), try u.str(command, "outcome"),
+                try u.json.integer(try u.get(command, "returncode")), try u.json.integer(try u.get(command, "timeout_ms")),
+            }));
+        }
+    }
     const passed = u.json.is(try u.get(report, "status"), "passed");
     try c.print("summary real-program schema=real-program-v1 program={s} programs=1 program_modes={d} reference_executions={d} local_executions={d} matched_program_modes={d} local_fail={d}\n", .{
         program,                                         (report.object.get("program_modes") orelse u.n(0)).integer, (try u.get(report, "reference_executions")).integer,
@@ -139,6 +164,7 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, manifest_path: []con
     try u.put(c.a, report, "tool_provenance", procedure);
     const manifest = try c.load(try c.join(&.{manifest_path}));
     _ = try linkDriver(args, manifest);
+    try u.put(c.a, report, "compile_timeout_ms", u.n(try compileTimeoutMs(manifest)));
     const modes = try selectedModes(c, args, manifest);
     const source_root = try c.join(&.{args.get("zig-source") orelse "../ziglang"});
     const zig = try c.join(&.{args.get("zig-emitter") orelse try c.join(&.{ source_root, "build/stage4/bin/zig" })});
@@ -189,15 +215,15 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, manifest_path: []con
 }
 
 fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8, source: []const u8, zig: []const u8, zllvm: []const u8, proxy: []const u8, global_cache: []const u8, manifest: u.Value, base_env: *const std.process.Environ.Map, runner: *Runner, report: *u.Value, row: *u.Value) !void {
+    const compile_options: Runner.Options = .{ .timeout_ms = try compileTimeoutMs(manifest) };
     var common = std.array_list.Managed([]const u8).init(c.a);
     try common.appendSlice(&.{ zig, "build-obj", source, "-lc", try c.fmt("-O{s}", .{mode}), "-target", try u.str(manifest, "target"), try c.fmt("-mcpu={s}", .{try u.str(manifest, "cpu")}), "-fllvm", "-flibllvm", "-fno-lto", "-fno-stack-protector", "-fno-unwind-tables", "--global-cache-dir", global_cache });
     if (manifest.object.get("extra_compile_args")) |extra| try common.appendSlice(try u.stringSlice(c.a, extra));
     const reference = try c.join(&.{ directory, "reference.o" });
-    if ((try runner.run(try argv(c, common.items, &.{ "--cache-dir", try c.join(&.{ directory, "reference-cache" }), try c.fmt("-femit-bin={s}", .{reference}) }), try c.join(&.{ directory, "reference-compile" }), base_env, .{})).code != 0) return;
+    if (!try runStage(c, runner, row, "reference-compile", try argv(c, common.items, &.{ "--cache-dir", try c.join(&.{ directory, "reference-cache" }), try c.fmt("-femit-bin={s}", .{reference}) }), try c.join(&.{ directory, "reference-compile" }), base_env, compile_options)) return;
     const linker = args.get("linker") orelse "cc";
-    try u.put(c.a, row, "failure_stage", u.s("reference-link"));
     const reference_exe = try c.join(&.{ directory, "reference" });
-    if ((try runner.run(try linkCommand(c, args, manifest, zig, linker, mode, reference, reference_exe, global_cache), try c.join(&.{ directory, "reference-link" }), base_env, .{})).code != 0) return;
+    if (!try runStage(c, runner, row, "reference-link", try linkCommand(c, args, manifest, zig, linker, mode, reference, reference_exe, global_cache), try c.join(&.{ directory, "reference-link" }), base_env, .{})) return;
     try u.increment(c.a, report, "reference_executions", 1);
     try u.put(c.a, row, "failure_stage", u.s("reference-execution"));
     runner.observe(reference_exe, &.{}, try u.json.integer(try u.get(manifest, "exit_status")), try u.str(manifest, "stdout"), try c.join(&.{ directory, "reference-run" }), base_env) catch |err| {
@@ -215,7 +241,7 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     const selection: []const []const u8 = if (args.flag("codegen-reachable")) &.{"--codegen-reachable"} else &.{};
     if (args.flag("codegen-reachable")) try local_env.put("ZLLVM_CODEGEN_REACHABLE", "1");
     const local_compile = try c.join(&.{ directory, "local-compile" });
-    if ((try runner.run(try argv(c, common.items, &.{ "--cache-dir", try c.join(&.{ directory, "candidate-cache" }), try c.fmt("-femit-bin={s}", .{candidate}) }), local_compile, &local_env, .{})).code != 0) {
+    if (!try runStage(c, runner, row, "local-compile", try argv(c, common.items, &.{ "--cache-dir", try c.join(&.{ directory, "candidate-cache" }), try c.fmt("-femit-bin={s}", .{candidate}) }), local_compile, &local_env, compile_options)) {
         const diagnostic = try c.read(try c.fmt("{s}.stderr", .{local_compile}));
         const fields = try markerFields(c, diagnostic);
         const stage = fields.get("failure_category") orelse "local-compile";
@@ -223,7 +249,7 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
         try u.put(c.a, row, "diagnostic", u.s(diagnostic[diagnostic.len -| 8192..]));
         const input = try c.join(&.{ capture_dir, "object-input.ll" });
         if (std.mem.eql(u8, stage, "object") and u.exists(c.io, input)) {
-            _ = try runner.run(try argv(c, &.{zllvm}, try argv(c, selection, &.{ "--report-all-codegen-failures", "--generic-cfg-selector", "--emit=obj", "--target=x86_64-unknown-linux-gnu", "--input-limit=67108864", input })), try c.join(&.{ directory, "codegen-failures" }), base_env, .{});
+            _ = try runner.run(try argv(c, &.{zllvm}, try argv(c, selection, &.{ "--report-all-codegen-failures", "--generic-cfg-selector", "--emit=obj", "--target=x86_64-unknown-linux-gnu", "--input-limit=67108864", input })), try c.join(&.{ directory, "codegen-failures" }), base_env, compile_options);
             const details = try c.read(try c.join(&.{ directory, "codegen-failures.stderr" }));
             try u.put(c.a, row, "codegen_diagnostic", u.s(details[details.len -| 8192..]));
         }
@@ -239,8 +265,7 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     if (!u.json.eql(hook_contract, try elf.parse(c.a, try c.read(candidate)))) return c.fail("linked candidate changed hook sections, symbols or relocations", .{});
     try c.writeJson(try c.join(&.{ directory, "object-contract.json" }), hook_contract);
     try u.put(c.a, row, "hook_object_sha256", u.s(try c.digest(hook)));
-    try u.put(c.a, row, "failure_stage", u.s("selection-owner-manifest"));
-    if ((try runner.run(try argv(c, &.{zllvm}, try argv(c, selection, &.{ "--emit=selection-owner-manifest", "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", "--input-limit=67108864", optimized })), try c.join(&.{ directory, "owners" }), base_env, .{})).code != 0) return;
+    if (!try runStage(c, runner, row, "selection-owner-manifest", try argv(c, &.{zllvm}, try argv(c, selection, &.{ "--emit=selection-owner-manifest", "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", "--input-limit=67108864", optimized })), try c.join(&.{ directory, "owners" }), base_env, compile_options)) return;
     var owners = u.object(c.a);
     var lines = std.mem.tokenizeScalar(u8, try c.read(try c.join(&.{ directory, "owners.stdout" })), '\n');
     _ = lines.next();
@@ -252,9 +277,8 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     try u.put(c.a, row, "selector_owners", owners);
     try u.put(c.a, row, "object_bytes", u.n((try std.Io.Dir.cwd().statFile(c.io, candidate, .{})).size));
     try u.put(c.a, row, "object_sha256", u.s(try c.digest(candidate)));
-    try u.put(c.a, row, "failure_stage", u.s("local-link"));
     const candidate_exe = try c.join(&.{ directory, "candidate" });
-    if ((try runner.run(try linkCommand(c, args, manifest, zig, linker, mode, candidate, candidate_exe, global_cache), try c.join(&.{ directory, "local-link" }), base_env, .{})).code != 0) return;
+    if (!try runStage(c, runner, row, "local-link", try linkCommand(c, args, manifest, zig, linker, mode, candidate, candidate_exe, global_cache), try c.join(&.{ directory, "local-link" }), base_env, .{})) return;
     try u.increment(c.a, row, "local_executions", 1);
     try u.increment(c.a, report, "local_executions", 1);
     try u.put(c.a, row, "failure_stage", u.s("local-execution"));

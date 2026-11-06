@@ -43,6 +43,14 @@ replacement behavior. Historical Python helpers in ignored validation evidence
 remain historical records; they are not dependencies of the active workflow.
 No archives were made.
 
+Unchanged-program manifests can set `compile_timeout_ms` to a positive 32-bit
+millisecond budget. It applies to reference/local compilation, selector-owner
+replay and diagnostic re-emission; the default is 120,000 ms. Fibonacci uses
+900,000 ms so a Debug compiler can process the Safe runtime. Links retain the
+default command budget and executable observations retain their five-second
+limit. Failed stage reports preserve the command outcome and actual termination
+even when the compiler produces no stderr; command records include the budget.
+
 The native population registry now lives in
 [`test/real_programs/native_canaries.json`](../test/real_programs/native_canaries.json).
 All function sets, expected outputs, observation counts, route flags and guard

@@ -56,6 +56,41 @@ test "program runtime linking requires an explicit known manifest driver without
     try u.put(f.c.a, &manifest, "link_driver", u.s("unknown"));
     try std.testing.expectError(error.UnsupportedProgramLinkDriver, program.linkDriver(args, manifest));
 }
+test "program compile budget is explicit and rejects invalid manifest values" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const program = @import("validation/program.zig");
+    var manifest = u.object(f.c.a);
+    try std.testing.expectEqual(@as(u32, 120_000), try program.compileTimeoutMs(manifest));
+    try u.put(f.c.a, &manifest, "compile_timeout_ms", u.n(900_000));
+    try std.testing.expectEqual(@as(u32, 900_000), try program.compileTimeoutMs(manifest));
+    for ([_]u.Value{ u.n(0), u.n(-1), u.n(@as(i64, std.math.maxInt(u32)) + 1), u.s("900000"), u.b(true), .{ .float = 1.5 } }) |invalid| {
+        try u.put(f.c.a, &manifest, "compile_timeout_ms", invalid);
+        try std.testing.expectError(error.InvalidProgramCompileTimeout, program.compileTimeoutMs(manifest));
+    }
+}
+test "program report distinguishes a silent timeout from an ordinary exit with the same code" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const program = @import("validation/program.zig");
+    var runner = Runner.init(&f.c, f.directory);
+    var row = u.object(f.c.a);
+    try expect(!try program.runStage(&f.c, &runner, &row, "local-compile", &.{ "/bin/sh", "-c", "exec sleep 30" }, try f.path("timeout"), &f.c.env, .{ .timeout_ms = 20 }));
+    try equal("local-compile", try u.str(row, "failure_stage"));
+    try equal("", try u.json.text(try u.get(row, "diagnostic")));
+    const timeout = try u.get(row, "failed_command");
+    try equal("timed_out", try u.str(timeout, "outcome"));
+    try std.testing.expectEqual(@as(i64, 124), try u.json.integer(try u.get(timeout, "returncode")));
+    try std.testing.expectEqual(@as(i64, 20), try u.json.integer(try u.get(timeout, "timeout_ms")));
+    try expect((try u.json.integer(try u.get(timeout, "actual_returncode"))) < 0);
+    try expect(!try program.runStage(&f.c, &runner, &row, "selection-owner-manifest", &.{ "/bin/sh", "-c", "printf ordinary >&2; exit 124" }, try f.path("exit"), &f.c.env, .{}));
+    const exited = try u.get(row, "failed_command");
+    try equal("completed", try u.str(exited, "outcome"));
+    try std.testing.expectEqual(@as(i64, 124), try u.json.integer(try u.get(exited, "actual_returncode")));
+    try equal("ordinary", try u.str(row, "diagnostic"));
+}
 test "command wrapper preserves binary log, durable failure, cancellation and owned child cleanup" {
     var f: Fixture = undefined;
     try f.init();
