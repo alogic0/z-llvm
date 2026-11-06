@@ -333,6 +333,16 @@ pub fn main(init: std.process.Init) !void {
         try stdout_writer.interface.flush();
         if (!common.termOk(unchanged_result.term)) try common.forwardCommandFailure(io, label, unchanged_result);
     }
+    const input_program_root = try temp.join(allocator, "input-program");
+    defer allocator.free(input_program_root);
+    const input_program_result = try common.runCapture(allocator, io, &.{
+        "zig",     "run",     "tools/run_input_program.zig", "--",        "--output-root", input_program_root,
+        "--zllvm", zllvm_exe, "--zig-emitter",               zig_emitter,
+    }, "unchanged input-driven JSON-dump");
+    defer common.freeRunResult(allocator, input_program_result);
+    try stdout_writer.interface.writeAll(input_program_result.stdout);
+    try stdout_writer.interface.flush();
+    if (!common.termOk(input_program_result.term)) try common.forwardCommandFailure(io, "unchanged input-driven JSON-dump", input_program_result);
     const c_program_root = try temp.join(allocator, "unchanged-upstream-c");
     defer allocator.free(c_program_root);
     const c_program_arg = try std.fmt.allocPrint(allocator, "--output-root={s}", .{c_program_root});

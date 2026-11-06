@@ -13,12 +13,15 @@ pub const Runner = struct {
     pub const Options = struct {
         timeout_ms: u32 = 120_000,
         stdout_file: ?[]const u8 = null,
+        stdin_file: ?[]const u8 = null,
         group: u.process.Group = .owned,
     };
-    pub const Result = struct { code: i64, wall_ns: u64 };
+    pub const Result = struct { code: i64, wall_ns: u64, completed: bool };
 
     pub fn run(r: *Runner, argv: []const []const u8, stem: []const u8, env: *const std.process.Environ.Map, options: Options) !Result {
         const c = r.context;
+        const input: ?std.Io.File = if (options.stdin_file) |path| try std.Io.Dir.cwd().openFile(c.io, path, .{}) else null;
+        defer if (input) |file| file.close(c.io);
         const out_path = options.stdout_file orelse try c.fmt("{s}.stdout", .{stem});
         const err_path = try c.fmt("{s}.stderr", .{stem});
         const out = try c.createLog(out_path, false);
@@ -32,6 +35,7 @@ pub const Runner = struct {
                 .environ_map = env,
                 .search_path = true,
                 .stdout = .{ .file = out },
+                .stdin = if (input) |file| .{ .file = file } else .ignore,
                 .stderr = .{ .file = err },
                 .cancellation = u.cancellation(),
                 .group = options.group,
@@ -68,13 +72,17 @@ pub const Runner = struct {
         try u.put(c.a, &record, "timeout_ms", u.n(options.timeout_ms));
         try u.put(c.a, &record, "stdout", u.s(out_path));
         try u.put(c.a, &record, "stderr", u.s(err_path));
+        if (options.stdin_file) |path| {
+            try u.put(c.a, &record, "stdin", u.s(path));
+            try u.put(c.a, &record, "stdin_sha256", u.s(try c.digest(path)));
+        }
         try u.put(c.a, &record, "outcome", u.s(outcome));
         if (failure) |name| try u.put(c.a, &record, "failure", u.s(name));
         if (report.cleanup_failure) |cleanup| try u.put(c.a, &record, "cleanup_failure", u.s(@errorName(cleanup)));
         if (report.term) |term| try u.put(c.a, &record, "actual_returncode", u.n(u.returnCode(term)));
         try u.add(&r.commands, record);
         try c.writeJson(try c.join(&.{ r.output, "commands.json" }), r.commands);
-        return .{ .code = code, .wall_ns = report.wall_ns };
+        return .{ .code = code, .wall_ns = report.wall_ns, .completed = report.outcome == .completed and report.term.? == .exited };
     }
 
     pub fn require(r: *Runner, argv: []const []const u8, stem: []const u8, env: *const std.process.Environ.Map) !void {

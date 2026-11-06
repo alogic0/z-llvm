@@ -100,7 +100,11 @@ fn capture(c: *u.Context, args: []const []const u8) !i64 {
     try c.copy(try c.join(&.{args[args.len - 1]}), try c.join(&.{ directory, if (object) "object-input.ll" else "preopt.ll" }));
     const output = try c.join(&.{ directory, if (object) "local.o" else "optimized.ll" });
     var runner = Runner.init(c, directory);
-    const command = try argv(c, &.{exe}, args);
+    const extra: []const []const u8 = if (object) &.{
+        try c.fmt("--selection-owner-output={s}/owners.tsv", .{directory}),
+        try c.fmt("--profile={s}/profile.json", .{directory}),
+    } else &.{};
+    const command = try argv(c, &.{exe}, try argv(c, extra, args));
     const result = try runner.run(command, try c.join(&.{ directory, stem }), &c.env, .{
         .stdout_file = output,
         .timeout_ms = std.math.maxInt(u32),
@@ -113,7 +117,7 @@ fn capture(c: *u.Context, args: []const []const u8) !i64 {
 }
 
 fn run(c: *u.Context, arguments: []const []const u8) !u8 {
-    const args = try u.Args.parse(c.a, arguments, &.{ "output-root", "zig-source", "zig-emitter", "zllvm", "linker", "manifest", "mode" }, &.{"codegen-reachable"});
+    const args = try u.Args.parse(c.a, arguments, &.{ "output-root", "zig-source", "zig-emitter", "zllvm", "linker", "manifest", "mode" }, &.{ "codegen-reachable", "replay-owners" });
     const output = try c.newOutput(try args.require("output-root"));
     const manifest_path = args.get("manifest") orelse try c.join(&.{"test/real_programs/hello_libc.json"});
     const program = std.fs.path.stem(manifest_path);
@@ -265,7 +269,14 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     if (!u.json.eql(hook_contract, try elf.parse(c.a, try c.read(candidate)))) return c.fail("linked candidate changed hook sections, symbols or relocations", .{});
     try c.writeJson(try c.join(&.{ directory, "object-contract.json" }), hook_contract);
     try u.put(c.a, row, "hook_object_sha256", u.s(try c.digest(hook)));
-    if (!try runStage(c, runner, row, "selection-owner-manifest", try argv(c, &.{zllvm}, try argv(c, selection, &.{ "--emit=selection-owner-manifest", "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", "--input-limit=67108864", optimized })), try c.join(&.{ directory, "owners" }), base_env, compile_options)) return;
+    const owner_manifest = try c.join(&.{ capture_dir, "owners.tsv" });
+    try c.copy(owner_manifest, try c.join(&.{ directory, "owners.stdout" }));
+    try u.put(c.a, row, "ownership_source", u.s("object-emission"));
+    try u.put(c.a, row, "compilation_profile", try c.load(try c.join(&.{ capture_dir, "profile.json" })));
+    if (args.flag("replay-owners")) {
+        if (!try runStage(c, runner, row, "selection-owner-manifest", try argv(c, &.{zllvm}, try argv(c, selection, &.{ "--emit=selection-owner-manifest", "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", "--input-limit=67108864", optimized })), try c.join(&.{ directory, "owners-replay" }), base_env, compile_options)) return;
+        if (!std.mem.eql(u8, try c.read(owner_manifest), try c.read(try c.join(&.{ directory, "owners-replay.stdout" })))) return error.OwnershipReplayMismatch;
+    }
     var owners = u.object(c.a);
     var lines = std.mem.tokenizeScalar(u8, try c.read(try c.join(&.{ directory, "owners.stdout" })), '\n');
     _ = lines.next();

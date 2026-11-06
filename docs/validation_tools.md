@@ -64,6 +64,22 @@ large unchanged programs; ordinary build commands and native-population tools
 keep their own compiler selection. A separate ReleaseFast build prefix permits
 faster development runs while retaining the Debug installation and unit tests.
 
+Unchanged Zig programs now obtain ownership and a phase profile from the captured
+object-emission run. `run_real_program --replay-owners` additionally selects the
+captured IR independently and requires identical ownership. Compilation-route
+tests permanently check object equality with profiling/sidecars enabled and
+sidecar/replay equality.
+
+`zig build input-program -- --output-root DIR` compiles the unchanged pinned
+`jsmn` JSON-dump example once per Fast/Safe/Small mode, then runs 46 frozen stdin
+inputs per executable. The [manifest](../test/real_programs/jsmn_jsondump.json)
+authenticates the unchanged sources and independently specified stdout, stderr
+and exit status. Reports retain all 138 input/mode observations, ownership
+replay, phase profiles and 552 observation-mutation controls. These controls test
+the oracle's rejection of wrong status/output and abnormal termination; they
+are not compiler mutation or allocation-failure tests. File-backed stdin is
+reopened for each execution and its hash is recorded with the command.
+
 The native population registry now lives in
 [`test/real_programs/native_canaries.json`](../test/real_programs/native_canaries.json).
 All function sets, expected outputs, observation counts, route flags and guard

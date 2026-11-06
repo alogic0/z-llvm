@@ -137,6 +137,10 @@ pub fn build(b: *std.Build) void {
     upstream_c_run.step.dependOn(b.getInstallStep());
     upstream_c_run.addPassthruArgs();
     b.step("upstream-c-program", "Compare the unchanged upstream C fixture and integer-varargs native canary").dependOn(&upstream_c_run.step);
+    const input_program = b.addSystemCommand(&.{ b.graph.zig_exe, "run", "tools/run_input_program.zig", "--" });
+    input_program.step.dependOn(b.getInstallStep());
+    input_program.addPassthruArgs();
+    b.step("input-program", "Execute the frozen input corpus against unchanged upstream JSON-dump").dependOn(&input_program.step);
     addToolStepWithArgs(b, "check-docs", "Validate current documentation links and accepted status", "tools/check_project_docs.zig");
     addToolStep(b, "check-zig-stage4-emitter", "Check the authoritative Zig stage4 emitter", "tools/check_zig_stage4_emitter.zig");
     addToolStep(b, "focused-codegen-canaries", "Run procedural fma and __multi3 codegen canaries (non-gating)", "tools/run_focused_codegen_canaries.zig");

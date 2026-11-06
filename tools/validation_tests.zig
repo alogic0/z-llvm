@@ -13,6 +13,32 @@ const expect = std.testing.expect;
 const equal = std.testing.expectEqualStrings;
 const io = std.testing.io;
 const zero_hash = &@as([64]u8, @splat('0'));
+test "input corpus requires ordinary exit and exact stdout and stderr" {
+    const matches = @import("validation/input_program.zig").matches;
+    try expect(matches(true, 2, "", "incomplete\n", 2, "", "incomplete\n"));
+    try expect(!matches(false, 124, "", "", 124, "", ""));
+    try expect(!matches(true, 0, "ok", "", 2, "ok", ""));
+    try expect(!matches(true, 0, "wrong", "", 0, "ok", ""));
+    try expect(!matches(true, 0, "ok", "extra", 0, "ok", ""));
+}
+test "file stdin is replayed from the beginning and recorded by hash" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    var runner = Runner.init(&f.c, f.directory);
+    const input = try f.path("input");
+    try f.c.write(input, "a\x00b\n");
+    for ([_][]const u8{ "first", "second" }) |name| {
+        const result = try runner.run(&.{"/bin/cat"}, try f.path(name), &f.c.env, .{ .stdin_file = input });
+        try expect(result.completed);
+        try std.testing.expectEqual(@as(i64, 0), result.code);
+        try equal("a\x00b\n", try f.c.read(try f.path(try f.c.fmt("{s}.stdout", .{name}))));
+    }
+    for (runner.commands.array.items) |record| {
+        try equal(input, try u.str(record, "stdin"));
+        try equal(try f.c.digest(input), try u.str(record, "stdin_sha256"));
+    }
+}
 test "command logs preserve independent positional writers and final error trace" {
     var f: Fixture = undefined;
     try f.init();
