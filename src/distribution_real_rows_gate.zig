@@ -777,11 +777,22 @@ fn sourceAuthoritySha256(identity: execution_cohort.SourceIdentity) [64]u8 {
     inline for (@typeInfo(execution_cohort.SourceIdentity).@"struct".field_names) |field_name| {
         hasher.update(field_name);
         hasher.update("\x00");
-        hasher.update(&@field(identity, field_name));
+        hasher.update(std.mem.asBytes(&@field(identity, field_name)));
     }
     var digest: [32]u8 = undefined;
     hasher.final(&digest);
     return std.fmt.bytesToHex(digest, .lower);
+}
+
+test "cohort source authority binds nested definition hashes" {
+    var identity: execution_cohort.SourceIdentity = std.mem.zeroes(execution_cohort.SourceIdentity);
+    const original = sourceAuthoritySha256(identity);
+    for (0..identity.breadth_definition_sha256.len) |index| {
+        identity.breadth_definition_sha256[index][31] = 1;
+        try std.testing.expect(!std.mem.eql(u8, &original, &sourceAuthoritySha256(identity)));
+        identity.breadth_definition_sha256[index][31] = 0;
+    }
+    try std.testing.expectEqual(original, sourceAuthoritySha256(identity));
 }
 
 fn airGenerationCacheKeyText(allocator: std.mem.Allocator, identity: DescriptorCacheIdentity) ![]u8 {
