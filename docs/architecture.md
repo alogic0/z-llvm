@@ -256,17 +256,25 @@ these folds so newly constant safety branches disappear before codegen.
 | Integrated preopt/postopt/writer gates | The selected route and wrappers declared by each runner. | Different routes exercise different optimization owners and selector paths. |
 | `distribution-all` | The tracked 17-subgate inventory and its declared populations. | Success does not cover every development pass, input shape, or separate frontier gate. |
 
-The [current acceptance](evidence/scalar_frame_acceptance_20261103.json)
-records 100 compiler-core functions lowered, emitted and linked, with five cohort
-executions in every release mode. ASCII contributes 256 input observations per
-mode; the retained constant methods contribute one each. The current serial run
-passes all 17 subgates against a frozen 2,580-file source snapshot, reusing three
-authenticated AIR exports while rerunning execution. Standalone programs,
-behavioral observations and compiler-rt counts retain their own populations.
+The [execution-breadth acceptance](evidence/execution_breadth_acceptance_20261106.json)
+records 100 compiler-core functions lowered, emitted and linked, with nine cohort
+executions in every release mode. The cohort checks 5,264 observations per mode:
+four constant methods, ASCII, index boundaries, guarded atomic state transitions
+and exhaustive packed-byte predicates. The 17-subgate run, unchanged programs,
+45 native populations and compiler-rt comparisons retain separate denominators.
+Fresh AIR generation and cached execution replay authenticate the expanded source
+identity. The fixed 100-row candidate prefix remains unchanged.
+
+The shared transfer planner snapshots cyclic sources and later call arguments
+before their registers are overwritten. Scalar integer register PHIs use the
+same transaction. Proven free scratch registers or existing spill authority
+preserve live aliases and widths; storage and unsupported-forward-reference
+failures roll back. Pair/vector PHIs and spill destinations retain existing paths.
+The [execution evidence](evidence/execution_breadth.md) records native cycle,
+fan-out, pressure, memory-guard and rollback checks.
+
 The earlier [infrastructure pair](evidence/startup_headroom_acceptance_20261103.json)
-passed both 17-subgate runs with 1,396 matching canonical records. Its calibrated
-8 GiB forecast and unchanged reserve are reused; the current serial report
-observes a 1.63 GB free-space decrease.
+established the calibrated 8 GiB forecast and unchanged execution reserve.
 Nested row workers inherit the original serial admission and enforce its reserve;
 their transient minimum enters the serial report. Schema-3 row telemetry measures
 allocated bytes across all seven owned roots, including retained exports.

@@ -4523,7 +4523,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `7e1c8bd7d435200d7ad4813cf4033e0270973353`; tree: `1883d4267713b9cfe12555195504a26eefe7207c`.
+Accepted revision: `f68ab145d3f5efc4f4a4f01d30012dc3e4db0eac`; tree: `06d222b29524f157950e80b6e4dd0c1dafdc0462`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -4534,8 +4534,8 @@ Candidate SHA-256: `847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe
 | Functions lowered | 100 | Compiler-core prefix |
 | Objects emitted | 100 | Compiler-core prefix |
 | Native links | 100 | Compiler-core prefix |
-| Functions executed | 5 | Fixed execution cohort |
-| Paired harnesses accepted | 5 | Legacy real_programs_ok cohort metric |
+| Functions executed | 9 | Fixed execution cohort |
+| Paired harnesses accepted | 9 | Legacy real_programs_ok cohort metric |
 | Local failures | 0 | Compiler-core gate |
 
 Compiler-rt bypass ratchet: 130 (separate 285-function population).

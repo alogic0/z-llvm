@@ -1,21 +1,27 @@
 # Active direction
 
-The [Fibonacci completion plan](plans/2026-11-05-fibonacci-completion.md) is
-accepted through step 6 at `7e1c8bd7`: all 17 integration gates pass, unchanged
-Fibonacci executes all six assertions in Fast, Safe and Small, and Safe emits
-all 1,568 selected definitions. The permanent regression is part of integration.
-The [acceptance record](evidence/fibonacci_completion_acceptance_20261106.json)
-binds the frozen source and results; the [completion evidence](evidence/fibonacci_completion.md)
-explains the implementation and boundaries.
+The [execution-breadth plan](plans/2026-11-06-execution-breadth.md) is implemented
+at `f68ab145`: all 17 integration gates pass. Fibonacci and four additional
+unchanged programs execute in Fast, Safe and Small. The fixed compiler-core
+prefix remains 100 lowered/emitted/linked functions, with nine executed functions
+per mode. All 45 native populations pass. The
+[acceptance record](evidence/execution_breadth_acceptance_20261106.json) and
+[implementation evidence](evidence/execution_breadth.md) bind these separate
+populations and the fresh/cache replay.
 
-Next action: follow the [execution-breadth plan](plans/2026-11-06-execution-breadth.md).
-Add diverse unchanged programs and extend the versioned compiler-core execution
-cohort. The accepted count remains five executed functions per mode, alongside
-100 lowered/emitted/linked rows and 44 native populations. Exploratory tagged-union
-and aggregate programs still fail Fast/Small emission. Reproduce that frontier,
-then repair parallel-copy cycles through the shared value-use planner and cover
-widths, aliases, PHIs, calls and pressure. Keep optimization performance as a
-separate measured milestone.
+Next action: consolidate optional legalization around checked normalized input,
+while adding larger unchanged programs with state and memory interactions.
+Continue testing register effects, aliases, widths and pressure through shared
+transactions. Pair/vector PHIs and spill destinations remain on their existing
+paths. Keep generated-code optimization quality as a separate measured milestone.
+
+For large development gates, use a ReleaseFast compiler build while retaining
+Debug tests. On the same Safe Fibonacci IR, emission plus ownership replay took
+about 65 seconds with ReleaseFast versus 650 seconds with Debug, with byte-identical
+outputs. These are single compiler-throughput samples. Ownership reporting during
+emission could avoid a second selection pass; preserve its proof and output
+contracts before changing that workflow. Host policy currently blocks `perf`
+sampling, so hotspot attribution remains open.
 
 The preceding completed task was the requested
 [Python-to-Zig tooling migration](evidence/python_tools_migration_20261105.json)

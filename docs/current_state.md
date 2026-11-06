@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `7e1c8bd7d435200d7ad4813cf4033e0270973353`; tree: `1883d4267713b9cfe12555195504a26eefe7207c`.
+Accepted revision: `f68ab145d3f5efc4f4a4f01d30012dc3e4db0eac`; tree: `06d222b29524f157950e80b6e4dd0c1dafdc0462`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -17,15 +17,46 @@ Candidate SHA-256: `847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe
 | Functions lowered | 100 | Compiler-core prefix |
 | Objects emitted | 100 | Compiler-core prefix |
 | Native links | 100 | Compiler-core prefix |
-| Functions executed | 5 | Fixed execution cohort |
-| Paired harnesses accepted | 5 | Legacy real_programs_ok cohort metric |
+| Functions executed | 9 | Fixed execution cohort |
+| Paired harnesses accepted | 9 | Legacy real_programs_ok cohort metric |
 | Local failures | 0 | Compiler-core gate |
 
 Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [Fibonacci completion checkpoint](evidence/fibonacci_completion_acceptance_20261106.json)
+The accepted [execution-breadth checkpoint](evidence/execution_breadth_acceptance_20261106.json)
+at `f68ab145` passes all 17 integration gates. The fixed compiler-core prefix
+remains 100 lowered/emitted/linked functions, with nine functions executed per
+mode. Fresh and cached execution match all 36 canonical records. Fibonacci,
+optionals, global tagged storage, anonymous aggregate arrays and runtime loops
+execute unchanged in Fast, Safe and Small with LLVM-equivalent status and output.
+Fibonacci retains all six assertions and 1,568 emitted Safe definitions.
+
+All 45 native populations pass 1,767,660 local observations against 883,830 LLVM
+observations. Shared parallel transfers preserve call arguments, scalar register
+PHIs, aliases and widths under pressure. The added compiler-core tests exposed
+and fixed 32-bit atomic exchange lowering for an 8-bit mutex. Twelve added
+function/mode checks and 27 negative controls verify values, linkage and guarded
+memory effects. Validation includes 1,901 unit tests in Debug and ReleaseSafe,
+36 policy tests per mode, 19 structural checks, 60 ABI comparisons, compilation
+route checks and readiness. Free space remains above the unchanged 24.36 GB reserve.
+
+The [implementation and timing evidence](evidence/execution_breadth.md) separates
+compiler throughput from generated-code quality. On the same Safe Fibonacci IR,
+emission plus ownership replay took about 650 seconds with a Debug compiler and
+65 seconds with ReleaseFast, with byte-identical outputs. These are single samples
+concurrent with validation; host policy blocks sampling-based profiling.
+The [completed plan](plans/2026-11-06-execution-breadth.md) records the order and
+remaining work: optional legalization, explicit register effects and larger state
+and memory programs. This checkpoint does not establish self-hosting or release
+optimization quality. Original scratch probes, diagnostic worktrees and the old
+authenticated AIR cache remain intact; no archives were created.
+
+The entries below are historical. Their counts and remaining failures describe
+those checkpoints, not the current frontier.
+
+The earlier [Fibonacci completion checkpoint](evidence/fibonacci_completion_acceptance_20261106.json)
 at `7e1c8bd7` passes all 17 integration gates. Unchanged pinned Fibonacci executes
 all six assertions in Fast, Safe and Small with LLVM-equivalent status and output.
 Safe emits all 1,568 selected definitions. The permanent three-mode regression
@@ -47,9 +78,6 @@ self-hosting or release optimization quality. The next
 [execution-breadth milestone](plans/2026-11-06-execution-breadth.md) adds diverse
 unchanged programs and more callable compiler-core functions. Original scratch
 files and the diagnostic worktree remain intact; no archives were created.
-
-The entries below are historical. Their counts and remaining failures describe
-those checkpoints, not the current frontier.
 
 The [Python-to-Zig tooling migration](evidence/python_tools_migration_20261105.json)
 is separately validated at `978ffaf9`. The maintained program, native, candidate,

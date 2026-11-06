@@ -1,84 +1,62 @@
 # Execution breadth after Fibonacci
 
-Status: next milestone after the accepted Fibonacci completion checkpoint.
-The [completion plan](2026-11-05-fibonacci-completion.md) closes steps 1–6;
-this plan develops step 7. Keep the fixed 100-row emission population and its
-five executed functions distinct from unchanged programs and native fixtures.
+Status: implemented and [accepted](../evidence/execution_breadth_acceptance_20261106.json)
+at `f68ab145`, with all 17 gates passing. This follows the
+[Fibonacci completion plan](2026-11-05-fibonacci-completion.md), step 7.
+Keep the fixed 100-row emission population, executed compiler-core functions,
+unchanged programs and native observations separate.
 
-## Unchanged programs
+## Implemented order
 
-Add a manifest-driven regression for several substantially different programs
-from the same pinned Zig source. Preserve every source byte, check the source
-hash, and compare exit status, stdout and stderr with LLVM in Fast, Safe and
-Small. Report each program and mode separately, including failures.
-
-The exploratory reports under
-`local-state/validations/fibonacci-completion-20261105/` identify useful starting
-cases; they are diagnostics, not accepted integration coverage:
-
-| Program | Exploratory result | Purpose |
-| --- | --- | --- |
-| `optionals` | Three modes match | Optional values and branching |
-| `taking_pointer_of_global_tagged_union` | Safe matches; Fast and Small fail emission | Global tagged storage, pointers and assertion runtime |
-| `array_in_anon_struct` | Safe matches; Fast and Small fail emission | Aggregate initialization and addressing |
-
-Include a further unchanged program with a runtime loop or memory traversal so
-the new population does more than exercise shared startup and assertion helpers.
-Do not change assertions, remove runtime dependencies, or replace these programs
-with semantic recipes to obtain a pass.
-
-## Shared repairs
-
-The retained tagged-union Fast frontier selects 1,484 functions and emits 1,469.
-`next-execution-frontier.json` records 15 rejected functions: nine copy-cycle
-rejections, four immediate-left binary forms, one call pointer argument, and one
-GEP value. Reproduce these against the accepted compiler before implementation.
-
-1. Extend the common value-use transfer planner to schedule parallel-copy cycles.
-   Save a source into a proven free scratch register or an owned spill slot;
-   preserve every live alias and width. Use the same scheduling contract for
-   calls and CFG transfers. Keep unsupported register classes and unproved
-   scratch/storage cases rejected, and preserve transactional rollback.
-2. Route immediate-left scalar forms through the existing scalar transaction.
-   Preserve operand order for subtraction, division, remainder and shifts.
-3. Trace the pointer argument in `Io.Reader.defaultRebase` and the address in
-   `Progress.Node.storageByIndex` to shared address/ABI rules. Admit only the
-   demonstrated layouts and value representations.
-4. Add native differential combinations of two- and three-register cycles,
-   fan-out, live aliases, narrow and full-width values, PHIs, calls and pressure.
-   Check final values and protected memory against LLVM. Add rejection and
-   rollback controls for unsupported transfer envelopes.
-
-Keep mandatory semantic normalization before generic selection. Additional
-optional legalizers must consume checked normalized input. New machine
-instructions must expose operand, register and control-flow effects. Avoid
-adding whole-program or symbol-specific matchers for these failures.
-
-## Compiler-core execution
-
-Expand the versioned execution cohort with authenticated definitions already
-inside the fixed 100-row prefix. Initial candidates are
-`bit_set.Dynamic.maskIndex` for index arithmetic,
-`atomic.Mutex.tryLock` for observable atomic state transitions, and
-`hash_map.Custom(...).Metadata.isFree` / `isTombstone` for packed state predicates.
-Confirm their exact exported identities, signatures and ABI before admission.
-
-Generate independent reference and local-call harnesses. Exercise boundary
-indexes, every relevant byte state, and successful/repeated lock attempts;
-check return values and memory effects. Retain object identity/linkage checks
-and wrong-result, wrong-symbol and clobber controls. Update the cohort schema,
-parser and counters together. Never infer execution from a successful link.
+1. Corrected architecture and pipeline documentation: ordinary object emission
+   honors explicit pass requests through shared compilation preparation.
+2. Reproduced the retained tagged-union Fast frontier: 1,484 selected functions,
+   1,469 emitted, 15 failures. Retained the original diagnostics and compiler hash.
+3. Extended the shared value-use planner to preserve parallel transfers across
+   calls and scalar register PHIs. Covered cycles, fan-out, aliases, dirty upper
+   bits, accumulator sources, pressure, flags, storage failures and rollback.
+4. Repaired demonstrated immediate-left multiplication, overlap-safe `memmove`
+   planning and symbolic constant-base GEPs through existing shared authorities.
+   The retained input now emits all 1,484 functions.
+5. Added permanent Fast/Safe/Small execution of unchanged `optionals`,
+   `taking_pointer_of_global_tagged_union`, `array_in_anon_struct` and `while_loops`,
+   alongside the existing six-assertion Fibonacci regression.
+6. Expanded the authenticated compiler-core execution cohort from five to nine
+   members without changing the 100-row prefix. Added index arithmetic, guarded
+   atomic state transitions and exhaustive packed-byte predicates, together with
+   wrong-result, wrong-symbol and memory-clobber controls. The new mutex harness
+   exposed and drove a shared atomic width/dataflow/ordering repair.
+7. Separated compiler throughput measurements from generated-code performance.
+   Compare Debug/ReleaseFast compiler builds on the same Safe Fibonacci IR, timing
+   object emission and ownership replay separately and checking identical outputs.
 
 ## Acceptance
 
-Run focused native regressions and route tests after each shared repair. Then
-freeze the combined source and run unit tests in Debug and ReleaseSafe,
-structural checks, ABI comparisons, policy checks and the full 17-gate suite.
-The permanent three-mode Fibonacci regression remains mandatory. Promote the
-new program and function counts only when every required mode passes.
+Freeze source and tool identities. Require Debug and ReleaseSafe unit suites,
+structural checks, ABI comparisons, route checks, policy tests, readiness and all
+17 integration gates. Require every mode of all five unchanged programs, all nine
+compiler-core execution members and all 45 native populations to pass. The cohort
+schema, output parser and counters advance together; emission and linkage do not
+count as execution.
 
-Retain small reports and provenance, the original 13 scratch probes and the
-diagnostic worktree. Create no archives. Keep the existing 32,949,672,960-byte
-start threshold and 24,359,738,368-byte execution reserve. Performance work uses
-the separate fixed workload matrix; passing more programs does not establish
-release optimization quality.
+The expanded source authority changed the AIR cache key. Fresh generation and
+cached execution replay pass with 36 matching canonical records. The old
+authenticated generation and initial failed runs remain as diagnostic evidence.
+The [implementation evidence](../evidence/execution_breadth.md) records the final
+program, native and function counts and the compiler-throughput comparison.
+
+Retain compact reports and provenance, the original 13 scratch probes and the
+diagnostic worktrees. Create no archives. Keep the 32,949,672,960-byte start
+threshold and 24,359,738,368-byte execution reserve.
+
+## Following work
+
+Optional legalizers still recurse and ordinary CLI selection retains its
+structural path. Consolidate these around checked normalized inputs, then make
+fixed-register effects more explicit in machine representation. Pair/vector PHIs
+and spill destinations still use their existing transfer paths. Extend execution
+coverage to larger state and memory interactions before broadening readiness claims.
+
+The host blocks `perf` sampling, so compiler hotspot attribution remains open.
+The recorded compiler throughput comparison does not establish generated-code
+optimization quality; continue measuring the separate fixed workload matrix.

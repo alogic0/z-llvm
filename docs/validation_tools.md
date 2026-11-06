@@ -27,8 +27,10 @@ remain in this repository.
 | Validation role | Zig entry point / build step |
 | --- | --- |
 | Unchanged upstream Zig program, including capture hook | `tools/run_real_program.zig` / `real-program` |
-| Upstream C program and 44 native populations | `tools/run_upstream_c_program.zig` / `upstream-c-program` |
+| Upstream C program and 45 native populations | `tools/run_upstream_c_program.zig` / `upstream-c-program` |
 | Permanent unchanged Fibonacci regression in three modes | `tools/run_real_program.zig` / `fibonacci-regression` |
+| Fibonacci plus four additional unchanged programs in three modes | `tools/run_distribution_zig_integrated_exe.zig` / `distribution-all` |
+| Added compiler-core execution and 27 negative controls | `src/distribution_execution_breadth_gate.zig` / `execution-breadth-controls` |
 | Fixed candidate selector | `tools/build_real_candidates_v3.zig` / `real-candidates-v3` |
 | Checked semantic facts | `tools/validation/candidate_facts.zig` library |
 | Fact freezing and replay proof | `tools/freeze_real_candidate_facts.zig` / `freeze-real-candidate-facts` |
@@ -47,12 +49,20 @@ No archives were made.
 
 Unchanged-program manifests can set `compile_timeout_ms` to a positive 32-bit
 millisecond budget. It applies to reference/local compilation, selector-owner
-replay and diagnostic re-emission; the default is 120,000 ms. Fibonacci uses
-900,000 ms so a Debug compiler can process the Safe runtime. Links retain the
+replay and diagnostic re-emission; the default is 120,000 ms. Fibonacci and the
+four execution-breadth manifests use 900,000 ms so a Debug compiler can process
+the Safe runtime. Links retain the
 default command budget and executable observations retain their five-second
 limit. Failed compilation, link and owner-replay stages preserve the command
 outcome and actual termination even when the compiler produces no stderr;
 command records include the budget.
+
+The [compiler throughput comparison](evidence/execution_breadth.md) measures Debug
+and ReleaseFast compiler builds separately from generated-code performance.
+`ZLLVM_EXE` selects the compiler for integrated object/executable routes and their
+large unchanged programs; ordinary build commands and native-population tools
+keep their own compiler selection. A separate ReleaseFast build prefix permits
+faster development runs while retaining the Debug installation and unit tests.
 
 The native population registry now lives in
 [`test/real_programs/native_canaries.json`](../test/real_programs/native_canaries.json).
@@ -65,6 +75,7 @@ zig build real-program-policy-tests verify-validation-sources
 zig build real-program-policy-tests -Doptimize=ReleaseSafe
 zig build real-program -- --output-root local-state/validations/my-program
 zig build upstream-c-program -- --output-root local-state/validations/my-native
+zig build execution-breadth-controls -- --output-root local-state/validations/my-cohort-controls
 zig build real-candidates-v3 -- \
   --facts-manifest docs/evidence/real_candidates_release_v3_facts_manifest.json \
   --releasefast-inventory local-state/validations/current-pin-20261102/current-releasefast.tsv \
