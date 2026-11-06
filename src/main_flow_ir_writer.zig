@@ -87,6 +87,8 @@ pub const Emit = enum {
 };
 
 pub const CodegenEmitOptions = struct {
+    profile: ?*@import("compilation_profile.zig").Profile = null,
+    owner_output: ?[]const u8 = null,
     quiet: bool = false,
     report_all_failures: bool = false,
     generic_cfg_selector: bool = false,
@@ -479,6 +481,8 @@ pub fn emitCodegenModule(
     var selected_aliases: std.ArrayList(ir.GlobalAlias) = .empty;
     defer selected_aliases.deinit(allocator);
     if (options.codegen_reachable) {
+        const scope = @import("compilation_profile.zig").enter(options.profile, .reachability);
+        defer scope.end();
         if (emit == .@"asm") return error.UnsupportedReachableAssembly;
         if (module.module_asm.items.len != 0) return error.UnsupportedModuleAssembly;
         var graph = try dependencies.Graph.build(allocator, module);
@@ -516,12 +520,16 @@ pub fn emitCodegenModule(
         selected_functions += 1;
         var selector_diagnostic_tag: ?[]const u8 = null;
         var selector_diagnostic_detail: ?[]const u8 = null;
+        const selection_scope = @import("compilation_profile.zig").enter(options.profile, .select);
+        defer selection_scope.end();
         var machine = compilation.select(allocator, triple, function, .{
+            .profile = options.profile,
             .generic_cfg_selector = options.generic_cfg_selector,
             .module_context = &module_context,
             .generic_cfg_selector_diagnostic_tag = &selector_diagnostic_tag,
             .generic_cfg_selector_diagnostic_detail = &selector_diagnostic_detail,
         }) catch |err| {
+            if (options.profile) |p| p.counters.failed_functions += 1;
             if (options.report_all_failures) {
                 if (failed_functions == 0) {
                     first_failing_function = function.name;
@@ -547,6 +555,14 @@ pub fn emitCodegenModule(
             try fatal(io, "codegen failed for function {s}: {any}\n", .{ function.name, err });
         };
         errdefer machine.deinit(allocator);
+        if (options.profile) |p| {
+            p.counters.selected_functions += 1;
+            p.counters.emitted_instructions += machine.instructions.items.len;
+            for (machine.instructions.items) |instruction| {
+                if (std.mem.startsWith(u8, @tagName(instruction), "spill_"))
+                    p.counters.emitted_spill_instructions += 1;
+            }
+        }
         if (options.codegen_reachable) {
             machine.symbol_linkage = function.linkage;
             machine.symbol_visibility = function.visibility;
@@ -556,12 +572,9 @@ pub fn emitCodegenModule(
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     if (emit == .selection_owner_manifest) {
-        std.mem.sort(codegen.x86_64.MachineFunction, machines.items, {}, machineNameLessThan);
-        try stdout_writer.interface.writeAll("row_identity\tselection_owner\n");
-        for (machines.items) |machine| {
-            if (machine.selection_owner == .unassigned) return error.UnassignedSelectionOwner;
-            try stdout_writer.interface.print("{s}\t{s}\n", .{ machine.name, @tagName(machine.selection_owner) });
-        }
+        const scope = @import("compilation_profile.zig").enter(options.profile, .ownership_write);
+        defer scope.end();
+        try writeOwnerManifest(allocator, machines.items, &stdout_writer.interface);
         try stdout_writer.interface.flush();
     }
     if (options.report_all_failures) {
@@ -580,7 +593,7 @@ pub fn emitCodegenModule(
             },
         );
         try stderr_writer.interface.flush();
-        if (failed_functions != 0) std.process.exit(1);
+        if (failed_functions != 0) return error.CodegenFunctionsFailed;
     }
 
     if (emit == .selection_owner_manifest) return;
@@ -591,12 +604,39 @@ pub fn emitCodegenModule(
     if (emit == .@"asm") {
         for (machines.items) |machine| try mc.assembly.printFunction(machine, stdout);
     } else {
+        const scope = @import("compilation_profile.zig").enter(options.profile, .object_write);
+        defer scope.end();
         try mc.elf.writeObjectWithModuleContext(allocator, machines.items, if (reachable != null) selected_aliases.items else module.aliases.items, module_context, stdout);
+        try stdout.flush();
     }
     try stdout.flush();
+    if (options.owner_output) |path| {
+        if (emit != .obj) return error.OwnerSidecarRequiresObject;
+        const scope = @import("compilation_profile.zig").enter(options.profile, .ownership_write);
+        defer scope.end();
+        const file = try std.Io.Dir.cwd().createFile(io, path, .{});
+        defer file.close(io);
+        var buffer: [4096]u8 = undefined;
+        var writer = file.writer(io, &buffer);
+        try writeOwnerManifest(allocator, machines.items, &writer.interface);
+        try writer.interface.flush();
+    }
 }
 
-fn machineNameLessThan(_: void, lhs: codegen.x86_64.MachineFunction, rhs: codegen.x86_64.MachineFunction) bool {
+fn writeOwnerManifest(allocator: std.mem.Allocator, machines: []const codegen.x86_64.MachineFunction, writer: *std.Io.Writer) !void {
+    // Sort references, preserving object function order and bytes.
+    const sorted = try allocator.alloc(*const codegen.x86_64.MachineFunction, machines.len);
+    defer allocator.free(sorted);
+    for (machines, sorted) |*machine, *slot| slot.* = machine;
+    std.mem.sort(*const codegen.x86_64.MachineFunction, sorted, {}, machineNameLessThan);
+    try writer.writeAll("row_identity\tselection_owner\n");
+    for (sorted) |machine| {
+        if (machine.selection_owner == .unassigned) return error.UnassignedSelectionOwner;
+        try writer.print("{s}\t{s}\n", .{ machine.name, @tagName(machine.selection_owner) });
+    }
+}
+
+fn machineNameLessThan(_: void, lhs: *const codegen.x86_64.MachineFunction, rhs: *const codegen.x86_64.MachineFunction) bool {
     return std.mem.lessThan(u8, lhs.name, rhs.name);
 }
 

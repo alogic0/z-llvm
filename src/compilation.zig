@@ -6,10 +6,12 @@ const ir = @import("ir.zig");
 const pm = @import("pass_manager.zig");
 const pipelines = @import("pipelines.zig");
 const codegen = @import("codegen.zig");
+const profiling = @import("compilation_profile.zig");
 
 pub const Options = struct {
     optimization: ?[]const u8 = null,
     passes: pm.RunOptions = .{},
+    profile: ?*profiling.Profile = null,
 };
 pub const SelectionOptions = codegen.x86_64.CodegenOptions;
 
@@ -22,8 +24,14 @@ pub fn validate(allocator: std.mem.Allocator, options: Options) !void {
 }
 
 pub fn prepare(allocator: std.mem.Allocator, io: ?std.Io, module: *ir.Module, diagnostics: *std.Io.Writer, options: Options) !void {
-    try module.verify();
+    {
+        const scope = profiling.enter(options.profile, .verify);
+        defer scope.end();
+        try module.verify();
+    }
     const sequence = options.optimization orelse return;
+    const scope = profiling.enter(options.profile, .optimize);
+    defer scope.end();
     var manager = pm.ModulePassManager.init(allocator);
     defer manager.deinit();
     try pipelines.addPasses(&manager, sequence);

@@ -42,6 +42,12 @@ An explicit pipeline can run in the same invocation as local codegen:
 zig build run -- --passes=release-o3 --target=x86_64-unknown-linux-gnu --generic-cfg-selector --emit=obj input.ll > output.o
 ```
 
+Add `--profile=profile.json` for exclusive compilation-phase measurements and
+`--selection-owner-output=owners.tsv` for ownership from the object-emission run.
+These do not require optimizer pass timing and never write into object stdout.
+Independent replay remains `--emit=selection-owner-manifest` with the same
+input, target, pass and selection options.
+
 The patched Zig preopt textual hook chooses an accepted mode alias. The postopt
 hook leaves module optimization with LLVM. The separate structured writer helper
 in [main_flow_ir_writer.zig](../src/main_flow_ir_writer.zig) conditionally runs

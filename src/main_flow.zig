@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("ir.zig");
 const compilation = @import("compilation.zig");
+const profiling = @import("compilation_profile.zig");
 const compilation_artifact = @import("compilation_artifact.zig");
 const target = @import("target.zig");
 const zae = @import("zig_air_export.zig");
@@ -31,6 +32,8 @@ const usage =
     \\--codegen-reachable selects module dependencies for object/owner output; opaque references retain all definitions.
     \\Explicit --passes/--pipeline run before IR, object, assembly and owner output. Object emission defaults to no optimization. Codegen traces and timing go to stderr.
     \\Structured adapter envelopes carry explicit passes for execution when their typed module is built; --emit=ir preserves this deferred recipe.
+    \\--profile=PATH writes exclusive phase timings and counters as JSON, independently of pass timing.
+    \\--selection-owner-output=PATH writes ownership from the same successful --emit=obj selection run.
     \\
 ;
 
@@ -58,6 +61,8 @@ pub fn main(init: std.process.Init) !void {
     var target_triple: ?[]const u8 = null;
     var target_datalayout: ?[]const u8 = null;
     var input_path: ?[]const u8 = null;
+    var profile_path: ?[]const u8 = null;
+    var owner_path: ?[]const u8 = null;
 
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
@@ -78,6 +83,12 @@ pub fn main(init: std.process.Init) !void {
             generic_cfg_selector = true;
         } else if (std.mem.eql(u8, arg, "--codegen-reachable")) {
             codegen_reachable = true;
+        } else if (std.mem.startsWith(u8, arg, "--profile=")) {
+            profile_path = arg["--profile=".len..];
+            if (profile_path.?.len == 0) return error.EmptyProfilePath;
+        } else if (std.mem.startsWith(u8, arg, "--selection-owner-output=")) {
+            owner_path = arg["--selection-owner-output=".len..];
+            if (owner_path.?.len == 0) return error.EmptyOwnerPath;
         } else if (std.mem.startsWith(u8, arg, "--pass-limit=")) {
             pass_limit = try std.fmt.parseInt(usize, arg["--pass-limit=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--input-limit=")) {
@@ -120,7 +131,22 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
+    if (owner_path != null and emit != .obj) return error.OwnerSidecarRequiresObject;
+    if (profile_path) |p| {
+        if (owner_path) |o| if (std.mem.eql(u8, p, o)) return error.ConflictingOutputPaths;
+        if (input_path) |i| if (std.mem.eql(u8, p, i)) return error.ConflictingOutputPaths;
+    }
+    if (owner_path) |o| if (input_path) |i| if (std.mem.eql(u8, o, i)) return error.ConflictingOutputPaths;
+    var profile_state: ?profiling.Profile = if (profile_path != null) .init(io) else null;
+    const profile: ?*profiling.Profile = if (profile_state) |*p| p else null;
+    var succeeded = true;
+    defer if (profile) |p| p.write(profile_path.?, succeeded) catch |err| {
+        std.debug.print("profile write failed: {s}\n", .{@errorName(err)});
+        std.process.exit(2);
+    };
+    errdefer succeeded = false;
     const optimization: compilation.Options = .{
+        .profile = profile,
         .optimization = if (explicit_optimization) pass_list else null,
         .passes = .{ .trace = trace, .timing = timing, .pass_limit = pass_limit },
     };
@@ -145,16 +171,28 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(2);
     };
 
-    const input = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(input_limit));
+    const input = blk: {
+        const scope = profiling.enter(profile, .input);
+        defer scope.end();
+        break :blk try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(input_limit));
+    };
     defer allocator.free(input);
 
     if (std.mem.startsWith(u8, input, zae.contract_name)) {
-        var air_module = zae.parse(allocator, input) catch |err| {
-            try fatal(io, "AIR export parse failed for {s}: {any}\n", .{ path, err });
+        var air_module = blk: {
+            const scope = profiling.enter(profile, .parse);
+            defer scope.end();
+            break :blk zae.parse(allocator, input) catch |err| {
+                try fatal(io, "AIR export parse failed for {s}: {any}\n", .{ path, err });
+            };
         };
         defer air_module.deinit();
-        var lowered = zal.lowerCompatible(allocator, air_module) catch |err| {
-            try fatal(io, "AIR lowering failed for {s}: {any}\n", .{ path, err });
+        var lowered = blk: {
+            const scope = profiling.enter(profile, .air_lowering);
+            defer scope.end();
+            break :blk zal.lowerCompatible(allocator, air_module) catch |err| {
+                try fatal(io, "AIR lowering failed for {s}: {any}\n", .{ path, err });
+            };
         };
         defer lowered.deinit();
         try reportAirLowering(io, air_module, lowered);
@@ -174,6 +212,8 @@ pub fn main(init: std.process.Init) !void {
                 .report_all_failures = report_all_codegen_failures,
                 .generic_cfg_selector = generic_cfg_selector,
                 .codegen_reachable = codegen_reachable,
+                .profile = profile,
+                .owner_output = owner_path,
             });
             return;
         }
@@ -212,6 +252,8 @@ pub fn main(init: std.process.Init) !void {
                 // compositional selection, including optimized instruction forms.
                 .generic_cfg_selector = true,
                 .codegen_reachable = codegen_reachable,
+                .profile = profile,
+                .owner_output = owner_path,
             });
             return;
         }
@@ -245,12 +287,18 @@ pub fn main(init: std.process.Init) !void {
                 .report_all_failures = report_all_codegen_failures,
                 .generic_cfg_selector = true,
                 .codegen_reachable = codegen_reachable,
+                .profile = profile,
+                .owner_output = owner_path,
             });
             return;
         }
     }
 
-    var module = try ir.Module.parse(allocator, input);
+    var module = blk: {
+        const scope = profiling.enter(profile, .parse);
+        defer scope.end();
+        break :blk try ir.Module.parse(allocator, input);
+    };
     defer module.deinit();
     if (target_triple) |triple| {
         _ = target.Triple.parse(triple) catch {
@@ -264,7 +312,6 @@ pub fn main(init: std.process.Init) !void {
         };
         if (module.target_datalayout == null) module.target_datalayout = datalayout;
     }
-    try module.verify();
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
@@ -279,6 +326,8 @@ pub fn main(init: std.process.Init) !void {
             .report_all_failures = report_all_codegen_failures,
             .generic_cfg_selector = generic_cfg_selector,
             .codegen_reachable = codegen_reachable,
+            .profile = profile,
+            .owner_output = owner_path,
         });
         return;
     }

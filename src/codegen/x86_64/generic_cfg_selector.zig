@@ -6,20 +6,7 @@ const legacy_lowering = @import("generic_cfg/legacy_lowering.zig");
 const stage2_planning = @import("generic_cfg/stage2_planning.zig");
 const composed_selector = @import("generic_cfg/composed_selector.zig");
 const address_dependencies = @import("generic_cfg/composed_selector_address_dependencies.zig");
-const abi_legalization = @import("generic_cfg/abi_legalization.zig");
-const narrow_abi = @import("generic_cfg/narrow_abi.zig");
-const scalar_forms = @import("generic_cfg/scalar_forms.zig");
-const comparison_forms = @import("generic_cfg/comparison_forms.zig");
-const overflow_values = @import("generic_cfg/overflow_values.zig");
-const word_arithmetic = @import("generic_cfg/word_arithmetic.zig");
-const integer_intrinsics = @import("generic_cfg/integer_intrinsics.zig");
 const switch_phi_edges = @import("generic_cfg/switch_phi_edges.zig");
-const switch_forms = @import("generic_cfg/switch_forms.zig");
-const word_pair_values = @import("generic_cfg/word_pair_values.zig");
-const word_pair_memory = @import("generic_cfg/word_pair_memory.zig");
-const padded_frame = @import("generic_cfg/padded_frame.zig");
-const stack_addresses = @import("generic_cfg/stack_addresses.zig");
-const global_memory = @import("generic_cfg/global_memory.zig");
 const semantic_normalization = @import("generic_cfg/semantic_normalization.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
@@ -46,124 +33,85 @@ pub fn tryLowerWithContext(
     function: ir.Function,
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
 ) !SelectionResult {
-    var normalization_arena = std.heap.ArenaAllocator.init(allocator);
-    defer normalization_arena.deinit();
-    const normalized = try semantic_normalization.normalize(normalization_arena.allocator(), function, module_context);
-    return selectNormalized(allocator, machine, normalized, module_context);
+    return tryLowerProfiled(allocator, machine, function, module_context, null);
 }
 
-fn selectNormalized(
+pub fn tryLowerProfiled(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
-    normalized: semantic_normalization.Function,
+    source: ir.Function,
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
-) anyerror!SelectionResult {
-    const function = normalized.ir_function;
-    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
-        if (!inst.removed and inst.kind == .alloca and !inst.kind.alloca.isSingleObject())
-            return .{ .unsupported = .{ .no_emitter = "alloca-count" } };
-    };
-    if (normalized.whole_function) |form| {
-        try legacy_lowering.lower(allocator, machine, form);
-        if (machine.selection_owner != .unassigned) return error.SelectionOwnerAlreadyAssigned;
-        machine.selection_owner = .legacy_envelope;
-        return .selected;
-    }
-    try semantic_normalization.check(function);
-    const inspected = inspection.inspectFunctionWithContext(function, module_context);
+    profile: ?*@import("../../compilation_profile.zig").Profile,
+) !SelectionResult {
+    const profiling = @import("../../compilation_profile.zig");
+    const optional = @import("generic_cfg/optional_legalization.zig");
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
-    if (try @import("generic_cfg/aligned_stack.zig").legalize(arena.allocator(), function, module_context)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    var pending_labels: std.ArrayList([]const ir.BasicBlock) = .empty;
+    var function = source;
+    var budget: optional.Budget = .{};
+    var iterations: u64 = 0;
+    while (true) {
+        iterations += 1;
+        if (profile) |p| {
+            p.counters.selection_iterations += 1;
+            p.counters.max_selection_iterations = @max(p.counters.max_selection_iterations, iterations);
+            p.counters.normalization_runs += 1;
+        }
+        const normalized = blk: {
+            const scope = profiling.enter(profile, .normalize);
+            defer scope.end();
+            break :blk try semantic_normalization.normalize(arena.allocator(), function, module_context);
+        };
+        function = normalized.ir_function;
+        const result: SelectionResult = blk: {
+            for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+                if (!inst.removed and inst.kind == .alloca and !inst.kind.alloca.isSingleObject())
+                    return .{ .unsupported = .{ .no_emitter = "alloca-count" } };
+            };
+            if (normalized.whole_function) |form| {
+                try legacy_lowering.lower(allocator, machine, form);
+                if (machine.selection_owner != .unassigned) return error.SelectionOwnerAlreadyAssigned;
+                machine.selection_owner = .legacy_envelope;
+                break :blk .selected;
+            }
+            try semantic_normalization.check(function);
+            const inspected = inspection.inspectFunctionWithContext(function, module_context);
+            if (try optional.next(arena.allocator(), function, module_context, profile)) |rewrite| {
+                if (rewrite.retry_original) {
+                    if (profile) |p| p.counters.original_form_retries += 1;
+                    if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) {
+                        if (profile) |p| p.counters.original_form_selected += 1;
+                        break :blk .selected;
+                    }
+                }
+                try budget.consume();
+                if (rewrite.retain_labels)
+                    try pending_labels.append(arena.allocator(), rewrite.function.blocks.items[function.blocks.items.len..]);
+                function = rewrite.function;
+                continue;
+            }
+            break :blk try selectReady(allocator, machine, function, module_context, inspected);
+        };
+        if (result == .selected) {
+            // Match recursive unwind order; labels must outlive the private IR.
+            var i = pending_labels.items.len;
+            while (i != 0) {
+                i -= 1;
+                try switch_phi_edges.retainLabels(allocator, machine, pending_labels.items[i]);
+            }
+        }
+        return result;
     }
-    if (try @import("generic_cfg/integer_vectors.zig").legalize(arena.allocator(), function, module_context)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try @import("generic_cfg/pair_memory.zig").legalize(arena.allocator(), function, module_context)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try @import("generic_cfg/wide_integer_forms.zig").legalize(arena.allocator(), function)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try overflow_values.legalize(arena.allocator(), function)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try comparison_forms.legalize(arena.allocator(), function, module_context)) |legalized| {
-        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try word_arithmetic.legalize(arena.allocator(), function)) |legalized| {
-        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try @import("generic_cfg/integer_forms.zig").legalize(arena.allocator(), function)) |legalized| {
-        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try @import("generic_cfg/pair_arithmetic.zig").legalize(arena.allocator(), function)) |legalized| {
-        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try integer_intrinsics.legalize(arena.allocator(), function)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try scalar_forms.legalize(arena.allocator(), function)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try switch_phi_edges.legalize(arena.allocator(), function)) |legalized| {
-        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
-        const selected = try tryLowerWithContext(allocator, machine, legalized, module_context);
-        if (selected == .selected) try switch_phi_edges.retainLabels(allocator, machine, legalized.blocks.items[function.blocks.items.len..]);
-        return selected;
-    }
-    if (try switch_forms.legalize(arena.allocator(), function)) |legalized| {
-        const selected = try tryLowerWithContext(allocator, machine, legalized, module_context);
-        if (selected == .selected) try switch_phi_edges.retainLabels(allocator, machine, legalized.blocks.items[function.blocks.items.len..]);
-        return selected;
-    }
-    if (try @import("generic_cfg/boolean_values.zig").legalize(arena.allocator(), function)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try narrow_abi.legalize(arena.allocator(), function)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try abi_legalization.integerPair(arena.allocator(), function)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try abi_legalization.paddedHalf(arena.allocator(), function)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try word_pair_values.legalize(arena.allocator(), function, module_context)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try word_pair_memory.legalize(arena.allocator(), function, module_context)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try padded_frame.legalize(arena.allocator(), function, module_context)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try padded_frame.legalizeStorage(arena.allocator(), function, module_context)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try @import("generic_cfg/address_forms.zig").legalize(arena.allocator(), function, module_context)) |legalized| {
-        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try stack_addresses.legalize(arena.allocator(), function, module_context)) |legalized| {
-        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try @import("generic_cfg/pointer_values.zig").legalize(arena.allocator(), function, module_context)) |legalized| {
-        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try global_memory.legalize(arena.allocator(), function, module_context)) |legalized| {
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
-    if (try @import("generic_cfg/block_order.zig").legalize(arena.allocator(), function)) |legalized| {
-        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
-        return tryLowerWithContext(allocator, machine, legalized, module_context);
-    }
+}
+
+fn selectReady(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
+    inspected: SelectionResult,
+) !SelectionResult {
     switch (inspected) {
         .selected => unreachable,
         .unsupported => |diagnostic| switch (diagnostic) {

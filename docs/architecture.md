@@ -95,8 +95,10 @@ zig build run -- --passes=release-o3 --target=x86_64-unknown-linux-gnu --generic
 attempt. Within that attempt, mandatory semantic normalization precedes
 selection. Recognized legacy envelopes retain their own lowering; other forms
 pass checked normalization invariants before optional legalization and composed
-block or CFG selection. Optional legalizers still recurse and may retry the
-original normalized form. An unsupported result can still lead to structural
+block or CFG selection. Optional legalizers use an ordered bounded driver with
+explicit original-form retry policy. Each rewrite returns through checked
+semantic normalization; generated switch labels are retained in unwind order.
+An unsupported result can still lead to structural
 fallback in the outer lowering dispatcher. Prepared typed adapters explicitly
 enable generic selection; ordinary CLI inputs retain the flag/environment choice.
 
@@ -105,6 +107,16 @@ The recorded owners are `legacy_envelope`, `composed_block`, `composed_cfg`, and
 The [behavioral runner](../tools/run_behavioral_diff.zig) checks the ownership
 manifest and rejects every owner except `composed_block` and `composed_cfg`.
 An aggregate `generic_codegen` counter is not a substitute for that assertion.
+
+`--selection-owner-output=PATH` writes the same sorted ownership manifest from
+the successful object-emission selection run. It sorts references to machine
+functions, preserving object order and bytes. The standalone manifest route
+remains available for independent replay. `--profile=PATH` records exclusive
+phase timings, per-legalizer attempts/rewrites, original-form retries, selection
+iterations and emitted spill instructions. Profiling state is explicit and local
+to a compilation; the JSON report is separate from binary stdout. `other` includes
+uninstrumented setup and cleanup. Timings describe compiler work, not runtime
+performance of emitted code.
 
 ## Correctness contracts at the AIR/backend boundary
 

@@ -111,6 +111,7 @@ fn check(r: *Runner, compiler: []const u8) !void {
     );
     const staged = try invoke(r, compiler, input, &.{"--passes=instcombine,dce"}, "optimize");
     const direct = try invoke(r, compiler, input, &.{"--emit=obj"}, "direct");
+    try checkProfile(r, compiler, input, direct, "direct-profile", &.{});
     const limited = try invoke(r, compiler, input, &.{ "--emit=obj", "--passes=instcombine,dce", "--pass-limit=0" }, "limited");
     try same(c, direct, limited);
     for ([_][]const u8{ "obj", "asm", "selection-owner-manifest" }) |emit| {
@@ -119,6 +120,7 @@ fn check(r: *Runner, compiler: []const u8) !void {
         const inline_result = try invoke(r, compiler, input, &.{ option, "--passes=instcombine,dce" }, try c.fmt("inline-{s}", .{emit}));
         try same(c, prepared, inline_result);
         if (std.mem.eql(u8, emit, "obj")) {
+            try checkProfile(r, compiler, input, inline_result, "optimized-profile", &.{"--passes=instcombine,dce"});
             if (std.mem.eql(u8, try c.read(direct), try c.read(inline_result))) return error.OptimizationDidNotChangeObject;
             const traced = try invoke(r, compiler, input, &.{ option, "--passes=instcombine,dce", "--trace", "--time" }, "traced");
             try same(c, traced, inline_result);
@@ -223,6 +225,28 @@ fn check(r: *Runner, compiler: []const u8) !void {
         \\
     );
     try checkPaddingLength(r, compiler);
+}
+
+fn checkProfile(r: *Runner, compiler: []const u8, input: []const u8, expected_object: []const u8, label: []const u8, options: []const []const u8) !void {
+    const c = r.context;
+    const owners = try c.join(&.{ r.output, try c.fmt("{s}.tsv", .{label}) });
+    const profile = try c.join(&.{ r.output, try c.fmt("{s}.json", .{label}) });
+    const args = try std.mem.concat(c.a, []const u8, &.{ options, &.{
+        "--emit=obj", try c.fmt("--selection-owner-output={s}", .{owners}), try c.fmt("--profile={s}", .{profile}),
+    } });
+    try same(c, expected_object, try invoke(r, compiler, input, args, label));
+    try same(c, owners, try invoke(r, compiler, input, try std.mem.concat(c.a, []const u8, &.{ options, &.{"--emit=selection-owner-manifest"} }), try c.fmt("{s}-replay", .{label})));
+    const measurement = try c.load(profile);
+    if (!u.json.is(try u.get(measurement, "schema"), "compilation-profile-v1") or !(try u.get(measurement, "succeeded")).bool) return error.InvalidCompilationProfile;
+    const counters = try u.get(measurement, "counters");
+    if ((try u.get(counters, "selected_functions")).integer != 10 or (try u.get(counters, "normalization_runs")).integer < 10 or (try u.get(counters, "legalizer_attempts")).integer == 0) return error.InvalidProfileCounters;
+    var total: i64 = 0;
+    for ((try u.get(measurement, "phases")).array.items) |phase| {
+        const ns = (try u.get(phase, "exclusive_ns")).integer;
+        if (ns < 0) return error.NegativePhaseTime;
+        total += ns;
+    }
+    if (total != (try u.get(measurement, "total_ns")).integer or total <= 0) return error.NestedTimingDoubleCounted;
 }
 
 fn checkArtifact(r: *Runner, compiler: []const u8, kind: []const u8, envelope: []const u8) !void {
