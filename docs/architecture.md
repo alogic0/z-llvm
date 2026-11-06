@@ -66,10 +66,11 @@ The dispatch is in [main_flow.zig](../src/main_flow.zig).
 | Input and operation | Optimization behavior | Output |
 | --- | --- | --- |
 | LLVM IR, default/`--emit=ir` | Run the selected pass list; default `instcombine,dce`. | Transformed LLVM-compatible text. |
-| LLVM IR, `--emit=obj`, `--emit=asm`, or selection-owner manifest | Verify and emit directly; return before the CLI pass manager. Supplying `--passes` does not turn this route into optimize-and-emit. | Object, assembly, or ownership report. |
-| Exported AIR, `--emit=ir` | Lower and print; return before the CLI pass manager. | Project IR text. |
-| Exported AIR, object/assembly | Lower and emit directly. | Object or assembly. |
-| Selected structured descriptors/writer cases | A surface- and environment-gated helper may run `sccp,simplifycfg,instcombine,dce` before emission. | Selected integration objects. |
+| LLVM IR, `--emit=obj`, `--emit=asm`, or selection-owner manifest | Shared preparation verifies the module and runs explicit `--passes`/`--pipeline` requests before selection. No optimization by default. | Object, assembly, or ownership report. |
+| Exported AIR, `--emit=ir` | Lower, verify, run any explicit optimization request, then print. No optimization by default. | Project IR text. |
+| Exported AIR, object/assembly/selection-owner manifest | Lower and use the same explicit preparation contract before selection. | Object, assembly, or ownership report. |
+| Structured descriptors/writer cases, `--emit=ir` | Preserve the adapter envelope and append validated explicit optimization requests as a deferred recipe. | Adapter artifact with its preparation recipe. |
+| Structured descriptors/writer cases, codegen | Build the typed module, run the surface- and environment-gated helper when applicable, replay deferred preparation, then apply explicit CLI optimization and generic selection. | Object, assembly, or ownership report. |
 | Patched Zig postopt hook | LLVM optimizes the module; z_llvm replaces target-machine object emission. | Object handed to Zig. |
 | Patched Zig preopt textual hook | The hook invokes z_llvm's accepted mode pipeline, then emits the transformed IR. | Object handed to Zig. |
 
@@ -78,20 +79,26 @@ development pipelines. The structured helper explicitly disables per-pass
 verification; callers and tests must not assume the pass manager's default
 verification setting applies to every route.
 
-For an explicit optimizer-plus-local-backend experiment, use two steps:
+The shared contract is implemented by [compilation.zig](../src/compilation.zig)
+and [compilation_artifact.zig](../src/compilation_artifact.zig). Codegen pass
+traces and timing go to stderr so they cannot corrupt object bytes. For an
+explicit optimizer-plus-local-backend experiment:
 
 ```sh
-zig build run -- --passes=release-o3 input.ll > optimized.ll
-zig build run -- --target=x86_64-unknown-linux-gnu --generic-cfg-selector --emit=obj optimized.ll > output.o
+zig build run -- --passes=release-o3 --target=x86_64-unknown-linux-gnu --generic-cfg-selector --emit=obj input.ll > output.o
 ```
 
 ## Selector ownership
 
 `CodegenOptions.generic_cfg_selector` defaults to false. The CLI flag
 `--generic-cfg-selector` or `ZLLVM_GENERIC_CFG_SELECTOR` enables the selector
-attempt. Within that attempt, a legacy envelope is tried before composed block
-or CFG selection. An unsupported result can still lead to structural fallback
-in the outer lowering dispatcher.
+attempt. Within that attempt, mandatory semantic normalization precedes
+selection. Recognized legacy envelopes retain their own lowering; other forms
+pass checked normalization invariants before optional legalization and composed
+block or CFG selection. Optional legalizers still recurse and may retry the
+original normalized form. An unsupported result can still lead to structural
+fallback in the outer lowering dispatcher. Prepared typed adapters explicitly
+enable generic selection; ordinary CLI inputs retain the flag/environment choice.
 
 The recorded owners are `legacy_envelope`, `composed_block`, `composed_cfg`, and
 `structural_fallback`. Merely enabling the flag does not prove composed lowering.

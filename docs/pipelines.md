@@ -29,17 +29,17 @@ For ordinary LLVM-compatible input, the CLI's default IR output runs
 `module(...)`, `function(...)`, `loop(...)`, and `cgscc(...)` nesting is flattened
 into module-pass execution. There are no distinct nested pass managers.
 
-Object, assembly, and selection-owner-manifest output take an earlier branch in
-[main_flow.zig](../src/main_flow.zig) and return before the CLI pass manager.
-Exported AIR input likewise lowers/prints or lowers/emits without using that
-ordinary text-input pass path. Do not infer optimization from a supplied
-`--passes` flag on those routes.
+Object, assembly, and selection-owner-manifest output use shared preparation in
+[compilation.zig](../src/compilation.zig), called by
+[main_flow.zig](../src/main_flow.zig) before selection. Explicit `--passes` and
+`--pipeline` requests run on these routes; without an explicit request, the
+module is verified and emitted without optimization. Exported AIR uses this
+same preparation contract after lowering, including for IR output.
 
-Use explicit stages when testing optimizer output through local codegen:
+An explicit pipeline can run in the same invocation as local codegen:
 
 ```sh
-zig build run -- --passes=release-o3 input.ll > optimized.ll
-zig build run -- --target=x86_64-unknown-linux-gnu --generic-cfg-selector --emit=obj optimized.ll > output.o
+zig build run -- --passes=release-o3 --target=x86_64-unknown-linux-gnu --generic-cfg-selector --emit=obj input.ll > output.o
 ```
 
 The patched Zig preopt textual hook chooses an accepted mode alias. The postopt
@@ -48,6 +48,13 @@ in [main_flow_ir_writer.zig](../src/main_flow_ir_writer.zig) conditionally runs
 `sccp,simplifycfg,instcombine,dce` for selected surfaces when the relevant preopt
 and Zig-mode environment fields are present. That helper sets
 `verify_each_pass=false`; it is not the ordinary accepted alias.
+
+Structured descriptor and writer envelopes preserve explicit optimization as a
+validated deferred recipe when emitted as IR. Their codegen route builds the
+typed module, runs the conditional helper, replays that recipe, then applies
+the current CLI request through shared preparation. The envelope body itself
+is not optimized as an ordinary textual module. Artifact-generation operations
+`--emit=ir-writer` and `--emit=semantic-descriptor` reject optimization requests.
 
 ## Verification and analysis lifetime
 
@@ -61,7 +68,9 @@ and own the responsibility for updating or rebuilding them after mutation.
 Default post-pass verification checks supported IR invariants; it cannot prove
 semantic equivalence or repair stale analysis state.
 
-Tracing, timing, and pass limits are available on the text optimization route:
+Tracing, timing, and pass limits apply to explicit preparation on all supported
+routes. Codegen diagnostics go to stderr; codegen pass controls without an
+explicit optimization request are rejected. For textual optimization:
 
 ```sh
 zig build run -- --passes=scalar-foundation --trace input.ll
