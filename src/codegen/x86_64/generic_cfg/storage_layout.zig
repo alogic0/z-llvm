@@ -58,6 +58,23 @@ pub fn query(context: ?*const machine.ReadOnlyModuleContext, ty: ir.Type) ?Layou
 
 fn queryDepth(context: ?*const machine.ReadOnlyModuleContext, dl: target.DataLayout, aggregate_alignment: u32, ty: ir.Type, depth: u8) ?Layout {
     if (depth >= 32) return null;
+    if (ty == .vector) {
+        const vector = ty.vector;
+        const bits: u32 = switch (vector.elem_ty) {
+            .int => |width| width,
+            .half => 16,
+            .float => 32,
+            .double => 64,
+            else => return null,
+        };
+        if (bits == 0 or bits > 64 or vector.len == 0 or vector.len > 16 or vector.len * bits > 128) return null;
+        if (context) |ctx| if (ctx.target_datalayout) |text| {
+            var parts = std.mem.splitScalar(u8, text, '-');
+            while (parts.next()) |part| if (part.len != 0 and part[0] == 'v') return null;
+        };
+        const bytes = std.math.ceilPowerOfTwo(u32, (vector.len * bits + 7) / 8) catch return null;
+        return .{ .bytes = bytes, .alignment = bytes };
+    }
     if (ty == .ptr or ty == .int or ty == .half or ty == .float or ty == .double or ty == .x86_fp80 or ty == .fp128) {
         if (ty == .int and (ty.int == 0 or ty.int > 128)) return null;
         const bytes = dl.typeAllocSizeBytes(ty) catch return null;

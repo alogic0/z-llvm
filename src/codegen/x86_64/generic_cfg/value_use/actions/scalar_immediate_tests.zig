@@ -1427,3 +1427,53 @@ test "value-use immediate RCX writes restore aliases on rollback" {
         try std.testing.expect(selector.values.get("result") == null);
     };
 }
+
+test "value-use immediate shift writeback preserves narrow sources and wide register aliases" {
+    const encoding = @import("../../../../../mc/encoding.zig");
+    for (std.meta.tags(@import("../../../types.zig").ArgReg)) |reg| for ([_]bool{ false, true }) |wide_alias| {
+        const row = PlanRow{ .id = "shift-writeback", .direction = .rhs, .operation = .shl, .bits = 32, .literal = 7, .accumulator = true, .scratch = true, .writes = 1 };
+        var machine = MachineFunction.init(row.id, .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        if (wide_alias) {
+            try addAtCurrent(&plan, "source");
+            try support.addLive(&plan, "wide-alias");
+        } else try support.addLive(&plan, "source");
+        try addAtCurrent(&plan, "result");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 136;
+        try selector_state.bindValueLoc(&selector, "source", .{ .scratch32 = reg });
+        if (wide_alias) try selector_state.bindValueLoc(&selector, "wide-alias", .{ .scratch64 = reg });
+        try machine.instructions.appendSlice(std.testing.allocator, &.{
+            .{ .sub_rsp_imm32 = 136 },
+            .{ .mov_arg64_arg = .{ .dst = reg, .src = .rdi } },
+        });
+        {
+            var transaction = try Transaction.begin(&selector);
+            defer transaction.deinit();
+            const handle = try registerImmediate(&transaction, row);
+            try transaction.seal();
+            try transaction.prepare();
+            try transaction.materializeAll();
+            try transaction.executePreparedAction(try transaction.preparedView(handle));
+            try transaction.commit();
+        }
+        try selector_state.emitValueIntoEax(&selector, .{ .named = "result" });
+        try selector_state.emitBinaryLocIntoAccumulator(&selector, .xor, selector_state.valueLoc(&selector, if (wide_alias) "wide-alias" else "source").?, if (wide_alias) 64 else 32);
+        try machine.instructions.appendSlice(std.testing.allocator, &.{ .{ .add_rsp_imm32 = 136 }, .ret });
+        const code = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(code);
+        const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..code.len], code);
+        const run: *const fn (u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+        for ([_]u64{ 0, 1, 2, 0x7ff00000, 0x80000000, 0xffffffff, 0xdeadbeef12345678, std.math.maxInt(u64) }) |input| {
+            const low: u32 = @truncate(input);
+            const retained: u64 = if (wide_alias) input else low;
+            try std.testing.expectEqual(@as(u64, low << 7) ^ retained, run(input));
+        }
+    };
+}

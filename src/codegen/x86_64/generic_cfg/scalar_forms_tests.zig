@@ -7,6 +7,24 @@ const encoding = @import("../../../mc/encoding.zig");
 const forms = @import("scalar_forms.zig");
 const edges = @import("switch_phi_edges.zig");
 
+test "scalar temporary names release collisions with parameters blocks and results" {
+    const source =
+        \\define i32 @names(i32 %__zllvm_scalar_form_0) {
+        \\__zllvm_scalar_form_1:
+        \\  %__zllvm_scalar_form_2 = add i32 %__zllvm_scalar_form_0, 1
+        \\  ret i32 %__zllvm_scalar_form_2
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    var serial: usize = 0;
+    const name = try forms.temporary(std.testing.allocator, module.functions.items[0], &serial);
+    defer std.testing.allocator.free(name);
+    try std.testing.expectEqualStrings("__zllvm_scalar_form_3", name);
+    try std.testing.expectEqual(@as(usize, 4), serial);
+}
+
 fn executable(module: ir.Module) ![]align(std.heap.page_size_min) u8 {
     const function = module.functions.items[0];
     var output = machine.MachineFunction.init(function.name, function.ret_ty);

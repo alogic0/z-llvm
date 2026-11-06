@@ -9,6 +9,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
     try writer.print("{s}:\n", .{function.name});
     for (function.instructions.items) |instruction| {
         switch (instruction) {
+            .indirect_jump => |jump| try writer.print("\tjmp *{s}\n", .{jump.reg.name64()}),
             .label => |label| try writer.print(".L{s}_{s}:\n", .{ function.name, label }),
             .mov_imm_eax => |value| try writer.print("\tmovl ${}, %eax\n", .{value}),
             .mov_imm_rax => |value| try writer.print("\tmovabsq ${}, %rax\n", .{value}),
@@ -35,6 +36,16 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .push_arg => |reg| try writer.print("\tpushq {s}\n", .{reg.name64()}),
             .pop_arg => |reg| try writer.print("\tpopq {s}\n", .{reg.name64()}),
             .push_rax => try writer.writeAll("\tpushq %rax\n"),
+            .linux_syscall => |count| {
+                if (count > 6) return error.UnsupportedCodegenInstruction;
+                if (count >= 4) try writer.writeAll("\tmovq %rcx, %r10\n");
+                try writer.writeAll("\tsyscall\n");
+            },
+            .register_snapshot_rdi => {
+                for ([_][]const u8{ "rax", "rdx", "rcx", "rbx", "rsi", "rdi", "rbp", "rsp", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" }, 0..) |reg, index|
+                    try writer.print("\tmovq %{s}, {d}(%rdi)\n", .{ reg, index * 8 });
+                try writer.writeAll("\tleaq (%rip), %rax\n\tmovq %rax, 128(%rdi)\n");
+            },
             .push_xmm64 => |reg| try writer.print("\tsubq $8, %rsp\n\tmovsd {s}, (%rsp)\n", .{reg.name()}),
             .push_byval_tail_arg_ptr => |copy| {
                 try writer.writeAll("\tsubq $8, %rsp\n\tmovq $0, (%rsp)\n");

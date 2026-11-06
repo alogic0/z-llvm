@@ -7,6 +7,41 @@ const selector = @import("../generic_cfg_selector.zig");
 const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 
+test "integer forms execute odd-width zero extension with dirty upper bits and live aliases" {
+    for ([_][2]u16{ .{ 8, 33 }, .{ 32, 39 }, .{ 33, 39 }, .{ 39, 51 }, .{ 51, 52 }, .{ 52, 63 } }) |widths| {
+        const source = try std.fmt.allocPrint(std.testing.allocator,
+            \\define i64 @extend(i64 %input, i64 %live) {{
+            \\entry:
+            \\ %narrow = trunc i64 %input to i{d}
+            \\ %middle = zext i{d} %narrow to i{d}
+            \\ %wide = zext i{d} %middle to i64
+            \\ %mixed = xor i64 %wide, %input
+            \\ %result = xor i64 %mixed, %live
+            \\ ret i64 %result
+            \\}}
+        , .{ widths[0], widths[0], widths[1], widths[1] });
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        try module.verify();
+        var output = machine.MachineFunction.init("extend", .{ .int = 64 });
+        defer output.deinit(std.testing.allocator);
+        const selected = try selector.tryLower(std.testing.allocator, &output, module.functions.items[0]);
+        if (selected == .unsupported) std.debug.print("zero extension {d}->{d}: {s}\n", .{ widths[0], widths[1], selected.unsupported.detail() });
+        try std.testing.expectEqual(selector.SelectionResult.selected, selected);
+        try verify.verifyFunction(output);
+        const code = try encoding.encodeFunction(std.testing.allocator, output);
+        defer std.testing.allocator.free(code);
+        const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..code.len], code);
+        const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+        const values = [_]u64{ 0, 1, 255, 0x7fffffff, 0xffffffff, 1 << 39, 1 << 51, 1 << 52, 0xdeadbeef12345678, std.math.maxInt(u64) };
+        const mask = (@as(u64, 1) << @as(u6, @intCast(widths[0]))) - 1;
+        for (values) |input| for (values) |live| try std.testing.expectEqual((input & mask) ^ input ^ live, run(input, live));
+    }
+}
+
 test "integer forms private expansion preserves source widths and reaches a fixed point" {
     var module = try ir.Module.parse(std.testing.allocator,
         \\define i31 @narrow(i31 %a, i31 %b) {

@@ -5,6 +5,7 @@ const x86_64 = @import("../codegen/x86_64.zig");
 const constant_table = @import("../codegen/x86_64/constant_table.zig");
 const global_data = @import("global_data.zig");
 const symbol_address = @import("../codegen/x86_64/symbol_address.zig");
+const symbol_names = @import("symbol_names.zig");
 
 const Section = struct {
     name_offset: u32,
@@ -34,7 +35,7 @@ const Relocation = struct {
     addend: i64,
 };
 
-const DataFixup = struct { offset: u64, address: symbol_address.Address };
+const DataFixup = struct { offset: u64, address: symbol_address.Address, block: ?[]const u8 = null };
 
 pub fn writeObject(allocator: std.mem.Allocator, functions: []const x86_64.MachineFunction, writer: anytype) !void {
     const object = try buildObject(allocator, functions);
@@ -123,7 +124,7 @@ fn buildObjectWithOptionalModuleContext(
 
     var symbols: std.ArrayList(Symbol) = .empty;
     defer symbols.deinit(allocator);
-    var symbol_indices = std.StringHashMap(u32).init(allocator);
+    var symbol_indices = symbol_names.Index.init(allocator);
     defer symbol_indices.deinit();
 
     const function_offsets = try allocator.alloc(u64, functions.len);
@@ -167,11 +168,28 @@ fn buildObjectWithOptionalModuleContext(
     var data_relocations: std.ArrayList(Relocation) = .empty;
     defer data_relocations.deinit(allocator);
     for (data_fixups.items) |fixup| {
+        var addend: i64 = fixup.address.addend;
+        if (fixup.block) |block| {
+            const function = for (functions) |candidate| {
+                if ((symbol_names.Context{}).eql(candidate.name, fixup.address.symbol)) break candidate;
+            } else return error.UnresolvedBlockAddress;
+            var offset: u32 = 0;
+            var found = false;
+            for (function.instructions.items) |instruction| {
+                if (instruction == .label and ir.identifiers.eql(instruction.label, block)) {
+                    if (found) return error.UnresolvedBlockAddress;
+                    addend += offset;
+                    found = true;
+                }
+                offset = try std.math.add(u32, offset, encoding.instructionSize(instruction));
+            }
+            if (!found) return error.UnresolvedBlockAddress;
+        }
         try data_relocations.append(allocator, .{
             .offset = fixup.offset,
             .symbol_index = try symbolIndexForCall(allocator, &symbols, &symbol_indices, fixup.address.symbol),
             .kind = 1, // R_X86_64_64
-            .addend = fixup.address.addend,
+            .addend = addend,
         });
     }
 
@@ -182,7 +200,7 @@ fn buildObjectWithOptionalModuleContext(
     defer allocator.free(symbol_name_offsets);
     for (symbols.items, 0..) |symbol, index| {
         symbol_name_offsets[index] = @intCast(strtab.items.len);
-        try strtab.appendSlice(allocator, symbol.name);
+        try symbol_names.append(allocator, &strtab, symbol.name);
         try strtab.append(allocator, 0);
     }
 
@@ -287,7 +305,7 @@ fn appendReachableGlobals(
     data_alignment: *u32,
     fixups: *std.ArrayList(DataFixup),
     symbols: *std.ArrayList(Symbol),
-    indices: *std.StringHashMap(u32),
+    indices: *symbol_names.Index,
     functions: []const x86_64.MachineFunction,
     aliases: []const ir.GlobalAlias,
     module_context: ?x86_64.ReadOnlyModuleContext,
@@ -343,13 +361,13 @@ fn appendReachableGlobals(
         });
         try indices.put(global.name, @intCast(symbols.items.len));
         for (decoded.relocations) |relocation| {
-            try fixups.append(allocator, .{ .offset = start + relocation.offset, .address = relocation.address });
+            try fixups.append(allocator, .{ .offset = start + relocation.offset, .address = relocation.address, .block = relocation.block });
             try queue.append(allocator, relocation.address.symbol);
         }
     }
 }
 
-fn orderLocalSymbols(allocator: std.mem.Allocator, symbols: *std.ArrayList(Symbol), indices: *std.StringHashMap(u32)) !u32 {
+fn orderLocalSymbols(allocator: std.mem.Allocator, symbols: *std.ArrayList(Symbol), indices: *symbol_names.Index) !u32 {
     var count: u32 = 0;
     for (symbols.items) |symbol| if (symbol.info >> 4 == 0) {
         count += 1;
@@ -378,7 +396,7 @@ fn appendSupportedGlobals(
     data: *std.ArrayList(u8),
     tdata: *std.ArrayList(u8),
     symbols: *std.ArrayList(Symbol),
-    symbol_indices: *std.StringHashMap(u32),
+    symbol_indices: *symbol_names.Index,
     globals: []const ir.Global,
     module_context: ?x86_64.ReadOnlyModuleContext,
 ) !void {
@@ -419,7 +437,7 @@ fn appendSyntheticF128Constants(
     allocator: std.mem.Allocator,
     data: *std.ArrayList(u8),
     symbols: *std.ArrayList(Symbol),
-    symbol_indices: *std.StringHashMap(u32),
+    symbol_indices: *symbol_names.Index,
     functions: []const x86_64.MachineFunction,
 ) !void {
     for (functions) |function| {
@@ -608,7 +626,7 @@ fn appendBase64DecodeTable(data: *std.ArrayList(u8), allocator: std.mem.Allocato
 fn appendLocalFunctionAliases(
     allocator: std.mem.Allocator,
     symbols: *std.ArrayList(Symbol),
-    symbol_indices: *std.StringHashMap(u32),
+    symbol_indices: *symbol_names.Index,
     aliases: []const ir.GlobalAlias,
     require_resolved: bool,
 ) !void {
@@ -666,7 +684,7 @@ fn collectCallRelocations(
     allocator: std.mem.Allocator,
     relocations: *std.ArrayList(Relocation),
     symbols: *std.ArrayList(Symbol),
-    symbol_indices: *std.StringHashMap(u32),
+    symbol_indices: *symbol_names.Index,
     function_offset: u64,
     function: x86_64.MachineFunction,
 ) !void {
@@ -916,7 +934,7 @@ fn collectCallRelocations(
 fn symbolIndexForCall(
     allocator: std.mem.Allocator,
     symbols: *std.ArrayList(Symbol),
-    symbol_indices: *std.StringHashMap(u32),
+    symbol_indices: *symbol_names.Index,
     name: []const u8,
 ) !u32 {
     if (symbol_indices.get(name)) |index| return index;
@@ -935,7 +953,7 @@ fn symbolIndexForCall(
 fn symbolIndexForTls(
     allocator: std.mem.Allocator,
     symbols: *std.ArrayList(Symbol),
-    symbol_indices: *std.StringHashMap(u32),
+    symbol_indices: *symbol_names.Index,
     name: []const u8,
 ) !u32 {
     if (symbol_indices.get(name)) |index| return index;

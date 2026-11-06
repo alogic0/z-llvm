@@ -406,10 +406,14 @@ fn allocationCheck(allocator: std.mem.Allocator, module: ir.Module, first_result
 }
 
 test "numeric serialization cleans up every print allocation failure" {
+    // In-place arena/writer growth depends on the backing allocator's current
+    // page layout. Force growth through allocation so the injected failure
+    // index describes the same operation in Debug and ReleaseSafe.
+    var moving = std.testing.FailingAllocator.init(std.testing.allocator, .{ .resize_fail_index = 0 });
     var module = try ir.Module.parse(std.testing.allocator, reordered);
     defer module.deinit();
-    try std.testing.checkAllAllocationFailures(std.testing.allocator, allocationCheck, .{ module, @as(?[]const u8, "2") });
+    try std.testing.checkAllAllocationFailures(moving.allocator(), allocationCheck, .{ module, @as(?[]const u8, "2") });
     var blocks = try ir.Module.parse(std.testing.allocator, block_addresses);
     defer blocks.deinit();
-    try std.testing.checkAllAllocationFailures(std.testing.allocator, allocationCheck, .{ blocks, @as(?[]const u8, null) });
+    try std.testing.checkAllAllocationFailures(moving.allocator(), allocationCheck, .{ blocks, @as(?[]const u8, null) });
 }

@@ -124,6 +124,17 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     try finish(allocator, &block, inst, wide, cast.to_ty, answer);
                     changed = true;
                     continue;
+                } else if (cast.op == .zext and integer(cast.from_ty) and integer(cast.to_ty) and
+                    cast.from_ty.int < cast.to_ty.int and cast.to_ty.int > 32 and cast.to_ty.int < 64 and operand(cast.value, cast.from_ty.int))
+                {
+                    // An odd-width extension has the same low bits as a word
+                    // extension. Retain the declared SSA width with a truncation
+                    // after establishing a clean 64-bit carrier.
+                    const wide: ir.Type = .{ .int = 64 };
+                    const answer = try unsigned(allocator, function, &block, &serial, cast.from_ty, wide, cast.value);
+                    try finish(allocator, &block, inst, wide, cast.to_ty, answer);
+                    changed = true;
+                    continue;
                 } else if (truncatedWord(function, cast)) |source| {
                     // zext(trunc(x)) is an ordinary word mask. This also avoids
                     // requiring a separate register carrier for the inner width.

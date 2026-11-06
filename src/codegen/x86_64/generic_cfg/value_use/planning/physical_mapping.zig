@@ -118,7 +118,18 @@ pub fn seal(comptime Authority: type, transaction: anytype) !void {
                 }
                 continue;
             }
-            graph[@backingInt(source)][@backingInt(mapping.destination)] = true;
+            // Scratch comparison snapshots an overlapping RHS before staging
+            // either operand (preserveScratchCompareOverlappingRhs). Its saved
+            // RHS therefore does not depend on the overwritten physical home.
+            // Keep the full mappings for semantic ordering: an early move must
+            // still see that the original RHS register is occupied.
+            const snapshotted_rhs = if (request.prepared_action) |*action| blk: {
+                if (action.* != .scratch_compare or action.scratch_compare.rhs != .named) break :blk false;
+                const compare_plan = try control_compare.classifyScratchCompare(&action.scratch_compare);
+                break :blk mapping.source_request_index == action.scratch_compare.rhs.named.index and
+                    source == nodeForArgReg(compare_plan.lhs_register);
+            } else false;
+            if (!snapshotted_rhs) graph[@backingInt(source)][@backingInt(mapping.destination)] = true;
             if (!deferred_writes) writes[@backingInt(mapping.destination)] = true;
         }
     }

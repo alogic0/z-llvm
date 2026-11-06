@@ -622,6 +622,10 @@ fn executeImmediateR02(
             try emitImmediateWrite(transaction, .{ .shl_eax_imm5 = @intCast(amount) });
             try failImmediateScalarForTest(transaction, .after_first_instruction);
         }
+        // The source can still be needed after this shift, including through
+        // a wider alias of the same physical register. Preserve those homes
+        // before writing the result back from EAX.
+        try selector_state.clobberArgReg(transaction.selector, destination);
         try transaction.selector.machine.instructions.append(
             transaction.selector.allocator,
             .{ .mov_eax_to_arg = destination },

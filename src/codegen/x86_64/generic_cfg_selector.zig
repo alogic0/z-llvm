@@ -20,6 +20,7 @@ const word_pair_memory = @import("generic_cfg/word_pair_memory.zig");
 const padded_frame = @import("generic_cfg/padded_frame.zig");
 const stack_addresses = @import("generic_cfg/stack_addresses.zig");
 const global_memory = @import("generic_cfg/global_memory.zig");
+const semantic_normalization = @import("generic_cfg/semantic_normalization.zig");
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 
@@ -45,24 +46,50 @@ pub fn tryLowerWithContext(
     function: ir.Function,
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
 ) !SelectionResult {
+    var normalization_arena = std.heap.ArenaAllocator.init(allocator);
+    defer normalization_arena.deinit();
+    const normalized = try semantic_normalization.normalize(normalization_arena.allocator(), function, module_context);
+    return selectNormalized(allocator, machine, normalized, module_context);
+}
+
+fn selectNormalized(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    normalized: semantic_normalization.Function,
+    module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
+) anyerror!SelectionResult {
+    const function = normalized.ir_function;
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (!inst.removed and inst.kind == .alloca and !inst.kind.alloca.isSingleObject())
             return .{ .unsupported = .{ .no_emitter = "alloca-count" } };
     };
-    const inspected = inspection.inspectFunctionWithContext(function, module_context);
-    if (try legacy_lowering.tryLower(allocator, machine, function)) {
+    if (normalized.whole_function) |form| {
+        try legacy_lowering.lower(allocator, machine, form);
         if (machine.selection_owner != .unassigned) return error.SelectionOwnerAlreadyAssigned;
         machine.selection_owner = .legacy_envelope;
         return .selected;
     }
+    try semantic_normalization.check(function);
+    const inspected = inspection.inspectFunctionWithContext(function, module_context);
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
+    if (try @import("generic_cfg/aligned_stack.zig").legalize(arena.allocator(), function, module_context)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
+    if (try @import("generic_cfg/integer_vectors.zig").legalize(arena.allocator(), function, module_context)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
+    if (try @import("generic_cfg/pair_memory.zig").legalize(arena.allocator(), function, module_context)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
+    if (try @import("generic_cfg/wide_integer_forms.zig").legalize(arena.allocator(), function)) |legalized| {
+        return tryLowerWithContext(allocator, machine, legalized, module_context);
+    }
     if (try overflow_values.legalize(arena.allocator(), function)) |legalized| {
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try comparison_forms.legalize(arena.allocator(), function, module_context)) |legalized| {
-        if (!comparison_forms.requiresNarrowNormalization(function) and
-            try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
+        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try word_arithmetic.legalize(arena.allocator(), function)) |legalized| {
@@ -70,8 +97,7 @@ pub fn tryLowerWithContext(
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try @import("generic_cfg/integer_forms.zig").legalize(arena.allocator(), function)) |legalized| {
-        if (!@import("generic_cfg/integer_forms.zig").requiresNormalization(function) and
-            try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
+        if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) return .selected;
         return tryLowerWithContext(allocator, machine, legalized, module_context);
     }
     if (try @import("generic_cfg/pair_arithmetic.zig").legalize(arena.allocator(), function)) |legalized| {
@@ -289,9 +315,7 @@ fn tryOriginalComposedForm(
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
     inspected: SelectionResult,
 ) !bool {
-    // Earlier legalizers must not reuse a form that still has a known narrow
-    // shift error merely because another instruction can already be selected.
-    if (@import("generic_cfg/integer_forms.zig").requiresNormalization(function)) return false;
+    try semantic_normalization.check(function);
     switch (inspected) {
         .selected => return false,
         .unsupported => |diagnostic| switch (diagnostic) {

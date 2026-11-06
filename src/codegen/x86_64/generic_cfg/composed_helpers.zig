@@ -192,6 +192,7 @@ pub fn stack128FrameBytes() u32 {
 }
 
 pub fn isComposedReturnType(ty: ir.Type) bool {
+    if (sysv_abi.isVector128AbiType(ty)) return true;
     if (ty == .ptr or ty == .void or ty == .half or ty == .float or ty == .double) return true;
     if (sysv_abi.sseAggregateReturnKind(ty) != null) return true;
     const bits = intBits(ty) orelse return false;

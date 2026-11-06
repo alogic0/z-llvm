@@ -1501,10 +1501,9 @@ test "generic cfg selector fails closed outside the bounded vector slice" {
         \\}
         , .tag = .unsupported_type, .detail = "insertelement" },
         .{ .ir_text =
-        \\define <2 x double> @bad(double %x) {
+        \\define <4 x double> @bad(<4 x double> %x) {
         \\entry:
-        \\  %v = insertelement <2 x double> poison, double %x, i64 0
-        \\  ret <2 x double> %v
+        \\  ret <4 x double> %x
         \\}
         , .tag = .unsupported_type, .detail = "unsupported-return-type" },
     };

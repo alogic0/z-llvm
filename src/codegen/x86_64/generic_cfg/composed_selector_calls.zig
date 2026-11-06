@@ -89,7 +89,11 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (sysv_abi.isVariadicCall(call)) try sysv_abi.rejectUnsupportedCallSignature(call);
     if (std.mem.eql(u8, call.callee, "llvm.experimental.noalias.scope.decl"))
         return if (result == null and intrinsic_attrs.isNoAliasScopeDecl(call)) null else .{ .no_emitter = "composed-block-noalias-scope-decl" };
-    if (call.inline_asm != null) return lowerFpBarrier(selector, result, call);
+    if (call.inline_asm != null) {
+        if (@import("../inline_asm.zig").classify(call)) |operation|
+            return lowerSystemAssembly(selector, result, call, operation);
+        return lowerFpBarrier(selector, result, call);
+    }
     if (std.mem.eql(u8, call.callee, "llvm.lifetime.start.p0") or std.mem.eql(u8, call.callee, "llvm.lifetime.end.p0")) return lowerLifetimeMarker(result, call);
     if (std.mem.eql(u8, call.callee, "llvm.assume")) return lowerAssume(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.trap")) return try lowerTrap(selector, result, call);
@@ -347,8 +351,11 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
     if (transaction) |*active| {
         if (try active.prepareCallBeforeArguments(.clobber)) |diagnostic| return diagnostic;
     } else if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+    var has_vector_abi = sysv_abi.isVector128AbiType(call.ret_ty);
+    for (call.args.items) |arg| has_vector_abi = has_vector_abi or sysv_abi.isVector128AbiType(arg.ty);
+    if (has_vector_abi) if (try selector_state.preserveFixedCallInputs(selector, call)) |diagnostic| return diagnostic;
     for (call.args.items) |arg| {
-        if (!sysv_abi.isScalarSseAbiType(arg.ty)) continue;
+        if (!sysv_abi.isScalarSseAbiType(arg.ty) and !sysv_abi.isVector128AbiType(arg.ty)) continue;
         const name = switch (arg.value) {
             .named => |name| name,
             else => continue,
@@ -359,6 +366,10 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
     for (call.args.items, plan.assignments.items) |arg, assignment| switch (assignment) {
         .gpr => |target| if (try lowerDirectCallArg(selector, arg, target)) |diagnostic| return diagnostic,
         .sse => |target| {
+            if (sysv_abi.isVector128AbiType(arg.ty)) {
+                if (try selector_vector.materializeAbiVector(selector, arg.value, arg.ty, target)) |diagnostic| return diagnostic;
+                continue;
+            }
             const bits: u16 = if (arg.ty == .half) 16 else if (arg.ty == .float) 32 else if (arg.ty == .double) 64 else unreachable;
             if (try selector_fp.materializeFpValue(selector, arg.value, target, bits)) |diagnostic| return diagnostic;
         },
@@ -373,6 +384,10 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
     else
         try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
     if (result) |result_name| {
+        if (selector_vector.abiShape(call.ret_ty)) |shape| {
+            try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = 128, .shape = .{ .vector = shape } } });
+            return null;
+        }
         if (sysv_abi.isScalarSseAbiType(call.ret_ty)) {
             const bits: u16 = if (call.ret_ty == .half) 16 else if (call.ret_ty == .float) 32 else 64;
             try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
@@ -418,6 +433,37 @@ fn lowerFpAbs(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.Ca
         try selector.machine.instructions.append(selector.allocator, .{ .movd_eax_xmm = .xmm0 });
     }
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
+    return null;
+}
+
+fn lowerSystemAssembly(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, operation: @import("../inline_asm.zig").Operation) !?Diagnostic {
+    if (operation == .register_snapshot and result != null) return .{ .unsupported_value = "inline-asm-result" };
+    if (operation == .linux_syscall and result == null) return .{ .unsupported_value = "inline-asm-result" };
+    var transaction: ?selector_state.AccumulatorDefinitionTransaction = if (result != null)
+        try selector_state.AccumulatorDefinitionTransaction.begin(selector)
+    else
+        null;
+    defer if (transaction) |*active| active.deinit();
+    if (transaction) |*active| {
+        if (try active.prepareCallBeforeArguments(.clobber)) |diagnostic| return diagnostic;
+    } else if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+    if (try selector_state.preserveFixedCallInputs(selector, call)) |diagnostic| return diagnostic;
+    switch (operation) {
+        .linux_syscall => |count| {
+            for (call.args.items[1..], 0..) |arg, index| {
+                if (try lowerDirectCallArg(selector, arg, try ArgReg.fromIndex(index))) |diagnostic| return diagnostic;
+            }
+            try transaction.?.finishCallPreparationAfterArguments();
+            try transaction.?.materialize(call.args.items[0].value, .fullRax());
+            try selector_state.emitEflagsInstruction(selector, .{ .linux_syscall = count }, .clobber);
+            if (result) |name| try transaction.?.define(name, .fullRax());
+        },
+        .register_snapshot => {
+            if (try lowerDirectCallArg(selector, call.args.items[0], .rdi)) |diagnostic| return diagnostic;
+            try selector_state.emitEflagsInstruction(selector, .register_snapshot_rdi, .clobber);
+        },
+    }
+    if (transaction) |*active| try active.commit();
     return null;
 }
 

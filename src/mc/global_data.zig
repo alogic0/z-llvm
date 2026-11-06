@@ -7,7 +7,7 @@ const constants = @import("../codegen/x86_64/constant_table.zig");
 const addresses = @import("../codegen/x86_64/symbol_address.zig");
 
 pub const max_object_bytes = 1024 * 1024;
-pub const Relocation = struct { offset: u32, address: addresses.Address };
+pub const Relocation = struct { offset: u32, address: addresses.Address, block: ?[]const u8 = null };
 pub const Decoded = struct {
     bytes: []u8,
     relocations: []Relocation,
@@ -25,6 +25,7 @@ const Layout = struct { size: u32, alignment: u32 };
 const Array = struct { count: u32, element: ir.Type };
 const Fields = struct {
     rest: []const u8,
+    packed_type: bool = false,
 
     fn next(iterator: *Fields) ?[]const u8 {
         const text = trim(iterator.rest);
@@ -49,6 +50,25 @@ fn aligned(size: u32, alignment: u32) !u32 {
     return bounded(std.mem.alignForward(u64, size, alignment));
 }
 
+fn dataType(text: []const u8) !ir.Type {
+    const input = trim(text);
+    if (std.mem.startsWith(u8, input, "<{")) {
+        if (!std.mem.endsWith(u8, input, "}>")) return error.UnsupportedGlobalData;
+        return .{ .aggregate = input };
+    }
+    return parser.parseType(input) catch error.UnsupportedGlobalData;
+}
+
+fn typedField(text: []const u8) !struct { ty: ir.Type, after: []const u8 } {
+    const input = trim(text);
+    if (std.mem.startsWith(u8, input, "<{")) {
+        const close = parser.findMatchingAngle(input, 0) orelse return error.UnsupportedGlobalData;
+        return .{ .ty = try dataType(input[0 .. close + 1]), .after = trim(input[close + 1 ..]) };
+    }
+    const parsed = parser.parseLeadingType(input) catch return error.UnsupportedGlobalData;
+    return .{ .ty = parsed.ty, .after = parsed.after };
+}
+
 fn arrayType(ty: ir.Type) !Array {
     if (ty != .aggregate) return error.UnsupportedGlobalData;
     const text = trim(ty.aggregate);
@@ -57,11 +77,15 @@ fn arrayType(ty: ir.Type) !Array {
     const separator = std.mem.indexOf(u8, body, " x ") orelse return error.UnsupportedGlobalData;
     const count = std.fmt.parseUnsigned(u32, trim(body[0..separator]), 10) catch return error.UnsupportedGlobalData;
     if (count > max_object_bytes) return error.UnsupportedGlobalData;
-    return .{ .count = count, .element = parser.parseType(trim(body[separator + 3 ..])) catch return error.UnsupportedGlobalData };
+    return .{ .count = count, .element = try dataType(body[separator + 3 ..]) };
 }
 
 fn fields(text: []const u8) !Fields {
     const body = trim(text);
+    if (std.mem.startsWith(u8, body, "<{")) {
+        if (!std.mem.endsWith(u8, body, "}>")) return error.UnsupportedGlobalData;
+        return .{ .rest = body[2 .. body.len - 2], .packed_type = true };
+    }
     if (body.len < 2 or body[0] != '{' or body[body.len - 1] != '}') return error.UnsupportedGlobalData;
     return .{ .rest = body[1 .. body.len - 1] };
 }
@@ -111,11 +135,11 @@ const Encoder = struct {
         }
         var items = try fields(ty.aggregate);
         var size: u32 = 0;
-        var alignment = encoder.aggregate_alignment;
+        var alignment: u32 = if (items.packed_type) 1 else encoder.aggregate_alignment;
         while (items.next()) |field| {
-            const layout = try encoder.typeLayout(parser.parseType(field) catch return error.UnsupportedGlobalData, depth + 1);
-            size = try bounded(@as(u64, try aligned(size, layout.alignment)) + layout.size);
-            alignment = @max(alignment, layout.alignment);
+            const layout = try encoder.typeLayout(try dataType(field), depth + 1);
+            size = try bounded(@as(u64, if (items.packed_type) size else try aligned(size, layout.alignment)) + layout.size);
+            if (!items.packed_type) alignment = @max(alignment, layout.alignment);
         }
         return .{ .size = try aligned(size, alignment), .alignment = alignment };
     }
@@ -123,6 +147,18 @@ const Encoder = struct {
     fn value(encoder: *Encoder, ty: ir.Type, input: ir.Value, offset: u32) !void {
         if (input == .zero_initializer or input == .undef) return;
         if (ty == .ptr) {
+            if (input == .constant_expr) {
+                const expression = trim(input.constant_expr);
+                if (std.mem.startsWith(u8, expression, "blockaddress(")) {
+                    var names: @import("../ir/opaque_names.zig").Iterator = .{ .raw = expression };
+                    const token = (try names.next()) orelse return error.UnsupportedGlobalData;
+                    if (token != .block_address or names.index != expression.len) return error.UnsupportedGlobalData;
+                    const address = token.block_address;
+                    const symbol = encoder.context.functionAddress(address.function) orelse return error.UnsupportedGlobalData;
+                    try encoder.relocations.append(encoder.allocator, .{ .offset = offset, .address = .{ .symbol = symbol }, .block = address.block });
+                    return;
+                }
+            }
             if (addresses.fromValue(input)) |address| {
                 try encoder.relocations.append(encoder.allocator, .{ .offset = offset, .address = address });
                 return;
@@ -149,6 +185,8 @@ const Encoder = struct {
         const input = trim(raw);
         if (std.mem.eql(u8, input, "zeroinitializer") or std.mem.eql(u8, input, "undef")) return;
         const actual = try encoder.resolved(ty, depth);
+        if (actual == .ptr and std.mem.startsWith(u8, input, "blockaddress("))
+            return encoder.value(actual, .{ .constant_expr = input }, offset);
         if (actual == .int or actual == .ptr) return encoder.value(actual, parser.parseValue(input) catch return error.UnsupportedGlobalData, offset);
         if (actual != .aggregate) return error.UnsupportedGlobalData;
         if (std.mem.startsWith(u8, trim(actual.aggregate), "[")) {
@@ -180,7 +218,7 @@ const Encoder = struct {
             if (input.len < 2 or input[0] != '[' or input[input.len - 1] != ']') return error.UnsupportedGlobalData;
             var values: Fields = .{ .rest = input[1 .. input.len - 1] };
             for (0..array.count) |index| {
-                const field = parser.parseLeadingType(values.next() orelse return error.UnsupportedGlobalData) catch return error.UnsupportedGlobalData;
+                const field = try typedField(values.next() orelse return error.UnsupportedGlobalData);
                 if (!field.ty.eql(array.element)) return error.UnsupportedGlobalData;
                 try encoder.text(array.element, field.after, offset + @as(u32, @intCast(index)) * element.size, depth + 1);
             }
@@ -189,13 +227,14 @@ const Encoder = struct {
         }
         var types = try fields(actual.aggregate);
         var values = try fields(input);
+        if (types.packed_type != values.packed_type) return error.UnsupportedGlobalData;
         var position: u32 = 0;
         while (types.next()) |field_text| {
-            const field_ty = parser.parseType(field_text) catch return error.UnsupportedGlobalData;
+            const field_ty = try dataType(field_text);
             const layout = try encoder.typeLayout(field_ty, depth + 1);
-            const field = parser.parseLeadingType(values.next() orelse return error.UnsupportedGlobalData) catch return error.UnsupportedGlobalData;
+            const field = try typedField(values.next() orelse return error.UnsupportedGlobalData);
             if (!field.ty.eql(field_ty)) return error.UnsupportedGlobalData;
-            position = try aligned(position, layout.alignment);
+            if (!types.packed_type) position = try aligned(position, layout.alignment);
             try encoder.text(field_ty, field.after, offset + position, depth + 1);
             position += layout.size;
         }
@@ -330,8 +369,36 @@ test "global data rejects incomplete unsupported and unbounded definitions" {
         defer module.deinit();
         try std.testing.expectError(error.UnsupportedGlobalData, decode(std.testing.allocator, .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout }, module.globals.items[0]));
     }
-    const packed_global: ir.Global = .{ .name = "packed", .kind = .global, .ty = .{ .aggregate = "<{ i8, i64 }>" }, .initializer = .{ .scalar = .zero_initializer } };
-    try std.testing.expectError(error.UnsupportedGlobalData, decode(std.testing.allocator, .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = null }, packed_global));
+}
+
+test "global data preserves nested packed field offsets and unaligned relocations" {
+    const source =
+        \\target datalayout = "e-p:64:64-i64:64-a:64"
+        \\%Packed = type <{ i8, ptr, i16 }>
+        \\@packed = global { i8, [2 x %Packed], i64 } { i8 127, [2 x %Packed] [%Packed <{ i8 1, ptr @first, i16 4660 }>, %Packed <{ i8 2, ptr @second, i16 -1 }>], i64 72623859790382856 }
+        \\@inline = global { i8, <{ i8, i64 }>, i16 } { i8 9, <{ i8, i64 }> <{ i8 10, i64 123 }>, i16 17 }
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    const ctx: constants.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout };
+    var data = try decode(std.testing.allocator, ctx, module.globals.items[0]);
+    defer data.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 32), data.bytes.len);
+    try std.testing.expectEqualSlices(u8, &.{ 127, 1 }, data.bytes[0..2]);
+    try std.testing.expectEqualSlices(u8, &.{ 0x34, 0x12, 2 }, data.bytes[10..13]);
+    try std.testing.expectEqualSlices(u8, &.{ 255, 255, 0 }, data.bytes[21..24]);
+    try std.testing.expectEqual(@as(u64, 72623859790382856), std.mem.readInt(u64, data.bytes[24..32], .little));
+    try std.testing.expectEqual(@as(u32, 8), data.alignment);
+    try std.testing.expectEqual(@as(usize, 2), data.relocations.len);
+    try std.testing.expectEqual(@as(u32, 2), data.relocations[0].offset);
+    try std.testing.expectEqual(@as(u32, 13), data.relocations[1].offset);
+    try std.testing.expectEqualStrings("first", data.relocations[0].address.symbol);
+    try std.testing.expectEqualStrings("second", data.relocations[1].address.symbol);
+    var inline_data = try decode(std.testing.allocator, ctx, module.globals.items[1]);
+    defer inline_data.deinit(std.testing.allocator);
+    try std.testing.expectEqualSlices(u8, &.{ 9, 10, 123, 0, 0, 0, 0, 0, 0, 0, 17, 0, 0, 0, 0, 0 }, inline_data.bytes);
+    const malformed: ir.Global = .{ .name = "mismatch", .kind = .global, .ty = .{ .aggregate = "<{ i8, i64 }>" }, .initializer = .{ .@"opaque" = "{ i8 1, i64 2 }" } };
+    try std.testing.expectError(error.UnsupportedGlobalData, decode(std.testing.allocator, ctx, malformed));
 }
 
 test "global data releases partial output after allocation failures" {

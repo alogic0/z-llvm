@@ -163,7 +163,7 @@ fn executeAccumulatorCase(
 }
 
 const ExpectedScalarCastDisplacement = enum {
-    always_spill_live,
+    framed_source_preserved,
     source_dependent_reuse,
 };
 
@@ -208,7 +208,7 @@ test "value-use scalar cast displacement table is explicit and byte exact" {
             .to_bits = 52,
             .exact_ei = false,
             .source_loc = .rax,
-            .displacement = .always_spill_live,
+            .displacement = .framed_source_preserved,
             .expected_instructions = &.{
                 .{ .spill_rax_rsp = .slot0 },
                 .{ .reload_rsp_rax = .slot0 },
@@ -284,7 +284,7 @@ test "value-use scalar cast displacement table is explicit and byte exact" {
             machine.instructions.items,
         );
         switch (case.displacement) {
-            .always_spill_live => {
+            .framed_source_preserved => {
                 try std.testing.expectEqual(@as(usize, 1), selector.spill_slots.count());
                 try std.testing.expectEqual(ValueLoc{ .spill64 = .slot0 }, selector_state.resolveValue(&selector, .{ .named = "source" }).?);
             },

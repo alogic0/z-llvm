@@ -206,6 +206,12 @@ pub fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic 
         try emitReturnEpilogue(selector);
         return null;
     }
+    if (sysv_abi.isVector128AbiType(ret.ty)) {
+        const value = ret.value orelse return .{ .unsupported_value = "composed-block-missing-ret-value" };
+        if (try @import("composed_selector_vector.zig").materializeAbiVector(selector, value, ret.ty, .xmm0)) |diagnostic| return diagnostic;
+        try emitReturnEpilogue(selector);
+        return null;
+    }
     if (sysv_abi.sseAggregateReturnKind(ret.ty)) |kind| {
         const value = ret.value orelse return .{ .unsupported_value = "composed-block-missing-ret-value" };
         selector_aggregate.emitReturn(selector, value, kind) catch return .{ .unsupported_value = "composed-block-aggregate-ret-value" };
@@ -316,7 +322,30 @@ pub fn lowerCfgTerminator(
                 try selector_state.emitEflagsInstruction(selector, .ud2, .preserve);
             break :blk null;
         },
-        .indirectbr => .{ .no_emitter = "stage2-terminator-not-owned" },
+        .indirectbr => |branch| blk: {
+            if (branch.targets.items.len == 0) break :blk .{ .unsupported_control_flow = "stage2-indirect-targets" };
+            for (branch.targets.items) |name| {
+                const target = function.blockIndex(name) orelse break :blk .{ .unsupported_control_flow = "stage2-indirect-target" };
+                // PHI destinations require edge-specific snapshots; retain that
+                // boundary until indirect edge trampolines are implemented.
+                for (function.blocks.items[target].instructions.items) |inst| {
+                    if (!inst.removed and inst.kind == .phi) break :blk .{ .no_emitter = "stage2-indirect-phi" };
+                }
+            }
+            if (selector.stack_frame_bytes != 0)
+                selector_state.spillLiveValuesForCfgBoundary(selector) catch break :blk .{ .no_spill_envelope = "stage2-cfg-boundary-spill" };
+            var transaction = try ValueUseTransaction.begin(selector);
+            defer transaction.deinit();
+            _ = try transaction.register(.{ .source = branch.addr, .expected = .{ .ty = .ptr, .register_class = .gpr64, .pointer_address_space = 0 }, .form = .pointer, .destination = .{ .gpr64 = .rcx } });
+            transaction.seal() catch break :blk .{ .unsupported_value = "stage2-indirect-address" };
+            transaction.prepare() catch break :blk .{ .unsupported_value = "stage2-indirect-address" };
+            transaction.materializeAll() catch break :blk .{ .unsupported_value = "stage2-indirect-address" };
+            try transaction.commit();
+            // These are original, module-owned targets. Private form rewrites
+            // preserve the indirect successor list, just as ordinary labels.
+            try selector_state.emitEflagsInstruction(selector, .{ .indirect_jump = .{ .reg = .rcx, .targets = branch.targets.items } }, .preserve);
+            break :blk null;
+        },
     };
 }
 

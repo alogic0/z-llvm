@@ -516,7 +516,9 @@ test "composed selector source guard freezes the closed scalar cast displacement
         ".eax, .rax => .reuse_source, else => .scratch_preferred, }, }; }";
     const accepted_displacement =
         "fn scalarCastDisplacement() void { " ++
-        "if (plan == .c52_0_trunc_i64_to_i52) return .spill_live; " ++
+        "if (plan == .c52_0_trunc_i64_to_i52) { " ++
+        "if (!try Authority.mustSurviveInstruction()) return .reuse_source; " ++
+        "return if (transaction.selector.stack_frame_bytes != 0) .spill_live else .scratch_preferred; } " ++
         "return scalarCastSourceDisplacement(); }";
     try validateScalarCastDisplacementPlan(
         plan_declaration ++ plan ++ accepted_displacement ++ source_displacement,
@@ -532,6 +534,13 @@ test "composed selector source guard freezes the closed scalar cast displacement
             plan_declaration ++ plan ++ widened_displacement ++ source_displacement,
         ),
     );
+    const dropped_final_use =
+        "fn scalarCastDisplacement() void { " ++
+        "if (plan == .c52_0_trunc_i64_to_i52) return .spill_live; " ++
+        "return scalarCastSourceDisplacement(); }";
+    try std.testing.expectError(error.ValueUseScalarCastSequenceMismatch, validateScalarCastDisplacementPlan(
+        plan_declaration ++ plan ++ dropped_final_use ++ source_displacement,
+    ));
 }
 
 test "composed selector source guard freezes distinct cast and arithmetic displacement authorities" {

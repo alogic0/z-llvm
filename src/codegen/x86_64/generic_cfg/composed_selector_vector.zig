@@ -206,6 +206,16 @@ pub fn lowerBitcast(selector: *ComposedBlockSelector, result: ?[]const u8, cast:
     if (cast.op == .bitcast and isMask4(cast.from_ty) and cast.to_ty.eql(.{ .int = 4 })) {
         return lowerMask4ToI4(selector, result_name, cast);
     }
+    if (cast.op == .bitcast and abiShape(cast.from_ty) != null and abiShape(cast.to_ty) != null) {
+        const expected = abiShape(cast.from_ty).?;
+        const operand = describeVectorValue(selector, cast.value, cast.from_ty) orelse return .{ .unsupported_value = "composed-vector-bitcast-source" };
+        if (!operand.shape.eql(expected)) return .{ .unsupported_value = "composed-vector-bitcast-source" };
+        const source_reg = vectorValueReg(selector, cast.value);
+        const dst = try resultXmmReg(selector, result_name, cast.value, null) orelse return .{ .no_spill_envelope = "composed-vector-bitcast-dst" };
+        if (try materializeVectorValue(selector, cast.value, operand, dst, source_reg)) |diagnostic| return diagnostic;
+        try bindVectorResult(selector, result_name, dst, abiShape(cast.to_ty).?);
+        return null;
+    }
     if (cast.op != .bitcast or !isPackedFp2(cast.from_ty)) return .{ .no_emitter = "composed-vector-bitcast-form" };
     const result_shape = shapeForType(cast.to_ty, 0) orelse return .{ .no_emitter = "composed-vector-bitcast-form" };
     if (result_shape.lane_type != .integer or result_shape.lane_bits != shapeForType(cast.from_ty, 0).?.lane_bits) {
@@ -732,6 +742,18 @@ fn definedLaneMask(comptime lane_count: usize, lanes: [lane_count]ir.vector_cons
         if (lane.isDefined()) mask |= @as(u4, 1) << @intCast(index);
     }
     return mask;
+}
+
+pub fn abiShape(ty: ir.Type) ?VectorShape {
+    if (!@import("../sysv_abi.zig").isVector128AbiType(ty)) return null;
+    return shapeForType(ty, if (ty.vector.len == 4) 0b1111 else 0b11);
+}
+
+pub fn materializeAbiVector(selector: *ComposedBlockSelector, value: ir.Value, ty: ir.Type, dst: XmmReg) !?Diagnostic {
+    const expected = abiShape(ty) orelse return .{ .no_emitter = "composed-vector-abi-type" };
+    const operand = describeVectorValue(selector, value, ty) orelse return .{ .unsupported_value = "composed-vector-abi-value" };
+    if (!operand.shape.eql(expected)) return .{ .unsupported_value = "composed-vector-abi-defined-lanes" };
+    return materializeVectorValue(selector, value, operand, dst, null);
 }
 
 fn shapeForType(ty: ir.Type, defined_lanes: u4) ?VectorShape {

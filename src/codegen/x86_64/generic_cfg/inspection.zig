@@ -44,7 +44,7 @@ pub fn inspectFunctionWithContext(function: ir.Function, context: ?*const x86_64
         return unsupported(.{ .unsupported_type = "unsupported-return-type" });
     }
     for (function.params.items) |param| {
-        if (!isSelectorScalarType(param.ty)) {
+        if (!isSelectorScalarType(param.ty) and !sysv_abi.isVector128AbiType(param.ty)) {
             return unsupported(.{ .unsupported_type = "unsupported-param-type" });
         }
     }
@@ -221,6 +221,7 @@ fn isVectorOperand(value: ir.Value, ty: ir.Type) bool {
 }
 
 fn inspectCast(cast: ir.CastInst) ?Diagnostic {
+    if (cast.op == .bitcast and sysv_abi.isVector128AbiType(cast.from_ty) and sysv_abi.isVector128AbiType(cast.to_ty)) return null;
     if (cast.op == .bitcast and isMask4(cast.from_ty) and cast.to_ty.eql(.{ .int = 4 })) return null;
     if (cast.op == .bitcast and isPackedFp2(cast.from_ty) and cast.to_ty == .vector and
         cast.to_ty.vector.len == 2 and cast.to_ty.vector.elem_ty == .int and
@@ -285,6 +286,7 @@ fn inspectSelect(select: ir.SelectInst) ?Diagnostic {
 
 fn inspectCall(call: ir.CallInst) ?Diagnostic {
     if (call.inline_asm) |inline_asm| {
+        if (@import("../inline_asm.zig").classify(call) != null) return null;
         const stack_memory_barrier = inline_asm.sideeffect and inline_asm.template.len == 0 and
             std.mem.eql(u8, inline_asm.constraints, "m,~{memory},~{dirflag},~{fpsr},~{flags}") and
             call.ret_ty == .void and call.args.items.len == 1 and call.args.items[0].ty == .ptr;
@@ -413,7 +415,7 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
     }
     if (!isScalarReturnType(call.ret_ty)) return .{ .unsupported_type = "call-ret" };
     for (call.args.items) |arg| {
-        if (!isSelectorScalarType(arg.ty)) return .{ .unsupported_type = "call-arg" };
+        if (!isSelectorScalarType(arg.ty) and !sysv_abi.isVector128AbiType(arg.ty)) return .{ .unsupported_type = "call-arg" };
     }
     return null;
 }
@@ -462,6 +464,7 @@ fn blockEndsInTrap(block: ir.BasicBlock) bool {
 }
 
 fn isScalarReturnType(ty: ir.Type) bool {
+    if (sysv_abi.isVector128AbiType(ty)) return true;
     return ty == .void or isSelectorScalarType(ty) or sysv_abi.sseAggregateReturnKind(ty) != null;
 }
 

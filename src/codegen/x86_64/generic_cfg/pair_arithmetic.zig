@@ -161,8 +161,10 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
             if (!inst.removed and inst.result != null) switch (inst.kind) {
                 .binary => |value| if (value.ty.eql(pair) and operand(value.lhs) and operand(value.rhs)) {
                     const expanded = switch (value.op) {
-                        .add, .mul, .@"and" => true,
-                        .shl, .lshr => value.rhs == .named,
+                        .add, .sub, .mul, .@"and", .xor => true,
+                        .@"or" => value.lhs == .int or value.rhs == .int,
+                        .shl => value.rhs == .named or value.rhs.int != 64,
+                        .lshr => value.rhs == .named or value.rhs.int > 64,
                         .ashr => value.rhs == .named or value.rhs.int != 127,
                         .udiv, .urem, .sdiv, .srem => divisor(value) != null,
                         else => false,
@@ -177,9 +179,15 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                                 const carry = try builder.cast(.zext, .{ .int = 1 }, try builder.compare(.ult, lo, a.lo), word);
                                 answer = .{ .lo = lo, .hi = try builder.binary(.add, try builder.binary(.add, a.hi, b.hi), carry) };
                             },
-                            .@"and" => {
+                            .sub => {
                                 const b = try builder.split(value.rhs);
-                                answer = .{ .lo = try builder.binary(.@"and", a.lo, b.lo), .hi = try builder.binary(.@"and", a.hi, b.hi) };
+                                const lo = try builder.binary(.sub, a.lo, b.lo);
+                                const borrow = try builder.cast(.zext, .{ .int = 1 }, try builder.compare(.ult, a.lo, b.lo), word);
+                                answer = .{ .lo = lo, .hi = try builder.binary(.sub, try builder.binary(.sub, a.hi, b.hi), borrow) };
+                            },
+                            .@"and", .@"or", .xor => {
+                                const b = try builder.split(value.rhs);
+                                answer = .{ .lo = try builder.binary(value.op, a.lo, b.lo), .hi = try builder.binary(value.op, a.hi, b.hi) };
                             },
                             .mul => {
                                 const b = try builder.split(value.rhs);
@@ -242,6 +250,19 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         copy.kind = .{ .cast = .{ .op = .zext, .from_ty = word, .value = try builder.literal(.{ .int = @intCast(bits) }), .to_ty = pair } };
                         try block.instructions.append(allocator, copy);
                     } else try builder.finish(inst, try builder.split(.{ .int = @bitCast(bits) }));
+                    changed = true;
+                    continue;
+                } else if (cast.to_ty.eql(pair) and cast.from_ty == .int and cast.from_ty.int > 0 and cast.from_ty.int <= 64 and cast.value == .named and
+                    (cast.op == .sext or (cast.op == .zext and cast.from_ty.int < 64)))
+                {
+                    const low = if (cast.from_ty.eql(word)) cast.value else try builder.cast(cast.op, cast.from_ty, cast.value, word);
+                    if (cast.op == .sext) {
+                        try builder.finish(inst, .{ .lo = low, .hi = try builder.binary(.ashr, low, .{ .int = 63 }) });
+                    } else {
+                        var copy = inst;
+                        copy.kind = .{ .cast = .{ .op = .zext, .from_ty = word, .value = low, .to_ty = pair } };
+                        try block.instructions.append(allocator, copy);
+                    }
                     changed = true;
                     continue;
                 } else if (cast.from_ty.eql(pair) and cast.to_ty == .int and cast.to_ty.int > 0 and cast.to_ty.int <= 64 and cast.op == .trunc and cast.value == .int) {

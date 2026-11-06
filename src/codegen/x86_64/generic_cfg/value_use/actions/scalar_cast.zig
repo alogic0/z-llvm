@@ -342,7 +342,17 @@ fn scalarCastDisplacement(
     source_index: u8,
     plan: AccumulatorScalarCastPlan,
 ) !AccumulatorDisplacementPolicy {
-    if (plan == .c52_0_trunc_i64_to_i52) return .spill_live;
+    if (plan == .c52_0_trunc_i64_to_i52) {
+        // The mask changes the source's full-width value. Reuse a final-use
+        // source; otherwise preserve it in the existing frame or a free scratch
+        // register. Preparation must not discard the operand before reading it.
+        if (transaction.requests[source_index].source == .named) switch (transaction.prepared_views[source_index].canonical_source_loc) {
+            .eax, .rax => if (!try Authority.mustSurviveInstruction(Authority, transaction, source_index))
+                return .{ .reuse_source = transaction.requests[source_index].source.named.slice() },
+            else => {},
+        };
+        return if (transaction.selector.stack_frame_bytes != 0) .spill_live else .scratch_preferred;
+    }
     return scalarCastSourceDisplacement(Authority, transaction, source_index);
 }
 

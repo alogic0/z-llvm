@@ -154,6 +154,12 @@ pub fn executeUnsignedQuotient(
     const session = &transaction.accumulator_session.?;
 
     if (rhs_is_accumulator) {
+        // Staging RAX into RCX can destroy a final-use dividend already in
+        // RCX. Preserve that registered input before its physical home changes.
+        const lhs_name = sourceName(transaction, lhs_index);
+        const lhs_binding = transaction.selector.values.get(lhs_name) orelse return error.ValueUseUnresolvedSource;
+        if (@import("../../composed_helpers.zig").locContainsReg(lhs_binding.loc, .rcx))
+            try selector_state.spillValueOrError(transaction.selector, lhs_name);
         try stageQuotientSource(Authority, transaction, rhs_index, .rcx, plan);
         try failQuotientForTest(transaction, .after_rhs_accumulator_staging);
         try refreshQuotientSource(Authority, transaction, lhs_index);

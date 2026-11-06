@@ -1251,7 +1251,10 @@ pub fn validateScalarCastDisplacementPlan(source: [:0]const u8) !void {
             return error.ValueUseScalarCastPhysicalIntentEscape;
     }
     if (countPattern(displacement, "plan == .c52_0_trunc_i64_to_i52") != 1 or
-        countPattern(displacement, "return .spill_live") != 1 or
+        countPattern(displacement, "Authority.mustSurviveInstruction(") != 1 or
+        countPattern(displacement, ".reuse_source") != 1 or
+        countPattern(displacement, "transaction.selector.stack_frame_bytes != 0") != 1 or
+        countPattern(displacement, ".spill_live else .scratch_preferred") != 1 or
         countPattern(displacement, "scalarCastSourceDisplacement(") != 1 or
         countPattern(source_displacement, ".eax, .rax") != 1 or
         countPattern(source_displacement, ".reuse_source") != 1 or

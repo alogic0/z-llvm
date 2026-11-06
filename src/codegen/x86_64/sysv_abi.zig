@@ -276,7 +276,8 @@ pub fn advanceParamCursors(
         if (gpr_index.* < 6) gpr_index.* += 1 else stack_eightbytes.* += 1;
         return;
     }
-    if (isScalarSseAbiType(ty)) {
+    if (isScalarSseAbiType(ty) or isVector128AbiType(ty)) {
+        if (isVector128AbiType(ty) and sse_index.* >= 8) return error.UnsupportedCodegenValue;
         if (sse_index.* < 8) sse_index.* += 1 else stack_eightbytes.* += 1;
         return;
     }
@@ -438,9 +439,10 @@ fn planCallWithFunction(allocator: std.mem.Allocator, function: ?ir.Function, ca
             plan.counts.gpr_args += 1;
             continue;
         }
-        if (isScalarSseAbiType(arg.ty)) {
+        if (isScalarSseAbiType(arg.ty) or isVector128AbiType(arg.ty)) {
             plan.has_non_i32_arg = true;
             if (fp_arg_index >= 8) {
+                if (isVector128AbiType(arg.ty)) return error.UnsupportedVectorAbi;
                 if (arg.ty == .half) return error.UnsupportedCodegenType;
                 const assignment: CallArgAssignment = switch (arg.value) {
                     .fp => |text| if (arg.ty.eql(.float))
@@ -497,7 +499,7 @@ pub fn planReturn(ret_ty: ir.Type) !CallPlanCounts {
     if (isScalarGprAbiType(ret_ty)) {
         return .{ .gpr_returns = 1 };
     }
-    if (isScalarSseAbiType(ret_ty)) {
+    if (isScalarSseAbiType(ret_ty) or isVector128AbiType(ret_ty)) {
         return .{ .sse_returns = 1 };
     }
     if (isAggregateType(ret_ty)) {
@@ -513,10 +515,19 @@ pub fn isScalarSseAbiType(ty: ir.Type) bool {
     return ty == .half or ty == .float or ty == .double;
 }
 
+/// Native 128-bit SysV vector values occupy one complete XMM register.
+/// Stack vectors and aggregates containing vectors remain separate boundaries.
+pub fn isVector128AbiType(ty: ir.Type) bool {
+    if (ty != .vector) return false;
+    const v = ty.vector;
+    return (v.len == 4 and (v.elem_ty == .float or (v.elem_ty == .int and v.elem_ty.int == 32))) or
+        (v.len == 2 and (v.elem_ty == .double or (v.elem_ty == .int and v.elem_ty.int == 64)));
+}
+
 pub fn callHasScalarSseType(call: ir.CallInst) bool {
-    if (isScalarSseAbiType(call.ret_ty)) return true;
+    if (isScalarSseAbiType(call.ret_ty) or isVector128AbiType(call.ret_ty)) return true;
     for (call.args.items) |arg| {
-        if (isScalarSseAbiType(arg.ty)) return true;
+        if (isScalarSseAbiType(arg.ty) or isVector128AbiType(arg.ty)) return true;
     }
     return false;
 }
@@ -525,6 +536,11 @@ pub fn entryXmmDefinedBits(function: ir.Function) [8]u16 {
     var result: [8]u16 = @splat(0);
     var xmm_index: usize = 0;
     for (function.params.items) |param| {
+        if (isVector128AbiType(param.ty)) {
+            if (xmm_index < result.len) result[xmm_index] = 128;
+            xmm_index += 1;
+            continue;
+        }
         if (isScalarSseAbiType(param.ty)) {
             if (xmm_index < result.len) result[xmm_index] = if (param.ty == .half) 16 else if (param.ty == .float) 32 else 64;
             xmm_index += 1;
@@ -645,7 +661,7 @@ fn rejectUnsupportedAbiAttrPayload(attrs: []const u8) !void {
             return error.UnsupportedPackedAggregateAbi;
         }
         if (attrsContainVectorAbiPayload(attrs, name)) {
-            return error.UnsupportedVectorAbi;
+            if (!std.mem.eql(u8, name, "sret") or !boundedVectorSret(attrs)) return error.UnsupportedVectorAbi;
         }
         if (attrsContainLongDoubleAbiPayload(attrs, name)) {
             return error.UnsupportedLongDoubleAbi;
@@ -750,6 +766,13 @@ fn attrsContainVectorAbiPayload(attrs: []const u8, name: []const u8) bool {
     return std.mem.indexOfScalar(u8, payload, '<') != null;
 }
 
+fn boundedVectorSret(attrs: []const u8) bool {
+    const payload = abiAttrPayload(attrs, "sret") orelse return false;
+    const parsed = @import("../../ir/parser_helpers.zig").parseLeadingType(payload) catch return false;
+    if (!std.mem.startsWith(u8, std.mem.trimStart(u8, parsed.after, " \t"), ")")) return false;
+    return @import("generic_cfg/storage_layout.zig").query(null, parsed.ty) != null;
+}
+
 fn attrsContainLongDoubleAbiPayload(attrs: []const u8, name: []const u8) bool {
     const payload = abiAttrPayload(attrs, name) orelse return false;
     return std.mem.indexOf(u8, payload, "x86_fp80") != null or std.mem.indexOf(u8, payload, "fp128") != null;
@@ -769,6 +792,7 @@ fn abiAttrPayload(attrs: []const u8, name: []const u8) ?[]const u8 {
 }
 
 pub fn rejectUnsupportedAbiType(ty: ir.Type) !void {
+    if (isVector128AbiType(ty)) return;
     if (air_capabilities.boundaryForIrType(ty)) |boundary| {
         return switch (boundary) {
             .vector => error.UnsupportedVectorAbi,

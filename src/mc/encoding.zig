@@ -173,6 +173,17 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .push_arg => |reg| try encodePushArg(&bytes, allocator, reg),
             .pop_arg => |reg| try encodePopArg(&bytes, allocator, reg),
             .push_rax => try bytes.append(allocator, 0x50),
+            .linux_syscall => |count| {
+                if (count > 6) return error.UnsupportedCodegenInstruction;
+                if (count >= 4) try bytes.appendSlice(allocator, &.{ 0x49, 0x89, 0xca });
+                try bytes.appendSlice(allocator, &.{ 0x0f, 0x05 });
+            },
+            .register_snapshot_rdi => {
+                for ([_]u8{ 0, 2, 1, 3, 6, 7, 5, 4, 8, 9, 10, 11, 12, 13, 14, 15 }, 0..) |reg, index| {
+                    try bytes.appendSlice(allocator, &.{ @as(u8, 0x48) | (if (reg >= 8) @as(u8, 4) else 0), 0x89, 0x47 | ((reg & 7) << 3), @intCast(index * 8) });
+                }
+                try bytes.appendSlice(allocator, &.{ 0x48, 0x8d, 0x05, 0, 0, 0, 0, 0x48, 0x89, 0x87, 0x80, 0, 0, 0 });
+            },
             .push_xmm64 => |reg| try encodePushXmm64(&bytes, allocator, reg),
             .push_byval_tail_arg_ptr => |copy| try encodePushByvalTailArgPtr(&bytes, allocator, copy.reg, copy.offset, copy.len),
             .push_byval_tail_stack_ptr => |copy| try encodePushByvalTailStackPtr(&bytes, allocator, copy.stack_disp, copy.offset, copy.len),
@@ -1775,6 +1786,11 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try appendI32(&bytes, allocator, 0);
             },
             .indirect_call_rax => try bytes.appendSlice(allocator, &.{ 0xff, 0xd0 }),
+            .indirect_jump => |jump| {
+                if (jump.reg == .r8 or jump.reg == .r9) try bytes.append(allocator, 0x41);
+                const code: u8 = switch (jump.reg) { .rdi => 7, .rsi => 6, .rdx => 2, .rcx => 1, .r8 => 0, .r9 => 1 };
+                try bytes.appendSlice(allocator, &.{ 0xff, 0xe0 | code });
+            },
             .cmp_arg8_imm8 => |cmp| try encodeCmp8Imm(&bytes, allocator, cmp.reg, cmp.imm),
             .test_arg8 => |reg| try encodeTest8(&bytes, allocator, reg),
             .test_arg32 => |reg| try encodeTest32(&bytes, allocator, reg),
@@ -1898,6 +1914,8 @@ fn fcmpResultSize(predicate: ir.FcmpPredicate) u32 {
 
 pub fn instructionSize(instruction: x86_64.Instruction) u32 {
     return switch (instruction) {
+        .linux_syscall => |count| if (count >= 4) 5 else 2,
+        .register_snapshot_rdi => 78,
         .label => 0,
         .mov_imm_eax => 5,
         .mov_imm_rax => 10,
@@ -2277,6 +2295,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .direct_call, .noreturn_direct_call => 5,
         .direct_jump => 5,
         .indirect_call_rax => 2,
+        .indirect_jump => |jump| if (jump.reg == .r8 or jump.reg == .r9) 3 else 2,
         .cmp_arg8_imm8 => |cmp| if (cmp.reg.needsRex8()) 4 else 3,
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
         .test_arg32 => |reg| if (reg.rexR()) 3 else 2,

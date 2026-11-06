@@ -16,7 +16,7 @@ fn operation(call: ir.CallInst) ?Operation {
         call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.callee_function_ty != null or
         call.calling_conv != null or call.ret_attrs != null or call.args.items.len != 2) return null;
     const ty = call.args.items[0].ty;
-    if (ty != .int or ty.int == 0 or (ty.int > 32 and ty.int != 64)) return null;
+    if (ty != .int or ty.int == 0 or (ty.int > 65 and ty.int != 96 and ty.int != 128)) return null;
     var buffer: [80]u8 = undefined;
     const pair = std.fmt.bufPrint(&buffer, "{{i{d},i1}}", .{ty.int}) catch return null;
     if (!pairs.spelling(call.ret_ty.aggregate, pair)) return null;
@@ -24,14 +24,20 @@ fn operation(call: ir.CallInst) ?Operation {
     for (call.args.items) |arg| {
         if (!arg.ty.eql(ty) or arg.attrs != null or (arg.value != .named and arg.value != .int)) return null;
         if (arg.value == .named and std.mem.startsWith(u8, arg.value.named, "@")) return null;
-        if (arg.value == .int and (arg.value.int < -(@as(i128, 1) << @as(u7, @intCast(ty.int - 1))) or
+        if (arg.value == .int and ty.int < 128 and (arg.value.int < -(@as(i128, 1) << @as(u7, @intCast(ty.int - 1))) or
             arg.value.int >= (@as(i128, 1) << @as(u7, @intCast(ty.int))))) return null;
     }
     for ([_][]const u8{ "uadd", "usub", "umul", "sadd", "ssub", "smul" }, [_]ir.BinaryOp{ .add, .sub, .mul, .add, .sub, .mul }) |name, op| {
         const spelling = std.fmt.bufPrint(&buffer, "llvm.{s}.with.overflow.i{d}", .{ name, ty.int }) catch return null;
         if (std.mem.eql(u8, call.callee, spelling)) {
             const signed = name[0] == 's';
-            if (ty.int == 64 and op == .mul) return null;
+            if (ty.int >= 64 and op == .mul) {
+                // A positive constant divisor allows an exact round-trip
+                // overflow check after wrapping multiplication. General wide
+                // products still require an independently lowered high half.
+                const rhs = call.args.items[1].value;
+                if (ty.int != 128 or rhs != .int or rhs.int < 1 or rhs.int > std.math.maxInt(u32)) return null;
+            }
             return .{ .op = op, .signed = signed, .bits = ty.int };
         }
     }
@@ -43,6 +49,7 @@ const Builder = struct {
     function: ir.Function,
     block: *ir.BasicBlock,
     serial: *usize,
+    carrier: ir.Type = word,
 
     fn emit(self: Builder, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
         const name = try forms.temporary(self.allocator, self.function, self.serial);
@@ -51,7 +58,7 @@ const Builder = struct {
     }
 
     fn literal(self: Builder, value: i128) !ir.Value {
-        return self.emit(.{ .binary = .{ .op = .add, .ty = word, .lhs = .{ .int = value }, .rhs = .{ .int = 0 } } });
+        return self.emit(.{ .binary = .{ .op = .add, .ty = self.carrier, .lhs = .{ .int = value }, .rhs = .{ .int = 0 } } });
     }
 
     fn extend(self: Builder, op: Operation, value: ir.Value) !ir.Value {
@@ -61,11 +68,11 @@ const Builder = struct {
             const bits = value.int & mask;
             return self.literal(if (op.signed) (bits ^ sign) - sign else bits);
         }
-        var result = try self.emit(.{ .cast = .{ .op = .zext, .from_ty = .{ .int = op.bits }, .value = value, .to_ty = word } });
+        var result = try self.emit(.{ .cast = .{ .op = .zext, .from_ty = .{ .int = op.bits }, .value = value, .to_ty = self.carrier } });
         if (op.signed) {
             const sign = try self.literal(@as(i128, 1) << @as(u7, @intCast(op.bits - 1)));
-            result = try self.emit(.{ .binary = .{ .op = .xor, .ty = word, .lhs = result, .rhs = sign } });
-            result = try self.emit(.{ .binary = .{ .op = .sub, .ty = word, .lhs = result, .rhs = sign } });
+            result = try self.emit(.{ .binary = .{ .op = .xor, .ty = self.carrier, .lhs = result, .rhs = sign } });
+            result = try self.emit(.{ .binary = .{ .op = .sub, .ty = self.carrier, .lhs = result, .rhs = sign } });
         }
         return result;
     }
@@ -73,20 +80,20 @@ const Builder = struct {
     fn narrowPair(self: Builder, inst: ir.Instruction, entry: Entry) !void {
         const lhs = try self.extend(entry.operation, inst.kind.call.args.items[0].value);
         const rhs = try self.extend(entry.operation, inst.kind.call.args.items[1].value);
-        // Up to 32-bit operands have an exact signed product and an exact
-        // unsigned product in 64 bits. Unsigned subtraction wraps only below
-        // zero. A narrow round trip therefore detects every overflow.
-        const full = try self.emit(.{ .binary = .{ .op = entry.operation.op, .ty = word, .lhs = lhs, .rhs = rhs } });
+        // Products through i32 fit in i64, and products through i63 plus
+        // i65/i96 sums and differences fit in i128. Unsigned subtraction wraps
+        // only below zero, so a narrow round trip detects every overflow.
+        const full = try self.emit(.{ .binary = .{ .op = entry.operation.op, .ty = self.carrier, .lhs = lhs, .rhs = rhs } });
         try self.block.instructions.append(self.allocator, .{ .result = entry.wrapped, .metadata = inst.metadata, .kind = .{ .cast = .{
             .op = .trunc,
-            .from_ty = word,
+            .from_ty = self.carrier,
             .value = full,
             .to_ty = .{ .int = entry.operation.bits },
         } } });
         const round_trip = try self.extend(entry.operation, .{ .named = entry.wrapped });
         try self.block.instructions.append(self.allocator, .{ .result = entry.overflow, .kind = .{ .icmp = .{
             .predicate = .ne,
-            .operand_ty = word,
+            .operand_ty = self.carrier,
             .lhs = full,
             .rhs = round_trip,
         } } });
@@ -105,8 +112,8 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
             .wrapped = try forms.temporary(allocator, function, &serial),
             .overflow = try forms.temporary(allocator, function, &serial),
             .wide_overflow = try forms.temporary(allocator, function, &serial),
-            .literal = if (op.bits == 64 and inst.kind.call.args.items[1].value == .int) try forms.temporary(allocator, function, &serial) else null,
-            .lhs_literal = if (op.bits == 64 and inst.kind.call.args.items[0].value == .int) try forms.temporary(allocator, function, &serial) else null,
+            .literal = if ((op.bits == 64 or op.bits == 128) and inst.kind.call.args.items[1].value == .int) try forms.temporary(allocator, function, &serial) else null,
+            .lhs_literal = if ((op.bits == 64 or op.bits == 128) and inst.kind.call.args.items[0].value == .int) try forms.temporary(allocator, function, &serial) else null,
         });
     };
     if (names.count() == 0) return null;
@@ -136,13 +143,14 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         for (original.instructions.items) |inst| {
             if (!inst.removed) {
                 if (inst.kind == .call and inst.result != null) if (names.get(inst.result.?)) |entry| {
-                    if (entry.operation.bits < 64) {
-                        try (Builder{ .allocator = allocator, .function = function, .block = &block, .serial = &serial }).narrowPair(inst, entry);
+                    if (entry.operation.bits != 64 and entry.operation.bits != 128) {
+                        try (Builder{ .allocator = allocator, .function = function, .block = &block, .serial = &serial, .carrier = if (entry.operation.bits > 32) .{ .int = 128 } else word }).narrowPair(inst, entry);
                     } else {
+                        const full: ir.Type = .{ .int = entry.operation.bits };
                         const original_lhs = inst.kind.call.args.items[0].value;
                         if (entry.lhs_literal) |literal| try block.instructions.append(allocator, .{ .result = literal, .kind = .{ .binary = .{
                             .op = .add,
-                            .ty = word,
+                            .ty = full,
                             .lhs = original_lhs,
                             .rhs = .{ .int = 0 },
                         } } });
@@ -150,7 +158,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         const original_rhs = inst.kind.call.args.items[1].value;
                         if (entry.literal) |literal| try block.instructions.append(allocator, .{ .result = literal, .kind = .{ .binary = .{
                             .op = .add,
-                            .ty = word,
+                            .ty = full,
                             .lhs = original_rhs,
                             .rhs = .{ .int = 0 },
                         } } });
@@ -158,29 +166,37 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         // Wrapping arithmetic is defined on both overflow paths.
                         try block.instructions.append(allocator, .{ .result = entry.wrapped, .metadata = inst.metadata, .kind = .{ .binary = .{
                             .op = entry.operation.op,
-                            .ty = word,
+                            .ty = full,
                             .lhs = lhs,
                             .rhs = rhs,
                         } } });
-                        if (entry.operation.signed) {
-                            const builder: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
-                            const changed_sign = try builder.emit(.{ .binary = .{ .op = .xor, .ty = word, .lhs = lhs, .rhs = .{ .named = entry.wrapped } } });
+                        const builder: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial, .carrier = full };
+                        if (entry.operation.op == .mul) {
+                            const round_trip = try builder.emit(.{ .binary = .{
+                                .op = if (entry.operation.signed) .sdiv else .udiv,
+                                .ty = full,
+                                .lhs = .{ .named = entry.wrapped },
+                                .rhs = original_rhs,
+                            } });
+                            try block.instructions.append(allocator, .{ .result = entry.overflow, .kind = .{ .icmp = .{ .predicate = .ne, .operand_ty = full, .lhs = round_trip, .rhs = lhs } } });
+                        } else if (entry.operation.signed) {
+                            const changed_sign = try builder.emit(.{ .binary = .{ .op = .xor, .ty = full, .lhs = lhs, .rhs = .{ .named = entry.wrapped } } });
                             const other_sign = try builder.emit(.{ .binary = .{
                                 .op = .xor,
-                                .ty = word,
+                                .ty = full,
                                 .lhs = if (entry.operation.op == .add) rhs else lhs,
                                 .rhs = if (entry.operation.op == .add) .{ .named = entry.wrapped } else rhs,
                             } });
-                            const both = try builder.emit(.{ .binary = .{ .op = .@"and", .ty = word, .lhs = changed_sign, .rhs = other_sign } });
+                            const both = try builder.emit(.{ .binary = .{ .op = .@"and", .ty = full, .lhs = changed_sign, .rhs = other_sign } });
                             try block.instructions.append(allocator, .{ .result = entry.overflow, .kind = .{ .icmp = .{
                                 .predicate = .slt,
-                                .operand_ty = word,
+                                .operand_ty = full,
                                 .lhs = both,
                                 .rhs = .{ .int = 0 },
                             } } });
                         } else try block.instructions.append(allocator, .{ .result = entry.overflow, .kind = .{ .icmp = .{
                             .predicate = .ult,
-                            .operand_ty = word,
+                            .operand_ty = full,
                             .lhs = if (entry.operation.op == .add) .{ .named = entry.wrapped } else lhs,
                             .rhs = if (entry.operation.op == .add) lhs else rhs,
                         } } });
@@ -202,7 +218,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         .to_ty = .{ .int = entry.operation.bits },
                     } } else if (std.mem.eql(u8, inst.kind.extractvalue.indices, "0")) .{ .binary = .{
                         .op = .add,
-                        .ty = word,
+                        .ty = .{ .int = entry.operation.bits },
                         .lhs = .{ .named = entry.wrapped },
                         .rhs = .{ .int = 0 },
                     } } else .{ .icmp = .{

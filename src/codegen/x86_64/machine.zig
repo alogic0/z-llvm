@@ -12,6 +12,13 @@ pub const ReadOnlyModuleContext = types.ReadOnlyModuleContext;
 
 pub const Instruction = union(enum) {
     label: []const u8,
+    // RAX is the syscall number/result. Arguments use the ordinary six GPR
+    // homes; encoding moves the fourth from RCX to R10. RCX/R11/flags and
+    // memory are clobbered. R10 is also written when arguments >= 4.
+    linux_syscall: u3,
+    // Reads all GPRs, writes 17 words through RDI (DWARF register order),
+    // and defines RAX with the captured instruction pointer.
+    register_snapshot_rdi,
     mov_imm_eax: i32,
     mov_imm_rax: i64,
     mov_imm_rdi: i64,
@@ -781,6 +788,9 @@ pub const Instruction = union(enum) {
     jae: []const u8,
     jle: []const u8,
     jmp: []const u8,
+    /// Reads one explicit GPR and transfers to a declared local successor.
+    /// Preserves registers, flags and the stack frame.
+    indirect_jump: struct { reg: ArgReg, targets: []const []const u8 },
     syscall,
     ud2,
     ret,

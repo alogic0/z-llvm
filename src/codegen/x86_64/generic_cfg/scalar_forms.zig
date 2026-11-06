@@ -19,6 +19,7 @@ pub fn temporary(allocator: std.mem.Allocator, function: ir.Function, serial: *u
             };
         }
         if (!collision) return name;
+        allocator.free(name);
     }
 }
 

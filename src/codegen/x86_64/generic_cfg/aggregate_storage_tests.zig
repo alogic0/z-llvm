@@ -29,6 +29,8 @@ test "aggregate storage layouts include nested packed fields and reject incomple
         .{ .text = "[3 x { i8, i32 }]", .bytes = 24, .alignment = 4 },
         .{ .text = "{ i8, [2 x i24] }", .bytes = 12, .alignment = 4 },
         .{ .text = "[32 x i64]", .bytes = 256, .alignment = 8 },
+        .{ .text = "{ <2 x i64> }", .bytes = 16, .alignment = 16 },
+        .{ .text = "[4 x <4 x i32>]", .bytes = 64, .alignment = 16 },
         .{ .text = "[8192 x i64]", .bytes = 65536, .alignment = 8 },
         .{ .text = "[0 x i8]", .bytes = 0, .alignment = 1 },
         .{ .text = "{ double }", .bytes = 8, .alignment = 8 },
@@ -36,7 +38,7 @@ test "aggregate storage layouts include nested packed fields and reject incomple
         .{ .text = "<{ i8, half, float, double, fp128 }>", .bytes = 31, .alignment = 1 },
     };
     for (cases) |case| try std.testing.expectEqualDeep(storage.Layout{ .bytes = case.bytes, .alignment = case.alignment }, storage.query(&context, .{ .aggregate = case.text }).?);
-    for ([_][]const u8{ "%Cycle", "%Duplicate", "%Missing", "{ i64, %Missing }", "{ i64, }", "{ i64 } junk", "{ i64", "[8193 x i64]", "[4294967295 x i128]", "<{ i8, ptr addrspace(1) }>", "{ <2 x i64> }" }) |text|
+    for ([_][]const u8{ "%Cycle", "%Duplicate", "%Missing", "{ i64, %Missing }", "{ i64, }", "{ i64 } junk", "{ i64", "[8193 x i64]", "[4294967295 x i128]", "<{ i8, ptr addrspace(1) }>", "{ <4 x i64> }" }) |text|
         try std.testing.expect(storage.query(&context, .{ .aggregate = text }) == null);
     context.target_datalayout = "e-a:64";
     try std.testing.expectEqualDeep(storage.Layout{ .bytes = 8, .alignment = 8 }, storage.query(&context, .{ .aggregate = "{ i8 }" }).?);
@@ -47,6 +49,8 @@ test "aggregate storage layouts include nested packed fields and reject incomple
     }
     context.target_datalayout = "e-f80:128-f128:128:128";
     try std.testing.expectEqualDeep(storage.Layout{ .bytes = 32, .alignment = 16 }, storage.query(&context, .{ .aggregate = "{ x86_fp80, fp128 }" }).?);
+    context.target_datalayout = "e-v128:64";
+    try std.testing.expect(storage.query(&context, .{ .aggregate = "[4 x <4 x i32>]" }) == null);
 }
 
 test "bounded storage executes narrow odd and large objects without changing adjacent values" {
@@ -125,7 +129,7 @@ test "bounded storage rejects huge frame arithmetic and unsupported stack alignm
     try std.testing.expect(helpers.alignedCallFrameBytes(std.math.maxInt(u32)) == null);
     try std.testing.expect(helpers.alignedCallFrameBytes(std.math.maxInt(u32) - 7) == null);
     for ([_][]const u8{
-        "[262144 x i32], align 4", "[1073741823 x i32], align 4", "[4294967295 x i32], align 4", "i64, align 32", "[1 x i32], align 2147483648",
+        "[262144 x i32], align 4", "[1073741823 x i32], align 4", "[4294967295 x i32], align 4", "i64, align 8192", "[1 x i32], align 2147483648",
     }) |allocation| {
         const text = try std.fmt.allocPrint(std.testing.allocator, "define i32 @large() {{\nentry:\n  %slot = alloca {s}\n  store i32 7, ptr %slot\n  ret i32 7\n}}\n", .{allocation});
         defer std.testing.allocator.free(text);

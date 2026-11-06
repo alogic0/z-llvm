@@ -194,10 +194,11 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
             gpr_index += 1;
             continue;
         }
-        if (param.ty == .half or param.ty == .float or param.ty == .double) {
+        const vector_shape = selector_vector.abiShape(param.ty);
+        if (param.ty == .half or param.ty == .float or param.ty == .double or vector_shape != null) {
             const reg = XmmReg.fromIndex(xmm_index) catch return .{ .unsupported_value = "composed-block-param-xmm-reg" };
-            const bits: u16 = if (param.ty == .half) 16 else if (param.ty == .float) 32 else 64;
-            try selector_state.bindValueLoc(selector, param.name, .{ .xmm = .{ .reg = reg, .bits = bits } });
+            const bits: u16 = if (vector_shape != null) 128 else if (param.ty == .half) 16 else if (param.ty == .float) 32 else 64;
+            try selector_state.bindValueLoc(selector, param.name, .{ .xmm = .{ .reg = reg, .bits = bits, .shape = if (vector_shape) |shape| .{ .vector = shape } else .scalar } });
             selector.machine.entry_xmm_defined_bits[@backingInt(reg)] = bits;
             xmm_index += 1;
             continue;

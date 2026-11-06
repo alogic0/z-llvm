@@ -6,6 +6,12 @@ const MachineFunction = machine_ir.MachineFunction;
 
 pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
+        .indirect_jump => |jump| {
+            if (jump.targets.len == 0) return error.InvalidBranchTarget;
+            for (jump.targets) |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget;
+        },
+        .linux_syscall => |count| if (count > 6) return error.UnsupportedCodegenInstruction,
+        .register_snapshot_rdi => {},
         .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget,
         .push_byval_tail_arg_ptr => |copy| try validateByvalTail(copy.offset, copy.len),
         .push_byval_tail_stack_ptr => |copy| try validateByvalTail(copy.offset, copy.len),
@@ -485,6 +491,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         }
         recordXmmDefinitions(instruction, &xmm_defined_bits);
         switch (instruction) {
+            .linux_syscall, .register_snapshot_rdi => eax_defined = true,
+            .indirect_jump => saw_terminator = true,
             .label => |label| {
                 eax_defined_before_label = eax_defined;
                 xmm0_defined_before_label = xmm0_defined;
@@ -542,7 +550,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             },
             .direct_call => |call| {
                 if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
-                const call_returns_scalar_sse = sysv_abi.isScalarSseAbiType(call.ret_ty);
+                const call_returns_scalar_sse = sysv_abi.isScalarSseAbiType(call.ret_ty) or sysv_abi.isVector128AbiType(call.ret_ty);
                 eax_defined = function.ret_ty == .void or (!call_returns_scalar_sse and call.ret_ty != .void);
                 if (call_returns_scalar_sse) xmm0_defined = true;
             },
@@ -702,7 +710,9 @@ pub fn verifyFunction(function: MachineFunction) !void {
             },
             .mov_arg_arg, .mov_arg64_arg, .xor_edx_edx, .shl_rdx_imm6, .shl_rcx_imm6, .shl_r8_imm6, .or_rcx_rax, .or_rcx_rdx, .add_rcx_imm32, .add_r8_rcx, .sub_r8_rcx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .store_eax_rdi_rcx4_ptr, .store_al_rcx_ptr, .store_ax_rcx_ptr, .store_eax_rcx_ptr, .store_rax_rcx_ptr, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rcx, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .stack_probe_rax_rcx_rsp, .spinlocked_memcpy_rsi_to_rdx_len_edi, .spinlocked_store_i128_rdi_rsi_rdx, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .inc_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_arg64_arg_ptr_disp32, .store_rax_arg_ptr_disp8, .store_rax_arg_ptr_disp32, .store_eax_arg_ptr_disp8, .store_eax_arg_ptr_disp32, .store_al_arg_ptr_disp8, .store_al_arg_ptr_disp32, .store_ax_arg_ptr_disp8, .store_ax_arg_ptr_disp32, .store_xmm0_arg_ptr_disp8, .store_xmm0_arg_ptr_disp32, .store_xmm0_f32_arg_ptr_disp8, .store_xmm0_f32_arg_ptr_disp32, .store_imm8_arg_ptr_disp8, .load_stack_disp8_xmm, .load_stack_disp32_xmm, .load_stack_disp8_xmm_f32, .load_stack_disp32_xmm_f32, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomiss, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .syscall, .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => {},
             .ret => {
-                if (returns_scalar_sse) {
+                if (sysv_abi.isVector128AbiType(function.ret_ty)) {
+                    if (xmm_defined_bits[0] < 128) return error.ReturnRegisterUndefined;
+                } else if (returns_scalar_sse) {
                     if (!xmm0_defined) return error.ReturnRegisterUndefined;
                 } else if (aggregate_return_kind) |kind| {
                     switch (kind) {
@@ -749,7 +759,7 @@ fn finalReturnJoin(function: MachineFunction) ?usize {
 
 fn fallsThrough(instruction: machine_ir.Instruction) bool {
     return switch (instruction) {
-        .jmp, .ret, .ud2, .direct_jump, .noreturn_direct_call => false,
+        .jmp, .indirect_jump, .ret, .ud2, .direct_jump, .noreturn_direct_call => false,
         else => true,
     };
 }
@@ -770,6 +780,9 @@ const ReturnDefinitions = struct {
 
 fn recordXmmDefinitions(instruction: machine_ir.Instruction, defined_bits: *[8]u16) void {
     switch (instruction) {
+        .direct_call => |call| if (sysv_abi.isVector128AbiType(call.ret_ty)) {
+            defined_bits[0] = 128;
+        },
         .wide_int_to_fp_rdi_rsi_xmm0 => |conversion| defined_bits[0] = conversion.to_bits,
         .mov_imm32_xmm0 => defined_bits[0] = 32,
         .mov_imm32_xmm1 => defined_bits[1] = 32,
@@ -784,6 +797,18 @@ fn recordXmmDefinitions(instruction: machine_ir.Instruction, defined_bits: *[8]u
             const src = @intFromEnum(unpack.src);
             defined_bits[dst] = if (defined_bits[dst] >= 32 and defined_bits[src] >= 32) 64 else 0;
         },
+        .unpcklpd_xmm => |unpack| {
+            const dst = @intFromEnum(unpack.dst);
+            const src = @intFromEnum(unpack.src);
+            defined_bits[dst] = if (defined_bits[dst] >= 64 and defined_bits[src] >= 64) 128 else 0;
+        },
+        .unpckhpd_xmm => |unpack| {
+            const dst = @intFromEnum(unpack.dst);
+            const src = @intFromEnum(unpack.src);
+            defined_bits[dst] = if (defined_bits[dst] >= 128 and defined_bits[src] >= 128) 128 else 0;
+        },
+        .load_f128_arg_ptr_xmm0, .load_f128_const_xmm0 => defined_bits[0] = 128,
+        .load_f128_const_xmm1 => defined_bits[1] = 128,
         .reload_xmm32_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 32,
         .reload_xmm64_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 64,
         .reload_xmm128_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 128,
@@ -818,6 +843,7 @@ fn recordXmmDefinitions(instruction: machine_ir.Instruction, defined_bits: *[8]u
 
 fn hasLabel(function: MachineFunction, name: []const u8) bool {
     for (function.instructions.items) |instruction| switch (instruction) {
+        .linux_syscall, .register_snapshot_rdi, .indirect_jump => {},
         .label => |label_name| if (std.mem.eql(u8, label_name, name)) return true,
         .mov_imm_eax,
         .mov_imm_rax,

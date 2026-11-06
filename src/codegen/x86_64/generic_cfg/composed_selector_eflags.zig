@@ -124,6 +124,8 @@ pub fn instructionEffect(instruction: Instruction) Effect {
         else => {},
     }
     return switch (instruction) {
+        .indirect_jump => .preserve,
+        .linux_syscall, .register_snapshot_rdi => .clobber,
         .cmp_r8d_arg32, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rcx, .cmp_rdx_rdi, .cmp_rax_rdx, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .ucomisd, .ucomiss, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64 => .definition,
         .setb_eax, .seta_eax, .sete_eax, .setg_eax, .setl_eax, .setne_eax, .setbe_eax, .je, .jne, .jo, .jc, .jp, .js, .jae, .jle => .use,
         .sbb_arg64_rax, .adc_rax_imm0 => .use_and_definition,
@@ -281,6 +283,11 @@ fn effectAt(instructions: []const Instruction, effects: ?[]const Effect, index: 
 fn successorLive(instructions: []const Instruction, live_in: []const bool, index: usize) !bool {
     const instruction = instructions[index];
     return switch (instruction) {
+        .indirect_jump => |jump| blk: {
+            var live = false;
+            for (jump.targets) |target| live = live or live_in[try requireLabelIndex(instructions, target)];
+            break :blk live;
+        },
         .jmp => |target| live_in[try requireLabelIndex(instructions, target)],
         .je, .jne, .jo, .jc, .jp, .js, .jae, .jle => |target| blk: {
             const fallthrough = if (index + 1 < instructions.len) live_in[index + 1] else false;
@@ -301,6 +308,9 @@ fn propagateToSuccessors(
 ) !void {
     const instruction = instructions[index];
     switch (instruction) {
+        .indirect_jump => |jump| for (jump.targets) |target| {
+            propagate(try requireLabelIndex(instructions, target), undefined_out, reachable, undefined_in, changed);
+        },
         .jmp => |target| propagate(
             try requireLabelIndex(instructions, target),
             undefined_out,

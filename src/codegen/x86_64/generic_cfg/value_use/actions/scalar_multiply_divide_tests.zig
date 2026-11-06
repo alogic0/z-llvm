@@ -661,3 +661,64 @@ test "unsigned quotient rollback is exact at every declared failure boundary" {
         try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
     }
 }
+
+test "unsigned quotient executes RCX dividend and accumulator divisor with final uses and live aliases" {
+    const encoding = @import("../../../../../mc/encoding.zig");
+    for ([_]u16{ 32, 64 }) |bits| for ([_]bool{ false, true }) |live| {
+        var output = MachineFunction.init("quotient-overlap", .{ .int = bits });
+        defer output.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try installPlan(&plan, 1, 1);
+        if (live) {
+            try plan.interval_ends.put("lhs-alias", 10);
+            try plan.interval_ends.put("rhs-alias", 10);
+        }
+        var state = ComposedBlockSelector.init(std.testing.allocator, &output);
+        defer state.deinit();
+        state.allocation_plan = &plan;
+        state.current_position = 1;
+        state.stack_frame_bytes = 136;
+        const lhs: ValueLoc = if (bits == 64) .{ .arg64 = .rcx } else .{ .arg32 = .rcx };
+        const rhs: ValueLoc = if (bits == 64) .rax else .eax;
+        try selector_state.bindValueLoc(&state, "lhs", lhs);
+        try selector_state.bindValueLoc(&state, "rhs", rhs);
+        if (live) {
+            try selector_state.bindValueLoc(&state, "lhs-alias", lhs);
+            try selector_state.bindValueLoc(&state, "rhs-alias", rhs);
+        }
+        try output.instructions.appendSlice(std.testing.allocator, &.{
+            .{ .sub_rsp_imm32 = 136 },
+            .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } },
+            .{ .mov_arg_rax = .rsi },
+        });
+        var transaction = try Transaction.begin(&state);
+        defer transaction.deinit();
+        const handles = try registerQuotient(&transaction, bits);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try transaction.executePreparedAction(try transaction.preparedView(handles.lhs));
+        try transaction.commit();
+        if (live) {
+            try selector_state.emitBinaryLocIntoAccumulator(&state, .xor, selector_state.valueLoc(&state, "lhs-alias").?, bits);
+            try selector_state.emitBinaryLocIntoAccumulator(&state, .xor, selector_state.valueLoc(&state, "rhs-alias").?, bits);
+        }
+        try output.instructions.appendSlice(std.testing.allocator, &.{ .{ .add_rsp_imm32 = 136 }, .ret });
+        const bytes = try encoding.encodeFunction(std.testing.allocator, output);
+        defer std.testing.allocator.free(bytes);
+        const memory = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..bytes.len], bytes);
+        const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+        const values = [_]u64{ 0, 1, 2, 3, 0x7fff_ffff, 0x8000_0000, 0xffff_ffff, 0x7fff_ffff_ffff_ffff, 0x8000_0000_0000_0000, 0xffff_ffff_0000_0001, 0xffff_ffff_ffff_ffff };
+        for (values) |a| for (values) |b| {
+            const mask: u64 = if (bits == 64) std.math.maxInt(u64) else 0xffff_ffff;
+            const x = a & mask;
+            const y = b & mask;
+            if (y == 0) continue;
+            const wanted = (x / y) ^ (if (live) x ^ y else @as(u64, 0));
+            try std.testing.expectEqual(wanted, run(a, b));
+        };
+    };
+}

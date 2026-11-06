@@ -2110,16 +2110,18 @@ pub fn emitBinaryLocIntoAccumulator(selector: *ComposedBlockSelector, op: Machin
 pub fn emitPairLshrImmediate(selector: *ComposedBlockSelector, result_name: []const u8, value: ir.Value, amount: u7) !void {
     if (amount > 127) return error.UnsupportedCodegenValue;
     const existing = resolvePairValue(selector, value);
-    const dst = if (existing) |src|
-        try choosePairScratch(selector, src) orelse return error.UnsupportedCodegenValue
-    else
-        try choosePairScratch(selector, null) orelse return error.UnsupportedCodegenValue;
+    const dst = (try choosePairScratch(selector, existing)) orelse
+        (try choosePairScratchForClobber(selector, existing)) orelse return error.UnsupportedCodegenValue;
     const src = if (existing) |src| src else try materializePairValue(selector, value, dst);
     switch (amount) {
         0 => {
             try emitPairIntoScratch(selector, src, dst);
         },
         64 => {
+            // The destination can contain live scalar aliases when a frame
+            // provides spill homes. Preserve both words before either write.
+            try clobberArgReg(selector, dst.lo);
+            try clobberArgReg(selector, dst.hi);
             try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = dst.lo, .src = src.hi } });
             try emitZeroArg64(selector, dst.hi);
         },
@@ -2465,6 +2467,22 @@ pub fn preserveCallArgumentSources(selector: *ComposedBlockSelector, call: ir.Ca
             .eax, .rax, .arg32, .arg64, .scratch32, .scratch64, .readonly_table_ptr => {
                 if (try spillValue(selector, arg.value.named)) |diagnostic| return diagnostic;
             },
+            .arg128, .scratch128 => if (try spillPairValue(selector, arg.value.named)) |diagnostic| return diagnostic,
+            else => {},
+        }
+    }
+    return null;
+}
+
+/// Preserve the complete simultaneous input set when a fixed-register operation
+/// has a different argument order from the ordinary call ABI. Even final-use
+/// values need homes until all constrained registers have been assigned.
+pub fn preserveFixedCallInputs(selector: *ComposedBlockSelector, call: ir.CallInst) !?Diagnostic {
+    for (call.args.items) |arg| {
+        if (arg.value != .named) continue;
+        const loc = resolveValue(selector, arg.value) orelse return .{ .unsupported_value = "fixed-call-input" };
+        switch (loc) {
+            .eax, .rax, .arg32, .arg64, .scratch32, .scratch64, .readonly_table_ptr => if (try spillValue(selector, arg.value.named)) |diagnostic| return diagnostic,
             .arg128, .scratch128 => if (try spillPairValue(selector, arg.value.named)) |diagnostic| return diagnostic,
             else => {},
         }

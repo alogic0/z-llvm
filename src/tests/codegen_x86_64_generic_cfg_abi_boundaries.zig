@@ -550,7 +550,7 @@ test "x86_64 SysV call planner rejects packed sret and byval attributes directly
     );
 }
 
-test "x86_64 SysV call planner rejects vector sret and byval attributes directly" {
+test "x86_64 SysV call planner accepts bounded vector sret and rejects vector byval" {
     const sret_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -567,14 +567,10 @@ test "x86_64 SysV call planner rejects vector sret and byval attributes directly
     defer sret_module.deinit();
     try sret_module.verify();
     const sret_call = sret_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
-    try std.testing.expectError(
-        abi_boundaries.Category.vector.errorValue(),
-        codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, sret_module.functions.items[0], sret_call),
-    );
-    try std.testing.expectError(
-        abi_boundaries.Category.vector.errorValue(),
-        codegen.x86_64.lowerFunction(std.testing.allocator, sret_module.target_triple.?, sret_module.functions.items[0]),
-    );
+    const counts = try codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, sret_module.functions.items[0], sret_call);
+    try std.testing.expectEqual(@as(usize, 1), counts.gpr_args);
+    var lowered = try codegen.x86_64.lowerFunction(std.testing.allocator, sret_module.target_triple.?, sret_module.functions.items[0]);
+    defer lowered.deinit(std.testing.allocator);
 
     const byval_input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -661,7 +657,7 @@ test "x86_64 SysV return planner rejects explicit ABI boundaries" {
     );
     try std.testing.expectError(
         abi_boundaries.Category.vector.errorValue(),
-        codegen.x86_64.sysvReturnPlanCountsForTest(.{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } }),
+        codegen.x86_64.sysvReturnPlanCountsForTest(.{ .vector = .{ .len = 4, .elem_ty = .{ .int = 64 } } }),
     );
     try std.testing.expectError(
         abi_boundaries.Category.x87.errorValue(),
@@ -673,8 +669,8 @@ test "x86_64 SysV return planner rejects explicit ABI boundaries" {
     );
 }
 
-test "x86_64 SysV scalar FP returns use the SSE class" {
-    inline for (.{ ir.Type.half, ir.Type.float, ir.Type.double }) |ty| {
+test "x86_64 SysV scalar FP and bounded vector returns use the SSE class" {
+    inline for (.{ ir.Type.half, ir.Type.float, ir.Type.double, ir.Type{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } }, ir.Type{ .vector = .{ .len = 4, .elem_ty = .{ .int = 32 } } } }) |ty| {
         const counts = try codegen.x86_64.sysvReturnPlanCountsForTest(ty);
         try std.testing.expectEqual(@as(usize, 0), counts.gpr_returns);
         try std.testing.expectEqual(@as(usize, 1), counts.sse_returns);

@@ -1,7 +1,15 @@
 const std = @import("std");
 
 comptime {
+    _ = @import("codegen/x86_64/generic_cfg/indirect_branches_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/aligned_stack_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/integer_vectors_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/compare_cycle_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/pair_memory_tests.zig");
     _ = @import("tests/compilation.zig");
+    _ = @import("codegen/x86_64/generic_cfg/wide_integer_forms_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/semantic_normalization_tests.zig");
+    _ = @import("codegen/x86_64/inline_asm_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/pair_arithmetic_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/constant_pair_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate_tests.zig");
