@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `1e513b68ff0a0bf4ade9ead5c5a639a5d94db2c2`; tree: `c05b2eb0ed7676e3903af6abb6ca0182116043f4`.
+Accepted revision: `fbb249a7d9a10b118696af3ef1b378a11a3e45aa`; tree: `10bff8f7b829b0d234e656cfcca0abdae23da278`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,41 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [input-driven execution checkpoint](evidence/input_driven_execution_acceptance_20261106.json)
+The accepted [selection-performance checkpoint](evidence/selection_performance_acceptance_20261106.json)
+at `fbb249a7` passes all 17 integration gates. Profile v2 records per-function
+timing and per-legalizer outcomes and allocation work. Nine legalizers now defer
+candidate copies until the first rewrite, preserving eligibility, ordered
+search, retries and independent candidate arrays.
+
+Five alternating ReleaseFast compiler comparisons on the retained Safe Fibonacci
+IR reduce median compilation from 29.78 s to 27.28 s (8.4% less time), median peak
+RSS from 598,260 to 239,124 KiB (60.0%), and logical legalizer allocations from
+7.76 GB to 2.27 GB (70.7%). Objects, ownership and per-function/per-stage counters
+remain identical. Profiling overhead is unresolved within sample variation;
+25 parser comparisons per compiler show no regression at 10 ms resolution.
+These measurements concern compiler throughput, not generated-code performance.
+
+All five unchanged Zig programs pass in Fast, Safe and Small, including all six
+Fibonacci assertions. The C parser matches 138 input/mode pairs and rejects
+552 observation mutations. The compiler-core prefix remains 100
+lowered/emitted/linked and nine executed functions per mode, with all 36 records
+matching prior fresh execution. All 45 native populations pass 1,767,660 local
+observations against 883,830 references. Debug and ReleaseSafe each pass 1,910
+unit tests, 28 policy tests and 19 structural checks; 60 ABI comparisons,
+compilation routes and readiness also pass.
+
+The [completed plan](plans/2026-11-06-compiler-selection-performance.md) and
+[measurement evidence](evidence/selection_performance.md) describe the scope.
+A larger unchanged Zig program using runtime input and allocation is the next
+separate coverage milestone. Minimum free space is 30.69 GB, above the unchanged
+24.36 GB reserve. Original scratch files, prior evidence, baseline compilers,
+diagnostic worktrees and authenticated AIR caches are preserved. No archives
+were created.
+
+The entries below are historical. Their counts and remaining failures describe
+those checkpoints, not the current frontier.
+
+The earlier [input-driven execution checkpoint](evidence/input_driven_execution_acceptance_20261106.json)
 at `1e513b68` passes all 17 integration gates. An unchanged pinned JSON parser
 executes 46 stdin inputs in each local release mode: 138 input/mode pairs match
 independent expected observations and LLVM, and 552 observation mutations are
@@ -57,9 +91,6 @@ fallback remain separate boundaries. No self-hosting or release optimization
 quality is claimed. Minimum free space is 30.62 GB, above the unchanged 24.36 GB
 reserve. Original scratch files, diagnostic worktrees, prior evidence and
 authenticated AIR caches are preserved; no archives were created.
-
-The entries below are historical. Their counts and remaining failures describe
-those checkpoints, not the current frontier.
 
 The earlier [execution-breadth checkpoint](evidence/execution_breadth_acceptance_20261106.json)
 at `f68ab145` passes all 17 integration gates. The fixed compiler-core prefix

@@ -1,6 +1,8 @@
 # Compiler selection performance
 
-Status: in progress. Successor to the completed
+Status: complete at `fbb249a7`. All 17 integration gates pass; see the
+[acceptance record](../evidence/selection_performance_acceptance_20261106.json)
+and [measurements](../evidence/selection_performance.md). Successor to the completed
 [input-driven execution plan](2026-11-06-input-driven-execution.md).
 
 ## Scope
@@ -53,3 +55,20 @@ Retain prior accepted evidence, baseline compilers, authenticated AIR exports,
 diagnostic worktrees and all thirteen original scratch files. Create no archives.
 Keep the 32,949,672,960-byte start threshold and 24,359,738,368-byte reserve;
 retire only idle, reproducible build products with a recorded cleanup if needed.
+
+## Completion
+
+Profile v2 records per-function phases and per-legalizer timing, outcomes and
+allocation work. Nine legalizers defer candidate copies until their first
+rewrite. All five repeated Fibonacci comparisons retain identical object and
+ownership bytes and identical per-function/per-stage selection counters.
+Median unprofiled compilation falls from 29.78 s to 27.28 s (8.4% less time),
+median peak RSS falls about 60%, and logical legalizer allocations fall about
+71%. Profiling overhead is unresolved within sample variation. The 25 parser
+comparisons per compiler show no regression at the timer's 10 ms resolution.
+
+Debug and ReleaseSafe each pass 1,910 unit tests, 28 policy tests and 19
+structural checks. Readiness, 60 ABI comparisons, compilation-route checks,
+the full input corpus and all 17 integration gates pass on the frozen source.
+The minimum observed free space is 30,689,878,016 bytes. No archives were made.
+The larger unchanged Zig input/allocation program remains separate next work.

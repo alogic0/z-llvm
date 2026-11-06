@@ -4529,6 +4529,21 @@ One line per completed cycle, append-only, newest last. This is the
   records match prior fresh execution. All 45 native populations pass.
   Evidence: `docs/evidence/input_driven_execution_acceptance_20261106.json`.
 
+- 2026-11-06 (compiler selection performance, `fbb249a7`) All 17 integration
+  gates pass on the verified frozen source. Profile v2 adds per-function timing
+  and per-stage outcomes/allocations. Nine legalizers defer candidate copying;
+  five alternating Fibonacci comparisons reduce median compilation from 29.78 s
+  to 27.28 s and median peak RSS by 60.0%, with identical objects, ownership and
+  per-function/per-stage counters. Logical allocation work falls 70.7%.
+  The parser has no measured regression in 25 comparisons per compiler;
+  profiling overhead is unresolved within sample variation. Debug and
+  ReleaseSafe each pass 1,910 units and 28 policy checks. All five unchanged Zig
+  programs, 138 parser input/mode pairs, 552 observation controls and 45 native
+  populations pass. The core cohort retains 100 lowered/emitted/linked and nine
+  executed per mode; its 36 records match prior fresh execution. No archives
+  were made. Evidence:
+  `docs/evidence/selection_performance_acceptance_20261106.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4536,7 +4551,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `1e513b68ff0a0bf4ade9ead5c5a639a5d94db2c2`; tree: `c05b2eb0ed7676e3903af6abb6ca0182116043f4`.
+Accepted revision: `fbb249a7d9a10b118696af3ef1b378a11a3e45aa`; tree: `10bff8f7b829b0d234e656cfcca0abdae23da278`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

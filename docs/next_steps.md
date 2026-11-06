@@ -1,39 +1,40 @@
 # Active direction
 
 The [compiler selection performance plan](plans/2026-11-06-compiler-selection-performance.md)
-is being implemented: measure function/stage costs, optimize demonstrated work,
-then validate repeated timings and unchanged outputs before accepting a new
-checkpoint. The larger unchanged Zig workload remains separate coverage work.
+is complete at `fbb249a7`. All 17 integration gates pass. Profile v2 attributes
+time and allocation work to functions and legalizers; nine legalizers defer
+candidate copying until the first rewrite. See the
+[acceptance record](evidence/selection_performance_acceptance_20261106.json) and
+[measurements](evidence/selection_performance.md).
 
-The [input-driven execution plan](plans/2026-11-06-input-driven-execution.md) is
-complete at `1e513b68`: all 17 integration gates pass. The unchanged JSON parser
-matches 46 inputs in each of three local release modes, including heap growth,
-mutation and error paths. All five existing unchanged Zig programs also pass.
-The fixed compiler-core prefix remains 100 lowered/emitted/linked functions,
-with nine executed per mode, and all 45 native populations pass. The
-[acceptance record](evidence/input_driven_execution_acceptance_20261106.json) and
-[implementation evidence](evidence/input_driven_execution.md) keep these
-populations separate and authenticate the source, tools and observations.
+Five alternating comparisons on the retained Safe Fibonacci IR reduce median
+ReleaseFast compiler time from 29.78 s to 27.28 s (8.4% less) and median peak RSS
+by 60.0%. Logical legalizer allocations fall 70.7%. Every benchmark object and
+ownership manifest is byte-identical, with unchanged per-function/per-stage
+counters. Profiling overhead is unresolved within sample variation. Twenty-five
+parser comparisons per compiler show no regression at 10 ms timing resolution.
 
-Recommended next work: add per-function and per-legalizer timing attribution,
-then reduce repeated optional-legalizer scans and original-form trials under
-the existing execution gates. Selection and optional legalization account for
-most elapsed compilation time in the retained Fibonacci sample; aggregate
-phase timers alone do not identify which individual functions or stages to
-change. Add a larger unchanged Zig program with runtime input and allocation
-to expand frontend evidence beyond the new C corpus.
+The next proposed coverage milestone is a larger unchanged Zig program that
+combines runtime input, allocation, mutation and error paths. The existing
+[input-driven C corpus](evidence/input_driven_execution.md) passes 138 input/mode
+pairs and 552 observation-mutation controls; it does not add Zig frontend
+coverage or compiler mutation tests. All five unchanged Zig programs pass in
+Fast, Safe and Small. The compiler-core prefix remains 100
+lowered/emitted/linked functions and nine executed per mode; all 45 native
+populations pass.
 
-Keep extending the common transfer contract when addressing pair/vector PHIs
-and spill destinations. Those cases and ordinary CLI structural selection still
-use their existing paths. Keep generated-code optimization quality as a separate
-measured milestone.
+For further compiler-performance work, use the retained function and stage
+profiles to choose the next measured cost. Ordered scans and original-form
+retries remain. Keep extending the common transfer contract when addressing
+pair/vector PHIs and spill destinations; those cases and ordinary CLI structural
+selection still use their existing paths. Generated-code optimization quality
+remains a separate measured milestone.
 
 For large development gates, use a ReleaseFast compiler while retaining Debug
-tests. The unchanged-program runner now obtains ownership during object emission;
-independent replay remains a permanent route/corpus regression and is available
-with `--replay-owners`. The retained combined Fibonacci measurement takes 31.76 s
-with ReleaseFast and 350.05 s with Debug, with identical outputs and counters.
-These single samples do not establish profiling overhead or generated-code speed.
+tests. Unchanged programs obtain ownership during object emission; independent
+replay remains a permanent route/corpus regression and is available with
+`--replay-owners`. Storage thresholds remain 32,949,672,960 bytes before starting
+and 24,359,738,368 bytes during execution. No archives were created.
 
 The entries below describe earlier milestones. The requested
 [Python-to-Zig tooling migration](evidence/python_tools_migration_20261105.json)
