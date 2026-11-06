@@ -1,0 +1,51 @@
+zllvm-air-export-v1
+contract_version=1
+payload=zig-air-print-v1
+producer=patched-zig-llvm-update-func
+root_source=main.zig
+wrapper=main.zig
+mode=ReleaseSafe
+target=x86_64-unknown-linux5.10.0-gnu2.31.0
+function_count=1
+global_count=0
+function_begin
+name_bytes=25
+bit_set.Dynamic.maskIndex
+type_bytes=16
+fn (usize) usize
+instruction_count=5
+main_body_count=5
+liveness=present
+air_bytes=316
+# Total AIR+Liveness bytes: 185B
+# AIR Instructions:         5 (45B)
+# AIR Extra Data:           7 (28B)
+# Liveness tomb_bits:       8B
+# Liveness Extra Data:      0 (0B)
+# Liveness special table:   0 (0B)
+  %0 = arg(usize, 0)
+  %1!= dbg_stmt(2:22)
+  %2 = shr(%0!, <u6, 6>)
+  %3!= dbg_stmt(2:9)
+  %4!= ret_safe(%2!)
+
+structured_air_bytes=151
+structured_air-v1
+body|main|-|5|0|1|2|3|4
+inst|0|arg|1|-
+inst|1|dbg_stmt|1|-
+inst|2|shr|1|-
+inst|3|dbg_stmt|1|-
+inst|4|ret_safe|1|-
+structured_air_end
+
+structured_air_v2_bytes=339
+structured_air-v2
+typed_inst|0|arg|5|usize|arg|0
+typed_inst|1|dbg_stmt|4|void|opaque|0
+typed_inst|2|shr|5|usize|bin_op|2|inst|1|0|5|usize|const|3|932|2|u6|2|operand0_text|2|%0|operand1_text|7|<u6, 6>
+typed_inst|3|dbg_stmt|4|void|opaque|0
+typed_inst|4|ret_safe|8|noreturn|un_op|1|inst|1|2|5|usize|1|operand0_text|2|%2
+structured_air_v2_end
+
+function_end

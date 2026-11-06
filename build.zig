@@ -82,6 +82,9 @@ pub fn build(b: *std.Build) void {
     compilation_contract.addPassthruArgs();
     compilation_contract.step.dependOn(b.getInstallStep());
     b.step("compilation-contract", "Check explicit optimization across IR, AIR, object, assembly and owner routes").dependOn(&compilation_contract.step);
+    const breadth_controls = b.addSystemCommand(&.{ b.graph.zig_exe, "run", "--dep", "validation", "-Mroot=src/distribution_execution_breadth_gate.zig", "-Mvalidation=tools/cohort_validation_support.zig", "--" });
+    breadth_controls.addPassthruArgs();
+    b.step("execution-breadth-controls", "Execute authenticated compiler-core additions and negative controls").dependOn(&breadth_controls.step);
 
     const abi_diff_run = b.addSystemCommand(&.{ "bash", "tools/run_abi_differential.sh" });
     abi_diff_run.step.dependOn(b.getInstallStep());

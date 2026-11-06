@@ -155,7 +155,7 @@ const CohortTracker = struct {
     }
 };
 
-const counter_schema_version = "distribution-real-rows-v2";
+const counter_schema_version = "distribution-real-rows-v3";
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -450,6 +450,10 @@ test "execution cohort denominator is exact rank independent and atomic" {
     candidates[42] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Requirements.size");
     candidates[61] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Requirements.slotType");
     candidates[83] = syntheticCohortCandidate("../ziglang/src/main.zig", "link.MachO.CodeSignature.Signature.slotType");
+    candidates[28] = syntheticCohortCandidate("../ziglang/src/main.zig", execution_cohort.Program.dynamic_mask_index.functionName());
+    candidates[41] = syntheticCohortCandidate("../ziglang/src/main.zig", execution_cohort.Program.mutex_try_lock.functionName());
+    candidates[45] = syntheticCohortCandidate("../ziglang/src/main.zig", execution_cohort.Program.metadata_is_free.functionName());
+    candidates[46] = syntheticCohortCandidate("../ziglang/src/main.zig", execution_cohort.Program.metadata_is_tombstone.functionName());
     var digest: [64]u8 = undefined;
     @memcpy(&digest, cohort_denominator_sha256);
     try requireCohortDenominator(&candidates, &digest);
@@ -473,9 +477,12 @@ test "execution cohort denominator is exact rank independent and atomic" {
     try tracker.record(.requirements_slot_type, .{ .real_executed = 1, .real_programs_ok = 1 });
     try std.testing.expectError(error.ExecutionCohortPartialCredit, tracker.finalize(&counters));
     try tracker.record(.ascii_is_ascii, .{ .real_executed = 1, .real_programs_ok = 1 });
+    try std.testing.expectError(error.ExecutionCohortPartialCredit, tracker.finalize(&counters));
+    for ([_]execution_cohort.Program{ .dynamic_mask_index, .mutex_try_lock, .metadata_is_free, .metadata_is_tombstone }) |program|
+        try tracker.record(program, .{ .real_executed = 1, .real_programs_ok = 1 });
     try tracker.finalize(&counters);
-    try std.testing.expectEqual(@as(usize, 5), counters.real_executed);
-    try std.testing.expectEqual(@as(usize, 5), counters.real_programs_ok);
+    try std.testing.expectEqual(@as(usize, 9), counters.real_executed);
+    try std.testing.expectEqual(@as(usize, 9), counters.real_programs_ok);
 }
 
 fn airGenerationCacheKeyForTest(identity: DescriptorCacheIdentity) ![64]u8 {

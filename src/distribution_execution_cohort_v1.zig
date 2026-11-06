@@ -1,9 +1,10 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
+const breadth = @import("distribution_execution_breadth.zig");
 
 const Sha256 = std.crypto.hash.sha2.Sha256;
 
-pub const schema = "distribution-execution-cohort-v3";
+pub const schema = "distribution-execution-cohort-v4";
 pub const repository_root = "/home/oleg/prog/z_llvm";
 pub const external_repository_root = "/home/oleg/prog/ziglang";
 pub const external_revision = "1c08b09d1c847f4f02c8216e3b62df323861a437";
@@ -32,14 +33,20 @@ pub const Program = enum {
     requirements_size,
     requirements_slot_type,
     ascii_is_ascii,
+    dynamic_mask_index,
+    mutex_try_lock,
+    metadata_is_free,
+    metadata_is_tombstone,
 
     pub fn functionName(program: Program) []const u8 {
+        if (breadth.fromProgram(program)) |member| return member.functionName();
         return switch (program) {
             .signature_size => "link.MachO.CodeSignature.Signature.size",
             .signature_slot_type => "link.MachO.CodeSignature.Signature.slotType",
             .requirements_size => "link.MachO.CodeSignature.Requirements.size",
             .requirements_slot_type => "link.MachO.CodeSignature.Requirements.slotType",
             .ascii_is_ascii => "ascii.isAscii",
+            else => unreachable,
         };
     }
 
@@ -49,67 +56,81 @@ pub const Program = enum {
     }
 
     pub fn linkedHarness(program: Program) []const u8 {
+        if (breadth.fromProgram(program)) |member| return member.linkedHarness();
         return switch (program) {
             .signature_size => symbol_linked_harness_source,
             .signature_slot_type => weak_external_linked_harness_source,
             .requirements_size => requirements_linked_harness_source,
             .requirements_slot_type => requirements_slot_type_linked_harness_source,
             .ascii_is_ascii => ascii_linked_harness_source,
+            else => unreachable,
         };
     }
 
     pub fn referenceHarness(program: Program) []const u8 {
+        if (breadth.fromProgram(program)) |member| return member.referenceHarness();
         return switch (program) {
             .signature_size => reference_harness_source,
             .signature_slot_type => signature_slot_reference_harness_source,
             .requirements_size => requirements_reference_harness_source,
             .requirements_slot_type => requirements_slot_type_reference_harness_source,
             .ascii_is_ascii => ascii_reference_harness_source,
+            else => unreachable,
         };
     }
 
     pub fn expectedResult(program: Program) usize {
+        if (breadth.fromProgram(program)) |member| return member.expectedResult();
         return switch (program) {
             .signature_size => 8,
             .signature_slot_type => 65536,
             .requirements_size => 12,
             .requirements_slot_type => 2,
             .ascii_is_ascii => 128,
+            else => unreachable,
         };
     }
 
     pub fn expectedWitness(program: Program) usize {
+        if (breadth.fromProgram(program)) |member| return member.expectedWitness();
         if (program == .ascii_is_ascii) return 8256;
         return program.expectedResult() *% 3 +% 7;
     }
 
     pub fn observations(program: Program) usize {
+        if (breadth.fromProgram(program)) |member| return member.observations();
         return if (program == .ascii_is_ascii) 256 else 1;
     }
 
     pub fn expectedStdout(program: Program) []const u8 {
+        if (breadth.fromProgram(program)) |member| return member.expectedStdout();
         return switch (program) {
             .signature_size => expected_stdout,
             .signature_slot_type => signature_slot_expected_stdout,
             .requirements_size => requirements_expected_stdout,
             .requirements_slot_type => requirements_slot_type_expected_stdout,
             .ascii_is_ascii => ascii_expected_stdout,
+            else => unreachable,
         };
     }
 
     fn descriptorType(program: Program) []const u8 {
+        if (breadth.fromProgram(program)) |member| return member.descriptorType();
         return switch (program) {
             .signature_size, .signature_slot_type => "fn (link.MachO.CodeSignature.Signature) u32",
             .requirements_size, .requirements_slot_type => "fn (link.MachO.CodeSignature.Requirements) u32",
             .ascii_is_ascii => "fn (u8) bool",
+            else => unreachable,
         };
     }
 
     fn descriptorReturnType(program: Program) []const u8 {
+        if (breadth.fromProgram(program)) |member| return member.descriptorReturnType();
         return switch (program) {
             .signature_size, .signature_slot_type => "u32",
             .requirements_size, .requirements_slot_type => "u32",
             .ascii_is_ascii => "bool",
+            else => unreachable,
         };
     }
 };
@@ -120,6 +141,10 @@ pub const programs = [_]Program{
     .requirements_size,
     .requirements_slot_type,
     .ascii_is_ascii,
+    .dynamic_mask_index,
+    .mutex_try_lock,
+    .metadata_is_free,
+    .metadata_is_tombstone,
 };
 
 // Only harnesses are generated here. Every called definition is authenticated
@@ -276,6 +301,7 @@ pub const SourceIdentity = struct {
     requirements_definition_sha256: [Sha256.digest_length]u8,
     requirements_import_sha256: [Sha256.digest_length]u8,
     ascii_definition_sha256: [Sha256.digest_length]u8,
+    breadth_definition_sha256: [breadth.source_paths.len][Sha256.digest_length]u8,
 };
 
 pub const OwnedSourceFiles = struct {
@@ -285,8 +311,10 @@ pub const OwnedSourceFiles = struct {
     requirements_definition: []u8,
     requirements_import_source: []u8,
     ascii_definition: []u8,
+    breadth_definitions: [breadth.source_paths.len][]u8,
 
     pub fn deinit(files: *OwnedSourceFiles, allocator: std.mem.Allocator) void {
+        for (files.breadth_definitions) |source| allocator.free(source);
         allocator.free(files.ascii_definition);
         allocator.free(files.requirements_import_source);
         allocator.free(files.requirements_definition);
@@ -297,6 +325,8 @@ pub const OwnedSourceFiles = struct {
     }
 
     pub fn identity(files: *const OwnedSourceFiles) SourceIdentity {
+        var breadth_hashes: [breadth.source_paths.len][Sha256.digest_length]u8 = undefined;
+        for (files.breadth_definitions, 0..) |source, index| breadth_hashes[index] = sha256(source);
         return .{
             .definition_sha256 = sha256(files.definition),
             .import_sha256 = sha256(files.import_source),
@@ -304,10 +334,12 @@ pub const OwnedSourceFiles = struct {
             .requirements_definition_sha256 = sha256(files.requirements_definition),
             .requirements_import_sha256 = sha256(files.requirements_import_source),
             .ascii_definition_sha256 = sha256(files.ascii_definition),
+            .breadth_definition_sha256 = breadth_hashes,
         };
     }
 
     pub fn validate(files: *const OwnedSourceFiles) !void {
+        try breadth.validateSources(files.breadth_definitions);
         try validateRequirementsSources(files.requirements_definition, files.requirements_import_source);
         try validateSignatureSource(files.requirements_definition);
         try validateAsciiSource(files.ascii_definition, files.import_source);
@@ -387,6 +419,7 @@ pub fn sha256(bytes: []const u8) [Sha256.digest_length]u8 {
 }
 
 pub fn validateHarnesses(program: Program) !void {
+    if (breadth.fromProgram(program)) |member| return breadth.validateHarnesses(member);
     const reference = program.referenceHarness();
     if (program == .ascii_is_ascii) {
         const linked = program.linkedHarness();
@@ -409,7 +442,7 @@ pub fn validateHarnesses(program: Program) !void {
         .signature_slot_type => "const result: u32 = 65536;",
         .requirements_size => "const result: u32 = 12;",
         .requirements_slot_type => "const result: u32 = 2;",
-        .ascii_is_ascii => unreachable,
+        else => unreachable,
     };
     if (std.mem.count(u8, reference, reference_result) != 1 or
         std.mem.count(u8, reference, "witness={}\\n") != 1 or
@@ -658,6 +691,14 @@ pub fn readCurrentSources(allocator: std.mem.Allocator, io: std.Io, max_bytes: u
     const requirements_import_source = try root.readFileAlloc(io, requirements_import_path, allocator, .limited(max_bytes));
     errdefer allocator.free(requirements_import_source);
     const ascii_definition = try root.readFileAlloc(io, ascii_definition_path, allocator, .limited(max_bytes));
+    errdefer allocator.free(ascii_definition);
+    var breadth_definitions: [breadth.source_paths.len][]u8 = undefined;
+    var breadth_count: usize = 0;
+    errdefer for (breadth_definitions[0..breadth_count]) |source| allocator.free(source);
+    for (breadth.source_paths, 0..) |path, index| {
+        breadth_definitions[index] = try root.readFileAlloc(io, path, allocator, .limited(max_bytes));
+        breadth_count += 1;
+    }
     return .{
         .definition = definition,
         .import_source = import_source,
@@ -665,6 +706,7 @@ pub fn readCurrentSources(allocator: std.mem.Allocator, io: std.Io, max_bytes: u
         .requirements_definition = requirements_definition,
         .requirements_import_source = requirements_import_source,
         .ascii_definition = ascii_definition,
+        .breadth_definitions = breadth_definitions,
     };
 }
 
@@ -786,7 +828,9 @@ pub fn validateDescriptor(allocator: std.mem.Allocator, program: Program, descri
     {
         return error.CohortDescriptorBindingMismatch;
     }
-    if (program == .ascii_is_ascii) try requireAsciiDescriptor(function) else try requireSemanticReturn(program, function);
+    if (breadth.fromProgram(program)) |member| {
+        try breadth.validateDescriptor(allocator, member, function);
+    } else if (program == .ascii_is_ascii) try requireAsciiDescriptor(function) else try requireSemanticReturn(program, function);
 }
 
 pub fn canonicalExecutionRecord(
@@ -986,7 +1030,7 @@ fn semanticDescriptorForTest(allocator: std.mem.Allocator, fixture: SemanticDesc
 }
 
 test "fixed cohort identities and harnesses are exact" {
-    try std.testing.expectEqual(@as(usize, 5), programs.len);
+    try std.testing.expectEqual(@as(usize, 9), programs.len);
     try std.testing.expectEqualStrings("link.MachO.CodeSignature.Signature.size", programs[0].functionName());
     try std.testing.expectEqualStrings("link.MachO.CodeSignature.Signature.slotType", programs[1].functionName());
     try std.testing.expectEqualStrings("link.MachO.CodeSignature.Requirements.size", programs[2].functionName());

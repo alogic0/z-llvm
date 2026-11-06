@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "source": "test/cases/array_in_anon_struct.zig",
+  "source_sha256": "9ea4e3efed991237fe3dcca39de9a8826efeb0d8de7df30c385870dc81471dce",
+  "target": "x86_64-linux-gnu",
+  "cpu": "baseline",
+  "modes": [
+    "ReleaseFast",
+    "ReleaseSafe",
+    "ReleaseSmall"
+  ],
+  "stdout": "",
+  "exit_status": 0,
+  "local_pipeline": "preopt",
+  "link_driver": "zig-compiler-rt",
+  "compile_timeout_ms": 900000,
+  "extra_compile_args": [
+    "-fsingle-threaded"
+  ],
+  "remaining_dependencies": [
+    "libLLVM IR construction",
+    "Zig linker and compiler-rt",
+    "libc and CRT",
+    "single-threaded Zig startup"
+  ]
+}

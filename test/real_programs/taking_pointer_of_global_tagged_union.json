@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "source": "test/cases/taking_pointer_of_global_tagged_union.zig",
+  "source_sha256": "d88d9cde2f25cb0134aac0e1d894dcf1448a21e780c8ded5a91130fe7b07d7dc",
+  "target": "x86_64-linux-gnu",
+  "cpu": "baseline",
+  "modes": [
+    "ReleaseFast",
+    "ReleaseSafe",
+    "ReleaseSmall"
+  ],
+  "stdout": "",
+  "exit_status": 0,
+  "local_pipeline": "preopt",
+  "link_driver": "zig-compiler-rt",
+  "compile_timeout_ms": 900000,
+  "extra_compile_args": [
+    "-fsingle-threaded"
+  ],
+  "remaining_dependencies": [
+    "libLLVM IR construction",
+    "Zig linker and compiler-rt",
+    "libc and CRT",
+    "single-threaded Zig startup"
+  ]
+}

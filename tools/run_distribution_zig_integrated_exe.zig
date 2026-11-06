@@ -295,6 +295,15 @@ pub fn main(init: std.process.Init) !void {
     try @import("run_memset_diff.zig").run(init);
     try @import("run_memcpy_diff.zig").run(init);
     try @import("run_byte_loops_diff.zig").run(init);
+    const cohort_controls_root = try temp.join(allocator, "execution-breadth-controls");
+    defer allocator.free(cohort_controls_root);
+    const cohort_controls = try common.runCapture(allocator, io, &.{
+        "zig",           "build",              "execution-breadth-controls", "--",
+        "--output-root", cohort_controls_root, "--zig-emitter",              zig_emitter,
+    }, "compiler-core execution breadth controls");
+    defer common.freeRunResult(allocator, cohort_controls);
+    try stdout_writer.interface.writeAll(cohort_controls.stdout);
+    try stdout_writer.interface.flush();
     const program_root = try temp.join(allocator, "unchanged-hello-libc");
     defer allocator.free(program_root);
     const program_arg = try std.fmt.allocPrint(allocator, "--output-root={s}", .{program_root});
@@ -304,18 +313,26 @@ pub fn main(init: std.process.Init) !void {
     try stdout_writer.interface.writeAll(program_result.stdout);
     try stdout_writer.interface.flush();
     if (!common.termOk(program_result.term)) try common.forwardCommandFailure(io, "unchanged upstream hello libc", program_result);
-    const fibonacci_root = try temp.join(allocator, "unchanged-recursive-fibonacci");
-    defer allocator.free(fibonacci_root);
-    const fibonacci_result = try common.runCapture(allocator, io, &.{
-        "zig",           "run",          "tools/run_real_program.zig", "--",
-        "--output-root", fibonacci_root, "--manifest",                 "test/real_programs/recursive_fibonacci.json",
-        "--zig-emitter", zig_emitter,    "--zig-source",               zig_source_dir,
-        "--zllvm",       zllvm_exe,      "--codegen-reachable",
-    }, "unchanged upstream recursive Fibonacci");
-    defer common.freeRunResult(allocator, fibonacci_result);
-    try stdout_writer.interface.writeAll(fibonacci_result.stdout);
-    try stdout_writer.interface.flush();
-    if (!common.termOk(fibonacci_result.term)) try common.forwardCommandFailure(io, "unchanged upstream recursive Fibonacci", fibonacci_result);
+    for ([_][]const u8{ "recursive_fibonacci", "optionals", "taking_pointer_of_global_tagged_union", "array_in_anon_struct", "while_loops" }) |program| {
+        const label = try std.fmt.allocPrint(allocator, "unchanged upstream {s}", .{program});
+        defer allocator.free(label);
+        const stem = try std.fmt.allocPrint(allocator, "unchanged-{s}", .{program});
+        defer allocator.free(stem);
+        const root = try temp.join(allocator, stem);
+        defer allocator.free(root);
+        const manifest = try std.fmt.allocPrint(allocator, "test/real_programs/{s}.json", .{program});
+        defer allocator.free(manifest);
+        const program_result = try common.runCapture(allocator, io, &.{
+            "zig",           "run",       "tools/run_real_program.zig", "--",
+            "--output-root", root,        "--manifest",                 manifest,
+            "--zig-emitter", zig_emitter, "--zig-source",               zig_source_dir,
+            "--zllvm",       zllvm_exe,   "--codegen-reachable",
+        }, label);
+        defer common.freeRunResult(allocator, program_result);
+        try stdout_writer.interface.writeAll(program_result.stdout);
+        try stdout_writer.interface.flush();
+        if (!common.termOk(program_result.term)) try common.forwardCommandFailure(io, label, program_result);
+    }
     const c_program_root = try temp.join(allocator, "unchanged-upstream-c");
     defer allocator.free(c_program_root);
     const c_program_arg = try std.fmt.allocPrint(allocator, "--output-root={s}", .{c_program_root});

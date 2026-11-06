@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "source": "test/cases/optionals.zig",
+  "source_sha256": "8e47ea56fd5690e7b0220917f8a16eca60aa59537e2b9207ae2bf7ea485c8035",
+  "target": "x86_64-linux-gnu",
+  "cpu": "baseline",
+  "modes": [
+    "ReleaseFast",
+    "ReleaseSafe",
+    "ReleaseSmall"
+  ],
+  "stdout": "",
+  "exit_status": 0,
+  "local_pipeline": "preopt",
+  "link_driver": "zig-compiler-rt",
+  "compile_timeout_ms": 900000,
+  "extra_compile_args": [
+    "-fsingle-threaded"
+  ],
+  "remaining_dependencies": [
+    "libLLVM IR construction",
+    "Zig linker and compiler-rt",
+    "libc and CRT",
+    "single-threaded Zig startup"
+  ]
+}

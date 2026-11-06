@@ -1,0 +1,54 @@
+zllvm-air-export-v1
+contract_version=1
+payload=zig-air-print-v1
+producer=patched-zig-llvm-update-func
+root_source=main.zig
+wrapper=main.zig
+mode=ReleaseFast
+target=x86_64-unknown-linux5.10.0-gnu2.31.0
+function_count=1
+global_count=0
+function_begin
+name_bytes=92
+hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree
+type_bytes=95
+fn (hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata) bool
+instruction_count=6
+main_body_count=6
+liveness=present
+air_bytes=422
+# Total AIR+Liveness bytes: 198B
+# AIR Instructions:         6 (54B)
+# AIR Extra Data:           8 (32B)
+# Liveness tomb_bits:       8B
+# Liveness Extra Data:      0 (0B)
+# Liveness special table:   0 (0B)
+  %0 = arg(hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata, 0)
+  %1!= dbg_stmt(2:32)
+  %2 = bit_cast(u8, %0!)
+  %3 = cmp_eq(%2!, @.zero_u8)
+  %4!= dbg_stmt(2:17)
+  %5!= ret(%3!)
+
+structured_air_bytes=171
+structured_air-v1
+body|main|-|6|0|1|2|3|4|5
+inst|0|arg|1|-
+inst|1|dbg_stmt|1|-
+inst|2|bit_cast|1|-
+inst|3|cmp_eq|1|-
+inst|4|dbg_stmt|1|-
+inst|5|ret|1|-
+structured_air_end
+
+structured_air_v2_bytes=569
+structured_air-v2
+typed_inst|0|arg|85|hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata|arg|0
+typed_inst|1|dbg_stmt|4|void|opaque|0
+typed_inst|2|bit_cast|2|u8|ty_op|1|inst|1|0|85|hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata|1|operand0_text|2|%0
+typed_inst|3|cmp_eq|4|bool|bin_op|2|inst|1|2|2|u8|const|3|115|2|u8|2|operand0_text|2|%2|operand1_text|9|@.zero_u8
+typed_inst|4|dbg_stmt|4|void|opaque|0
+typed_inst|5|ret|8|noreturn|un_op|1|inst|1|3|4|bool|1|operand0_text|2|%3
+structured_air_v2_end
+
+function_end
