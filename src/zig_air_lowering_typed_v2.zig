@@ -297,8 +297,9 @@ pub fn lowerTypedV2AtomicTryLock(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    if (air_model.typedAtomicTryLockSummary(function_type, structured_air_v2) == null) return null;
+    const facts = air_model.typedAtomicTryLockSummary(air_function, function_type, structured_air_v2) orelse return null;
     _ = module;
+    const pair_type = try std.fmt.allocPrint(allocator, "{{ i{d}, i1 }}", .{facts.ty.int});
 
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 1 });
     errdefer function.deinit(allocator);
@@ -311,18 +312,18 @@ pub fn lowerTypedV2AtomicTryLock(
         .result = "lock_pair",
         .kind = .{ .cmpxchg = .{
             .ptr = .{ .named = "arg0" },
-            .ty = .{ .int = 32 },
-            .result_ty = .{ .aggregate = try allocator.dupe(u8, "{ i32, i1 }") },
-            .expected = .{ .int = 0 },
-            .replacement = .{ .int = 1 },
-            .success_ordering = "acquire",
-            .failure_ordering = "monotonic",
+            .ty = facts.ty,
+            .result_ty = .{ .aggregate = pair_type },
+            .expected = facts.expected,
+            .replacement = facts.replacement,
+            .success_ordering = facts.success_ordering,
+            .failure_ordering = facts.failure_ordering,
         } },
     });
     try block.instructions.append(allocator, .{
         .result = "success",
         .kind = .{ .extractvalue = .{
-            .aggregate_ty = .{ .aggregate = "{ i32, i1 }" },
+            .aggregate_ty = .{ .aggregate = pair_type },
             .aggregate = .{ .named = "lock_pair" },
             .indices = "1",
             .result_ty = .{ .int = 1 },

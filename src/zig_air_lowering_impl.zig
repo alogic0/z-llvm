@@ -499,7 +499,7 @@ pub fn firstUnsupported(
             false;
     const typed_atomic_try_lock =
         if (function.structured_air_v2) |structured_air_v2|
-            air_model.typedAtomicTryLockSummary(function_type, structured_air_v2) != null
+            air_model.typedAtomicTryLockSummary(function, function_type, structured_air_v2) != null
         else
             false;
     const typed_void_ret_ptr =

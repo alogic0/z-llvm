@@ -19,6 +19,12 @@ const io_event_enumerators = [_]Enumerator{
     .{ .name = "is_set", .value = 2 },
 };
 
+// Pinned lib/std/atomic.zig: Mutex is enum(u8), not an ABI-sized integer.
+const atomic_mutex_enumerators = [_]Enumerator{
+    .{ .name = "unlocked", .value = 0 },
+    .{ .name = "locked", .value = 1 },
+};
+
 const io_limit_enumerators = [_]Enumerator{
     .{ .name = "nothing", .value = 0 },
     .{ .name = "unlimited", .value = std.math.maxInt(u64) },
@@ -231,6 +237,16 @@ const facts = [_]Fact{
         .name = "Io.Event",
         .backing_type = .{ .int = 32 },
         .enumerators = io_event_enumerators[0..],
+    },
+    .{
+        .name = "atomic.Mutex",
+        .backing_type = .{ .int = 8 },
+        .enumerators = &atomic_mutex_enumerators,
+    },
+    .{
+        .name = "std.atomic.Mutex",
+        .backing_type = .{ .int = 8 },
+        .enumerators = &atomic_mutex_enumerators,
     },
     .{
         .name = "Io.Limit",

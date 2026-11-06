@@ -848,6 +848,7 @@ pub fn typedAtomicAddSummary(
 }
 
 pub fn typedAtomicTryLockSummary(
+    function: air_export.Function,
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) ?TypedAtomicTryLockSummary {
@@ -856,13 +857,78 @@ pub fn typedAtomicTryLockSummary(
         !function_type.return_type.ir_type.eql(.{ .int = 1 }) or
         typedOpcodeCount(structured_air_v2, "arg") != 1 or
         (typedOpcodeCount(structured_air_v2, "cmpxchg_strong") != 1 and
-         typedOpcodeCount(structured_air_v2, "cmpxchg") != 1) or
+            typedOpcodeCount(structured_air_v2, "cmpxchg") != 1) or
         typedOpcodeCount(structured_air_v2, "is_null") != 1 or
         !typedHasReturnOpcode(structured_air_v2))
     {
         return null;
     }
-    return .{};
+    // Opcode totals alone do not establish width, values, ordering, or that
+    // the returned boolean belongs to this exchange. Bind both AIR views.
+    const types = @import("zig_air_types.zig");
+    const text = @import("zig_air_text.zig");
+    const values = @import("zig_air_values.zig");
+    const ty = function_type.params[0].pointer_child orelse return null;
+    if (ty != .int or (ty.int != 8 and ty.int != 16 and ty.int != 32 and ty.int != 64)) return null;
+    if (function.main_body_count != function.instruction_count or function.instructions.len != structured_air_v2.instructions.len) return null;
+    var argument: ?u32 = null;
+    var exchange: ?u32 = null;
+    var success: ?u32 = null;
+    var returned = false;
+    var facts: ?TypedAtomicTryLockSummary = null;
+    for (structured_air_v2.instructions, function.instructions) |instruction, raw| {
+        if (instruction.index != raw.index or !std.mem.eql(u8, instruction.opcode, raw.opcode)) return null;
+        if (std.mem.eql(u8, instruction.opcode, "dbg_stmt")) {
+            if (!std.mem.eql(u8, instruction.result_type, "void") or instruction.operands.len != 0) return null;
+        } else if (std.mem.eql(u8, instruction.opcode, "arg")) {
+            const pointer = types.parseZigType(instruction.result_type) orelse return null;
+            if (argument != null or pointer.ir_type != .ptr or pointer.pointer_child == null or !pointer.pointer_child.?.eql(ty) or pointer.is_volatile_pointer) return null;
+            var fields = text.splitTopLevel(raw.payload, ',');
+            if (!std.mem.eql(u8, std.mem.trim(u8, fields.next() orelse return null, " "), instruction.result_type) or
+                !std.mem.eql(u8, std.mem.trim(u8, fields.next() orelse return null, " "), "0") or fields.next() != null) return null;
+            argument = instruction.index;
+        } else if (std.mem.eql(u8, instruction.opcode, "cmpxchg_strong") or std.mem.eql(u8, instruction.opcode, "cmpxchg")) {
+            if (exchange != null or argument == null or instruction.operands.len != 0 or !std.mem.eql(u8, instruction.data_kind, "ty_pl")) return null;
+            var fields = text.splitTopLevel(raw.payload, ',');
+            if (text.instructionRef(fields.next() orelse return null) != argument) return null;
+            const expected_value = values.parseConstant(std.mem.trim(u8, fields.next() orelse return null, " ")) orelse return null;
+            const replacement = values.parseConstant(std.mem.trim(u8, fields.next() orelse return null, " ")) orelse return null;
+            if (!expected_value.ty.ir_type.eql(ty) or !replacement.ty.ir_type.eql(ty) or expected_value.value != .int or replacement.value != .int) return null;
+            for ([_]TypedValue{ expected_value, replacement }) |value| {
+                const high: i128 = (@as(i128, 1) << @intCast(ty.int - @intFromBool(value.ty.signed))) - 1;
+                const low: i128 = if (value.ty.signed) -high - 1 else 0;
+                if (value.value.int < low or value.value.int > high) return null;
+            }
+            const success_ordering = std.mem.trim(u8, fields.next() orelse return null, " ");
+            const failure_ordering = std.mem.trim(u8, fields.next() orelse return null, " ");
+            if (fields.next() != null or !atomicCompareOrdering(success_ordering, failure_ordering)) return null;
+            exchange = instruction.index;
+            facts = .{ .ty = ty, .expected = expected_value.value, .replacement = replacement.value, .success_ordering = success_ordering, .failure_ordering = failure_ordering };
+        } else if (std.mem.eql(u8, instruction.opcode, "is_null")) {
+            if (success != null or exchange == null or instruction.operands.len != 1 or !std.mem.eql(u8, instruction.operands[0].kind, "inst") or
+                (std.fmt.parseUnsigned(u32, instruction.operands[0].value, 10) catch return null) != exchange or text.instructionRef(raw.payload) != exchange) return null;
+            const optional = instruction.operands[0].type_text;
+            if (optional.len == 0 or optional[0] != '?') return null;
+            const payload = types.parseZigType(optional[1..]) orelse return null;
+            if (!payload.ir_type.eql(ty)) return null;
+            success = instruction.index;
+        } else if (std.mem.eql(u8, instruction.opcode, "ret") or std.mem.eql(u8, instruction.opcode, "ret_safe")) {
+            if (returned or success == null or instruction.operands.len != 1 or !std.mem.eql(u8, instruction.operands[0].kind, "inst") or
+                !std.mem.eql(u8, instruction.operands[0].type_text, "bool") or
+                (std.fmt.parseUnsigned(u32, instruction.operands[0].value, 10) catch return null) != success or text.instructionRef(raw.payload) != success) return null;
+            returned = true;
+        } else return null;
+    }
+    return if (returned) facts else null;
+}
+
+fn atomicCompareOrdering(success: []const u8, failure: []const u8) bool {
+    if (std.mem.eql(u8, failure, "seq_cst")) return std.mem.eql(u8, success, "seq_cst");
+    if (std.mem.eql(u8, failure, "acquire")) return std.mem.eql(u8, success, "acquire") or std.mem.eql(u8, success, "acq_rel") or std.mem.eql(u8, success, "seq_cst");
+    if (!std.mem.eql(u8, failure, "monotonic")) return false;
+    for ([_][]const u8{ "monotonic", "acquire", "release", "acq_rel", "seq_cst" }) |ordering|
+        if (std.mem.eql(u8, success, ordering)) return true;
+    return false;
 }
 
 pub fn typedDenseIntegerSwitchSummary(

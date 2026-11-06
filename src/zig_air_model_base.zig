@@ -1172,7 +1172,13 @@ pub const TypedAtomicRmwSummary = struct {
     instruction: air_export.TypedInstruction,
 };
 
-pub const TypedAtomicTryLockSummary = struct {};
+pub const TypedAtomicTryLockSummary = struct {
+    ty: ir.Type,
+    expected: ir.Value,
+    replacement: ir.Value,
+    success_ordering: []const u8,
+    failure_ordering: []const u8,
+};
 
 pub const TypedDenseIntegerSwitchSummary = struct {
     results: [5]i32,
