@@ -1,6 +1,6 @@
 # Artifact retention and disk headroom
 
-Updated 2026-11-03 for the user-authorized storage simplification and cleanup.
+Updated 2026-11-06 for the user-authorized storage simplification and cleanup.
 Historical frozen INBOX roots and the exact 43-worktree inventory are retired.
 
 ## Retained state
@@ -28,6 +28,14 @@ Retained source and evidence removed from old run directories can be located by
 name in the manifests and retrieved with `artifact-store get`.
 
 ## Generated run cleanup
+
+The [Fibonacci completion cleanup](evidence/fibonacci_completion_cleanup_20261106.json)
+removes 150 complete idle compiler-cache roots, reclaiming 10.56 GB and increasing
+available filesystem space from 49.50 GB to 60.06 GB. All 169,792 retained regular
+files, the original scratch probes, accepted evidence and worktree edits are
+verified unchanged. Current AIR, installed outputs, diagnostic worktrees,
+performance inputs and shared caches remain. Future builds regenerate compiler
+caches. No archives are created.
 
 The [symbol identity checkpoint](evidence/symbol_identity_acceptance_20261103.json)
 retires 0.81 GB of complete idle project build-cache file allocation before its
