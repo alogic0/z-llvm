@@ -1,6 +1,7 @@
 //! Give i1 truncations and byte loads a canonical 0/1 representation. Truncation
 //! aliases otherwise retain upper bits that an ordinary branch test can observe.
 const std = @import("std");
+const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const forms = @import("scalar_forms.zig");
 
@@ -34,39 +35,37 @@ fn normalize(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Bas
 }
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
-    var result = function;
-    result.blocks = .empty;
+    var candidate = Candidate.init(allocator, function);
     var serial: usize = 0;
-    var changed = false;
-    for (function.blocks.items) |original| {
+    for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;
-        for (original.instructions.items) |inst| {
+        for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!inst.removed and inst.result != null) switch (inst.kind) {
                 .cast => |cast| if (cast.op == .trunc and cast.to_ty.eql(.{ .int = 1 }) and
                     cast.from_ty == .int and cast.from_ty.int > 1 and cast.from_ty.int <= 128 and
                     (cast.value == .named or cast.value == .int))
                 {
+                    try candidate.begin(&block, block_index, instruction_index);
                     try normalize(allocator, function, &block, &serial, cast.value, cast.from_ty.int, inst.result.?);
-                    changed = true;
                     continue;
                 },
                 .load => |load| if (load.ty.eql(.{ .int = 1 }) and load.ty_addrspace == null and
                     load.ptr_addrspace == null and !load.attrs.isBarrier() and load.attrs.syncscope == null)
                 {
+                    try candidate.begin(&block, block_index, instruction_index);
                     var byte = inst;
                     byte.result = try forms.temporary(allocator, function, &serial);
                     byte.kind.load.ty = .{ .int = 8 };
                     try block.instructions.append(allocator, byte);
                     try normalize(allocator, function, &block, &serial, .{ .named = byte.result.? }, 8, inst.result.?);
-                    changed = true;
                     continue;
                 },
                 else => {},
             };
-            try block.instructions.append(allocator, inst);
+            try candidate.keep(&block, inst);
         }
-        try result.blocks.append(allocator, block);
+        try candidate.finishBlock(block);
     }
-    return if (changed) result else null;
+    return candidate.finish();
 }

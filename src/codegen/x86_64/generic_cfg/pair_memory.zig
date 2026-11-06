@@ -3,6 +3,7 @@
 //! that a later store or call could change. Atomic and volatile accesses stay
 //! outside this expansion.
 const std = @import("std");
+const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const machine = @import("../machine.zig");
 const addresses = @import("../symbol_address.zig");
@@ -59,18 +60,17 @@ fn finalStackRead(function: ir.Function, block: ir.BasicBlock, index: usize, ptr
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
     if (!addresses.supportsLayout(if (context) |ctx| ctx.target_datalayout else null)) return null;
-    var result = function;
-    result.blocks = .empty;
+    var candidate = Candidate.init(allocator, function);
     var serial: usize = 0;
-    var changed = false;
-    for (function.blocks.items) |original| {
+    for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;
         const b: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
-        for (original.instructions.items, 0..) |inst, index| {
+        for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!inst.removed and inst.kind == .load and inst.result != null and supported(inst.kind.load) and
-                !finalStackRead(function, original, index, inst.kind.load.ptr))
+                !finalStackRead(function, original, instruction_index, inst.kind.load.ptr))
             {
+                try candidate.begin(&block, block_index, instruction_index);
                 const access = inst.kind.load;
                 var high_attrs = access.attrs;
                 high_attrs.@"align" = @min(access.attrs.@"align" orelse 8, 8);
@@ -81,8 +81,8 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 const high_pair = try b.cast(.zext, word, hi, pair);
                 const shifted = try b.emit(.{ .binary = .{ .op = .shl, .ty = pair, .lhs = high_pair, .rhs = .{ .int = 64 } } });
                 try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .binary = .{ .op = .@"or", .ty = pair, .lhs = low_pair, .rhs = shifted } } });
-                changed = true;
             } else if (!inst.removed and inst.kind == .store and supported(inst.kind.store) and (inst.kind.store.value == .named or inst.kind.store.value == .int)) {
+                try candidate.begin(&block, block_index, instruction_index);
                 const access = inst.kind.store;
                 var high_attrs = access.attrs;
                 high_attrs.@"align" = @min(access.attrs.@"align" orelse 8, 8);
@@ -91,10 +91,9 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 const hi = if (access.value == .int) ir.Value{ .int = @as(u64, @truncate(@as(u128, @bitCast(access.value.int)) >> 64)) } else try b.cast(.trunc, pair, try b.emit(.{ .binary = .{ .op = .lshr, .ty = pair, .lhs = access.value, .rhs = .{ .int = 64 } } }), word);
                 try block.instructions.append(allocator, .{ .result = null, .metadata = inst.metadata, .kind = .{ .store = .{ .ty = word, .value = lo, .ptr = access.ptr, .attrs = access.attrs } } });
                 try block.instructions.append(allocator, .{ .result = null, .metadata = inst.metadata, .kind = .{ .store = .{ .ty = word, .value = hi, .ptr = hi_ptr, .attrs = high_attrs } } });
-                changed = true;
-            } else try block.instructions.append(allocator, inst);
+            } else try candidate.keep(&block, inst);
         }
-        try result.blocks.append(allocator, block);
+        try candidate.finishBlock(block);
     }
-    return if (changed) result else null;
+    return candidate.finish();
 }

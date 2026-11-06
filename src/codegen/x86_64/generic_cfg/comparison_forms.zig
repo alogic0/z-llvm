@@ -2,6 +2,7 @@
 //! Narrow signed order is unsigned order after flipping the original sign bit.
 //! All temporaries belong to the private view; no source IR or ABI is changed.
 const std = @import("std");
+const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const machine = @import("../machine.zig");
 const addresses = @import("../symbol_address.zig");
@@ -140,14 +141,12 @@ pub fn requiresNarrowNormalization(function: ir.Function) bool {
 }
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
-    var result = function;
-    result.blocks = .empty;
-    var changed = false;
+    var candidate = Candidate.init(allocator, function);
     var serial: usize = 0;
-    for (function.blocks.items) |original| {
+    for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;
-        for (original.instructions.items) |inst| {
+        for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!inst.removed and inst.result != null and inst.kind == .icmp) {
                 var cmp = inst.kind.icmp;
                 const pointer = cmp.operand_ty == .ptr;
@@ -170,6 +169,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                     (pointer or bits >= 32 or needsNarrowNormalization(function, cmp)) and
                     (cmp.lhs == .named or cmp.rhs == .named))
                 {
+                    try candidate.begin(&block, block_index, instruction_index);
                     if (cmp.lhs != .named and cmp.rhs == .named) {
                         const lhs = cmp.lhs;
                         cmp.lhs = cmp.rhs;
@@ -194,13 +194,12 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                         .lhs = .{ .named = comparison.result.? },
                         .rhs = .{ .int = 1 },
                     } } });
-                    changed = true;
                     continue;
                 }
             }
-            try block.instructions.append(allocator, inst);
+            try candidate.keep(&block, inst);
         }
-        try result.blocks.append(allocator, block);
+        try candidate.finishBlock(block);
     }
-    return if (changed) result else null;
+    return candidate.finish();
 }

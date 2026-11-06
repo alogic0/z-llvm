@@ -2,6 +2,7 @@
 //! operations. Only private selector IR changes; source widths remain visible
 //! at every original SSA definition and ABI boundary.
 const std = @import("std");
+const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const forms = @import("scalar_forms.zig");
 
@@ -93,20 +94,19 @@ pub fn requiresNormalization(function: ir.Function) bool {
 }
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
-    var result = function;
-    result.blocks = .empty;
+    var candidate = Candidate.init(allocator, function);
     var serial: usize = 0;
-    var changed = false;
-    for (function.blocks.items) |original| {
+    for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;
-        for (original.instructions.items) |inst| {
+        for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!inst.removed and inst.result != null) switch (inst.kind) {
                 .binary => |value| if (integer(value.ty) and supported(value.op) and operand(value.lhs, value.ty.int) and operand(value.rhs, value.ty.int) and
                     ((value.ty.int != 32 and value.ty.int != 64) or value.op == .sdiv or value.op == .srem))
                 {
                     // The ordinary two-register multiply action uses a word
                     // carrier. Truncation retains the original modular result.
+                    try candidate.begin(&block, block_index, instruction_index);
                     const wide: ir.Type = .{ .int = if (value.ty.int <= 32 and value.op != .mul) 32 else 64 };
                     const is_signed = value.op == .ashr or value.op == .sdiv or value.op == .srem;
                     const lhs = if (is_signed) try signed(allocator, function, &block, &serial, value.ty, wide, value.lhs) else try unsigned(allocator, function, &block, &serial, value.ty, wide, value.lhs);
@@ -115,14 +115,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     // Width-specific overflow and exact flags constrain defined
                     // inputs in the original IR. Expanded intermediates wrap.
                     try finish(allocator, &block, inst, wide, value.ty, answer);
-                    changed = true;
                     continue;
                 },
                 .cast => |cast| if (cast.op == .sext and integer(cast.from_ty) and integer(cast.to_ty) and cast.from_ty.int < cast.to_ty.int and operand(cast.value, cast.from_ty.int)) {
+                    try candidate.begin(&block, block_index, instruction_index);
                     const wide: ir.Type = .{ .int = if (cast.to_ty.int <= 32) 32 else 64 };
                     const answer = try signed(allocator, function, &block, &serial, cast.from_ty, wide, cast.value);
                     try finish(allocator, &block, inst, wide, cast.to_ty, answer);
-                    changed = true;
                     continue;
                 } else if (cast.op == .zext and integer(cast.from_ty) and integer(cast.to_ty) and
                     cast.from_ty.int < cast.to_ty.int and cast.to_ty.int > 32 and cast.to_ty.int < 64 and operand(cast.value, cast.from_ty.int))
@@ -130,24 +129,25 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     // An odd-width extension has the same low bits as a word
                     // extension. Retain the declared SSA width with a truncation
                     // after establishing a clean 64-bit carrier.
+                    try candidate.begin(&block, block_index, instruction_index);
                     const wide: ir.Type = .{ .int = 64 };
                     const answer = try unsigned(allocator, function, &block, &serial, cast.from_ty, wide, cast.value);
                     try finish(allocator, &block, inst, wide, cast.to_ty, answer);
-                    changed = true;
                     continue;
                 } else if (truncatedWord(function, cast)) |source| {
                     // zext(trunc(x)) is an ordinary word mask. This also avoids
                     // requiring a separate register carrier for the inner width.
+                    try candidate.begin(&block, block_index, instruction_index);
                     var copy = inst;
                     copy.kind = .{ .binary = .{ .op = .@"and", .ty = cast.to_ty, .lhs = source, .rhs = .{ .int = (@as(i128, 1) << @as(u7, @intCast(cast.from_ty.int))) - 1 } } };
                     try block.instructions.append(allocator, copy);
-                    changed = true;
                     continue;
                 },
                 .select => |select| if (integer(select.ty) and select.ty.int > 32 and select.ty.int < 64 and
                     select.cond_ty.eql(.{ .int = 1 }) and operand(select.cond, 1) and
                     operand(select.true_value, select.ty.int) and operand(select.false_value, select.ty.int))
                 {
+                    try candidate.begin(&block, block_index, instruction_index);
                     const wide: ir.Type = .{ .int = 64 };
                     var expanded = select;
                     expanded.ty = wide;
@@ -155,14 +155,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     expanded.false_value = try unsigned(allocator, function, &block, &serial, select.ty, wide, select.false_value);
                     const answer = try emit(allocator, function, &block, &serial, .{ .select = expanded });
                     try finish(allocator, &block, inst, wide, select.ty, answer);
-                    changed = true;
                     continue;
                 },
                 else => {},
             };
-            try block.instructions.append(allocator, inst);
+            try candidate.keep(&block, inst);
         }
-        try result.blocks.append(allocator, block);
+        try candidate.finishBlock(block);
     }
-    return if (changed) result else null;
+    return candidate.finish();
 }

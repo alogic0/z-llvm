@@ -1,20 +1,19 @@
 //! Overaligned local objects use a bounded backing allocation and a rounded
 //! interior pointer. The fixed stack frame keeps its native 16-byte alignment.
 const std = @import("std");
+const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const machine = @import("../machine.zig");
 const storage = @import("storage_layout.zig");
 const forms = @import("scalar_forms.zig");
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
-    var result = function;
-    result.blocks = .empty;
+    var candidate = Candidate.init(allocator, function);
     var serial: usize = 0;
-    var changed = false;
-    for (function.blocks.items) |original| {
+    for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;
-        for (original.instructions.items) |inst| {
+        for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!inst.removed and inst.kind == .alloca and inst.result != null) {
                 const alloca = inst.kind.alloca;
                 const text = std.mem.trim(u8, alloca.attrs orelse "", " \t");
@@ -24,6 +23,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                         const bytes = std.math.add(u32, layout.bytes, alignment - 1) catch return null;
                         const backing_bytes = std.mem.alignForward(u32, bytes, 4);
                         if (backing_bytes > storage.max_bytes) return null;
+                        try candidate.begin(&block, block_index, instruction_index);
                         const backing = try forms.temporary(allocator, function, &serial);
                         const pointer = try forms.temporary(allocator, function, &serial);
                         const address = try forms.temporary(allocator, function, &serial);
@@ -39,14 +39,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                             .{ .result = aligned, .kind = .{ .binary = .{ .op = .@"and", .ty = .{ .int = 64 }, .lhs = .{ .named = bumped }, .rhs = .{ .int = -@as(i128, alignment) } } } },
                             .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .cast = .{ .op = .inttoptr, .from_ty = .{ .int = 64 }, .value = .{ .named = aligned }, .to_ty = .ptr } } },
                         });
-                        changed = true;
                         continue;
                     };
                 }
             }
-            try block.instructions.append(allocator, inst);
+            try candidate.keep(&block, inst);
         }
-        try result.blocks.append(allocator, block);
+        try candidate.finishBlock(block);
     }
-    return if (changed) result else null;
+    return candidate.finish();
 }

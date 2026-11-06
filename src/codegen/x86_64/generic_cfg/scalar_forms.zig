@@ -1,6 +1,7 @@
 //! Private scalar expansions reuse the selector's ordinary compare/select and
 //! memory paths. The caller owns an arena; the original IR is never changed.
 const std = @import("std");
+const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const sysv = @import("../sysv_abi.zig");
 
@@ -51,16 +52,15 @@ fn unsignedSaturatingSub(call: ir.CallInst) bool {
 }
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
-    var result = function;
-    result.blocks = .empty;
-    var changed = false;
+    var candidate = Candidate.init(allocator, function);
     var serial: usize = 0;
-    for (function.blocks.items) |original| {
+    for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;
-        for (original.instructions.items) |inst| {
+        for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!inst.removed and inst.result != null) switch (inst.kind) {
                 .call => |call| if (unsignedMin(call)) {
+                    try candidate.begin(&block, block_index, instruction_index);
                     const condition = try temporary(allocator, function, &serial);
                     const swapped = call.args.items[0].value == .int;
                     const lhs = call.args.items[@intFromBool(swapped)].value;
@@ -78,9 +78,9 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         .true_value = lhs,
                         .false_value = rhs,
                     } } });
-                    changed = true;
                     continue;
                 } else if (unsignedSaturatingSub(call)) {
+                    try candidate.begin(&block, block_index, instruction_index);
                     const condition = try temporary(allocator, function, &serial);
                     const difference = try temporary(allocator, function, &serial);
                     const lhs = call.args.items[0].value;
@@ -106,7 +106,6 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         .true_value = .{ .int = 0 },
                         .false_value = .{ .named = difference },
                     } } });
-                    changed = true;
                     continue;
                 },
                 .icmp => |icmp| if (!icmp.samesign and
@@ -114,13 +113,14 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     (((icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })) and icmp.lhs == .int) or
                         (icmp.operand_ty == .ptr and icmp.lhs == .null_value)) and icmp.rhs == .named)
                 {
+                    try candidate.begin(&block, block_index, instruction_index);
                     var comparison = inst;
                     comparison.kind.icmp.lhs = icmp.rhs;
                     comparison.kind.icmp.rhs = icmp.lhs;
                     try block.instructions.append(allocator, comparison);
-                    changed = true;
                     continue;
                 } else if (signedLe(icmp)) {
+                    try candidate.begin(&block, block_index, instruction_index);
                     var comparison = inst;
                     comparison.result = try temporary(allocator, function, &serial);
                     comparison.kind.icmp.predicate = .sgt;
@@ -131,14 +131,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         .lhs = .{ .named = comparison.result.? },
                         .rhs = .{ .int = 1 },
                     } } });
-                    changed = true;
                     continue;
                 },
                 else => {},
             };
-            try block.instructions.append(allocator, inst);
+            try candidate.keep(&block, inst);
         }
-        try result.blocks.append(allocator, block);
+        try candidate.finishBlock(block);
     }
-    return if (changed) result else null;
+    return candidate.finish();
 }

@@ -1,6 +1,7 @@
 //! Expand two-word integer operations through ordinary scalar SSA operations.
 //! Existing pair loads, stores, casts and ABI actions retain their ownership.
 const std = @import("std");
+const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const forms = @import("scalar_forms.zig");
 const word: ir.Type = .{ .int = 64 };
@@ -147,17 +148,15 @@ fn divisor(value: ir.BinaryInst) ?u32 {
 }
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
-    var result = function;
-    result.blocks = .empty;
+    var candidate = Candidate.init(allocator, function);
     var serial: usize = 0;
-    var changed = false;
     var known_parts = std.StringHashMap(Parts).init(allocator);
     defer known_parts.deinit();
-    for (function.blocks.items) |original| {
+    for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;
         const builder: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial, .known_parts = &known_parts };
-        for (original.instructions.items) |inst| {
+        for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!inst.removed and inst.result != null) switch (inst.kind) {
                 .binary => |value| if (value.ty.eql(pair) and operand(value.lhs) and operand(value.rhs)) {
                     const expanded = switch (value.op) {
@@ -170,6 +169,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         else => false,
                     };
                     if (expanded) {
+                        try candidate.begin(&block, block_index, instruction_index);
                         const a = try builder.split(value.lhs);
                         var answer: Parts = undefined;
                         switch (value.op) {
@@ -207,11 +207,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                             else => unreachable,
                         }
                         try builder.finish(inst, answer);
-                        changed = true;
                         continue;
                     }
                 },
                 .icmp => |cmp| if (cmp.operand_ty.eql(pair) and operand(cmp.lhs) and operand(cmp.rhs)) {
+                    try candidate.begin(&block, block_index, instruction_index);
                     const a = try builder.split(cmp.lhs);
                     const b = try builder.split(cmp.rhs);
                     const high_equal = try builder.compare(.eq, a.hi, b.hi);
@@ -228,17 +228,17 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     var copy = inst;
                     copy.kind = .{ .cast = .{ .op = .trunc, .from_ty = word, .value = selected, .to_ty = .{ .int = 1 } } };
                     try block.instructions.append(allocator, copy);
-                    changed = true;
                     continue;
                 },
                 .select => |select| if (select.ty.eql(pair) and select.cond_ty.eql(.{ .int = 1 }) and select.cond == .named and operand(select.true_value) and operand(select.false_value)) {
+                    try candidate.begin(&block, block_index, instruction_index);
                     const a = try builder.split(select.true_value);
                     const b = try builder.split(select.false_value);
                     try builder.finish(inst, .{ .lo = try builder.choose(select.cond, a.lo, b.lo), .hi = try builder.choose(select.cond, a.hi, b.hi) });
-                    changed = true;
                     continue;
                 },
                 .cast => |cast| if (cast.to_ty.eql(pair) and cast.from_ty == .int and cast.from_ty.int > 0 and cast.from_ty.int < 128 and cast.value == .int and (cast.op == .zext or cast.op == .sext)) {
+                    try candidate.begin(&block, block_index, instruction_index);
                     const mask = (@as(u128, 1) << @as(u7, @intCast(cast.from_ty.int))) - 1;
                     var bits = @as(u128, @bitCast(cast.value.int)) & mask;
                     if (cast.op == .sext and bits & (@as(u128, 1) << @as(u7, @intCast(cast.from_ty.int - 1))) != 0) bits |= ~mask;
@@ -250,11 +250,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         copy.kind = .{ .cast = .{ .op = .zext, .from_ty = word, .value = try builder.literal(.{ .int = @intCast(bits) }), .to_ty = pair } };
                         try block.instructions.append(allocator, copy);
                     } else try builder.finish(inst, try builder.split(.{ .int = @bitCast(bits) }));
-                    changed = true;
                     continue;
                 } else if (cast.to_ty.eql(pair) and cast.from_ty == .int and cast.from_ty.int > 0 and cast.from_ty.int <= 64 and cast.value == .named and
                     (cast.op == .sext or (cast.op == .zext and cast.from_ty.int < 64)))
                 {
+                    try candidate.begin(&block, block_index, instruction_index);
                     const low = if (cast.from_ty.eql(word)) cast.value else try builder.cast(cast.op, cast.from_ty, cast.value, word);
                     if (cast.op == .sext) {
                         try builder.finish(inst, .{ .lo = low, .hi = try builder.binary(.ashr, low, .{ .int = 63 }) });
@@ -263,9 +263,9 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         copy.kind = .{ .cast = .{ .op = .zext, .from_ty = word, .value = low, .to_ty = pair } };
                         try block.instructions.append(allocator, copy);
                     }
-                    changed = true;
                     continue;
                 } else if (cast.from_ty.eql(pair) and cast.to_ty == .int and cast.to_ty.int > 0 and cast.to_ty.int <= 64 and cast.op == .trunc and cast.value == .int) {
+                    try candidate.begin(&block, block_index, instruction_index);
                     const low: ir.Value = .{ .int = @as(u64, @truncate(@as(u128, @bitCast(cast.value.int)))) };
                     var copy = inst;
                     copy.kind = if (cast.to_ty.eql(word))
@@ -273,14 +273,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     else
                         .{ .cast = .{ .op = .trunc, .from_ty = word, .value = try builder.literal(low), .to_ty = cast.to_ty } };
                     try block.instructions.append(allocator, copy);
-                    changed = true;
                     continue;
                 },
                 else => {},
             };
-            try block.instructions.append(allocator, inst);
+            try candidate.keep(&block, inst);
         }
-        try result.blocks.append(allocator, block);
+        try candidate.finishBlock(block);
     }
-    return if (changed) result else null;
+    return candidate.finish();
 }

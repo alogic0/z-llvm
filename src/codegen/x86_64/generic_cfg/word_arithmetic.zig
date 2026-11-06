@@ -1,5 +1,6 @@
 //! Private scalar forms for full-word division and min/max intrinsics.
 const std = @import("std");
+const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const forms = @import("scalar_forms.zig");
 const sysv = @import("../sysv_abi.zig");
@@ -47,14 +48,12 @@ fn constantProduct(call: ir.CallInst) bool {
 }
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
-    var result = function;
-    result.blocks = .empty;
-    var changed = false;
+    var candidate = Candidate.init(allocator, function);
     var serial: usize = 0;
-    for (function.blocks.items) |original| {
+    for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;
-        for (original.instructions.items) |inst| {
+        for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!inst.removed and inst.result != null) {
                 if (inst.kind == .binary) {
                     var binary = inst.kind.binary;
@@ -67,23 +66,24 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         // Leave zero-divisor UB and the already admitted power-of-two
                         // remainder action under their existing boundaries.
                         if (divisor == null or (divisor.? != 0 and (binary.op != .urem or !std.math.isPowerOfTwo(@as(u128, @intCast(divisor.?)))))) {
+                            try candidate.begin(&block, block_index, instruction_index);
                             binary.lhs = try literal(allocator, function, &block, &serial, binary.ty, binary.lhs);
                             binary.rhs = try literal(allocator, function, &block, &serial, binary.ty, binary.rhs);
                             var copy = inst;
                             copy.kind.binary = binary;
                             try block.instructions.append(allocator, copy);
-                            changed = true;
                             continue;
                         }
                     }
                 } else if (inst.kind == .call and constantProduct(inst.kind.call)) {
+                    try candidate.begin(&block, block_index, instruction_index);
                     var copy = inst;
                     copy.kind.call.args = try inst.kind.call.args.clone(allocator);
                     for (copy.kind.call.args.items) |*arg| arg.value = try literal(allocator, function, &block, &serial, arg.ty, arg.value);
                     try block.instructions.append(allocator, copy);
-                    changed = true;
                     continue;
                 } else if (inst.kind == .call) if (minMax(inst.kind.call)) |predicate| {
+                    try candidate.begin(&block, block_index, instruction_index);
                     const call = inst.kind.call;
                     const lhs = try literal(allocator, function, &block, &serial, call.ret_ty, call.args.items[0].value);
                     const rhs = try literal(allocator, function, &block, &serial, call.ret_ty, call.args.items[1].value);
@@ -101,13 +101,12 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         .true_value = lhs,
                         .false_value = rhs,
                     } } });
-                    changed = true;
                     continue;
                 };
             }
-            try block.instructions.append(allocator, inst);
+            try candidate.keep(&block, inst);
         }
-        try result.blocks.append(allocator, block);
+        try candidate.finishBlock(block);
     }
-    return if (changed) result else null;
+    return candidate.finish();
 }

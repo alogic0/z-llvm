@@ -1,6 +1,7 @@
 //! Expand scalar saturation and narrow bit permutations into existing integer
 //! operations without changing the original function or its ABI.
 const std = @import("std");
+const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const forms = @import("scalar_forms.zig");
 const sysv = @import("../sysv_abi.zig");
@@ -54,15 +55,14 @@ fn operation(call: ir.CallInst) ?Operation {
 }
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
-    var result = function;
-    result.blocks = .empty;
+    var candidate = Candidate.init(allocator, function);
     var serial: usize = 0;
-    var changed = false;
-    for (function.blocks.items) |original| {
+    for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;
-        for (original.instructions.items) |inst| {
+        for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!inst.removed and inst.result != null and inst.kind == .call) if (operation(inst.kind.call)) |op| {
+                try candidate.begin(&block, block_index, instruction_index);
                 const call = inst.kind.call;
                 const bits = call.ret_ty.int;
                 if (minimumMaximum(op)) {
@@ -147,12 +147,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         .false_value = .{ .named = value_name },
                     } } });
                 }
-                changed = true;
                 continue;
             };
-            try block.instructions.append(allocator, inst);
+            try candidate.keep(&block, inst);
         }
-        try result.blocks.append(allocator, block);
+        try candidate.finishBlock(block);
     }
-    return if (changed) result else null;
+    return candidate.finish();
 }
