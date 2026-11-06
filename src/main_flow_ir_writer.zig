@@ -520,7 +520,14 @@ pub fn emitCodegenModule(
         selected_functions += 1;
         var selector_diagnostic_tag: ?[]const u8 = null;
         var selector_diagnostic_detail: ?[]const u8 = null;
-        const selection_scope = @import("compilation_profile.zig").enter(options.profile, .select);
+        const profiling = @import("compilation_profile.zig");
+        const function_scope = if (options.profile) |p| blk: {
+            var instructions: usize = 0;
+            for (function.blocks.items) |block| instructions += block.instructions.items.len;
+            break :blk try p.beginFunction(function.name, function.blocks.items.len, instructions);
+        } else profiling.FunctionScope{};
+        defer function_scope.end();
+        const selection_scope = profiling.enter(options.profile, .select);
         defer selection_scope.end();
         var machine = compilation.select(allocator, triple, function, .{
             .profile = options.profile,

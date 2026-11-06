@@ -112,6 +112,7 @@ fn check(r: *Runner, compiler: []const u8) !void {
     const staged = try invoke(r, compiler, input, &.{"--passes=instcombine,dce"}, "optimize");
     const direct = try invoke(r, compiler, input, &.{"--emit=obj"}, "direct");
     try checkProfile(r, compiler, input, direct, "direct-profile", &.{});
+    try checkFailedProfile(r, compiler);
     const limited = try invoke(r, compiler, input, &.{ "--emit=obj", "--passes=instcombine,dce", "--pass-limit=0" }, "limited");
     try same(c, direct, limited);
     for ([_][]const u8{ "obj", "asm", "selection-owner-manifest" }) |emit| {
@@ -237,7 +238,7 @@ fn checkProfile(r: *Runner, compiler: []const u8, input: []const u8, expected_ob
     try same(c, expected_object, try invoke(r, compiler, input, args, label));
     try same(c, owners, try invoke(r, compiler, input, try std.mem.concat(c.a, []const u8, &.{ options, &.{"--emit=selection-owner-manifest"} }), try c.fmt("{s}-replay", .{label})));
     const measurement = try c.load(profile);
-    if (!u.json.is(try u.get(measurement, "schema"), "compilation-profile-v1") or !(try u.get(measurement, "succeeded")).bool) return error.InvalidCompilationProfile;
+    if (!u.json.is(try u.get(measurement, "schema"), "compilation-profile-v2") or !(try u.get(measurement, "succeeded")).bool) return error.InvalidCompilationProfile;
     const counters = try u.get(measurement, "counters");
     if ((try u.get(counters, "selected_functions")).integer != 10 or (try u.get(counters, "normalization_runs")).integer < 10 or (try u.get(counters, "legalizer_attempts")).integer == 0) return error.InvalidProfileCounters;
     var total: i64 = 0;
@@ -247,6 +248,73 @@ fn checkProfile(r: *Runner, compiler: []const u8, input: []const u8, expected_ob
         total += ns;
     }
     if (total != (try u.get(measurement, "total_ns")).integer or total <= 0) return error.NestedTimingDoubleCounted;
+    const functions = (try u.get(measurement, "functions")).array.items;
+    if (functions.len != 10) return error.MissingFunctionProfiles;
+    var names = std.StringHashMap(void).init(c.a);
+    var attempts: i64 = 0;
+    var allocated: i64 = 0;
+    var grown: i64 = 0;
+    for (functions) |function| {
+        if ((try names.getOrPut(try u.str(function, "name"))).found_existing) return error.DuplicateFunctionProfile;
+        var function_total: i64 = 0;
+        for ((try u.get(function, "phases")).array.items) |phase| function_total += (try u.get(phase, "exclusive_ns")).integer;
+        if (function_total != (try u.get(function, "total_ns")).integer or function_total < 0) return error.InvalidFunctionTime;
+        const counts = try u.get(function, "counters");
+        if ((try u.get(counts, "selected_functions")).integer != 1 or (try u.get(counts, "failed_functions")).integer != 0) return error.InvalidFunctionStatus;
+        attempts += (try u.get(counts, "legalizer_attempts")).integer;
+        const allocations = try u.get(function, "legalizer_allocations");
+        allocated += (try u.get(allocations, "allocated_bytes")).integer;
+        grown += (try u.get(allocations, "grown_bytes")).integer;
+    }
+    if (!names.contains("route") or !names.contains("byte_array_const")) return error.InvalidFunctionNames;
+    const allocations = try u.get(measurement, "legalizer_allocations");
+    if (attempts != (try u.get(counters, "legalizer_attempts")).integer or
+        allocated != (try u.get(allocations, "allocated_bytes")).integer or
+        grown != (try u.get(allocations, "grown_bytes")).integer) return error.InvalidFunctionAccounting;
+    var stage_attempts: i64 = 0;
+    var stage_bytes: i64 = 0;
+    for ((try u.get(measurement, "legalizers")).array.items) |stage| {
+        const split = (try u.get(stage, "rewritten_ns")).integer + (try u.get(stage, "unchanged_ns")).integer + (try u.get(stage, "error_ns")).integer;
+        if (split != (try u.get(stage, "elapsed_ns")).integer or split < 0) return error.InvalidLegalizerTime;
+        stage_attempts += (try u.get(stage, "attempts")).integer;
+        const stats = try u.get(stage, "allocations");
+        stage_bytes += (try u.get(stats, "allocated_bytes")).integer + (try u.get(stats, "grown_bytes")).integer;
+    }
+    if (stage_attempts != attempts or stage_bytes != allocated + grown) return error.InvalidLegalizerAccounting;
+}
+
+fn checkFailedProfile(r: *Runner, compiler: []const u8) !void {
+    const c = r.context;
+    const input = try c.join(&.{ r.output, "profile-failure.ll" });
+    try c.write(input,
+        \\define i32 @good() {
+        \\entry:
+        \\ ret i32 7
+        \\}
+        \\define i256 @bad(i256 %value) {
+        \\entry:
+        \\ ret i256 %value
+        \\}
+        \\
+    );
+    const profile = try c.join(&.{ r.output, "profile-failure.json" });
+    const owners = try c.join(&.{ r.output, "profile-failure.tsv" });
+    const stem = try c.join(&.{ r.output, "profile-failure" });
+    const result = try r.run(&.{ compiler, "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", "--report-all-codegen-failures", "--emit=obj", try c.fmt("--profile={s}", .{profile}), try c.fmt("--selection-owner-output={s}", .{owners}), input }, stem, &c.env, .{});
+    if (result.code == 0 or (try c.read(try c.fmt("{s}.stdout", .{stem}))).len != 0 or u.exists(c.io, owners)) return error.FailedSelectionPublishedObject;
+    const measurement = try c.load(profile);
+    if ((try u.get(measurement, "succeeded")).bool) return error.FailedSelectionProfileSucceeded;
+    const functions = (try u.get(measurement, "functions")).array.items;
+    if (functions.len != 2) return error.MissingFailedFunctionProfile;
+    var selected: i64 = 0;
+    var failed: i64 = 0;
+    for (functions) |function| {
+        const counters = try u.get(function, "counters");
+        selected += (try u.get(counters, "selected_functions")).integer;
+        failed += (try u.get(counters, "failed_functions")).integer;
+        if (u.json.is(try u.get(function, "name"), "bad") and (try u.get(counters, "failed_functions")).integer != 1) return error.WrongFailedFunctionProfile;
+    }
+    if (selected != 1 or failed != 1) return error.InvalidFailedFunctionAccounting;
 }
 
 fn checkArtifact(r: *Runner, compiler: []const u8, kind: []const u8, envelope: []const u8) !void {

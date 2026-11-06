@@ -53,11 +53,7 @@ pub fn tryLowerProfiled(
     var iterations: u64 = 0;
     while (true) {
         iterations += 1;
-        if (profile) |p| {
-            p.counters.selection_iterations += 1;
-            p.counters.max_selection_iterations = @max(p.counters.max_selection_iterations, iterations);
-            p.counters.normalization_runs += 1;
-        }
+        if (profile) |p| p.iteration(iterations);
         const normalized = blk: {
             const scope = profiling.enter(profile, .normalize);
             defer scope.end();
@@ -80,8 +76,13 @@ pub fn tryLowerProfiled(
             if (try optional.next(arena.allocator(), function, module_context, profile)) |rewrite| {
                 if (rewrite.retry_original) {
                     if (profile) |p| p.counters.original_form_retries += 1;
+                    const retry_scope = profiling.retry(profile);
+                    defer retry_scope.end();
                     if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) {
-                        if (profile) |p| p.counters.original_form_selected += 1;
+                        if (profile) |p| {
+                            p.counters.original_form_selected += 1;
+                            p.discardCandidate(rewrite.profile_stage, rewrite.profile_allocation_bytes);
+                        }
                         break :blk .selected;
                     }
                 }

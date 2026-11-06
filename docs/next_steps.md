@@ -1,5 +1,10 @@
 # Active direction
 
+The [compiler selection performance plan](plans/2026-11-06-compiler-selection-performance.md)
+is being implemented: measure function/stage costs, optimize demonstrated work,
+then validate repeated timings and unchanged outputs before accepting a new
+checkpoint. The larger unchanged Zig workload remains separate coverage work.
+
 The [input-driven execution plan](plans/2026-11-06-input-driven-execution.md) is
 complete at `1e513b68`: all 17 integration gates pass. The unchanged JSON parser
 matches 46 inputs in each of three local release modes, including heap growth,

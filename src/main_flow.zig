@@ -137,8 +137,9 @@ pub fn main(init: std.process.Init) !void {
         if (input_path) |i| if (std.mem.eql(u8, p, i)) return error.ConflictingOutputPaths;
     }
     if (owner_path) |o| if (input_path) |i| if (std.mem.eql(u8, o, i)) return error.ConflictingOutputPaths;
-    var profile_state: ?profiling.Profile = if (profile_path != null) .init(io) else null;
+    var profile_state: ?profiling.Profile = if (profile_path != null) .init(allocator, io) else null;
     const profile: ?*profiling.Profile = if (profile_state) |*p| p else null;
+    defer if (profile) |p| p.deinit();
     var succeeded = true;
     defer if (profile) |p| p.write(profile_path.?, succeeded) catch |err| {
         std.debug.print("profile write failed: {s}\n", .{@errorName(err)});
