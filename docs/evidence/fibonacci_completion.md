@@ -25,8 +25,8 @@ check. Most runtime helpers are not exercised by Fibonacci's successful path.
 Mandatory semantic normalization now runs before selection. It refines scalar
 undef/poison PHI inputs, normalizes narrow comparisons and integer width semantics,
 and checks that no required normalization remains. Original source IR and ABI
-parameters remain unchanged. Existing whole-function forms retain their complete
-envelope proofs and explicit classification. Optional instruction-form rewrites
+parameters remain unchanged. Seventeen existing limb and pointer whole-function
+forms retain their envelope proofs and explicit classification. Optional instruction-form rewrites
 still use recursive selection and may retry already normalized input; removing
 that remaining dispatch dependence is future work.
 
@@ -34,7 +34,44 @@ The shared compilation API separates verification, explicit optimization and
 selection. Ordinary object and assembly emission honor `--passes` and
 `--pipeline`; pass traces and timing go to diagnostics, outside object bytes.
 Route checks compare staged and direct preparation, reject unknown passes,
-honor pass limits, exercise AIR input, and execute 201 input values.
+honor pass limits, exercise AIR input, and execute 201 input values. Structured
+IR-writer and descriptor envelopes carry a versioned, validated preparation
+recipe. Passes execute when the adapter builds its typed module; transporting
+the envelope does not claim to produce optimized LLVM IR. Chained requests keep
+their order, limits and diagnostic options without changing module ownership.
+Typed adapter modules enter the generic selector after preparation. These
+fixtures remain bounded semantic recipes; they do not add unchanged-program
+execution coverage.
+
+The first full acceptance attempt stopped at integration gate 8 because the
+IR-writer optimizer call was rejected. Focused adapter checks then exposed a
+legacy Base64 matcher that errored on unrelated removed instructions, TLS
+attribute and calling-convention mismatches, missing checked-operation records
+and declarations, and indirect calls represented as direct calls. Every
+structured case and direct descriptor program now has verification coverage.
+The descriptor slice loop now reads its array and length and returns zero on
+the empty path. Both preparation routes execute 289 data/length combinations,
+the null empty case and the existing wrapper main. A closed nonreturning CFG
+may end in a checked local jump; trailing fallthrough and unknown targets stay
+rejected. Literal half/float/double bitcasts preserve raw bits, with executable
+negative-zero, NaN-payload and subnormal checks. Failed logs remain retained.
+Array addressing covers register-held i32 array pointers and normalizes a
+leading-zero byte-array GEP to a byte offset. The executable checks include
+constant, dynamic and negative offsets; custom layouts remain checked.
+
+Executing the prepared Base64 recipes exposed an incorrect padding-length
+expectation: `6 + sext(true) + sext(true)` is 4, not 8. LLVM independently
+confirms the original fixture's failure. The fixture is corrected and the
+legacy matcher that returned constant success is removed. Eight combinations
+of padding bytes and comparison values now agree with LLVM through direct and
+optimized generic selection; legacy selection rejects unsupported forms.
+The recipe input and output buffers now cover their actual accesses, and
+lifetime intrinsics apply to local allocations. These repairs preserve the
+upstream source and do not expand the unchanged-program claim.
+All 146 IR-writer executions and 100 direct descriptor executions pass focused
+checks. The 24 rendered Base64 recipes compile and execute with LLVM 22 and
+AddressSanitizer (`base64-reference-v4.json` and `.log`), including corrected
+value/block name separation in the textual rendering.
 
 Shared register repairs cover overlapping compare moves, accumulator divisors,
 live RCX shift sources, 32-bit shift writeback, and odd-width cast sources. The
@@ -42,6 +79,8 @@ reviewed C52-0 authority policy reuses a final-use source, preserves a live sour
 with an existing frame, and otherwise allocates scratch. It adds no direct
 register-authority bypass. The entry binding fingerprint changes with the
 reviewed vector ABI binding; the bypass ratchet remains 130.
+The reviewed floating-bitcast fingerprint also changes: literal materialization
+uses the existing clobber and binding paths without adding authority bypasses.
 
 Bounded lowering closes Linux system assembly, i65/i96 carriers, checked
 33–63-bit and two-word arithmetic, exact two-word memory, integer vector lanes,

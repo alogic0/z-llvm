@@ -201,8 +201,12 @@ pub fn validateReleaseSmallStrFromFloatWholeShape(function: ir.Function) !void {
                 .binary => |binary| if (typeIsI128(binary.ty)) {
                     has_i128_math = true;
                 },
-                .load => |load| if (load.ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } })) {
-                    has_vector_i64_load = true;
+                .load => |load| {
+                    if (load.ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } })) has_vector_i64_load = true;
+                    // Instcombine removes zero-offset GEPs, retaining the same
+                    // table address directly on the load.
+                    if (valueReferencesGlobal(load.ptr, "fmt.float.FLOAT64_POW5_INV_SPLIT2")) has_pow5_inv_table = true;
+                    if (valueReferencesGlobal(load.ptr, "fmt.float.FLOAT64_POW5_SPLIT2")) has_pow5_table = true;
                 },
                 .store => |store| if (store.ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } })) {
                     has_vector_i64_store = true;

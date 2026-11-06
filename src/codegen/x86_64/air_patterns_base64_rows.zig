@@ -998,11 +998,14 @@ pub fn lowerBase64DecodeExitStepMainReturn(
     if (!std.mem.eql(u8, function.name, "main")) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (block.instructions.items.len != 2) return false;
+    // Optimized modules can retain removed instructions. An unrelated main
+    // with two slots is not evidence for this complete lifetime-call form.
+    if (block.instructions.items[0].removed or block.instructions.items[1].removed) return false;
 
     const count_arg = [_]ExpectedCallArg{.{ .ty = .ptr, .value = .{ .named = "@base64.decode_exit_count" } }};
     const bits_arg = [_]ExpectedCallArg{.{ .ty = .ptr, .value = .{ .named = "@base64.decode_exit_bits" } }};
-    try validateVoidCall(block.instructions.items[0], "llvm.lifetime.end.p0", &count_arg);
-    try validateVoidCall(block.instructions.items[1], "llvm.lifetime.end.p0", &bits_arg);
+    validateVoidCall(block.instructions.items[0], "llvm.lifetime.end.p0", &count_arg) catch return false;
+    validateVoidCall(block.instructions.items[1], "llvm.lifetime.end.p0", &bits_arg) catch return false;
 
     if (!isInt(ret.value orelse return error.InvalidRet, 0)) return false;
 
@@ -1058,74 +1061,6 @@ pub fn lowerBase64PaddingTailStepMainReturn(
     };
     if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
     if (!isNamed(select.cond, is_pad_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
-
-    const ret_name = switch (ret.value orelse return error.InvalidRet) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
-    };
-    if (!std.mem.eql(u8, ret_name, select_name)) return false;
-
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
-    try machine.instructions.append(allocator, .ret);
-    return true;
-}
-
-pub fn lowerBase64PaddingLengthStepMainReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-    block: ir.BasicBlock,
-    ret: anytype,
-) !bool {
-    if (!std.mem.eql(u8, function.name, "main")) return false;
-    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
-    if (block.instructions.items.len != 13) return false;
-
-    const end_name = block.instructions.items[0].result orelse return false;
-    const validated_end_name = (try validateBase64PaddingLengthEnd(block.instructions.items[0], 2)) orelse return false;
-    if (!std.mem.eql(u8, end_name, validated_end_name)) return false;
-
-    const last_name = (try validateBase64PaddingLengthTailLoad(block.instructions.items[1], block.instructions.items[2], end_name, -1)) orelse return false;
-    const last_eq_name = block.instructions.items[3].result orelse return false;
-    try validateBase64PaddingLengthEq(block.instructions.items[3], last_name);
-    const last_adj_name = try validateBase64PaddingLengthSext(block.instructions.items[4], last_eq_name);
-
-    const base_name = block.instructions.items[5].result orelse return false;
-    const base_add = switch (block.instructions.items[5].kind) {
-        .binary => |binary| binary,
-        else => return false,
-    };
-    if (base_add.op != .add or !base_add.ty.eql(.{ .int = 64 })) return false;
-    if (!((isInt(base_add.lhs, 6) and isNamed(base_add.rhs, last_adj_name)) or
-        (isNamed(base_add.lhs, last_adj_name) and isInt(base_add.rhs, 6))))
-        return false;
-
-    const second_name = (try validateBase64PaddingLengthTailLoad(block.instructions.items[6], block.instructions.items[7], end_name, -2)) orelse return false;
-    const second_eq_name = block.instructions.items[8].result orelse return false;
-    try validateBase64PaddingLengthEq(block.instructions.items[8], second_name);
-    const second_adj_name = try validateBase64PaddingLengthSext(block.instructions.items[9], second_eq_name);
-
-    const total_name = block.instructions.items[10].result orelse return false;
-    const total_add = switch (block.instructions.items[10].kind) {
-        .binary => |binary| binary,
-        else => return false,
-    };
-    if (total_add.op != .add or !total_add.ty.eql(.{ .int = 64 }) or !isNamed(total_add.lhs, base_name) or !isNamed(total_add.rhs, second_adj_name)) return false;
-
-    const ok_name = block.instructions.items[11].result orelse return false;
-    const ok = switch (block.instructions.items[11].kind) {
-        .icmp => |icmp| icmp,
-        else => return false,
-    };
-    if (ok.predicate != .eq or !ok.operand_ty.eql(.{ .int = 64 }) or !isNamed(ok.lhs, total_name) or !isInt(ok.rhs, 8)) return false;
-
-    const select_name = block.instructions.items[12].result orelse return false;
-    const select = switch (block.instructions.items[12].kind) {
-        .select => |select| select,
-        else => return false,
-    };
-    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
-    if (!isNamed(select.cond, ok_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
 
     const ret_name = switch (ret.value orelse return error.InvalidRet) {
         .named => |name| name,
@@ -1991,64 +1926,6 @@ pub fn validateBase64ChunkGuardIcmp(instruction: ir.Instruction, lhs_name: []con
     };
     return icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 64 }) and isNamed(icmp.lhs, lhs_name) and isInt(icmp.rhs, rhs_value);
 }
-
-pub fn validateBase64PaddingLengthEnd(instruction: ir.Instruction, expected_offset: i128) !?[]const u8 {
-    if (instruction.removed) return null;
-    const end_name = instruction.result orelse return null;
-    const gep = switch (instruction.kind) {
-        .gep => |gep| gep,
-        else => return null,
-    };
-    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" })) return null;
-    const symbol = switch (gep.ptr) {
-        .named => |name| try globalSymbolName(name),
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-    };
-    if (!std.mem.eql(u8, symbol, "base64.padding_length_tail")) return null;
-    if (gep.indices.items.len != 1) return null;
-    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, expected_offset)) return null;
-    return end_name;
-}
-
-pub fn validateBase64PaddingLengthTailLoad(gep_inst: ir.Instruction, load_inst: ir.Instruction, end_name: []const u8, expected_offset: i128) !?[]const u8 {
-    if (gep_inst.removed or load_inst.removed) return null;
-    const ptr_name = gep_inst.result orelse return null;
-    const load_name = load_inst.result orelse return null;
-    const gep = switch (gep_inst.kind) {
-        .gep => |gep| gep,
-        else => return null,
-    };
-    if (!gep.source_ty.eql(.{ .int = 8 })) return null;
-    if (!isNamed(gep.ptr, end_name)) return null;
-    if (gep.indices.items.len != 1) return null;
-    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, expected_offset)) return null;
-
-    const load = switch (load_inst.kind) {
-        .load => |load| load,
-        else => return null,
-    };
-    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, ptr_name)) return null;
-    return load_name;
-}
-
-pub fn validateBase64PaddingLengthEq(instruction: ir.Instruction, byte_name: []const u8) !void {
-    const icmp = switch (instruction.kind) {
-        .icmp => |icmp| icmp,
-        else => return error.UnsupportedCodegenInstruction,
-    };
-    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 8 }) or !isNamed(icmp.lhs, byte_name) or !isInt(icmp.rhs, 61)) return error.UnsupportedCodegenInstruction;
-}
-
-pub fn validateBase64PaddingLengthSext(instruction: ir.Instruction, cond_name: []const u8) ![]const u8 {
-    const result = instruction.result orelse return error.UnsupportedCodegenInstruction;
-    const cast = switch (instruction.kind) {
-        .cast => |cast| cast,
-        else => return error.UnsupportedCodegenInstruction,
-    };
-    if (cast.op != .sext or !cast.from_ty.eql(.{ .int = 1 }) or !cast.to_ty.eql(.{ .int = 64 }) or !isNamed(cast.value, cond_name)) return error.UnsupportedCodegenInstruction;
-    return result;
-}
-
 pub fn validateBase64DecodeStepLoad(gep_inst: ir.Instruction, load_inst: ir.Instruction, table_index: i128) !?[]const u8 {
     if (gep_inst.removed or load_inst.removed) return null;
     const gep_name = gep_inst.result orelse return null;

@@ -268,6 +268,7 @@ pub fn writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody(
 
 pub fn writeReleaseSmallMixCAddMayPanicModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
+    try module.declare(.void, "llvm.assume", "i1");
     try module.global("main.zig_k", "private unnamed_addr", .i32, "1", "4");
     try module.constant("__anon_14658", "private unnamed_addr", .{ .text = "[13 x i8]" }, "c\"negative int\\00\"", "1");
     try writer.writeAll("\n");
@@ -453,7 +454,7 @@ pub fn writeReleaseSmallCAbiF128SretStructuredModule(writer: *std.Io.Writer) !vo
     try module.constant("__anon_762", "private unnamed_addr", .{ .text = "[13 x i8]" }, "c\"test failure\\00\"", "1");
     try module.alias("zig_f128_f128_struct", .{ .text = "void (ptr, ptr)" }, "@main.zig_f128_f128_struct");
     try module.declare(.i32, "__eqtf2", "fp128, fp128");
-    try module.declare(.void, "debug.defaultPanic", "ptr, i64");
+    try module.declareWithCallingConv(.void, "debug.defaultPanic", "ptr, i64", "fastcc");
     try writer.writeAll("\n");
     try writeRet0Main(&module);
     var function = try module.function("private ", .void, "main.zig_f128_f128_struct", "ptr %0, ptr %1", " unnamed_addr align 1");
@@ -724,10 +725,10 @@ pub fn writeStrFromFloatHelpStructuredModule(writer: *std.Io.Writer) !void {
     try module.declare(.void, "llvm.assume", "i1");
     try module.declare(.void, "llvm.memcpy.p0.p0.i64", "ptr, ptr, i64, i1");
     try module.declare(.void, "llvm.memset.p0.i64", "ptr, i8, i64, i1");
-    try module.declare(.i64, "fmt.float.mulShift64", "i64, ptr, i32");
-    try module.declare(.i1, "fmt.float.multipleOfPowerOf5__anon_1356", "i64, i32");
-    try module.declare(.i32, "fmt.float.decimalLength__anon_1195", "i64");
-    try module.declare(.void, "fmt.float.writeDecimal__anon_1212", "ptr, ptr, i64");
+    try module.declareWithCallingConv(.i64, "fmt.float.mulShift64", "i64, ptr, i32", "fastcc");
+    try module.declareWithCallingConv(.i1, "fmt.float.multipleOfPowerOf5__anon_1356", "i64, i32", "fastcc");
+    try module.declareWithCallingConv(.i32, "fmt.float.decimalLength__anon_1195", "i64", "fastcc");
+    try module.declareWithCallingConv(.void, "fmt.float.writeDecimal__anon_1212", "ptr, ptr, i64", "fastcc");
     try writer.writeAll("\n");
 
     var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
@@ -1197,22 +1198,22 @@ pub fn writeReleaseSafeRuntimeBranchMixStructuredModule(writer: *std.Io.Writer) 
     try writer.writeAll("\n");
     var merge = try branch_mix.block("merge");
     _ = try merge.phi2("value", checked_pair, sib.local(checked_pair, "%add_checked"), "add_path", sib.local(checked_pair, "%sub_checked"), "sub_path");
-    try writer.writeAll("  %result = extractvalue { i32, i1 } %value, 0\n");
+    _ = try merge.extractValue("result", "{ i32, i1 }", "%value", 0, .i32);
     try merge.ret(sib.local(.i32, "%result"));
     try writer.writeAll("\n");
     var add_path = try branch_mix.block("add_path");
     _ = try add_path.call("add_checked", "tail ", checked_pair, "@llvm.sadd.with.overflow.i32", "i32 %a, i32 %b");
-    try writer.writeAll("  %add_overflow = extractvalue { i32, i1 } %add_checked, 1\n");
+    _ = try add_path.extractValue("add_overflow", "{ i32, i1 }", "%add_checked", 1, .i1);
     try add_path.panicEdge(sib.local(.i1, "%add_overflow"), "merge", "panic_add");
     try writer.writeAll("\n");
     var sub_path = try branch_mix.block("sub_path");
     _ = try sub_path.call("sub_checked", "tail ", checked_pair, "@llvm.ssub.with.overflow.i32", "i32 %a, i32 %b");
-    try writer.writeAll("  %sub_overflow = extractvalue { i32, i1 } %sub_checked, 1\n");
+    _ = try sub_path.extractValue("sub_overflow", "{ i32, i1 }", "%sub_checked", 1, .i1);
     try sub_path.panicEdge(sib.local(.i1, "%sub_overflow"), "merge", "panic_sub");
     try writer.writeAll("\n");
-    try irw.integerOverflowPanicBlock(writer, "panic_add");
+    try writeIntegerOverflowPanicBlockStructured(&branch_mix, "panic_add");
     try writer.writeAll("\n");
-    try irw.integerOverflowPanicBlock(writer, "panic_sub");
+    try writeIntegerOverflowPanicBlockStructured(&branch_mix, "panic_sub");
     try branch_mix.end();
     var panic_fn = try module.function("fastcc ", .void, "\"debug.FullPanic((function 'defaultPanic')).integerOverflow\"", "", "");
     var panic_entry = try panic_fn.block("entry");

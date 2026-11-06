@@ -142,14 +142,20 @@ pub const Module = struct {
             try self.writer.print("@{s} = {s} thread_local({s}) global {s} {s}, align {s}\n", .{ name, linkage, model, ty.llvm(), initializer, align_text });
         }
         if (active_direct) |direct| {
-            const address_attrs = try direct.formatArgs("thread_local {s}", .{model});
+            const address_attrs = try direct.formatArgs("thread_local({s})", .{model});
             try direct.global(name, linkage, .global, ty, initializer, align_text, address_attrs);
         }
     }
 
     pub fn declare(self: *Module, ret_ty: Type, name: []const u8, params: []const u8) !void {
-        try self.writer.print("declare {s} @{s}({s})\n", .{ ret_ty.llvm(), name, params });
-        if (active_direct) |direct| try direct.declare(ret_ty, name, params);
+        return self.declareWithCallingConv(ret_ty, name, params, null);
+    }
+
+    pub fn declareWithCallingConv(self: *Module, ret_ty: Type, name: []const u8, params: []const u8, calling_conv: ?[]const u8) !void {
+        try self.writer.writeAll("declare ");
+        if (calling_conv) |cc| try self.writer.print("{s} ", .{cc});
+        try self.writer.print("{s} @{s}({s})\n", .{ ret_ty.llvm(), name, params });
+        if (active_direct) |direct| try direct.declareWithCallingConv(ret_ty, name, params, calling_conv);
     }
 
     pub fn function(self: *Module, linkage: []const u8, ret_ty: Type, name: []const u8, params: []const u8, attrs: []const u8) !Function {
@@ -526,8 +532,13 @@ pub const DirectBuilder = struct {
     }
 
     pub fn declare(self: *DirectBuilder, ret_ty: Type, name: []const u8, params_text: []const u8) !void {
+        return self.declareWithCallingConv(ret_ty, name, params_text, null);
+    }
+
+    pub fn declareWithCallingConv(self: *DirectBuilder, ret_ty: Type, name: []const u8, params_text: []const u8, calling_conv: ?[]const u8) !void {
         var decl = ir.FunctionDecl.init(stripGlobalPrefix(name), ret_ty.toIr());
         errdefer decl.deinit(self.allocator);
+        decl.calling_conv = calling_conv;
         var iter = std.mem.splitScalar(u8, params_text, ',');
         while (iter.next()) |raw_param| {
             const param_text = std.mem.trim(u8, raw_param, " \t");
@@ -655,9 +666,11 @@ pub const DirectBuilder = struct {
     }
 
     pub fn call(self: *DirectBuilder, result: ?[]const u8, attrs_text: []const u8, ret_ty: Type, callee: []const u8, args_text: []const u8) !void {
+        const indirect = std.mem.startsWith(u8, callee, "%");
         var call_inst: ir.CallInst = .{
             .ret_ty = ret_ty.toIr(),
-            .callee = stripGlobalPrefix(callee),
+            .callee = if (indirect) "" else stripGlobalPrefix(callee),
+            .callee_value = if (indirect) parseValueRef(callee) else null,
             .calling_conv = parseCallingConv(attrs_text),
             .tail_kind = parseTailKind(attrs_text),
             .args = .empty,

@@ -57,6 +57,56 @@ fn check(r: *Runner, compiler: []const u8) !void {
         \\ %answer = add i32 %x, %constant
         \\ ret i32 %answer
         \\}
+        \\define i16 @fp16() {
+        \\entry:
+        \\ %bits = bitcast half 0xH8000 to i16
+        \\ ret i16 %bits
+        \\}
+        \\define i32 @fp32() {
+        \\entry:
+        \\ %bits = bitcast float -0.000000e+00 to i32
+        \\ ret i32 %bits
+        \\}
+        \\define i64 @fp64() {
+        \\entry:
+        \\ %bits = bitcast double 1.000000e+00 to i64
+        \\ ret i64 %bits
+        \\}
+        \\define i64 @fp_nan() {
+        \\entry:
+        \\ %bits = bitcast double 0x7FF8000000000042 to i64
+        \\ ret i64 %bits
+        \\}
+        \\define i64 @fp_subnormal() {
+        \\entry:
+        \\ %bits = bitcast double 0x0000000000000001 to i64
+        \\ ret i64 %bits
+        \\}
+        \\define i32 @array_at(ptr %base, i64 %index) {
+        \\entry:
+        \\ %element = getelementptr [16 x i32], ptr %base, i64 0, i64 %index
+        \\ %value = load i32, ptr %element, align 4
+        \\ ret i32 %value
+        \\}
+        \\define i32 @array_const(ptr %base) {
+        \\entry:
+        \\ %element = getelementptr [16 x i32], ptr %base, i64 0, i64 5
+        \\ %value = load i32, ptr %element, align 4
+        \\ ret i32 %value
+        \\}
+        \\define i8 @byte_array_at(ptr %base, i64 %index) {
+        \\entry:
+        \\ %element = getelementptr [4 x i8], ptr %base, i64 0, i64 %index
+        \\ %value = load i8, ptr %element, align 1
+        \\ ret i8 %value
+        \\}
+        \\@bytes = private constant [4 x i8] c"\00\04\08\0C"
+        \\define i8 @byte_array_const() {
+        \\entry:
+        \\ %element = getelementptr [4 x i8], ptr @bytes, i64 0, i64 3
+        \\ %value = load i8, ptr %element, align 1
+        \\ ret i8 %value
+        \\}
         \\
     );
     const staged = try invoke(r, compiler, input, &.{"--passes=instcombine,dce"}, "optimize");
@@ -75,7 +125,28 @@ fn check(r: *Runner, compiler: []const u8) !void {
             const diagnostics = try c.read(try c.join(&.{ r.output, "traced.stderr" }));
             if (std.mem.indexOf(u8, diagnostics, "; before instcombine") == null or std.mem.indexOf(u8, diagnostics, "; time instcombine") == null) return error.MissingPassDiagnostics;
             const driver = try c.join(&.{ r.output, "driver.c" });
-            try c.write(driver, "extern int route(int); int main(void) { for (int i=-100; i<=100; ++i) if (route(i)!=i+42) return 1; return 0; }\n");
+            try c.write(driver,
+                \\#include <stdint.h>
+                \\extern int route(int);
+                \\extern uint16_t fp16(void);
+                \\extern uint32_t fp32(void);
+                \\extern uint64_t fp64(void), fp_nan(void), fp_subnormal(void);
+                \\extern int array_at(const int *, int64_t), array_const(const int *);
+                \\extern uint8_t byte_array_at(const uint8_t *, int64_t), byte_array_const(void);
+                \\int main(void) {
+                \\  for (int i=-100; i<=100; ++i) if (route(i)!=i+42) return 1;
+                \\  if (fp16()!=0x8000 || fp32()!=0x80000000U) return 2;
+                \\  if (fp64()!=0x3ff0000000000000ULL || fp_nan()!=0x7ff8000000000042ULL || fp_subnormal()!=1) return 3;
+                \\  int values[16]; for (int i=0; i<16; ++i) values[i]=i*7-39;
+                \\  for (int i=0; i<16; ++i) if (array_at(values, i)!=values[i]) return 4;
+                \\  if (array_const(values)!=values[5] || array_at(values+1, -1)!=values[0]) return 5;
+                \\  const uint8_t bytes[4] = {0, 65, 128, 255};
+                \\  for (int i=0; i<4; ++i) if (byte_array_at(bytes, i)!=bytes[i]) return 6;
+                \\  if (byte_array_at(bytes+1, -1)!=0 || byte_array_const()!=12) return 7;
+                \\  return 0;
+                \\}
+                \\
+            );
             const object = try c.join(&.{ r.output, "route.o" });
             try c.copy(inline_result, object);
             const exe = try c.join(&.{ r.output, "route" });
@@ -123,5 +194,153 @@ fn check(r: *Runner, compiler: []const u8) !void {
         try same(c, prepared, try invoke(r, compiler, air, &.{ option, "--passes=instcombine,dce", "--trace" }, try c.fmt("air-inline-{s}", .{emit})));
         const diagnostics = try c.read(try c.join(&.{ r.output, try c.fmt("air-inline-{s}.stderr", .{emit}) }));
         if (std.mem.indexOf(u8, diagnostics, "; before instcombine") == null) return error.AirOptimizationWasIgnored;
+    }
+    try checkArtifact(r, compiler, "builder",
+        \\; zllvm_ir_writer_construction = "ir-construction=zllvm-structured-builder"
+        \\; zllvm_ir_writer_case = "releasefast_tiny_scalar"
+        \\; deliberately no LLVM body: the structured builder owns the module
+        \\
+    );
+    try checkArtifact(r, compiler, "descriptor",
+        \\; zllvm_semantic_descriptor = "descriptor-owned"
+        \\; zllvm_ir_writer_wrapper = "tiny_scalar_main.zig"
+        \\; zllvm_ir_writer_mode = "ReleaseFast"
+        \\; zllvm_ir_writer_source_fixture = "-"
+        \\; zllvm_ir_writer_source_tag = "contract-test"
+        \\; zllvm_semantic_descriptor_body = "scalar-add-ret"
+        \\; zllvm_ir_writer_surface = "scalar-add-ret"
+        \\; deliberately no LLVM body: the descriptor owns the module
+        \\
+    );
+    try checkArtifact(r, compiler, "slice",
+        \\; zllvm_semantic_descriptor = "descriptor-owned"
+        \\; zllvm_ir_writer_wrapper = "runtime_slice_sum_main.zig"
+        \\; zllvm_ir_writer_mode = "ReleaseFast"
+        \\; zllvm_ir_writer_source_fixture = "-"
+        \\; zllvm_ir_writer_source_tag = "contract-test"
+        \\; zllvm_semantic_descriptor_body = "slice-loop-sum"
+        \\; zllvm_ir_writer_surface = "slice-loop-sum"
+        \\
+    );
+    try checkPaddingLength(r, compiler);
+}
+
+fn checkArtifact(r: *Runner, compiler: []const u8, kind: []const u8, envelope: []const u8) !void {
+    const c = r.context;
+    const input = try c.join(&.{ r.output, try c.fmt("{s}.recipe", .{kind}) });
+    try c.write(input, envelope);
+    const staged = try invoke(r, compiler, input, &.{ "--passes=instcombine,dce", "--trace", "--time" }, try c.fmt("{s}-prepare", .{kind}));
+    const staged_text = try c.read(staged);
+    if (!std.mem.endsWith(u8, staged_text, envelope) or !std.mem.startsWith(u8, staged_text, "; zllvm_deferred_preparation_v1 = ")) return error.ArtifactOwnershipLost;
+    const limited = try invoke(r, compiler, input, &.{ "--passes=instcombine,dce", "--pass-limit=0" }, try c.fmt("{s}-limited", .{kind}));
+    const limited_object = try invoke(r, compiler, limited, &.{"--emit=obj"}, try c.fmt("{s}-limited-object", .{kind}));
+    const unoptimized = try invoke(r, compiler, input, &.{"--emit=obj"}, try c.fmt("{s}-unoptimized", .{kind}));
+    try same(c, limited_object, unoptimized);
+    var prepared_object: ?[]const u8 = null;
+    for ([_][]const u8{ "obj", "asm", "selection-owner-manifest" }) |emit| {
+        const option = try c.fmt("--emit={s}", .{emit});
+        const label = try c.fmt("{s}-staged-{s}", .{ kind, emit });
+        const prepared = try invoke(r, compiler, staged, &.{option}, label);
+        if (std.mem.eql(u8, emit, "obj")) prepared_object = prepared;
+        const inline_result = try invoke(r, compiler, input, &.{ option, "--passes=instcombine,dce" }, try c.fmt("{s}-inline-{s}", .{ kind, emit }));
+        try same(c, prepared, inline_result);
+        const diagnostics = try c.read(try c.join(&.{ r.output, try c.fmt("{s}.stderr", .{label}) }));
+        if (std.mem.indexOf(u8, diagnostics, "; before instcombine") == null or std.mem.indexOf(u8, diagnostics, "; time instcombine") == null) return error.DeferredOptimizationWasIgnored;
+        // This builder emits foldable arithmetic. The descriptor fixture is
+        // already constant, so its trace proves execution without a byte change.
+        if (std.mem.eql(u8, kind, "builder") and std.mem.eql(u8, emit, "obj") and std.mem.eql(u8, try c.read(prepared), try c.read(unoptimized))) return error.ArtifactOptimizationDidNotChangeObject;
+    }
+    const chained = try invoke(r, compiler, limited, &.{"--pipeline=zig-release-fast-accepted"}, try c.fmt("{s}-chained", .{kind}));
+    const chained_object = try invoke(r, compiler, chained, &.{"--emit=obj"}, try c.fmt("{s}-chained-object", .{kind}));
+    try same(c, chained_object, try invoke(r, compiler, input, &.{ "--emit=obj", "--pipeline=zig-release-fast-accepted" }, try c.fmt("{s}-pipeline-object", .{kind})));
+    const stem = try c.join(&.{ r.output, try c.fmt("{s}-invalid", .{kind}) });
+    const failure = try r.run(&.{ compiler, "--passes=not-a-pass", input }, stem, &c.env, .{});
+    if (failure.code == 0 or (try c.read(try c.fmt("{s}.stdout", .{stem}))).len != 0 or std.mem.indexOf(u8, try c.read(try c.fmt("{s}.stderr", .{stem})), "UnknownPass") == null) return error.InvalidArtifactPassWasIgnored;
+    if (std.mem.eql(u8, kind, "slice")) try checkSliceExecution(r, &.{ unoptimized, prepared_object.? });
+}
+
+fn checkSliceExecution(r: *Runner, objects: []const []const u8) !void {
+    const c = r.context;
+    const driver = try c.join(&.{ r.output, "slice-driver.c" });
+    try c.write(driver,
+        \\#include <stdint.h>
+        \\extern int slice_sum(const int *, uint64_t) __asm__("aggregates.slice_sum");
+        \\extern int descriptor_main(void);
+        \\int main(void) {
+        \\  if (descriptor_main() != 0 || slice_sum(0, 0) != 0) return 1;
+        \\  for (int seed = -8; seed <= 8; ++seed) {
+        \\    int values[16], expected = 0;
+        \\    for (int i = 0; i < 16; ++i) values[i] = (i * 7) - seed * 3;
+        \\    for (unsigned n = 0; n <= 16; ++n) {
+        \\      if (slice_sum(values, n) != expected) return 2;
+        \\      if (n < 16) expected += values[n];
+        \\    }
+        \\  }
+        \\  return 0;
+        \\}
+        \\
+    );
+    for (objects, 0..) |object, index| {
+        const exported = try c.join(&.{ r.output, try c.fmt("slice-{d}.o", .{index}) });
+        try r.require(&.{ "objcopy", "--redefine-sym", "main=descriptor_main", "--globalize-symbol", "aggregates.slice_sum", object, exported }, try c.join(&.{ r.output, try c.fmt("slice-export-{d}", .{index}) }), &c.env);
+        const exe = try c.join(&.{ r.output, try c.fmt("slice-{d}", .{index}) });
+        try r.require(&.{ "cc", "-no-pie", "-Wl,-z,noexecstack", driver, exported, "-o", exe }, try c.join(&.{ r.output, try c.fmt("slice-link-{d}", .{index}) }), &c.env);
+        try r.observe(exe, &.{}, 0, "", try c.join(&.{ r.output, try c.fmt("slice-execute-{d}", .{index}) }), &c.env);
+    }
+}
+
+// The old whole-function matcher returned success even when sext i1 made
+// the fixture's comparison false. Vary both memory bytes and the expectation,
+// and check default/generic selection against an independent LLVM execution.
+fn checkPaddingLength(r: *Runner, compiler: []const u8) !void {
+    const c = r.context;
+    for ([_]u32{ 0, 61, 61 << 8, 15677 }) |tail| {
+        for ([_]u32{ 4, 8 }) |expected| {
+            const label = try c.fmt("padding-{d}-{d}", .{ tail, expected });
+            const input = try c.join(&.{ r.output, try c.fmt("{s}.ll", .{label}) });
+            try c.write(input, try c.fmt(
+                \\@base64.padding_length_tail = private unnamed_addr global i32 {d}, align 4
+                \\define i32 @main() {{
+                \\entry:
+                \\ %end = getelementptr [1 x i8], ptr @base64.padding_length_tail, i64 2
+                \\ %last_ptr = getelementptr i8, ptr %end, i64 -1
+                \\ %last = load i8, ptr %last_ptr, align 1
+                \\ %last_eq = icmp eq i8 %last, 61
+                \\ %last_adj = sext i1 %last_eq to i64
+                \\ %base = add i64 6, %last_adj
+                \\ %second_ptr = getelementptr i8, ptr %end, i64 -2
+                \\ %second = load i8, ptr %second_ptr, align 1
+                \\ %second_eq = icmp eq i8 %second, 61
+                \\ %second_adj = sext i1 %second_eq to i64
+                \\ %total = add i64 %base, %second_adj
+                \\ %ok = icmp eq i64 %total, {d}
+                \\ %ret = select i1 %ok, i32 0, i32 1
+                \\ ret i32 %ret
+                \\}}
+                \\
+            , .{ tail, expected }));
+            const exit_code: u8 = if (tail == 15677 and expected == 4) 0 else 1;
+            const reference = try c.join(&.{ r.output, try c.fmt("{s}-reference", .{label}) });
+            try r.require(&.{ "clang-22", "-Wno-override-module", "-O0", input, "-o", reference }, try c.fmt("{s}-compile", .{reference}), &c.env);
+            try r.observe(reference, &.{}, exit_code, "", try c.fmt("{s}-execute", .{reference}), &c.env);
+            for ([_][]const []const u8{ &.{}, &.{"--generic-cfg-selector"}, &.{ "--generic-cfg-selector", "--passes=zig-release-small-accepted" } }, 0..) |options, index| {
+                const stem = try c.join(&.{ r.output, try c.fmt("{s}-{d}", .{ label, index }) });
+                const command = try std.mem.concat(c.a, []const u8, &.{ &.{ compiler, "--emit=obj", "--target=x86_64-unknown-linux-gnu" }, options, &.{input} });
+                const compilation_result = try r.run(command, try c.fmt("{s}-object", .{stem}), &c.env, .{});
+                // The legacy route may reject this form. It must never turn
+                // an unproved memory-dependent computation into constant success.
+                if (index == 0 and compilation_result.code != 0) {
+                    const diagnostic = try c.read(try c.fmt("{s}-object.stderr", .{stem}));
+                    if (std.mem.indexOf(u8, diagnostic, "UnsupportedCodegenInstruction") == null or
+                        (try c.read(try c.fmt("{s}-object.stdout", .{stem}))).len != 0) return error.UnexpectedLegacyFailure;
+                    continue;
+                }
+                if (compilation_result.code != 0) return error.PaddingLengthCompilationFailed;
+                const object = try c.fmt("{s}.o", .{stem});
+                try c.copy(try c.fmt("{s}-object.stdout", .{stem}), object);
+                try r.require(&.{ "cc", "-no-pie", "-Wl,-z,noexecstack", object, "-o", stem }, try c.fmt("{s}-link", .{stem}), &c.env);
+                try r.observe(stem, &.{}, exit_code, "", try c.fmt("{s}-execute", .{stem}), &c.env);
+            }
+        }
     }
 }

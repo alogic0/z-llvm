@@ -60,8 +60,7 @@ test "address flow schedules late dominators and retains every unreachable block
 test "address flow byte offsets preserve exact scalar aggregate and large strides" {
     const Case = struct { spelling: []const u8, size: u64 };
     for ([_]Case{ .{ .spelling = "i32", .size = 4 }, .{ .spelling = "i64", .size = 8 }, .{ .spelling = "[0 x i8]", .size = 0 }, .{ .spelling = "[257 x i8]", .size = 257 }, .{ .spelling = "{ i8, i64 }", .size = 16 } }) |case| {
-        const text = try std.fmt.allocPrint(std.testing.allocator,
-            "define i64 @f(ptr %p, i64 %index) {{\nentry:\n  %q = getelementptr {s}, ptr %p, i64 %index\n  %bits = ptrtoint ptr %q to i64\n  ret i64 %bits\n}}\n", .{case.spelling});
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @f(ptr %p, i64 %index) {{\nentry:\n  %q = getelementptr {s}, ptr %p, i64 %index\n  %bits = ptrtoint ptr %q to i64\n  ret i64 %bits\n}}\n", .{case.spelling});
         defer std.testing.allocator.free(text);
         var module = try ir.Module.parse(std.testing.allocator, text);
         defer module.deinit();
@@ -91,7 +90,12 @@ test "address flow materializes scalar frame pointers for bounded memory intrins
             \\{s}
             \\  ret i64 {s}
             \\}}
-        , .{ bits, bits / 8, bits, if (bits == 64) "" else switch (bits) { 8 => "  %extended = zext i8 %loaded to i64", 16 => "  %extended = zext i16 %loaded to i64", 32 => "  %extended = zext i32 %loaded to i64", else => unreachable }, if (bits == 64) "%loaded" else "%extended" });
+        , .{ bits, bits / 8, bits, if (bits == 64) "" else switch (bits) {
+            8 => "  %extended = zext i8 %loaded to i64",
+            16 => "  %extended = zext i16 %loaded to i64",
+            32 => "  %extended = zext i32 %loaded to i64",
+            else => unreachable,
+        }, if (bits == 64) "%loaded" else "%extended" });
         defer std.testing.allocator.free(text);
         var module = try ir.Module.parse(std.testing.allocator, text);
         defer module.deinit();
@@ -104,6 +108,34 @@ test "address flow materializes scalar frame pointers for bounded memory intrins
             try std.testing.expectEqual(input & mask, run(&input));
         }
     }
+}
+
+test "address flow byte-array elements retain signed offsets and checked layout" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\define i64 @f(ptr %p, i64 %index) {
+        \\entry:
+        \\ %q = getelementptr [4 x i8], ptr %p, i64 0, i64 %index
+        \\ %bits = ptrtoint ptr %q to i64
+        \\ ret i64 %bits
+        \\}
+    );
+    defer module.deinit();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const view = (try addresses.legalize(arena.allocator(), module.functions.items[0], null)).?;
+    try std.testing.expect(try addresses.legalize(arena.allocator(), view, null) == null);
+    try std.testing.expectEqual(@as(usize, 2), module.functions.items[0].blocks.items[0].instructions.items[0].kind.gep.indices.items.len);
+    const memory = try executable(module);
+    defer std.posix.munmap(memory);
+    const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+    for ([_]u64{ 0, 1, 3, 255, 0x8000000000000000, std.math.maxInt(u64) }) |index|
+        try std.testing.expectEqual(@as(u64, 4096) +% index, run(4096, index));
+    for ([_][]const u8{ "E-p:64:64", "e-p:32:32", "e-ni:0", "e-i8:16:16" }) |layout| {
+        const context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = layout };
+        try std.testing.expect(try addresses.legalize(arena.allocator(), module.functions.items[0], &context) == null);
+    }
+    module.functions.items[0].blocks.items[0].instructions.items[0].kind.gep.indices.items[0].value = .{ .int = 1 };
+    try std.testing.expect(try addresses.legalize(arena.allocator(), module.functions.items[0], null) == null);
 }
 
 test "address flow rejects nonintegral narrow big endian and unproved pointee layouts" {

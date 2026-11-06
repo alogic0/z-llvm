@@ -75,6 +75,14 @@ pub fn lowerToStructuredIr(program: Program, writer: *std.Io.Writer) !void {
     try verify(canonicalized);
     try verifyCanonicalizedReleaseProgram(program, canonicalized);
     var module = sib.Module.init(writer);
+    var has_checked_add = false;
+    var has_checked_mul = false;
+    for (canonicalized.functions) |function| for (function.blocks) |block| for (block.instructions) |instruction| {
+        has_checked_add = has_checked_add or instruction == .checked_add;
+        has_checked_mul = has_checked_mul or instruction == .checked_mul;
+    };
+    if (has_checked_add) try module.declare(.{ .text = "{ i32, i1 }" }, "llvm.sadd.with.overflow.i32", "i32, i32");
+    if (has_checked_mul) try module.declare(.{ .text = "{ i32, i1 }" }, "llvm.smul.with.overflow.i32", "i32, i32");
     for (canonicalized.globals) |global| {
         try lowering.lowerGlobal(&module, global);
     }
@@ -1378,24 +1386,26 @@ const slice_entry_insts = [_]Instruction{
     .{ .compare = .{ .result = "empty", .op = .eq, .ty = .{ .int = 64 }, .lhs = i64Ref("%len"), .rhs = i64Ref("0") } },
 };
 const slice_loop_insts = [_]Instruction{
-    phiI32("index", "0", "entry", "%next", "body"),
+    .{ .phi = .{ .result = "index", .ty = .{ .int = 64 }, .incoming = &.{
+        .{ .block = "entry", .value = i64Ref("0") },
+        .{ .block = "body", .value = i64Ref("%next") },
+    } } },
     phiI32("sum", "0", "entry", "%sum_next", "body"),
-    cmpI32("done", "eq", "%index", "3"),
+    .{ .compare = .{ .result = "done", .op = .eq, .ty = .{ .int = 64 }, .lhs = i64Ref("%index"), .rhs = i64Ref("%len") } },
 };
 const slice_body_insts = [_]Instruction{
-    addI32Ref("loaded", "%index", "1"),
+    .{ .binop = .{ .result = "offset", .op = .mul, .ty = .{ .int = 64 }, .lhs = i64Ref("%index"), .rhs = i64Ref("4") } },
+    .{ .gep = .{ .result = "element", .base = ptrRef("%ptr"), .indices = &.{i64Ref("%offset")} } },
+    loadI32("loaded", "%element"),
     addI32Ref2("sum_next", "%sum", "%loaded"),
-    addI32Ref("next", "%index", "1"),
-};
-const slice_exit_insts = [_]Instruction{
-    cmpI32("ok", "eq", "%sum", "6"),
-    selectI32("retv", "%ok", "0", "1"),
+    .{ .binop = .{ .result = "next", .op = .add, .ty = .{ .int = 64 }, .lhs = i64Ref("%index"), .rhs = i64Ref("1") } },
 };
 const slice_sum_blocks = [_]Block{
-    .{ .name = "entry", .instructions = &slice_entry_insts, .terminator = .{ .condbr = .{ .cond = boolRef("%empty"), .then_block = "exit", .else_block = "loop" } } },
+    .{ .name = "entry", .instructions = &slice_entry_insts, .terminator = .{ .condbr = .{ .cond = boolRef("%empty"), .then_block = "zero", .else_block = "loop" } } },
     .{ .name = "loop", .instructions = &slice_loop_insts, .terminator = .{ .condbr = .{ .cond = boolRef("%done"), .then_block = "exit", .else_block = "body" } } },
     .{ .name = "body", .instructions = &slice_body_insts, .terminator = .{ .br = "loop" } },
-    .{ .name = "exit", .instructions = &slice_exit_insts, .terminator = .{ .ret = i32Ref("%retv") } },
+    .{ .name = "exit", .instructions = &.{}, .terminator = .{ .ret = i32Ref("%sum") } },
+    .{ .name = "zero", .instructions = &.{}, .terminator = .{ .ret = i32Ref("0") } },
 };
 const slice_sum_functions = [_]Function{
     mainFunction(&slice_sum_main_blocks),

@@ -19,6 +19,21 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         for (original.instructions.items) |inst| {
             if (!inst.removed and inst.result != null and inst.kind == .gep) {
                 const gep = inst.kind.gep;
+                // A leading zero steps within the same array; the second
+                // index selects a byte. Keep the layout proof explicit and
+                // reuse ordinary byte addressing for globals and parameters.
+                if (gep.ptr_addrspace == null and gep.indices.items.len == 2 and
+                    gep.indices.items[0].ty.eql(.{ .int = 64 }) and gep.indices.items[0].value.eql(.{ .int = 0 }) and
+                    gep.indices.items[1].ty.eql(.{ .int = 64 }) and isByteArray(context, gep.source_ty))
+                {
+                    var copy = inst;
+                    copy.kind.gep.source_ty = .{ .int = 8 };
+                    copy.kind.gep.indices = .empty;
+                    try copy.kind.gep.indices.append(allocator, gep.indices.items[1]);
+                    try block.instructions.append(allocator, copy);
+                    changed = true;
+                    continue;
+                }
                 if (gep.ptr_addrspace == null and gep.indices.items.len == 1 and
                     !gep.source_ty.eql(.{ .int = 8 }) and gep.indices.items[0].ty.eql(.{ .int = 64 }) and
                     (gep.indices.items[0].value == .int or gep.indices.items[0].value == .named))
@@ -59,4 +74,17 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         try result.blocks.append(allocator, block);
     }
     return if (changed) result else null;
+}
+
+fn isByteArray(context: ?*const machine.ReadOnlyModuleContext, ty: ir.Type) bool {
+    if (ty != .aggregate) return false;
+    const text = std.mem.trim(u8, ty.aggregate, " \t\r\n");
+    if (text.len < 2 or text[0] != '[' or text[text.len - 1] != ']') return false;
+    var tokens = std.mem.tokenizeAny(u8, text[1 .. text.len - 1], " \t\r\n");
+    _ = std.fmt.parseUnsigned(u32, tokens.next() orelse return false, 10) catch return false;
+    if (!std.mem.eql(u8, tokens.next() orelse return false, "x") or
+        !std.mem.eql(u8, tokens.next() orelse return false, "i8") or tokens.next() != null) return false;
+    _ = storage.query(context, ty) orelse return false;
+    const element = storage.query(context, .{ .int = 8 }) orelse return false;
+    return element.bytes == 1;
 }

@@ -72,7 +72,6 @@ const lowerBase64ResidualFinalMaskStepMainReturn = air_patterns_base64_rows.lowe
 const lowerBase64ResidualPaddingLoopStepMainReturn = air_patterns_base64_rows.lowerBase64ResidualPaddingLoopStepMainReturn;
 const lowerBase64DecodeExitStepMainReturn = air_patterns_base64_rows.lowerBase64DecodeExitStepMainReturn;
 const lowerBase64PaddingTailStepMainReturn = air_patterns_base64_rows.lowerBase64PaddingTailStepMainReturn;
-const lowerBase64PaddingLengthStepMainReturn = air_patterns_base64_rows.lowerBase64PaddingLengthStepMainReturn;
 const lowerBase64ChunkGuardStepMainReturn = air_patterns_base64_rows.lowerBase64ChunkGuardStepMainReturn;
 const lowerBase64SourceStrideStepMainReturn = air_patterns_base64_rows.lowerBase64SourceStrideStepMainReturn;
 const lowerBase64SourceBundleStepMainReturn = air_patterns_base64_rows.lowerBase64SourceBundleStepMainReturn;
@@ -203,7 +202,6 @@ pub fn lowerStraightLineReturn(
             if (try lowerBase64SourceBundleStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64SourceStrideStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ChunkGuardStepMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerBase64PaddingLengthStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64PaddingTailStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualByteStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualAccumulatorStepMainReturn(allocator, machine, function, block, ret)) return;

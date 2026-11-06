@@ -735,7 +735,11 @@ pub fn verifyFunction(function: MachineFunction) !void {
             },
         }
     }
-    if (!saw_terminator) return error.MissingMachineReturn;
+    // A closed branch cycle is a valid nonreturning function. Label targets
+    // were checked above; requiring a final jump rules out falling off the end.
+    if (!saw_terminator and (function.instructions.items.len == 0 or
+        function.instructions.items[function.instructions.items.len - 1] != .jmp))
+        return error.MissingMachineReturn;
 }
 
 // Prove the incoming return-register definitions for a final shared epilogue.

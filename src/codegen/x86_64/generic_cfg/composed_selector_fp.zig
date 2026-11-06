@@ -467,7 +467,10 @@ fn lowerFpIntBitcast(selector: *ComposedBlockSelector, result_name: []const u8, 
     if (!isFpIntBitcast(cast)) return .{ .no_emitter = "composed-block-fp-bitcast-type" };
     if (cast.from_ty == .half or cast.from_ty == .float or cast.from_ty == .double) {
         const bits: u16 = if (cast.from_ty == .half) 16 else if (cast.from_ty == .float) 32 else 64;
-        const source = selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-fp-bitcast-source" };
+        const source = if (cast.value == .fp) blk: {
+            if (try materializeFpValue(selector, cast.value, .xmm0, bits)) |diagnostic| return diagnostic;
+            break :blk selector_types.ValueLoc{ .xmm = .{ .reg = .xmm0, .bits = bits } };
+        } else selector_state.resolveValue(selector, cast.value) orelse return .{ .unsupported_value = "composed-block-fp-bitcast-source" };
         try selector_state.clobberAccumulator(selector);
         const reg = switch (source) {
             .xmm => |fp| if (fp.bits == bits) fp.reg else return .{ .unsupported_value = "composed-block-fp-bitcast-source" },

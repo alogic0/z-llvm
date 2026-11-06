@@ -13,6 +13,14 @@ pub const Options = struct {
 };
 pub const SelectionOptions = codegen.x86_64.CodegenOptions;
 
+/// Validate a deferred request without constructing or optimizing a module.
+pub fn validate(allocator: std.mem.Allocator, options: Options) !void {
+    const sequence = options.optimization orelse return;
+    var manager = pm.ModulePassManager.init(allocator);
+    defer manager.deinit();
+    try pipelines.addPasses(&manager, sequence);
+}
+
 pub fn prepare(allocator: std.mem.Allocator, io: ?std.Io, module: *ir.Module, diagnostics: *std.Io.Writer, options: Options) !void {
     try module.verify();
     const sequence = options.optimization orelse return;

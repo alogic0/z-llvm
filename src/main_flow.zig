@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("ir.zig");
 const compilation = @import("compilation.zig");
+const compilation_artifact = @import("compilation_artifact.zig");
 const target = @import("target.zig");
 const zae = @import("zig_air_export.zig");
 const zal = @import("zig_air_lowering.zig");
@@ -29,6 +30,7 @@ const usage =
     \\Default input limit: 1048576 bytes
     \\--codegen-reachable selects module dependencies for object/owner output; opaque references retain all definitions.
     \\Explicit --passes/--pipeline run before IR, object, assembly and owner output. Object emission defaults to no optimization. Codegen traces and timing go to stderr.
+    \\Structured adapter envelopes carry explicit passes for execution when their typed module is built; --emit=ir preserves this deferred recipe.
     \\
 ;
 
@@ -183,14 +185,13 @@ pub fn main(init: std.process.Init) !void {
         return;
     } else if (resolveDirectSemanticDescriptor(io, input)) |descriptor| {
         if (emit == .ir) {
-            if (explicit_optimization) return error.OptimizationNotApplicableToArtifact;
             var stdout_buffer: [4096]u8 = undefined;
             var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
-            try stdout_writer.interface.writeAll(input);
+            try compilation_artifact.write(allocator, &stdout_writer.interface, input, optimization);
             try stdout_writer.interface.flush();
             return;
         }
-        if (emit == .obj or emit == .@"asm") {
+        if (emit == .obj or emit == .@"asm" or emit == .selection_owner_manifest) {
             var module = buildStructuredDirectModuleFromDescriptor(allocator, io, descriptor) catch |err| {
                 try fatal(io, "direct semantic descriptor module build failed for {s}: {any}\n", .{ descriptor.id, err });
             };
@@ -202,25 +203,27 @@ pub fn main(init: std.process.Init) !void {
                 if (module.target_triple == null) module.target_triple = triple;
             }
             try runStructuredDirectAcceptedPipelineForSurface(allocator, io, &module, init.environ_map, descriptor.surface);
+            try prepareArtifact(allocator, io, &module, input);
             try prepareForCodegen(allocator, io, &module, optimization);
             try emitCodegenModule(allocator, io, module, emit, target_triple, .{
                 .quiet = quiet,
                 .report_all_failures = report_all_codegen_failures,
-                .generic_cfg_selector = generic_cfg_selector,
+                // Prepared typed adapters use mandatory normalization and
+                // compositional selection, including optimized instruction forms.
+                .generic_cfg_selector = true,
                 .codegen_reachable = codegen_reachable,
             });
             return;
         }
     } else if (resolveDirectIrWriterCase(input)) |ir_writer_case| {
         if (emit == .ir) {
-            if (explicit_optimization) return error.OptimizationNotApplicableToArtifact;
             var stdout_buffer: [4096]u8 = undefined;
             var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
-            try stdout_writer.interface.writeAll(input);
+            try compilation_artifact.write(allocator, &stdout_writer.interface, input, optimization);
             try stdout_writer.interface.flush();
             return;
         }
-        if (emit == .obj or emit == .@"asm") {
+        if (emit == .obj or emit == .@"asm" or emit == .selection_owner_manifest) {
             if (ir_writer_case.construction != .structured_builder) {
                 try fatal(io, "direct IR writer artifact references non-direct case: {s}\n", .{ir_writer_case.id});
             }
@@ -235,11 +238,12 @@ pub fn main(init: std.process.Init) !void {
                 if (module.target_triple == null) module.target_triple = triple;
             }
             try runStructuredDirectAcceptedPipeline(allocator, io, &module, init.environ_map, ir_writer_case);
+            try prepareArtifact(allocator, io, &module, input);
             try prepareForCodegen(allocator, io, &module, optimization);
             try emitCodegenModule(allocator, io, module, emit, target_triple, .{
                 .quiet = quiet,
                 .report_all_failures = report_all_codegen_failures,
-                .generic_cfg_selector = generic_cfg_selector,
+                .generic_cfg_selector = true,
                 .codegen_reachable = codegen_reachable,
             });
             return;
@@ -284,6 +288,13 @@ pub fn main(init: std.process.Init) !void {
     try compilation.prepare(allocator, io, &module, stdout, ir_options);
     if (!trace and !quiet) try module.print(stdout);
     try stdout.flush();
+}
+
+fn prepareArtifact(allocator: std.mem.Allocator, io: std.Io, module: *ir.Module, input: []const u8) !void {
+    var buffer: [4096]u8 = undefined;
+    var writer = std.Io.File.stderr().writerStreaming(io, &buffer);
+    try compilation_artifact.prepare(allocator, io, module, &writer.interface, input);
+    try writer.interface.flush();
 }
 
 fn prepareForCodegen(allocator: std.mem.Allocator, io: std.Io, module: *ir.Module, options: compilation.Options) !void {

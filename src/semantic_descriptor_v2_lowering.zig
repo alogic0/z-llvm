@@ -341,11 +341,13 @@ fn appendBuf(buf: []u8, used: usize, comptime fmt: []const u8, args: anytype) !u
 }
 
 fn functionLinkage(function: Function) []const u8 {
-    return if (std.mem.eql(u8, function.name, "main")) "dso_local " else "internal ";
+    if (std.mem.eql(u8, function.name, "main"))
+        return if (function.calling_convention == .fastcc) "dso_local fastcc " else "dso_local ";
+    return if (function.calling_convention == .fastcc) "internal fastcc " else "internal ";
 }
 
-fn functionAttrs(function: Function) []const u8 {
-    return if (function.calling_convention == .fastcc) " fastcc" else " local_unnamed_addr";
+fn functionAttrs(_: Function) []const u8 {
+    return " local_unnamed_addr";
 }
 
 fn callConvAttrs(cc: CallConv) []const u8 {

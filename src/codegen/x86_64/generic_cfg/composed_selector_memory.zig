@@ -1061,9 +1061,11 @@ pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.G
         return diagnostic;
     }
     const len = parseI32ArrayType(gep.source_ty) orelse return .{ .no_emitter = "composed-block-gep-source" };
-    const base_class = selector_state.valueRegisterClass(selector, gep.ptr) orelse
+    const base_use = pointerUseForm(selector, gep.ptr, false) orelse
         return .{ .unsupported_value = "composed-block-unknown-array-gep-ptr" };
-    if (base_class != .stack_object) return .{ .no_emitter = "composed-block-gep-ptr" };
+    if (selector.module_context) |context| {
+        if (!symbol_address.supportsLayout(context.target_datalayout)) return .{ .no_emitter = "composed-block-array-gep-layout" };
+    }
     if (gep.ptr_addrspace != null) return .{ .no_emitter = "composed-block-gep-addrspace" };
     if (gep.indices.items.len != 2) return .{ .no_emitter = "composed-block-gep-index-count" };
     const first_index = gep.indices.items[0];
@@ -1093,13 +1095,13 @@ pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.G
         &transaction,
         gep.ptr,
         .ptr,
-        .stack_object,
-        .stack_object_address,
+        base_use.class,
+        base_use.form,
         .{ .form_scaled_address = .{
             .result = try valueUseActionIdentity(result_name),
             .index = action_index,
             .scale = 4,
-            .expected_stack_array_len = len,
+            .expected_stack_array_len = if (base_use.class == .stack_object) len else null,
         } },
     );
     executeValueUseAction(&transaction, action) catch |err| return switch (err) {

@@ -698,7 +698,8 @@ pub fn writeBase64PaddingLengthStepStructuredModule(writer: *std.Io.Writer) !voi
     _ = try entry.icmp("second_eq", "eq", .i8, sib.local(.i8, "%second"), sib.int(.i8, "61"));
     _ = try entry.cast("second_adj", "sext", sib.local(.i1, "%second_eq"), .i64);
     _ = try entry.binary("total", "add", .i64, sib.local(.i64, "%base"), sib.local(.i64, "%second_adj"));
-    _ = try entry.icmp("ok", "eq", .i64, sib.local(.i64, "%total"), sib.int(.i64, "8"));
+    // A true i1 sign-extends to -1: two padding bytes reduce six to four.
+    _ = try entry.icmp("ok", "eq", .i64, sib.local(.i64, "%total"), sib.int(.i64, "4"));
     _ = try entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
     try entry.ret(sib.local(.i32, "%ret"));
     try function.end();
@@ -740,7 +741,7 @@ pub fn writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody(
 
 pub fn writeBase64SourceStrideStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
-    try module.global("base64.source_stride_input", "private unnamed_addr", .i32, "0", "4");
+    try module.global("base64.source_stride_input", "private unnamed_addr", .i64, "0", "8");
     try module.global("base64.source_stride_table", "private unnamed_addr", .{ .text = "[8 x i32]" }, "[i32 42, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0]", "4");
     try writer.writeAll("\n");
     var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
@@ -788,7 +789,8 @@ pub fn writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody(
 
 pub fn writeBase64SourceBundleStructuredModule(writer: *std.Io.Writer, prefix: []const u8, input_symbol: []const u8, first_offset: []const u8) !void {
     var module = sib.Module.init(writer);
-    try module.global(input_symbol, "private unnamed_addr", .i32, "0", "4");
+    // The largest bundle starts at byte 12 and reads through byte 15.
+    try module.global(input_symbol, "private unnamed_addr", .{ .text = "[16 x i8]" }, "zeroinitializer", "4");
     const suffixes = [_][]const u8{ "0", "1", "2", "3" };
     const values = [_][]const u8{ "0", "4096", "8192", "196608" };
     for (suffixes, values) |suffix, value| {
@@ -853,7 +855,7 @@ pub fn writeBase64BitBufferStoreStructuredModule(writer: *std.Io.Writer) !void {
     try module.global("base64.bit_buffer_word1", "private unnamed_addr", .i32, "2", "4");
     try module.global("base64.bit_buffer_word2", "private unnamed_addr", .i32, "3", "4");
     try module.global("base64.bit_buffer_word3", "private unnamed_addr", .i32, "4", "4");
-    try module.global("base64.bit_buffer_output", "private unnamed_addr", .i32, "0", "4");
+    try module.global("base64.bit_buffer_output", "private unnamed_addr", .i128, "0", "16");
     try writer.writeAll("\n");
     var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
     var entry = try function.block("entry");
@@ -1045,8 +1047,8 @@ pub fn writeBase64ResidualTableCheckStructuredModule(writer: *std.Io.Writer) !vo
     _ = try entry.load("byte", .i8, sib.local(.ptr, "%src"), "1");
     _ = try entry.cast("idx", "zext", sib.local(.i8, "%byte"), .i64);
     _ = try entry.gep("entry_ptr", .{ .text = "[1 x i8]" }, sib.global(.ptr, "@base64.residual_table_check_table"), .i64, sib.local(.i64, "%idx"));
-    _ = try entry.load("entry", .i8, sib.local(.ptr, "%entry_ptr"), "1");
-    _ = try entry.icmp("invalid", "eq", .i8, sib.local(.i8, "%entry"), sib.int(.i8, "-1"));
+    _ = try entry.load("table.entry", .i8, sib.local(.ptr, "%entry_ptr"), "1");
+    _ = try entry.icmp("invalid", "eq", .i8, sib.local(.i8, "%table.entry"), sib.int(.i8, "-1"));
     _ = try entry.select("ret", sib.local(.i1, "%invalid"), .i32, sib.int(.i32, "1"), sib.int(.i32, "0"));
     try entry.ret(sib.local(.i32, "%ret"));
     try function.end();
@@ -1226,15 +1228,21 @@ pub fn writeReleaseSmallRuntimeBase64DecodeExitStepIrWriterBody(
 
 pub fn writeBase64DecodeExitStructuredModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
-    try module.global("base64.decode_exit_bits", "private unnamed_addr", .i16, "0", "2");
-    try module.global("base64.decode_exit_count", "private unnamed_addr", .i8, "0", "1");
-    try writer.writeAll("\n");
+    try module.declare(.void, "llvm.lifetime.start.p0", "ptr");
     try module.declare(.void, "llvm.lifetime.end.p0", "ptr");
     try writer.writeAll("\n");
     var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
     var entry = try function.block("entry");
-    try entry.lifetimeEnd(sib.global(.ptr, "@base64.decode_exit_count"));
-    try entry.lifetimeEnd(sib.global(.ptr, "@base64.decode_exit_bits"));
+    _ = try entry.alloca("bits", .i16, "2");
+    _ = try entry.alloca("count", .i8, "1");
+    const bits = sib.local(.ptr, "%bits");
+    const count = sib.local(.ptr, "%count");
+    try entry.lifetimeStart(bits);
+    try entry.lifetimeStart(count);
+    try entry.store(sib.int(.i16, "0"), bits, "2");
+    try entry.store(sib.int(.i8, "0"), count, "1");
+    try entry.lifetimeEnd(count);
+    try entry.lifetimeEnd(bits);
     try entry.ret(sib.int(.i32, "0"));
     try function.end();
 }
